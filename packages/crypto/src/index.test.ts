@@ -16,6 +16,8 @@ import {
   verifyContentManifest,
   bytesToHex,
   computeObjectHash,
+  encryptWithDekAndAad,
+  decryptWithDekAndAad,
 } from './index';
 
 describe('Crypto Identity & Encryption', () => {
@@ -96,6 +98,18 @@ describe('Crypto Identity & Encryption', () => {
 
     const decrypted = decryptContent(encrypted.chunks, dek, encrypted.totalSize);
     expect(decrypted).toEqual(plaintext);
+  });
+
+  it('authenticates chunk context as well as ciphertext', () => {
+    const dek = new Uint8Array(32).fill(7);
+    const plaintext = new TextEncoder().encode('private chunk bytes');
+    const context = new TextEncoder().encode('gmatch-social|1|object-1|chunk-0');
+    const encrypted = encryptWithDekAndAad(plaintext, dek, context);
+    expect(decryptWithDekAndAad(encrypted.ciphertext, dek, encrypted.nonce, context)).toEqual(plaintext);
+    expect(() => decryptWithDekAndAad(encrypted.ciphertext, dek, encrypted.nonce, new TextEncoder().encode('other object'))).toThrow();
+    const tampered = encrypted.ciphertext.slice();
+    tampered[0] ^= 1;
+    expect(() => decryptWithDekAndAad(tampered, dek, encrypted.nonce, context)).toThrow();
   });
 
   it('wraps one DEK for multiple recipients without sharing the DEK itself', () => {

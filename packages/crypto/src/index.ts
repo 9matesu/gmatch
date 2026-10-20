@@ -161,6 +161,26 @@ export function decryptWithDek(ciphertext: Uint8Array, dek: Uint8Array, nonce: U
   return cipher.decrypt(ciphertext);
 }
 
+/** Encrypt with caller-supplied authenticated context; legacy helpers stay wire-compatible. */
+export function encryptWithDekAndAad(
+  plaintext: Uint8Array,
+  dek: Uint8Array,
+  additionalData: Uint8Array,
+): { ciphertext: Uint8Array; nonce: Uint8Array } {
+  const nonce = randomBytes(24);
+  const cipher = xchacha20poly1305(dek, nonce, additionalData);
+  return { ciphertext: cipher.encrypt(plaintext), nonce };
+}
+
+export function decryptWithDekAndAad(
+  ciphertext: Uint8Array,
+  dek: Uint8Array,
+  nonce: Uint8Array,
+  additionalData: Uint8Array,
+): Uint8Array {
+  return xchacha20poly1305(dek, nonce, additionalData).decrypt(ciphertext);
+}
+
 export function wrapDekForRecipient(dek: Uint8Array, senderPrivHex: string, recipientPubHex: string): Uint8Array {
   return encryptPayload(dek, senderPrivHex, recipientPubHex);
 }

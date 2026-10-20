@@ -188,6 +188,18 @@ shape and signatures; it must not be used as a write authorization decision.
   `packages/crypto/src/index.ts` are building blocks, not a protocol approval;
   review key derivation, context binding, nonce handling, and recipient binding
   before use. No new custom cryptography.
+- Experimental chunk primitive: `encryptWithDekAndAad` /
+  `decryptWithDekAndAad` use XChaCha20-Poly1305 with a random 24-byte nonce
+  and caller-supplied AAD. A caller must canonicalize context bytes under a
+  separate `gmatch-social|1|content-chunk|` domain and bind at least owner,
+  object ID, chunk index/count, plaintext chunk size, MIME, and key epoch.
+  Sensitive caption/tags and plaintext content hashes must not be put in
+  public AAD. This helper is not yet used by media creation or transfer.
+- DEK wrapping/recipient key binding is not approved: the existing static
+  X25519 `encryptPayload`/`wrapDekForRecipient` format has no caller AAD or
+  forward secrecy. Do not use it for new private-content v1 writes. Specify
+  ephemeral sender keys, domain-separated KDF/context, recipient binding,
+  signature binding, and rotation/revocation before implementation.
 - Transfer request binds requester, object CID, manifest hash/version,
   authorization proof, and fresh request nonce. Chunks bind to that transfer
   and have strict per-object/per-peer/global byte and time budgets.
