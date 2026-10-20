@@ -74,9 +74,12 @@ export function __resetLocalObjectCacheForTests(): void {
   localObjectBytes = 0
 }
 
-const CHUNK_SIZE = 64 * 1024 // 64KB per WebRTC DataChannel chunk
+const CHUNK_SIZE = 5 * 1024 // Keep base64 JSON chunk frames below relay splitting.
 const MAX_OBJECT_BYTES = 64 * 1024 * 1024
 const MAX_CHUNKS = Math.ceil(MAX_OBJECT_BYTES / CHUNK_SIZE)
+// Keep the JSON envelope under the relay's 30 KB frame-splitting threshold.
+const MAX_SWARM_FRAME_BYTES = 8 * 1024
+const MAX_CHUNK_BASE64_LENGTH = Math.floor((MAX_SWARM_FRAME_BYTES - 512) / 4) * 4
 
 /** SHA-256 hex of a blob's bytes (Web Crypto). Used to VERIFY reassembled
  *  swarm media against the object's content_hash before accepting it —
@@ -88,6 +91,10 @@ export async function sha256HexBlob(blob: Blob): Promise<string> {
 
 function isSha256Hex(value: string): boolean {
   return /^[a-f\d]{64}$/i.test(value)
+}
+
+function isBoundedChunkFrame(message: SwarmMessage): boolean {
+  return message.type !== 'SWARM_CHUNK' || new TextEncoder().encode(JSON.stringify(message)).byteLength <= MAX_SWARM_FRAME_BYTES
 }
 
 /** Broadcast by useP2P whenever a peer transitions to online (swarm or
@@ -403,7 +410,7 @@ function decodeChunk(dataBase64: string): Uint8Array {
 
 async function finishFetch(id: string, req: PendingFetch): Promise<void> {
   clearTimeout(req.timer)
-  const parts: Uint8Array[] = []
+    const parts: Uint8Array[] = []
   for (let i = 0; i < req.total; i++) {
     const chunk = req.chunks.get(i)
     if (chunk) parts.push(chunk)
@@ -462,7 +469,9 @@ export async function handleSwarmMessage(msg: SwarmMessage): Promise<boolean> {
         const slice = new Uint8Array(buffer.slice(i * CHUNK_SIZE, Math.min((i + 1) * CHUNK_SIZE, buffer.byteLength)))
         let binaryStr = ''
         for (let j = 0; j < slice.length; j++) binaryStr += String.fromCharCode(slice[j])
-        swarmSend({ type: 'SWARM_CHUNK', id: msg.id, index: i, total: totalChunks, mimeType, dataBase64: btoa(binaryStr) })
+        const frame: SwarmMessage = { type: 'SWARM_CHUNK', id: msg.id, index: i, total: totalChunks, mimeType, dataBase64: btoa(binaryStr) }
+        if (!isBoundedChunkFrame(frame)) return true
+        swarmSend(frame)
       }
     } catch {
       /* read failed */
@@ -476,7 +485,7 @@ export async function handleSwarmMessage(msg: SwarmMessage): Promise<boolean> {
       if (!Number.isSafeInteger(msg.total) || msg.total < 1 || msg.total > MAX_CHUNKS ||
           !Number.isSafeInteger(msg.index) || msg.index < 0 || msg.index >= msg.total ||
           typeof msg.mimeType !== 'string' || msg.mimeType.length > 128 ||
-          typeof msg.dataBase64 !== 'string' || msg.dataBase64.length > Math.ceil(CHUNK_SIZE / 3) * 4 ||
+          typeof msg.dataBase64 !== 'string' || msg.dataBase64.length > MAX_CHUNK_BASE64_LENGTH || !isBoundedChunkFrame(msg) ||
           (req.total !== 0 && req.total !== msg.total) ||
           (req.mimeType !== '' && req.mimeType !== msg.mimeType) ||
           req.chunks.has(msg.index)) {
@@ -638,14 +647,16 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
         }
         const dataBase64 = btoa(binaryStr)
 
-        options.send({
+        const frame: SwarmMessage = {
           type: 'SWARM_CHUNK',
           id: msg.id,
           index: i,
           total: totalChunks,
           mimeType,
           dataBase64,
-        })
+        }
+        if (!isBoundedChunkFrame(frame)) return
+        options.send(frame)
       }
       return
     }
@@ -659,7 +670,7 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
         if (!Number.isSafeInteger(msg.total) || msg.total < 1 || msg.total > MAX_CHUNKS ||
             !Number.isSafeInteger(msg.index) || msg.index < 0 || msg.index >= msg.total ||
             typeof msg.mimeType !== 'string' || msg.mimeType.length > 128 ||
-            typeof msg.dataBase64 !== 'string' || msg.dataBase64.length > Math.ceil(CHUNK_SIZE / 3) * 4 ||
+            typeof msg.dataBase64 !== 'string' || msg.dataBase64.length > MAX_CHUNK_BASE64_LENGTH || !isBoundedChunkFrame(msg) ||
             (req.total !== 0 && req.total !== msg.total) ||
             (req.mimeType !== '' && req.mimeType !== msg.mimeType) || req.chunks.has(msg.index)) {
           throw new Error('Invalid swarm chunk metadata')

@@ -449,9 +449,12 @@ Four distinct outcomes, never conflated in the UI or in claims:
 
 1. **Local durability** � the post (an `Objects` row) and its media bytes live
    on this machine. Media: IndexedDB `orbit-gallery` seed (survives restart) +
-   optional `media-vault/`; metadata: a persisted publish outbox
+   optional `media-vault/`; metadata: a localStorage publish outbox
    (`gmatch_post_outbox_v1`) commits locally *before* any network call, so a
-   server timeout never loses the post. Replication state is shown as
+   server timeout never loses the post during normal operation (localStorage
+   quota/write failures are best-effort and not transactional). Swarm retry
+   records are bounded localStorage hints, not a durable operation log.
+   Replication state is shown as
    `local` ? `pending` ? `replicated` on the optimistic tile. This is the only
    level the app guarantees without any peer or server.
 2. **Direct peer-to-peer delivery** � another *connected* peer received the

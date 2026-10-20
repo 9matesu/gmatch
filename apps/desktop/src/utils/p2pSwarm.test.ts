@@ -120,9 +120,9 @@ describe('p2pSwarm (WebRTC Object Swarm Transfer)', () => {
       if (msg.type !== 'SWARM_WANT' || msg.id !== id) return
       void (async () => {
         const buffer = await blob.arrayBuffer()
-        const total = Math.ceil(buffer.byteLength / (64 * 1024)) || 1
+        const total = Math.ceil(buffer.byteLength / (5 * 1024)) || 1
         for (let i = 0; i < total; i++) {
-          const slice = new Uint8Array(buffer.slice(i * 64 * 1024, Math.min((i + 1) * 64 * 1024, buffer.byteLength)))
+          const slice = new Uint8Array(buffer.slice(i * 5 * 1024, Math.min((i + 1) * 5 * 1024, buffer.byteLength)))
           let binaryStr = ''
           for (let j = 0; j < slice.length; j++) binaryStr += String.fromCharCode(slice[j])
           await handleSwarmMessage({ type: 'SWARM_CHUNK', id, index: i, total, mimeType: mime, dataBase64: btoa(binaryStr) })
@@ -192,6 +192,19 @@ describe('p2pSwarm (WebRTC Object Swarm Transfer)', () => {
     setSwarmTransport(null)
   })
 
+  it('keeps maximum-size chunk frames below the relay split threshold', async () => {
+    const sent: SwarmMessage[] = []
+    const id = 'i'.repeat(256)
+    setSwarmTransport((message) => sent.push(message))
+    registerLocalObject(id, new Blob([new Uint8Array(5 * 1024)]))
+    await handleSwarmMessage({ type: 'SWARM_WANT', id })
+    const chunks = sent.filter((message) => message.type === 'SWARM_CHUNK')
+    expect(chunks).toHaveLength(1)
+    expect(new TextEncoder().encode(JSON.stringify(chunks[0])).byteLength).toBeLessThan(8 * 1024)
+    expect(new TextEncoder().encode(JSON.stringify(chunks[0])).byteLength).toBeLessThan(30_000)
+    setSwarmTransport(null)
+  })
+
   it('rejects malformed chunk metadata and lengths before storing bytes', async () => {
     const cases = [
       { index: 1, total: 1, data: 'eA==' }, // index outside transfer
@@ -238,8 +251,8 @@ describe('p2pSwarm (WebRTC Object Swarm Transfer)', () => {
     vi.stubGlobal('window', { gmatch: { vaultPutBytes: vi.fn().mockResolvedValue({ ok: true }) } })
     const seen: Array<[number, number]> = []
     await requestSwarmObject('progress-1', 5000, { onProgress: (r, t) => { seen.push([r, t]) } })
-    expect(seen.length).toBeGreaterThanOrEqual(3)
-    expect(seen.at(-1)).toEqual([3, 3])
+    expect(seen.length).toBeGreaterThan(3)
+    expect(seen.at(-1)?.[0]).toBe(seen.at(-1)?.[1])
     setSwarmTransport(null)
     vi.unstubAllGlobals()
   })
@@ -252,10 +265,10 @@ describe('p2pSwarm (WebRTC Object Swarm Transfer)', () => {
       if (msg.type !== 'SWARM_WANT' || msg.id !== 'cancel-1') return
       void (async () => {
         const buffer = await blob.arrayBuffer()
-        const total = 4
+        const total = Math.ceil(buffer.byteLength / (5 * 1024))
         for (let i = 0; i < total; i++) {
           await new Promise((r) => setTimeout(r, 25))
-          const slice = new Uint8Array(buffer.slice(i * 64 * 1024, Math.min((i + 1) * 64 * 1024, buffer.byteLength)))
+          const slice = new Uint8Array(buffer.slice(i * 5 * 1024, Math.min((i + 1) * 5 * 1024, buffer.byteLength)))
           let binaryStr = ''
           for (let j = 0; j < slice.length; j++) binaryStr += String.fromCharCode(slice[j])
           await handleSwarmMessage({ type: 'SWARM_CHUNK', id: 'cancel-1', index: i, total, mimeType: 'video/mp4', dataBase64: btoa(binaryStr) })
@@ -268,7 +281,7 @@ describe('p2pSwarm (WebRTC Object Swarm Transfer)', () => {
     await expect(pending).rejects.toThrow(/cancelled/i)
     expect(hasLocalObject('cancel-1')).toBe(false)
     // Late chunks for a cancelled fetch are ignored, not resurrected.
-    expect(await handleSwarmMessage({ type: 'SWARM_CHUNK', id: 'cancel-1', index: 3, total: 4, mimeType: 'video/mp4', dataBase64: 'eA==' })).toBe(false)
+    expect(await handleSwarmMessage({ type: 'SWARM_CHUNK', id: 'cancel-1', index: 39, total: 40, mimeType: 'video/mp4', dataBase64: 'eA==' })).toBe(false)
     expect(cancelSwarmObject('cancel-1')).toBe(false)
     setSwarmTransport(null)
   })
