@@ -1,10 +1,13 @@
 # Local-first social protocol — v1 proposal
 
-**Status: proposal only.** This document defines the contract to implement in
-later phases. The current app does not implement this protocol end-to-end. Do
-not label existing `gossip-v1`, `SWARM_*`, `localStorage` outbox, or DM traffic
-as conforming merely because their names contain “v1”. Existing wire formats
-remain supported until an explicit, tested migration is shipped.
+**Status: proposal; core operation primitive is experimental.** The pure
+operation ID/signature/shape helper in `packages/protocol/src/social-operation.ts`
+matches the record and domain formula below, but is not wired to persistence,
+feed, or peer transport and does not implement operation-specific authorization
+or conflict semantics. The current app does not implement this protocol
+end-to-end. Do not label existing `gossip-v1`, `SWARM_*`, `localStorage` outbox,
+or DM traffic as conforming merely because their names contain “v1”. Existing
+wire formats remain supported until an explicit, tested migration is shipped.
 
 ## Goals and non-goals
 

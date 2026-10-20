@@ -285,6 +285,11 @@ UI or documentation.
   Ed25519 identity/signature vector is checked in
   `packages/crypto/src/index.test.ts`; this is only a primitive vector, not the
   full L0 operation/CID/encryption conformance suite.
+- An experimental pure operation helper now exists at
+  `packages/protocol/src/social-operation.ts`, with fixed operation-ID and
+  signature coverage. It is intentionally not connected to application
+  persistence or network paths; operation-specific authorization, encryption,
+  migration, and cross-language vectors remain incomplete.
 - The focused API gossip suite passed (8 tests); workspace typecheck passed;
   lint passed with 0 errors / 47 existing warnings; desktop build passed with
   existing chunk warnings.
