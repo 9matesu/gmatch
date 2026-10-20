@@ -470,6 +470,11 @@ Four distinct outcomes, never conflated in the UI or in claims:
    verification against the object's `content_hash` (`sha256HexBlob` in
    `utils/p2pSwarm.ts`); a peer's chunk stream or URL is never proof.
 
+Public gossip envelopes also require author identity binding: `author_id` must
+equal SHA-256 of the enclosed Ed25519 public key, both when a relay accepts an
+envelope and when a host applies a pulled one. This prevents a valid key from
+signing posts under an unrelated account ID; it does not prove media availability.
+
 Pending swarm transfers persist (`gmatch_pending_transfers_v1`) and resume on
 boot and on `PEER_ONLINE_EVENT`, so an offline seeder is retried later rather
 than lost. Two-machine delivery remains **unverified** until tested on real
