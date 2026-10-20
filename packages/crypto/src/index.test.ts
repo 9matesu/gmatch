@@ -112,6 +112,18 @@ describe('Crypto Identity & Encryption', () => {
     expect(() => decryptWithDekAndAad(tampered, dek, encrypted.nonce, context)).toThrow();
   });
 
+  it('decrypts the fixed XChaCha20-Poly1305 content-context vector', () => {
+    const key = new Uint8Array(32).fill(7);
+    const nonce = new Uint8Array(24).fill(9);
+    const aad = new TextEncoder().encode('gmatch-social|1|content-chunk|vector');
+    const ciphertext = Uint8Array.from(Buffer.from(
+      'c81781fe13d85912987361521c167f9f118448b5aa447f0097220dd0a3114b9f',
+      'hex',
+    ));
+    expect(new TextDecoder().decode(decryptWithDekAndAad(ciphertext, key, nonce, aad))).toBe('vector plaintext');
+    expect(() => decryptWithDekAndAad(ciphertext, key, nonce, new TextEncoder().encode('wrong context'))).toThrow();
+  });
+
   it('wraps one DEK for multiple recipients without sharing the DEK itself', () => {
     const sender = generateIdentity();
     const alice = generateIdentity();

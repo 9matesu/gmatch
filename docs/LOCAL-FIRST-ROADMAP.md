@@ -297,16 +297,15 @@ UI or documentation.
   enforced against an operation graph.
 - `packages/crypto` now exposes experimental XChaCha20-Poly1305 DEK helpers
   with caller-provided AAD. Round-trip and context/ciphertext tampering tests
-  pass. They are not wired into media or DEK wrapping; encryption key binding,
-  wrapping, rotation, and deterministic cross-language AEAD vectors remain
-  open.
+  pass, including a fixed decrypt/context vector. They are not wired into media
+  or DEK wrapping; encryption key binding, wrapping, and rotation remain open.
 - The focused API gossip suite passed (8 tests); workspace typecheck passed;
   lint passed with 0 errors / 47 existing warnings; desktop build passed with
   existing chunk warnings.
 - After adding the experimental operation primitive, the protocol package
   suite passed (28 tests) and the crypto package suite passed (9 tests); both
   package typechecks passed. After adding the AAD encryption helper, crypto
-  tests passed (10) and crypto typecheck passed.
+  tests passed (11) and crypto typecheck passed.
 - Root `npm test` had one failure in
   `GMatchFeed.inline-expand.test.tsx` (reply button inaccessible); rerunning
   that file alone passed all 7 tests. Treat the full-suite result as flaky/not
