@@ -198,7 +198,7 @@ describe('proposed social operation v1', () => {
     })).toMatch(/verified author manifest/)
   })
 
-  it('rejects equivocation or broken chains already present in the accepted history', () => {
+  it('rejects equivocation and wrong-predecessor binding but allows detectable gaps', () => {
     const first = createFixture()
     const second = createSocialOperation({
       protocol: 'gmatch-social', version: 1, type: 'post.create', actorId: IDENTITY.orbitId,
@@ -213,10 +213,20 @@ describe('proposed social operation v1', () => {
       payload: { contentCid: 'e'.repeat(64), manifestHash: 'f'.repeat(64), mimeType: 'image/jpeg', sizeBytes: 1 },
     }, IDENTITY.privateKeyHex)
     expect(authorizeSocialOperation(createFixture(), [first, second, fork])).toMatch(/equivocation/)
-    const broken = createSocialOperation({
+    // A predecessor that exists but binds to the wrong sequence is rejected...
+    const misbound = createSocialOperation({
       protocol: 'gmatch-social', version: 1, type: 'post.create', actorId: IDENTITY.orbitId,
-      signingKey: IDENTITY.publicKeyHex, actorSequence: 3, previousOperationId: 'f'.repeat(64),
+      signingKey: IDENTITY.publicKeyHex, actorSequence: 3, previousOperationId: first.operationId,
       createdAt: 3, objectId: 'post-4',
+      payload: { contentCid: 'a'.repeat(64), manifestHash: 'c'.repeat(64), mimeType: 'image/jpeg', sizeBytes: 1 },
+    }, IDENTITY.privateKeyHex)
+    expect(authorizeSocialOperation(createFixture(), [first, misbound])).toMatch(/mismatched actor predecessor/)
+    // ...while a pruned/partially-synced history (gap, absent predecessor) is
+    // legal and detectable, so pruning never breaks self-authorization.
+    const gapped = createSocialOperation({
+      protocol: 'gmatch-social', version: 1, type: 'post.create', actorId: IDENTITY.orbitId,
+      signingKey: IDENTITY.publicKeyHex, actorSequence: 5, previousOperationId: 'f'.repeat(64),
+      createdAt: 5, objectId: 'post-5',
       payload: { contentCid: 'a'.repeat(64), manifestHash: 'c'.repeat(64), mimeType: 'image/jpeg', sizeBytes: 1 },
     }, IDENTITY.privateKeyHex)
     const unrelated = createSocialOperation({
@@ -225,6 +235,13 @@ describe('proposed social operation v1', () => {
       createdAt: 1, objectId: 'other-post',
       payload: { contentCid: 'a'.repeat(64), manifestHash: 'c'.repeat(64), mimeType: 'image/jpeg', sizeBytes: 1 },
     }, OTHER.privateKeyHex)
-    expect(authorizeSocialOperation(unrelated, [first, broken])).toMatch(/missing or mismatched/)
+    expect(authorizeSocialOperation(unrelated, [first, gapped], {
+      verifiedManifests: new Map([[unrelated.payload.manifestHash as string, {
+        ownerId: OTHER.orbitId,
+        contentCid: unrelated.payload.contentCid as string,
+        mimeType: unrelated.payload.mimeType as string,
+        sizeBytes: unrelated.payload.sizeBytes as number,
+      }]]),
+    })).toBeNull()
   })
 })

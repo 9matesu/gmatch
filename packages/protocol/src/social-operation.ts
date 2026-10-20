@@ -159,7 +159,12 @@ export function validateSocialOperation(value: unknown): string | null {
   return null
 }
 
-/** Authorize one operation against an accepted, signature-verified history. */
+/**
+ * Authorize one operation against an accepted, signature-verified history.
+ * The history may be PARTIAL (pruned or partially synced): sequence gaps are
+ * legal and detectable, but sequence reuse (equivocation) and a predecessor
+ * reference that binds to the wrong entry are always rejected.
+ */
 export function authorizeSocialOperation(
   value: unknown,
   acceptedHistory: SocialOperation[],
@@ -176,10 +181,13 @@ export function authorizeSocialOperation(
     const key = `${entry.actorId}:${entry.actorSequence}`
     if (actorSequences.has(key)) return 'accepted history contains actor equivocation'
     actorSequences.add(key)
-    if (entry.actorSequence > 1) {
-      const predecessor = historyIds.get(entry.previousOperationId!)
-      if (!predecessor || predecessor.actorId !== entry.actorId || predecessor.actorSequence !== entry.actorSequence - 1) {
-        return 'accepted history has a missing or mismatched actor predecessor'
+    // Partial histories are legal (pruning, partial sync): a gap between
+    // retained entries is allowed and detectable. What is NEVER allowed:
+    // a predecessor reference that exists but binds to the wrong entry.
+    if (entry.actorSequence > 1 && entry.previousOperationId) {
+      const predecessor = historyIds.get(entry.previousOperationId)
+      if (predecessor && (predecessor.actorId !== entry.actorId || predecessor.actorSequence !== entry.actorSequence - 1)) {
+        return 'accepted history has a mismatched actor predecessor'
       }
     }
   }

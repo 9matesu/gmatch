@@ -143,11 +143,15 @@ supersedes the current head, or that reaction removals are authorized. Those
 checks require the replicated operation view and must be completed before
 network integration.
 
-The experimental pure checker accepts one candidate plus the complete
-signature-verified history needed for its references. It rejects a repeated
-actor sequence, a missing/mismatched predecessor, and a fork already present
-in that history. It does not fetch missing history or merge remote forks;
-callers must retain the fork evidence and wait for explicit resolution.
+The experimental pure checker accepts one candidate plus the caller's
+signature-verified history for its references. The history may be partial
+(pruned locally or partially synced): sequence gaps are legal and detectable.
+Always rejected: a repeated actor sequence (equivocation) and a predecessor
+reference that exists but binds to the wrong entry. The candidate itself must
+chain onto its actor's sequence-1 predecessor, so new writes require the actor's
+current head to be retained. The checker does not fetch missing history or
+merge remote forks; callers must retain fork evidence and wait for explicit
+resolution.
 For `post.create`/`post.edit`, callers must also supply the candidate's
 manifest in `verifiedManifests`, but only after checking its author signature;
 the checker binds owner, CID, MIME, and size to the operation. A caller-provided
