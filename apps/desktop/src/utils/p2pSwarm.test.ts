@@ -195,23 +195,22 @@ describe('p2pSwarm (WebRTC Object Swarm Transfer)', () => {
   })
 
   it('verifies cached bytes against an expected hash before returning them', async () => {
-    const valid = new Blob(['verified replacement'], { type: 'text/plain' })
-    const expectedHash = await sha256HexBlob(valid)
-    registerLocalObject('cached-tamper', new Blob(['stale or corrupt']))
+    const corrupt = new Blob(['stale or corrupt'])
+    const expectedHash = await sha256HexBlob(new Blob(['different expected bytes']))
+    registerLocalObject('cached-tamper', corrupt)
     vi.stubGlobal('window', { gmatch: { vaultPutBytes: vi.fn().mockResolvedValue({ ok: true }) } })
     setSwarmTransport((message) => {
       if (message.type !== 'SWARM_WANT' || message.id !== 'cached-tamper') return
       void (async () => {
-        const bytes = new Uint8Array(await valid.arrayBuffer())
+        const bytes = new Uint8Array(await corrupt.arrayBuffer())
         const dataBase64 = btoa(String.fromCharCode(...bytes))
         await handleSwarmMessage({
           type: 'SWARM_CHUNK', id: 'cached-tamper', index: 0, total: 1,
-          mimeType: valid.type, dataBase64,
+          mimeType: corrupt.type, dataBase64,
         })
       })()
     })
-    const result = await requestSwarmObject('cached-tamper', 1000, { expectedHash })
-    expect(await result.text()).toBe('verified replacement')
+    await expect(requestSwarmObject('cached-tamper', 1000, { expectedHash })).rejects.toThrow(/hash verification/)
     setSwarmTransport(null)
     vi.unstubAllGlobals()
   })
