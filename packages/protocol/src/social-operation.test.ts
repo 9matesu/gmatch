@@ -109,18 +109,26 @@ describe('proposed social operation v1', () => {
 
   it('authorizes ownership, causal edits, tombstones, comments, and reactions', () => {
     const history: SocialOperation[] = []
+    const verifiedManifests = new Map<string, { ownerId: string; contentCid: string; mimeType: string; sizeBytes: number }>()
     const make = (identity: typeof IDENTITY, type: string, objectId: string, payload: Record<string, unknown>) => {
       const prior = history.filter((entry) => entry.actorId === identity.orbitId)
         .sort((a, b) => b.actorSequence - a.actorSequence)[0]
-      return createSocialOperation({
+      const operation = createSocialOperation({
         protocol: 'gmatch-social', version: 1, type, actorId: identity.orbitId,
         signingKey: identity.publicKeyHex, actorSequence: (prior?.actorSequence ?? 0) + 1,
         previousOperationId: prior?.operationId ?? null, createdAt: 1, objectId, payload,
       }, identity.privateKeyHex)
+      if (type === 'post.create' || type === 'post.edit') {
+        verifiedManifests.set(payload.manifestHash as string, {
+          ownerId: identity.orbitId, contentCid: payload.contentCid as string,
+          mimeType: payload.mimeType as string, sizeBytes: payload.sizeBytes as number,
+        })
+      }
+      return operation
     }
     const append = (identity: typeof IDENTITY, type: string, objectId: string, payload: Record<string, unknown>) => {
       const operation = make(identity, type, objectId, payload)
-      expect(authorizeSocialOperation(operation, history)).toBeNull()
+      expect(authorizeSocialOperation(operation, history, { verifiedManifests })).toBeNull()
       history.push(operation)
       return operation
     }
@@ -131,7 +139,7 @@ describe('proposed social operation v1', () => {
     const outsiderEdit = make(OTHER, 'post.edit', 'post-1', {
       supersedes: [post.operationId], contentCid: 'c'.repeat(64), manifestHash: 'd'.repeat(64), mimeType: 'image/jpeg', sizeBytes: 1,
     })
-    expect(authorizeSocialOperation(outsiderEdit, history)).toMatch(/only the post author/)
+    expect(authorizeSocialOperation(outsiderEdit, history, { verifiedManifests })).toMatch(/only the post author/)
 
     const edit = append(IDENTITY, 'post.edit', 'post-1', {
       supersedes: [post.operationId], contentCid: 'c'.repeat(64), manifestHash: 'd'.repeat(64), mimeType: 'image/jpeg', sizeBytes: 1,
@@ -139,22 +147,22 @@ describe('proposed social operation v1', () => {
     const staleEdit = make(IDENTITY, 'post.edit', 'post-1', {
       supersedes: [post.operationId], contentCid: 'e'.repeat(64), manifestHash: 'f'.repeat(64), mimeType: 'image/jpeg', sizeBytes: 1,
     })
-    expect(authorizeSocialOperation(staleEdit, history)).toMatch(/current post heads/)
+    expect(authorizeSocialOperation(staleEdit, history, { verifiedManifests })).toMatch(/current post heads/)
 
     const comment = append(OTHER, 'comment.create', 'comment-1', { postId: 'post-1', parentCommentId: null, body: 'hello' })
     const unauthorizedDelete = make(IDENTITY, 'comment.delete', 'comment-1', { targetOperationId: comment.operationId })
-    expect(authorizeSocialOperation(unauthorizedDelete, history)).toMatch(/only the comment author/)
+    expect(authorizeSocialOperation(unauthorizedDelete, history, { verifiedManifests })).toMatch(/only the comment author/)
     append(OTHER, 'comment.delete', 'comment-1', { targetOperationId: comment.operationId })
 
     const add = append(OTHER, 'reaction.add', 'reaction-1', { targetType: 'post', targetId: 'post-1', reaction: 'like' })
     const removeByOther = make(IDENTITY, 'reaction.remove', 'reaction-remove-1', { targetAddOperationIds: [add.operationId] })
-    expect(authorizeSocialOperation(removeByOther, history)).toMatch(/not owned by actor/)
+    expect(authorizeSocialOperation(removeByOther, history, { verifiedManifests })).toMatch(/not owned by actor/)
     append(OTHER, 'reaction.remove', 'reaction-remove-2', { targetAddOperationIds: [add.operationId] })
 
     const deletePost = append(IDENTITY, 'post.delete', 'post-1', { targetOperationId: post.operationId })
     expect(deletePost.operationId).toBeTruthy()
     const afterDelete = make(OTHER, 'comment.create', 'comment-2', { postId: 'post-1', parentCommentId: null, body: 'late' })
-    expect(authorizeSocialOperation(afterDelete, history)).toMatch(/post is unavailable/)
+    expect(authorizeSocialOperation(afterDelete, history, { verifiedManifests })).toMatch(/post is unavailable/)
     expect(edit.operationId).not.toBe(post.operationId)
   })
 
@@ -175,6 +183,19 @@ describe('proposed social operation v1', () => {
       payload: { contentCid: 'e'.repeat(64), manifestHash: 'a'.repeat(64), mimeType: 'image/jpeg', sizeBytes: 1 },
     }, IDENTITY.privateKeyHex)
     expect(authorizeSocialOperation(missingParent, history)).toMatch(/predecessor is missing/)
+  })
+
+  it('requires a verified author manifest for post creation', () => {
+    const post = createFixture()
+    expect(authorizeSocialOperation(post, [])).toMatch(/verified author manifest/)
+    expect(authorizeSocialOperation(post, [], {
+      verifiedManifests: new Map([[post.payload.manifestHash as string, {
+        ownerId: OTHER.orbitId,
+        contentCid: post.payload.contentCid as string,
+        mimeType: post.payload.mimeType as string,
+        sizeBytes: post.payload.sizeBytes as number,
+      }]]),
+    })).toMatch(/verified author manifest/)
   })
 
   it('rejects equivocation or broken chains already present in the accepted history', () => {

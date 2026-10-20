@@ -290,11 +290,12 @@ UI or documentation.
   signature coverage, canonical key-order behavior, strict known operation
   names, exact payload keys and per-type shape bounds, JSON-only bounded
   payloads, sequence-chain checks, and a pure authorizer for ownership,
-  current edit heads, tombstones, comment hierarchy, and reaction add/remove.
-  The authorizer accepts a complete already-verified history; it does not
-  validate manifests or resolve incomplete/forked history. It is intentionally
-  not connected to application persistence or network paths; migration and
-  cross-language end-to-end vectors remain incomplete.
+  current edit heads, tombstones, comment hierarchy, reaction add/remove, and
+  binding post manifests to verified owner/CID/MIME/size records. The
+  authorizer accepts a complete already-verified history and caller-verified
+  manifest map; it does not fetch missing history or resolve forks. It is
+  intentionally not connected to application persistence or network paths;
+  migration and cross-language end-to-end vectors remain incomplete.
 - `packages/crypto` now exposes experimental XChaCha20-Poly1305 DEK helpers
   with caller-provided AAD. Round-trip and context/ciphertext tampering tests
   pass, including a fixed decrypt/context vector. They are not wired into media
@@ -303,7 +304,7 @@ UI or documentation.
   lint passed with 0 errors / 47 existing warnings; desktop build passed with
   existing chunk warnings.
 - After adding the experimental operation primitive, the protocol package
-  suite passed (31 tests) and the crypto package suite passed (11 tests); both
+  suite passed (32 tests) and the crypto package suite passed (11 tests); both
   package typechecks passed.
 - Root `npm test` had one failure in
   `GMatchFeed.inline-expand.test.tsx` (reply button inaccessible); rerunning

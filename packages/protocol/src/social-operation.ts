@@ -29,6 +29,18 @@ export interface SocialOperation {
   signature: string
 }
 
+export interface VerifiedSocialManifest {
+  ownerId: string
+  contentCid: string
+  mimeType: string
+  sizeBytes: number
+}
+
+export interface SocialAuthorizationContext {
+  /** Must contain only manifests whose signature and CID were already checked. */
+  verifiedManifests: ReadonlyMap<string, VerifiedSocialManifest>
+}
+
 type UnsignedOperation = Omit<SocialOperation, 'operationId' | 'signature'>
 
 function operationIdPreimage(operation: UnsignedOperation): Uint8Array {
@@ -151,6 +163,7 @@ export function validateSocialOperation(value: unknown): string | null {
 export function authorizeSocialOperation(
   value: unknown,
   acceptedHistory: SocialOperation[],
+  context: SocialAuthorizationContext = { verifiedManifests: new Map() },
 ): string | null {
   const malformed = validateSocialOperation(value)
   if (malformed) return malformed
@@ -185,9 +198,16 @@ export function authorizeSocialOperation(
     entry.type === 'post.delete' && (entry.payload as { targetOperationId: string }).targetOperationId === post.operationId)
   const commentIsDeleted = (comment: SocialOperation) => acceptedHistory.some((entry) =>
     entry.type === 'comment.delete' && (entry.payload as { targetOperationId: string }).targetOperationId === comment.operationId)
+  const manifestMatches = () => {
+    const manifest = context.verifiedManifests.get(operation.payload.manifestHash as string)
+    return !!manifest && manifest.ownerId === operation.actorId &&
+      manifest.contentCid === operation.payload.contentCid &&
+      manifest.mimeType === operation.payload.mimeType && manifest.sizeBytes === operation.payload.sizeBytes
+  }
 
   if (operation.type === 'post.create') {
-    return postCreate(operation.objectId) ? 'post already created' : null
+    if (postCreate(operation.objectId)) return 'post already created'
+    return manifestMatches() ? null : 'verified author manifest is required'
   }
   if (operation.type === 'post.edit' || operation.type === 'post.delete') {
     const post = postCreate(operation.objectId)
@@ -197,6 +217,7 @@ export function authorizeSocialOperation(
     if (operation.type === 'post.delete') {
       return operation.payload.targetOperationId === post.operationId ? null : 'delete target does not match post'
     }
+    if (!manifestMatches()) return 'verified author manifest is required'
     const heads = acceptedHistory
       .filter((entry) => entry.objectId === post.objectId && (entry.type === 'post.create' || entry.type === 'post.edit'))
       .filter((entry) => !acceptedHistory.some((candidate) =>

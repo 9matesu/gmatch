@@ -148,6 +148,11 @@ signature-verified history needed for its references. It rejects a repeated
 actor sequence, a missing/mismatched predecessor, and a fork already present
 in that history. It does not fetch missing history or merge remote forks;
 callers must retain the fork evidence and wait for explicit resolution.
+For `post.create`/`post.edit`, callers must also supply the candidate's
+manifest in `verifiedManifests`, but only after checking its author signature;
+the checker binds owner, CID, MIME, and size to the operation. A caller-provided
+map is not itself cryptographic proof and must never be populated from an
+untrusted envelope without verification.
 
 ### Public-operation authorization and projection rules (proposal)
 
