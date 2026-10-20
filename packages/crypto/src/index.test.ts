@@ -20,7 +20,6 @@ import {
   decryptWithDekAndAad,
   wrapDekForRecipientV2,
   unwrapDekV2,
-  hexToBytes,
 } from './index';
 
 describe('Crypto Identity & Encryption', () => {

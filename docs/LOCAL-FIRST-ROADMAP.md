@@ -375,13 +375,17 @@ UI or documentation.
 - After adding the experimental operation primitive, the protocol package
   suite passed (32 tests) and the crypto package suite passed (11 tests); both
   package typechecks passed.
-- Root `npm test` previously had one failure in
-  `GMatchFeed.inline-expand.test.tsx` that passed on a solo rerun. The next
-  full run was green: 239 desktop files / 1,848 tests, crypto 11, protocol 32,
-  shared 21. Root typecheck passed, lint passed with 0 errors / 47 existing
-  warnings, and the desktop build passed with existing chunk warnings. The
-  earlier failure did not reproduce; treat it as an environment flake and
-  re-investigate only if it returns.
+- Root `npm test` previously had an intermittent failure in
+  `GMatchFeed.inline-expand.test.tsx` (different assertions each time, always
+  passing solo). Root cause found and fixed: the fixture stamped each post
+  with its own `new Date().toISOString()`, so under parallel-worker load the
+  two calls could straddle a millisecond boundary, flipping the `latest`
+  sort order and making `expanders()[0]` point at the wrong post. The
+  fixture now uses deterministic distinct ages (p1 strictly newer than p2).
+  After the fix, the full gate is green: 243 desktop files / 1,882 tests,
+  crypto 12, protocol 45, shared 21. A duplicate `hexToBytes` import that
+  only vitest's parser caught (bun tolerated it) was also removed from the
+  crypto test file.
 - No independent three-peer durable-replication, process-restart, real
   two-machine NAT, or lifecycle resource evidence is currently recorded.
 - The central deployment's stateful API/CORS failure behavior has not yet been

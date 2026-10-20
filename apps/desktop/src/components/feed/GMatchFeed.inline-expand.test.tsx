@@ -24,12 +24,12 @@ vi.mock('../../services/imageCache', () => ({
 const mockIdentity = { orbitId: 'me', sign: vi.fn() } as any;
 const mockUsers = [{ id: 'alice', display_name: 'Alice', online: true }];
 
-function post(id: string, caption: string, comments?: any[]) {
+function post(id: string, caption: string, comments?: any[], ageMs = 0) {
   return {
     id,
     author_id: 'alice',
     author_name: 'Alice',
-    created_at: new Date().toISOString(),
+    created_at: new Date(Date.now() - ageMs).toISOString(),
     caption,
     url: 'https://example.com/1.jpg',
     tags: [],
@@ -46,7 +46,7 @@ function renderTwo(
   return render(
     <GMatchFeed
       identity={mockIdentity}
-      posts={[post('p1', 'first', commentsById?.p1), post('p2', 'second', commentsById?.p2)]}
+      posts={[post('p1', 'first', commentsById?.p1, 0), post('p2', 'second', commentsById?.p2, 1000)]}
       stories={[]}
       users={mockUsers}
       feedSort="latest"
