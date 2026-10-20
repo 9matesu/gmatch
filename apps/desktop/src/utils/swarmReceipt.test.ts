@@ -8,6 +8,7 @@ import {
   createSwarmSession,
   getDurableReplication,
   handleSwarmMessage,
+  hydrateDurableReplications,
   registerLocalObject,
   setSwarmReceiptIdentity,
   setSwarmTransport,
@@ -145,5 +146,48 @@ describe('swarm durable-replication receipts (L2 wiring)', () => {
       setSwarmTransport(null)
       __resetReceiptStateForTests()
     }
+  })
+
+  it('fires the persistence hook exactly once per accepted receipt', async () => {
+    const recorded: Array<{ id: string; confirmedAt: number }> = []
+    const frames: SwarmMessage[] = []
+    const a = createSwarmSession({
+      send: (m) => { frames.push(m); void b.handleMessage(m) },
+      onRecord: (id, entry) => { recorded.push({ id, confirmedAt: entry.confirmedAt }) },
+    })
+    const b = createSwarmSession({
+      send: (m) => { frames.push(m); void a.handleMessage(m) },
+      receiptIdentity: { orbitId: FETCHER.orbitId, publicKeyHex: FETCHER.publicKeyHex, privateKeyHex: FETCHER.privateKeyHex },
+    })
+    a.registerLocalObject(contentId, new Blob([PAYLOAD]))
+    await b.requestObject(contentId, 5000)
+    await settle()
+    expect(recorded).toHaveLength(1)
+    expect(recorded[0].id).toBe(contentId)
+    expect(a.receiptRoles.getDurableReplication(contentId)!.confirmedAt).toBe(recorded[0].confirmedAt)
+    // Rejections never trigger the hook.
+    await a.handleMessage({ type: 'SWARM_RECEIPT', id: contentId, receipt: { tampered: true } })
+    expect(recorded).toHaveLength(1)
+  })
+
+  it('hydrates persisted receipts as historical evidence', async () => {
+    const roles = createSwarmSession({
+      send: () => {},
+      receiptIdentity: { orbitId: FETCHER.orbitId, publicKeyHex: FETCHER.publicKeyHex, privateKeyHex: FETCHER.privateKeyHex },
+    }).receiptRoles
+    const good = createReplicationReceipt({
+      protocol: 'gmatch-social', version: 1,
+      receiverId: FETCHER.orbitId, receiverKey: FETCHER.publicKeyHex,
+      objectCid: 'a'.repeat(64), manifestHash: 'a'.repeat(64), durable: true,
+      challenge: 'b'.repeat(64), createdAt: Date.now(),
+    }, FETCHER.privateKeyHex)
+    // note() is the hydrator's trusted path (rows are re-validated before it);
+    // the receipt survives as historical evidence with its original timestamp.
+    roles.note('a'.repeat(64), { receipt: good, confirmedAt: 1234 })
+    expect(roles.getDurableReplication('a'.repeat(64))?.confirmedAt).toBe(1234)
+
+    // Without IndexedDB (node env) hydration is a safe zero, never a throw.
+    __resetReceiptStateForTests()
+    await expect(hydrateDurableReplications()).resolves.toBe(0)
   })
 })

@@ -127,11 +127,14 @@ handshake: `createSwarmReceiptRoles` (module singleton + per-session
 instances) mints a challenge on serve, signs a receipt only after a durable
 read-back, and records only challenge-matching valid receipts. Six two-peer
 session/module tests cover the full loop plus tamper, stale-challenge,
-unsolicited, no-identity, and failed-read-back rejections. The swarm
+unsolicited, no-identity, and failed-read-back rejections. Accepted receipts
+now persist to IndexedDB (`swarm_receipts`, capped, additive DB v3 upgrade)
+and are re-validated + reloaded on boot (`hydrateDurableReplications`), so
+replication evidence survives restarts. The swarm
 transport already bounds frames/objects and hash-verifies before persistence.
 Still open: authorization capabilities for private objects, streaming
-backpressure, persisting receipt evidence across restarts, UI surfacing of
-"peer-confirmed durable", and the multi-instance adversarial evidence.
+backpressure, UI surfacing of "peer-confirmed durable", and the
+multi-instance adversarial evidence.
 
 - [ ] Version swarm messages and bind every transfer to object CID/hash,
   manifest version, declared size, MIME, requester/owner identity, and an

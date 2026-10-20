@@ -9,7 +9,7 @@ import { mergeRoster } from '../utils/peerRoster';
 import { presenceBucket } from '../utils/compare';
 import { CHAT_WIPE_SECONDS } from '@orbit/shared';
 import { logger } from '../utils/logger';
-import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, announcePeerOnline, PEER_ONLINE_EVENT, announceHeldObjects, setSwarmReceiptIdentity, type SwarmMessage } from '../utils/p2pSwarm';
+import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, hydrateDurableReplications, announcePeerOnline, PEER_ONLINE_EVENT, announceHeldObjects, setSwarmReceiptIdentity, type SwarmMessage } from '../utils/p2pSwarm';
 import { broadcastPresence, fetchPresenceRoster } from '../services/courierPresence';
 import { broadcastMeshFrame, onMeshMessage, connectToPeerMesh } from '../utils/courierSignaling';
 import { resolveDisplayName } from '../utils/displayName';
@@ -345,6 +345,9 @@ export function useP2P(identity: OrbitIdentity | null) {
         announceHave()
       })
       .catch(() => {})
+    // Reload durable-replication receipts recorded before this boot, so
+    // "peer-confirmed durable" evidence survives restarts (L2).
+    void hydrateDurableReplications().catch(() => {})
 
     // Phase 4: resume swarm transfers that failed while a seeder was offline.
     // Bytes only land after hash verification (requestSwarmObject).

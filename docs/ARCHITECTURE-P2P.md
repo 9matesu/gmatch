@@ -483,8 +483,12 @@ returns a SIGNED receipt bound to that challenge (`SWARM_RECEIPT`,
 `createSwarmReceiptRoles` in `utils/p2pSwarm.ts`). Only a receipt matching
 the seeder's outstanding challenge counts (`getDurableReplication`);
 tampered, stale-challenge, unsolicited, or un-attested transfers (failed
-read-back, no signing identity) never do. Receipts are recorded per session
-and are not yet surfaced in the UI or persisted across restarts.
+read-back, no signing identity) never do. Accepted receipts persist to
+IndexedDB (`orbit-gallery`/`swarm_receipts`, capped at 256) and are
+re-validated and reloaded on boot (`hydrateDurableReplications`), so
+"peer-confirmed durable" evidence survives restarts. The receipts are
+historical attestations (freshness was enforced at accept time); they are
+not yet surfaced in the UI.
 
 Pending swarm transfers persist (`gmatch_pending_transfers_v1`) and resume on
 boot and on `PEER_ONLINE_EVENT`, so an offline seeder is retried later rather

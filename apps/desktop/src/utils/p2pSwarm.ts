@@ -353,6 +353,9 @@ export interface SwarmReceiptRolesOptions {
   readBack: (id: string) => Promise<boolean>
   /** This node's signing identity for receipts it issues as a FETCHER. */
   identity: () => SwarmReceiptIdentity | null
+  /** Optional: called with each freshly accepted receipt (module-level
+   *  persistence uses this; sessions stay pure). */
+  onRecord?: (id: string, entry: { receipt: ReplicationReceipt; confirmedAt: number }) => void
 }
 
 export interface SwarmReceiptRoles {
@@ -365,6 +368,9 @@ export interface SwarmReceiptRoles {
   /** Inbound: a fetcher claims durable custody of an object we serve. */
   handleReceipt(id: string, receipt: unknown): void
   getDurableReplication(id: string): { receipt: ReplicationReceipt; confirmedAt: number } | null
+  /** Hydration only: insert pre-validated persisted evidence. Callers must
+   *  have verified the record themselves — this path skips challenge state. */
+  note(id: string, entry: { receipt: ReplicationReceipt; confirmedAt: number }): void
   reset(): void
 }
 
@@ -460,11 +466,17 @@ export function createSwarmReceiptRoles(options: SwarmReceiptRolesOptions): Swar
       if (valid.challenge !== outstanding.challenge) return // replay/stale
       if (valid.objectCid !== id) return
       outstandingChallenges.delete(id)
-      durableReplications.set(id, { receipt: valid, confirmedAt: Date.now() })
+      const entry = { receipt: valid, confirmedAt: Date.now() }
+      durableReplications.set(id, entry)
       boundMap(durableReplications, MAX_DURABLE_REPLICATIONS)
+      options.onRecord?.(id, entry)
     },
     getDurableReplication(id) {
       return durableReplications.get(id) ?? null
+    },
+    note(id, entry) {
+      durableReplications.set(id, entry)
+      boundMap(durableReplications, MAX_DURABLE_REPLICATIONS)
     },
     reset() {
       outstandingChallenges.clear()
@@ -501,7 +513,40 @@ const moduleReceiptRoles = createSwarmReceiptRoles({
   send: (msg) => { try { swarmSend?.(msg) } catch { /* transport hiccup */ } },
   readBack: confirmDurableHold,
   identity: () => receiptIdentity,
+  onRecord: (id, entry) => {
+    // Best-effort durable evidence: the session map keeps the receipt either
+    // way; a failed write only costs restart survival, never correctness.
+    void (async () => {
+      try {
+        const { saveSwarmReceipt } = await import('./storage')
+        await saveSwarmReceipt({ objectCid: id, receipt: entry.receipt as unknown as Record<string, unknown>, confirmedAt: entry.confirmedAt })
+      } catch {
+        /* quota/IDB unavailable: receipt stays session-only */
+      }
+    })()
+  },
 })
+
+/**
+ * Reload persisted durable-replication evidence into the session map.
+ * Called on boot next to hydrateLocalObjects. Each stored record is
+ * re-validated (shape, signature, identity binding — using its own
+ * confirmed-at time, since freshness was enforced when it was accepted);
+ * tampered or corrupt rows are skipped, never loaded.
+ */
+export async function hydrateDurableReplications(): Promise<number> {
+  const { getAllSwarmReceipts } = await import('./storage')
+  const rows = await getAllSwarmReceipts().catch(() => [])
+  let loaded = 0
+  for (const row of rows) {
+    if (!row?.objectCid || !row.receipt) continue
+    const receipt = row.receipt as unknown as ReplicationReceipt
+    if (validateReplicationReceipt(receipt, receipt.createdAt)) continue
+    moduleReceiptRoles.note(row.objectCid, { receipt, confirmedAt: row.confirmedAt ?? Date.now() })
+    loaded += 1
+  }
+  return loaded
+}
 
 /** Latest valid durable-replication receipt recorded for an object we serve. */
 export function getDurableReplication(id: string): { receipt: ReplicationReceipt; confirmedAt: number } | null {
@@ -856,6 +901,8 @@ export interface SwarmSessionOptions {
   receiptIdentity?: SwarmReceiptIdentity | null
   /** Test override for the session's durable read-back. */
   durableReadBack?: (id: string) => Promise<boolean>
+  /** Optional persistence hook for each accepted receipt (see roles options). */
+  onRecord?: (id: string, entry: { receipt: ReplicationReceipt; confirmedAt: number }) => void
 }
 
 export interface SwarmSession {
@@ -872,6 +919,7 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
   const receiptRoles = createSwarmReceiptRoles({
     send: options.send,
     identity: () => options.receiptIdentity ?? null,
+    onRecord: options.onRecord,
     readBack: options.durableReadBack ?? (async (id) => {
       // A session's durable store is its sessionStore: the read-back hashes
       // the stored bytes against the content-addressed id.

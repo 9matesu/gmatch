@@ -73,10 +73,23 @@ export interface DecryptedContent {
 }
 
 const DB_NAME = 'orbit-gallery'
-const DB_VERSION = 2
+const DB_VERSION = 3
 const STORE_OBJECTS = 'objects'
 const STORE_CHUNKS = 'encrypted_chunks'
 const STORE_MANIFESTS = 'manifests'
+const STORE_RECEIPTS = 'swarm_receipts'
+
+/** Signed durable-replication receipts recorded by the swarm seeder side
+ *  (p2pSwarm). Historical evidence — freshness was enforced at accept time;
+ *  `confirmedAt` is when this node accepted the receipt. */
+export interface StoredSwarmReceipt {
+  objectCid: string
+  receipt: Record<string, unknown>
+  confirmedAt: number
+}
+
+/** Receipt store bound: matches the in-memory cap in p2pSwarm. */
+export const MAX_STORED_RECEIPTS = 256
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -93,6 +106,9 @@ function openDB(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(STORE_MANIFESTS)) {
         db.createObjectStore(STORE_MANIFESTS, { keyPath: 'id' })
+      }
+      if (!db.objectStoreNames.contains(STORE_RECEIPTS)) {
+        db.createObjectStore(STORE_RECEIPTS, { keyPath: 'objectCid' })
       }
     }
     req.onsuccess = () => resolve(req.result)
@@ -166,6 +182,59 @@ export async function deleteObject(id: string): Promise<void> {
     tx.oncomplete = () => resolve()
     tx.onerror = () => reject(tx.error)
   })
+}
+
+/** Record one accepted replication receipt (latest per object wins; the
+ *  store is capped at MAX_STORED_RECEIPTS by dropping the oldest). */
+export async function saveSwarmReceipt(entry: StoredSwarmReceipt): Promise<void> {
+  const db = await openDB()
+  try {
+    const existing = await new Promise<StoredSwarmReceipt[]>((resolve, reject) => {
+      const tx = db.transaction(STORE_RECEIPTS, 'readonly')
+      const req = tx.objectStore(STORE_RECEIPTS).getAll()
+      req.onsuccess = () => resolve((req.result as StoredSwarmReceipt[]) ?? [])
+      req.onerror = () => reject(req.error)
+    })
+    if (existing.length >= MAX_STORED_RECEIPTS) {
+      const oldest = [...existing].sort((a, b) => a.confirmedAt - b.confirmedAt)[0]
+      if (oldest && oldest.objectCid !== entry.objectCid) {
+        await new Promise<void>((resolve, reject) => {
+          const tx = db.transaction(STORE_RECEIPTS, 'readwrite')
+          tx.objectStore(STORE_RECEIPTS).delete(oldest.objectCid)
+          tx.oncomplete = () => resolve()
+          tx.onerror = () => reject(tx.error)
+        })
+      }
+    }
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE_RECEIPTS, 'readwrite')
+      tx.objectStore(STORE_RECEIPTS).put(entry)
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+    })
+  } finally {
+    db.close()
+  }
+}
+
+/** All persisted receipts, newest first. Empty when IndexedDB is unavailable. */
+export async function getAllSwarmReceipts(): Promise<StoredSwarmReceipt[]> {
+  try {
+    const db = await openDB()
+    try {
+      return await new Promise<StoredSwarmReceipt[]>((resolve, reject) => {
+        const tx = db.transaction(STORE_RECEIPTS, 'readonly')
+        const req = tx.objectStore(STORE_RECEIPTS).getAll()
+        req.onsuccess = () =>
+          resolve(((req.result as StoredSwarmReceipt[]) ?? []).sort((a, b) => b.confirmedAt - a.confirmedAt))
+        req.onerror = () => reject(req.error)
+      })
+    } finally {
+      db.close()
+    }
+  } catch {
+    return []
+  }
 }
 
 export async function clearObjects(): Promise<void> {
