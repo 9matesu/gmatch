@@ -225,7 +225,14 @@ shape and signatures; it must not be used as a write authorization decision.
   manifest hash, protocol version, durable-store/read-back result, and a fresh
   challenge/transfer nonce. A HAVE message or successful sender write is not a
   receipt. Product status must distinguish local-only, queued, transfer in
-  progress, peer-confirmed durable, and unavailable.
+  progress, peer-confirmed durable, and unavailable. Experimental primitive:
+  `packages/protocol/src/replication-receipt.ts` (receiver Ed25519 identity
+  binding, `durable: true` enforced, asymmetric freshness window — full
+  `MAX_RECEIPT_AGE_MS` backwards, `RECEIPT_SKEW_MS` forward so a receiver
+  cannot future-date a receipt into validity). The requester's own
+  challenge-nonce match remains the primary replay guard and must be enforced
+  by the transfer layer once wired; the shape validator alone does not know
+  which challenge is outstanding.
 
 ## Version negotiation and legacy behavior
 

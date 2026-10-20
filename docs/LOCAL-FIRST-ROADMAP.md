@@ -112,6 +112,16 @@ success; duplicate delivery is idempotent.
 **Purpose:** upgrade byte transfer from opportunistic exchange to safe
 replication with truthful acknowledgements.
 
+Progress: the pure receipt primitive exists —
+`packages/protocol/src/replication-receipt.ts` (receiver identity binding,
+durable-read-back enforcement, per-transfer challenge binding, asymmetric
+freshness window; 5 tests including tamper-per-field, wrong-key, non-durable,
+and stale/future-dated rejections). The swarm transport already bounds
+frames/objects and hash-verifies before persistence. Still open: wiring
+receipts + challenge nonces into the actual transfer handshake, authorization
+capabilities for private objects, streaming backpressure, and the
+multi-instance adversarial evidence.
+
 - [ ] Version swarm messages and bind every transfer to object CID/hash,
   manifest version, declared size, MIME, requester/owner identity, and an
   authorization capability when the object is not public.
