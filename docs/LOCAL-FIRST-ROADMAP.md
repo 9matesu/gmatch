@@ -279,6 +279,12 @@ UI or documentation.
   data. Cached RAM bytes with a mismatching expected hash are rejected.
 - Public gossip writes and pulled-envelope application bind `author_id` to the
   SHA-256 of `author_pubkey`; route tests cover both boundaries.
+- `docs/PROTOCOL-V1.md` now records the proposed operation, authorization,
+  content, transfer, compatibility, and threat-model contracts. It is still a
+  proposal; protocol-family details and review decisions remain open. A fixed
+  Ed25519 identity/signature vector is checked in
+  `packages/crypto/src/index.test.ts`; this is only a primitive vector, not the
+  full L0 operation/CID/encryption conformance suite.
 - The focused API gossip suite passed (8 tests); workspace typecheck passed;
   lint passed with 0 errors / 47 existing warnings; desktop build passed with
   existing chunk warnings.
