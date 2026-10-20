@@ -45,6 +45,9 @@ run the narrow checks, then commit only the files in that slice.
 **Purpose:** establish what is signed, encrypted, authorized, replicated, and
 considered complete before migrating more features.
 
+Draft contract: [`PROTOCOL-V1.md`](PROTOCOL-V1.md). It is explicitly a
+proposal; unresolved decisions and conformance-vector work remain blockers.
+
 - [ ] Write a versioned protocol document covering identity binding, canonical
   serialization, post/comment/reaction/edit/delete operations, tombstones,
   content manifests, key distribution/rotation, access control, expiry, and
@@ -62,6 +65,9 @@ considered complete before migrating more features.
 - [ ] Define invariants and test vectors for signatures, identity-to-key
   binding, hash/CID computation, ciphertext authentication, timestamps,
   monotonic sequence numbers, and authorization proofs.
+- [ ] Review/accept `PROTOCOL-V1.md`, resolve its stated open decisions, and
+  check in deterministic language-independent conformance vectors before
+  marking L0 complete.
 
 **Acceptance:** reviewable protocol doc plus deterministic valid/invalid test
 vectors; no application migration begins until the format and compatibility

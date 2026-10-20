@@ -1,0 +1,203 @@
+# Local-first social protocol — v1 proposal
+
+**Status: proposal only.** This document defines the contract to implement in
+later phases. The current app does not implement this protocol end-to-end. Do
+not label existing `gossip-v1`, `SWARM_*`, `localStorage` outbox, or DM traffic
+as conforming merely because their names contain “v1”. Existing wire formats
+remain supported until an explicit, tested migration is shipped.
+
+## Goals and non-goals
+
+The protocol should let independent desktop nodes commit social operations
+locally, exchange them directly or through untrusted relays, verify authorship
+and content integrity, enforce recipient authorization, and recover after
+offline periods/restarts. Relays may route/store signed public envelopes but
+must not become the authority for private content or claim that an object is
+durably replicated without a receiver read-back receipt.
+
+V1 does not promise anonymity, traffic-analysis resistance, guaranteed
+availability, censorship resistance, protection after endpoint compromise, or
+retroactive secrecy after a recipient has obtained plaintext/keys. Public
+author IDs, post metadata, peer IP addresses, timing, and connection patterns
+may be visible to peers and rendezvous services. Transport encryption does
+not replace content encryption or authorization.
+
+## Identity and serialization
+
+- Signing identity is Ed25519. `authorId` is lowercase hex SHA-256 of the
+  32-byte Ed25519 public key (64 lowercase hex characters). Receivers recompute
+  this value; a payload may not choose an unrelated author ID.
+- Encryption identity is a separately generated X25519 key. It is not
+  implicitly certified by the Ed25519 key. A future signed identity-binding
+  record must bind encryption keys to the signing identity before those keys
+  authorize private content. Existing directory/profile fields are hints, not
+  proof of binding.
+- Protocol records use UTF-8 canonical JSON with recursively sorted object
+  keys, array order preserved, no duplicate keys, no non-finite numbers, and
+  no `undefined`. The implementation must reject values outside the schema
+  before canonicalization. Do not rely on ordinary object insertion order.
+- Every signature is domain-separated by protocol, record type, and version;
+  e.g. `gmatch-social|1|operation|` followed by canonical record bytes.
+  Existing `gossip-v1|...` signatures are a separate legacy domain and are
+  verified with their current exact format.
+- All IDs/hashes are lowercase hex in canonical records. Parsers may accept
+  uppercase only at documented legacy boundaries and normalize before
+  verification; canonical v1 records reject noncanonical casing.
+
+## Operation record
+
+An operation is immutable and signed by its actor. The following is a shape,
+not a finalized TypeScript API:
+
+```json
+{
+  "protocol": "gmatch-social",
+  "version": 1,
+  "type": "post.create",
+  "operationId": "sha256-of-canonical-unsigned-record",
+  "actorId": "sha256-of-ed25519-public-key",
+  "signingKey": "32-byte-ed25519-public-key-hex",
+  "actorSequence": 12,
+  "previousOperationId": "prior-operation-id-or-null",
+  "createdAt": 1792454400000,
+  "objectId": "stable-object-id",
+  "payload": {},
+  "signature": "64-byte-ed25519-signature-hex"
+}
+```
+
+Finalize field limits and exact operation-ID preimage in implementation tests
+before using the record in the database. `operationId` excludes the signature
+and is computed over the canonical record with `operationId` and `signature`
+omitted; its preimage has its own domain prefix. Signature covers every
+unsigned field including `operationId`. Actor sequences are monotonic per
+signing identity; `previousOperationId` chains an actor's history. Gaps are
+allowed during partial sync but must be detectable. Two valid records with the
+same actor/sequence and different IDs are equivocation: retain both evidence
+records, mark the actor history forked, and do not silently pick a winner.
+
+Wall-clock timestamps are presentation/expiry hints, not trusted ordering or
+authorization. Deterministic projections use causal dependencies first and
+then a stable operation-ID tie-break where the operation type allows merging.
+Types that cannot be safely merged stay visibly conflicted until the actor or
+policy resolves them.
+
+## Operation semantics and authorization
+
+- `post.create`, `comment.create`, and `reaction.add` are separate immutable
+  operations. A repeated operation ID is idempotent. Similar payloads with
+  different IDs are distinct user actions unless a type-specific rule says
+  otherwise.
+- `post.edit` may be authored only by the post author and references the
+  target post plus the version it edits. Concurrent edits do not overwrite
+  silently; expose the conflict or resolve with a later author-signed edit
+  that names all superseded operation IDs.
+- `post.delete` and `comment.delete` are signed tombstones, never physical
+  deletion of the operation history. A post author may tombstone their post;
+  a comment author may tombstone their comment. Moderation deletion requires a
+  separately specified, auditable moderator capability and is not implied by
+  a relay decision. Tombstone precedence is monotonic; replaying an older
+  create/edit cannot resurrect a tombstoned item.
+- Reaction removal references the exact add-operation IDs it removes. This
+  makes concurrent add/remove behavior deterministic and prevents a stale
+  remove from erasing a later reaction.
+- Private operations require an explicit recipient/group authorization proof
+  and authenticated encryption. Knowledge of an object ID, `HAVE` message,
+  magnet URI, relay response, or sender assertion is never authorization.
+- Public post metadata is signed, not secret. Do not distribute a private
+  caption/tag/location in a public envelope. Private media must encrypt both
+  bytes and sensitive manifest fields; the outer routing envelope contains
+  only what routing/authorization requires.
+
+Exact payload schemas, moderator policy, group membership proof, and key
+rotation/revocation semantics remain blocking design decisions before those
+operation families are implemented.
+
+## Content and transfer contract
+
+- Plaintext object CID is SHA-256 of exact plaintext bytes. Encrypted objects
+  use a distinct ciphertext CID; a private manifest may carry the plaintext
+  digest only inside authenticated ciphertext, otherwise the digest leaks a
+  content fingerprint.
+- A signed manifest binds protocol/version, owner, object/CID, byte size, MIME,
+  chunk ordering and hashes, encryption parameters, recipient key wraps or
+  group key epoch, and creation metadata. Validate bounds before allocating or
+  persisting. MIME is advisory; renderers still sniff/handle untrusted bytes.
+- Private encryption must use a reviewed, domain-separated KDF and
+  authenticated encryption with unique nonces. Existing helpers in
+  `packages/crypto/src/index.ts` are building blocks, not a protocol approval;
+  review key derivation, context binding, nonce handling, and recipient binding
+  before use. No new custom cryptography.
+- Transfer request binds requester, object CID, manifest hash/version,
+  authorization proof, and fresh request nonce. Chunks bind to that transfer
+  and have strict per-object/per-peer/global byte and time budgets.
+- The receiver verifies authorization, manifest signature, chunk hashes,
+  assembled CID, and authenticated decryption (for private data), then commits
+  bytes durably and reads them back before issuing a receipt.
+- A replication receipt is signed by the receiving node and binds object CID,
+  manifest hash, protocol version, durable-store/read-back result, and a fresh
+  challenge/transfer nonce. A HAVE message or successful sender write is not a
+  receipt. Product status must distinguish local-only, queued, transfer in
+  progress, peer-confirmed durable, and unavailable.
+
+## Version negotiation and legacy behavior
+
+- New handshakes advertise supported protocol versions and capabilities. Peers
+  select the highest mutually supported version; downgrade is explicit and
+  logged. A v1-only authorization/encryption requirement must never downgrade
+  into an unauthenticated legacy transfer.
+- Unknown versions/types fail closed for writes and private reads. Preserve the
+  original record/bytes for export or later software support; never rewrite an
+  unknown record as a known version.
+- Existing gossip envelopes remain a separate legacy public-post format.
+  Current author-key binding is an integrity improvement, not full social
+  operation semantics. Existing swarm `HAVE/WANT/CHUNK` is legacy transport;
+  it does not prove recipient authorization or remote durability.
+- Existing local posts, IndexedDB objects, vault objects, localStorage outbox,
+  DMs, and rooms must remain readable during migration. Copy/convert
+  transactionally where available, verify counts and hashes, retain source
+  records until recovery is tested, and provide rollback/export instructions.
+
+## Threat model
+
+| Threat | Required behavior | Remaining limitation |
+|---|---|---|
+| Malicious relay changes, reorders, replays, or drops data | Verify signatures, IDs, dependencies, expiry, and idempotence locally; report gaps | Relay can censor or delay delivery |
+| Malicious peer sends corrupt/oversized data | Validate schema and bounds before allocation; verify hashes/signatures before persistence; rate-limit/cancel | Peer can consume its allowed bandwidth/CPU budget |
+| Peer requests private object by guessing ID | Require recipient/group authorization at serving and receiving side | Authorized recipient can copy plaintext |
+| Author equivocates or replays old operations | Detect actor-sequence forks; retain evidence; reject replayed nonces; tombstones do not resurrect | Resolution may require author recovery or user choice |
+| Stale/compromised recipient key | Version key bindings and membership epochs; revoke future access | Revocation cannot erase already copied keys/data |
+| Local rollback/corruption | Hash-check records/objects and detect sequence gaps; recover from peers/backups | No global authority can prove the latest state during a partition |
+| Storage exhaustion or slow peers | Bound queue/object/frame/parallelism/time/disk use; expose persistence failures | Limits may delay sync of large libraries |
+| Metadata and traffic analysis | Minimize public/private outer fields; document leakage; avoid false anonymity claims | Peer IPs, timing, sizes, and public graph remain observable |
+
+## Required conformance vectors
+
+Before L0 is considered complete, check in deterministic fixtures for:
+
+1. canonical JSON key ordering and array preservation;
+2. valid signature and author-ID derivation from a fixed Ed25519 key;
+3. rejection after changing each signed field, signature domain, or version;
+4. operation ID preimage and signature preimage;
+5. plaintext and ciphertext CID computation, including empty/oversized input;
+6. valid authenticated decrypt and rejection on nonce, tag, context, recipient,
+   or ciphertext tampering;
+7. actor sequence duplicate, gap, replay, and equivocation behavior;
+8. valid/invalid post authorization, comment authorization, tombstone replay,
+   reaction add/remove, and unknown-version behavior.
+
+Fixtures must be language-independent bytes/hex and pass in both the desktop
+and API workspaces. Use fixed known test keys; never put real user keys in
+fixtures.
+
+## Implementation gates
+
+1. Resolve the open decisions above in a reviewed protocol change. Update L0 in
+   `docs/LOCAL-FIRST-ROADMAP.md` only when the contract is accepted.
+2. Implement pure canonicalization, IDs, validation, and signature helpers in
+   shared packages; add conformance vectors before wiring persistence/network.
+3. Implement durable operation storage/outbox (L1) and restart tests.
+4. Implement authenticated transfer/receipts (L2) and independent instance
+   recovery (L3).
+5. Migrate feed/social/chat in the roadmap order. Do not call the target
+   complete until L8 evidence is recorded.
