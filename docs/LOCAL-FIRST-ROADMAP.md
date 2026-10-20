@@ -297,9 +297,14 @@ UI or documentation.
   intentionally not connected to application persistence or network paths;
   migration and cross-language end-to-end vectors remain incomplete.
 - `packages/crypto` now exposes experimental XChaCha20-Poly1305 DEK helpers
-  with caller-provided AAD. Round-trip and context/ciphertext tampering tests
-  pass, including a fixed decrypt/context vector. They are not wired into media
-  or DEK wrapping; encryption key binding, wrapping, and rotation remain open.
+  with caller-provided AAD, plus a v2 recipient-bound DEK wrap (ephemeral
+  sender key, domain-separated BLAKE3 KDF binding both public keys and the
+  object context, context-bound AEAD). Round-trip, wrong-context,
+  wrong-recipient, tamper, malformed-length, and fixed-vector tests pass
+  (crypto suite: 12 tests). None of this is wired into media, manifests, or
+  the legacy DM envelope; the legacy static wrap stays read-only for existing
+  data. Identity-to-encryption-key binding records and key rotation/revocation
+  remain open.
 - The focused API gossip suite passed (8 tests); workspace typecheck passed;
   lint passed with 0 errors / 47 existing warnings; desktop build passed with
   existing chunk warnings.

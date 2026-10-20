@@ -181,6 +181,77 @@ export function decryptWithDekAndAad(
   return xchacha20poly1305(dek, nonce, additionalData).decrypt(ciphertext);
 }
 
+/** Domain separator for the v2 recipient wrap; never reuse for other purposes. */
+const DEK_WRAP_V2_DOMAIN = 'gmatch-social|1|dek-wrap|';
+
+/**
+ * Recipient-bound DEK wrap, protocol proposal v2 (experimental).
+ *
+ * Improvements over the legacy `wrapDekForRecipient`/`encryptPayload` format:
+ * - Ephemeral sender X25519 key per wrap: no sender-key reuse across objects.
+ * - Domain-separated BLAKE3 KDF binding shared secret + both public keys +
+ *   the caller context (owner/object/key epoch), so a wrapped DEK cannot be
+ *   replayed onto another object or recipient.
+ * - XChaCha20-Poly1305 with the same context as AAD.
+ *
+ * Wire layout: ephemeralPub(32) || nonce(24) || ciphertext+tag(48).
+ * The legacy format above remains only to read existing data; new private
+ * v1 content must use this wrap once the protocol proposal is accepted.
+ */
+export function wrapDekForRecipientV2(
+  dek: Uint8Array,
+  recipientPubHex: string,
+  context: Uint8Array,
+  pinned?: { ephemeralPrivHex: string; nonceHex?: string },
+): Uint8Array {
+  if (dek.length !== 32) throw new Error('DEK must be 32 bytes');
+  const ephPriv = pinned ? hexToBytes(pinned.ephemeralPrivHex) : x25519.utils.randomPrivateKey();
+  const ephPub = x25519.getPublicKey(ephPriv);
+  const recipientPub = hexToBytes(recipientPubHex);
+  const sharedSecret = x25519.getSharedSecret(ephPriv, recipientPub);
+  const domain = new TextEncoder().encode(DEK_WRAP_V2_DOMAIN);
+  const kdfInput = new Uint8Array(domain.length + sharedSecret.length + ephPub.length + recipientPub.length + context.length);
+  let offset = 0;
+  kdfInput.set(domain, offset); offset += domain.length;
+  kdfInput.set(sharedSecret, offset); offset += sharedSecret.length;
+  kdfInput.set(ephPub, offset); offset += ephPub.length;
+  kdfInput.set(recipientPub, offset); offset += recipientPub.length;
+  kdfInput.set(context, offset);
+  const key = blake3(kdfInput);
+  const aad = new Uint8Array(domain.length + context.length);
+  aad.set(domain, 0);
+  aad.set(context, domain.length);
+  const nonce = pinned?.nonceHex ? hexToBytes(pinned.nonceHex) : randomBytes(24);
+  const ciphertext = xchacha20poly1305(key, nonce, aad).encrypt(dek);
+  const out = new Uint8Array(32 + 24 + ciphertext.length);
+  out.set(ephPub, 0);
+  out.set(nonce, 32);
+  out.set(ciphertext, 56);
+  return out;
+}
+
+export function unwrapDekV2(wrapped: Uint8Array, recipientPrivHex: string, context: Uint8Array): Uint8Array {
+  if (wrapped.length !== 32 + 24 + 32 + 16) throw new Error('malformed DEK wrap');
+  const ephPub = wrapped.slice(0, 32);
+  const nonce = wrapped.slice(32, 56);
+  const ciphertext = wrapped.slice(56);
+  const recipientPub = x25519.getPublicKey(hexToBytes(recipientPrivHex));
+  const sharedSecret = x25519.getSharedSecret(hexToBytes(recipientPrivHex), ephPub);
+  const domain = new TextEncoder().encode(DEK_WRAP_V2_DOMAIN);
+  const kdfInput = new Uint8Array(domain.length + sharedSecret.length + ephPub.length + recipientPub.length + context.length);
+  let offset = 0;
+  kdfInput.set(domain, offset); offset += domain.length;
+  kdfInput.set(sharedSecret, offset); offset += sharedSecret.length;
+  kdfInput.set(ephPub, offset); offset += ephPub.length;
+  kdfInput.set(recipientPub, offset); offset += recipientPub.length;
+  kdfInput.set(context, offset);
+  const key = blake3(kdfInput);
+  const aad = new Uint8Array(domain.length + context.length);
+  aad.set(domain, 0);
+  aad.set(context, domain.length);
+  return xchacha20poly1305(key, nonce, aad).decrypt(ciphertext);
+}
+
 export function wrapDekForRecipient(dek: Uint8Array, senderPrivHex: string, recipientPubHex: string): Uint8Array {
   return encryptPayload(dek, senderPrivHex, recipientPubHex);
 }

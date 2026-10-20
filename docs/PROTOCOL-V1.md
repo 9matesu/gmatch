@@ -206,11 +206,15 @@ shape and signatures; it must not be used as a write authorization decision.
   object ID, chunk index/count, plaintext chunk size, MIME, and key epoch.
   Sensitive caption/tags and plaintext content hashes must not be put in
   public AAD. This helper is not yet used by media creation or transfer.
-- DEK wrapping/recipient key binding is not approved: the existing static
-  X25519 `encryptPayload`/`wrapDekForRecipient` format has no caller AAD or
-  forward secrecy. Do not use it for new private-content v1 writes. Specify
-  ephemeral sender keys, domain-separated KDF/context, recipient binding,
-  signature binding, and rotation/revocation before implementation.
+- DEK wrapping/recipient key binding: an experimental v2 wrap
+  (`wrapDekForRecipientV2`/`unwrapDekV2`) now matches this contract — ephemeral
+  sender X25519 key per wrap, BLAKE3 KDF over domain + shared secret + both
+  public keys + caller context, XChaCha20-Poly1305 with that context as AAD.
+  It is unwired. The legacy static `encryptPayload`/`wrapDekForRecipient`
+  format (no AAD, no forward secrecy) remains only to read existing data and
+  must not be used for new private-content v1 writes. Key rotation/revocation
+  semantics and a signed identity-binding record for encryption keys remain
+  open.
 - Transfer request binds requester, object CID, manifest hash/version,
   authorization proof, and fresh request nonce. Chunks bind to that transfer
   and have strict per-object/per-peer/global byte and time budgets.

@@ -18,6 +18,9 @@ import {
   computeObjectHash,
   encryptWithDekAndAad,
   decryptWithDekAndAad,
+  wrapDekForRecipientV2,
+  unwrapDekV2,
+  hexToBytes,
 } from './index';
 
 describe('Crypto Identity & Encryption', () => {
@@ -122,6 +125,23 @@ describe('Crypto Identity & Encryption', () => {
     ));
     expect(new TextDecoder().decode(decryptWithDekAndAad(ciphertext, key, nonce, aad))).toBe('vector plaintext');
     expect(() => decryptWithDekAndAad(ciphertext, key, nonce, new TextEncoder().encode('wrong context'))).toThrow();
+  });
+
+  it('wraps DEKs to a recipient bound by context and matches the fixed vector', () => {
+    const recipient = restoreIdentity('00'.repeat(32), '11'.repeat(32));
+    const dek = new Uint8Array(32).fill(7);
+    const context = new TextEncoder().encode('gmatch-social|1|content-key|obj-1|epoch-1');
+    const wrapped = wrapDekForRecipientV2(dek, recipient.encryptionPubHex, context, { ephemeralPrivHex: '44'.repeat(32), nonceHex: '99'.repeat(24) });
+    expect(bytesToHex(wrapped)).toBe('ff2ee45601ec1b67310c7790404585ae697331eee1c1f8cf2419731c1fff3e6b999999999999999999999999999999999999999999999999065289cad0fa8d80087cc4157f1e9c48247cc433fce1640ff71089713022f2aa72cbea30453ccbcd68355f15ac0710cd');
+    expect(unwrapDekV2(wrapped, recipient.encryptionPrivHex, context)).toEqual(dek);
+    // Wrong context, wrong recipient, and tampered bytes all fail closed.
+    expect(() => unwrapDekV2(wrapped, recipient.encryptionPrivHex, new TextEncoder().encode('other-object'))).toThrow();
+    const outsider = restoreIdentity('22'.repeat(32), '33'.repeat(32));
+    expect(() => unwrapDekV2(wrapped, outsider.encryptionPrivHex, context)).toThrow();
+    const tampered = wrapped.slice();
+    tampered[60] ^= 1;
+    expect(() => unwrapDekV2(tampered, recipient.encryptionPrivHex, context)).toThrow();
+    expect(() => unwrapDekV2(hexToBytes('00'.repeat(10)), recipient.encryptionPrivHex, context)).toThrow();
   });
 
   it('wraps one DEK for multiple recipients without sharing the DEK itself', () => {
