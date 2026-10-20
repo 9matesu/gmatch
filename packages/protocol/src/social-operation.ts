@@ -50,6 +50,58 @@ function isJsonValue(value: unknown, depth = 0): boolean {
     Object.values(value).every((entry) => isJsonValue(entry, depth + 1))
 }
 
+function hasOnlyKeys(value: Record<string, unknown>, required: string[], optional: string[] = []): boolean {
+  return required.every((key) => Object.hasOwn(value, key)) &&
+    Object.keys(value).every((key) => required.includes(key) || optional.includes(key))
+}
+
+function validText(value: unknown, maxLength: number, allowEmpty = false): boolean {
+  return typeof value === 'string' && value.length <= maxLength && (allowEmpty || value.length > 0)
+}
+
+function validHexId(value: unknown): value is string {
+  return typeof value === 'string' && HEX64.test(value)
+}
+
+function validObjectId(value: unknown): value is string {
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{1,256}$/.test(value)
+}
+
+function validatePostPayload(payload: Record<string, unknown>, editing: boolean): boolean {
+  const required = editing ? ['supersedes', 'contentCid', 'manifestHash', 'mimeType', 'sizeBytes']
+    : ['contentCid', 'manifestHash', 'mimeType', 'sizeBytes']
+  if (!hasOnlyKeys(payload, required, ['caption', 'tags'])) return false
+  if (!validHexId(payload.contentCid) || !validHexId(payload.manifestHash)) return false
+  if (!validText(payload.mimeType, 100) || !Number.isSafeInteger(payload.sizeBytes) || (payload.sizeBytes as number) < 1 || (payload.sizeBytes as number) > 64 * 1024 * 1024) return false
+  if (Object.hasOwn(payload, 'caption') && !validText(payload.caption, 2000, true)) return false
+  if (Object.hasOwn(payload, 'tags') && (!Array.isArray(payload.tags) || payload.tags.length > 5 || payload.tags.some((tag) => !validText(tag, 20)))) return false
+  return !editing || (Array.isArray(payload.supersedes) && payload.supersedes.length > 0 && payload.supersedes.length <= 32 && payload.supersedes.every(validHexId))
+}
+
+function validateOperationPayload(type: string, payload: Record<string, unknown>): boolean {
+  switch (type) {
+    case 'post.create': return validatePostPayload(payload, false)
+    case 'post.edit': return validatePostPayload(payload, true)
+    case 'post.delete':
+    case 'comment.delete':
+      return hasOnlyKeys(payload, ['targetOperationId']) && validHexId(payload.targetOperationId)
+    case 'comment.create':
+      return hasOnlyKeys(payload, ['postId', 'parentCommentId', 'body']) &&
+        validObjectId(payload.postId) &&
+        (payload.parentCommentId === null || validObjectId(payload.parentCommentId)) &&
+        validText(payload.body, 4000)
+    case 'reaction.add':
+      return hasOnlyKeys(payload, ['targetType', 'targetId', 'reaction']) &&
+        (payload.targetType === 'post' || payload.targetType === 'comment') &&
+        validObjectId(payload.targetId) && payload.reaction === 'like'
+    case 'reaction.remove':
+      return hasOnlyKeys(payload, ['targetAddOperationIds']) &&
+        Array.isArray(payload.targetAddOperationIds) && payload.targetAddOperationIds.length > 0 &&
+        payload.targetAddOperationIds.length <= 100 && payload.targetAddOperationIds.every(validHexId)
+    default: return false
+  }
+}
+
 export function createSocialOperation(
   operation: UnsignedOperation,
   privateKeyHex: string,
@@ -77,9 +129,10 @@ export function validateSocialOperation(value: unknown): string | null {
   if (op.previousOperationId !== null && (typeof op.previousOperationId !== 'string' || !HEX64.test(op.previousOperationId))) return 'invalid previous operation id'
   if ((op.actorSequence === 1) !== (op.previousOperationId === null)) return 'sequence and previous operation mismatch'
   if (!Number.isSafeInteger(op.createdAt) || (op.createdAt as number) < 0) return 'invalid creation time'
-  if (typeof op.objectId !== 'string' || op.objectId.length < 1 || op.objectId.length > 256) return 'invalid object id'
+  if (!validObjectId(op.objectId)) return 'invalid object id'
   if (!op.payload || typeof op.payload !== 'object' || Array.isArray(op.payload)) return 'payload must be an object'
   if (!isJsonValue(op.payload)) return 'payload must contain only bounded-depth JSON values'
+  if (!validateOperationPayload(op.type as string, op.payload as Record<string, unknown>)) return 'invalid operation payload'
   if (typeof op.signature !== 'string' || !HEX128.test(op.signature)) return 'invalid signature'
   try {
     if (new TextEncoder().encode(stableStringify(op.payload)).byteLength > MAX_PAYLOAD_BYTES) return 'payload too large'

@@ -118,9 +118,30 @@ policy resolves them.
   bytes and sensitive manifest fields; the outer routing envelope contains
   only what routing/authorization requires.
 
-Exact payload schemas, moderator policy, group membership proof, and key
-rotation/revocation semantics remain blocking design decisions before those
-operation families are implemented.
+Moderator policy, group membership proof, key rotation/revocation semantics,
+and operation-state authorization remain blocking design decisions before
+those operation families are implemented.
+
+The experimental validator currently defines these public v1 payload shapes
+(exact keys only; all referenced `objectId` values are 1–256 ASCII letters,
+digits, `_`, or `-`; operation references are 64-character lowercase hex):
+
+| Type | Required payload fields | Optional fields / limits |
+|---|---|---|
+| `post.create` | `contentCid`, `manifestHash`, `mimeType`, `sizeBytes` | `caption` ≤2,000 chars; `tags` ≤5 entries, each ≤20 chars |
+| `post.edit` | `supersedes` (1–32 operation IDs), plus create fields | same caption/tags |
+| `post.delete` | `targetOperationId` (operation ID) | none |
+| `comment.create` | `postId`, `parentCommentId` (object ID or null), `body` (1–4,000 chars) | none |
+| `comment.delete` | `targetOperationId` | none |
+| `reaction.add` | `targetType` (`post`/`comment`), `targetId`, `reaction` (`like`) | none |
+| `reaction.remove` | `targetAddOperationIds` (1–100 operation IDs) | none |
+
+`sizeBytes` is 1..64 MiB. `mimeType` is a nonempty string ≤100 chars, not a
+content-safety assertion. The helper checks shape only: it does not prove the
+referenced manifest exists, that the actor owns a post/comment, that an edit
+supersedes the current head, or that reaction removals are authorized. Those
+checks require the replicated operation view and must be completed before
+network integration.
 
 ## Content and transfer contract
 
