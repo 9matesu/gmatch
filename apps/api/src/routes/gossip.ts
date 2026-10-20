@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { orbitAuth } from '../middleware/auth'
 import type { D1Turso } from '../db'
-import { verifySignature, hexToBytes } from '@orbit/crypto'
+import { verifySignature, hexToBytes, computeObjectHash } from '@orbit/crypto'
 import {
   gossipWellFormed,
   gossipSigningMessage,
@@ -65,6 +65,14 @@ function verifyEnvelopeSig(e: GossipEnvelope): boolean {
   }
 }
 
+function authorKeyMatchesId(e: GossipEnvelope): boolean {
+  try {
+    return computeObjectHash(hexToBytes(e.payload.author_pubkey)).sha256Hex === e.author_id.toLowerCase()
+  } catch {
+    return false
+  }
+}
+
 /**
  * Apply one pulled envelope to a host db: re-validate everything (never
  * trust the relay), then upsert a minimal Users stub + the public Objects
@@ -76,6 +84,7 @@ export async function applyGossipEnvelope(
 ): Promise<'applied' | 'duplicate' | 'rejected'> {
   const malformed = gossipWellFormed(e)
   if (malformed) return 'rejected'
+  if (!authorKeyMatchesId(e)) return 'rejected'
   if (!verifyEnvelopeSig(e)) return 'rejected'
   const p: GossipPostPayload = e.payload
   // Client-side filtering only: envelopes apply verbatim (see module doc).
@@ -113,6 +122,7 @@ gossip.post('/envelopes', orbitAuth, async (c) => {
   }
   const malformed = gossipWellFormed(body)
   if (malformed) return c.json({ error: malformed }, 400)
+  if (!authorKeyMatchesId(body)) return c.json({ error: 'author_id does not match signing key' }, 403)
   // Own posts only: the caller signs with their own key, which also bounds
   // relay spam to the per-author daily cap below.
   if (body.author_id !== orbitId) return c.json({ error: 'author_id must match caller' }, 403)

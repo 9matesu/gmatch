@@ -99,6 +99,17 @@ describe('Gossip relay (self-hosting posts)', () => {
     conns.clear()
   })
 
+  it('rejects envelopes whose claimed author id is not the signing key identity', async () => {
+    const signer = createTestIdentity()
+    const claimedId = createTestIdentity()
+    const payload = payloadFor(signer, { owner_id: claimedId.orbitId })
+    const envelope = signEnvelope(signer, payload)
+    envelope.author_id = claimedId.orbitId
+    const response = await postEnvelopeOn(env, claimedId, envelope)
+    expect(response.status).toBe(403)
+    conns.clear()
+  })
+
   it('accepts any tags verbatim (filtering is client-side only)', async () => {
     const id = createTestIdentity()
     const envelope = signEnvelope(id, payloadFor(id, { post_tags: 'art, loli' }))
@@ -193,5 +204,19 @@ describe('Gossip relay (self-hosting posts)', () => {
     expect(r2.rejected).toBe(1)
     expect(r2.applied).toBe(0)
     conns.clear()
+  })
+
+  it('host pull rejects a valid signature with an author id unrelated to its key', async () => {
+    const signer = createTestIdentity()
+    const claimed = createTestIdentity()
+    const payload = payloadFor(signer, { owner_id: claimed.orbitId })
+    const envelope = signEnvelope(signer, payload)
+    envelope.author_id = claimed.orbitId
+    const hostEnv = await createMockEnv()
+    const fetchFor = (async () => new Response(JSON.stringify({ envelopes: [envelope], nextCursor: null }), {
+      headers: { 'Content-Type': 'application/json' },
+    })) as typeof fetch
+    const result = await pullGossipUpstream(hostEnv.DB, 'https://u.test', fetchFor)
+    expect(result).toMatchObject({ applied: 0, rejected: 1 })
   })
 })
