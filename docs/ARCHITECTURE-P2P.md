@@ -46,7 +46,7 @@ In `gmatch` v1.5.0, the central deployment (`https://gmatch-wcz1.onrender.com`) 
    - Direct peer-to-peer data channels (`gmatch-mesh`) transmit social feeds, chats, and image/video media.
 - Large media files are divided into 64KB chunks and distributed via `SWARM_WANT` and `SWARM_CHUNK` protocols.
 - Every node that downloads or creates media persists it to local IndexedDB and acts as a seeder (`hydrateLocalObjects`).
-- Swarm frames enforce chunk metadata/length bounds and a 64 MiB object ceiling. A fetched object is only reported as received after local persistence succeeds; session RAM caching alone is not durability evidence. Pending retry state is bounded and validates object IDs and SHA-256 hashes.
+- Swarm frames enforce chunk metadata/length bounds and a 64 MiB object ceiling. A fetched object is only reported as received after local persistence succeeds; session RAM caching alone is not durability evidence. Pending retry state is bounded and validates object IDs and SHA-256 hashes. Duplicate chunk re-delivery (relay/transport replay) is an idempotent no-op, never a fetch failure; every other malformed frame still aborts the transfer without storing bytes.
 
 ---
 

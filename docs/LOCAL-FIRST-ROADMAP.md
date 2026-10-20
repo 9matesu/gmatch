@@ -166,6 +166,21 @@ the receipt peer can read bytes back from its persistent store.
 **Purpose:** prove the protocol across actual application instances instead
 of module-level simulated sessions.
 
+Progress: the in-process layer exists — `apps/desktop/src/utils/swarmHarness.ts`
+composes fully isolated session nodes (own identity, own durable-store map,
+own receipt state machine) over a controllable in-memory network with
+partitions, frame duplication, frame drops, and restarts that survive on the
+durable store. Four acceptance scenarios pass
+(`src/utils/swarmHarness.test.ts`): A→B→C replication with receipts while A
+is offline, restart-onto-durable-store with fresh receipts, idempotence
+under frame duplication, and mid-transfer partition + recovery. Sessions
+gained an injectable awaited `persist` sink (persist-before-attest contract;
+module store untouched when present), and duplicate chunk re-delivery is now
+an idempotent no-op instead of a fetch failure. Still open: real
+multi-PROCESS instances (separate Electron user-data dirs), real
+NAT/TURN two-machine evidence, relay-outage/peer-churn beyond the modeled
+faults, and lifecycle resource measurements.
+
 - [ ] Build a hermetic multi-instance test harness with isolated user-data
   directories, separate identities, databases, vaults, and transport endpoints.
 - [ ] Demonstrate A creates and publishes; B fetches/verifies/persists; A
@@ -344,6 +359,11 @@ UI or documentation.
   the protocol package (37 tests) and the API workspace (6 tests), including a
   check that the social-operation and legacy gossip signature domains never
   cross-verify. Full-suite and all-workspace typechecks pass.
+- L3 in-process harness (see the L3 progress note): four scenarios pass —
+  A→B→C replication with A offline, restart-onto-durable-store, duplicate-
+  frame idempotence, and mid-transfer partition recovery. This models the
+  protocol contract across isolated node contexts; it is NOT separate OS
+  processes or real NAT, which remain L3's open acceptance gate.
 - Public durable feed publishes now commit a signed v1 `post.create` operation
   to the durable operation log (`f99661e` protocol-side gap-tolerant
   authorization + manifest hashing; desktop wiring in socialPublish/mediaForge).

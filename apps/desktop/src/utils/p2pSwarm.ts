@@ -762,8 +762,7 @@ export async function handleSwarmMessage(msg: SwarmMessage): Promise<boolean> {
           typeof msg.mimeType !== 'string' || msg.mimeType.length > 128 ||
           typeof msg.dataBase64 !== 'string' || msg.dataBase64.length > MAX_CHUNK_BASE64_LENGTH || !isBoundedChunkFrame(msg) ||
           (req.total !== 0 && req.total !== msg.total) ||
-          (req.mimeType !== '' && req.mimeType !== msg.mimeType) ||
-          req.chunks.has(msg.index)) {
+          (req.mimeType !== '' && req.mimeType !== msg.mimeType)) {
         throw new Error('Invalid swarm chunk metadata')
       }
       let bytes: Uint8Array
@@ -772,6 +771,9 @@ export async function handleSwarmMessage(msg: SwarmMessage): Promise<boolean> {
       } catch {
         throw new Error('Invalid swarm chunk encoding')
       }
+      // Duplicate re-delivery (relay/transport replay) is an idempotent
+      // no-op, never a fetch failure: we already hold that index.
+      if (req.chunks.has(msg.index)) return true
       const isLast = msg.index === msg.total - 1
       if (!bytes.byteLength || bytes.byteLength > CHUNK_SIZE || (!isLast && bytes.byteLength !== CHUNK_SIZE) ||
           req.receivedBytes + bytes.byteLength > MAX_OBJECT_BYTES) {
@@ -903,6 +905,14 @@ export interface SwarmSessionOptions {
   durableReadBack?: (id: string) => Promise<boolean>
   /** Optional persistence hook for each accepted receipt (see roles options). */
   onRecord?: (id: string, entry: { receipt: ReplicationReceipt; confirmedAt: number }) => void
+  /**
+   * Hermetic persistence sink (roadmap L3 harness): when present, fetched
+   * bytes are AWAITED into this sink (failure rejects the fetch, mirroring
+   * the module path's persist-before-resolve contract) and the module-level
+   * store is never touched. Absent = legacy behavior (module
+   * registerLocalObject, fire-and-forget).
+   */
+  persist?: (id: string, blob: Blob) => Promise<void>
 }
 
 export interface SwarmSession {
@@ -995,10 +1005,12 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
             typeof msg.mimeType !== 'string' || msg.mimeType.length > 128 ||
             typeof msg.dataBase64 !== 'string' || msg.dataBase64.length > MAX_CHUNK_BASE64_LENGTH || !isBoundedChunkFrame(msg) ||
             (req.total !== 0 && req.total !== msg.total) ||
-            (req.mimeType !== '' && req.mimeType !== msg.mimeType) || req.chunks.has(msg.index)) {
+            (req.mimeType !== '' && req.mimeType !== msg.mimeType)) {
           throw new Error('Invalid swarm chunk metadata')
         }
         bytes = decodeChunk(msg.dataBase64)
+        // Duplicate re-delivery: idempotent no-op (see module handler note).
+        if (req.chunks.has(msg.index)) return
         const last = msg.index === msg.total - 1
         if (!bytes.byteLength || bytes.byteLength > CHUNK_SIZE || (!last && bytes.byteLength !== CHUNK_SIZE) ||
             req.receivedBytes + bytes.byteLength > MAX_OBJECT_BYTES) {
@@ -1032,7 +1044,7 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
             req.reject(new Error('Invalid expected swarm hash'))
             return
           }
-          void sha256HexBlob(assembledBlob).then((got) => {
+          void sha256HexBlob(assembledBlob).then(async (got) => {
             if (pendingRequests.get(msg.id) !== req) return
             if (got !== req.expectedHash) {
               clearTimeout(req.timer)
@@ -1040,10 +1052,18 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
               req.reject(new Error(`Swarm object ${msg.id} failed hash verification`))
               return
             }
+            try {
+              if (options.persist) await options.persist(msg.id, assembledBlob)
+            } catch (error) {
+              clearTimeout(req.timer)
+              pendingRequests.delete(msg.id)
+              req.reject(error instanceof Error ? error : new Error('session persist failed'))
+              return
+            }
             clearTimeout(req.timer)
             pendingRequests.delete(msg.id)
             sessionStore.set(msg.id, assembledBlob)
-            registerLocalObject(msg.id, assembledBlob)
+            if (!options.persist) registerLocalObject(msg.id, assembledBlob)
             receiptRoles.noteDurablePersist(msg.id)
             req.resolve(assembledBlob)
           }).catch(() => {
@@ -1054,10 +1074,18 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
           })
         } else {
           if (pendingRequests.get(msg.id) !== req) return
+          try {
+            if (options.persist) await options.persist(msg.id, assembledBlob)
+          } catch (error) {
+            clearTimeout(req.timer)
+            pendingRequests.delete(msg.id)
+            req.reject(error instanceof Error ? error : new Error('session persist failed'))
+            return
+          }
           clearTimeout(req.timer)
           pendingRequests.delete(msg.id)
           sessionStore.set(msg.id, assembledBlob)
-          registerLocalObject(msg.id, assembledBlob)
+          if (!options.persist) registerLocalObject(msg.id, assembledBlob)
           receiptRoles.noteDurablePersist(msg.id)
           req.resolve(assembledBlob)
         }
