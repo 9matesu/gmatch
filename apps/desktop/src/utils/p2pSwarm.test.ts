@@ -199,18 +199,10 @@ describe('p2pSwarm (WebRTC Object Swarm Transfer)', () => {
     const expectedHash = await sha256HexBlob(new Blob(['different expected bytes']))
     registerLocalObject('cached-tamper', corrupt)
     vi.stubGlobal('window', { gmatch: { vaultPutBytes: vi.fn().mockResolvedValue({ ok: true }) } })
-    setSwarmTransport((message) => {
-      if (message.type !== 'SWARM_WANT' || message.id !== 'cached-tamper') return
-      void (async () => {
-        const bytes = new Uint8Array(await corrupt.arrayBuffer())
-        const dataBase64 = btoa(String.fromCharCode(...bytes))
-        await handleSwarmMessage({
-          type: 'SWARM_CHUNK', id: 'cached-tamper', index: 0, total: 1,
-          mimeType: corrupt.type, dataBase64,
-        })
-      })()
-    })
+    const send = vi.fn()
+    setSwarmTransport(send)
     await expect(requestSwarmObject('cached-tamper', 1000, { expectedHash })).rejects.toThrow(/hash verification/)
+    expect(send).not.toHaveBeenCalled()
     setSwarmTransport(null)
     vi.unstubAllGlobals()
   })

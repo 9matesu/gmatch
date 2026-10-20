@@ -553,11 +553,11 @@ export function requestSwarmObject(id: string, timeoutMs = 15000, opts: SwarmFet
   const cached = lookupLocalObject(id)
   if (cached) {
     if (!expectedHash) return Promise.resolve(cached)
-    return sha256HexBlob(cached).then(async (actualHash) => {
+    return sha256HexBlob(cached).then((actualHash) => {
       if (actualHash === expectedHash) return cached
-      return fetchVerifiedPeerObject(id, timeoutMs, opts, expectedHash)
-    }, async () => {
-      return fetchVerifiedPeerObject(id, timeoutMs, opts, expectedHash)
+      return Promise.reject(new Error(`Cached swarm object ${id} failed hash verification`))
+    }, () => {
+      return Promise.reject(new Error(`Cached swarm object ${id} verification failed`))
     })
   }
   return fetchVerifiedPeerObject(id, timeoutMs, opts, expectedHash)
