@@ -26,6 +26,8 @@ export type SwarmMessage =
   | { type: 'SWARM_RECEIPT'; id: string; receipt: unknown }
   /** A signed social operation travelling between peers (L4 transport). */
   | { type: 'SWARM_OP'; operation: unknown }
+  /** Peer reports it durably appended that operation (L4.3). */
+  | { type: 'SWARM_OP_ACK'; operationId: string; actorId: string }
 
 /**
  * RAM cache of swarm bytes.
@@ -564,6 +566,13 @@ export function setSwarmOperationHandler(handler: ((operation: unknown) => Promi
   swarmOperationHandler = handler
 }
 
+// Inbound acks: a peer confirming it durably appended one of our operations.
+// Validation (shape, known id, actor match) lives in the injected handler.
+let swarmOperationAckHandler: ((ack: unknown) => void) | null = null
+export function setSwarmOperationAckHandler(handler: ((ack: unknown) => void) | null): void {
+  swarmOperationAckHandler = handler
+}
+
 /** Fire one frame out over every wired transport pipe. Best-effort. */
 export function sendSwarmFrame(msg: SwarmMessage): boolean {
   if (!swarmSend) return false
@@ -834,6 +843,10 @@ export async function handleSwarmMessage(msg: SwarmMessage): Promise<boolean> {
   if (msg.type === 'SWARM_OP') {
     // Untrusted transport: validation lives in the injected handler.
     void swarmOperationHandler?.(msg.operation)
+    return true
+  }
+  if (msg.type === 'SWARM_OP_ACK') {
+    swarmOperationAckHandler?.({ operationId: msg.operationId, actorId: msg.actorId })
     return true
   }
   return false

@@ -60,6 +60,34 @@ export const SENDING_EVICT_MS = 7 * 24 * 3600_000
 const HEX64 = /^[0-9a-f]{64}$/
 const STATUS_RANK: Record<OperationLogStatus, number> = { committed: 0, sending: 1, delivered: 2 }
 
+/**
+ * Process-wide revision of the durable log.
+ *
+ * Every instance reads through the same IndexedDB store, so a per-instance
+ * cache would go stale the moment another instance writes. Reading is the hot
+ * path — inbound replication validates each operation against its actor's
+ * retained history, which used to mean one full store scan PER OPERATION
+ * (O(n^2) for a sync wave). Instances therefore cache the entry list and key
+ * the cache on this shared counter; any write from any instance invalidates
+ * every cache in the process with one integer compare.
+ */
+let logRevision = 0
+
+/** Revision the cached read is valid for (diagnostics/tests). */
+export function currentOperationLogRevision(): number {
+  return logRevision
+}
+
+/** Fired after a durable write so projections/UI can refresh. */
+export const OPERATION_LOG_CHANGED_EVENT = 'gmatch:operation-log-changed'
+
+function bumpLogRevision(): void {
+  logRevision += 1
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    try { window.dispatchEvent(new Event(OPERATION_LOG_CHANGED_EVENT)) } catch { /* no DOM */ }
+  }
+}
+
 function isSafeInt(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value)
 }
@@ -101,12 +129,28 @@ export interface AppendResult {
 
 export class SocialOperationLog {
   private readonly maxEntries: number
+  /** Entry-list cache, valid only for `logRevision` (see bumpLogRevision). */
+  private cachedEntries: { revision: number; entries: LoggedOperation[] } | null = null
 
   constructor(
     private readonly backend: OperationLogBackend,
     options: { maxEntries?: number } = {},
   ) {
     this.maxEntries = options.maxEntries ?? MAX_LOG_ENTRIES
+  }
+
+  /**
+   * Every valid entry, cached until any instance writes. The returned array is
+   * shared: callers must treat it as read-only (all public readers copy or
+   * filter into a new array).
+   */
+  private async allEntries(): Promise<LoggedOperation[]> {
+    if (this.cachedEntries && this.cachedEntries.revision === logRevision) {
+      return this.cachedEntries.entries
+    }
+    const entries = (await this.backend.getAll()).filter(isValidLogEntryShape)
+    this.cachedEntries = { revision: logRevision, entries }
+    return entries
   }
 
   async append(input: {
@@ -132,7 +176,7 @@ export class SocialOperationLog {
     // Capacity: evict oldest delivered first, then long-stuck 'sending'
     // entries (already broadcast); never evict fresh pending work, actor
     // chain heads, or anything else.
-    const all = await this.backend.getAll()
+    const all = await this.allEntries()
     if (all.length >= this.maxEntries) {
       const now = Date.now()
       const protectedIds = new Set([...actorHeads(all).values()].map((head) => head.operationId))
@@ -147,12 +191,26 @@ export class SocialOperationLog {
       for (const victim of evictable) {
         if (room <= limit) break
         await this.backend.delete(victim.operationId)
+        bumpLogRevision()
         room -= 1
       }
       if (room > limit) throw new Error('operation log is full of undelivered entries')
     }
     await this.backend.put(entry)
+    bumpLogRevision()
     return { outcome: 'appended', entry }
+  }
+
+  /** One entry (status/attempts included) or null — ack/validation reads. */
+  async getEntry(operationId: string): Promise<LoggedOperation | null> {
+    if (!HEX64.test(operationId)) return null
+    return this.backend.get(operationId)
+  }
+
+  /** Every valid entry, unordered — feed projection input. The array is a
+   *  copy, so callers may sort it. */
+  async listAllOperations(): Promise<LoggedOperation[]> {
+    return [...await this.allEntries()]
   }
 
   /** Fast duplicate check for inbound transports (append is still the
@@ -169,6 +227,7 @@ export class SocialOperationLog {
     const updated = { ...entry, status, updatedAt: Date.now() }
     if (!isValidLogEntryShape(updated)) throw new Error('corrupted log entry')
     await this.backend.put(updated)
+    bumpLogRevision()
     return true
   }
 
@@ -178,22 +237,23 @@ export class SocialOperationLog {
     if (!entry) return false
     const updated = { ...entry, attempts: entry.attempts + 1, updatedAt: Date.now() }
     await this.backend.put(updated)
+    bumpLogRevision()
     return true
   }
 
   /** Undelivered entries, oldest first — the boot/reconnect replay order. */
   async listPendingOperations(): Promise<LoggedOperation[]> {
-    const all = await this.backend.getAll()
+    const all = await this.allEntries()
     return all
-      .filter((entry) => isValidLogEntryShape(entry) && entry.status !== 'delivered')
+      .filter((entry) => entry.status !== 'delivered')
       .sort((a, b) => a.createdAt - b.createdAt || (a.operationId < b.operationId ? -1 : 1))
   }
 
   /** One actor's entries, highest sequence first (chain head first). */
   async listOperationsByActor(actorId: string): Promise<LoggedOperation[]> {
-    const all = await this.backend.getAll()
+    const all = await this.allEntries()
     return all
-      .filter((entry) => isValidLogEntryShape(entry) && entry.actorId === actorId)
+      .filter((entry) => entry.actorId === actorId)
       .sort((a, b) => b.actorSequence - a.actorSequence)
   }
 
@@ -216,12 +276,13 @@ export class SocialOperationLog {
   /** Drop delivered entries past the grace window; undelivered entries and
    *  actor chain heads are never dropped (a missing head forks the actor). */
   async prune(now = Date.now()): Promise<number> {
-    const all = await this.backend.getAll()
+    const all = await this.allEntries()
     const protectedIds = new Set([...actorHeads(all).values()].map((head) => head.operationId))
     let removed = 0
     for (const entry of all) {
       if (entry.status === 'delivered' && now - entry.updatedAt > DELIVERED_GRACE_MS && !protectedIds.has(entry.operationId)) {
         await this.backend.delete(entry.operationId)
+        bumpLogRevision()
         removed += 1
       }
     }
@@ -346,4 +407,19 @@ export function createIndexedDbOperationLogBackend(): OperationLogBackend {
       }
     },
   }
+}
+
+/**
+ * One log instance per renderer process.
+ *
+ * Three call sites (mediaForge's publish, useP2P's transport, the feed
+ * projection) previously built their own instance over the same store. The
+ * revision-keyed cache keeps concurrent instances coherent, but sharing one is
+ * cheaper and makes "the log" a single object to reason about.
+ */
+let sharedLog: SocialOperationLog | null = null
+
+export function sharedSocialOperationLog(): SocialOperationLog {
+  if (!sharedLog) sharedLog = new SocialOperationLog(createIndexedDbOperationLogBackend())
+  return sharedLog
 }

@@ -28,6 +28,41 @@ import type { SocialOperationLog } from './socialOperationLog'
 
 export type InboundOperationOutcome = 'accepted' | 'duplicate' | 'rejected'
 
+/** Peer acknowledgement that an operation was durably appended (L4.3). */
+export interface OperationAck {
+  operationId: string
+  actorId: string
+}
+
+const HEX64 = /^[0-9a-f]{64}$/
+
+export function validateOperationAck(value: unknown): OperationAck | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const ack = value as Record<string, unknown>
+  if (typeof ack.operationId !== 'string' || !HEX64.test(ack.operationId)) return null
+  if (typeof ack.actorId !== 'string' || !HEX64.test(ack.actorId)) return null
+  return { operationId: ack.operationId, actorId: ack.actorId }
+}
+
+/**
+ * Apply a peer's ack: the operation exists locally, its actor matches, and it
+ * advances to 'delivered'.
+ *
+ * Honest scope: this is a connected peer REPORTING a durable append, not a
+ * signed proof that the bytes will still be there tomorrow. It is deliberately
+ * weaker than the media replication receipt (L2), where the attestation is
+ * signed and challenge-bound. Unknown ids, actor mismatches, and downgrades are
+ * refused so a stray or forged frame cannot mark our work delivered.
+ */
+export async function applyOperationAck(log: SocialOperationLog, value: unknown): Promise<boolean> {
+  const ack = validateOperationAck(value)
+  if (!ack) return false
+  const entry = await log.getEntry(ack.operationId)
+  if (!entry) return false
+  if (entry.actorId !== ack.actorId) return false
+  return log.advanceStatus(ack.operationId, 'delivered')
+}
+
 export async function acceptInboundOperation(
   log: SocialOperationLog,
   value: unknown,

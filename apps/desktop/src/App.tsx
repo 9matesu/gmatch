@@ -26,6 +26,7 @@ import { ImageViewer } from "./components/ImageViewer";
 import { PasskeyManager } from "./components/PasskeyManager";
 import { IdleOverlay } from "./components/IdleOverlay";
 import { useP2P } from "./hooks/useP2P";
+import { usePeerFeedPosts } from './hooks/usePeerFeedPosts'
 import { useLegacyBackfill } from "./hooks/useLegacyBackfill";
 import type { ChatMessage } from "./hooks/useP2P";
 import { useGame } from "./hooks/useGame";
@@ -1238,6 +1239,10 @@ export default function Home() {
   const [followingIds, setFollowingIds] = useState<string[]>([])
   const [pmMessagesByPeer, setPmMessagesByPeer] = useState<Record<string, ChatMessage[]>>({})
 
+  // Peer-replicated posts (L4): projected from the durable operation log, no
+  // node route involved. Empty until something has been replicated.
+  const peerFeedPosts = usePeerFeedPosts(identity?.orbitId)
+
   // Server posts now carry `media: {id,url,mime_type}[]` for multi-image posts.
   // Map that into `mediaUrls` so the existing feed/lightbox carousel works.
   const normalizeFeedPost = useCallback((p: FeedPost): FeedPost => {
@@ -1255,7 +1260,6 @@ export default function Home() {
         (p) => !deletedPostIds.has(p.id)
       )
       .map(normalizeFeedPost);
-
     // Public posts: both own uploaded public posts and peer public posts received via P2P
     const seenServerIds = new Set(serverVisible.map((p) => p.id));
     const localPublicPosts: FeedPost[] = items
@@ -1313,8 +1317,32 @@ export default function Home() {
       (p) => !deletedPostIds.has(p.id) && !seenServerIds.has(p.id),
     );
 
-    return [...optimisticVisible, ...pinnedVisible, ...serverVisible, ...repostedPosts, ...localPublicPosts];
-  }, [items, profilePics, identity, myProfile, repostedPosts, archivedPostIds, deletedPostIds, serverPosts, normalizeFeedPost, users, optimisticPosts, pinnedPosts]);
+    // Peer-replicated rows from the durable operation log (L4). Keyed by the
+    // same media objectId as server/local rows, so a post read from any source
+    // is one tile. These are what keep the feed readable when the node hosts
+    // no stateful routes at all (the blind courier 404s /api/posts).
+    const knownIds = new Set([
+      ...seenServerIds,
+      ...localPublicPosts.map((p) => p.id),
+      ...optimisticVisible.map((p) => p.id),
+    ]);
+    const peerVisible = peerFeedPosts
+      .filter((p) => !deletedPostIds.has(p.id) && !knownIds.has(p.id))
+      .map((p) => {
+        const isSelf = p.author_id === identity?.orbitId;
+        const author = users.find((u) => u.id === p.author_id || (u as any).orbitId === p.author_id);
+        if (!isSelf && !author) return p;
+        return {
+          ...p,
+          author_name: isSelf ? (myProfile.displayName || 'You') : (author?.display_name || p.author_name),
+          author_avatar: isSelf
+            ? (profilePics[identity?.orbitId || ''] || null)
+            : (author?.pfp_url || p.author_avatar || null),
+        };
+      });
+
+    return [...optimisticVisible, ...pinnedVisible, ...peerVisible, ...serverVisible, ...repostedPosts, ...localPublicPosts];
+  }, [items, profilePics, identity, myProfile, repostedPosts, archivedPostIds, deletedPostIds, serverPosts, normalizeFeedPost, users, optimisticPosts, pinnedPosts, peerFeedPosts]);
 
   const feedPostsRef = useRef<FeedPost[]>(feedPosts)
   useEffect(() => { feedPostsRef.current = feedPosts }, [feedPosts])

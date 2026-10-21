@@ -211,13 +211,27 @@ peers over the swarm channel (`SWARM_OP` frames,
 the local log's retained history) before a durable append; duplicates are
 no-ops; out-of-order operations are rejected until their predecessor lands.
 Outbound waves (`broadcastPendingOperations`, wired in `useP2P` on boot and
-peer-online) advance entries to 'sending' — never 'delivered', which stays
-reserved for proof-backed acks; long-stuck 'sending' entries become evictable
+peer-online) advance entries to 'sending' — never 'delivered', which is only
+reached by a peer ACK (`SWARM_OP_ACK`, shape + known-id + actor-match
+validated, `applyOperationAck`); long-stuck 'sending' entries become evictable
 past a 7-day window (heads still never evicted, gaps stay detectable).
-8 transport tests pass, including full author→peer replication. Still open:
-the peer feed projection (applying accepted operations to the visible feed),
-operation acks, comment/reaction operations on the wire, offline read paths,
-and the migration/compatibility work below.
+
+The feed projection exists too: `services/socialFeedProjection.ts` turns
+accepted `post.create`/`post.edit`/`post.delete` operations into a
+deterministic post list (objectId identity so server/local rows dedupe against
+it, edited-head resolution, tombstone hiding, createdAt ordering with an
+operationId tiebreak, blocklist filtering of remote tags), and
+`hooks/usePeerFeedPosts.ts` merges those rows into the shell feed as
+`origin: 'peer'` with `sync_state` derived from the local log status. Media
+still resolves through `useObjectImage` (local vault/IndexedDB → signed GET →
+swarm with expectedHash), never a provider URL.
+
+Performance: the log now caches its entry list behind a process-wide revision
+counter, so replicating a wave no longer costs one full store scan per
+operation (previously O(n²) IndexedDB reads); any write from any instance
+invalidates every cache with one integer compare. Still open: offline read
+paths beyond the local log, comment/reaction projection, and the
+migration/compatibility work below.
 
 - [ ] Define signed, versioned post operations and deterministic feed ordering,
   pagination, edits, deletes/tombstones, reposts, and duplicate/conflict rules.

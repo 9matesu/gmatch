@@ -9,7 +9,7 @@ import { mergeRoster } from '../utils/peerRoster';
 import { presenceBucket } from '../utils/compare';
 import { CHAT_WIPE_SECONDS } from '@orbit/shared';
 import { logger } from '../utils/logger';
-import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, hydrateDurableReplications, announcePeerOnline, PEER_ONLINE_EVENT, announceHeldObjects, setSwarmReceiptIdentity, setSwarmOperationHandler, sendSwarmFrame, type SwarmMessage } from '../utils/p2pSwarm';
+import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, hydrateDurableReplications, announcePeerOnline, PEER_ONLINE_EVENT, announceHeldObjects, setSwarmReceiptIdentity, setSwarmOperationHandler, setSwarmOperationAckHandler, sendSwarmFrame, type SwarmMessage } from '../utils/p2pSwarm';
 import { broadcastPresence, fetchPresenceRoster } from '../services/courierPresence';
 import { broadcastMeshFrame, onMeshMessage, connectToPeerMesh } from '../utils/courierSignaling';
 import { resolveDisplayName } from '../utils/displayName';
@@ -370,10 +370,24 @@ export function useP2P(identity: OrbitIdentity | null) {
     // network on boot and whenever a peer comes online. Broadcast is
     // fire-and-forget ('sending', never 'delivered' — proof comes later).
     let teardownOperations: (() => void) | null = null
-    void import('../services/socialOperationLog').then(async ({ SocialOperationLog, createIndexedDbOperationLogBackend }) => {
-      const { acceptInboundOperation, broadcastPendingOperations } = await import('../services/socialOpTransport')
-      const operationLog = new SocialOperationLog(createIndexedDbOperationLogBackend())
-      setSwarmOperationHandler((operation) => acceptInboundOperation(operationLog, operation).then(() => undefined))
+    void import('../services/socialOperationLog').then(async ({ sharedSocialOperationLog }) => {
+      const { acceptInboundOperation, applyOperationAck, broadcastPendingOperations } = await import('../services/socialOpTransport')
+      const operationLog = sharedSocialOperationLog()
+      // Inbound: validate + authorize + durable append, then ACK the sender
+      // (a duplicate is already durable here, so it is acked too). Never ack a
+      // rejection — the sender keeps retrying and re-validating.
+      setSwarmOperationHandler(async (operation) => {
+        const outcome = await acceptInboundOperation(operationLog, operation)
+        if (outcome !== 'accepted' && outcome !== 'duplicate') return
+        const op = operation as { operationId?: unknown; actorId?: unknown }
+        if (typeof op?.operationId !== 'string' || typeof op?.actorId !== 'string') return
+        sendSwarmFrame({ type: 'SWARM_OP_ACK', operationId: op.operationId, actorId: op.actorId })
+      })
+      // Outbound acks advance our own entries to 'delivered' — the only path
+      // that does, since a broadcast is fire-and-forget.
+      setSwarmOperationAckHandler((ack) => {
+        void applyOperationAck(operationLog, ack).catch(() => {})
+      })
       const broadcastOperations = () => {
         void broadcastPendingOperations(operationLog, (operation) => {
           sendSwarmFrame({ type: 'SWARM_OP', operation })
@@ -384,6 +398,7 @@ export function useP2P(identity: OrbitIdentity | null) {
       teardownOperations = () => {
         window.removeEventListener(PEER_ONLINE_EVENT, broadcastOperations)
         setSwarmOperationHandler(null)
+        setSwarmOperationAckHandler(null)
       }
     }).catch(() => { /* operation transport unavailable this session */ })
 

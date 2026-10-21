@@ -141,7 +141,7 @@ export async function forgeMediaLocally(
     if (shouldEmitSocialOperation(options)) {
       try {
         const { publishSignedPostOperation } = await import('./socialPublish')
-        const { SocialOperationLog, createIndexedDbOperationLogBackend } = await import('./socialOperationLog')
+        const { sharedSocialOperationLog } = await import('./socialOperationLog')
         const operation = await publishSignedPostOperation(identity, {
           objectId,
           contentCid: contentHash,
@@ -149,7 +149,7 @@ export async function forgeMediaLocally(
           sizeBytes: file.size,
           caption: options.postCaption || options.caption,
           tags: options.tags,
-        }, new SocialOperationLog(createIndexedDbOperationLogBackend()))
+        }, sharedSocialOperationLog())
         socialOperationId = operation.operationId
       } catch (error) {
         console.warn('[socialPublish] v1 operation commit skipped:', error instanceof Error ? error.message : error)

@@ -101,6 +101,9 @@ export interface FeedPost {
   /** Phase 3 durable publish: optimistic own-post sync badge. Absent on
    *  reconciled server rows (nothing to show). */
   sync_state?: 'local' | 'pending' | 'replicated';
+  /** Where this row came from: a node's feed route or the local operation log
+   *  (peer-replicated). Absent means the legacy server path. */
+  origin?: 'server' | 'peer';
   /** Newest-first liker names for the "Liked by X and N others" line. */
   likers?: { user_id: string; display_name: string; pfp_url?: string | null }[];
   comment_count: number;
