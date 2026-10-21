@@ -81,8 +81,34 @@ export function currentOperationLogRevision(): number {
 /** Fired after a durable write so projections/UI can refresh. */
 export const OPERATION_LOG_CHANGED_EVENT = 'gmatch:operation-log-changed'
 
+/**
+ * Cross-tab coherence.
+ *
+ * The revision counter lives in the renderer process, but the store is shared
+ * IndexedDB: a second window (or the dev server's second tab) writes with its
+ * own counter, and this tab's cache would keep serving a stale entry list —
+ * which would let it authorize an operation against a history it no longer
+ * has. A BroadcastChannel tells the other tabs that a write happened; they
+ * bump their counter and re-read.
+ */
+const LOG_CHANNEL_NAME = 'gmatch-operation-log'
+let logChannel: BroadcastChannel | null = null
+
+function logChannelInstance(): BroadcastChannel | null {
+  if (logChannel) return logChannel
+  if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') return null
+  try {
+    logChannel = new BroadcastChannel(LOG_CHANNEL_NAME)
+    logChannel.onmessage = () => { logRevision += 1 }
+  } catch {
+    logChannel = null
+  }
+  return logChannel
+}
+
 function bumpLogRevision(): void {
   logRevision += 1
+  try { logChannelInstance()?.postMessage({ revision: logRevision }) } catch { /* channel closed */ }
   if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
     try { window.dispatchEvent(new Event(OPERATION_LOG_CHANGED_EVENT)) } catch { /* no DOM */ }
   }

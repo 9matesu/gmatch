@@ -229,8 +229,10 @@ swarm with expectedHash), never a provider URL.
 Performance: the log now caches its entry list behind a process-wide revision
 counter, so replicating a wave no longer costs one full store scan per
 operation (previously O(n²) IndexedDB reads); any write from any instance
-invalidates every cache with one integer compare. Still open: offline read
-paths beyond the local log, comment/reaction projection, and the
+invalidates every cache with one integer compare. A `BroadcastChannel` signal
+extends that to OTHER windows of the same app: without it, a second tab would
+authorize operations against a history it no longer had. Still open: offline
+read paths beyond the local log, comment/reaction projection, and the
 migration/compatibility work below.
 
 - [ ] Define signed, versioned post operations and deterministic feed ordering,
