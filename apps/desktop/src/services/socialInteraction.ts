@@ -31,6 +31,28 @@ export interface ReactionTarget {
   targetId: string
 }
 
+/**
+ * Where a like must be persisted: as a signed operation (the post came from a
+ * peer, so no node owns it) or on the node (server content). The decision is
+ * a pure function so it can be tested without the shell.
+ */
+export function likePersistenceRoute(
+  post: { origin?: 'server' | 'peer' } | null | undefined,
+): 'peer-operation' | 'server' {
+  return post?.origin === 'peer' ? 'peer-operation' : 'server'
+}
+
+/** Persist a like as a signed operation (peer-replicated posts). */
+export async function persistPeerLike(
+  identity: OrbitIdentityLike,
+  target: ReactionTarget,
+  liked: boolean,
+  log: SocialOperationLog,
+): Promise<void> {
+  if (liked) await publishReactionAdd(identity, target, log)
+  else await publishReactionRemove(identity, target, log)
+}
+
 /** Every accepted operation, in any order — the authorizer's history. */
 async function acceptedHistory(log: SocialOperationLog): Promise<SocialOperation[]> {
   const entries = await log.listAllOperations()

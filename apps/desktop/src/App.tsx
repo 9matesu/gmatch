@@ -1601,6 +1601,17 @@ export default function Home() {
   // response carries no count (keep the optimistic value, don't roll back).
   const persistLike = useCallback(async (postId: string, liked: boolean): Promise<number | undefined> => {
     if (!identity) return undefined
+    // A peer-replicated post has no server row to like: the like is a SIGNED
+    // operation in the durable log (L5.2), replicated to peers like every
+    // other operation. Server posts keep the node path.
+    const post = feedPostsRef.current.find((p) => p.id === postId)
+    const { likePersistenceRoute, persistPeerLike } = await import('./services/socialInteraction')
+    if (likePersistenceRoute(post) === 'peer-operation') {
+      const { sharedSocialOperationLog } = await import('./services/socialOperationLog')
+      await persistPeerLike(identity, { targetType: 'post', targetId: postId }, liked, sharedSocialOperationLog())
+      // The count comes from the local projection, not from a node.
+      return undefined
+    }
     const res = await orbitFetch(`/api/posts/${postId}/like`, { method: liked ? 'POST' : 'DELETE' }, identity)
     if (!res.ok) throw new Error(`like failed: ${res.status}`)
     const data = await res.json()

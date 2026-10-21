@@ -321,9 +321,19 @@ peer-replicated social state applies to peer-replicated content. Posts that
 exist only on a node keep using that node's endpoints — there is no hidden
 fallback in between. Peer reaction COUNTS are already folded into the feed
 rows (`applyReactionsToFeedPosts`), so a replicated post shows the real
-number and marks our own like. Still open: the write path in the UI (the like
-button and the comment box still call the node), profile/follow operations,
-moderation reports, and the migration/import path.
+number and marks our own like. The WRITE path is live too: liking a
+peer-replicated post publishes a signed `reaction.add`/`reaction.remove` in the
+durable log instead of calling a node that does not own the post
+(`persistLike` → `likePersistenceRoute` → `persistPeerLike`); server posts keep
+the node path. Still open: the comment box write path, profile/follow
+operations, moderation reports, and the import surface.
+
+**Migration of existing content.** `services/socialPostImport.ts` turns the
+user's OWN public local posts into `post.create` operations, so the
+local-first feed is not born empty. Guardrails: own posts only, idempotent by
+objectId, capped per run, additive only (it never touches the post, its bytes
+or the vault), and **opt-in** — re-publishing old content to peers is a
+visible decision, so nothing calls it automatically at boot.
 - [ ] Model comments/replies, reactions, follows, profile fields, and
   moderation reports as authorized signed operations with stable IDs and
   explicit deletion/edit behavior.
@@ -372,6 +382,14 @@ storage. Metadata leakage and retention limits are documented.
 **Purpose:** inventory and explicitly migrate or retain every remaining
 central service rather than silently treating rendezvous as content authority.
 
+Progress: the inventory exists — [`API-INVENTORY.md`](API-INVENTORY.md) lists
+every node route the client calls, with its role (rendezvous / economy /
+core-social / media-metadata / legacy / optional / host) and its migration
+target. A guard test (`src/utils/apiInventory.test.ts`) scans the renderer for
+every `orbitFetch('/api/...')` and fails when a route is not classified, so
+the inventory cannot rot into a lie. The economy stays node-authoritative on
+purpose (`g$` settlement needs one ordering).
+
 - [ ] Audit `orbitFetch('/api/...')` use in `apps/desktop/src`, classify each
   endpoint as rendezvous, economy/authoritative transaction, import/legacy,
   optional enhancement, or core social state. Maintain the list in docs.
@@ -399,6 +417,10 @@ routes disabled.
   read-only, adult-rated, and client-filtered by the shared blocklist.
 - [ ] Fuzz message parsers and migrations; add property tests for size bounds,
   canonical signatures, replay idempotence, and transaction interruption.
+  **Done (first pass):** `src/utils/parserProperties.test.ts` asserts that
+  every single-byte mutation of a signed operation is rejected, that random
+  operation-shaped objects are rejected, and that 300 malformed swarm frames
+  never store bytes.
 - [ ] Test on supported Windows and Linux builds. Include upgrade from current
   IndexedDB/localStorage/vault data, rollback/recovery instructions, and
   backup/export verification.

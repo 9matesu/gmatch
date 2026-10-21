@@ -4,6 +4,8 @@ import { SocialOperationLog, type LoggedOperation, type OperationLogBackend } fr
 import { acceptInboundOperation } from './socialOpTransport'
 import { publishSignedPostOperation } from './socialPublish'
 import {
+  likePersistenceRoute,
+  persistPeerLike,
   publishComment,
   publishCommentDelete,
   publishReactionAdd,
@@ -60,6 +62,24 @@ describe('signed social state (L5.1)', () => {
     const log = newLog()
     await expect(publishReactionAdd(ME, { targetType: 'post', targetId: 'ghost' }, log))
       .rejects.toThrow(/unavailable/)
+  })
+
+  it('routes a like to the peer operation path only for peer content', () => {
+    expect(likePersistenceRoute({ origin: 'peer' })).toBe('peer-operation')
+    expect(likePersistenceRoute({ origin: 'server' })).toBe('server')
+    expect(likePersistenceRoute(undefined)).toBe('server')
+    expect(likePersistenceRoute(null)).toBe('server')
+  })
+
+  it('persists a peer like as a signed operation (and un-likes it)', async () => {
+    const log = newLog()
+    await peerPostIn(log)
+    await persistPeerLike(ME, { targetType: 'post', targetId: 'post-1' }, true, log)
+    const liked = projectReactions(await log.listAllOperations())
+    expect(liked.get(reactionKey('post', 'post-1'))?.count).toBe(1)
+    await persistPeerLike(ME, { targetType: 'post', targetId: 'post-1' }, false, log)
+    const unliked = projectReactions(await log.listAllOperations())
+    expect(unliked.get(reactionKey('post', 'post-1'))?.count ?? 0).toBe(0)
   })
 
   it('refuses an un-like without an active like', async () => {
