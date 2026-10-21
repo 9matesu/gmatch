@@ -199,6 +199,47 @@ faults, and lifecycle resource measurements.
 logs/artifacts; independent stores are verified by read-back, not by a HAVE
 message or sender acknowledgement alone.
 
+## Measurements (2026-10-21, this machine)
+
+Numbers, not claims. Reproduce with `npx vitest run src/utils/swarmHarness.measure.test.ts`
+(protocol/CPU) and `node scripts/measure-disk.cjs` (real encrypted disk).
+
+**Peer file dissemination** (two isolated peers in one process — protocol and
+persistence evidence, NOT NAT evidence):
+
+| measurement | result |
+|---|---|
+| 4 MiB file, peer to peer | 245–267 ms wall, 234–296 ms CPU → 15–16 MiB/s wall, 12–17 MiB/s per CPU-second |
+| wire cost | 820 chunk frames of 5 KiB + 1 WANT + 1 challenge + 1 receipt |
+| persistence | the bytes land in the peer's DURABLE store (hash verified) |
+| restart | a new session over the same store still holds the file |
+| re-seeding | the restarted peer serves the file to a third peer |
+| fan-out | 2 MiB to 3 peers → 3/3 durable copies |
+
+**Operation replication wave** (512 signed posts, author signs, peer accepts):
+
+| measurement | before | now |
+|---|---|---|
+| wave wall time | hung (>15 min) | 4.7 s |
+| CPU per operation | O(n²) signature re-verification | 9.55 ms (author 5.14 / peer 4.04) |
+| peer store scans | 512 (one per operation) | 1 (whole wave) |
+| projection of 512 operations | — | 16 ms |
+
+The three fixes behind those numbers: the authorizer no longer re-verifies the
+whole accepted history per operation (`trustedHistory`), the log cache survives
+local writes instead of being dropped (per-store revision), and the operation
+is verified once instead of twice per hop (`authorizeValidatedOperation`).
+
+**Encrypted image cache** (real disk, AES-256-GCM files under
+`<userData>/imgcache`):
+
+| measurement | result |
+|---|---|
+| write (encrypted) | 40 MiB in 102 ms → 392 MiB/s, 109 ms CPU |
+| read + decrypt | 40 MiB in 263 ms → 152 MiB/s, 142 ms CPU |
+| disk footprint | 1.00× payload (per-file nonce + tag are negligible) |
+| LRU ceiling | cap 8 MiB respected (kept 6 MiB / 3 files) |
+
 ### L4 — Feed and post lifecycle migration
 
 **Purpose:** remove API dependence from the core public-feed read/write path

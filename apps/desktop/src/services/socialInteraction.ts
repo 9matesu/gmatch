@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  authorizeSocialOperation,
+  authorizeValidatedOperation,
   createSocialOperation,
   type SocialOperation,
 } from '@orbit/protocol'
@@ -47,7 +47,8 @@ async function signAndAppend(
   // SIGNED operation against the accepted history — an unsigned draft cannot
   // be authorized (the authorizer verifies ids and signatures).
   const signed = createSocialOperation(operation, identity.privateKeyHex)
-  const error = authorizeSocialOperation(signed, history)
+  // The log only holds operations that were validated on ingest.
+  const error = authorizeValidatedOperation(signed, history, { verifiedManifests: new Map(), trustedHistory: true })
   if (error) throw new Error(error)
   const { outcome } = await log.append({
     operationId: signed.operationId,

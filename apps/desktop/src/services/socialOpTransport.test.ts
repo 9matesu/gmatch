@@ -107,18 +107,16 @@ describe('socialOpTransport (L4 seed)', () => {
 
   it('evicts long-stuck sending entries at capacity but never the chain head', async () => {
     const backend = memoryBackend()
-    const log = new SocialOperationLog(backend, { maxEntries: 4 })
+    let now = Date.now()
+    const log = new SocialOperationLog(backend, { maxEntries: 4, now: () => now })
     const first = await authorPost(log, 1)
-    await authorPost(log, 2) // the chain head that must survive
-    // Age the non-head entry far past SENDING_EVICT_MS; the head stays fresh.
-    for (const [id, entry] of backend.store) {
-      const isHead = entry.actorSequence === 2
-      backend.store.set(id, {
-        ...entry,
-        status: 'sending',
-        updatedAt: isHead ? Date.now() : Date.now() - SENDING_EVICT_MS - 1000,
-      })
-    }
+    const second = await authorPost(log, 2) // the chain head that must survive
+    // Both are 'sending' (broadcast, no ack yet). The clock then jumps past the
+    // eviction window: the stale entry is evictable, the head stays fresh.
+    await log.advanceStatus(first.operationId, 'sending')
+    await log.advanceStatus(second.operationId, 'sending')
+    now += SENDING_EVICT_MS + 1000
+    await log.bumpAttempts(second.operationId) // refresh the head only
     // Fill past capacity: the stale entry is evictable, the head is not.
     await authorPost(log, 3)
     await authorPost(log, 4)

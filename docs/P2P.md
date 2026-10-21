@@ -22,7 +22,7 @@
 
 ## 3. Transports and replication
 
-- 1.5.5: direct WebRTC DataChannels (`gmatch-mesh`), `SWARM_WANT/CHUNK` 64KB
+- 1.5.5: direct WebRTC DataChannels (`gmatch-mesh`), `SWARM_WANT/CHUNK` 5 KiB frames
   legacy media path, BitTorrent v1 (real infohashes, self-hosted blind wss
   trackers, no public trackers, no DHT), sealed courier mailboxes for
   off-mesh/DM/signal. Target: js-libp2p (WebRTC-direct, relay-v2 explicit

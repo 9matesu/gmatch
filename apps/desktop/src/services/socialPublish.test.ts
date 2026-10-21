@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { restoreIdentity } from '@orbit/crypto'
 import { validateSocialOperation } from '@orbit/protocol'
-import { SocialOperationLog, type OperationLogBackend } from './socialOperationLog'
+import { SocialOperationLog, DELIVERED_GRACE_MS, type OperationLogBackend } from './socialOperationLog'
 import { publishSignedPostOperation, shouldEmitSocialOperation } from './socialPublish'
 import { contentManifestHash } from '@orbit/protocol'
 
@@ -34,10 +34,13 @@ function input(n: number, overrides: Partial<Parameters<typeof publishSignedPost
 describe('publishSignedPostOperation (L1 slice 3)', () => {
   let backend: ReturnType<typeof memoryBackend>
   let log: SocialOperationLog
+  /** Injectable clock: aging must go through the log, not behind its back. */
+  let clock: { now: number; advance: (ms: number) => void }
 
   beforeEach(() => {
     backend = memoryBackend()
-    log = new SocialOperationLog(backend)
+    clock = { now: 1_000_000, advance: (ms) => { clock.now += ms } }
+    log = new SocialOperationLog(backend, { now: () => clock.now })
   })
 
   it('commits a signed, self-authorized, chained post.create durably', async () => {
@@ -89,8 +92,13 @@ describe('publishSignedPostOperation (L1 slice 3)', () => {
   it('never emits onto a forked log history', async () => {
     await publishSignedPostOperation(IDENTITY, input(1), log)
     // Tamper a second entry in at the same sequence — the slot helper must refuse.
-    const existing = [...backend.store.values()][0]
-    backend.store.set('b'.repeat(64), { ...existing, operationId: 'b'.repeat(64), actorSequence: existing.actorSequence })
+    await log.append({
+      operationId: 'b'.repeat(64),
+      actorId: IDENTITY.orbitId,
+      actorSequence: 1,
+      createdAt: clock.now,
+      record: { tampered: true },
+    })
     await expect(publishSignedPostOperation(IDENTITY, input(2), log)).rejects.toThrow(/fork/)
   })
 
@@ -104,23 +112,21 @@ describe('publishSignedPostOperation (L1 slice 3)', () => {
 
   it('preserves actor heads across prune and capacity eviction', async () => {
     await publishSignedPostOperation(IDENTITY, input(1), log)
-    await publishSignedPostOperation(IDENTITY, input(2), log)
-    // Age and deliver the older entry so prune wants it — but it is the
-    // referenced predecessor, and the head must survive regardless.
-    const older = [...backend.store.values()].find((entry) => entry.actorSequence === 1)!
-    backend.store.set(older.operationId, { ...older, status: 'delivered', updatedAt: 1 })
-    await log.advanceStatus([...backend.store.values()].find((entry) => entry.actorSequence === 2)!.operationId, 'delivered')
-    const headEntry = [...backend.store.values()].find((entry) => entry.actorSequence === 2)!
-    backend.store.set(headEntry.operationId, { ...headEntry, updatedAt: 1 })
-    const removed = await log.prune(Date.now())
+    const second = await publishSignedPostOperation(IDENTITY, input(2), log)
+    // Deliver both, then age them past the grace window: the older entry is
+    // the referenced predecessor and the head is the chain head.
+    await log.advanceStatus([...backend.store.values()].find((entry) => entry.actorSequence === 1)!.operationId, 'delivered')
+    await log.advanceStatus(second.operationId, 'delivered')
+    clock.advance(DELIVERED_GRACE_MS + 10_000)
+    const removed = await log.prune(clock.now)
     // The aged delivered predecessor is pruned (gaps are legal and
     // detectable); the actor's chain HEAD must survive.
     expect(removed).toBe(1)
     expect([...backend.store.values()].map((entry) => entry.actorSequence)).toEqual([2])
     // The head survives even when it alone is old + delivered.
-    backend.store.set(headEntry.operationId, { ...headEntry, status: 'delivered', updatedAt: 1 })
-    expect(await log.prune(Date.now())).toBe(0)
-    expect(backend.store.has(headEntry.operationId)).toBe(true)
+    clock.advance(DELIVERED_GRACE_MS + 10_000)
+    expect(await log.prune(clock.now)).toBe(0)
+    expect(backend.store.has(second.operationId)).toBe(true)
   })
 
   it('gates emission to public durable feed posts only', () => {

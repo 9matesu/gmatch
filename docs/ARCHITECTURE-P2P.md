@@ -24,7 +24,7 @@ In `gmatch` v1.5.0, the central deployment (`https://gmatch-wcz1.onrender.com`) 
              +--------------+  DataChannels  +--------------+
                     |                               |
               Local IndexedDB                 Local IndexedDB
-              64KB Chunk Seed                 64KB Chunk Seed
+              5KB Chunk Seed                  5KB Chunk Seed
 ```
 
 ### Core Architecture Pillars
@@ -44,7 +44,7 @@ In `gmatch` v1.5.0, the central deployment (`https://gmatch-wcz1.onrender.com`) 
 
 4. **WebRTC DataChannel Mesh & Chunked Swarm:**
    - Direct peer-to-peer data channels (`gmatch-mesh`) transmit social feeds, chats, and image/video media.
-- Large media files are divided into 64KB chunks and distributed via `SWARM_WANT` and `SWARM_CHUNK` protocols.
+- Large media files are divided into 5 KiB chunks and distributed via `SWARM_WANT` and `SWARM_CHUNK` protocols.
 - Every node that downloads or creates media persists it to local IndexedDB and acts as a seeder (`hydrateLocalObjects`).
 - Swarm frames enforce chunk metadata/length bounds and a 64 MiB object ceiling. A fetched object is only reported as received after local persistence succeeds; session RAM caching alone is not durability evidence. Pending retry state is bounded and validates object IDs and SHA-256 hashes. Duplicate chunk re-delivery (relay/transport replay) is an idempotent no-op, never a fetch failure; every other malformed frame still aborts the transfer without storing bytes.
 
@@ -250,13 +250,13 @@ type SwarmMessage =
 
 ### Chunking Mechanics
 
-- **Chunk Size:** Standard 64KB (`64 * 1024` bytes) per chunk.
+- **Chunk Size:** 5 KiB (`5 * 1024` bytes) per chunk. The smaller size keeps the base64 JSON frame under the relay's frame-splitting threshold (`MAX_SWARM_FRAME_BYTES` = 8 KiB); the "64 KB" figure in earlier versions of this document was stale.
 - **Request Cycle:** When a peer sees an image announcement or post referencing `objectId`, it broadcasts `SWARM_WANT` with the ID across:
   1. Active WebRTC mesh data channels (`broadcastMeshFrame`).
   2. Local tab cross-process `BroadcastChannel('orbit_p2p_swarm')`.
   3. The node's WS relay, wrapped as `{ type: 'SWARM_FRAME', swarm }` — the
      guaranteed fallback when no direct channel exists.
-- **Response Cycle:** Any peer holding the object slices the binary buffer into 64KB chunks and sends sequential `SWARM_CHUNK` frames.
+- **Response Cycle:** Any peer holding the object slices the binary buffer into 5 KiB chunks and sends sequential `SWARM_CHUNK` frames (4 MiB = 820 frames).
 - **Reassembly:** The requesting peer tracks received chunk indices in memory. Once all chunks are present, it assembles the final `Blob`, verifies the SHA-256 digest against `objectId`, and commits it to local IndexedDB.
 
 ### SWARM_HAVE: advertise, don't broadcast the world (2026-10-19)

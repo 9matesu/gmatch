@@ -39,10 +39,14 @@ function entry(n: number, overrides: Partial<LoggedOperation> = {}) {
 describe('SocialOperationLog (L1 slice 1)', () => {
   let backend: ReturnType<typeof memoryBackend>
   let log: SocialOperationLog
+  /** Injectable clock: aging entries must not mean mutating the store behind
+   *  the log's back (the log caches its entry list). */
+  let clock: { now: number; advance: (ms: number) => void }
 
   beforeEach(() => {
     backend = memoryBackend()
-    log = new SocialOperationLog(backend)
+    clock = { now: 1_000_000, advance: (ms) => { clock.now += ms } }
+    log = new SocialOperationLog(backend, { now: () => clock.now })
   })
 
   it('appends durably and is idempotent by operation id', async () => {
@@ -85,14 +89,12 @@ describe('SocialOperationLog (L1 slice 1)', () => {
   })
 
   it('prunes only delivered entries past the grace window', async () => {
-    const now = Date.now()
-    await log.append(entry(1, { createdAt: now - DELIVERED_GRACE_MS - 10_000, updatedAt: now - DELIVERED_GRACE_MS - 10_000 }))
-    await log.append(entry(2, { createdAt: now - DELIVERED_GRACE_MS - 10_000, updatedAt: now - DELIVERED_GRACE_MS - 10_000 }))
+    await log.append(entry(1, { createdAt: clock.now - DELIVERED_GRACE_MS - 10_000, updatedAt: clock.now - DELIVERED_GRACE_MS - 10_000 }))
+    await log.append(entry(2, { createdAt: clock.now - DELIVERED_GRACE_MS - 10_000, updatedAt: clock.now - DELIVERED_GRACE_MS - 10_000 }))
     await log.advanceStatus(entry(1).operationId, 'delivered')
     // Age the delivered entry past the grace window (delivery refreshed updatedAt).
-    const aged = backend.store.get(entry(1).operationId)!
-    backend.store.set(entry(1).operationId, { ...aged, updatedAt: now - DELIVERED_GRACE_MS - 10_000 })
-    const removed = await log.prune(now)
+    clock.advance(DELIVERED_GRACE_MS + 10_000)
+    const removed = await log.prune(clock.now)
     expect(removed).toBe(1)
     expect(backend.store.has(entry(1).operationId)).toBe(false)
     expect(backend.store.has(entry(2).operationId)).toBe(true)

@@ -39,6 +39,19 @@ export interface VerifiedSocialManifest {
 export interface SocialAuthorizationContext {
   /** Must contain only manifests whose signature and CID were already checked. */
   verifiedManifests: ReadonlyMap<string, VerifiedSocialManifest>
+  /**
+   * The caller guarantees the accepted history was ALREADY validated when it
+   * was ingested (the transport validates every operation before it appends
+   * it, so the log only ever holds valid operations).
+   *
+   * Without this flag the authorizer re-validates the entire history on every
+   * call — one signature verification per retained entry, PER OPERATION. A
+   * 512-operation replication wave did ~131k Ed25519 verifications that way
+   * (O(n²)); with the flag only the operation under authorization is
+   * verified, and the cheap structural checks (equivocation, predecessor
+   * binding) still run.
+   */
+  trustedHistory?: boolean
 }
 
 type UnsignedOperation = Omit<SocialOperation, 'operationId' | 'signature'>
@@ -172,9 +185,29 @@ export function authorizeSocialOperation(
 ): string | null {
   const malformed = validateSocialOperation(value)
   if (malformed) return malformed
-  const operation = value as SocialOperation
-  const historyError = acceptedHistory.find((entry) => validateSocialOperation(entry))
-  if (historyError) return 'accepted history contains an invalid operation'
+  return authorizeValidatedOperation(value as SocialOperation, acceptedHistory, context)
+}
+
+/**
+ * The same authorization WITHOUT re-validating the operation's signature.
+ *
+ * Callers that just validated (or created) the operation pay for exactly one
+ * Ed25519 verification instead of two: the replication path used to verify
+ * every operation twice per hop (validate + authorize), which was half of the
+ * CPU cost of a replication wave. The history checks are unchanged.
+ */
+export function authorizeValidatedOperation(
+  operation: SocialOperation,
+  acceptedHistory: SocialOperation[],
+  context: SocialAuthorizationContext = { verifiedManifests: new Map() },
+): string | null {
+  // Re-validating every retained entry is O(history) signature verifications
+  // per operation. Callers that ingested the history through the validated
+  // path opt out with `trustedHistory`; the default stays strict.
+  if (!context.trustedHistory) {
+    const historyError = acceptedHistory.find((entry) => validateSocialOperation(entry))
+    if (historyError) return 'accepted history contains an invalid operation'
+  }
   const historyIds = new Map(acceptedHistory.map((entry) => [entry.operationId, entry]))
   const actorSequences = new Set<string>()
   for (const entry of acceptedHistory) {

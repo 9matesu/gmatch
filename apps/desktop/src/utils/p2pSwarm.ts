@@ -100,6 +100,24 @@ const MAX_CHUNKS = Math.ceil(MAX_OBJECT_BYTES / CHUNK_SIZE)
 const MAX_SWARM_FRAME_BYTES = 8 * 1024
 const MAX_CHUNK_BASE64_LENGTH = Math.floor((MAX_SWARM_FRAME_BYTES - 512) / 4) * 4
 
+/**
+ * Base64 for chunk frames.
+ *
+ * The obvious loop that appends one character at a time dominated the CPU
+ * cost of a transfer (4 MiB = 4M string appends). Building the binary string
+ * in 32 KiB blocks with `String.fromCharCode.apply` produces the same result
+ * an order of magnitude cheaper.
+ */
+function bytesToBase64(bytes: Uint8Array): string {
+  const BLOCK = 0x8000
+  let binary = ''
+  for (let offset = 0; offset < bytes.length; offset += BLOCK) {
+    const end = Math.min(offset + BLOCK, bytes.length)
+    binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(offset, end)))
+  }
+  return btoa(binary)
+}
+
 /** SHA-256 hex of a blob's bytes (Web Crypto). Used to VERIFY reassembled
  *  swarm media against the object's content_hash before accepting it —
  *  a peer's chunk stream is not proof the bytes are the real object. */
@@ -770,9 +788,7 @@ export async function handleSwarmMessage(msg: SwarmMessage): Promise<boolean> {
       const mimeType = blob.type || 'application/octet-stream'
       for (let i = 0; i < totalChunks; i++) {
         const slice = new Uint8Array(buffer.slice(i * CHUNK_SIZE, Math.min((i + 1) * CHUNK_SIZE, buffer.byteLength)))
-        let binaryStr = ''
-        for (let j = 0; j < slice.length; j++) binaryStr += String.fromCharCode(slice[j])
-        const frame: SwarmMessage = { type: 'SWARM_CHUNK', id: msg.id, index: i, total: totalChunks, mimeType, dataBase64: btoa(binaryStr) }
+        const frame: SwarmMessage = { type: 'SWARM_CHUNK', id: msg.id, index: i, total: totalChunks, mimeType, dataBase64: bytesToBase64(slice) }
         if (!isBoundedChunkFrame(frame)) return true
         swarmSend(frame)
       }
@@ -1012,12 +1028,8 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
         const end = Math.min(start + CHUNK_SIZE, totalBytes)
         const slice = new Uint8Array(buffer.slice(start, end))
 
-        // Convert slice to base64
-        let binaryStr = ''
-        for (let j = 0; j < slice.length; j++) {
-          binaryStr += String.fromCharCode(slice[j])
-        }
-        const dataBase64 = btoa(binaryStr)
+        // Convert slice to base64 (block-wise: see bytesToBase64).
+        const dataBase64 = bytesToBase64(slice)
 
         const frame: SwarmMessage = {
           type: 'SWARM_CHUNK',

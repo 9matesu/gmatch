@@ -340,7 +340,7 @@ offline earnings). Each +5% click power. Persist across prestige.
   roster with 60s TTL and 120s drop threshold. Zero presence state stored on server.
 - **Signaling over Courier:** WebRTC signaling (SDP offer/answer, ICE) sealed with X25519 ECIES
   and routed as `kind: 'signal'` envelopes via `/api/mail/:token`.
-- **Swarm Media Distribution:** Media divided into 64KB chunks (`SWARM_WANT`, `SWARM_CHUNK`)
+- **Swarm Media Distribution:** Media divided into 5 KiB chunks (`SWARM_WANT`, `SWARM_CHUNK`) — the chunk size keeps the base64 JSON frame under the relay's frame-splitting threshold
   over direct WebRTC DataChannels (`gmatch-mesh`). All received/created media stored in local
   IndexedDB and automatically seeded on boot (`hydrateLocalObjects`).
 - **Announcements ride the relay too (2026-10-19):** peer announcements

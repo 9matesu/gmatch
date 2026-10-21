@@ -2,7 +2,7 @@
 
 import { normalizeTagShape } from '@orbit/shared'
 import {
-  authorizeSocialOperation,
+  authorizeValidatedOperation,
   contentManifestHash,
   createSocialOperation,
   type SocialOperation,
@@ -90,8 +90,11 @@ export async function publishSignedPostOperation(
   // bookkeeping fields must not leak into the protocol view.)
   const history = (await log.listOperationsByActor(identity.orbitId))
     .map((entry) => entry.record as unknown as SocialOperation)
-  const error = authorizeSocialOperation(operation, history, {
+  const error = authorizeValidatedOperation(operation, history, {
     verifiedManifests: new Map([[manifestHash, manifest]]),
+    // Our own log only holds operations that were validated on ingest, and
+    // the operation was just signed (and validated) by the signer.
+    trustedHistory: true,
   })
   if (error) throw new Error(error)
 

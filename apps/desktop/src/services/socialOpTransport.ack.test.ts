@@ -79,11 +79,14 @@ describe('operation log read cache', () => {
     await log.listAllOperations()
     await log.listAllOperations()
     await log.listPendingOperations()
-    // One scan for the whole burst: the cache is shared by revision.
-    expect(backend.reads).toBe(before + 1)
+    // A local write keeps the cache in step: the burst costs NO extra scan.
+    expect(backend.reads).toBe(before)
 
     // A write through ANOTHER instance invalidates this instance's cache.
+    await other.listAllOperations() // warm the other instance's cache first
+    const beforeOtherWrite = backend.reads
     await authorPost(other, 2)
     expect(await log.listAllOperations()).toHaveLength(2)
+    expect(backend.reads).toBe(beforeOtherWrite + 1)
   })
 })

@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  authorizeSocialOperation,
+  authorizeValidatedOperation,
   contentManifestHash,
   validateSocialOperation,
   type SocialOperation,
@@ -93,7 +93,10 @@ export async function acceptInboundOperation(
 
   const history = (await log.listOperationsByActor(operation.actorId))
     .map((entry) => entry.record as unknown as SocialOperation)
-  if (authorizeSocialOperation(operation, history, { verifiedManifests })) return 'rejected'
+  // The log only holds operations that were validated on ingest, so the
+  // authorizer does not re-verify the whole history for every operation, and
+  // the operation itself was already validated above (one verification, not two).
+  if (authorizeValidatedOperation(operation, history, { verifiedManifests, trustedHistory: true })) return 'rejected'
 
   try {
     const { outcome } = await log.append({

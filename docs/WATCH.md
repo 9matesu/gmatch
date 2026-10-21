@@ -169,7 +169,7 @@ A host path is never a remote source. The flow is explicit:
    `size`). Creating a room from a file uses `POST /api/watchparty`
    `{localEntry}`; the server verifies the object row, its video MIME, the
    hash, and owner/recipient access before seeding the room.
-6. Each participant fetches explicitly (Receive): 64KB swarm chunks with
+6. Each participant fetches explicitly (Receive): 5 KiB swarm chunks with
    progress + cancel, SHA-256 verified before the bytes count as available.
    Partial or tampered transfers are dropped, never registered.
 7. Verified clients signal `watch.ready {party, id, hash}`; the server
@@ -178,7 +178,7 @@ A host path is never a remote source. The flow is explicit:
    declared available from the readiness counts, not from a bare resolve.
 
 Limits, stated honestly: recipients are the members at share time (late
-joiners need a re-share); large transfers ride the same 64KB-chunk swarm as
+joiners need a re-share); large transfers ride the same 5 KiB-chunk swarm as
 everything else, so movies take a while and the 120s receive window plus
 cancel exist for exactly that; swarm chunks carry no per-chunk digest, so
 integrity is whole-file SHA-256 on completion.

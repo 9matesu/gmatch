@@ -68,14 +68,27 @@ const STATUS_RANK: Record<OperationLogStatus, number> = { committed: 0, sending:
  * path — inbound replication validates each operation against its actor's
  * retained history, which used to mean one full store scan PER OPERATION
  * (O(n^2) for a sync wave). Instances therefore cache the entry list and key
- * the cache on this shared counter; any write from any instance invalidates
- * every cache in the process with one integer compare.
+ * the cache on a revision, so any write invalidates every cache over the same
+ * store with one integer compare.
+ *
+ * The revision is PER STORE (a WeakMap keyed by the backend), not global: two
+ * logs over two different stores (e.g. an author log and the peer log in the
+ * measurement harness) must not invalidate each other. Cross-WINDOW writes
+ * (another renderer over the same IndexedDB store, but a different backend
+ * object) are announced over the BroadcastChannel and bump the external
+ * revision, which invalidates every cache in this window.
  */
-let logRevision = 0
+const backendRevisions = new WeakMap<object, number>()
+/** Bumped when ANOTHER window wrote to our store. */
+let externalRevision = 0
+
+function backendRevision(backend: object): number {
+  return backendRevisions.get(backend) ?? 0
+}
 
 /** Revision the cached read is valid for (diagnostics/tests). */
 export function currentOperationLogRevision(): number {
-  return logRevision
+  return externalRevision
 }
 
 /** Fired after a durable write so projections/UI can refresh. */
@@ -84,12 +97,11 @@ export const OPERATION_LOG_CHANGED_EVENT = 'gmatch:operation-log-changed'
 /**
  * Cross-tab coherence.
  *
- * The revision counter lives in the renderer process, but the store is shared
- * IndexedDB: a second window (or the dev server's second tab) writes with its
- * own counter, and this tab's cache would keep serving a stale entry list —
- * which would let it authorize an operation against a history it no longer
- * has. A BroadcastChannel tells the other tabs that a write happened; they
- * bump their counter and re-read.
+ * The store is shared IndexedDB: a second window (or the dev server's second
+ * tab) writes through its own backend object, and this tab's cache would keep
+ * serving a stale entry list — which would let it authorize an operation
+ * against a history it no longer has. A BroadcastChannel tells the other tabs
+ * that a write happened; they invalidate and re-read.
  */
 const LOG_CHANNEL_NAME = 'gmatch-operation-log'
 let logChannel: BroadcastChannel | null = null
@@ -99,16 +111,21 @@ function logChannelInstance(): BroadcastChannel | null {
   if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') return null
   try {
     logChannel = new BroadcastChannel(LOG_CHANNEL_NAME)
-    logChannel.onmessage = () => { logRevision += 1 }
+    logChannel.onmessage = () => {
+      externalRevision += 1
+      if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+        try { window.dispatchEvent(new Event(OPERATION_LOG_CHANGED_EVENT)) } catch { /* no DOM */ }
+      }
+    }
   } catch {
     logChannel = null
   }
   return logChannel
 }
 
-function bumpLogRevision(): void {
-  logRevision += 1
-  try { logChannelInstance()?.postMessage({ revision: logRevision }) } catch { /* channel closed */ }
+function bumpLogRevision(backend: object): void {
+  backendRevisions.set(backend, backendRevision(backend) + 1)
+  try { logChannelInstance()?.postMessage({ store: backendRevision(backend) }) } catch { /* channel closed */ }
   if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
     try { window.dispatchEvent(new Event(OPERATION_LOG_CHANGED_EVENT)) } catch { /* no DOM */ }
   }
@@ -155,28 +172,61 @@ export interface AppendResult {
 
 export class SocialOperationLog {
   private readonly maxEntries: number
-  /** Entry-list cache, valid only for `logRevision` (see bumpLogRevision). */
-  private cachedEntries: { revision: number; entries: LoggedOperation[] } | null = null
+  /** Entry-list cache, valid only for the store revision + external revision. */
+  private cachedEntries: { storeRevision: number; externalRevision: number; entries: LoggedOperation[] } | null = null
+  /** Injectable clock: aging (grace windows, eviction) must be testable
+   *  without mutating the store behind the log's back. */
+  private readonly now: () => number
 
   constructor(
     private readonly backend: OperationLogBackend,
-    options: { maxEntries?: number } = {},
+    options: { maxEntries?: number; now?: () => number } = {},
   ) {
     this.maxEntries = options.maxEntries ?? MAX_LOG_ENTRIES
+    this.now = options.now ?? (() => Date.now())
   }
 
   /**
-   * Every valid entry, cached until any instance writes. The returned array is
-   * shared: callers must treat it as read-only (all public readers copy or
-   * filter into a new array).
+   * Every valid entry, cached until this store (or another window) writes. The
+   * returned array is shared: callers must treat it as read-only (all public
+   * readers copy or filter into a new array).
    */
   private async allEntries(): Promise<LoggedOperation[]> {
-    if (this.cachedEntries && this.cachedEntries.revision === logRevision) {
+    const storeRevision = backendRevision(this.backend)
+    if (this.cachedEntries &&
+        this.cachedEntries.storeRevision === storeRevision &&
+        this.cachedEntries.externalRevision === externalRevision) {
       return this.cachedEntries.entries
     }
     const entries = (await this.backend.getAll()).filter(isValidLogEntryShape)
-    this.cachedEntries = { revision: logRevision, entries }
+    this.cachedEntries = { storeRevision, externalRevision, entries }
     return entries
+  }
+
+  /**
+   * A local write keeps the cache in step instead of dropping it: dropping it
+   * meant the NEXT read re-scanned the whole store, so a replication wave
+   * still cost one full scan per operation (O(n²) reads). The store revision
+   * still moves, so other instances over the SAME store re-read.
+   */
+  private cacheUpsert(entry: LoggedOperation): void {
+    bumpLogRevision(this.backend)
+    if (!this.cachedEntries) return
+    this.cachedEntries = {
+      storeRevision: backendRevision(this.backend),
+      externalRevision,
+      entries: [...this.cachedEntries.entries.filter((e) => e.operationId !== entry.operationId), entry],
+    }
+  }
+
+  private cacheRemove(operationId: string): void {
+    bumpLogRevision(this.backend)
+    if (!this.cachedEntries) return
+    this.cachedEntries = {
+      storeRevision: backendRevision(this.backend),
+      externalRevision,
+      entries: this.cachedEntries.entries.filter((e) => e.operationId !== operationId),
+    }
   }
 
   async append(input: {
@@ -191,7 +241,7 @@ export class SocialOperationLog {
     if (size > MAX_RECORD_BYTES) throw new Error('operation record too large for the durable log')
     const existing = await this.backend.get(input.operationId)
     if (existing) return { outcome: 'duplicate', entry: existing }
-    const now = Date.now()
+    const now = this.now()
     const entry: LoggedOperation = {
       ...input,
       status: 'committed',
@@ -204,7 +254,7 @@ export class SocialOperationLog {
     // chain heads, or anything else.
     const all = await this.allEntries()
     if (all.length >= this.maxEntries) {
-      const now = Date.now()
+      const now = this.now()
       const protectedIds = new Set([...actorHeads(all).values()].map((head) => head.operationId))
       const evictable = all
         .filter((candidate) => !protectedIds.has(candidate.operationId) && (
@@ -217,13 +267,13 @@ export class SocialOperationLog {
       for (const victim of evictable) {
         if (room <= limit) break
         await this.backend.delete(victim.operationId)
-        bumpLogRevision()
+        this.cacheRemove(victim.operationId)
         room -= 1
       }
       if (room > limit) throw new Error('operation log is full of undelivered entries')
     }
     await this.backend.put(entry)
-    bumpLogRevision()
+    this.cacheUpsert(entry)
     return { outcome: 'appended', entry }
   }
 
@@ -250,10 +300,10 @@ export class SocialOperationLog {
     const entry = await this.backend.get(operationId)
     if (!entry) return false
     if (STATUS_RANK[status] <= STATUS_RANK[entry.status]) return false
-    const updated = { ...entry, status, updatedAt: Date.now() }
+    const updated = { ...entry, status, updatedAt: this.now() }
     if (!isValidLogEntryShape(updated)) throw new Error('corrupted log entry')
     await this.backend.put(updated)
-    bumpLogRevision()
+    this.cacheUpsert(updated)
     return true
   }
 
@@ -261,9 +311,9 @@ export class SocialOperationLog {
   async bumpAttempts(operationId: string): Promise<boolean> {
     const entry = await this.backend.get(operationId)
     if (!entry) return false
-    const updated = { ...entry, attempts: entry.attempts + 1, updatedAt: Date.now() }
+    const updated = { ...entry, attempts: entry.attempts + 1, updatedAt: this.now() }
     await this.backend.put(updated)
-    bumpLogRevision()
+    this.cacheUpsert(updated)
     return true
   }
 
@@ -301,14 +351,14 @@ export class SocialOperationLog {
 
   /** Drop delivered entries past the grace window; undelivered entries and
    *  actor chain heads are never dropped (a missing head forks the actor). */
-  async prune(now = Date.now()): Promise<number> {
+  async prune(now = this.now()): Promise<number> {
     const all = await this.allEntries()
     const protectedIds = new Set([...actorHeads(all).values()].map((head) => head.operationId))
     let removed = 0
     for (const entry of all) {
       if (entry.status === 'delivered' && now - entry.updatedAt > DELIVERED_GRACE_MS && !protectedIds.has(entry.operationId)) {
         await this.backend.delete(entry.operationId)
-        bumpLogRevision()
+        this.cacheRemove(entry.operationId)
         removed += 1
       }
     }
