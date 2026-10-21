@@ -106,11 +106,27 @@ Two edges matter when debugging a user's "my keepsake is gone":
 
 Feed: `https://gmatch-wcz1.onrender.com/release.json` (GitHub Releases is a mirror).
 Check on boot + every 24h. Auto-downloads the new portable exe with a
-progress percent, **verifies SHA-256 against the published digest** (an
-unpublished digest is shown honestly as unverified), then Settings → Update's
-"Install & Restart" hands a detached cmd.exe a retry-move script, quits, and
-the script swaps the file and relaunches. Downgrade/bad-asset releases are
-rejected by `planCheck` (`updater-core.cjs`).
+progress percent, **verifies SHA-256 and the published size** (an
+unpublished digest is shown honestly as unverified and is never installed),
+then Settings → Update's "Install & Restart" hands a **hidden** cmd.exe a
+retry-move script, quits, and the script swaps the file and relaunches.
+Downgrade/bad-asset releases are rejected by `planCheck` (`updater-core.cjs`).
+
+The cmd runs `windowsHide` **without** `detached`: a detached cmd has no
+console, so every console exe the batch calls (the retry `ping`) allocates its
+own visible window — the "reappearing command prompts" report. The batch
+retries the move with a 3s/6s/10s backoff (30 tries, ~3 min) and, if it still
+cannot replace the file, relaunches the OLD exe so no failure path ends with a
+closed app.
+
+**Verifying the swap on a real machine:** `node electron/updater-swap.e2e.cjs`
+(Windows only) is the end-to-end check — it proves the A/B difference
+(`windowsHide` without `detached` shows no console window; `detached` shows
+one), then runs the real updater against a local feed with the installed file
+locked (the antivirus-scan case) and asserts that the file is replaced, that
+the batch needed a retry, and that **no console window appeared**. The
+scripted checks live in `electron/updater-core.test.cjs` and
+`electron/updater.test.cjs`.
 
 ## Admin console in the exe
 
