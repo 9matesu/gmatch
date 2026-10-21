@@ -9,6 +9,7 @@ import {
   type LoggedOperation,
 } from '../services/socialOperationLog'
 import { projectPosts, type ProjectedPost } from '../services/socialFeedProjection'
+import { projectReactions, reactionKey, type ProjectedReaction } from '../services/socialInteractionProjection'
 import { PEER_ONLINE_EVENT } from '../utils/p2pSwarm'
 
 /**
@@ -49,10 +50,32 @@ export function projectedPostsToFeedPosts(posts: readonly ProjectedPost[], selfI
   })
 }
 
+/**
+ * Fold peer reactions into the feed rows: a post replicated from a peer can
+ * already carry likes from other peers (L5.1), and the feed shows the real
+ * number instead of a hard zero. Our own like is shown as ours.
+ */
+export function applyReactionsToFeedPosts(
+  rows: readonly FeedPost[],
+  reactions: ReadonlyMap<string, ProjectedReaction>,
+  selfId?: string | null,
+): FeedPost[] {
+  return rows.map((row) => {
+    const reaction = reactions.get(reactionKey('post', row.id))
+    if (!reaction) return row
+    return {
+      ...row,
+      like_count: reaction.count,
+      is_liked: !!selfId && reaction.actors.includes(selfId),
+    }
+  })
+}
+
 async function readProjection(selfId?: string | null): Promise<FeedPost[]> {
   const log = sharedSocialOperationLog()
   const entries: LoggedOperation[] = await log.listAllOperations()
-  return projectedPostsToFeedPosts(projectPosts(entries), selfId)
+  const rows = projectedPostsToFeedPosts(projectPosts(entries), selfId)
+  return applyReactionsToFeedPosts(rows, projectReactions(entries), selfId)
 }
 
 export function usePeerFeedPosts(selfId?: string | null): FeedPost[] {

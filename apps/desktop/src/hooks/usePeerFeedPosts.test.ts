@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { projectedPostsToFeedPosts } from './usePeerFeedPosts'
+import { applyReactionsToFeedPosts, projectedPostsToFeedPosts } from './usePeerFeedPosts'
 import type { ProjectedPost } from '../services/socialFeedProjection'
+import { reactionKey, type ProjectedReaction } from '../services/socialInteractionProjection'
 
 const base: ProjectedPost = {
   id: 'post-a',
@@ -42,5 +43,24 @@ describe('peer feed rows (L4.2)', () => {
     expect(mine('delivered').sync_state).toBe('replicated')
     // Someone else's post is never labelled with our delivery state.
     expect(projectedPostsToFeedPosts([base], 'me')[0].sync_state).toBeUndefined()
+  })
+
+  it('folds peer reactions into the row (count + own like)', () => {
+    const rows = projectedPostsToFeedPosts([base], 'me')
+    const reactions = new Map<string, ProjectedReaction>([
+      [reactionKey('post', 'post-a'), { targetType: 'post', targetId: 'post-a', count: 2, actors: ['me', 'other'] }],
+    ])
+    const [row] = applyReactionsToFeedPosts(rows, reactions, 'me')
+    expect(row.like_count).toBe(2)
+    expect(row.is_liked).toBe(true)
+
+    const [notMine] = applyReactionsToFeedPosts(rows, reactions, 'someone-else')
+    expect(notMine.like_count).toBe(2)
+    expect(notMine.is_liked).toBe(false)
+
+    // No reactions for that post: the row keeps its zeroed default.
+    const [plain] = applyReactionsToFeedPosts(rows, new Map(), 'me')
+    expect(plain.like_count).toBe(0)
+    expect(plain.is_liked).toBe(false)
   })
 })

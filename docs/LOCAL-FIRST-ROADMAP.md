@@ -278,9 +278,11 @@ Deliberate constraint, documented rather than hidden: a reaction or comment
 can only target a post/comment that exists in the LOCAL operation log, so
 peer-replicated social state applies to peer-replicated content. Posts that
 exist only on a node keep using that node's endpoints — there is no hidden
-fallback in between. Still open: the UI wiring (like button, comment box,
-counts merged with the server rows), profile/follow operations, moderation
-reports, and the migration/import path.
+fallback in between. Peer reaction COUNTS are already folded into the feed
+rows (`applyReactionsToFeedPosts`), so a replicated post shows the real
+number and marks our own like. Still open: the write path in the UI (the like
+button and the comment box still call the node), profile/follow operations,
+moderation reports, and the migration/import path.
 - [ ] Model comments/replies, reactions, follows, profile fields, and
   moderation reports as authorized signed operations with stable IDs and
   explicit deletion/edit behavior.
