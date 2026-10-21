@@ -106,12 +106,18 @@ Two edges matter when debugging a user's "my keepsake is gone":
 
 Feed: the site's `release.json`, tried on **two hosts** (Render, then Fly):
 `https://gmatch-wcz1.onrender.com/release.json` and
-`https://gmatch.fly.dev/release.json`. Both are asked on every check; the
-winner is the highest version among the hosts that answered, and the download
-URL always comes from the SAME host that served the feed (the hash and the
-bytes must share an origin). A host that is asleep or down therefore cannot
-block an update, and a stale host cannot hide a newer release. GitHub Releases
-is a mirror, not the feed (the repo is private).
+`https://gmatch.fly.dev/release.json`. Both are asked in parallel on every
+check; the winner is the highest version among the hosts that answered, and
+the download URL always comes from the SAME host that served the feed (the
+hash and the bytes must share an origin). A host that is asleep, **stuck** or
+down is skipped (8 s budget each) instead of blocking the check, and a stale
+host cannot hide a newer release. GitHub Releases is a mirror, not the feed
+(the repo is private).
+
+Both hosts are **being decommissioned** (SPEC §12b): `fly.dev` is frozen and
+stuck on an old release, and the Render host is the temporary stand-in. This
+two-host fallback is a stopgap — the end state is the release artifact served
+by peers, with the app saying "no host answered" honestly in the meantime.
 
 Check on boot + every 24h. Auto-downloads the new portable exe with a
 progress percent, **verifies SHA-256 and the published size** (an

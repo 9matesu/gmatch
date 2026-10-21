@@ -419,8 +419,36 @@ offline earnings). Each +5% click power. Persist across prestige.
   hidden. A 503 from the release host is the free-tier dyno waking up — an
   error to retry, not a missing release.
 
-## 13. Servers (directory, federation, admin) — v1.1+
+### 12b. Host decommissioning — the central hosts are scaffolding, not the target
 
+**Decision (2026-10-21): the central hosts are temporary and are being left on
+purpose.** The end state is **direct peer-to-peer**: no central host stores
+posts, media, comments, likes, profiles or presence.
+
+- `gmatch.fly.dev` is **frozen and decommissioning**. It is stuck on an old
+  release and is not being redeployed; nothing may depend on it. It stays
+  visible in the server list only as an ordinary destination.
+- `gmatch-wcz1.onrender.com` (Render) is the current stand-in for the blind
+  courier and the release feed. It is expected to go the same way once the
+  stateful routes it still answers are gone (see `docs/API-INVENTORY.md` for
+  what each route is and what replaces it).
+- What legitimately remains central is a **rendezvous** (sealed mail, TURN,
+  the node directory) and — optionally — a node one of the players hosts.
+  Both are replaceable by any peer; the app must keep working with neither.
+
+Consequences that are already implemented:
+- The updater asks **two** release hosts and takes the highest version among
+  the ones that answer; a host that is asleep, stuck or down is skipped
+  (8 s budget each) instead of blocking the check.
+- `site/releases/` carries **only the current artifact**; older versions live
+  in their GitHub Releases. A tree with every historical exe is a
+  build-context problem, not a convenience.
+- The last host-dependent piece is the **release feed itself**: when the
+  hosts are gone, the artifact has to be served by peers (or by the user),
+  and until then the updater must say "no host answered" honestly rather than
+  pretend the app is up to date.
+
+## 13. Servers (directory, federation, admin) — v1.1+
 ADR-002 (`docs/ADR-002-servers.md`) é canônico; resumo de operação:
 
 - **Criar**: Servers → "+ Add server" → passo "Host a server" → publica

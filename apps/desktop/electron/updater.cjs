@@ -28,6 +28,19 @@ const RELEASE_FEEDS = [
 ]
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
 const FIRST_CHECK_DELAY_MS = 12 * 1000
+/** A release host that does not answer within this window is abandoned for
+ *  this check (a stuck host must not hold the update check open). */
+const FEED_TIMEOUT_MS = 8 * 1000
+
+/** Reject with `message` if `promise` does not settle in `ms`. */
+function withTimeout(promise, ms, message) {
+  let timer = null
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms)
+    if (typeof timer.unref === 'function') timer.unref()
+  })
+  return Promise.race([promise, timeout]).finally(() => { if (timer) clearTimeout(timer) })
+}
 
 /** The origin of a feed URL (where its /releases/<file> lives). */
 function baseOf(url) {
@@ -162,23 +175,29 @@ function createUpdater({ app, webContents, log = () => {}, spawnFn = spawn, feed
     // must not erase what the already-downloaded guard needs to compare.
     const prev = { phase: state.phase, version: state.version, destPath: state.destPath }
     setStatus({ phase: 'checking', manual: Boolean(manual) })
-    // Ask EVERY feed; a host that is asleep or down must not hide the other.
+    // Ask EVERY feed, in parallel: a host that is asleep, stuck or down must
+    // not block the others, and a stuck host must not hold the check open.
     // The winner is the highest version among the feeds that answered, and
     // its download URL comes from that same host.
     let best = null
     let lastError = ''
-    for (const feed of feeds) {
+    const answers = await Promise.all(feeds.map(async (feed) => {
       try {
-        const release = await getJson(feed.url, { insecure: insecureOverride })
+        const release = await withTimeout(
+          getJson(feed.url, { insecure: insecureOverride }),
+          FEED_TIMEOUT_MS,
+          'release host did not answer',
+        )
         const plan = core.planCheck(release, app.getVersion(), { insecure: insecureOverride, base: feed.base })
-        if (plan.action === 'error') { lastError = plan.error; continue }
-        if (!best) { best = plan; continue }
-        const bestVersion = best.version
-        const planVersion = plan.version
-        if (core.isNewer(planVersion, bestVersion)) best = plan
+        return plan.action === 'error' ? { error: plan.error } : { plan }
       } catch (err) {
-        lastError = String(err?.message || err)
+        return { error: String(err?.message || err) }
       }
+    }))
+    for (const answer of answers) {
+      if (answer.error) { lastError = answer.error; continue }
+      if (!best) { best = answer.plan; continue }
+      if (core.isNewer(answer.plan.version, best.version)) best = answer.plan
     }
     if (!best) {
       // A 503 from the release host is a cold-start (free-tier dyno waking),

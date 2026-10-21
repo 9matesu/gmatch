@@ -9,6 +9,13 @@ run the narrow checks, then commit only the files in that slice.
 
 ## Current state and constraints
 
+- **The central hosts are being decommissioned on purpose.** `gmatch.fly.dev`
+  is frozen and stuck on an old release; `gmatch-wcz1.onrender.com` is the
+  current stand-in and is expected to go the same way. The end state is
+  **direct peer-to-peer** — no central host storing posts, media, comments,
+  likes, profiles or presence (SPEC §12b). Any work that deepens a central
+  dependency is a step backwards; every route's fate is written down in
+  `docs/API-INVENTORY.md`.
 - The desktop app still uses API nodes for feed reads and writes, comments,
   likes, profile/directory data, notifications, Lobby chat, and other social
   state. Public gossip replicates signed post metadata between hosts, but that

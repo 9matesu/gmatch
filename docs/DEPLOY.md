@@ -1,5 +1,28 @@
 # Deploy notes (security-relevant ops)
 
+## Host status (2026-10-21) — both central hosts are being decommissioned
+
+| Host | State | Action |
+|---|---|---|
+| `gmatch.fly.dev` | **frozen / stuck** on an old release (1.4.7) | not redeployed; treat as dead. Do not depend on it. |
+| `gmatch-wcz1.onrender.com` | the current stand-in (courier + release feed); was returning 503 for ~40 min on 2026-10-21 | redeploy or migrate; the site tree now carries only the current artifact, so the build context is small again. |
+
+The end state is direct peer-to-peer (SPEC §12b): no central host storing
+posts, media, comments, likes or profiles. What stays central is a rendezvous
+(sealed mail / TURN / directory) and optionally a node a player hosts.
+
+Recovery, in order:
+1. `fly auth login && fly deploy` from the repo root — brings the API **and**
+   `site/releases/` (the current portable exe) up on fly, which is
+   always-on (`min_machines_running = 1`).
+2. If Render is the one down, check its deploy log for a failed build
+   (context size, disk) rather than assuming the app is broken: the API
+   bundles cleanly (`npm run stage:api`).
+
+**The release feed is the last host-dependent piece.** When the hosts are
+gone, the artifact has to be served by peers or by the user; until then the
+updater must say "no host answered" rather than pretend the app is current.
+
 ## Central node (gmatch-wcz1.onrender.com)
 
 - Secrets live in fly (`fly secrets list -a gmatch`); never in the repo.

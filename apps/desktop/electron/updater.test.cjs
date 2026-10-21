@@ -43,6 +43,9 @@ function makeFeedServer() {
         return json(res, { file: 'gMatch-9.9.9-portable.exe', version: '9.9.9', downloadUrl: dl('exe') })
       case '/old.json':
         return json(res, { file: 'gMatch-9.9.8-portable.exe', version: '9.9.8', sha256: NEW_SHA, sizeBytes: NEW_EXE.length, downloadUrl: dl('exe') })
+      case '/stuck.json':
+        // A host that never answers (the fly.dev case).
+        return setTimeout(() => {}, 60000)
       case '/exe':
         hits.exe += 1
         res.writeHead(200, { 'content-length': String(NEW_EXE.length), 'content-type': 'application/octet-stream' })
@@ -223,6 +226,18 @@ async function main() {
     await stale.updater.check(true)
     const staleState = await waitFor(stale.updater, (s) => s.phase === 'ready', 'ready from the newest feed')
     assert.strictEqual(staleState.version, '9.9.9')
+
+    // 13) A host that never answers must not hide the healthy one.
+    const stuckFeeds = [
+      { url: `http://127.0.0.1:${port()}/stuck.json`, base: `http://127.0.0.1:${port()}` },
+      { url: `http://127.0.0.1:${port()}/ok.json`, base: `http://127.0.0.1:${port()}` },
+    ]
+    const stuck = makeUpdater('/ok.json', undefined, stuckFeeds)
+    const startedAt = Date.now()
+    await stuck.updater.check(true)
+    const stuckState = await waitFor(stuck.updater, (s) => s.phase === 'ready', 'ready despite a stuck host', 20000)
+    assert.strictEqual(stuckState.version, '9.9.9')
+    assert.ok(Date.now() - startedAt < 15000, 'a stuck host must not hold the check open')
   } finally {    server.close()
     try { fs.rmSync(tmp, { recursive: true, force: true }) } catch { /* best effort */ }
   }
