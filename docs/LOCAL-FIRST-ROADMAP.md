@@ -262,6 +262,23 @@ queued, and replicated states accurately.
 **Purpose:** migrate each dependent social feature only after the operation
 model and feed projection are stable.
 
+Progress (slice 1 — the model layer): reactions and comments are now signed,
+chained operations with the same rules as posts
+(`services/socialInteraction.ts`): `reaction.add` / `reaction.remove` (the
+removal references the actor's own add operations) and `comment.create` /
+`comment.delete`. They are authorized against the accepted history and
+committed to the durable log before any network call, and
+`services/socialInteractionProjection.ts` projects them into reaction counts
+(per target, per actor) and comment threads (nested replies, tombstones
+hidden, orphans promoted to top level instead of vanishing).
+
+Deliberate constraint, documented rather than hidden: a reaction or comment
+can only target a post/comment that exists in the LOCAL operation log, so
+peer-replicated social state applies to peer-replicated content. Posts that
+exist only on a node keep using that node's endpoints — there is no hidden
+fallback in between. Still open: the UI wiring (like button, comment box,
+counts merged with the server rows), profile/follow operations, moderation
+reports, and the migration/import path.
 - [ ] Model comments/replies, reactions, follows, profile fields, and
   moderation reports as authorized signed operations with stable IDs and
   explicit deletion/edit behavior.

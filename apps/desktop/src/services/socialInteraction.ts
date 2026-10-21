@@ -1,0 +1,182 @@
+"use client";
+
+import {
+  authorizeSocialOperation,
+  createSocialOperation,
+  type SocialOperation,
+} from '@orbit/protocol'
+import type { OrbitIdentityLike } from '../utils/api'
+import type { SocialOperationLog } from './socialOperationLog'
+
+/**
+ * Signed social-state operations (roadmap L5.1): reactions and comments.
+ *
+ * These are the FIRST operations that are not a post. Same rules as the post
+ * path: signed, chained onto the actor's sequence, appended to the DURABLE log
+ * before any network call, and authorized against the accepted history.
+ *
+ * Honest constraint (not a bug, a design consequence): a reaction or comment
+ * can only be authored against a target that EXISTS IN THE LOCAL OPERATION
+ * LOG. A post that only lives on a central node has no `post.create` operation
+ * here, and the protocol refuses a reaction whose target is unavailable — so
+ * peer-replicated social state works on peer-replicated content, while posts
+ * that exist only on a node keep using the node's own endpoints. There is no
+ * hidden fallback in between.
+ */
+
+export type ReactionTargetType = 'post' | 'comment'
+
+export interface ReactionTarget {
+  targetType: ReactionTargetType
+  targetId: string
+}
+
+/** Every accepted operation, in any order — the authorizer's history. */
+async function acceptedHistory(log: SocialOperationLog): Promise<SocialOperation[]> {
+  const entries = await log.listAllOperations()
+  return entries.map((entry) => entry.record as unknown as SocialOperation)
+}
+
+async function signAndAppend(
+  identity: OrbitIdentityLike,
+  log: SocialOperationLog,
+  operation: Omit<SocialOperation, 'operationId' | 'signature'>,
+  history: SocialOperation[],
+): Promise<SocialOperation> {
+  // Sign first (the shape is validated by the signer), then authorize the
+  // SIGNED operation against the accepted history — an unsigned draft cannot
+  // be authorized (the authorizer verifies ids and signatures).
+  const signed = createSocialOperation(operation, identity.privateKeyHex)
+  const error = authorizeSocialOperation(signed, history)
+  if (error) throw new Error(error)
+  const { outcome } = await log.append({
+    operationId: signed.operationId,
+    actorId: signed.actorId,
+    actorSequence: signed.actorSequence,
+    createdAt: signed.createdAt,
+    record: signed as unknown as Record<string, unknown>,
+  })
+  if (outcome === 'duplicate') throw new Error('operation already committed to the durable log')
+  return signed
+}
+
+/** Reaction operations get their own id namespace; the protocol's objectId
+ *  charset is [A-Za-z0-9_-], so the target is folded in without separators
+ *  that would break it. */
+function reactionObjectId(target: ReactionTarget): string {
+  const targetId = target.targetId.replace(/[^A-Za-z0-9_-]/g, '')
+  return `reaction_${target.targetType}_${targetId}`
+}
+
+/** Like a post or comment (reaction.add). */
+export async function publishReactionAdd(
+  identity: OrbitIdentityLike,
+  target: ReactionTarget,
+  log: SocialOperationLog,
+): Promise<SocialOperation> {
+  const { actorSequence, previousOperationId } = await log.nextActorSlot(identity.orbitId)
+  const history = await acceptedHistory(log)
+  return signAndAppend(identity, log, {
+    protocol: 'gmatch-social',
+    version: 1,
+    type: 'reaction.add',
+    actorId: identity.orbitId,
+    signingKey: identity.publicKeyHex,
+    actorSequence,
+    previousOperationId,
+    createdAt: Date.now(),
+    objectId: reactionObjectId(target),
+    payload: { targetType: target.targetType, targetId: target.targetId, reaction: 'like' },
+  }, history)
+}
+
+/**
+ * Undo a like. The operation references the actor's own `reaction.add`
+ * operations (that is how a removal is authorized and how a peer can see
+ * exactly which likes were withdrawn).
+ */
+export async function publishReactionRemove(
+  identity: OrbitIdentityLike,
+  target: ReactionTarget,
+  log: SocialOperationLog,
+): Promise<SocialOperation> {
+  const history = await acceptedHistory(log)
+  const removed = new Set(history
+    .filter((entry) => entry.type === 'reaction.remove')
+    .flatMap((entry) => (entry.payload as { targetAddOperationIds?: string[] }).targetAddOperationIds ?? []))
+  const adds = history
+    .filter((entry) => entry.type === 'reaction.add' && entry.actorId === identity.orbitId)
+    .filter((entry) => (entry.payload as { targetType?: string }).targetType === target.targetType)
+    .filter((entry) => (entry.payload as { targetId?: string }).targetId === target.targetId)
+    .filter((entry) => !removed.has(entry.operationId))
+    .map((entry) => entry.operationId)
+  if (adds.length === 0) throw new Error('no active reaction to remove')
+  const { actorSequence, previousOperationId } = await log.nextActorSlot(identity.orbitId)
+  return signAndAppend(identity, log, {
+    protocol: 'gmatch-social',
+    version: 1,
+    type: 'reaction.remove',
+    actorId: identity.orbitId,
+    signingKey: identity.publicKeyHex,
+    actorSequence,
+    previousOperationId,
+    createdAt: Date.now(),
+    objectId: reactionObjectId(target),
+    payload: { targetAddOperationIds: adds },
+  }, history)
+}
+
+export interface CommentInput {
+  /** The post's objectId — it must exist in the local operation log. */
+  postId: string
+  /** Parent comment objectId, or null for a top-level comment. */
+  parentCommentId: string | null
+  body: string
+  /** Stable id for this comment (unique per comment). */
+  commentId: string
+}
+
+export async function publishComment(
+  identity: OrbitIdentityLike,
+  input: CommentInput,
+  log: SocialOperationLog,
+): Promise<SocialOperation> {
+  const { actorSequence, previousOperationId } = await log.nextActorSlot(identity.orbitId)
+  const history = await acceptedHistory(log)
+  return signAndAppend(identity, log, {
+    protocol: 'gmatch-social',
+    version: 1,
+    type: 'comment.create',
+    actorId: identity.orbitId,
+    signingKey: identity.publicKeyHex,
+    actorSequence,
+    previousOperationId,
+    createdAt: Date.now(),
+    objectId: input.commentId,
+    payload: { postId: input.postId, parentCommentId: input.parentCommentId, body: input.body },
+  }, history)
+}
+
+export async function publishCommentDelete(
+  identity: OrbitIdentityLike,
+  commentOperationId: string,
+  log: SocialOperationLog,
+): Promise<SocialOperation> {
+  const history = await acceptedHistory(log)
+  const target = history.find((entry) => entry.operationId === commentOperationId)
+  if (!target || target.type !== 'comment.create') throw new Error('comment not found in the local log')
+  if (target.actorId !== identity.orbitId) throw new Error('only the comment author may delete it')
+  const { actorSequence, previousOperationId } = await log.nextActorSlot(identity.orbitId)
+  return signAndAppend(identity, log, {
+    protocol: 'gmatch-social',
+    version: 1,
+    type: 'comment.delete',
+    actorId: identity.orbitId,
+    signingKey: identity.publicKeyHex,
+    actorSequence,
+    previousOperationId,
+    createdAt: Date.now(),
+    objectId: target.objectId,
+    payload: { targetOperationId: commentOperationId },
+  }, history)
+}
