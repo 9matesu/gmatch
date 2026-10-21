@@ -14,11 +14,25 @@ const { spawn } = require('node:child_process')
 const core = require('./updater-core.cjs')
 
 // The repo is PRIVATE, so the canonical public release feed for installed
-// apps is the site's release.json (fly mirrors the GitHub Release artifact;
-// it carries the exact sha256 we verify). GitHub API shape also supported.
-const RELEASE_URL = 'https://gmatch-wcz1.onrender.com/release.json'
+// apps is the site's release.json (the hosts carry the exact sha256 we
+// verify). GitHub API shape also supported.
+//
+// TWO feeds, tried in order and then merged: a single host being asleep or
+// down must not stop updates. The plan that wins is the one with the highest
+// version across the feeds that answered, and the download URL always comes
+// from the SAME host that served the feed (the hash and the bytes must match
+// the same origin).
+const RELEASE_FEEDS = [
+  { url: 'https://gmatch-wcz1.onrender.com/release.json', base: 'https://gmatch-wcz1.onrender.com' },
+  { url: 'https://gmatch.fly.dev/release.json', base: 'https://gmatch.fly.dev' },
+]
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
 const FIRST_CHECK_DELAY_MS = 12 * 1000
+
+/** The origin of a feed URL (where its /releases/<file> lives). */
+function baseOf(url) {
+  try { return new URL(url).origin } catch { return url }
+}
 
 function get(url, { insecure = false } = {}, redirects = 5) {
   return new Promise((resolve, reject) => {
@@ -88,10 +102,14 @@ function pickDestDir(userExePath, tempDir) {
   return null
 }
 
-function createUpdater({ app, webContents, log = () => {}, spawnFn = spawn }) {
+function createUpdater({ app, webContents, log = () => {}, spawnFn = spawn, feeds: injectedFeeds }) {
   let state = { phase: 'idle', current: app.getVersion() }
-  const insecureOverride = Boolean(process.env.GMATCH_RELEASE_URL)
-  const apiUrl = process.env.GMATCH_RELEASE_URL || RELEASE_URL
+  const feeds = injectedFeeds ?? (process.env.GMATCH_RELEASE_URL
+    ? [{ url: process.env.GMATCH_RELEASE_URL, base: baseOf(process.env.GMATCH_RELEASE_URL) }]
+    : RELEASE_FEEDS)
+  // Plain http is only allowed for an explicit local override (env or an
+  // injected test feed); the shipped feeds are https.
+  const insecureOverride = Boolean(process.env.GMATCH_RELEASE_URL) || feeds.some((f) => /^http:\/\//i.test(f.url))
 
   const setStatus = (patch) => {
     state = { ...state, ...patch }
@@ -144,30 +162,42 @@ function createUpdater({ app, webContents, log = () => {}, spawnFn = spawn }) {
     // must not erase what the already-downloaded guard needs to compare.
     const prev = { phase: state.phase, version: state.version, destPath: state.destPath }
     setStatus({ phase: 'checking', manual: Boolean(manual) })
-    try {
-      const release = await getJson(apiUrl, { insecure: insecureOverride })
-      const plan = core.planCheck(release, app.getVersion(), { insecure: insecureOverride })
-      if (plan.action === 'current') return setStatus({ phase: 'current', latest: plan.version })
-      if (plan.action === 'error') return setStatus({ phase: 'error', error: plan.error })
-      // Already downloaded these exact bytes and the file is still there:
-      // repeated checks (daily timer, manual) must not re-download the same
-      // version over and over.
-      if (plan.action === 'download' && prev.phase === 'ready' &&
-          prev.version === plan.version && prev.destPath && fs.existsSync(prev.destPath)) {
-        return setStatus({ phase: 'ready', version: plan.version, destPath: prev.destPath })
+    // Ask EVERY feed; a host that is asleep or down must not hide the other.
+    // The winner is the highest version among the feeds that answered, and
+    // its download URL comes from that same host.
+    let best = null
+    let lastError = ''
+    for (const feed of feeds) {
+      try {
+        const release = await getJson(feed.url, { insecure: insecureOverride })
+        const plan = core.planCheck(release, app.getVersion(), { insecure: insecureOverride, base: feed.base })
+        if (plan.action === 'error') { lastError = plan.error; continue }
+        if (!best) { best = plan; continue }
+        const bestVersion = best.version
+        const planVersion = plan.version
+        if (core.isNewer(planVersion, bestVersion)) best = plan
+      } catch (err) {
+        lastError = String(err?.message || err)
       }
-      setStatus({ phase: 'available', version: plan.version })
-      void startDownload(plan) // auto-download; the user only confirms the swap
-      return state
-    } catch (err) {
-      const message = String(err?.message || err)
+    }
+    if (!best) {
       // A 503 from the release host is a cold-start (free-tier dyno waking),
       // not a missing release: say so instead of reading like a dead link.
-      const friendly = message.includes('503')
-        ? `${message} (the release host may be waking up - retry in a minute)`
-        : message
+      const friendly = lastError.includes('503')
+        ? `${lastError} (the release hosts may be waking up - retry in a minute)`
+        : (lastError || 'no release host answered')
       return setStatus({ phase: 'error', error: friendly })
     }
+    if (best.action === 'current') return setStatus({ phase: 'current', latest: best.version })
+    // Already downloaded these exact bytes and the file is still there:
+    // repeated checks (daily timer, manual) must not re-download the same
+    // version over and over.
+    if (prev.phase === 'ready' && prev.version === best.version && prev.destPath && fs.existsSync(prev.destPath)) {
+      return setStatus({ phase: 'ready', version: best.version, destPath: prev.destPath })
+    }
+    setStatus({ phase: 'available', version: best.version })
+    void startDownload(best) // auto-download; the user only confirms the swap
+    return state
   }
 
   /** Hand off to cmd.exe (replace the user's portable exe + relaunch) and quit. */
@@ -213,4 +243,4 @@ function createUpdater({ app, webContents, log = () => {}, spawnFn = spawn }) {
   return { check, install, schedule, getState: () => state }
 }
 
-module.exports = { createUpdater, RELEASE_URL, pickDestDir, download }
+module.exports = { createUpdater, RELEASE_FEEDS, pickDestDir, download }

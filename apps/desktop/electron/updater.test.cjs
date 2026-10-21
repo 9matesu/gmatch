@@ -41,6 +41,8 @@ function makeFeedServer() {
         return json(res, { file: 'gMatch-9.9.9-portable.exe', version: '9.9.9', sha256: NEW_SHA, sizeBytes: 999999, downloadUrl: dl('exe') })
       case '/nohash.json':
         return json(res, { file: 'gMatch-9.9.9-portable.exe', version: '9.9.9', downloadUrl: dl('exe') })
+      case '/old.json':
+        return json(res, { file: 'gMatch-9.9.8-portable.exe', version: '9.9.8', sha256: NEW_SHA, sizeBytes: NEW_EXE.length, downloadUrl: dl('exe') })
       case '/exe':
         hits.exe += 1
         res.writeHead(200, { 'content-length': String(NEW_EXE.length), 'content-type': 'application/octet-stream' })
@@ -84,10 +86,10 @@ async function main() {
     }
     return app
   }
-  const makeUpdater = (feedPath, spawnStub) => {
+  const makeUpdater = (feedPath, spawnStub, extraFeeds) => {
     process.env.GMATCH_RELEASE_URL = `http://127.0.0.1:${port()}${feedPath}`
     const app = makeApp()
-    const updater = createUpdater({ app, webContents: () => [], log: () => {}, spawnFn: spawnStub })
+    const updater = createUpdater({ app, webContents: () => [], log: () => {}, spawnFn: spawnStub, feeds: extraFeeds })
     return { updater, app }
   }
   const waitFor = async (updater, predicate, label, timeoutMs = 5000) => {
@@ -190,8 +192,38 @@ async function main() {
     const coldState = await waitFor(cold.updater, (s) => s.phase === 'error', 'error (503 feed)')
     assert.match(coldState.error, /503/)
     assert.match(coldState.error, /waking up/)
-  } finally {
-    server.close()
+
+    // 10) Two feeds: a dead one must not hide the live one.
+    const twoFeeds = [
+      { url: `http://127.0.0.1:${port()}/503.json`, base: `http://127.0.0.1:${port()}` },
+      { url: `http://127.0.0.1:${port()}/ok.json`, base: `http://127.0.0.1:${port()}` },
+    ]
+    const multi = makeUpdater('/ok.json', undefined, twoFeeds)
+    await multi.updater.check(true)
+    const multiState = await waitFor(multi.updater, (s) => s.phase === 'ready', 'ready via the second feed')
+    assert.strictEqual(multiState.verified, true)
+    assert.strictEqual(multiState.version, '9.9.9')
+
+    // 11) Both feeds dead: an honest error, not a silent "up to date".
+    const deadFeeds = [
+      { url: `http://127.0.0.1:${port()}/503.json`, base: `http://127.0.0.1:${port()}` },
+      { url: `http://127.0.0.1:${port()}/503.json`, base: `http://127.0.0.1:${port()}` },
+    ]
+    const dead = makeUpdater('/503.json', undefined, deadFeeds)
+    await dead.updater.check(true)
+    const deadState = await waitFor(dead.updater, (s) => s.phase === 'error', 'error (both feeds down)')
+    assert.match(deadState.error, /503/)
+
+    // 12) A stale feed must not hide a newer one.
+    const staleFeeds = [
+      { url: `http://127.0.0.1:${port()}/old.json`, base: `http://127.0.0.1:${port()}` },
+      { url: `http://127.0.0.1:${port()}/ok.json`, base: `http://127.0.0.1:${port()}` },
+    ]
+    const stale = makeUpdater('/ok.json', undefined, staleFeeds)
+    await stale.updater.check(true)
+    const staleState = await waitFor(stale.updater, (s) => s.phase === 'ready', 'ready from the newest feed')
+    assert.strictEqual(staleState.version, '9.9.9')
+  } finally {    server.close()
     try { fs.rmSync(tmp, { recursive: true, force: true }) } catch { /* best effort */ }
   }
 

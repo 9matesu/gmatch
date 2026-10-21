@@ -104,7 +104,15 @@ Two edges matter when debugging a user's "my keepsake is gone":
 
 ## Self-update (`electron/updater.cjs`, `updater-core.cjs`)
 
-Feed: `https://gmatch-wcz1.onrender.com/release.json` (GitHub Releases is a mirror).
+Feed: the site's `release.json`, tried on **two hosts** (Render, then Fly):
+`https://gmatch-wcz1.onrender.com/release.json` and
+`https://gmatch.fly.dev/release.json`. Both are asked on every check; the
+winner is the highest version among the hosts that answered, and the download
+URL always comes from the SAME host that served the feed (the hash and the
+bytes must share an origin). A host that is asleep or down therefore cannot
+block an update, and a stale host cannot hide a newer release. GitHub Releases
+is a mirror, not the feed (the repo is private).
+
 Check on boot + every 24h. Auto-downloads the new portable exe with a
 progress percent, **verifies SHA-256 and the published size** (an
 unpublished digest is shown honestly as unverified and is never installed),
@@ -127,6 +135,12 @@ locked (the antivirus-scan case) and asserts that the file is replaced, that
 the batch needed a retry, and that **no console window appeared**. The
 scripted checks live in `electron/updater-core.test.cjs` and
 `electron/updater.test.cjs`.
+
+**Hosting the artifact:** the site tree carries ONLY the current release exe
+(`site/releases/gMatch-<version>-portable.exe`); older versions live in their
+GitHub Releases. A tree with every historical exe (1 GB+) is a build-context
+problem for the host, not a convenience. `site/release.json` is generated from
+the bytes that are actually served, so the published hash is never hand-typed.
 
 ## Admin console in the exe
 
