@@ -47,7 +47,7 @@ describe('operation log cross-tab coherence', () => {
       await tabB.listAllOperations()
       const afterFirst = backend.reads
       await tabB.listAllOperations()
-      expect(backend.reads).toBe(afterFirst, 'the second read of the same tab is cached')
+      expect(backend.reads).toBe(afterFirst) // the second read of the same tab is cached
 
       // Tab A writes: tab B must not keep serving its stale list.
       const entry: LoggedOperation = {
