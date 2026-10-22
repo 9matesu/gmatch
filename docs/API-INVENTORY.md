@@ -47,7 +47,8 @@ Patterns: a trailing `*` covers every route below it.
 | `/api/notifications` | core-social | server notification rows; L5 target |
 | `/api/notifications/*` | core-social | notification reads |
 | `/api/relationships` | core-social | follows/blocks; L5 target |
-| `/api/report` | core-social | generic report |
+| `/api/report` | core-social | generic report (node-hosted content) |
+| `/release.json`, `/releases/*` | host | the release feed this node offers its peers (the updater reads it) |
 | `/api/auth/*` | core-social | passkey enrolment; L5 target |
 | `/api/objects` | media-metadata | object bytes/metadata; L6 target |
 | `/api/objects/*` | media-metadata | register, stories, archive, view; L6 target |

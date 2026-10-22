@@ -72,7 +72,7 @@ export interface AppNotification {
 }
 
 /** Canonical, collision-free event key. */
-export function notificationKey(kind: 'server' | 'dm' | 'room', subject: string): string {
+export function notificationKey(kind: 'server' | 'dm' | 'room' | 'local', subject: string): string {
   return `${kind}:${subject}`
 }
 
@@ -306,6 +306,42 @@ export function deriveConversationNotifications(
  * Merge sources into one list: newest first, deduped by {@link AppNotification.key}
  * (the newest row for a key wins, so a repeated delivery cannot double-render).
  */
+/**
+ * Reports about MY content (peer lane).
+ *
+ * In a mesh there is no central moderator: a report travels as a signed
+ * operation to the peers, and the AUTHOR of the content is the one who can
+ * act on it. So the report shows up in the author's notification centre —
+ * not as "an admin will handle it" (nobody is an admin of a mesh).
+ */
+export function derivePeerReportNotifications(
+  reports: ReadonlyArray<{ operationId: string; targetType: 'post' | 'comment'; targetId: string; reason: string; reporterId: string; createdAt: number }>,
+  args: { resolveName?: (peerId: string, payloadName?: string) => string } = {},
+): AppNotification[] {
+  const resolveName =
+    args.resolveName ??
+    ((peerId: string, payloadName?: string) => payloadName?.trim() || generateFallbackName(peerId))
+  return reports.map((report) => {
+    const name = resolveName(report.reporterId)
+    return {
+      key: notificationKey('local', `report-${report.operationId}`),
+      id: report.operationId,
+      source: 'local',
+      type: 'report',
+      title: `${name} reported your ${report.targetType}`,
+      body: report.reason.trim() || null,
+      createdAt: new Date(report.createdAt).toISOString(),
+      read: false,
+      actorId: report.reporterId,
+      actorName: name,
+      target: report.targetType === 'post'
+        ? { postId: report.targetId }
+        : { commentId: report.targetId },
+      marks: [],
+    }
+  })
+}
+
 export function mergeNotifications(
   ...groups: ReadonlyArray<ReadonlyArray<AppNotification>>
 ): AppNotification[] {

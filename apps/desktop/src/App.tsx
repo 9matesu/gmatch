@@ -98,6 +98,8 @@ import { logger } from './utils/logger';
 import { useNotifications } from './hooks/useNotifications';
 import { isKnownSiteCourier, cachedMailMode, detectMailMode } from "./utils/mail-mode";
 import { useCourierDms } from './hooks/useCourierDms';
+import { usePeerReports } from './hooks/usePeerReports';
+import { ensureGroupRoom, mergeGroupMessages, roomIdForGroup, type GroupRoomOps } from './services/groupRooms';
 import { useServerHeartbeat } from './hooks/useServerHeartbeat';
 import { usePresencePoll } from './hooks/usePresencePoll';
 import { usePresence } from './game/presenceStore';
@@ -1561,10 +1563,36 @@ export default function Home() {
     if (!identity || userId === identity.orbitId) return
     const wasFollowing = followingIds.includes(userId)
     setFollowingIds(prev => wasFollowing ? prev.filter(id => id !== userId) : [...prev, userId])
+    const rollback = () => setFollowingIds(prev => wasFollowing ? [...prev, userId] : prev.filter(id => id !== userId))
+
+    // 1. The PEER graph: a follow is a signed operation, so the peers know
+    // who I follow even when no node is reachable. This is the source of
+    // truth off-node; the node's own row is bookkeeping.
+    let opOk = false
+    try {
+      const { sharedSocialOperationLog } = await import('./services/socialOperationLog')
+      const { publishFollow, publishUnfollow, activeFollowOperationId } = await import('./services/socialInteraction')
+      const log = sharedSocialOperationLog()
+      if (wasFollowing) {
+        const entries = await log.listAllOperations()
+        const opId = activeFollowOperationId(entries, identity.orbitId, userId)
+        if (opId) {
+          await publishUnfollow(identity, opId, log)
+          opOk = true
+        }
+      } else {
+        await publishFollow(identity, userId, log)
+        opOk = true
+      }
+    } catch {
+      opOk = false
+    }
+
+    // 2. The NODE's world (its follower counts) — best effort.
     try {
       const res = await orbitFetch(`/api/users/${userId}/follow`, { method: wasFollowing ? 'DELETE' : 'POST' }, identity)
       if (!res.ok) {
-        setFollowingIds(prev => wasFollowing ? [...prev, userId] : prev.filter(id => id !== userId))
+        if (!opOk) rollback()
       } else {
         // Invalidate BEFORE refetching. A bare loadUsers() (what this used to
         // dispatch) was served by orbitFetch's 3s response cache, so the
@@ -1578,7 +1606,8 @@ export default function Home() {
         window.dispatchEvent(new CustomEvent('orbit-profilesync'))
       }
     } catch {
-      setFollowingIds(prev => wasFollowing ? [...prev, userId] : prev.filter(id => id !== userId))
+      // The node is unreachable: the operation still carries the follow.
+      if (!opOk) rollback()
     }
   }, [identity, followingIds])
 
@@ -1704,6 +1733,23 @@ export default function Home() {
   // Unified report for any content type. Reporting hides the item instantly.
   const reportTarget = useCallback((targetType: string, targetId: string, reason?: string) => {
     if (!identity) return
+    // A peer-replicated post has no node row to moderate: the report travels
+    // as a signed operation and reaches the AUTHOR through the mesh. There is
+    // no admin in a mesh — the author is the one who can act on it.
+    const peerPost = feedPostsRef.current.find((p) => p.id === targetId)
+    if (peerPost?.origin === 'peer') {
+      void (async () => {
+        try {
+          const { sharedSocialOperationLog } = await import('./services/socialOperationLog')
+          const { publishReport } = await import('./services/socialInteraction')
+          await publishReport(identity, { targetType: 'post', targetId }, reason || '', sharedSocialOperationLog())
+          toast('Reported. The author sees it — in a mesh there is no admin but the author.', 'info')
+        } catch {
+          toast('Could not send the report.', 'error')
+        }
+      })()
+      return
+    }
     toast('Reported. Content hidden until an admin reviews it.', 'info')
     orbitFetch('/api/report', {
       method: 'POST',
@@ -2177,8 +2223,12 @@ export default function Home() {
     },
     [identity?.orbitId, nameRoster],
   )
+  // Reports about my own content (peer lane): in a mesh the author is the
+  // one who can act on a report, so it belongs in the same centre.
+  const peerReports = usePeerReports(identity?.orbitId)
   const notificationCenter = useNotificationCenter({
     rows: lobby.notifications,
+    peerReports,
     threads: courier.threads,
     dmSeen,
     rooms: courier.rooms,
@@ -2835,6 +2885,31 @@ export default function Home() {
       .catch(() => { })
   }, [identity])
 
+  const loadGroupMembers = useCallback(async (groupId: string): Promise<GroupMember[]> => {
+    if (!identity) return []
+    const res = await orbitFetch(`/api/groups/${groupId}/members`, {}, identity)
+    if (!res.ok) throw new Error(`Could not load members (${res.status})`)
+    const data = await res.json()
+    return Array.isArray(data?.members) ? data.members : []
+  }, [identity])
+
+  // The conversation of a group travels through a SEALED ROOM (roadmap L6):
+  // the node owns the membership, the words are group-sealed and fanned out
+  // to the members' mailboxes. The node's rows stay as the history from
+  // before the room existed, and the two are merged by id.
+  const groupRoomOps = useMemo<GroupRoomOps>(() => ({
+    rooms: () => courier.rooms,
+    createRoom: (name, id) => courier.createRoomWithId(name, id) ?? {
+      id, name, dekHex: '', epoch: 0, ownerId: identity?.orbitId || '', members: [], createdAt: Date.now(),
+    },
+    invite: (roomId, peerId) => courier.inviteToRoom(roomId, peerId),
+    messages: (roomId) => courier.roomMessages(roomId),
+    say: (roomId, text) => courier.sayInRoom(roomId, text),
+  }), [courier.rooms, courier.createRoomWithId, courier.inviteToRoom, courier.roomMessages, courier.sayInRoom, identity?.orbitId])
+
+  /** groupId -> what the transport did (for an honest badge in the UI). */
+  const [groupTransport, setGroupTransport] = useState<Record<string, 'sealed' | 'node'>>({})
+
   const loadGroupMessages = useCallback((groupId: string) => {
     if (!identity) return Promise.resolve()
     return orbitFetch(`/api/groups/${groupId}/messages`, {}, identity)
@@ -2858,11 +2933,33 @@ export default function Home() {
             attachmentUrl: m.attachment_id ? `/api/objects/${m.attachment_id}` : undefined,
             attachmentMime: m.attachment_mime || undefined,
           })).sort((a: ChatMessage, b: ChatMessage) => a.timestamp - b.timestamp)
-          setGroupMessagesByGroup(prev => ({ ...prev, [groupId]: msgs }))
+
+          // The sealed room carries what comes next. Make sure it exists and
+          // that the members have the DEK, then merge both halves.
+          let merged: ChatMessage[] = msgs
+          try {
+            const group = chatGroups.find((g) => g.id === groupId)
+            const members = await loadGroupMembers(groupId)
+            if (group) {
+              const result = await ensureGroupRoom(group, members, groupRoomOps, identity.orbitId)
+              const roomRows = groupRoomOps.messages(result.roomId)
+              merged = mergeGroupMessages(
+                msgs,
+                roomRows,
+                identity.orbitId,
+                myProfile.displayName || 'You',
+              ) as ChatMessage[]
+              const sealed = roomRows.length > 0 || result.invited.length > 0
+              setGroupTransport((prev) => ({ ...prev, [groupId]: sealed ? 'sealed' : 'node' }))
+            }
+          } catch {
+            /* the sealed lane is unavailable: the node rows still stand */
+          }
+          setGroupMessagesByGroup(prev => ({ ...prev, [groupId]: merged }))
         }
       })
       .catch(() => { })
-  }, [identity, nameRoster])
+  }, [identity, nameRoster, chatGroups, loadGroupMembers, groupRoomOps, myProfile.displayName])
 
   useEffect(() => {
     const refreshChat = () => {
@@ -2878,14 +2975,6 @@ export default function Home() {
       document.removeEventListener('visibilitychange', refreshChat)
     }
   }, [activeGroupId, loadChatGroups, loadGroupMessages, loadPmMessages, pmPeer?.id])
-
-  const loadGroupMembers = useCallback(async (groupId: string): Promise<GroupMember[]> => {
-    if (!identity) return []
-    const res = await orbitFetch(`/api/groups/${groupId}/members`, {}, identity)
-    if (!res.ok) throw new Error(`Could not load members (${res.status})`)
-    const data = await res.json()
-    return Array.isArray(data?.members) ? data.members : []
-  }, [identity])
 
   const addGroupMembers = useCallback(async (groupId: string, ids: string[]) => {
     if (!identity || ids.length === 0) return false
@@ -2930,6 +3019,34 @@ export default function Home() {
 
   const sendGroupMessage = useCallback(async (groupId: string, text: string, replyToId?: string, attachment?: { id: string; url: string; isVideo?: boolean }) => {
     if (!identity || (!text.trim() && !attachment)) return
+    // The sealed room is the transport when it can reach the members. An
+    // attachment still goes to the node (the bytes are node-hosted today),
+    // so that case stays on the node path.
+    if (!attachment && text.trim()) {
+      try {
+        const roomId = roomIdForGroup(groupId)
+        const room = groupRoomOps.rooms().find((r) => r.id === roomId)
+        const reachable = room?.members.filter((m) => m !== identity.orbitId) ?? []
+        if (room && reachable.length > 0) {
+          const sentId = await groupRoomOps.say(roomId, text.trim())
+          if (sentId) {
+            setGroupMessagesByGroup((prev) => ({
+              ...prev,
+              [groupId]: [...(prev[groupId] || []), {
+                id: sentId,
+                senderId: identity.orbitId,
+                senderName: myProfile.displayName || 'You',
+                text: text.trim(),
+                timestamp: Date.now(),
+              }],
+            }))
+            return
+          }
+        }
+      } catch {
+        /* fall through to the node route */
+      }
+    }
     try {
       const res = await orbitFetch(`/api/groups/${groupId}/messages`, {
         method: 'POST',
@@ -2945,7 +3062,7 @@ export default function Home() {
     } catch (err) {
       toast(userFacingError(err, { fallback: 'Could not send group message. The server is unreachable.' }), 'error')
     }
-  }, [identity, loadGroupMessages, toast])
+  }, [identity, loadGroupMessages, toast, groupRoomOps, myProfile.displayName])
 
   const openAttachmentModal = useCallback((
     target: 'pm' | 'group',
@@ -4749,7 +4866,7 @@ export default function Home() {
                           threads={pmThreads}
                           profilePics={profilePics}
                           myDisplayName={myProfile.displayName || 'You'}
-                          groups={chatGroups}
+                          groups={chatGroups.map((g) => ({ ...g, transport: groupTransport[g.id] }))}
                           groupMessages={groupMessagesByGroup}
                           activeGroupId={activeGroupId}
                           rooms={chatRooms}

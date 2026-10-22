@@ -156,10 +156,15 @@ export class RoomManager {
     return true
   }
 
-  createRoom(name: string): Room {
+  /**
+   * Create a room. `id` may be given (a node group maps to a deterministic
+   * room id, so every member derives the same room); without it the room gets
+   * a random one.
+   */
+  createRoom(name: string, id?: string): Room {
     const me = this.deps.identity.orbitId
     const room: Room = {
-      id: randomHex(16),
+      id: id || randomHex(16),
       name: name.trim() || 'untitled room',
       dekHex: toHex(generateDek()),
       epoch: 1,
@@ -267,8 +272,14 @@ export class RoomManager {
       const room = wire.room
       const existing = this.rooms().find((r) => r.id === room.id)
       if (existing) {
-        if (room.epoch >= existing.epoch) {
+        // Strictly newer epoch only: a re-key (leave) replaces the DEK, an
+        // equal epoch does NOT (two members may have created the same group
+        // room independently — the first DEK stays, the membership merges).
+        if (room.epoch > existing.epoch) {
           this.saveRooms(this.rooms().map((r) => (r.id === room.id ? { ...room, members: [...new Set([...room.members, me])] } : r)))
+        } else {
+          const members = [...new Set([...existing.members, ...room.members, me])]
+          this.saveRooms(this.rooms().map((r) => (r.id === room.id ? { ...r, members } : r)))
         }
       } else {
         this.saveRooms([...this.rooms(), { ...room, members: [...new Set([...room.members, me])] }])

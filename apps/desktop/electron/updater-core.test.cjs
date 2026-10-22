@@ -30,6 +30,15 @@ async function main() {
   // sanitizePath regression: dangerous cmd metacharacters must vanish.
   assert.strictEqual(core.sanitizePath('a"b&c|d<e>f^g%h'), 'abcdefgh')
 
+  // ---- a node feed on the user's own network may be plain http ----
+  assert.strictEqual(core.isPrivateFeedUrl('http://127.0.0.1:8790/release.json'), true,
+    'the node on this machine may serve the feed over http')
+  assert.strictEqual(core.isPrivateFeedUrl('http://192.168.1.10:8790/release.json'), true,
+    'a node on the user\'s LAN may serve the feed over http')
+  assert.strictEqual(core.isPrivateFeedUrl('http://93.184.216.34/release.json'), false,
+    'a public host may NOT serve the feed over http')
+  assert.strictEqual(core.isPrivateFeedUrl('https://gmatch-wcz1.onrender.com/release.json'), false)
+
   // ---- planCheck: site release.json shape ----
   const site = {
     file: 'gMatch-1.6.0-portable.exe',

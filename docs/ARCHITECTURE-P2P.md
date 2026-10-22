@@ -196,6 +196,41 @@ courier until something unrelated pulled. The watch socket is built by
 `wsUrlForBase` (`utils/api.ts`) so a relative API base (browser dev, riding the
 Vite proxy) resolves to the page origin instead of the invalid `ws:///api/mail/ws`.
 
+### The release feed travels between peers (2026-10-22)
+
+The central release hosts are decommissioned with the rest, so the update
+feed cannot be a website any more. A NODE serves it instead:
+
+| route | what |
+|---|---|
+| `GET /release.json` | `{ file, version, sha256, sizeBytes }` — the manifest |
+| `GET /releases/<file>` | the portable build |
+
+The directory is `userData/releases` on a packaged install (empty by
+default). `npm run dist` ends with `stage:release`, which copies the built
+exe there and writes the manifest — so the builder's own node serves the new
+build to everyone who joined it. The updater asks, in order: the node this
+install is connected to, the node on this machine, then the old central hosts
+(skipped when they are down). The manifest's sha256 is what makes the
+download safe: the updater verifies it and discards a mismatch, and a plain
+http feed is accepted only for a host on the user's own network (loopback or
+a private LAN address) — never for a public one.
+
+### Group chat is a sealed room (2026-10-22)
+
+The node owns the GROUP; the ROOM carries the words. A group maps to a room
+whose id is derived from the group id (`group_<id>`), so every member
+computes the same room without a directory lookup. The DEK is the secret and
+cannot be derived: it is created once and shipped inside the sealed 1:1
+invite. Two members may open the group before they meet — the first room
+wins the DEK and a later invite merges the membership instead of replacing
+it (an equal epoch never replaces; a higher epoch — a leave — does).
+
+Every message is group-sealed once and then ECIES-copied to each member's
+mailbox, so the node relays ciphertext it cannot open. The node's own group
+rows stay as the history from before the room existed; the two lists are
+merged by id and ordered by time.
+
 ### A peer on another node (2026-10-21)
 
 The courier is the node a client is connected to — there is no central one any

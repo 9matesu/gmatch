@@ -159,6 +159,118 @@ export async function publishReactionRemove(
   }, history)
 }
 
+/**
+ * The social graph and the reports, as signed operations (roadmap L5/L7).
+ *
+ * A follow targets a USER, not a post: the followed account may never post
+ * here, so it needs no local operation to exist. The removal references the
+ * author's own add operation, exactly like a reaction removal.
+ */
+export async function publishFollow(
+  identity: OrbitIdentityLike,
+  targetId: string,
+  log: SocialOperationLog,
+): Promise<SocialOperation> {
+  const { actorSequence, previousOperationId } = await log.nextActorSlot(identity.orbitId)
+  const history = await acceptedHistory(log)
+  return signAndAppend(identity, log, {
+    protocol: 'gmatch-social',
+    version: 1,
+    type: 'follow.add',
+    actorId: identity.orbitId,
+    signingKey: identity.publicKeyHex,
+    actorSequence,
+    previousOperationId,
+    createdAt: Date.now(),
+    objectId: `follow_${targetId}`,
+    payload: { targetId },
+  }, history)
+}
+
+/**
+ * The operation id of MY active follow of this user (the undo needs it), or
+ * null when there is none.
+ */
+export function activeFollowOperationId(
+  entries: readonly { record: unknown }[],
+  selfId: string,
+  targetId: string,
+): string | null {
+  const removed = new Set<string>()
+  const operations = entries
+    .map((entry) => entry.record as { type?: string; operationId?: string; actorId?: string; payload?: { targetId?: unknown; targetAddOperationIds?: unknown } } | null)
+    .filter((record): record is NonNullable<typeof record> => !!record && typeof record === 'object')
+  for (const record of operations) {
+    if (record.type !== 'follow.remove') continue
+    const ids = record.payload?.targetAddOperationIds
+    if (Array.isArray(ids)) for (const id of ids) if (typeof id === 'string') removed.add(id)
+  }
+  for (const record of operations) {
+    if (record.type !== 'follow.add') continue
+    if (record.actorId !== selfId) continue
+    if (record.payload?.targetId !== targetId) continue
+    if (!record.operationId) continue
+    if (removed.has(record.operationId)) continue
+    return record.operationId
+  }
+  return null
+}
+
+/**
+ * Unfollow: the removal names the author's own accepted follow operation.
+ * Without it there is nothing to undo, and the authorizer refuses.
+ */
+export async function publishUnfollow(
+  identity: OrbitIdentityLike,
+  followOperationId: string,
+  log: SocialOperationLog,
+): Promise<SocialOperation> {
+  const history = await acceptedHistory(log)
+  const target = history.find((entry) => entry.operationId === followOperationId)
+  if (!target || target.type !== 'follow.add') throw new Error('follow not found in the local log')
+  if (target.actorId !== identity.orbitId) throw new Error('only the follower may remove the follow')
+  const { actorSequence, previousOperationId } = await log.nextActorSlot(identity.orbitId)
+  return signAndAppend(identity, log, {
+    protocol: 'gmatch-social',
+    version: 1,
+    type: 'follow.remove',
+    actorId: identity.orbitId,
+    signingKey: identity.publicKeyHex,
+    actorSequence,
+    previousOperationId,
+    createdAt: Date.now(),
+    objectId: target.objectId,
+    payload: { targetAddOperationIds: [followOperationId] },
+  }, history)
+}
+
+/**
+ * A report about content (a post or a comment). It travels as a signed
+ * operation, so it reaches the author of the content through the mesh: in a
+ * mesh there is no central moderator, and the author is the one who can act.
+ */
+export async function publishReport(
+  identity: OrbitIdentityLike,
+  target: { targetType: 'post' | 'comment'; targetId: string },
+  reason: string,
+  log: SocialOperationLog,
+): Promise<SocialOperation> {
+  const { actorSequence, previousOperationId } = await log.nextActorSlot(identity.orbitId)
+  const history = await acceptedHistory(log)
+  return signAndAppend(identity, log, {
+    protocol: 'gmatch-social',
+    version: 1,
+    type: 'report.create',
+    actorId: identity.orbitId,
+    signingKey: identity.publicKeyHex,
+    actorSequence,
+    previousOperationId,
+    createdAt: Date.now(),
+    objectId: `report_${target.targetId}`,
+    payload: { targetType: target.targetType, targetId: target.targetId, reason: reason.trim() },
+  }, history)
+}
+
 export interface CommentInput {
   /** The post's objectId — it must exist in the local operation log. */
   postId: string

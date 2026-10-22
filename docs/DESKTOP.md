@@ -59,6 +59,17 @@ yours and your friend's must be reachable from each other:
    the sealed messages pass through it (it cannot read them) and the media and
    the signed operations travel **directly** between the two apps over WebRTC.
 
+**Updates without a release host.** The central release hosts are gone with
+the rest, so the update feed travels between the people who use the app: a
+node serves `/release.json` and `/releases/<file>` from
+`userData/releases`, and `npm run dist` ends with `stage:release`, which
+copies the built exe there and writes the manifest (version + sha256 + size).
+The updater asks the node this install is connected to first, then the node on
+this machine, then the old central hosts (skipped when they are down). The
+sha256 in the manifest is what makes it safe: the updater verifies it and
+discards a mismatch. A plain-http feed is accepted only for a host on the
+user's own network (loopback or a private LAN address).
+
 **The honest limits.** Two nodes that are both unreachable from the public
 internet cannot meet — that is NAT, not architecture, and no client-side code
 fixes it. STUN covers most home connections; a symmetric NAT needs a reachable

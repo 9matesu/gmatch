@@ -12,6 +12,7 @@ const MAX_PAYLOAD_BYTES = 32 * 1024
 const OPERATION_TYPES = new Set([
   'post.create', 'post.edit', 'post.delete',
   'comment.create', 'comment.delete', 'reaction.add', 'reaction.remove',
+  'follow.add', 'follow.remove', 'report.create',
 ])
 
 export interface SocialOperation {
@@ -123,6 +124,20 @@ function validateOperationPayload(type: string, payload: Record<string, unknown>
       return hasOnlyKeys(payload, ['targetAddOperationIds']) &&
         Array.isArray(payload.targetAddOperationIds) && payload.targetAddOperationIds.length > 0 &&
         payload.targetAddOperationIds.length <= 100 && payload.targetAddOperationIds.every(validHexId)
+    // The social graph: a follow targets a USER (their orbit id). It needs no
+    // local operation to exist — the followed account may never post here.
+    case 'follow.add':
+      return hasOnlyKeys(payload, ['targetId']) && validHexId(payload.targetId)
+    case 'follow.remove':
+      return hasOnlyKeys(payload, ['targetAddOperationIds']) &&
+        Array.isArray(payload.targetAddOperationIds) && payload.targetAddOperationIds.length > 0 &&
+        payload.targetAddOperationIds.length <= 100 && payload.targetAddOperationIds.every(validHexId)
+    // A report about content: the target is a post or a comment object id.
+    case 'report.create':
+      return hasOnlyKeys(payload, ['targetType', 'targetId', 'reason']) &&
+        (payload.targetType === 'post' || payload.targetType === 'comment') &&
+        validObjectId(payload.targetId) &&
+        validText(payload.reason, 500, true)
     default: return false
   }
 }
@@ -286,6 +301,33 @@ export function authorizeValidatedOperation(
     if (!comment || comment.type !== 'comment.create' || comment.objectId !== operation.objectId) return 'delete target does not match comment'
     if (comment.actorId !== operation.actorId) return 'only the comment author may delete it'
     return commentIsDeleted(comment) ? 'comment is already tombstoned' : null
+  }
+  if (operation.type === 'follow.add') {
+    const targetId = operation.payload.targetId as string
+    const removed = new Set(acceptedHistory.filter((entry) => entry.type === 'follow.remove')
+      .flatMap((entry) => entry.payload.targetAddOperationIds as string[]))
+    const active = acceptedHistory.some((entry) => entry.type === 'follow.add' &&
+      entry.actorId === operation.actorId && entry.payload.targetId === targetId && !removed.has(entry.operationId))
+    if (active) return 'already following this user'
+    // Following yourself is not a relation.
+    return targetId === operation.actorId ? 'cannot follow yourself' : null
+  }
+  if (operation.type === 'follow.remove') {
+    const ids = operation.payload.targetAddOperationIds as string[]
+    const adds = ids.map((id) => byId(id)).filter((entry): entry is SocialOperation =>
+      !!entry && entry.type === 'follow.add')
+    if (!adds.length) return 'follow removal must reference an accepted follow'
+    // Only the follower may undo their own follow.
+    if (adds.some((add) => add.actorId !== operation.actorId)) return 'only the follower may remove the follow'
+    return null
+  }
+  if (operation.type === 'report.create') {
+    const targetType = operation.payload.targetType
+    const targetId = operation.payload.targetId as string
+    const target = targetType === 'post' ? postCreate(targetId) : commentCreate(targetId)
+    if (!target) return 'report target is unavailable'
+    if (targetType === 'post' ? postIsDeleted(target) : commentIsDeleted(target)) return 'report target is unavailable'
+    return null
   }
   if (operation.type === 'reaction.add') {
     const targetType = operation.payload.targetType

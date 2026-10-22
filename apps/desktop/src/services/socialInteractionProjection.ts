@@ -86,6 +86,76 @@ export function projectReactions(entries: readonly LoggedOperation[]): Map<strin
   return out
 }
 
+/**
+ * The peer social graph: follower id -> the ids they follow.
+ *
+ * A follow is active until some removal references its add operation. Only
+ * the follower's own operations count (an actor cannot follow somebody on
+ * their behalf).
+ */
+export function projectFollows(entries: readonly LoggedOperation[]): Map<string, Set<string>> {
+  const operations = operationsOf(entries)
+  const removed = new Set<string>()
+  for (const operation of operations) {
+    if (operation.type !== 'follow.remove') continue
+    const ids = (operation.payload as { targetAddOperationIds?: unknown }).targetAddOperationIds
+    if (Array.isArray(ids)) for (const id of ids) if (typeof id === 'string') removed.add(id)
+  }
+  const out = new Map<string, Set<string>>()
+  for (const operation of operations) {
+    if (operation.type !== 'follow.add') continue
+    if (removed.has(operation.operationId)) continue
+    const targetId = (operation.payload as { targetId?: unknown }).targetId
+    if (typeof targetId !== 'string') continue
+    const followees = out.get(operation.actorId) ?? new Set<string>()
+    followees.add(targetId)
+    out.set(operation.actorId, followees)
+  }
+  return out
+}
+
+/** A report about content, as the author sees it. */
+export interface ProjectedReport {
+  operationId: string
+  targetType: 'post' | 'comment'
+  targetId: string
+  reason: string
+  reporterId: string
+  createdAt: number
+}
+
+/**
+ * The reports about the content of ONE author (their own view).
+ *
+ * The author of the reported content is the author of the operation that
+ * created it — a report about somebody else's post is not shown to you.
+ */
+export function projectReportsFor(entries: readonly LoggedOperation[], authorId: string): ProjectedReport[] {
+  const operations = operationsOf(entries)
+  const authorOf = new Map<string, string>()
+  for (const operation of operations) {
+    if (operation.type !== 'post.create' && operation.type !== 'comment.create') continue
+    if (!authorOf.has(operation.objectId)) authorOf.set(operation.objectId, operation.actorId)
+  }
+  const out: ProjectedReport[] = []
+  for (const operation of operations) {
+    if (operation.type !== 'report.create') continue
+    const payload = operation.payload as { targetType?: unknown; targetId?: unknown; reason?: unknown }
+    if (payload.targetType !== 'post' && payload.targetType !== 'comment') continue
+    if (typeof payload.targetId !== 'string') continue
+    if (authorOf.get(payload.targetId) !== authorId) continue
+    out.push({
+      operationId: operation.operationId,
+      targetType: payload.targetType,
+      targetId: payload.targetId,
+      reason: typeof payload.reason === 'string' ? payload.reason : '',
+      reporterId: operation.actorId,
+      createdAt: operation.createdAt,
+    })
+  }
+  return out.sort((a, b) => a.createdAt - b.createdAt)
+}
+
 /** Comment threads per post. Deleted comments are hidden; a reply whose
  *  parent is missing (gap) is kept as a top-level comment instead of vanishing. */
 export function projectComments(entries: readonly LoggedOperation[]): Map<string, ProjectedComment[]> {

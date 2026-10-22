@@ -8,6 +8,7 @@ import {
   planCheck,
   sanitizePath,
   buildUpdaterScript,
+  isPrivateFeedUrl,
 } from '../../electron/updater-core.cjs'
 import { isNewer as isNewerTs } from '../utils/version'
 
@@ -86,6 +87,19 @@ describe('updater-core (portable self-update)', () => {
     expect(planCheck({ file: 'evil.zip', version: '9.9.9' }, '1.1.3').action).toBe('error')
     expect(planCheck({ version: '1.2.0', downloadUrl: 'http://x/y.exe' }, '1.1.3').action).toBe('error')
     expect(planCheck({ version: '1.2.0', downloadUrl: 'http://x/y.exe' }, '1.1.3', { insecure: true })).toMatchObject({ action: 'download', name: 'y.exe' })
+  })
+
+  it('a node feed on the user\'s own network may be plain http', () => {
+    // The node this install talks to (their machine, their LAN) is a host the
+    // user chose: http is acceptable there, and nowhere else.
+    expect(isPrivateFeedUrl('http://127.0.0.1:8790/release.json')).toBe(true)
+    expect(isPrivateFeedUrl('http://localhost:8790/release.json')).toBe(true)
+    expect(isPrivateFeedUrl('http://192.168.1.10:8790/release.json')).toBe(true)
+    expect(isPrivateFeedUrl('http://10.0.0.4:8790/release.json')).toBe(true)
+    expect(isPrivateFeedUrl('http://172.16.3.4:8790/release.json')).toBe(true)
+    expect(isPrivateFeedUrl('https://gmatch-wcz1.onrender.com/release.json')).toBe(false)
+    expect(isPrivateFeedUrl('http://93.184.216.34/release.json')).toBe(false)
+    expect(isPrivateFeedUrl('nonsense')).toBe(false)
   })
 
   it('renderer TS mirror behaves identically (drift guard)', () => {

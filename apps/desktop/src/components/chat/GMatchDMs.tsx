@@ -67,6 +67,9 @@ export interface GroupInfo {
   owner_id: string;
   member_count: number;
   is_member: number;
+  /** Where the conversation travels: a sealed room (the node cannot read it)
+   *  or the node's own group route. Absent means "not measured yet". */
+  transport?: 'sealed' | 'node';
 }
 
 // GROUP_WINDOW_MS now lives with the block grouping it belongs to, in
@@ -688,6 +691,8 @@ export function GMatchDMs({
     }
   };
 
+  const activeGroup = openTarget === 'group' ? groups.find((g) => g.id === activeGroupId) : undefined;
+
   const headerTitle =
     openTarget === 'room'
       ? (activeRoom?.name || 'Room')
@@ -704,14 +709,17 @@ export function GMatchDMs({
     openTarget === 'room'
       ? `E2EE room · ${activeRoom?.members.length ?? 0} members · epoch ${activeRoom?.epoch ?? 1}`
       : openTarget === 'group'
-      ? 'Group chat'
+      // Honest about the transport: a sealed room rides the courier (the node
+      // cannot read it), a group without a room still lives on the node.
+      ? (activeGroup?.transport === 'sealed'
+        ? 'Sealed group chat · end-to-end encrypted'
+        : 'Group chat · on this node')
       : isLobbyGroup
       ? 'Public lobby'
       : isQueueGroup
       ? 'Queue chat'
       : 'Direct message';
 
-  const activeGroup = openTarget === 'group' ? groups.find((g) => g.id === activeGroupId) : undefined;
   const canShowMembers = openTarget === 'group' && !!activeGroupId && !!onLoadGroupMembers;
 
   return (
@@ -831,7 +839,9 @@ export function GMatchDMs({
                   <div className="w-10 h-10 rounded-full bg-surface-raised border border-border-glass text-retro-muted shrink-0 overflow-hidden flex items-center justify-center"><Users className="w-4 h-4" /></div>
                   <div className="flex-1 min-w-0">
                     <span className="text-xs font-medium text-retro-body truncate block">{g.name}</span>
-                    <p className="text-xs truncate mt-0.5 text-retro-muted">{g.member_count} members</p>
+                    <p className="text-xs truncate mt-0.5 text-retro-muted">
+                      {g.member_count} members{g.transport === 'sealed' ? ' · sealed' : ''}
+                    </p>
                   </div>
                 </button>
               ))}

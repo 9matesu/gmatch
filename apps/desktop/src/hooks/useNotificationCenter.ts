@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import {
   deriveConversationNotifications,
+  derivePeerReportNotifications,
   mergeNotifications,
   serverRowToAppNotification,
   unreadByTypeOf,
@@ -41,6 +42,15 @@ export interface NotificationCenterInput {
   resolveName?: (peerId: string, payloadName?: string) => string
   /** Monotonic clock for mutable courier stores (rooms/threads). */
   version?: number
+  /** Reports about my own content (peer lane, signed operations). */
+  peerReports?: ReadonlyArray<{
+    operationId: string
+    targetType: 'post' | 'comment'
+    targetId: string
+    reason: string
+    reporterId: string
+    createdAt: number
+  }> | null
 }
 
 export interface NotificationCenter {
@@ -56,6 +66,7 @@ export interface NotificationCenter {
 export function useNotificationCenter(input: NotificationCenterInput): NotificationCenter {
   const {
     rows,
+    peerReports,
     threads,
     dmSeen,
     rooms,
@@ -89,9 +100,17 @@ export function useNotificationCenter(input: NotificationCenterInput): Notificat
     [threads, dmSeen, rooms, roomMessages, roomSeen, selfId, selfName, resolveName, version],
   )
 
+  // The peer lane: reports about my own content. Kept separate from the
+  // conversation lane, but merged into the SAME list — the badge and the list
+  // must never tell different stories.
+  const peerReportItems = useMemo(
+    () => derivePeerReportNotifications(peerReports ?? [], { resolveName }),
+    [peerReports, resolveName],
+  )
+
   const items = useMemo(
-    () => mergeNotifications(serverItems, localItems),
-    [serverItems, localItems],
+    () => mergeNotifications(serverItems, [...localItems, ...peerReportItems]),
+    [serverItems, localItems, peerReportItems],
   )
 
   const unreadCount = useMemo(() => unreadCountOf(items), [items])

@@ -48,6 +48,29 @@ run the narrow checks, then commit only the files in that slice.
   demonstrated. The single age gate and client-side prohibited-tag blocklist
   remain mandatory.
 
+## What changed on 2026-10-22 (the last central dependencies)
+
+- **Group chat rides a sealed room** (`services/groupRooms.ts`): the node
+  keeps the membership, the words are group-sealed and fanned out to the
+  members' mailboxes, and the node's rows remain as the older history. The
+  UI says which transport a group is on.
+- **The social graph is operations**: `follow.add` / `follow.remove`
+  (protocol level, with the authorizer rules: no duplicate follow, no
+  following yourself, only the follower may undo it) plus the projection.
+  The follow button publishes the operation AND keeps the node's row.
+- **Reports are operations, and there is no admin in a mesh**: a report about
+  peer-replicated content is a signed `report.create`, and it reaches the
+  AUTHOR of that content (their notification centre shows "X reported your
+  post"). Node-hosted content keeps the node's moderation queue.
+- **The update feed travels between peers**: a node serves
+  `/release.json` + `/releases/<file>` from `userData/releases`, and
+  `npm run dist` stages the built exe there. The updater asks the node it is
+  connected to first. No hosted release host is needed any more.
+- **Still open**: the mesh-wide moderation story beyond "the author acts"
+  (there is no way to force a peer to remove content), profile fields as
+  operations (the display name/bio still live on the node), and the
+  multi-process/NAT evidence.
+
 ## What changed on 2026-10-21 (the hosts went away)
 
 - **Host mode is the default** for packaged builds (`electron/server-mode.cjs`).

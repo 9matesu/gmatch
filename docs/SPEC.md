@@ -371,6 +371,31 @@ offline earnings). Each +5% click power. Persist across prestige.
   never borrows that user's directory name or avatar.
 - Full specification documented in `docs/ARCHITECTURE-P2P.md`.
 
+## 10e. Group chat, social graph and reports as peer operations (2026-10-22)
+
+- **Group chat rides a SEALED ROOM.** The node keeps the group (who is in it,
+  who may join); the conversation does not have to live on the node. A group
+  maps to a room whose id is DERIVED from the group id, so every member
+  computes the same room without a lookup. The DEK cannot be derived (it is
+  the secret), so it is created once and shipped inside the sealed invite:
+  the first member to open the group owns it, and a second creator does NOT
+  overwrite it (an equal-epoch invite merges the membership, a higher epoch —
+  a leave/re-key — replaces the DEK). Every message is group-sealed and fanned
+  out to the members' mailboxes; the node's rows stay as the history from
+  before the room existed, and the two are merged by id. The UI says which
+  transport a group is on ("sealed group chat" vs "on this node").
+- **The social graph is operations.** `follow.add` / `follow.remove` are
+  signed, chained operations: the removal names the author's own add
+  operation, a duplicate follow is refused, and following yourself is
+  refused. The node's follower counts remain the node's bookkeeping; the
+  operation is the graph that travels.
+- **Reports are operations, and there is no admin in a mesh.** A report about
+  peer-replicated content is a signed `report.create` operation, so it
+  reaches the AUTHOR of that content through the mesh. The author is the one
+  who can act on it, and the report shows up in their notification centre
+  ("X reported your post"). Node-hosted content keeps the node's moderation
+  queue — the node that hosts the content moderates it.
+
 ## 11. Save
 
 - zustand state → localStorage `gmatch.save.v1`, autosave every 10s + on unload.

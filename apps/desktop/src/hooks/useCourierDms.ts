@@ -333,6 +333,10 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
   }, [])
 
   const createRoom = useCallback((name: string): Room | null => roomsRef.current?.createRoom(name) ?? null, [])
+  /** A room with a caller-chosen id: a node group maps to a deterministic room
+   *  id, so every member derives the same room without a lookup. */
+  const createRoomWithId = useCallback((name: string, id: string): Room | null =>
+    roomsRef.current?.createRoom(name, id) ?? null, [])
   const inviteToRoom = useCallback((roomId: string, peerId: string) => {
     const r = roomsRef.current
     return r ? r.invite(roomId, peerId) : Promise.resolve(false)
@@ -346,5 +350,5 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
 
   const courierActive = useMemo(() => mode === 'courier' && !!identity, [mode, identity])
 
-  return { mode, courierActive, send, pull, threadFor, registerPeerKeys, meshSend, peerAddressable, threads, rooms, createRoom, inviteToRoom, sayInRoom, leaveRoom, roomMessages, edit, remove, react, type, markRead, isTyping }
+  return { mode, courierActive, send, pull, threadFor, registerPeerKeys, meshSend, peerAddressable, threads, rooms, createRoom, createRoomWithId, inviteToRoom, sayInRoom, leaveRoom, roomMessages, edit, remove, react, type, markRead, isTyping }
 }
