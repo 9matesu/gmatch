@@ -26,7 +26,7 @@ const STORY_DURATION_MS = 5000;
  * watchdog on ObjectImage defaults to 6s, which used to outlast the 5s story
  * and leave the stage spinning after the next one had already advanced.
  */
-const STORY_MEDIA_TIMEOUT_MS = 4000;
+const STORY_MEDIA_TIMEOUT_MS = 8000;
 /** Cap on the persisted seen-id set (it only drives ring styling). */
 const SEEN_STORIES_MAX = 500;
 const SEEN_PERSIST_DEBOUNCE_MS = 800;

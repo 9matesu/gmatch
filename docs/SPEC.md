@@ -369,22 +369,25 @@ offline earnings). Each +5% click power. Persist across prestige.
 - zustand state → localStorage `gmatch.save.v1`, autosave every 10s + on unload.
 - Offline earnings = elapsed * pts/s * 25%, capped 8h, shown in modal on load.
 
-## 12. Server topology (central courier + opt-in host mode)
+## 12. Server topology (per-install node, opt-in client mode)
 
 - Every packaged copy bundles its OWN server: `apps/desktop/scripts/stage-api.cjs`
   stages a self-contained API (`packages/{crypto,shared}` + `apps/api` + prod
   deps + `bun.exe`) at `api-stage/`; electron-builder ships it as
   `resources/api` (`extraResources`). Nothing must be installed on the machine.
 - Packaged startup (`electron/main.cjs` + `electron/server-mode.cjs`):
-  - **client** (default): the central node `https://gmatch-wcz1.onrender.com` — a blind
-    courier (mail + TURN only; content routes 404 at the edge). A persisted
-    `userData/server-mode.json` may point at any friend's node instead
-    (validated `http(s)://host[:port]`, applied on relaunch).
-    `gmatch_SERVER_URL` env overrides both.
-  - **host** (opt-in in Settings → Server): spawn the bundled server on
+  - **host** (default since 2026-10-21): spawns the bundled server on
     `:8790` (world data lives in `userData/orbit.sqlite` + `userData/blobs`);
     the Server tab lists this machine's LAN URLs (`http://<ip>:8790`) to share
-    with friends.
+    with friends. The central Render host was decommissioned (the account can
+    no longer be paid for), so a packaged build with no stored mode starts its
+    own node instead of dialing a dead one.
+  - **client** (opt-in in Settings → Server): talks to someone else's node —
+    a friend's machine or any `http(s)://host[:port]` the user was given
+    (validated, applied on relaunch). `gmatch_SERVER_URL` env overrides both.
+    There is **no fallback to a hosted default**: a machine with no node and no
+    stored URL is a machine whose node is not running, and the UI says so
+    instead of silently dialing a dead host.
   - Nodes are reachable WITHOUT the hub (wave 2): the directory gossips
     through whichever node you are on into `orbit_node_directory_v1`, and
     `gmatch://node/...` codes (`utils/nodeMask.ts`) join a node out-of-band.

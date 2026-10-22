@@ -129,12 +129,11 @@ async function startApi() {
           : path.join(__dirname, '..', '..', '..', 'shared', 'blocklist.json')
       })(),
       // Gossip pull (plan G1): packaged hosts replicate public posts from
-      // central into their own db. Dev sidecars stay islanded unless opted
-      // in; 'off' disables everywhere.
-      ...(process.env.GMATCH_GOSSIP_UPSTREAM === 'off' ? {} : {
-        GOSSIP_UPSTREAM: process.env.GMATCH_GOSSIP_UPSTREAM
-          || (app.isPackaged ? 'https://gmatch-wcz1.onrender.com' : ''),
-      }),
+      // an upstream relay. Opt-in only — set GMATCH_GOSSIP_UPSTREAM to a
+      // full node URL, or 'off' to disable. No Render traffic by default.
+      ...(process.env.GMATCH_GOSSIP_UPSTREAM && process.env.GMATCH_GOSSIP_UPSTREAM !== 'off'
+        ? { GOSSIP_UPSTREAM: process.env.GMATCH_GOSSIP_UPSTREAM }
+        : {}),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })

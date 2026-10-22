@@ -1,7 +1,9 @@
 // Server-mode config for packaged builds.
-//   client (default): talk to the central node (gmatch-wcz1.onrender.com); no local
-//     bun sidecar process — leaner RAM/CPU for the portable app.
-//   host: run the bundled server locally; friends connect to us.
+//   host (default): run the bundled server locally; friends connect to us.
+//     Every packaged install is self-contained — no Render dependency for
+//     local data, social, or economy. Render courier stays optional (mail /
+//     TURN / directory) and is reachable through the central URL setting.
+//   client (opt-in): talk to a friend's node or the central courier.
 // Persisted in userData/server-mode.json so the choice survives restarts.
 const { app } = require('electron')
 const path = require('node:path')
@@ -31,9 +33,9 @@ function readServerMode() {
       return { mode: 'client', url }
     }
   } catch {
-    /* first run / unreadable -> central node (host stays opt-in in Settings) */
+    /* first run / unreadable -> host mode (bundled server, no Render required) */
   }
-  return { mode: 'client', url: 'https://gmatch-wcz1.onrender.com' }
+  return { mode: 'host', url: `http://127.0.0.1:${PORT}` }
 }
 
 function writeServerMode(mode, url) {

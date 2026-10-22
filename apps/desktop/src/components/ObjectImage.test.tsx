@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 // Signed objects render from a fetched blob; the placeholder must not claim
 // "No preview" while that fetch is simply still in flight (T-W3).
@@ -85,6 +85,14 @@ describe('ObjectImage placeholder (T-W3)', () => {
     const img = container.querySelector('img')
     expect(img).toBeInTheDocument()
     expect(img).not.toHaveAttribute('crossorigin')
+  })
+
+  it('clears a stale load error when media resolves to a different local URL', async () => {
+    const { container, rerender } = render(<ObjectImage contentUrl="https://cdn.example.com/first.jpg" identity={identity} />)
+    fireEvent.error(container.querySelector('img')!)
+    expect(screen.getByText('Image unavailable')).toBeInTheDocument()
+    rerender(<ObjectImage contentUrl="gmcache://f/recovered.jpg" identity={identity} />)
+    await waitFor(() => expect(container.querySelector('img')).toBeInTheDocument())
   })
 
   it('hides component cleanly when hideUnavailable is true and image failed', () => {

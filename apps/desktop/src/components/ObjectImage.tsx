@@ -208,6 +208,13 @@ export function ObjectImage({
   const proxied = devFetchable(baseSrc)
   const src = vaultSrc || cachedDirectUrl || proxied || baseSrc
 
+  // A direct provider URL may fail while its IPC/vault copy is still being
+  // resolved. When that resolution swaps `src` to the local copy, clear the
+  // previous URL's error instead of leaving a good cached image hidden.
+  useEffect(() => {
+    setHasError(false)
+  }, [src])
+
   useEffect(() => {
     if ((signed && img.failed) || hasError) {
       onMediaUnavailable?.()

@@ -48,12 +48,8 @@ function enabled(): boolean {
 // re-renders can't stack pins (which would leak bytes past eviction).
 const sessionPinned = new Set<string>()
 
-// Failed pins are remembered for the session too: the App backfill effect
-// re-runs on every feed update, and without this a URL the host refuses is
-// re-fetched on every pass. A transient failure therefore does not retry until
-// the next app launch — accepted, because the alternative is a fetch storm.
-// ponytail: session-scoped negative cache; add a TTL if a flaky host matters.
-const sessionFailed = new Set<string>()
+// Suppress fetch storms, but let transient gateway/network failures recover.
+const sessionFailed = new Map<string, number>()
 
 const VIDEO_LOCAL_RE = /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i
 
@@ -141,7 +137,9 @@ export async function vaultProbe(ref: string): Promise<VaultProbe> {
 /** Get-or-fetch + pin. Fire-and-forget for keeps/cards; resolves vault:// or cached url. */
 export async function vaultPin(url: string): Promise<string | null> {
   if (!url || !enabled()) return null
-  if (sessionFailed.has(url)) return null
+  const failedAt = sessionFailed.get(url)
+  if (failedAt !== undefined && Date.now() - failedAt < 30_000) return null
+  sessionFailed.delete(url)
   try {
     if (sessionPinned.has(url)) return vaultGet(url)
     if (vaultBridge()) {
@@ -154,7 +152,7 @@ export async function vaultPin(url: string): Promise<string | null> {
         return res.local
       }
       // Bridge refused (no bytes stored): negative-cache like a failure.
-      sessionFailed.add(url)
+      sessionFailed.set(url, Date.now())
       return null
     }
     // No bridge (browser dev): there is no durable byte store behind the
@@ -163,7 +161,7 @@ export async function vaultPin(url: string): Promise<string | null> {
     // provider. Return null: IndexedDB (registerLocalObject) is the dev bytes.
     return null
   } catch {
-    sessionFailed.add(url)
+    sessionFailed.set(url, Date.now())
     return null
   }
 }

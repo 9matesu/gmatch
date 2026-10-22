@@ -79,6 +79,17 @@ describe('TagBrowser', () => {
     expect(await screen.findByText(/offline/i)).toBeInTheDocument()
   })
 
+  it('clears loading and offers retry when the provider call rejects', async () => {
+    fetchPostsMock.mockRejectedValueOnce(new Error('gateway error')).mockResolvedValueOnce({
+      posts: [{ id: 'retry', url: 'https://e.test/retry.jpg', tags: ['wet_ass'] }], source: 'tbib', ok: true,
+    })
+    render(<TagBrowser />)
+    fireEvent.click(screen.getByRole('button', { name: /wet_ass/i }))
+    expect(await screen.findByText('Offline: tag search failed')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(await screen.findByText('1 from tbib')).toBeInTheDocument()
+  })
+
   it('drops a stale response so a slow round cannot overwrite a newer query', async () => {
     let resolveFirst: (v: unknown) => void = () => {}
     fetchPostsMock

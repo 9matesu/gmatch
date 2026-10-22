@@ -33,6 +33,7 @@ export default function TagBrowser({ onClose }: { onClose?: () => void }) {
   const [status, setStatus] = useState('Pick tags to browse')
   const [loading, setLoading] = useState(false)
   const [viewerId, setViewerId] = useState<string | null>(null)
+  const [retry, setRetry] = useState(0)
 
   // Discards stale responses: a slow round must not overwrite a newer one.
   const requestRef = useRef(0)
@@ -58,15 +59,20 @@ export default function TagBrowser({ onClose }: { onClose?: () => void }) {
     }
     const reqId = ++requestRef.current
     setLoading(true)
-    void (async () => {
-      const res = await fetchPosts({ tags: query, limit: PAGE_LIMIT, silent: true })
-      if (reqId !== requestRef.current) return // a newer query won
-      const clean = dedupePosts(res.posts || [])
-      setPosts(clean)
-      setStatus(provenanceLabel(res, clean.length))
-      setLoading(false)
-    })()
-  }, [query])
+    void fetchPosts({ tags: query, limit: PAGE_LIMIT, silent: true })
+      .then((res) => {
+        if (reqId !== requestRef.current) return // a newer query won
+        const clean = dedupePosts(res.posts || [])
+        setPosts(clean)
+        setStatus(provenanceLabel(res, clean.length))
+      })
+      .catch(() => {
+        if (reqId === requestRef.current) setStatus('Offline: tag search failed')
+      })
+      .finally(() => {
+        if (reqId === requestRef.current) setLoading(false)
+      })
+  }, [query, retry])
 
   const viewer = viewerId ? posts.find((p) => p.id === viewerId) || null : null
 
@@ -117,6 +123,11 @@ export default function TagBrowser({ onClose }: { onClose?: () => void }) {
       {/* Provenance line */}
       <div className="flex shrink-0 items-center gap-2 px-3 py-2 text-xs text-retro-muted">
         {loading ? <span className="animate-pulse">Browsing {query}…</span> : <span>{status}</span>}
+        {!loading && query && status.startsWith('Offline') && (
+          <button type="button" className="ml-auto cursor-pointer underline hover:text-retro-fg" onClick={() => setRetry((n) => n + 1)}>
+            Retry
+          </button>
+        )}
       </div>
 
       {/* Results */}

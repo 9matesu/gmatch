@@ -68,6 +68,27 @@ describe('useObjectImage magic-byte video sniffing', () => {
   })
 })
 
+describe('useObjectImage transient gateway retry', () => {
+  it('retries a 502 response instead of poisoning the media cache', async () => {
+    const { useObjectImage } = await import('./useObjectImage')
+    const { orbitFetch } = await import('../utils/api')
+    vi.mocked(orbitFetch)
+      .mockResolvedValueOnce({ ok: false, status: 502 } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'Content-Type': 'image/png' }),
+        blob: async () => new Blob(['recovered'], { type: 'image/png' }),
+      } as Response)
+
+    const h = renderHook(() => useObjectImage('gateway-card', identity))
+    await waitFor(() => expect(h.result.current.url).toMatch(/^blob:/))
+    expect(h.result.current.failed).toBe(false)
+    expect(orbitFetch).toHaveBeenCalledTimes(2)
+    h.unmount()
+  })
+})
+
 describe('useObjectImage eviction (signed media vanish)', () => {
   it('never revokes the blob URL of a still-mounted entry when the cap overflows', async () => {
     const { useObjectImage } = await import('./useObjectImage')

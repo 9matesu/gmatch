@@ -198,12 +198,17 @@ async function resolveObject(cleanId: string, identity: IdentityLike): Promise<R
     })
   }
 
-  let res: Response
-  try {
-    res = await orbitFetch(`/api/objects/${cleanId}`, { method: 'GET' }, identity)
-  } catch {
-    return commit(FAILED(cleanId))
+  let res: Response | null = null
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      res = await orbitFetch(`/api/objects/${cleanId}`, { method: 'GET' }, identity)
+      if (![502, 503, 504].includes(res.status) || attempt === 2) break
+    } catch {
+      if (attempt === 2) return { state: FAILED(cleanId), cache: false, awaitingSeeder: false }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)))
   }
+  if (!res) return { state: FAILED(cleanId), cache: false, awaitingSeeder: false }
 
   if (!res.ok) {
     if (res.status === 404 && typeof window !== 'undefined') {

@@ -1974,9 +1974,10 @@ app.whenReady().then(async () => {
     updateHandoff = true
     return updater.install()
   })
-  // Topology: packaged builds default to CLIENT mode on the central node
-  // (gmatch-wcz1.onrender.com); host mode (the bundled server) is the opt-in in
-  // Settings. Dev keeps the repo-local sidecar path unchanged.
+  // Topology: packaged builds default to HOST mode (bundled Bun sidecar,
+  // fully local — no Render required). Client mode (friend's node or central
+  // courier) is opt-in via Settings → Server. Dev keeps the repo-local
+  // sidecar path unchanged.
   // The window MUST exist before any sidecar wait: 1.2.5 blocked up to 30s
   // on startApi() before createWindow(), so a slow/migrating bundled server
   // looked like "Task Mgr spin, never opens" (and invited double-clicks
@@ -2014,8 +2015,8 @@ app.whenReady().then(async () => {
       mainLog(`boot: server mode=${packagedServer.mode} url=${packagedServer.url}`)
     }
   } catch (err) {
-    mainLog(`boot: readServerMode failed, defaulting to client (${err?.message || err})`)
-    packagedServer = { mode: 'client', url: 'https://gmatch-wcz1.onrender.com' }
+    mainLog(`boot: readServerMode failed, defaulting to host (${err?.message || err})`)
+    packagedServer = { mode: 'host', url: `http://127.0.0.1:${serverMode.PORT}` }
   }
   // Window first — never gate first paint on the bundled server.
   mainLog(`boot: creating window (v${app.getVersion()}, packaged=${app.isPackaged})`)

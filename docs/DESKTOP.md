@@ -15,11 +15,15 @@ spawning a second bundled server.
 Two topologies, chosen once per launch in Settings → Server
 (`electron/server-mode.cjs`, persisted in `userData/server-mode.json`):
 
-- **client (default):** talks to the central node `https://gmatch-wcz1.onrender.com`
-  (a blind courier: relays encrypted envelopes it cannot open). No local server.
-- **host:** spawns the bundled server (bun sidecar on `:8790`,
+- **host (default):** spawns the bundled server (bun sidecar on `:8790`,
   `electron/apiSidecar.cjs`); one world per host, LAN addresses shown for
-  friends. No cloud account, no telemetry.
+  friends. No cloud account, no telemetry, no hosted dependency — the machine
+  you are sitting at IS the node.
+- **client (opt-in):** talks to someone else's node (a friend's machine, or any
+  `http(s)://host[:port]` you were given). The central Render deployment is
+  **gone** (decommissioned 2026-10-21 — the account can no longer be paid
+  for), so nothing falls back to it: a packaged build with no stored mode
+  starts its own server instead of dialing a dead host.
 
 ## Boot flow (`electron/main.cjs`)
 

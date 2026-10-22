@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 
 describe('vaultPin negative cache', () => {
-  const bridge = { vaultGet: vi.fn(async () => ({ local: null })), vaultPin: vi.fn(async () => ({ local: null })) }
+  const bridge = { vaultGet: vi.fn(async () => ({ local: null as string | null })), vaultPin: vi.fn(async () => ({ local: null as string | null })) }
   const storage: Record<string, string> = {}
 
   beforeEach(async () => {
@@ -26,12 +26,23 @@ describe('vaultPin negative cache', () => {
     mod._resetSessionGuards?.()
   })
 
-  it('does not re-call the bridge for a URL that already failed', async () => {
+  it('suppresses retries briefly after a failure', async () => {
     const { vaultPin } = await import('./vault')
     await vaultPin('https://x/dead.jpg')
     await vaultPin('https://x/dead.jpg')
     await vaultPin('https://x/dead.jpg')
     expect(bridge.vaultPin).toHaveBeenCalledTimes(1)
+  })
+
+  it('retries a failed pin after the short cooldown', async () => {
+    vi.useFakeTimers()
+    bridge.vaultPin.mockResolvedValueOnce({ local: null }).mockResolvedValueOnce({ local: 'vault://f/recovered' })
+    const { vaultPin } = await import('./vault')
+    await vaultPin('https://x/flaky.jpg')
+    await vi.advanceTimersByTimeAsync(30_001)
+    expect(await vaultPin('https://x/flaky.jpg')).toBe('vault://f/recovered')
+    expect(bridge.vaultPin).toHaveBeenCalledTimes(2)
+    vi.useRealTimers()
   })
 
   it('defaults to opt-in when localVault setting is missing', async () => {
