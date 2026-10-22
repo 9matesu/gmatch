@@ -121,6 +121,9 @@ async function startApi() {
       STORAGE_ENCRYPTION_KEY: storageKey,
       SNAPSHOT_PATH: path.join(app.getPath('userData'), 'orbit.sqlite'),
       BLOB_STORE_DIR: path.join(app.getPath('userData'), 'blobs'),
+      // The release feed this node offers its peers (empty by default: a node
+      // serves a portable build only if its operator put one there).
+      RELEASES_DIR: path.join(app.getPath('userData'), 'releases'),
       BLOCKLIST_PATH: (() => {
         const userPath = path.join(app.getPath('userData'), 'blocklist.json')
         if (require('node:fs').existsSync(userPath)) return userPath

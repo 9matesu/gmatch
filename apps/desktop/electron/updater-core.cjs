@@ -109,6 +109,27 @@ function planCheck(release, currentVersion, opts) {
   return { action: 'download', ...parsed }
 }
 
+/**
+ * True for a feed on the user's OWN network: the loopback node or a private
+ * LAN address. Those are hosts the user chose (their machine, their network),
+ * so a plain-http feed is acceptable there — and nowhere else.
+ */
+function isPrivateFeedUrl(url) {
+  const raw = String(url || '')
+  if (!/^http:\/\//i.test(raw)) return false
+  let host = ''
+  try {
+    host = new URL(raw).hostname
+  } catch {
+    return false
+  }
+  if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]') return true
+  if (/^10\./.test(host)) return true
+  if (/^192\.168\./.test(host)) return true
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(host)) return true
+  return false
+}
+
 /** Keep only characters safe for a quoted cmd.exe path token. */
 function sanitizePath(p) {
   return String(p).replace(/["&|<>^%\n\r]/g, '')
@@ -165,4 +186,4 @@ function buildUpdaterScript({ source, target, logPath }) {
   ].join('\r\n')
 }
 
-module.exports = { isNewer, parsePortableName, parseDigest, parseRelease, parseSiteRelease, shaField, sizeField, shaFromReleaseJson, planCheck, sanitizePath, buildUpdaterScript, PORTABLE_RE }
+module.exports = { isNewer, parsePortableName, parseDigest, parseRelease, parseSiteRelease, shaField, sizeField, shaFromReleaseJson, planCheck, sanitizePath, buildUpdaterScript, isPrivateFeedUrl, PORTABLE_RE }

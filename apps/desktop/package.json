@@ -15,9 +15,10 @@
       "typecheck": "tsc --noEmit",
       "e2e:clean": "node scripts/clean-e2e-state.mjs",
     "icon": "node scripts/make-icon.cjs",
-    "dist": "npm run icon && npm run stage:api && npm run build && electron-builder --win portable --config.directories.output=release",
+    "dist": "npm run icon && npm run stage:api && npm run build && electron-builder --win portable --config.directories.output=release && npm run stage:release",
     "pack": "electron-builder --win portable",
-    "stage:api": "node scripts/stage-api.cjs"
+    "stage:api": "node scripts/stage-api.cjs",
+    "stage:release": "node scripts/stage-release.cjs"
   },
   "dependencies": {
     "@chainsafe/libp2p-noise": "^17.0.0",

@@ -115,14 +115,34 @@ function pickDestDir(userExePath, tempDir) {
   return null
 }
 
-function createUpdater({ app, webContents, log = () => {}, spawnFn = spawn, feeds: injectedFeeds }) {
+function createUpdater({ app, webContents, log = () => {}, spawnFn = spawn, feeds: injectedFeeds, getServerUrl = null }) {
   let state = { phase: 'idle', current: app.getVersion() }
-  const feeds = injectedFeeds ?? (process.env.GMATCH_RELEASE_URL
-    ? [{ url: process.env.GMATCH_RELEASE_URL, base: baseOf(process.env.GMATCH_RELEASE_URL) }]
-    : RELEASE_FEEDS)
+  // The node this install talks to can host the release feed.
+  const nodeFeedUrl = () => {
+    const url = typeof getServerUrl === 'function' ? getServerUrl() : ''
+    if (!url) return ''
+    return `${url.replace(/\/+$/, '')}/release.json`
+  }
+  // The release feed, resolved AT CHECK TIME: the node this install talks
+  // to can serve the artifact to its peers, and the user can switch worlds
+  // between two checks. Then the old central hosts (decommissioned — they are
+  // skipped when they are down).
+  const resolveFeeds = () => {
+    if (injectedFeeds) return injectedFeeds
+    if (process.env.GMATCH_RELEASE_URL) {
+      return [{ url: process.env.GMATCH_RELEASE_URL, base: baseOf(process.env.GMATCH_RELEASE_URL) }]
+    }
+    const node = nodeFeedUrl()
+    return [
+      ...(node ? [{ url: node, base: baseOf(node) }] : []),
+      ...RELEASE_FEEDS,
+    ]
+  }
   // Plain http is only allowed for an explicit local override (env or an
-  // injected test feed); the shipped feeds are https.
-  const insecureOverride = Boolean(process.env.GMATCH_RELEASE_URL) || feeds.some((f) => /^http:\/\//i.test(f.url))
+  // injected test feed); the shipped feeds are https. A NODE feed is the
+  // exception: it is a host the user chose (their own machine, their own
+  // network), and it is checked per feed — never as a blanket for the others.
+  const insecureOverride = Boolean(process.env.GMATCH_RELEASE_URL)
 
   const setStatus = (patch) => {
     state = { ...state, ...patch }
@@ -149,7 +169,7 @@ function createUpdater({ app, webContents, log = () => {}, spawnFn = spawn, feed
       setStatus({ phase: 'downloading', version: plan.version, percent: 0, bytes: 0 })
       const { sha256, bytes } = await download(plan.url, partial, (percent, received) => {
         setStatus({ phase: 'downloading', percent: Math.max(0, percent), bytes: received })
-      }, { insecure: insecureOverride })
+      }, { insecure: insecureOverride || core.isPrivateFeedUrl(plan.url) })
       const expected = plan.digest || null
       // Size first (cheap truncation catch), then the published digest.
       if (plan.sizeBytes !== null && bytes !== plan.sizeBytes) {
@@ -181,14 +201,18 @@ function createUpdater({ app, webContents, log = () => {}, spawnFn = spawn, feed
     // its download URL comes from that same host.
     let best = null
     let lastError = ''
+    const feeds = resolveFeeds()
     const answers = await Promise.all(feeds.map(async (feed) => {
+      // A feed on the user's own network (the node) may be plain http; the
+      // public feeds must stay https.
+      const insecure = insecureOverride || core.isPrivateFeedUrl(feed.url)
       try {
         const release = await withTimeout(
-          getJson(feed.url, { insecure: insecureOverride }),
+          getJson(feed.url, { insecure }),
           FEED_TIMEOUT_MS,
           'release host did not answer',
         )
-        const plan = core.planCheck(release, app.getVersion(), { insecure: insecureOverride, base: feed.base })
+        const plan = core.planCheck(release, app.getVersion(), { insecure, base: feed.base })
         return plan.action === 'error' ? { error: plan.error } : { plan }
       } catch (err) {
         return { error: String(err?.message || err) }

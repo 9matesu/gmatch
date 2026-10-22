@@ -1,3 +1,4 @@
+import { serveRelease } from './releases'
 import { createClient } from '@libsql/client'
 import { D1Turso, ensureSchema } from './db'
 import { existsSync } from 'node:fs'
@@ -279,6 +280,15 @@ Bun.serve({
         return Response.json({ error: 'API is starting. Try again shortly.' }, { status: 503 })
       }
       return app.fetch(req, env)
+    }
+
+    // The release feed this node serves to its peers (the central release
+    // hosts are decommissioned: the artifact travels between the people who
+    // use the app). A node without a releases directory serves nothing.
+    if (url.pathname === '/release.json' || url.pathname.startsWith('/releases/')) {
+      const release = await serveRelease(url.pathname, env as { RELEASES_DIR?: string })
+      if (release) return release
+      return new Response('Not Found', { status: 404 })
     }
 
     // Static frontend

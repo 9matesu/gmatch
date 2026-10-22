@@ -1965,6 +1965,16 @@ app.whenReady().then(async () => {
       app,
       webContents: () => BrowserWindow.getAllWindows().map((w) => w.webContents),
       log: mainLog,
+      // The node this install talks to can serve the release feed (the
+      // central release hosts are decommissioned).
+      getServerUrl: () => {
+        try {
+          if (packagedServer && packagedServer.url) return packagedServer.url
+          return serverMode.readServerMode().url
+        } catch {
+          return ''
+        }
+      },
     })
   }
   ipcMain.handle('update:check', () => (updater ? updater.check(true) : { phase: 'unsupported', current: app.getVersion() }))
