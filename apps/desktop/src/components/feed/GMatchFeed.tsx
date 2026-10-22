@@ -56,6 +56,8 @@ import { orbitFetch, postShareUrl } from '../../utils/api';
 import { GAME_AD_TEMPLATES } from '../../utils/gameAds';
 import { ExploreSearchModal } from './ExploreSearchModal';
 import { useNow } from '../../hooks/useNow';
+import { usePeerCommentsByPost } from '../../hooks/usePeerComments';
+import { mergeCommentRows } from '../../utils/commentMerge';
 import { SharePostModal } from './SharePostModal';
 import { PostTimestamp } from './PostTimestamp';
 import { PostOptionsModal } from './PostOptionsModal';
@@ -341,6 +343,8 @@ export function GMatchFeed({
 
   // Comments State (No mockups)
   const [commentsMap, setCommentsMap] = useState<Record<string, PostComment[]>>({});
+  // Comments that only exist as signed operations (peer-replicated posts).
+  const peerComments = usePeerCommentsByPost(identity?.orbitId);
   /** Posts whose comment list is already in `commentsMap` — a ref, not state, so
    *  the fetch effect doesn't re-run (and refetch) on every list mutation. */
   const commentsLoadedRef = useRef<Set<string>>(new Set());
@@ -970,7 +974,13 @@ export function GMatchFeed({
                : post.likers;
              const likedByLabel = formatLikedBy(likersPreview, currentLikes);
 
-            const postComments = commentsMap[post.id] || [];
+            // Node rows and peer operations live in two places; the thread
+            // is the union, deduped by id (a node row wins: it carries the
+            // display name and the avatar).
+            const postComments = mergeCommentRows(
+              commentsMap[post.id] || [],
+              peerComments.get(post.id) || [],
+            );
             // Server truth for the count; the local map is only warm once the
             // post has been opened (inline expansion or lightbox).
             const postCommentCount = Math.max(post.comment_count ?? 0, postComments.length);

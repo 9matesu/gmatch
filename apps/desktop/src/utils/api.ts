@@ -11,10 +11,25 @@ import { logger } from './logger';
  */
 const COURIER_HOSTS = /(^|\.)onrender\.com$/;
 
+/**
+ * The Fly deployment is decommissioned too (same reason as Render: the
+ * account cannot be paid for). A stored URL pointing at either host is
+ * dropped on sight — it is a dead address, never a data base.
+ */
+const DEAD_HOSTS = /(^|\.)fly\.dev$/;
+
+/**
+ * The node this install runs (host mode is the default since 2026-10-21).
+ * There is no hosted fallback anymore: a machine with no node and no stored
+ * URL is a machine whose node is not running, and the UI says so.
+ */
+export const LOCAL_NODE_BASE = 'http://127.0.0.1:8790';
+
 export function isCourierApiUrl(url: string | null | undefined): boolean {
   if (!url?.trim()) return false;
   try {
-    return COURIER_HOSTS.test(new URL(url.trim()).hostname);
+    const host = new URL(url.trim()).hostname;
+    return COURIER_HOSTS.test(host) || DEAD_HOSTS.test(host);
   } catch {
     return false;
   }
@@ -45,7 +60,7 @@ function computeApiBase(): string {
   }
 
   // Desktop merge (D3): VITE_API_URL, or the Electron preload's __API_BASE__
-  // (local sidecar). Default: central node; local sidecar is opt-in via the
+  // (local sidecar). Default: the local node; another node is opt-in via the
   // server-mode switch in Settings.
   const envUrl =
     (import.meta.env.VITE_API_URL as string | undefined) ||
@@ -56,10 +71,10 @@ function computeApiBase(): string {
   }
 
   // Last resort (no preload/env/stored server, e.g. a browser build served
-  // from a public host): the central courier. It serves the directory and the
-  // share pages; stateful routes 404 there, which is why it must never be
-  // selected as a data base above.
-  return 'https://gmatch-wcz1.onrender.com'
+  // from a public host): the node on this machine. There is no hosted
+  // fallback anymore — the central deployments are decommissioned, and a
+  // dead address is worse than an honest "no node".
+  return LOCAL_NODE_BASE
 }
 
 export const API_BASE = computeApiBase();
@@ -88,7 +103,7 @@ export function resolveLiveApiBase(): string {
     (import.meta.env.VITE_API_URL as string | undefined) ||
     (typeof window !== 'undefined' && (window as unknown as { __API_BASE__?: string }).__API_BASE__)
   if (envUrl) return envUrl.replace(/\/+$/, '')
-  return 'https://gmatch-wcz1.onrender.com'
+  return LOCAL_NODE_BASE
 }
 
 /** Fired after a client-to-client switch commits, so effects re-subscribe. */
@@ -111,8 +126,8 @@ export function subscribeApiBase(listener: (base: string) => void): () => void {
 }
 
 /** Openable share links (P3.5): public HTML pages served by the API host. */
-export const postShareUrl = (id: string) => `${API_BASE || 'https://gmatch-wcz1.onrender.com'}/p/${encodeURIComponent(id)}`
-export const profileShareUrl = (id: string) => `${API_BASE || 'https://gmatch-wcz1.onrender.com'}/u/${encodeURIComponent(id)}`
+export const postShareUrl = (id: string) => `${API_BASE || LOCAL_NODE_BASE}/p/${encodeURIComponent(id)}`
+export const profileShareUrl = (id: string) => `${API_BASE || LOCAL_NODE_BASE}/u/${encodeURIComponent(id)}`
 
 const inflightRequests = new Map<string, Promise<Response>>()
 const responseCache = new Map<string, { data: Response; expiry: number }>()

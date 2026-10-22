@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { getCentralApiUrl } from '../utils/central'
-import { orbitFetch } from '../utils/api'
+import { getApiBaseUrl, orbitFetch } from '../utils/api'
 
 // Host heartbeat (plan T3.5, docs/ADR-002-servers.md). While this install
 // HOSTS a server that was registered from it, keep its directory row fresh.
@@ -17,7 +17,10 @@ export function useServerHeartbeat(identity: Parameters<typeof orbitFetch>[2] | 
     const tick = async () => {
       const st = await window.gmatch?.serverState?.().catch(() => null)
       if (!alive || st?.mode !== 'host') return
-      const central = getCentralApiUrl()
+      // No hub configured? Register in our OWN node's directory: the node
+      // lists itself, and the entry gossips to the nodes that know us. A hub
+      // is an extra publisher, never a requirement.
+      const central = getCentralApiUrl() || getApiBaseUrl()
       if (!central) return
       let raw: string | null = null
       try { raw = localStorage.getItem(REG_KEY) } catch { /* session-only */ }

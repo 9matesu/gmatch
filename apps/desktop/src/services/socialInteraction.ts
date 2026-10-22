@@ -42,6 +42,16 @@ export function likePersistenceRoute(
   return post?.origin === 'peer' ? 'peer-operation' : 'server'
 }
 
+/**
+ * Where a comment must be persisted. Same rule as a like: a peer-replicated
+ * post has no node row to comment on, so the comment is a signed operation.
+ */
+export function commentPersistenceRoute(
+  post: { origin?: 'server' | 'peer' } | null | undefined,
+): 'peer-operation' | 'server' {
+  return post?.origin === 'peer' ? 'peer-operation' : 'server'
+}
+
 /** Persist a like as a signed operation (peer-replicated posts). */
 export async function persistPeerLike(
   identity: OrbitIdentityLike,
@@ -157,6 +167,19 @@ export interface CommentInput {
   body: string
   /** Stable id for this comment (unique per comment). */
   commentId: string
+}
+
+/**
+ * Persist a comment as a signed operation (peer-replicated posts). The caller
+ * owns the id it wants the comment to carry, so the optimistic row and the
+ * projected row agree.
+ */
+export async function persistPeerComment(
+  identity: OrbitIdentityLike,
+  input: CommentInput,
+  log: SocialOperationLog,
+): Promise<SocialOperation> {
+  return publishComment(identity, input, log)
 }
 
 export async function publishComment(

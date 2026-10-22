@@ -1,11 +1,14 @@
 /**
- * Central node base URL (docs/ADR-002-servers.md): the directory lives there;
- * each client points at it to LIST/REGISTER servers. Empty = no central
- * configured (Servers tab explains instead of crashing). Vite env:
- * VITE_CENTRAL_URL (build-time), overridable at runtime via
- * localStorage['gmatch.central.url'] for packaged builds.
+ * Directory hub base URL (docs/ADR-002-servers.md): a node where servers
+ * register and are listed. EMPTY by default since 2026-10-21 — the built-in
+ * central deployments (Render, Fly) were decommissioned and cannot be paid
+ * for. The directory is per node now: the node you are on lists the servers
+ * it knows, and a hub is only needed when you want one node to publish for
+ * many. Empty = no hub configured (the Servers tab explains instead of
+ * crashing). Vite env: VITE_CENTRAL_URL (build-time), overridable at runtime
+ * via localStorage['gmatch.central.url'] for packaged builds.
  */
-const DEFAULT_CENTRAL_URL = 'https://gmatch-wcz1.onrender.com'
+const DEFAULT_CENTRAL_URL = ''
 const NO_CENTRAL = ['none', 'off', '0']
 
 export function getCentralApiUrl(): string {

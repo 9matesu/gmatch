@@ -1625,6 +1625,38 @@ export default function Home() {
 
   const persistComment = useCallback(async (postId: string, text: string, parentCommentId?: string | null) => {
     if (!identity) return null
+    // A peer-replicated post has no node row to comment on: the comment is a
+    // SIGNED operation in the durable log (L5.2), replicated to peers like
+    // every other operation. Node posts keep the node path.
+    const post = feedPostsRef.current.find((p) => p.id === postId)
+    const { commentPersistenceRoute, persistPeerComment } = await import('./services/socialInteraction')
+    if (commentPersistenceRoute(post) === 'peer-operation') {
+      try {
+        const { sharedSocialOperationLog } = await import('./services/socialOperationLog')
+        // A stable, protocol-legal id: the optimistic row and the projected
+        // row must be the same row, not two of them.
+        const commentId = `c_${identity.orbitId.slice(0, 8)}_${Date.now().toString(36)}`
+        await persistPeerComment(identity, {
+          postId,
+          parentCommentId: parentCommentId ?? null,
+          body: text,
+          commentId,
+        }, sharedSocialOperationLog())
+        return {
+          id: commentId,
+          author_id: identity.orbitId,
+          author_name: myProfile.displayName || 'You',
+          author_avatar: profilePics[identity.orbitId] || null,
+          text,
+          created_at: new Date().toISOString(),
+          like_count: 0,
+          is_liked: false,
+          ...(parentCommentId ? { parent_comment_id: String(parentCommentId) } : {}),
+        }
+      } catch {
+        return null
+      }
+    }
     try {
       const res = await orbitFetch(`/api/posts/${postId}/comments`, {
         method: 'POST',

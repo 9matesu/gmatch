@@ -17,16 +17,16 @@ afterEach(() => {
 })
 
 describe('central utils', () => {
-  it('returns default central URL in test environment', () => {
-    expect(getCentralApiUrl()).toBe('https://gmatch-wcz1.onrender.com')
-    expect(hasCentral()).toBe(true)
+  it('has no hub by default (the central deployments are decommissioned)', () => {
+    expect(getCentralApiUrl()).toBe('')
+    expect(hasCentral()).toBe(false)
   })
 
   it('respects setCentralApiUrl and localStorage', () => {
     setCentralApiUrl('http://custom-node:9000')
     expect(getCentralApiUrl()).toBe('http://custom-node:9000')
     setCentralApiUrl('')
-    expect(getCentralApiUrl()).toBe('https://gmatch-wcz1.onrender.com')
+    expect(getCentralApiUrl()).toBe('')
   })
 
   it('handles "none" central keyword', () => {

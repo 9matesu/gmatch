@@ -244,8 +244,16 @@ export function ServersView({
 
   const isLocalHost = (url: string) => url.includes('127.0.0.1') || url.includes('localhost')
 
+  // Decommissioned deployments (2026-10-21): the accounts cannot be paid
+  // for any more. These constants are kept ONLY to recognise and refuse a
+  // stale URL — they are never a destination and never a probe target.
   const RENDER_COURIER_URL = 'https://gmatch-wcz1.onrender.com'
   const GM_CENTRAL_URL = 'https://gmatch.fly.dev'
+  const isDecommissioned = (hint?: string | null): boolean => {
+    if (!hint) return false
+    const h = hint.trim().toLowerCase()
+    return h.includes('onrender.com') || h.includes('fly.dev')
+  }
 
   const [centralProbe, setCentralProbe] = useState<{ online: boolean; count: number | null; total: number | null }>({ online: false, count: null, total: null })
 
@@ -294,55 +302,30 @@ export function ServersView({
     const runBase = getApiBaseUrl()
     const switchedAway = () => getApiBaseUrl() !== runBase
 
-    // Live probe: gMatch Central (Electron IPC -> Vite dev proxy -> direct fetch)
+    // Live probe of the CONFIGURED directory hub. There is no built-in one:
+    // the central deployments are decommissioned, so a hub is opt-in and the
+    // node we are on is the directory.
     const probeCentral = async () => {
+      if (!central) {
+        setCentralProbe({ online: false, count: null, total: null })
+        return
+      }
       let isOnline = false
       let onlineCount: number | null = null
       let totalMembers: number | null = null
       try {
-        const shouldFetchDash = isOnline && (Boolean(identity) || (isDev && import.meta.env.MODE !== 'test'))
-        if (window.gmatch?.serverProbe) {
-          const probeRes = await window.gmatch.serverProbe(`${GM_CENTRAL_URL}/api/health`).catch(() => null)
-          isOnline = Boolean(probeRes?.ok)
-          if (shouldFetchDash) {
-            const dashRes = await fetch(`${GM_CENTRAL_URL}/api/servers/dashboard`, {
-              signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined,
-            }).catch(() => null)
-            if (dashRes?.ok) {
-              const dj = await dashRes.json().catch(() => null)
-              onlineCount = typeof dj?.online_count === 'number' ? dj.online_count : null
-              totalMembers = typeof dj?.members_total === 'number' ? dj.members_total : null
-            }
-          }
-        } else if (isDev) {
-          const res = await fetch('/fly-api/api/health', {
+        const health = await fetch(`${central}/api/health`, {
+          signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined,
+        }).catch(() => null)
+        isOnline = Boolean(health?.ok)
+        if (isOnline) {
+          const dashRes = await fetch(`${central}/api/servers/dashboard`, {
             signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined,
           }).catch(() => null)
-          isOnline = Boolean(res?.ok)
-          if (shouldFetchDash) {
-            const dashRes = await fetch('/fly-api/api/servers/dashboard', {
-              signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined,
-            }).catch(() => null)
-            if (dashRes?.ok) {
-              const dj = await dashRes.json().catch(() => null)
-              onlineCount = typeof dj?.online_count === 'number' ? dj.online_count : null
-              totalMembers = typeof dj?.members_total === 'number' ? dj.members_total : null
-            }
-          }
-        } else {
-          const res = await fetch(`${GM_CENTRAL_URL}/api/health`, {
-            signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined,
-          }).catch(() => null)
-          isOnline = Boolean(res?.ok)
-          if (shouldFetchDash) {
-            const dashRes = await fetch(`${GM_CENTRAL_URL}/api/servers/dashboard`, {
-              signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined,
-            }).catch(() => null)
-            if (dashRes?.ok) {
-              const dj = await dashRes.json().catch(() => null)
-              onlineCount = typeof dj?.online_count === 'number' ? dj.online_count : null
-              totalMembers = typeof dj?.members_total === 'number' ? dj.members_total : null
-            }
+          if (dashRes?.ok) {
+            const dj = await dashRes.json().catch(() => null)
+            onlineCount = typeof dj?.online_count === 'number' ? dj.online_count : null
+            totalMembers = typeof dj?.members_total === 'number' ? dj.members_total : null
           }
         }
       } catch {
@@ -432,39 +415,40 @@ export function ServersView({
       }
     } catch { /* old nodes have no /node yet */ }
 
-    if (!central) { setServers(readDirectoryCache()); setDirError(false); return }
+    // The directory is PER NODE: the node we are on lists the servers it
+    // knows (its own registration plus everything gossiped into it). A
+    // configured hub is an EXTRA source, never the only one — there is no
+    // built-in hub left to depend on.
+    let merged = readDirectoryCache()
+    let dirFailed = false
     try {
       // cache-bust: orbitFetch dedups/caches GETs; the list must be fresh
-      const res = await orbitFetch(`${central}/api/servers?_ts=${Date.now()}`, { method: 'GET' }, identity)
+      const res = await orbitFetch(`/api/servers?_ts=${Date.now()}`, { method: 'GET' }, identity)
       if (res.ok) {
         const data = (await res.json()) as { servers: DirectoryServer[] }
-        // Wave 2 (D2): the hub's list merges into the local gossip cache so
-        // the directory survives the central node going down later.
-        let merged = mergeDirectory(readDirectoryCache(), Array.isArray(data.servers) ? data.servers : [])
-        // Wave 2 (D2): gossip — when we're ON another node, ask it too. Its
-        // directory (plus what it learned) seeds ours, so nodes are reachable
-        // without the hub. Best-effort: an old node 404s and we move on.
-        if (central && central.replace(/\/+$/, '').toLowerCase() !== getApiBaseUrl().replace(/\/+$/, '').toLowerCase()) {
-          try {
-            const r2 = await orbitFetch(`${getApiBaseUrl()}/api/servers?_ts=${Date.now()}`, { method: 'GET' }, identity)
-            if (r2.ok) {
-              const d2 = (await r2.json()) as { servers?: DirectoryServer[] }
-              if (Array.isArray(d2.servers)) merged = mergeDirectory(merged, d2.servers)
-            }
-          } catch { /* node offline or legacy. Cache stays as-is */ }
-        }
-        writeDirectoryCache(merged)
-        setServers(merged)
-        setDirError(false)
+        merged = mergeDirectory(merged, Array.isArray(data.servers) ? data.servers : [])
       } else {
-        setDirError(true)
+        dirFailed = true
       }
     } catch {
-      // Configured central is unreachable: fall back to gossiped nodes, and
-      // surface it rather than fake "none online".
-      setServers(readDirectoryCache())
-      setDirError(true)
+      // Our own node is unreachable: keep the gossiped cache and say so
+      // rather than fake an empty directory.
+      dirFailed = true
     }
+    if (central && central.replace(/\/+$/, '').toLowerCase() !== getApiBaseUrl().replace(/\/+$/, '').toLowerCase()) {
+      try {
+        const r2 = await orbitFetch(`${central}/api/servers?_ts=${Date.now()}`, { method: 'GET' }, identity)
+        if (r2.ok) {
+          const d2 = (await r2.json()) as { servers?: DirectoryServer[] }
+          if (Array.isArray(d2.servers)) merged = mergeDirectory(merged, d2.servers)
+        }
+      } catch { /* hub offline; the node's own list stands */ }
+    }
+    // A decommissioned deployment is never a destination.
+    merged = merged.filter((s) => !isDecommissioned(s.endpoint_hint))
+    writeDirectoryCache(merged)
+    setServers(merged)
+    setDirError(dirFailed)
   }, [identity, central])
 
   useEffect(() => { refreshRef.current = refresh }, [refresh])
@@ -712,15 +696,18 @@ export function ServersView({
     setEditingServer(true)
   }
 
-  // Best-effort: list the (public) registration on the central directory.
+  // Best-effort: list the (public) registration in a directory. The
+  // configured hub when there is one, otherwise OUR OWN node — a node
+  // always has a directory, so listing never needs a third party.
   // Returns the created row (or null). The host heartbeat replays the saved
   // registration every 15min, so a dead directory here self-heals later.
   const registerDirectory = async (
     n: string, d: string, h: string, pwRequired: boolean, isPrivate: boolean,
   ): Promise<DirectoryServer | null> => {
-    if (!central || !identity) return null
+    const directory = central || getApiBaseUrl()
+    if (!directory || !identity) return null
     try {
-      const res = await orbitFetch(`${central}/api/servers`, {
+      const res = await orbitFetch(`${directory}/api/servers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: n, description: d, endpoint_hint: h, password_required: pwRequired, private: isPrivate, owner_name: localDisplayName() || undefined }),
@@ -790,7 +777,7 @@ export function ServersView({
       }
       // Browser/dev build without the desktop bridge: directory-only listing;
       // hosting your own node needs the packaged app.
-      if (!central) { toast('Configure a central node to list a server here. Hosting runs in the desktop app.', 'warning'); return }
+      if (!central && !getApiBaseUrl()) { toast('No node to list this server on. Hosting runs in the desktop app.', 'warning'); return }
       const listed = await registerDirectory(trimmed, desc, hintFinal, needsPassword, isPrivate)
       if (listed) {
         toast('Server registered. Signed-in users can see it in the directory.', 'success')
@@ -925,6 +912,10 @@ export function ServersView({
 
   const join = async (s: DirectoryServer) => {
     if (connectingId) return
+    if (isDecommissioned(s.endpoint_hint)) {
+      toast('That deployment was decommissioned — pick a node that is running.', 'warning')
+      return
+    }
     // The courier row is transport status, not a world — there is no data
     // base to join (pointing data traffic at it 404s by design).
     if (s.id === 'central-p2p') {
@@ -939,8 +930,7 @@ export function ServersView({
         s.id === 'central-node' ||
         (s.endpoint_hint && (
           s.endpoint_hint === central ||
-          s.endpoint_hint === RENDER_COURIER_URL ||
-          s.endpoint_hint === GM_CENTRAL_URL
+          isDecommissioned(s.endpoint_hint)
         ))
       ) {
         const rawTarget = s.endpoint_hint || central
@@ -1473,14 +1463,15 @@ export function ServersView({
                     </button>
                   </div>
                   <p className="text-[10px] text-retro-muted">
-                    Where servers register and publish metadata. Change it only if you run your own.
+                    Optional: a node that publishes a server directory for others. Empty means your own node
+                    is the directory.
                   </p>
                   <div className="flex items-center gap-1.5">
                     <input
                       aria-label="Central node URL"
                       value={setupUrl || (central || '')}
                       onChange={(e) => setSetupUrl(e.target.value)}
-                      placeholder="https://gmatch-wcz1.onrender.com"
+                      placeholder="http://192.168.1.10:8790"
                       className="glass-field w-full px-2.5 py-1 text-xs font-mono"
                     />
                     <button
@@ -1511,22 +1502,6 @@ export function ServersView({
                           }`}
                         >
                           local:8790
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCentralApiUrl('https://gmatch-wcz1.onrender.com')
-                            setCentral('https://gmatch-wcz1.onrender.com')
-                            toast('Switched to render', 'info')
-                            void refresh()
-                          }}
-                          className={`px-1.5 py-0.5 rounded text-[10px] font-mono cursor-pointer ${
-                            central === 'https://gmatch-wcz1.onrender.com'
-                              ? 'bg-retro-accent text-retro-accent-text font-bold'
-                              : 'bg-glass-w10 text-retro-muted hover:text-retro-fg'
-                          }`}
-                        >
-                          render
                         </button>
                       </div>
                     </div>
