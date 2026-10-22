@@ -21,6 +21,8 @@ const CHAT_WIPE_MS = CHAT_WIPE_SECONDS * 1000;
 const DIRECT_WEBRTC_FANOUT_LIMIT = 3;
 /** Cap on frames parked while the relay socket is down. */
 const MAX_QUEUED_FRAMES = 200;
+/** How many nodes one roster round may read the presence mailbox of. */
+const MAX_ROSTER_NODES_PER_ROUND = 8;
 
 export interface ChatMessage {
   id: string;
@@ -765,10 +767,15 @@ export function useP2P(identity: OrbitIdentity | null) {
         const nodes = [getApiBaseUrl(), ...knownNodes()].filter(Boolean)
         const seen = new Set<string>()
         const users: User[] = []
+        // Bounded: a client never fans out to the whole known-node list in
+        // one round. The nearest nodes come first (ours is always first).
+        let asked = 0
         for (const node of nodes) {
+          if (asked >= MAX_ROSTER_NODES_PER_ROUND) break
           const base = node.replace(/\/+$/, '')
           if (seen.has(base)) continue
           seen.add(base)
+          asked++
           const roster = await fetchPresenceRosterFrom(base, selfUserRef.current.id).catch(() => ({ users: [], nodeById: new Map<string, string>() }))
           for (const [peerId, peerNode] of roster.nodeById) rememberPeerNode(peerId, peerNode)
           users.push(...roster.users)

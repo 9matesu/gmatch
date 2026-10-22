@@ -469,6 +469,35 @@ routes disabled.
 cross-platform test results, green required gates, and no unverified claims in
 UI or documentation.
 
+## Evidence log (2026-10-21, the hosts went away)
+
+- The packaged app no longer resolves to a hosted address: the API base falls
+  back to the node on this machine (`utils/api.ts`, `LOCAL_NODE_BASE`), a
+  stored URL pointing at a decommissioned host is dropped
+  (`isCourierApiUrl` covers Render AND Fly), and the server directory is read
+  from the node you are on (`/api/servers`). A stored *client mode* that
+  pointed at a dead deployment now migrates to the local node
+  (`server-mode-core.resolveServerUrl` + the renderer mirror, drift-guarded).
+- The presence beacon carries the node URL the peer is connected to, INSIDE the
+  signed payload; a rewritten address breaks the signature and the beacon is
+  dropped (test: `courierPresence.crossNode.test.ts`). A beacon without the
+  field still verifies against the old payload.
+- A peer on another node is reachable end to end: the roster reads the
+  presence mailbox of every known node (bounded to 8 per round), the sealed
+  envelope goes into THAT node's mailbox (`MailClient.send(..., { base })`),
+  and the WebRTC signaling follows the same route (`sendCourierSignal(...,
+  { base })`).
+- Comments on a peer-replicated post are a signed operation
+  (`persistPeerComment`) and the feed renders the peer thread merged with the
+  node rows, deduped by id (`usePeerComments.ts`, `commentMerge.ts`).
+- Gate: lint 0 errors, typecheck clean, desktop suite green
+  (260 files / 1,945 tests) and the API/crypto/protocol/shared suites green.
+- The E2E `domination.spec.ts` hangs in this environment BEFORE these changes
+  too (verified on the pre-change commit `8cbf2f5` in a separate worktree):
+  it is a pre-existing environment failure, not a regression. The rest of the
+  E2E (including `chat-two-peer.spec.ts`, the sealed DM path) runs green
+  against the local node.
+
 ## Evidence log (2026-10-20)
 
 - Implemented swarm input/frame bounds, 64 MiB object cap, persistence-before-
