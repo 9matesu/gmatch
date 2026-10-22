@@ -332,9 +332,16 @@ offline earnings). Each +5% click power. Persist across prestige.
 
 ## 10d. P2P Swarm & Blind Courier Presence (ARCHITECTURE-P2P.md)
 
-- Central courier (`https://gmatch-wcz1.onrender.com`) is strictly a blind, zero-knowledge
-  forwarder (`SITE_SERVICES=mail,turn,admin`). All legacy central routes (`/api/users/online`,
-  `/api/posts`, `/api/objects`, `/api/signal/*`) intentionally 404.
+- **The courier is the node each client is connected to** (2026-10-21: the central
+  deployments are decommissioned — the accounts cannot be paid for — and every packaged
+  app runs its own node). A node is strictly a blind, zero-knowledge forwarder for its
+  clients: it holds no profiles, presence, posts or media, only sealed envelopes and
+  relayed swarm frames. All legacy central routes (`/api/users/online`, `/api/posts`,
+  `/api/objects`, `/api/signal/*`) intentionally 404.
+- **A peer on another node is reachable:** the signed presence beacon carries the node
+  URL the peer is connected to, and a sealed envelope addressed to that peer is dropped
+  into THAT node's mailbox (the node still cannot open it). The client learns the other
+  nodes from the directory it reads on the node it is on (SPEC §12).
 - **Presence & Discovery:** Ephemeral signed beacons (`PresenceBeacon`) broadcast to public
   presence token `sha256Hex('orbit-global-presence-v1')`. Client compiles and verifies in-memory
   roster with 60s TTL and 120s drop threshold. Zero presence state stored on server.

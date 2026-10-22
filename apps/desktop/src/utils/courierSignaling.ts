@@ -6,6 +6,7 @@ import {
 } from '@orbit/protocol'
 import { getApiBaseUrl } from './api'
 import { defaultIceConfig, sanitizeCandidate } from './ice-hygiene'
+import { peerNodeFor } from './peerNodes'
 import { logger } from './logger'
 
 function readTurnEnv(): Record<string, string | undefined> {
@@ -99,6 +100,7 @@ export async function sendCourierSignal(
   payload: CourierSignalPayload,
   identity: OrbitIdentity,
   fetchImpl: typeof globalThis.fetch = globalThis.fetch,
+  opts?: { base?: string },
 ): Promise<boolean> {
   const token = deliveryToken(recipientPubKeyHex)
   const env = seal1to1(
@@ -118,7 +120,10 @@ export async function sendCourierSignal(
   )
 
   try {
-    const url = `${getApiBaseUrl()}/api/mail/${token}`
+    // The recipient's mailbox is on the node THEY are connected to: a peer on
+    // another node gets the signal there, not on ours.
+    const base = (opts?.base || getApiBaseUrl()).replace(/\/+$/, '')
+    const url = `${base}/api/mail/${token}`
     const res = await fetchImpl(url, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -181,6 +186,8 @@ export async function handleInboundSignal(
       }
     }
 
+    // The sender lives on its own node: answer and ICE go there.
+    const senderBase = peerNodeFor(payload.fromOrbitId)
     pc.onicecandidate = (e) => {
       if (!e.candidate) return
       const safe = sanitizeCandidate(e.candidate.toJSON())
@@ -196,6 +203,7 @@ export async function handleInboundSignal(
         },
         identity,
         fetchImpl,
+        { base: senderBase || undefined },
       )
     }
 
@@ -218,6 +226,7 @@ export async function handleInboundSignal(
       },
       identity,
       fetchImpl,
+      { base: senderBase || undefined },
     )
     return true
   }
@@ -269,6 +278,8 @@ export async function connectToPeerMesh(
   const pc = new RTCPeerConnection(defaultIceConfig(readTurnEnv()))
   const channel = pc.createDataChannel('gmatch-mesh')
   const sessionId = `${identity.orbitId.slice(0, 8)}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+  // A peer on another node: the signal goes to THEIR courier.
+  const peerBase = peerNodeFor(peer.id)
 
   return new Promise<PeerMeshConnection>((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -323,6 +334,7 @@ export async function connectToPeerMesh(
         },
         identity,
         fetchImpl,
+        { base: peerBase || undefined },
       )
     }
 
@@ -345,6 +357,7 @@ export async function connectToPeerMesh(
           },
           identity,
           fetchImpl,
+          { base: peerBase || undefined },
         )
       } catch (err) {
         clearTimeout(timer)

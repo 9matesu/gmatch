@@ -10,6 +10,19 @@ export function normalizeServerUrl(v: string): string | null {
   return isServerUrl(v) ? v.replace(/\/+$/, '') : null
 }
 
+/**
+ * True for a decommissioned deployment (mirror of the CJS core): those hosts
+ * cannot be paid for any more, so they are never a destination.
+ */
+export function isDecommissionedUrl(v: unknown): boolean {
+  if (typeof v !== 'string' || !v) return false
+  try {
+    return /(^|\.)(onrender\.com|fly\.dev)$/.test(new URL(v).hostname)
+  } catch {
+    return false
+  }
+}
+
 /** True when a directory row's endpoint_hint points at the node we are on. */
 export function isCurrentServerUrl(base: string, hint: string): boolean {
   const norm = (u: string) => u.trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '').toLowerCase()

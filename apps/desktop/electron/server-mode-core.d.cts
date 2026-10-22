@@ -8,6 +8,7 @@ export interface ResolvedServer {
 export declare function isServerUrl(v: unknown): v is string
 export declare function normalizeServerUrl(v: unknown): string | null
 export declare function isMode(v: unknown): v is ServerMode
+export declare function isDecommissionedUrl(v: unknown): boolean
 export declare function resolveServerUrl(input: {
   envUrl?: string | null
   stored?: { mode?: string; url?: string } | null
