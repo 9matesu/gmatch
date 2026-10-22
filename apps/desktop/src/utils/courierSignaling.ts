@@ -53,7 +53,72 @@ const pendingSessions = new Map<string, {
   channel?: RTCDataChannel
   resolveChannel?: (ch: RTCDataChannel) => void
   rejectChannel?: (err: Error) => void
+  /** Trickle ICE that arrived before the remote description (buffered until
+   *  the local session can apply them — candidates are never lost to races). */
+  iceQueue: RTCIceCandidateInit[]
+  /** Dedupe by candidate string: relays and retries can deliver pairs twice. */
+  seenCandidates: Set<string>
 }>()
+
+/** Track a set of per-connection failure cleanup callbacks (used to notify
+ *  the transport-selection layer when ICE dies). */
+type IceFailureHandler = (peerOrbitId: string, reason: string) => void
+let onIceFailure: IceFailureHandler | null = null
+/** Wire the terminal-ICE callback; returns the uninstall handle. */
+export function setMeshIceFailureHandler(handler: IceFailureHandler | null): () => void {
+  const prev = onIceFailure
+  onIceFailure = handler
+  return () => { onIceFailure = prev }
+}
+
+/** Apply one inbound trickle candidate, buffering it until the remote
+ *  description exists and never applying a duplicate twice. */
+async function acceptMeshIceCandidate(
+  session: NonNullable<ReturnType<typeof pendingSessions.get>>,
+  candidate: RTCIceCandidateInit,
+  labelForLog = '',
+): Promise<void> {
+  const digest = candidate.candidate || ''
+  if (!digest || session.seenCandidates.has(digest)) return
+  session.seenCandidates.add(digest)
+  if (!session.pc.remoteDescription) {
+    session.iceQueue.push(candidate)
+    return
+  }
+  try {
+    await session.pc.addIceCandidate(new RTCIceCandidate(candidate))
+  } catch {
+    // A candidate that lost the race to a closed pc is not an error we can
+    // fix here; the connection-state watchdog owns the terminal outcome.
+    logger.warn(`[Mesh] ICE candidate could not be applied ${labelForLog}`)
+  }
+}
+
+function drainIceQueue(session: NonNullable<ReturnType<typeof pendingSessions.get>>): void {
+  if (!session.pc.remoteDescription) return
+  const queued = session.iceQueue
+  session.iceQueue = []
+  for (const candidate of queued) {
+    void acceptMeshIceCandidate(session, candidate).catch(() => { /* already logged */ })
+  }
+}
+
+/** Wire the connection-state watchdog: ICE failure is terminal for the mesh
+ *  pipe. The swarm keeps flowing through the relay regardless. */
+function watchMeshIce(pc: RTCPeerConnection, peerOrbitId: string, sessionId?: string): void {
+  pc.oniceconnectionstatechange = () => {
+    const state = pc.iceConnectionState
+    if (state === 'failed' || state === 'closed') {
+      if (sessionId) pendingSessions.delete(sessionId)
+      const existing = activeMeshPeers.get(peerOrbitId)
+      if (existing && existing.pc === pc) activeMeshPeers.delete(peerOrbitId)
+      if (state === 'failed') {
+        logger.warn(`[Mesh] ICE failed for peer ${peerOrbitId}`)
+        try { onIceFailure?.(peerOrbitId, 'ice failed') } catch { /* handler bug must not crash transport */ }
+      }
+    }
+  }
+}
 
 export function getActiveMeshPeers(): Map<string, PeerMeshConnection> {
   return activeMeshPeers
@@ -207,9 +272,12 @@ export async function handleInboundSignal(
       )
     }
 
-    pendingSessions.set(sessionId, { pc })
+    const session = { pc, iceQueue: [] as RTCIceCandidateInit[], seenCandidates: new Set<string>() }
+    pendingSessions.set(sessionId, session)
+    watchMeshIce(pc, payload.fromOrbitId, sessionId)
 
     await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp))
+    drainIceQueue(session)
     const answer = await pc.createAnswer()
     await pc.setLocalDescription(answer)
 
@@ -236,6 +304,7 @@ export async function handleInboundSignal(
     if (!session) return false
     try {
       await session.pc.setRemoteDescription(new RTCSessionDescription(payload.sdp))
+      drainIceQueue(session)
       return true
     } catch (err) {
       logger.warn('[Mesh] Error setting remote description from answer:', err)
@@ -246,12 +315,8 @@ export async function handleInboundSignal(
   if (payload.type === 'ice') {
     const session = pendingSessions.get(payload.sessionId)
     if (!session) return false
-    try {
-      await session.pc.addIceCandidate(new RTCIceCandidate(payload.candidate))
-      return true
-    } catch {
-      return false
-    }
+    await acceptMeshIceCandidate(session, payload.candidate)
+    return true
   }
 
   return false
@@ -280,6 +345,7 @@ export async function connectToPeerMesh(
   const sessionId = `${identity.orbitId.slice(0, 8)}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
   // A peer on another node: the signal goes to THEIR courier.
   const peerBase = peerNodeFor(peer.id)
+  const session = { pc, iceQueue: [] as RTCIceCandidateInit[], seenCandidates: new Set<string>() }
 
   return new Promise<PeerMeshConnection>((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -338,7 +404,8 @@ export async function connectToPeerMesh(
       )
     }
 
-    pendingSessions.set(sessionId, { pc, channel })
+    watchMeshIce(pc, peer.id, sessionId)
+    pendingSessions.set(sessionId, session)
 
     void (async () => {
       try {

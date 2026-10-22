@@ -12,7 +12,8 @@ import { logger } from '../utils/logger';
 import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, hydrateDurableReplications, announcePeerOnline, PEER_ONLINE_EVENT, announceHeldObjects, setSwarmReceiptIdentity, setSwarmOperationHandler, setSwarmOperationAckHandler, sendSwarmFrame, type SwarmMessage } from '../utils/p2pSwarm';
 import { broadcastPresence, fetchPresenceRosterFrom } from '../services/courierPresence';
 import { knownNodes, rememberKnownNode, rememberPeerNode } from '../utils/peerNodes';
-import { broadcastMeshFrame, onMeshMessage, connectToPeerMesh } from '../utils/courierSignaling';
+import { broadcastMeshFrame, onMeshMessage, connectToPeerMesh, setMeshIceFailureHandler } from '../utils/courierSignaling';
+import { createTransportRegistry, type PeerTransportPhase } from '../utils/transportState';
 import { resolveDisplayName } from '../utils/displayName';
 import { parseApiTimestamp } from '../utils/timeAgo';
 import { mediaFlag, resolveClaimedOwner, descriptorUrlFromBytes } from '../utils/objectDescriptor';
@@ -23,6 +24,36 @@ const DIRECT_WEBRTC_FANOUT_LIMIT = 3;
 const MAX_QUEUED_FRAMES = 200;
 /** How many nodes one roster round may read the presence mailbox of. */
 const MAX_ROSTER_NODES_PER_ROUND = 8;
+/** How often the transport-selection tick runs direct retries & deadlines. */
+const TRANSPORT_TICK_MS = 4000;
+
+/**
+ * Per-peer transport-selection registry (roadmap P0): idle / connecting-direct
+ * / direct / relay / failed. The swarm itself keeps fanning frames over every
+ * wired pipe — this layer makes WHICH path is real observable and keeps the
+ * relay session alive while direct attempts retry with backoff.
+ */
+const swarmTransportRegistry = createTransportRegistry();
+
+/** UI probe: one entry per known peer's transport phase. */
+export function getSwarmTransportPhases(): Array<{ id: string; phase: PeerTransportPhase; lastFailure?: string }> {
+  return [...swarmTransportRegistry.snapshot().entries()].map(([id, entry]) => ({
+    id,
+    phase: entry.phase,
+    lastFailure: entry.lastFailure,
+  }));
+}
+
+/** Human label for the peer list: what path is this peer's traffic really
+ *  taking? Null = nothing worth showing yet (idle/connecting). */
+export function swarmTransportLabel(peerId: string): string | null {
+  switch (swarmTransportRegistry.phaseFor(peerId)) {
+    case 'direct': return 'P2P direto'
+    case 'relay': return 'relay via nó (NAT)'
+    case 'failed': return 'sem rota'
+    default: return null
+  }
+}
 
 export interface ChatMessage {
   id: string;
@@ -804,7 +835,17 @@ export function useP2P(identity: OrbitIdentity | null) {
               const pubKey = u.publicKey || (u as any).public_key
               const encKey = u.encryptionPubKey || (u as any).encryption_pub_key
               if (courierOnlyWs && pubKey && encKey) {
-                void connectToPeerMesh({ id: u.id, public_key: pubKey, encryption_pub_key: encKey }, identity).catch(() => {})
+                // Transport selection (P0): every roster arrival gets one
+                // deadline-bounded direct attempt. The node's relay carries
+                // the frames meanwhile; failure schedules a backoff retry.
+                swarmTransportRegistry.startDirectAttempt(u.id)
+                void connectToPeerMesh({ id: u.id, public_key: pubKey, encryption_pub_key: encKey }, identity)
+                  .then(() => swarmTransportRegistry.markDirectValidated(u.id))
+                  .catch((err) => swarmTransportRegistry.markDirectFailed(
+                    u.id,
+                    err instanceof Error ? err.message : 'direct connect failed',
+                    true,
+                  ))
               }
             }
           }
@@ -813,6 +854,43 @@ export function useP2P(identity: OrbitIdentity | null) {
     }
     pullRoster()
     const rosterInterval = setInterval(pullRoster, 60_000)
+
+    // 4d. Transport-selection tick (P0): decay deadlines, keep the relay
+    // mapping honest, and fire due direct retries. Cheap: a few dozen peers,
+    // no network I/O except an at-most-one retry per cycle.
+    const transportTick = () => {
+      if (!identity) return
+      for (const [peerId, entry] of swarmTransportRegistry.snapshot()) {
+        if (entry.phase === 'connecting-direct' && swarmTransportRegistry.isDirectAttemptOverdue(peerId)) {
+          swarmTransportRegistry.markDirectFailed(peerId, 'direct attempt deadline', true)
+        }
+      }
+      for (const [peerId, peer] of peerMapRef.current) {
+        if (peerId === selfUserRef.current.id || !peer?.online) continue
+        const phase = swarmTransportRegistry.phaseFor(peerId)
+        if (phase === 'idle' || phase === 'failed') {
+          // Frames for this peer ride the node's relay until proven direct.
+          swarmTransportRegistry.markRelayInUse(peerId)
+          continue
+        }
+        if (phase !== 'relay' || !swarmTransportRegistry.shouldRetryDirect(peerId)) continue
+        const pubKey = peer.publicKey || (peer as any).public_key
+        const encKey = peer.encryptionPubKey || (peer as any).encryption_pub_key
+        if (!pubKey || !encKey) continue
+        swarmTransportRegistry.startDirectAttempt(peerId)
+        void connectToPeerMesh({ id: peerId, public_key: pubKey, encryption_pub_key: encKey }, identity)
+          .then(() => swarmTransportRegistry.markDirectValidated(peerId))
+          .catch((err) => swarmTransportRegistry.markDirectFailed(
+            peerId,
+            err instanceof Error ? err.message : 'direct connect failed',
+            true,
+          ))
+      }
+    }
+    const transportInterval = setInterval(transportTick, TRANSPORT_TICK_MS)
+    // ICE died mid-session: terminate the mesh pipe for that peer. The relay
+    // keeps the frames flowing; the next retry re-dials.
+    setMeshIceFailureHandler((peerId, reason) => swarmTransportRegistry.markDirectFailed(peerId, reason, true))
 
     // 4c. Foreground burst: timers are throttled while hidden and heartbeats
     // are skipped, so on return immediately re-announce + re-pull instead of
@@ -886,6 +964,8 @@ export function useP2P(identity: OrbitIdentity | null) {
       cancelled = true;
       clearInterval(interval);
       clearInterval(rosterInterval);
+      clearInterval(transportInterval);
+      setMeshIceFailureHandler(null);
       if (typeof document !== 'undefined') {
         document.removeEventListener('visibilitychange', onVisible)
       }

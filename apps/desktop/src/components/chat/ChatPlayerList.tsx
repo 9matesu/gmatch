@@ -9,6 +9,7 @@ import { Avatar } from '../Avatar';
 import { parseSeenMs } from '../../utils/presence';
 import { usePresence } from '../../game/presenceStore';
 import { usePresencePoll } from '../../hooks/usePresencePoll';
+import { swarmTransportLabel } from '../../hooks/useP2P';
 
 export interface ChatPlayerItem {
   id: string;
@@ -317,7 +318,12 @@ export function ChatPlayerList({
                     </div>
                     <span className="block text-[10px] text-retro-muted truncate">
                       {player.online ? (
-                        <span className="text-retro-online font-medium">Active now</span>
+                        <>
+                          <span className="text-retro-online font-medium">Active now</span>
+                          {swarmTransportLabel(player.id) && (
+                            <span> · {swarmTransportLabel(player.id)}</span>
+                          )}
+                        </>
                       ) : (
                         <span>Seen {formatRelativeTime(player.last_seen)}</span>
                       )}
