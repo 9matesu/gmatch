@@ -8,19 +8,32 @@
 import {
   createReplicationReceipt,
   validateReplicationReceipt,
+  createSwarmDek,
+  createSwarmOffer,
+  decryptSwarmChunk,
+  encryptSwarmChunk,
+  openSwarmKey,
+  sealSwarmKey,
   type ReplicationReceipt,
 } from '@orbit/protocol'
 
 export type SwarmMessage =
-  | { type: 'SWARM_HAVE'; ids: string[] }
-  | { type: 'SWARM_WANT'; id: string }
+  | { type: 'SWARM_HAVE'; ids: string[]; from?: string }
+  | { type: 'SWARM_WANT'; id: string; transferId?: string; offerPub?: string; from?: string }
+  | { type: 'SWARM_KEY'; id: string; transferId: string; wrapped: string; from?: string }
   | {
       type: 'SWARM_CHUNK'
       id: string
       index: number
       total: number
       mimeType: string
+      /** Legacy plaintext payload (v0). Only accepted when legacy ingest is enabled. */
       dataBase64: string
+      /** 'swarm-v1': the wire payload is DEK-encrypted, see swarmTransfer below. */
+      enc?: 'swarm-v1'
+      transferId?: string
+      nonce?: string
+      from?: string
     }
   | { type: 'SWARM_CHALLENGE'; id: string; challenge: string }
   | { type: 'SWARM_RECEIPT'; id: string; receipt: unknown }
@@ -99,6 +112,12 @@ const MAX_CHUNKS = Math.ceil(MAX_OBJECT_BYTES / CHUNK_SIZE)
 // Keep the JSON envelope under the relay's 30 KB frame-splitting threshold.
 const MAX_SWARM_FRAME_BYTES = 8 * 1024
 const MAX_CHUNK_BASE64_LENGTH = Math.floor((MAX_SWARM_FRAME_BYTES - 512) / 4) * 4
+/**
+ * Plaintext bytes per encrypted wire chunk (swarm-v1). The AEAD adds a 16-byte
+ * tag and a 24-byte nonce field to the frame; 4 KiB keeps the base64 envelope
+ * inside the relay split threshold (4096 -> 4112 bytes -> 5484 base64 chars).
+ */
+const SWARM_CHUNK_PAYLOAD = 4 * 1024
 
 /**
  * Base64 for chunk frames.
@@ -342,6 +361,243 @@ let swarmSend: SwarmSend | null = null
 
 export function setSwarmTransport(send: SwarmSend | null): void {
   swarmSend = send
+}
+
+// ---- swarm-v1: end-to-end encrypted chunk transfers (roadmap P0) ---------
+// The swarm's fallback transport is the NODE's WebSocket relay, and the relay
+// is not trusted: it sees every byte it forwards. The wire therefore carries
+// chunks encrypted with a per-transfer DEK sealed to the requester's
+// EPHEMERAL key (packages/protocol swarm-chunk.ts):
+//   fetcher  → SWARM_WANT { id, transferId, offerPub, from }
+//   seeder   → SWARM_KEY  { id, transferId, wrapped: sealed DEK }
+//   seeder   → SWARM_CHUNK { ..., enc:'swarm-v1', nonce, dataBase64 = CT }
+// The relay (and every other peer on the node) forwards ciphertexts and a
+// wrapped key it cannot open; only the requester's ephemeral private key
+// decrypts. The AEAD binds every chunk to object id, transfer id, position
+// and both sides, so a chunk cannot be moved between transfers or objects and
+// a modified ciphertext is rejected instead of silently accepted.
+//
+// Legacy v0 plaintext frames are a explicit opt-in (` Legacy plaintext
+// serving`): with the flag off (the default) the wire NEVER carries or
+// accepts unencrypted media, and a legacy peer's frames are dropped.
+
+interface SwarmKeyCandidate {
+  dek: Uint8Array
+  senderOrbitId: string
+}
+
+interface TransferOffer {
+  transferId: string
+  offerPrivHex: string
+  offerPubHex: string
+  keys: SwarmKeyCandidate[]
+  badFrames: number
+  createdAt: number
+}
+
+const MAX_TRANSFER_KEYS = 4
+const MAX_KEY_WRAPPED_LENGTH = 512
+
+let legacyPlaintextServing = false
+
+/** Explicit opt-in for the legacy plaintext wire (v0 peers). Off by default. */
+export function setSwarmLegacyPlaintextEnabled(enabled: boolean): void {
+  legacyPlaintextServing = enabled
+}
+
+function randomHex(bytes: number): string {
+  const buf = new Uint8Array(bytes)
+  crypto.getRandomValues(buf)
+  return Array.from(buf).map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+/** Build a fresh transfer offer (or null before an offer was possible). */
+function newTransferOffer(): TransferOffer {
+  const offer = createSwarmOffer()
+  return {
+    transferId: randomHex(16),
+    offerPrivHex: offer.privateKeyHex,
+    offerPubHex: offer.publicKeyHex,
+    keys: [],
+    badFrames: 0,
+    createdAt: Date.now(),
+  }
+}
+
+/** Open a SWARM_KEY frame into a candidate candidate DEK for our offer. */
+function candidateFromKeyFrame(offerPrivHex: string, wrapped: string, from: unknown): SwarmKeyCandidate | null {
+  if (typeof wrapped !== 'string' || !wrapped || wrapped.length > MAX_KEY_WRAPPED_LENGTH) return null
+  let decoded: Uint8Array
+  try {
+    decoded = decodeChunk(wrapped)
+  } catch {
+    return null
+  }
+  let dek: Uint8Array
+  try {
+    dek = openSwarmKey(decoded, offerPrivHex)
+  } catch {
+    return null // wrapped for someone else / tampered / wrong transfer: drop
+  }
+  return { dek, senderOrbitId: typeof from === 'string' ? from : '' }
+}
+
+function chunkContext(
+  offer: TransferOffer,
+  id: string,
+  index: number,
+  total: number,
+  senderOrbitId: string,
+): {
+  objectId: string
+  index: number
+  total: number
+  transferId: string
+  senderOrbitId: string
+  receiverOfferPub: string
+} {
+  return {
+    objectId: id,
+    index,
+    total,
+    transferId: offer.transferId,
+    senderOrbitId,
+    receiverOfferPub: offer.offerPubHex,
+  }
+}
+
+type SwarmChunkFrame = Extract<SwarmMessage, { type: 'SWARM_CHUNK' }>
+
+/** A WANT that carries a well-formed swarm-v1 transfer offer. */
+function isOfferedWant(msg: SwarmMessage): boolean {
+  if (msg.type !== 'SWARM_WANT') return false
+  if (typeof msg.transferId !== 'string' || !/^[a-f\d]+$/i.test(msg.transferId) || msg.transferId.length < 8 || msg.transferId.length > 128) return false
+  if (typeof msg.offerPub !== 'string' || !/^[a-f\d]{64}$/i.test(msg.offerPub)) return false
+  return true
+}
+
+/** Shared chunk-envelope validation (both the module and the session path). */
+function validateChunkEnvelope(
+  msg: SwarmChunkFrame,
+  reqTotal: number,
+  reqMime: string,
+): void {
+  if (!Number.isSafeInteger(msg.total) || msg.total < 1 || msg.total > MAX_CHUNKS ||
+      !Number.isSafeInteger(msg.index) || msg.index < 0 || msg.index >= msg.total ||
+      typeof msg.mimeType !== 'string' || msg.mimeType.length > 128 ||
+      typeof msg.dataBase64 !== 'string' || msg.dataBase64.length > MAX_CHUNK_BASE64_LENGTH ||
+      !isBoundedChunkFrame(msg) ||
+      (reqTotal !== 0 && reqTotal !== msg.total) ||
+      (reqMime !== '' && reqMime !== msg.mimeType)) {
+    throw new Error('Invalid swarm chunk metadata')
+  }
+}
+
+/** Seed chunks of `blob` to one requester's transfer offer (ciphertext only). */
+async function serveOfferedObject(
+  send: (msg: SwarmMessage) => void,
+  id: string,
+  blob: Blob,
+  transferId: string,
+  offerPubHex: string,
+  senderOrbitId: string,
+): Promise<void> {
+  const buffer = await blob.arrayBuffer()
+  if (buffer.byteLength === 0 || buffer.byteLength > MAX_OBJECT_BYTES) return
+  const dek = createSwarmDek()
+  const wrapped = sealSwarmKey(dek, offerPubHex)
+  send({
+    type: 'SWARM_KEY',
+    id,
+    transferId,
+    wrapped: bytesToBase64(wrapped),
+    from: senderOrbitId || undefined,
+  })
+  const totalChunks = Math.ceil(buffer.byteLength / SWARM_CHUNK_PAYLOAD) || 1
+  const mimeType = blob.type || 'application/octet-stream'
+  for (let i = 0; i < totalChunks; i++) {
+    const slice = new Uint8Array(buffer.slice(i * SWARM_CHUNK_PAYLOAD, Math.min((i + 1) * SWARM_CHUNK_PAYLOAD, buffer.byteLength)))
+    const { ciphertext, nonce } = encryptSwarmChunk(dek, slice, {
+      objectId: id,
+      index: i,
+      total: totalChunks,
+      transferId,
+      senderOrbitId,
+      receiverOfferPub: offerPubHex,
+    })
+    const frame: SwarmMessage = {
+      type: 'SWARM_CHUNK',
+      id,
+      index: i,
+      total: totalChunks,
+      mimeType,
+      enc: 'swarm-v1',
+      transferId,
+      nonce: bytesToBase64(nonce),
+      dataBase64: bytesToBase64(ciphertext),
+      from: senderOrbitId || undefined,
+    }
+    if (!isBoundedChunkFrame(frame)) return
+    send(frame)
+  }
+}
+
+/**
+ * Ingest one swarm-v1 chunk. Returns true when the transfer may continue.
+ * A chunk that fails every candidate DEK is dropped (never silently
+ * accepted); a flood of such frames fails the fetch outright, so a hostile
+ * relay cannot spin the fetcher until timeout for free.
+ */
+function handleEncryptedChunkFrame(msg: SwarmChunkFrame, req: PendingFetch): boolean {
+  const offer = req.offer
+  if (!offer || msg.transferId !== offer.transferId) return true
+  if (typeof msg.nonce !== 'string') return true
+  let nonce: Uint8Array | null = null
+  try { nonce = decodeChunk(msg.nonce) } catch { nonce = null }
+  if (!nonce || nonce.length !== 24) return true
+  let ciphertext: Uint8Array | null = null
+  try { ciphertext = decodeChunk(msg.dataBase64) } catch { ciphertext = null }
+  if (!ciphertext || !ciphertext.byteLength) return true
+  let plaintext: Uint8Array | null = null
+  for (const candidate of offer.keys) {
+    try {
+      plaintext = decryptSwarmChunk(
+        candidate.dek,
+        nonce,
+        ciphertext,
+        chunkContext(offer, msg.id, msg.index, msg.total, candidate.senderOrbitId),
+      )
+      break
+    } catch {
+      plaintext = null
+    }
+  }
+  if (!plaintext) {
+    req.offer!.badFrames += 1
+    if (req.offer!.badFrames > MAX_TRANSFER_KEYS * Math.max(1, msg.total || 1) + 8) {
+      failFetch(msg.id, req, new Error('Swarm transfer failed authenticated-chunk checks'))
+    }
+    return true
+  }
+  try {
+    validateChunkEnvelope(msg, req.total, req.mimeType)
+    // Duplicate re-delivery (relay/transport replay) is an idempotent
+    // no-op, never a fetch failure: we already hold that index.
+    if (req.chunks.has(msg.index)) return true
+    const isLast = msg.index === msg.total - 1
+    if (!plaintext.byteLength || plaintext.byteLength > SWARM_CHUNK_PAYLOAD ||
+        (!isLast && plaintext.byteLength !== SWARM_CHUNK_PAYLOAD) ||
+        req.receivedBytes + plaintext.byteLength > MAX_OBJECT_BYTES) {
+      throw new Error('Invalid swarm chunk length')
+    }
+    req.chunks.set(msg.index, plaintext)
+    req.receivedBytes += plaintext.byteLength
+    req.total = msg.total
+    req.mimeType = msg.mimeType
+  } catch (error) {
+    failFetch(msg.id, req, error instanceof Error ? error : new Error('Invalid swarm chunk'))
+  }
+  return true
 }
 
 // ---- SWARM_CHALLENGE / SWARM_RECEIPT: durable-replication evidence -------
@@ -624,6 +880,8 @@ interface PendingFetch {
   mimeType: string
   expectedHash?: string
   onProgress?: (received: number, total: number) => void
+  /** swarm-v1: this fetch's ephemeral offer. Absent = no offer was possible. */
+  offer?: TransferOffer
 }
 const pendingFetches = new Map<string, PendingFetch>()
 
@@ -781,6 +1039,22 @@ export async function handleSwarmMessage(msg: SwarmMessage): Promise<boolean> {
   if (msg.type === 'SWARM_WANT') {
     const blob = lookupLocalObject(msg.id) || (await getLocalObject(msg.id))
     if (!blob || !swarmSend) return true
+    // swarm-v1: an offered WANT gets an end-to-end encrypted transfer. The
+    // seeder learns nothing it can read: it seals a per-transfer DEK to the
+    // requester's ephemeral public key and ships ciphertext.
+    const offerOk = isOfferedWant(msg)
+    if (offerOk && msg.transferId && msg.offerPub) {
+      try {
+        await serveOfferedObject(swarmSend, msg.id, blob, msg.transferId, msg.offerPub, receiptIdentity?.orbitId ?? '')
+        // v1 replication evidence: challenge the fetcher to attest durable
+        // custody once it lands the bytes (content-addressed ids only).
+        moduleReceiptRoles.mintChallengeFor(msg.id)
+      } catch {
+        /* cannot seal to that offer: the fetcher times out, never plaintext */
+      }
+      return true
+    }
+    if (!legacyPlaintextServing) return true
     try {
       const buffer = await blob.arrayBuffer()
       if (buffer.byteLength === 0 || buffer.byteLength > MAX_OBJECT_BYTES) return true
@@ -792,47 +1066,62 @@ export async function handleSwarmMessage(msg: SwarmMessage): Promise<boolean> {
         if (!isBoundedChunkFrame(frame)) return true
         swarmSend(frame)
       }
-      // v1 replication evidence: challenge the fetcher to attest durable
-      // custody once it lands the bytes (content-addressed ids only).
       moduleReceiptRoles.mintChallengeFor(msg.id)
     } catch {
       /* read failed */
     }
     return true
   }
+  if (msg.type === 'SWARM_KEY') {
+    const req = pendingFetches.get(msg.id)
+    if (!req?.offer) return true
+    if (msg.transferId !== req.offer.transferId) return true
+    if (req.offer.keys.length >= MAX_TRANSFER_KEYS) return true
+    const candidate = candidateFromKeyFrame(req.offer.offerPrivHex, msg.wrapped, msg.from)
+    if (candidate) req.offer.keys.push(candidate)
+    return true
+  }
   if (msg.type === 'SWARM_CHUNK') {
     const req = pendingFetches.get(msg.id)
     if (!req) return false
-    try {
-      if (!Number.isSafeInteger(msg.total) || msg.total < 1 || msg.total > MAX_CHUNKS ||
-          !Number.isSafeInteger(msg.index) || msg.index < 0 || msg.index >= msg.total ||
-          typeof msg.mimeType !== 'string' || msg.mimeType.length > 128 ||
-          typeof msg.dataBase64 !== 'string' || msg.dataBase64.length > MAX_CHUNK_BASE64_LENGTH || !isBoundedChunkFrame(msg) ||
-          (req.total !== 0 && req.total !== msg.total) ||
-          (req.mimeType !== '' && req.mimeType !== msg.mimeType)) {
-        throw new Error('Invalid swarm chunk metadata')
-      }
-      let bytes: Uint8Array
+    if (msg.enc === 'swarm-v1') {
+      if (!handleEncryptedChunkFrame(msg, req)) return true
+    } else {
+      // v0 plaintext media is refused by default: no seeder after the flag
+      // flips is expected to send it, and accepting bytes through a frame we
+      // cannot authenticate would put unverified media into the vault.
+      if (!legacyPlaintextServing) return true
       try {
-        bytes = decodeChunk(msg.dataBase64)
-      } catch {
-        throw new Error('Invalid swarm chunk encoding')
+        if (!Number.isSafeInteger(msg.total) || msg.total < 1 || msg.total > MAX_CHUNKS ||
+            !Number.isSafeInteger(msg.index) || msg.index < 0 || msg.index >= msg.total ||
+            typeof msg.mimeType !== 'string' || msg.mimeType.length > 128 ||
+            typeof msg.dataBase64 !== 'string' || msg.dataBase64.length > MAX_CHUNK_BASE64_LENGTH || !isBoundedChunkFrame(msg) ||
+            (req.total !== 0 && req.total !== msg.total) ||
+            (req.mimeType !== '' && req.mimeType !== msg.mimeType)) {
+          throw new Error('Invalid swarm chunk metadata')
+        }
+        let bytes: Uint8Array
+        try {
+          bytes = decodeChunk(msg.dataBase64)
+        } catch {
+          throw new Error('Invalid swarm chunk encoding')
+        }
+        // Duplicate re-delivery (relay/transport replay) is an idempotent
+        // no-op, never a fetch failure: we already hold that index.
+        if (req.chunks.has(msg.index)) return true
+        const isLast = msg.index === msg.total - 1
+        if (!bytes.byteLength || bytes.byteLength > CHUNK_SIZE || (!isLast && bytes.byteLength !== CHUNK_SIZE) ||
+            req.receivedBytes + bytes.byteLength > MAX_OBJECT_BYTES) {
+          throw new Error('Invalid swarm chunk length')
+        }
+        req.chunks.set(msg.index, bytes)
+        req.receivedBytes += bytes.byteLength
+        req.total = msg.total
+        req.mimeType = msg.mimeType
+      } catch (error) {
+        failFetch(msg.id, req, error instanceof Error ? error : new Error('Invalid swarm chunk'))
+        return true
       }
-      // Duplicate re-delivery (relay/transport replay) is an idempotent
-      // no-op, never a fetch failure: we already hold that index.
-      if (req.chunks.has(msg.index)) return true
-      const isLast = msg.index === msg.total - 1
-      if (!bytes.byteLength || bytes.byteLength > CHUNK_SIZE || (!isLast && bytes.byteLength !== CHUNK_SIZE) ||
-          req.receivedBytes + bytes.byteLength > MAX_OBJECT_BYTES) {
-        throw new Error('Invalid swarm chunk length')
-      }
-      req.chunks.set(msg.index, bytes)
-      req.receivedBytes += bytes.byteLength
-      req.total = msg.total
-      req.mimeType = msg.mimeType
-    } catch (error) {
-      failFetch(msg.id, req, error instanceof Error ? error : new Error('Invalid swarm chunk'))
-      return true
     }
     try {
       req.onProgress?.(req.chunks.size, req.total)
@@ -930,8 +1219,27 @@ function fetchVerifiedPeerObject(id: string, timeoutMs: number, opts: SwarmFetch
       reject(new Error(`Timed out waiting for swarm object ${id}`))
     }, timeoutMs)
     const request = () => {
-      pendingFetches.set(id, { resolve, reject, timer, chunks: new Map(), receivedBytes: 0, total: 0, mimeType: '', expectedHash, onProgress: opts.onProgress })
-      try { swarmSend!({ type: 'SWARM_WANT', id }) }
+      // Every fetch opens with a fresh transfer offer: without one no seeder
+      // can serve us anything we can decrypt, and silently falling back to
+      // plaintext media would defeat the transport layer. Reject instead.
+      let offer: TransferOffer
+      try {
+        offer = newTransferOffer()
+      } catch (err) {
+        clearTimeout(timer)
+        reject(err instanceof Error ? err : new Error('swarm transfer offer unavailable'))
+        return
+      }
+      pendingFetches.set(id, { resolve, reject, timer, chunks: new Map(), receivedBytes: 0, total: 0, mimeType: '', expectedHash, onProgress: opts.onProgress, offer })
+      try {
+        swarmSend!({
+          type: 'SWARM_WANT',
+          id,
+          transferId: offer.transferId,
+          offerPub: offer.offerPubHex,
+          from: receiptIdentity?.orbitId,
+        })
+      }
       catch (err) {
         clearTimeout(timer)
         pendingFetches.delete(id)
@@ -955,7 +1263,8 @@ export function cancelSwarmObject(id: string): boolean {
 export interface SwarmSessionOptions {
   send: (msg: SwarmMessage) => void
   localStore?: Map<string, Blob>
-  /** Signing identity for durable-custody receipts this session issues. */
+  /** Signing identity for durable-custody receipts this session issues.
+   *  Its orbitId is also the swarm-v1 sender/receiver wire label. */
   receiptIdentity?: SwarmReceiptIdentity | null
   /** Test override for the session's durable read-back. */
   durableReadBack?: (id: string) => Promise<boolean>
@@ -969,6 +1278,12 @@ export interface SwarmSessionOptions {
    * registerLocalObject, fire-and-forget).
    */
   persist?: (id: string, blob: Blob) => Promise<void>
+  /**
+   * Explicit opt-in for the legacy v0 plaintext wire (WANT without offer and
+   * chunk frames without `enc`). Off by default: the session neither serves
+   * nor ingests unauthenticated media without this.
+   */
+  legacyPlaintext?: boolean
 }
 
 export interface SwarmSession {
@@ -1009,14 +1324,96 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
         receivedBytes: number
         mimeType: string
       expectedHash?: string
+      /** swarm-v1: this fetch's ephemeral offer. */
+      offer?: TransferOffer
     }
   >()
+  const sessionSenderOrbitId = options.receiptIdentity?.orbitId ?? ''
+
+  /**
+   * Session-local twin of handleEncryptedChunkFrame: the sandboxed session's
+   * fetch state lives in a different map, so the decrypt + assemble logic is
+   * repeated here with the session's own failure path.
+   */
+  function handleSessionEncryptedChunk(
+    msg: SwarmChunkFrame,
+    req: {
+      chunks: Map<number, Uint8Array>
+      receivedBytes: number
+      total: number
+      mimeType: string
+      offer?: TransferOffer
+      timer: ReturnType<typeof setTimeout>
+      reject: (err: Error) => void
+    },
+  ): boolean {
+    const offer = req.offer
+    if (!offer || msg.transferId !== offer.transferId) return false
+    if (typeof msg.nonce !== 'string') return false
+    let nonce: Uint8Array | null = null
+    try { nonce = decodeChunk(msg.nonce) } catch { nonce = null }
+    if (!nonce || nonce.length !== 24) return false
+    let ciphertext: Uint8Array | null = null
+    try { ciphertext = decodeChunk(msg.dataBase64) } catch { ciphertext = null }
+    if (!ciphertext || !ciphertext.byteLength) return false
+    let plaintext: Uint8Array | null = null
+    for (const candidate of offer.keys) {
+      try {
+        plaintext = decryptSwarmChunk(
+          candidate.dek,
+          nonce,
+          ciphertext,
+          chunkContext(offer, msg.id, msg.index, msg.total, candidate.senderOrbitId),
+        )
+        break
+      } catch {
+        plaintext = null
+      }
+    }
+    if (!plaintext) {
+      clearTimeout(req.timer)
+      pendingRequests.delete(msg.id)
+      req.reject(new Error(`Swarm chunk for ${msg.id} failed authenticated decryption`))
+      return false
+    }
+    try {
+      validateChunkEnvelope(msg, req.total, req.mimeType)
+      if (req.chunks.has(msg.index)) return false
+      const isLast = msg.index === msg.total - 1
+      if (!plaintext.byteLength || plaintext.byteLength > SWARM_CHUNK_PAYLOAD ||
+          (!isLast && plaintext.byteLength !== SWARM_CHUNK_PAYLOAD) ||
+          req.receivedBytes + plaintext.byteLength > MAX_OBJECT_BYTES) {
+        throw new Error('Invalid swarm chunk length')
+      }
+      req.chunks.set(msg.index, plaintext)
+      req.receivedBytes += plaintext.byteLength
+      req.total = msg.total
+      req.mimeType = msg.mimeType
+    } catch (error) {
+      clearTimeout(req.timer)
+      pendingRequests.delete(msg.id)
+      req.reject(error instanceof Error ? error : new Error('Invalid swarm chunk'))
+      return false
+    }
+    return true
+  }
 
   async function handleMessage(msg: SwarmMessage): Promise<void> {
     if (msg.type === 'SWARM_WANT') {
       const blob = sessionStore.get(msg.id) || (await getLocalObject(msg.id))
       if (!blob) return
 
+      // swarm-v1: an offered WANT gets ciphertext only.
+      if (isOfferedWant(msg) && msg.transferId && msg.offerPub) {
+        try {
+          await serveOfferedObject(options.send, msg.id, blob, msg.transferId, msg.offerPub, sessionSenderOrbitId)
+          receiptRoles.mintChallengeFor(msg.id)
+        } catch {
+          /* cannot seal: the request times out, never plaintext */
+        }
+        return
+      }
+      if (!options.legacyPlaintext) return
       if (blob.size === 0 || blob.size > MAX_OBJECT_BYTES) return
       const buffer = await blob.arrayBuffer()
       const totalBytes = buffer.byteLength
@@ -1046,39 +1443,54 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
       return
     }
 
+    if (msg.type === 'SWARM_KEY') {
+      const req = pendingRequests.get(msg.id)
+      if (!req?.offer) return
+      if (msg.transferId !== req.offer.transferId) return
+      if (req.offer.keys.length >= MAX_TRANSFER_KEYS) return
+      const candidate = candidateFromKeyFrame(req.offer.offerPrivHex, msg.wrapped, msg.from)
+      if (candidate) req.offer.keys.push(candidate)
+      return
+    }
+
     if (msg.type === 'SWARM_CHUNK') {
       const req = pendingRequests.get(msg.id)
       if (!req) return
 
-      let bytes: Uint8Array
-      try {
-        if (!Number.isSafeInteger(msg.total) || msg.total < 1 || msg.total > MAX_CHUNKS ||
-            !Number.isSafeInteger(msg.index) || msg.index < 0 || msg.index >= msg.total ||
-            typeof msg.mimeType !== 'string' || msg.mimeType.length > 128 ||
-            typeof msg.dataBase64 !== 'string' || msg.dataBase64.length > MAX_CHUNK_BASE64_LENGTH || !isBoundedChunkFrame(msg) ||
-            (req.total !== 0 && req.total !== msg.total) ||
-            (req.mimeType !== '' && req.mimeType !== msg.mimeType)) {
-          throw new Error('Invalid swarm chunk metadata')
+      if (msg.enc === 'swarm-v1') {
+        if (!handleSessionEncryptedChunk(msg, req)) return
+      } else {
+        if (!options.legacyPlaintext) return
+        let bytes: Uint8Array
+        try {
+          if (!Number.isSafeInteger(msg.total) || msg.total < 1 || msg.total > MAX_CHUNKS ||
+              !Number.isSafeInteger(msg.index) || msg.index < 0 || msg.index >= msg.total ||
+              typeof msg.mimeType !== 'string' || msg.mimeType.length > 128 ||
+              typeof msg.dataBase64 !== 'string' || msg.dataBase64.length > MAX_CHUNK_BASE64_LENGTH || !isBoundedChunkFrame(msg) ||
+              (req.total !== 0 && req.total !== msg.total) ||
+              (req.mimeType !== '' && req.mimeType !== msg.mimeType)) {
+            throw new Error('Invalid swarm chunk metadata')
+          }
+          bytes = decodeChunk(msg.dataBase64)
+          // Duplicate re-delivery: idempotent no-op (see module handler note).
+          if (req.chunks.has(msg.index)) return
+          const last = msg.index === msg.total - 1
+          if (!bytes.byteLength || bytes.byteLength > CHUNK_SIZE || (!last && bytes.byteLength !== CHUNK_SIZE) ||
+              req.receivedBytes + bytes.byteLength > MAX_OBJECT_BYTES) {
+            throw new Error('Invalid swarm chunk length')
+          }
+        } catch (error) {
+          clearTimeout(req.timer)
+          pendingRequests.delete(msg.id)
+          req.reject(error instanceof Error ? error : new Error('Invalid swarm chunk'))
+          return
         }
-        bytes = decodeChunk(msg.dataBase64)
-        // Duplicate re-delivery: idempotent no-op (see module handler note).
-        if (req.chunks.has(msg.index)) return
-        const last = msg.index === msg.total - 1
-        if (!bytes.byteLength || bytes.byteLength > CHUNK_SIZE || (!last && bytes.byteLength !== CHUNK_SIZE) ||
-            req.receivedBytes + bytes.byteLength > MAX_OBJECT_BYTES) {
-          throw new Error('Invalid swarm chunk length')
-        }
-      } catch (error) {
-        clearTimeout(req.timer)
-        pendingRequests.delete(msg.id)
-        req.reject(error instanceof Error ? error : new Error('Invalid swarm chunk'))
-        return
-      }
 
-      req.chunks.set(msg.index, bytes)
-      req.receivedBytes += bytes.byteLength
-      req.total = msg.total
-      req.mimeType = msg.mimeType
+        req.chunks.set(msg.index, bytes)
+        req.receivedBytes += bytes.byteLength
+        req.total = msg.total
+        req.mimeType = msg.mimeType
+      }
 
       if (req.chunks.size === req.total) {
         // Assemble all chunks in order
@@ -1184,6 +1596,14 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
         reject(new Error(`Timed out waiting for swarm object ${id}`))
       }, timeoutMs)
 
+      let offer: TransferOffer
+      try {
+        offer = newTransferOffer()
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error('swarm transfer offer unavailable'))
+        return
+      }
+
       pendingRequests.set(id, {
         resolve,
         reject,
@@ -1193,10 +1613,17 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
         total: 0,
         mimeType: '',
         expectedHash,
+        offer,
       })
 
       try {
-        options.send({ type: 'SWARM_WANT', id })
+        options.send({
+          type: 'SWARM_WANT',
+          id,
+          transferId: offer.transferId,
+          offerPub: offer.offerPubHex,
+          from: sessionSenderOrbitId || undefined,
+        })
       } catch (error) {
         clearTimeout(timer)
         pendingRequests.delete(id)

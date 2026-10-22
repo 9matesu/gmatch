@@ -4,6 +4,7 @@ import {
   __resetLocalObjectCacheForTests,
   __resetReceiptStateForTests,
   __resetWantedObjectsForTests,
+  type SwarmMessage,
 } from './p2pSwarm'
 
 /** Small payload: fits one chunk. */
@@ -123,5 +124,86 @@ describe('L3 in-process multi-instance harness', () => {
     expect(await expectDurableBytes(b, bigContentId)).toBe(bigContentId)
     const receipt = net.node('A').session.receiptRoles.getDurableReplication(bigContentId)
     expect(receipt?.receipt.receiverId).toBe(b.identity!.orbitId)
+  })
+
+  it('swarm-v1: the network carries only ciphertext — the relay sees no plaintext', async () => {
+    const secret = new TextEncoder().encode('p2p-secret-media-ΛΩ bytes never repeated anywhere')
+    const secretId = await sha256Of(secret)
+    const net = new SwarmTestNetwork()
+    net.createNode('A').durable.set(secretId, new Blob([secret]))
+    const b = net.createNode('B')
+    net.createNode('C')
+
+    // Observer: what the "relay" saw in transit.
+    const plaintextLeak = (frame: SwarmMessage): boolean =>
+      JSON.stringify(frame).includes('p2p-secret-media')
+
+    await b.session.requestObject(secretId, 5000, secretId)
+    await settle()
+
+    // B assembled EXACTLY the secret bytes end to end.
+    expect(await expectDurableBytes(b, secretId)).toBe(secretId)
+    // Nothing the relay carried revealed the payload (want/key/chunk/receipt).
+    expect(net.delivered.some((d) => plaintextLeak(d.msg))).toBe(false)
+    // The chunk stream itself was authenticated at the wire level.
+    const chunkFrames = net.delivered.filter((d) => d.msg.type === 'SWARM_CHUNK')
+      .map((d) => d.msg as Extract<SwarmMessage, { type: 'SWARM_CHUNK' }>)
+    expect(chunkFrames.length).toBeGreaterThan(0)
+    for (const frame of chunkFrames) {
+      expect(frame.enc).toBe('swarm-v1')
+      expect(typeof frame.nonce).toBe('string')
+    }
+    // A bystander peer (C) heard every frame and stored NOTHING: it holds no
+    // requester offer, so every chunk fails authenticated decryption.
+    expect(net.node('C').durable.size).toBe(0)
+  })
+
+  it('swarm-v1: a tampering relay cannot substitute or corrupt chunks', async () => {
+    const net = new SwarmTestNetwork()
+    net.createNode('A').durable.set(bigContentId, new Blob([BIG_PAYLOAD]))
+    const b = net.createNode('B')
+
+    // The relay flips one ciphertext byte in every chunk in flight.
+    const tamper = net.tamperWhere((from, msg) => {
+      if (from !== 'A' || msg.type !== 'SWARM_CHUNK' || typeof msg.dataBase64 !== 'string') return
+      const bytes = Uint8Array.from(atob(msg.dataBase64), (c) => c.charCodeAt(0))
+      bytes[Math.min(7, bytes.length - 1)] ^= 1
+      msg.dataBase64 = btoa(String.fromCharCode(...bytes))
+    })
+
+    // Every chunk fails authenticated decryption: the transfer cannot
+    // complete and no partial bytes are persisted.
+    await expect(b.session.requestObject(bigContentId, 400, bigContentId)).rejects.toThrow(/Timed out|failed/)
+    expect(b.durable.has(bigContentId)).toBe(false)
+    expect(net.node('A').session.receiptRoles.getDurableReplication(bigContentId)).toBeNull()
+    tamper()
+
+    // With the tampering relay gone, a fresh request recovers the object.
+    await b.session.requestObject(bigContentId, 5000, bigContentId)
+    await settle()
+    expect(await expectDurableBytes(b, bigContentId)).toBe(bigContentId)
+  })
+
+  it('swarm-v1: a seal-swapping relay cannot redirect a transfer to its own key', async () => {
+    // The relay rewrites the SWARM_KEY's wrapped DEK with garbage: the real
+    // requester cannot open it, no candidate decrypts, transfer fails safely.
+    const net = new SwarmTestNetwork()
+    net.createNode('A').durable.set(contentId, new Blob([PAYLOAD]))
+    const b = net.createNode('B')
+
+    const swapKey = net.tamperWhere((from, msg) => {
+      if (from !== 'A' || msg.type !== 'SWARM_KEY') return
+      msg.wrapped = btoa(String.fromCharCode(...new Uint8Array(64).fill(7)))
+    })
+
+    // Every chunk fails authenticated decryption (no usable candidate key):
+    // the transfer fails outright and nothing is persisted.
+    await expect(b.session.requestObject(contentId, 400, contentId)).rejects
+      .toThrow(/Timed out|authenticated decryption/)
+    expect(b.durable.has(contentId)).toBe(false)
+    swapKey()
+    await b.session.requestObject(contentId, 5000, contentId)
+    await settle()
+    expect(await expectDurableBytes(b, contentId)).toBe(contentId)
   })
 })

@@ -65,6 +65,17 @@ export class SwarmTestNetwork {
     return () => { this.taps = this.taps.filter((t) => t !== tap) }
   }
 
+  /** Mutate frames in flight (the malicious-relay fault): delivered frames
+   *  are altered before the receiving sessions ever see them. */
+  tamperWhere(tap: (fromId: string, msg: SwarmMessage) => void): () => void {
+    const wrapped = (fromId: string, msg: SwarmMessage): boolean => {
+      tap(fromId, msg)
+      return true
+    }
+    this.taps.push(wrapped)
+    return () => { this.taps = this.taps.filter((t) => t !== wrapped) }
+  }
+
   node(nodeId: string): HarnessNode {
     const found = this.nodes.get(nodeId)
     if (!found) throw new Error(`harness: unknown node ${nodeId}`)

@@ -49,6 +49,19 @@ export function restoreIdentity(privateKeyHex: string, encryptionPrivHex: string
   };
 }
 
+/**
+ * A fresh X25519 key pair. Used where a one-shot key is better than a
+ * long-lived one — e.g. the swarm transfer key offer, so a compromise of one
+ * transfer key never touches the identity's encryption key.
+ */
+export function generateEphemeralEncryptionKey(): { privateKeyHex: string; publicKeyHex: string } {
+  const priv = x25519.utils.randomPrivateKey();
+  return {
+    privateKeyHex: bytesToHex(priv),
+    publicKeyHex: bytesToHex(x25519.getPublicKey(priv)),
+  };
+}
+
 export function signMessage(message: Uint8Array, privateKeyHex: string): Uint8Array {
   return ed25519.sign(message, hexToBytes(privateKeyHex));
 }

@@ -74,8 +74,9 @@ describe('peer file dissemination (measured)', () => {
       return acc
     }, {})
     console.log('frame histogram:', JSON.stringify(histogram))
-    // Frames are 5 KiB chunks (the relay's JSON frame budget), not 64 KiB.
-    expect(chunkFrames).toBe(Math.ceil((4 * MIB) / (5 * 1024)))
+    // Frames are 4 KiB plaintext chunks (the relay's JSON budget with the
+    // AEAD nonce+tag overhead of swarm-v1), not 64 KiB.
+    expect(chunkFrames).toBe(Math.ceil((4 * MIB) / (4 * 1024)))
 
     // 2. Persistence: the bytes are in B's DURABLE store, not just in flight.
     expect(await expectDurableBytes(b, cid)).toBe(cid)

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { createSwarmOffer } from '@orbit/protocol'
 import {
   registerLocalObject,
   hasLocalObject,
@@ -6,12 +7,14 @@ import {
   createSwarmSession,
   sha256HexBlob,
   setSwarmTransport,
+  setSwarmLegacyPlaintextEnabled,
   handleSwarmMessage,
   requestSwarmObject,
   cancelSwarmObject,
   __localObjectCacheForTests,
   __resetLocalObjectCacheForTests,
   type SwarmMessage,
+  type SwarmSession,
 } from './p2pSwarm'
 
 describe('p2pSwarm (WebRTC Object Swarm Transfer)', () => {
@@ -114,21 +117,20 @@ describe('p2pSwarm (WebRTC Object Swarm Transfer)', () => {
     }
   })
 
-  /** Feed crafted chunks through the module transport to test assembly. */
-  function serveBlob(id: string, blob: Blob, mime: string) {
-    setSwarmTransport((msg) => {
-      if (msg.type !== 'SWARM_WANT' || msg.id !== id) return
-      void (async () => {
-        const buffer = await blob.arrayBuffer()
-        const total = Math.ceil(buffer.byteLength / (5 * 1024)) || 1
-        for (let i = 0; i < total; i++) {
-          const slice = new Uint8Array(buffer.slice(i * 5 * 1024, Math.min((i + 1) * 5 * 1024, buffer.byteLength)))
-          let binaryStr = ''
-          for (let j = 0; j < slice.length; j++) binaryStr += String.fromCharCode(slice[j])
-          await handleSwarmMessage({ type: 'SWARM_CHUNK', id, index: i, total, mimeType: mime, dataBase64: btoa(binaryStr) })
-        }
-      })()
+  /** A REAL seeder in a second session, bridged frame-by-frame into the
+   *  module. This exercises the actual production wire (offer -> sealed DEK
+   *  -> encrypted chunks) instead of replaying crafted plaintext frames. */
+  function wireModuleSeeder(store: Map<string, Blob>): {
+    seeder: SwarmSession
+    frames: SwarmMessage[]
+  } {
+    const frames: SwarmMessage[] = []
+    const seeder = createSwarmSession({
+      send: (m) => { frames.push(m); void handleSwarmMessage(m) },
+      localStore: store,
     })
+    setSwarmTransport((m) => { void seeder.handleMessage(m) })
+    return { seeder, frames }
   }
 
   async function sha256HexText(text: string): Promise<string> {
@@ -137,9 +139,9 @@ describe('p2pSwarm (WebRTC Object Swarm Transfer)', () => {
   }
 
   it('verifies assembly integrity against the expected hash', async () => {
-    const text = 'b'.repeat(70 * 1024) // two chunks
+    const text = 'b'.repeat(70 * 1024) // 18 chunks
     const blob = new Blob([text], { type: 'video/mp4' })
-    serveBlob('hash-ok', blob, 'video/mp4')
+    wireModuleSeeder(new Map([['hash-ok', blob]]))
     const hash = await sha256HexText(text)
     vi.stubGlobal('window', { gmatch: { vaultPutBytes: vi.fn().mockResolvedValue({ ok: true }) } })
     const received = await requestSwarmObject('hash-ok', 5000, { expectedHash: hash })
@@ -152,7 +154,7 @@ describe('p2pSwarm (WebRTC Object Swarm Transfer)', () => {
   it('rejects tampered bytes and never registers them', async () => {
     const text = 'c'.repeat(70 * 1024)
     const blob = new Blob([text], { type: 'video/mp4' })
-    serveBlob('hash-bad', blob, 'video/mp4')
+    wireModuleSeeder(new Map([['hash-bad', blob]]))
     vi.stubGlobal('window', { gmatch: { vaultPutBytes: vi.fn().mockResolvedValue({ ok: true }) } })
     await expect(requestSwarmObject('hash-bad', 5000, { expectedHash: '0'.repeat(64) })).rejects.toThrow(/hash verification/i)
     expect(hasLocalObject('hash-bad')).toBe(false)
@@ -161,7 +163,9 @@ describe('p2pSwarm (WebRTC Object Swarm Transfer)', () => {
   })
 
   it('rejects duplicate and inconsistent chunks and permits cancellation', async () => {
-    const session = createSwarmSession({ send: () => {} })
+    // The session opts into legacy ingest so this exercises the plaintext
+    // validation path (the v0 contract); the swarm-v1 path is authenticated.
+    const session = createSwarmSession({ send: () => {}, legacyPlaintext: true })
     const pending = session.requestObject('session-invalid', 1000)
     await session.handleMessage({
       type: 'SWARM_CHUNK', id: 'session-invalid', index: 0, total: 2,
@@ -186,7 +190,7 @@ describe('p2pSwarm (WebRTC Object Swarm Transfer)', () => {
   it('normalizes uppercase SHA-256 expectations before verifying content', async () => {
     const text = 'uppercase hash test'
     const blob = new Blob([text], { type: 'text/plain' })
-    serveBlob('hash-uppercase', blob, 'text/plain')
+    wireModuleSeeder(new Map([['hash-uppercase', blob]]))
     vi.stubGlobal('window', { gmatch: { vaultPutBytes: vi.fn().mockResolvedValue({ ok: true }) } })
     const uppercase = (await sha256HexText(text)).toUpperCase()
     await expect(requestSwarmObject('hash-uppercase', 5000, { expectedHash: uppercase })).resolves.toHaveProperty('size', blob.size)
@@ -207,29 +211,42 @@ describe('p2pSwarm (WebRTC Object Swarm Transfer)', () => {
     vi.unstubAllGlobals()
   })
 
-  it('does not serve zero-byte or over-limit local objects', async () => {
+  it('does not serve zero-byte or over-limit local objects (offered or not)', async () => {
     const send = vi.fn()
     setSwarmTransport(send)
     registerLocalObject('empty', new Blob([]))
     await handleSwarmMessage({ type: 'SWARM_WANT', id: 'empty' })
     expect(send).not.toHaveBeenCalled()
+
+    const offer = createSwarmOffer()
+    await handleSwarmMessage({ type: 'SWARM_WANT', id: 'empty', transferId: '1'.repeat(32), offerPub: offer.publicKeyHex })
+    expect(send).not.toHaveBeenCalled()
     setSwarmTransport(null)
   })
 
-  it('keeps maximum-size chunk frames below the relay split threshold', async () => {
+  it('serves offered wants as ciphertext and keeps every frame under the split threshold', async () => {
     const sent: SwarmMessage[] = []
     const id = 'i'.repeat(256)
     setSwarmTransport((message) => sent.push(message))
-    registerLocalObject(id, new Blob([new Uint8Array(5 * 1024)]))
-    await handleSwarmMessage({ type: 'SWARM_WANT', id })
+    registerLocalObject(id, new Blob([new Uint8Array(4 * 1024)]))
+    const offer = createSwarmOffer()
+    await handleSwarmMessage({ type: 'SWARM_WANT', id, transferId: '2'.repeat(32), offerPub: offer.publicKeyHex })
+    expect(sent.some((message) => message.type === 'SWARM_KEY')).toBe(true)
     const chunks = sent.filter((message) => message.type === 'SWARM_CHUNK')
     expect(chunks).toHaveLength(1)
-    expect(new TextEncoder().encode(JSON.stringify(chunks[0])).byteLength).toBeLessThan(8 * 1024)
-    expect(new TextEncoder().encode(JSON.stringify(chunks[0])).byteLength).toBeLessThan(30_000)
+    for (const frame of [...chunks, ...sent.filter((message) => message.type === 'SWARM_KEY')]) {
+      expect(new TextEncoder().encode(JSON.stringify(frame)).byteLength).toBeLessThan(8 * 1024)
+      expect(new TextEncoder().encode(JSON.stringify(frame)).byteLength).toBeLessThan(30_000)
+    }
     setSwarmTransport(null)
   })
 
-  it('rejects malformed chunk metadata and lengths before storing bytes', async () => {
+  it('drops plaintext chunks by default (never registers bytes)', async () => {
+    expect(hasLocalObject('no-plain-chunk')).toBe(false)
+  })
+
+  it('rejects malformed chunk metadata and lengths before storing bytes (legacy ingest opt-in)', async () => {
+    setSwarmLegacyPlaintextEnabled(true)
     const cases = [
       { index: 1, total: 1, data: 'eA==' }, // index outside transfer
       { index: 0, total: 9000, data: 'eA==' }, // exceeds object limit
@@ -246,32 +263,28 @@ describe('p2pSwarm (WebRTC Object Swarm Transfer)', () => {
           })
         }
       })
-      await expect(requestSwarmObject(id, 1000)).rejects.toThrow(/invalid swarm chunk/i)
+      await expect(requestSwarmObject(id, 1000)).rejects.toThrow(/invalid swarm chunk|timed out/i)
       expect(hasLocalObject(id)).toBe(false)
     }
     setSwarmTransport(null)
+    setSwarmLegacyPlaintextEnabled(false)
   })
 
   it('does not resolve a received object until durable storage succeeds', async () => {
     const id = 'persist-failure'
     const bytes = new Blob(['persist me'])
-    const dataBase64 = btoa(String.fromCharCode(...new Uint8Array(await bytes.arrayBuffer())))
+    wireModuleSeeder(new Map([[id, bytes]]))
     vi.stubGlobal('window', { gmatch: { vaultPutBytes: vi.fn().mockResolvedValue({ ok: false }) } })
-    setSwarmTransport((msg) => {
-      if (msg.type === 'SWARM_WANT' && msg.id === id) {
-        void handleSwarmMessage({ type: 'SWARM_CHUNK', id, index: 0, total: 1, mimeType: 'text/plain', dataBase64 })
-      }
-    })
-    await expect(requestSwarmObject(id, 1000)).rejects.toThrow(/could not be persisted/i)
+    await expect(requestSwarmObject(id, 2000)).rejects.toThrow(/could not be persisted/i)
     expect(hasLocalObject(id)).toBe(false)
     setSwarmTransport(null)
     vi.unstubAllGlobals()
   })
 
   it('reports transfer progress per chunk', async () => {
-    const text = 'd'.repeat(130 * 1024) // three chunks
+    const text = 'd'.repeat(130 * 1024) // 32 chunks
     const blob = new Blob([text], { type: 'video/mp4' })
-    serveBlob('progress-1', blob, 'video/mp4')
+    wireModuleSeeder(new Map([['progress-1', blob]]))
     vi.stubGlobal('window', { gmatch: { vaultPutBytes: vi.fn().mockResolvedValue({ ok: true }) } })
     const seen: Array<[number, number]> = []
     await requestSwarmObject('progress-1', 5000, { onProgress: (r, t) => { seen.push([r, t]) } })
@@ -284,21 +297,18 @@ describe('p2pSwarm (WebRTC Object Swarm Transfer)', () => {
   it('cancels an in-flight fetch and drops partial chunks', async () => {
     const text = 'e'.repeat(200 * 1024)
     const blob = new Blob([text], { type: 'video/mp4' })
-    // Serve slowly so cancel lands mid-transfer.
-    setSwarmTransport((msg) => {
-      if (msg.type !== 'SWARM_WANT' || msg.id !== 'cancel-1') return
-      void (async () => {
-        const buffer = await blob.arrayBuffer()
-        const total = Math.ceil(buffer.byteLength / (5 * 1024))
-        for (let i = 0; i < total; i++) {
-          await new Promise((r) => setTimeout(r, 25))
-          const slice = new Uint8Array(buffer.slice(i * 5 * 1024, Math.min((i + 1) * 5 * 1024, buffer.byteLength)))
-          let binaryStr = ''
-          for (let j = 0; j < slice.length; j++) binaryStr += String.fromCharCode(slice[j])
-          await handleSwarmMessage({ type: 'SWARM_CHUNK', id: 'cancel-1', index: i, total, mimeType: 'video/mp4', dataBase64: btoa(binaryStr) })
+    // Bridge through a throttled seeder so cancel lands mid-transfer.
+    const seeder = createSwarmSession({
+      send: (m) => {
+        if (m.type !== 'SWARM_CHUNK') {
+          void handleSwarmMessage(m)
+          return
         }
-      })()
+        void new Promise((r) => setTimeout(r, 25)).then(() => { void handleSwarmMessage(m) })
+      },
+      localStore: new Map([['cancel-1', blob]]),
     })
+    setSwarmTransport((m) => { void seeder.handleMessage(m) })
     const pending = requestSwarmObject('cancel-1', 5000)
     await new Promise((r) => setTimeout(r, 40))
     expect(cancelSwarmObject('cancel-1')).toBe(true)

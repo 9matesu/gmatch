@@ -7,3 +7,4 @@ export * from './peer-binding';
 export * from './social-operation';
 export * from './replication-receipt';
 export * from './content-manifest';
+export * from './swarm-chunk';

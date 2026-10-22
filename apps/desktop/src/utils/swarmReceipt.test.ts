@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { restoreIdentity } from '@orbit/crypto'
-import { createReplicationReceipt, validateReplicationReceipt } from '@orbit/protocol'
+import { createReplicationReceipt, createSwarmOffer, validateReplicationReceipt } from '@orbit/protocol'
 import {
   __resetLocalObjectCacheForTests,
   __resetReceiptStateForTests,
@@ -47,6 +47,18 @@ describe('swarm durable-replication receipts (L2 wiring)', () => {
    *  (read-back -> hash -> sign -> send); give it a macrotask. */
   const settle = () => new Promise((resolve) => setTimeout(resolve, 20))
 
+  /** A want that carries a swarm-v1 transfer offer (seeder cannot serve
+   *  plaintext to anonymous wants anymore). */
+  function offeredWant(id: string): SwarmMessage & { transferId: string; offerPub: string } {
+    const offer = createSwarmOffer()
+    return {
+      type: 'SWARM_WANT',
+      id,
+      transferId: Array.from(crypto.getRandomValues(new Uint8Array(16))).map((b) => b.toString(16).padStart(2, '0')).join(''),
+      offerPub: offer.publicKeyHex,
+    }
+  }
+
   it('completes serve -> challenge -> durable persist -> validated receipt between two peers', async () => {
     const { a, b } = wire()
     a.registerLocalObject(contentId, new Blob([PAYLOAD], { type: 'text/plain' }))
@@ -89,8 +101,8 @@ describe('swarm durable-replication receipts (L2 wiring)', () => {
 
     // Re-serve from A mints a FRESH challenge; the fetcher (already durable)
     // re-attests, so the recorded receipt must change.
-    await a.handleMessage({ type: 'SWARM_WANT', id: contentId })
-    await new Promise((resolve) => setTimeout(resolve, 10))
+    await a.handleMessage(offeredWant(contentId))
+    await settle()
     const second = a.receiptRoles.getDurableReplication(contentId)!
     expect(second.receipt.challenge).not.toBe(first.receipt.challenge)
 
@@ -111,7 +123,7 @@ describe('swarm durable-replication receipts (L2 wiring)', () => {
   it('mints no challenge for non-content-addressed ids', async () => {
     const { a, b, frames } = wire()
     a.registerLocalObject('plain-object-id', new Blob(['x']))
-    await b.handleMessage({ type: 'SWARM_WANT', id: 'plain-object-id' })
+    await b.handleMessage(offeredWant('plain-object-id'))
     expect(frames.some((msg) => msg.type === 'SWARM_CHALLENGE')).toBe(false)
   })
 
@@ -124,9 +136,15 @@ describe('swarm durable-replication receipts (L2 wiring)', () => {
     setSwarmReceiptIdentity({ orbitId: FETCHER.orbitId, publicKeyHex: FETCHER.publicKeyHex, privateKeyHex: FETCHER.privateKeyHex })
     try {
       registerLocalObject(contentId, new Blob([PAYLOAD], { type: 'text/plain' }))
-      await handleSwarmMessage({ type: 'SWARM_WANT', id: contentId })
+      await handleSwarmMessage(offeredWant(contentId))
       const challengeFrame = sent.find((m) => m.type === 'SWARM_CHALLENGE') as { challenge: string } | undefined
       expect(challengeFrame).toBeTruthy()
+      // The serve itself carries ciphertext + a sealed DEK, never plaintext.
+      const keyFrame = sent.find((m) => m.type === 'SWARM_KEY') as { wrapped: string } | undefined
+      expect(keyFrame).toBeTruthy()
+      const chunkFrames = sent.filter((m) => m.type === 'SWARM_CHUNK') as Extract<SwarmMessage, { type: 'SWARM_CHUNK' }>[]
+      expect(chunkFrames.length).toBeGreaterThan(0)
+      for (const frame of chunkFrames) expect(frame.enc).toBe('swarm-v1')
 
       // The receipt a fetcher would send, fed to the module's seeder side.
       const receipt = createReplicationReceipt({
