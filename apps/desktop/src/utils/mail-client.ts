@@ -173,12 +173,16 @@ export class MailClient {
     this.reconnectTimer = setTimeout(() => this.connect(), delay)
   }
 
-  /** Drop a sealed envelope into the recipient's box. Returns the envelope. */
+  /** Drop a sealed envelope into the recipient's box. Returns the envelope.
+   *
+   *  `opts.base` is the NODE the recipient is connected to: a peer on another
+   *  node has its mailbox there, not on ours. The envelope is sealed either
+   *  way — the node only ever moves ciphertext it cannot open. */
   async send(
     body: string,
     kind: EnvelopeKind,
     recipient: { publicKeyHex: string; encryptionPubHex: string },
-    opts?: { id?: string; exp?: number; to?: string },
+    opts?: { id?: string; exp?: number; to?: string; base?: string },
   ): Promise<Envelope> {
     const id = this.deps.identity
     const env = seal1to1(body, kind, {
@@ -187,7 +191,8 @@ export class MailClient {
       encryptionPrivHex: id.encryptionPrivHex,
       encryptionPubHex: id.encryptionPubHex,
     }, recipient, { ...opts, id: opts?.id ?? randomId() })
-    const res = await this.fetcher()(`${this.deps.apiBase.replace(/\/+$/, '')}/api/mail/${env.to}`, {
+    const target = (opts?.base || this.deps.apiBase).replace(/\/+$/, '')
+    const res = await this.fetcher()(`${target}/api/mail/${env.to}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ env }),

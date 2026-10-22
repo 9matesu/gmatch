@@ -7,25 +7,35 @@
 
 ## 1. System Overview
 
-In `gmatch` v1.5.0, the central deployment (`https://gmatch-wcz1.onrender.com`) is strictly a **blind, stateless courier** (`SITE_SERVICES=mail,turn,admin`). It does not store user profiles, online presence, posts, feeds, or media objects. All user data, media, and interactions are served **end-to-end directly between peer nodes**.
+Since 2026-10-21 there is **no central deployment at all**. Both hostings
+(`gmatch-wcz1.onrender.com` and `gmatch.fly.dev`) were decommissioned — the
+accounts cannot be paid for — and every packaged copy of the app runs **its own
+node** (host mode is the default). A node is still a *blind, stateless courier*
+for its own clients: it holds no user profiles, no presence, no posts, no feeds
+and no media objects. It only moves sealed envelopes and relays swarm frames.
+
+The courier role moved from "one central host" to "the node each client is
+connected to":
 
 ```
-                   +----------------------------------+
-                   |          BLIND COURIER           |
-                   | (Render: mail, turn, admin only) |
-                   +----------------------------------+
-                        ^         ^            ^
-           Blind Mail   |         | STUN/TURN  |   Ephemeral
-           Put/Get/WS   |         | Traversal  |   Beacons
-                        v         v            v
-             +--------------+                +--------------+
-             |    Node A    |<==============>|    Node B    |
-             | (Edge Peer)  |  WebRTC Mesh   | (Edge Peer)  |
-             +--------------+  DataChannels  +--------------+
-                    |                               |
-              Local IndexedDB                 Local IndexedDB
-              5KB Chunk Seed                  5KB Chunk Seed
+        +-------------------------+            +-------------------------+
+        |      Node A (you)       |            |      Node B (friend)    |
+        |  bundled Bun, :8790     |            |  bundled Bun, :8790     |
+        |  blind courier for its  |            |  blind courier for its  |
+        |  own clients            |            |  own clients            |
+        +-------------------------+            +-------------------------+
+             ^          |                             ^          |
+   sealed mail |        | presence beacon              |        | presence beacon
+   (opaque)    |        | (signed, names the node)     |        |
+                +------------ WebRTC mesh ----------------+
+                (direct: media chunks, signed operations)
 ```
+
+Two clients on the SAME node find each other through that node (it relays the
+presence beacons and the swarm frames) and then talk **directly** over WebRTC.
+Two clients on DIFFERENT nodes meet through the directory: a beacon names the
+node a peer lives on, so the sealed envelope is dropped straight into that
+node's mailbox — the node still cannot open it.
 
 ### Core Architecture Pillars
 
@@ -185,6 +195,33 @@ arrives mid-drain; absorbing it (the previous behaviour) left a message on the
 courier until something unrelated pulled. The watch socket is built by
 `wsUrlForBase` (`utils/api.ts`) so a relative API base (browser dev, riding the
 Vite proxy) resolves to the page origin instead of the invalid `ws:///api/mail/ws`.
+
+### A peer on another node (2026-10-21)
+
+The courier is the node a client is connected to — there is no central one any
+more. A peer that lives on a DIFFERENT node is still reachable, because:
+
+- the presence beacon carries the **node URL** the peer is connected to, and
+  the URL is inside the signed payload (`presence-v1|orbitId|pubkey|ts|node`).
+  A relay that rewrites the address breaks the signature, so the beacon is
+  dropped instead of being redirected. A beacon from a client that does not
+  know the field still verifies against the old payload.
+- the presence token is a well-known public constant, so a client can read the
+  presence mailbox of any node it knows (ours, plus the nodes the directory
+  lists). That is how a peer on another node enters the roster.
+- the sealed envelope is then dropped into **that** node's mailbox
+  (`MailClient.send(..., { base })`), not into ours. The ciphertext is
+  identical either way: the node moves bytes it cannot open.
+
+The registry (`utils/peerNodes.ts`) is a bounded localStorage hint: peer id →
+node URL, plus the set of known nodes. It is fed by beacons and by the
+directory (`/api/servers`), and it is a hint, never authority — losing it
+costs one rediscovery, not a message.
+
+**What this does not buy:** two peers whose nodes are both unreachable from
+the public internet (behind a NAT with no port forward) still cannot meet.
+Either node must be reachable, or a third node must relay for them. STUN
+covers most home NATs; a symmetric NAT without a reachable node does not.
 
 **Node-hosted lanes are probed, not assumed.** `detectMailMode` reports "courier"
 for both a full node and the blind courier, so it cannot gate gameplay. The UI

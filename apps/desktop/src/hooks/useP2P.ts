@@ -10,7 +10,8 @@ import { presenceBucket } from '../utils/compare';
 import { CHAT_WIPE_SECONDS } from '@orbit/shared';
 import { logger } from '../utils/logger';
 import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, hydrateDurableReplications, announcePeerOnline, PEER_ONLINE_EVENT, announceHeldObjects, setSwarmReceiptIdentity, setSwarmOperationHandler, setSwarmOperationAckHandler, sendSwarmFrame, type SwarmMessage } from '../utils/p2pSwarm';
-import { broadcastPresence, fetchPresenceRoster } from '../services/courierPresence';
+import { broadcastPresence, fetchPresenceRosterFrom } from '../services/courierPresence';
+import { knownNodes, rememberKnownNode, rememberPeerNode } from '../utils/peerNodes';
 import { broadcastMeshFrame, onMeshMessage, connectToPeerMesh } from '../utils/courierSignaling';
 import { resolveDisplayName } from '../utils/displayName';
 import { parseApiTimestamp } from '../utils/timeAgo';
@@ -755,8 +756,27 @@ export function useP2P(identity: OrbitIdentity | null) {
     // the server's current online set instead of waiting passively for the
     // next swarm event. Refresh rides the same 60s cadence as presence.
     const pullRoster = () => {
+      // Courier mode: the roster is the presence mailbox of EVERY node we
+      // know — ours, plus the nodes peers told us they live on. A peer on
+      // another node is then reachable (its mailbox is there), which is what
+      // makes the mesh work across the open internet without a hub.
+      const crossNodeRoster = async (): Promise<{ users: User[] }> => {
+        rememberKnownNode(getApiBaseUrl())
+        const nodes = [getApiBaseUrl(), ...knownNodes()].filter(Boolean)
+        const seen = new Set<string>()
+        const users: User[] = []
+        for (const node of nodes) {
+          const base = node.replace(/\/+$/, '')
+          if (seen.has(base)) continue
+          seen.add(base)
+          const roster = await fetchPresenceRosterFrom(base, selfUserRef.current.id).catch(() => ({ users: [], nodeById: new Map<string, string>() }))
+          for (const [peerId, peerNode] of roster.nodeById) rememberPeerNode(peerId, peerNode)
+          users.push(...roster.users)
+        }
+        return { users }
+      }
       ;(courierOnlyWs
-        ? fetchPresenceRoster(selfUserRef.current.id).then((users) => ({ users }))
+        ? crossNodeRoster()
         : orbitFetch('/api/users/online', {}, identity).then((r) => (r.ok ? r.json() : { users: [] })).catch(() => ({ users: [] })))
         .then((res: any) => (res && 'users' in res ? res : (res && res.ok ? res.json() : { users: [] })))
         .then(({ users }: { users?: User[] }) => {

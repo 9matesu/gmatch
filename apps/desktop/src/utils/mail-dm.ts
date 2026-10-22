@@ -5,6 +5,7 @@ import { logger } from './logger'
 import { isEpoch, peerAddressToken } from './handleRotation'
 import { TYPING_TTL_MS, shouldEmitTyping } from './dmTyping'
 import { getSecureItem, setSecureItem } from './secure-storage'
+import { peerNodeFor } from './peerNodes'
 
 /**
  * Courier-backed DM layer (plan P3.2). Source of truth is LOCAL
@@ -395,7 +396,7 @@ export interface MailClientLike {
     body: string,
     kind: 'mail',
     recipient: { publicKeyHex: string; encryptionPubHex: string },
-    opts?: { id?: string; exp?: number; to?: string },
+    opts?: { id?: string; exp?: number; to?: string; base?: string },
   ): Promise<Envelope>
   readonly epoch?: { cur: string; prev: string }
 }
@@ -416,11 +417,18 @@ export class DmManager {
     if (!keys?.publicKeyHex || !keys.encryptionPubHex) {
       return Promise.reject(new Error('peer keys unknown'))
     }
+    // A peer on another node keeps its mailbox THERE: drop the sealed
+    // envelope straight into that node's box (it cannot read it either).
+    const peerBase = peerNodeFor(peerId)
     return this.deps.mail.send(
       body,
       'mail',
       { publicKeyHex: keys.publicKeyHex, encryptionPubHex: keys.encryptionPubHex },
-      { to: peerAddressToken(keys, deliveryToken), ...(exp ? { exp } : {}) },
+      {
+        to: peerAddressToken(keys, deliveryToken),
+        ...(peerBase ? { base: peerBase } : {}),
+        ...(exp ? { exp } : {}),
+      },
     )
   }
 

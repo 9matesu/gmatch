@@ -12,6 +12,7 @@ import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { Lock, Globe, ShieldCheck, RefreshCw, Pencil, Check, X, Search, Share2, ArrowLeft, Plus, Trash2 } from 'lucide-react'
 import { generateIdentity } from '@orbit/crypto'
 import { getCentralApiUrl, setCentralApiUrl } from '../../utils/central'
+import { rememberKnownNodeHint } from '../../utils/peerNodes'
 import { orbitFetch, getApiBaseUrl, isCourierApiUrl } from '../../utils/api'
 import { normalizeServerUrl, isCurrentServerUrl } from '../../utils/serverUrl'
 import { joinServer } from '../../utils/join-server'
@@ -257,18 +258,21 @@ export function ServersView({
 
   const [centralProbe, setCentralProbe] = useState<{ online: boolean; count: number | null; total: number | null }>({ online: false, count: null, total: null })
 
-  const centralServer: DirectoryServer = useMemo(() => ({
+  // The configured directory hub. There is no built-in one any more (the
+  // central deployments are decommissioned), so this row exists only when the
+  // user configured a hub — and it points at THAT hub, never at a dead host.
+  const centralServer: DirectoryServer | null = useMemo(() => (central ? ({
     id: 'central-deprecated',
     name: 'gMatch Central',
     description: '',
     owner_id: 'central-deprecated',
-    endpoint_hint: GM_CENTRAL_URL,
+    endpoint_hint: central,
     password_required: 0,
     is_private: 0,
     online_count: centralProbe.count,
     user_count: centralProbe.total,
     last_seen: centralProbe.online ? new Date().toISOString() : undefined,
-  }), [centralProbe])
+  }) : null), [centralProbe, central])
 
   // Mirror the connected server into the dev-proxy cookie so browser /api
   // traffic follows it. A courier is a DIRECTORY, not a data node (it 404s
@@ -318,7 +322,9 @@ export function ServersView({
           signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined,
         }).catch(() => null)
         isOnline = Boolean(health?.ok)
-        if (isOnline) {
+        // The dashboard carries member counts: an anonymous browser has no
+        // business asking for it (it is a node route).
+        if (isOnline && identity) {
           const dashRes = await fetch(`${central}/api/servers/dashboard`, {
             signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined,
           }).catch(() => null)
@@ -446,6 +452,10 @@ export function ServersView({
     }
     // A decommissioned deployment is never a destination.
     merged = merged.filter((s) => !isDecommissioned(s.endpoint_hint))
+    // Every node the directory knows becomes a node we can read beacons from
+    // (and drop sealed envelopes into) — the discovery path for peers that
+    // live on another machine.
+    for (const s of merged) rememberKnownNodeHint(s.endpoint_hint)
     writeDirectoryCache(merged)
     setServers(merged)
     setDirError(dirFailed)
@@ -597,7 +607,7 @@ export function ServersView({
       !q || `${s.name} ${s.description ?? ''}`.toLowerCase().includes(q)
     const listed = dedupeServers([
       ...visibleServers,
-      ...(matches(centralServer) ? [centralServer] : []),
+      ...(centralServer && matches(centralServer) ? [centralServer] : []),
     ])
     // The node on this machine IS a server even when the directory does not
     // list it. Its own directory record wins when there is one (that is the

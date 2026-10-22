@@ -9,13 +9,16 @@ run the narrow checks, then commit only the files in that slice.
 
 ## Current state and constraints
 
-- **The central hosts are being decommissioned on purpose.** `gmatch.fly.dev`
-  is frozen and stuck on an old release; `gmatch-wcz1.onrender.com` is the
-  current stand-in and is expected to go the same way. The end state is
-  **direct peer-to-peer** — no central host storing posts, media, comments,
-  likes, profiles or presence (SPEC §12b). Any work that deepens a central
-  dependency is a step backwards; every route's fate is written down in
-  `docs/API-INVENTORY.md`.
+- **The central hosts are GONE (2026-10-21).** `gmatch.fly.dev` was frozen
+  on an old release and `gmatch-wcz1.onrender.com` could not be paid for any
+  more. Nothing resolves to them any more: the API base falls back to the node
+  on this machine, a stored URL pointing at a dead host is dropped on sight,
+  and the packaged app starts its OWN node (host mode is the default). The
+  courier role moved from "one central host" to "the node each client is
+  connected to" — still blind, still stateless, still only moving ciphertext.
+  The end state is **direct peer-to-peer** — no central host storing posts,
+  media, comments, likes, profiles or presence (SPEC §12b). Every route's fate
+  is written down in `docs/API-INVENTORY.md`.
 - The desktop app still uses API nodes for feed reads and writes, comments,
   likes, profile/directory data, notifications, Lobby chat, and other social
   state. Public gossip replicates signed post metadata between hosts, but that
@@ -44,6 +47,27 @@ run the narrow checks, then commit only the files in that slice.
   idempotent migrations and preserve legacy records until tested recovery is
   demonstrated. The single age gate and client-side prohibited-tag blocklist
   remain mandatory.
+
+## What changed on 2026-10-21 (the hosts went away)
+
+- **Host mode is the default** for packaged builds (`electron/server-mode.cjs`).
+  The bundled Bun node is the app's world; the Settings → Server tab switches
+  to a friend's node instead of to a hosted default.
+- **No hosted fallback anywhere in the client**: `utils/api.ts` resolves to
+  the local node, `utils/central.ts` has NO hub by default (a hub is opt-in),
+  and the server directory is read from the node you are on (`/api/servers`).
+- **Peers on different nodes**: the presence beacon carries the node URL the
+  peer lives on (signed), and a sealed envelope is dropped into THAT node's
+  mailbox (`utils/peerNodes.ts`, `MailClient.send(..., { base })`). This is
+  what makes the mesh work across the open internet without paying for a
+  rendezvous: the node you are on is the rendezvous.
+- **Comments on peer-replicated posts are now a signed operation** (the L5
+  write path) and the feed renders the peer thread merged with the node rows
+  (`hooks/usePeerComments.ts`, `utils/commentMerge.ts`).
+- **Still open** (unchanged by this round): group chat as sealed rooms, the
+  profile/follow graph as operations, moderation reports over the mesh, the
+  release feed (the update hosts are gone too — the app says so honestly), and
+  the multi-process/NAT evidence.
 
 ## Execution order
 
@@ -279,8 +303,10 @@ counter, so replicating a wave no longer costs one full store scan per
 operation (previously O(n²) IndexedDB reads); any write from any instance
 invalidates every cache with one integer compare. A `BroadcastChannel` signal
 extends that to OTHER windows of the same app: without it, a second tab would
-authorize operations against a history it no longer had. Still open: offline
-read paths beyond the local log, comment/reaction projection, and the
+authorize operations against a history it no longer had. The comment/reaction
+projection now has a READ path too: `projectComments` renders the peer thread
+next to the node rows (`hooks/usePeerComments.ts`, `utils/commentMerge.ts`).
+Still open: offline read paths beyond the local log, and the
 migration/compatibility work below.
 
 - [ ] Define signed, versioned post operations and deterministic feed ordering,
@@ -332,7 +358,9 @@ number and marks our own like. The WRITE path is live too: liking a
 peer-replicated post publishes a signed `reaction.add`/`reaction.remove` in the
 durable log instead of calling a node that does not own the post
 (`persistLike` → `likePersistenceRoute` → `persistPeerLike`); server posts keep
-the node path. Still open: the comment box write path, profile/follow
+the node path. The comment box write path is live for peer-replicated posts
+too: a signed `comment.create`/`comment.delete` in the durable log, replicated
+like every other operation (`persistPeerComment`). Still open: profile/follow
 operations, moderation reports, and the import surface.
 
 **Migration of existing content.** `services/socialPostImport.ts` turns the

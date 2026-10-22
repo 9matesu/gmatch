@@ -177,7 +177,7 @@ describe('ServersView', () => {
     expect(screen.queryByText(/relay transport/i)).toBeNull()
   })
 
-  it('keeps gMatch Central as an ordinary row with a menu-only connect', async () => {
+  it('keeps the configured hub as an ordinary row with a menu-only connect', async () => {
     mockFetch(async (url) => {
       if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
       if (url.includes('/api/servers')) return json({ servers: [] })
@@ -188,18 +188,35 @@ describe('ServersView', () => {
     await screen.findByText('gMatch Central')
 
     const centralRow = rowOf('gMatch Central')
-    expect(within(centralRow).getByText(/gmatch\.fly\.dev/)).toBeInTheDocument()
-    // the row is a destination, and it is the only place the old connect lives
+    // The row points at the CONFIGURED hub. The built-in central deployments
+    // are decommissioned and are never offered as a destination.
+    expect(within(centralRow).getByText(/central\.test/)).toBeInTheDocument()
+    expect(within(centralRow).queryByText(/fly\.dev/)).toBeNull()
     expect(within(centralRow).getByRole('button', { name: /connect to gmatch central/i })).toBeInTheDocument()
     fireEvent.click(within(centralRow).getByRole('button', { name: /more actions/i }))
     fireEvent.click(await within(centralRow).findByText('Connect to gMatch Central'))
     expect(onServerJoined).toHaveBeenCalledWith(expect.objectContaining({ id: 'central-deprecated' }))
-    expect(localStorage.getItem('gmatch.api.url')).toBe('https://gmatch.fly.dev')
+    expect(localStorage.getItem('gmatch.api.url')).toBe('https://central.test')
+  })
+
+  it('never offers a decommissioned deployment as a destination', async () => {
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers')) return json({ servers: [
+        { id: 'dead', name: 'Old Central', description: '', owner_id: 'o1', password_required: 0, endpoint_hint: 'https://gmatch-wcz1.onrender.com', last_seen: 'x' },
+      ] })
+      return json({})
+    })
+    const toast = vi.fn()
+    render(<ServersView identity={identity} toast={toast} />)
+    await screen.findByText('gMatch Central')
+    // The dead row is filtered out of the list entirely.
+    expect(screen.queryByText('Old Central')).toBeNull()
   })
 
   it('shows an unavailable destination as unavailable, not as ready to connect', async () => {
     mockFetch(async (url) => {
-      if (url.includes('/fly-api')) return json({}, 503)
+      if (url.includes('central.test')) return json({}, 503)
       if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
       if (url.includes('/api/servers')) return json({ servers: [] })
       return json({})
@@ -228,14 +245,14 @@ describe('ServersView', () => {
 
   it('never fabricates a count for a server nothing has measured', async () => {
     mockFetch(async (url) => {
-      if (url.includes('/fly-api')) return json({}, 503)
+      if (url.includes('central.test')) return json({}, 503)
       if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
       if (url.includes('/api/servers')) return json({ servers: [] })
       return json({})
     })
     render(<ServersView identity={identity} toast={() => {}} />)
     await screen.findByText('gMatch Central')
-    // the official entry stays visible and reports its real state...
+    // the hub entry stays visible and reports its real state...
     const centralRow = rowOf('gMatch Central')
     expect(within(centralRow).getByText('Unavailable')).toBeInTheDocument()
     // ...and no row invents a member figure out of nothing

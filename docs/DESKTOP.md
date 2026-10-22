@@ -25,6 +25,47 @@ Two topologies, chosen once per launch in Settings → Server
   for), so nothing falls back to it: a packaged build with no stored mode
   starts its own server instead of dialing a dead host.
 
+## Running with no hosted server (2026-10-21)
+
+Both hosted deployments are gone (the accounts cannot be paid for), so the app
+is self-sufficient: **host mode is the default** and the bundled node is the
+world. Nothing in the client resolves to a hosted address any more — the API
+base falls back to `http://127.0.0.1:8790`, a stored URL pointing at a dead
+host is dropped on sight, and the server directory is read from the node you
+are on.
+
+What the local node gives you, with no third party involved:
+
+| feature | where it lives now |
+|---|---|
+| feed, comments, likes, profiles, inbox | the local node's SQLite + blobs |
+| media bytes | the Electron vault + IndexedDB (never uploaded) |
+| DMs | sealed envelopes through the node's blind courier (`/api/mail`) |
+| group chat, watch parties, groups, idle game | the local node's routes |
+| posts/likes/comments between peers | signed operations, replicated peer-to-peer |
+
+**Reaching a friend over the internet.** Your node must be reachable, or
+yours and your friend's must be reachable from each other:
+
+1. Settings → Server → *host* (the default) and note the LAN address the tab
+   shows.
+2. Make that port reachable from the internet: a port forward on the router,
+   or a mesh/tunnel (Tailscale, Cloudflare Tunnel, a reverse proxy on a VPS you
+   already have).
+3. Put the PUBLIC address in the node's advertised address (Settings → Server
+   → the server's address) and use *Copy share code* — the code carries the
+   address, so your friend joins your node by pasting it.
+4. Your friend's client then talks to your node as its courier and rendezvous:
+   the sealed messages pass through it (it cannot read them) and the media and
+   the signed operations travel **directly** between the two apps over WebRTC.
+
+**The honest limits.** Two nodes that are both unreachable from the public
+internet cannot meet — that is NAT, not architecture, and no client-side code
+fixes it. STUN covers most home connections; a symmetric NAT needs a reachable
+node or a TURN relay. The **self-update feed is offline** for the same
+reason (both release hosts are decommissioned): the app says "no host
+answered" and the artifact has to be copied by hand until a host exists again.
+
 ## Boot flow (`electron/main.cjs`)
 
 1. `requestSingleInstanceLock` — duplicate launches exit after focusing.

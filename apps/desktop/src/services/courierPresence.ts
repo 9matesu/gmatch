@@ -3,6 +3,7 @@ import { signMessage, verifySignature, hexToBytes, bytesToHex } from '@orbit/cry
 import { sha256Hex } from '@orbit/protocol'
 import { type User, generateFallbackName } from '@orbit/shared'
 import { getApiBaseUrl } from '../utils/api'
+import { normalizeNodeUrl } from '../utils/peerNodes'
 
 /**
  * Well-known 64-hex delivery token on the blind courier dedicated to
@@ -17,6 +18,14 @@ export interface PresenceBeacon {
   pfpUrl: string | null
   publicKeyHex: string
   encryptionPubHex?: string
+  /**
+   * The node this peer is connected to (its courier/rendezvous). Signed with
+   * the beacon, so a peer cannot be redirected to somebody else's node
+   * without breaking the signature. Optional: a client that does not know the
+   * field still verifies against the OLD payload (see
+   * beaconSignaturePayload).
+   */
+  nodeUrl?: string
   timestamp: number
   sig?: string
 }
@@ -32,7 +41,11 @@ function randomHex(bytesLen: number): string {
 }
 
 function beaconSignaturePayload(b: Omit<PresenceBeacon, 'sig'>): Uint8Array {
-  return new TextEncoder().encode(`presence-v1|${b.orbitId}|${b.publicKeyHex}|${b.timestamp}`)
+  const base = `presence-v1|${b.orbitId}|${b.publicKeyHex}|${b.timestamp}`
+  // The node URL is signed ONLY when it is present: a beacon from a client
+  // that does not know the field keeps verifying against the old payload, so
+  // an older peer is still seen (it just has no address).
+  return new TextEncoder().encode(b.nodeUrl ? `${base}|${b.nodeUrl}` : base)
 }
 
 /**
@@ -50,6 +63,9 @@ export async function broadcastPresence(
     pfpUrl: profile.pfpUrl || null,
     publicKeyHex: identity.publicKeyHex,
     encryptionPubHex: identity.encryptionPubHex || '',
+    // Where we live: the node we are connected to. It is the mailbox that
+    // holds a sealed envelope addressed to us.
+    ...(normalizeNodeUrl(getApiBaseUrl()) ? { nodeUrl: normalizeNodeUrl(getApiBaseUrl())! } : {}),
     timestamp: now,
   }
 
@@ -89,13 +105,42 @@ export async function fetchPresenceRoster(
   selfId?: string,
   fetchImpl: typeof globalThis.fetch = globalThis.fetch,
 ): Promise<User[]> {
+  const { users } = await fetchPresenceRosterFrom(getApiBaseUrl(), selfId, fetchImpl)
+  return users
+}
+
+/** A roster and the node each peer lives on. */
+export interface PresenceRoster {
+  users: User[]
+  /** node URL per peer id — the node the peer's mailbox is on. */
+  nodeById: Map<string, string>
+}
+
+/**
+ * Read the presence mailbox of ANY node — ours, or a node a peer lives on.
+ *
+ * The presence token is a well-known public constant, so a node can read
+ * another node's beacons without an account there. A beacon says which node
+ * the peer is connected to, which is how a peer on another node becomes
+ * reachable: the sealed envelope goes straight into that node's box.
+ */
+export async function fetchPresenceRosterFrom(
+  base: string,
+  selfId?: string,
+  fetchImpl: typeof globalThis.fetch = globalThis.fetch,
+): Promise<PresenceRoster> {
+  // An empty base is the browser dev proxy (same origin): it is a valid
+  // mailbox. Anything else must be an http(s) node URL.
+  const trimmed = base.trim()
+  const nodeBase = trimmed === '' ? '' : normalizeNodeUrl(trimmed)
+  if (nodeBase === null) return { users: [], nodeById: new Map() }
   try {
-    const url = `${getApiBaseUrl()}/api/mail/${PRESENCE_TOKEN}`
+    const url = `${nodeBase}/api/mail/${PRESENCE_TOKEN}`
     const res = await fetchImpl(url, { method: 'GET' })
-    if (!res.ok) return []
+    if (!res.ok) return { users: [], nodeById: new Map() }
 
     const data = await res.json().catch(() => null)
-    if (!data || !Array.isArray(data.envelopes)) return []
+    if (!data || !Array.isArray(data.envelopes)) return { users: [], nodeById: new Map() }
 
     const now = Date.now()
     const activeMap = new Map<string, PresenceBeacon>()
@@ -124,7 +169,10 @@ export async function fetchPresenceRoster(
     }
 
     const users: User[] = []
+    const nodeById = new Map<string, string>()
     for (const beacon of activeMap.values()) {
+      const peerNode = normalizeNodeUrl(beacon.nodeUrl)
+      if (peerNode) nodeById.set(beacon.orbitId, peerNode)
       if (selfId && beacon.orbitId === selfId) continue
       users.push({
         id: beacon.orbitId,
@@ -138,8 +186,8 @@ export async function fetchPresenceRoster(
       })
     }
 
-    return users
+    return { users, nodeById }
   } catch {
-    return []
+    return { users: [], nodeById: new Map() }
   }
 }
