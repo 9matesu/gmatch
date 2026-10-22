@@ -73,7 +73,11 @@ user's own network (loopback or a private LAN address).
 **The honest limits.** Two nodes that are both unreachable from the public
 internet cannot meet — that is NAT, not architecture, and no client-side code
 fixes it. STUN covers most home connections; a symmetric NAT needs a reachable
-node or a TURN relay. The **self-update feed is offline** for the same
+node or a TURN relay. And when the direct WebRTC channel is blocked, the
+swarm falls back to the node's WebSocket relay: the media still arrives, but
+it travels through that node in the clear (the chunks are hash-verified, not
+sealed — the DMs and the room messages stay sealed either way). The direct
+path is what keeps the media private from the node. The **self-update feed is offline** for the same
 reason (both release hosts are decommissioned): the app says "no host
 answered" and the artifact has to be copied by hand until a host exists again.
 

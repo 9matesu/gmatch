@@ -68,8 +68,12 @@ run the narrow checks, then commit only the files in that slice.
   connected to first. No hosted release host is needed any more.
 - **Still open**: the mesh-wide moderation story beyond "the author acts"
   (there is no way to force a peer to remove content), profile fields as
-  operations (the display name/bio still live on the node), and the
-  multi-process/NAT evidence.
+  operations (the display name/bio still live on the node), the
+  multi-process/NAT evidence, and **the swarm's relay fallback is not
+  end-to-end encrypted** (when the direct WebRTC channel is blocked, the
+  media chunks travel through the node in the clear — the DMs and the room
+  messages stay sealed, but encrypting the chunk stream itself is still L2
+  work).
 
 ## What changed on 2026-10-21 (the hosts went away)
 

@@ -258,6 +258,25 @@ the public internet (behind a NAT with no port forward) still cannot meet.
 Either node must be reachable, or a third node must relay for them. STUN
 covers most home NATs; a symmetric NAT without a reachable node does not.
 
+### What the relay fallback costs (the honest price of a blocked direct path)
+
+When the direct WebRTC channel cannot be established, the swarm falls back to
+the node's WebSocket relay (`SWARM_FRAME`), which is the guaranteed path: the
+data still flows, through the node the user chose. Two things differ from the
+direct path, and both are worth stating plainly:
+
+- **The media is not end-to-end encrypted on that path.** The direct
+  DataChannel is DTLS-encrypted between the two peers; the relay fallback
+  carries the same chunk frames over the node's socket, so the node sees the
+  bytes it forwards (the chunks are hash-verified, not sealed). DMs and room
+  messages are unaffected: they are sealed envelopes the node cannot open.
+- **The latency is the node's, not the peers'.**
+
+So the direct path is not a nicety: it is what keeps the media private from
+the node. A blocked direct path is a privacy downgrade, not just a slow
+one. Closing that gap means encrypting the chunk stream itself (a session key
+derived from the two peers), which is still open (L2).
+
 **Node-hosted lanes are probed, not assumed.** `detectMailMode` reports "courier"
 for both a full node and the blind courier, so it cannot gate gameplay. The UI
 probes an unauthenticated `GET /api/lobby/invites`: 404 means the node does not
