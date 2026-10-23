@@ -98,6 +98,23 @@ describe('proposed social operation v1', () => {
     expect(validateSocialOperation({ ...post, payload: { ...post.payload, unexpected: true } })).toMatch(/payload/)
   })
 
+  it('validates profile.update as an actor-owned versioned statement', () => {
+    const common = {
+      protocol: 'gmatch-social' as const, version: 1 as const, actorId: IDENTITY.orbitId,
+      signingKey: IDENTITY.publicKeyHex, actorSequence: 2, previousOperationId: 'a'.repeat(64),
+      createdAt: 2, objectId: IDENTITY.orbitId,
+    }
+    const valid = createSocialOperation({ ...common, type: 'profile.update', payload: { displayName: 'nova', bio: 'olá' } }, IDENTITY.privateKeyHex)
+    expect(validateSocialOperation(valid)).toBeNull()
+    // Explicit clears are legal (deletion semantics), unknown fields are not.
+    expect(validateSocialOperation(createSocialOperation({ ...common, type: 'profile.update', payload: { displayName: '', bio: '' } }, IDENTITY.privateKeyHex))).toBeNull()
+    expect(validateSocialOperation({ ...valid, objectId: 'someone-else' })).toMatch(/actor itself/)
+    expect(() => createSocialOperation({ ...common, type: 'profile.update', payload: { avatar: 'x' } }, IDENTITY.privateKeyHex)).toThrow(/invalid operation payload/)
+    expect(() => createSocialOperation({ ...common, type: 'profile.update', payload: {} }, IDENTITY.privateKeyHex)).toThrow(/invalid operation payload/)
+    expect(() => createSocialOperation({ ...common, type: 'profile.update', payload: { displayName: 'x'.repeat(61) } }, IDENTITY.privateKeyHex)).toThrow(/invalid operation payload/)
+    expect(() => createSocialOperation({ ...common, type: 'profile.update', payload: { bio: 'x'.repeat(501) } }, IDENTITY.privateKeyHex)).toThrow(/invalid operation payload/)
+  })
+
   it('does not create an operation when the supplied private key cannot sign for its public key', () => {
     expect(() => createSocialOperation({
       protocol: 'gmatch-social', version: 1, type: 'post.create',
@@ -158,6 +175,11 @@ describe('proposed social operation v1', () => {
     const removeByOther = make(IDENTITY, 'reaction.remove', 'reaction-remove-1', { targetAddOperationIds: [add.operationId] })
     expect(authorizeSocialOperation(removeByOther, history, { verifiedManifests })).toMatch(/not owned by actor/)
     append(OTHER, 'reaction.remove', 'reaction-remove-2', { targetAddOperationIds: [add.operationId] })
+
+    // Profile updates: the actor restates own fields anytime. An objectId
+    // that is not the actor itself never even passes creation (see the
+    // validation test above).
+    append(OTHER, 'profile.update', OTHER.orbitId, { displayName: 'other-nova', bio: '' })
 
     const deletePost = append(IDENTITY, 'post.delete', 'post-1', { targetOperationId: post.operationId })
     expect(deletePost.operationId).toBeTruthy()

@@ -13,6 +13,7 @@ const OPERATION_TYPES = new Set([
   'post.create', 'post.edit', 'post.delete',
   'comment.create', 'comment.delete', 'reaction.add', 'reaction.remove',
   'follow.add', 'follow.remove', 'report.create',
+  'profile.update',
 ])
 
 export interface SocialOperation {
@@ -138,6 +139,27 @@ function validateOperationPayload(type: string, payload: Record<string, unknown>
         (payload.targetType === 'post' || payload.targetType === 'comment') &&
         validObjectId(payload.targetId) &&
         validText(payload.reason, 500, true)
+    // Profile FIELDS as a versioned replicated operation (roadmap P1): the
+    // avatar/display name/bio are not node-hosted rows, they are the last
+    // signed statement of the actor. An omitted field is "unchanged"; an
+    // EMPTY string is an explicit clear. At least one field must be named.
+    case 'profile.update': {
+      const keys = Object.keys(payload)
+      if (keys.length === 0) return false
+      for (const key of keys) {
+        if (key === 'displayName') {
+          // The protocol cap sits ABOVE the app's own display-name cap
+          // (MAX_DISPLAY_NAME_LENGTH = 50): the wire must never be tighter
+          // than the writers, or valid local names could not replicate.
+          if (!validText(payload.displayName, 60, true)) return false
+        } else if (key === 'bio') {
+          if (!validText(payload.bio, 500, true)) return false
+        } else {
+          return false
+        }
+      }
+      return true
+    }
     default: return false
   }
 }
@@ -172,6 +194,7 @@ export function validateSocialOperation(value: unknown): string | null {
   if (!validObjectId(op.objectId)) return 'invalid object id'
   if (!op.payload || typeof op.payload !== 'object' || Array.isArray(op.payload)) return 'payload must be an object'
   if (!isJsonValue(op.payload)) return 'payload must contain only bounded-depth JSON values'
+  if (op.type === 'profile.update' && op.objectId !== op.actorId) return 'profile updates must target the actor itself'
   if (!validateOperationPayload(op.type as string, op.payload as Record<string, unknown>)) return 'invalid operation payload'
   if (typeof op.signature !== 'string' || !HEX128.test(op.signature)) return 'invalid signature'
   try {
@@ -327,6 +350,11 @@ export function authorizeValidatedOperation(
     const target = targetType === 'post' ? postCreate(targetId) : commentCreate(targetId)
     if (!target) return 'report target is unavailable'
     if (targetType === 'post' ? postIsDeleted(target) : commentIsDeleted(target)) return 'report target is unavailable'
+    return null
+  }
+  if (operation.type === 'profile.update') {
+    // The actor restates OWN profile fields; objectId === actorId is already
+    // enforced by validation, so there is no further precondition.
     return null
   }
   if (operation.type === 'reaction.add') {

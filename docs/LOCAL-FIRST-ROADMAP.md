@@ -63,6 +63,10 @@ run the narrow checks, then commit only the files in that slice.
   roster label reports the real path (`P2P direto` / `relay via nó (NAT)` /
   `sem rota`). The relay guarantees the mesh works where a direct hole cannot
   be punched; it does not solve symmetric NAT for the direct path.
+- **Profile fields are versioned operations** (`profile.update`): display
+  name/bio resolve deterministically per actor by highest sequence with
+  carry-forward of unnamed fields; an empty string is an explicit clear;
+  `saveUserProfile` publishes the op and inbound ops feed the name directory.
 - **Deletion is a tombstone plus a purge**: an accepted `post.delete` also
   purges the replica's bytes (RAM + IndexedDB + vault) for that content hash.
   Honest limits are documented: a tombstone is accepted only after the author's

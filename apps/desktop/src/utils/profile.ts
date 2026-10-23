@@ -1,5 +1,6 @@
 import { normalizeTags, MAX_TAGS, MAX_TAG_LENGTH, isDefaultPeerName } from '@orbit/shared';
 import { orbitFetch, invalidateCache } from './api';
+import { sharedSocialOperationLog } from '../services/socialOperationLog';
 import type { OrbitIdentity } from '@orbit/crypto';
 
 export { MAX_TAGS, MAX_TAG_LENGTH };
@@ -29,6 +30,20 @@ export async function saveUserProfile(
 ): Promise<{ ok: boolean; status: number; error?: string; pfpUrl?: string }> {
   const body: ProfilePatch = { ...patch };
   if (body.tags !== undefined) body.tags = normalizeTags(body.tags as (string | null | undefined)[]);
+  // The profile FIELDS also travel as a versioned signed operation (roadmap
+  // P1), so peers that never query a node still converge on the same name
+  // and bio: every replica folds the operation log. Fire-and-forget: the
+  // node save decides this call's outcome; the replication op rides along
+  // and is swept to peers by the regular transport waves.
+  const opFields = {
+    ...(body.display_name !== undefined ? { displayName: body.display_name } : {}),
+    ...(body.bio !== undefined ? { bio: body.bio } : {}),
+  };
+  if (Object.keys(opFields).length > 0) {
+    void import('../services/socialInteraction')
+      .then(({ publishProfileUpdate }) => publishProfileUpdate(identity, opFields, sharedSocialOperationLog()))
+      .catch(() => { /* replication is best-effort; the node save holds the truth */ });
+  }
   // ponytail: base64 data URL up to ~256px JPEG stored directly in DB; migrate to S3/R2 signed upload if concurrent active users exceed 500
   const res = await orbitFetch('/api/users/profile', {
     method: 'PATCH',

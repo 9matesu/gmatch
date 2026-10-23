@@ -364,6 +364,33 @@ otherwise. Server-side engagement rows (`Notifications`) are a separate,
 node-hosted system that does survive an offline client — the two are merged for
 display only (SPEC §15) and never written into each other.
 
+### Profile fields are signed state, not node rows (2026-10-22)
+
+The operation log has been the write path for posts, reactions, comments,
+follows and reports. Profile fields now replicate the same way:
+
+**`profile.update`** — display name and bio are the actor's last signed
+statement:
+
+| field | rule |
+|---|---|
+| `objectId` | MUST equal `actorId` (a profile can only be rewritten by its actor) |
+| payload | at least one of `displayName` (≤ 60 bytes) / `bio` (≤ 500); unknown keys refused |
+| omitted field | "unchanged" |
+| empty string | explicit CLEAR of that field (deletion semantics) |
+
+Resolution is **deterministic and clock-free**: per actor, fold the accepted
+`profile.update` entries in `actorSequence` order, applying only the fields
+each entry names (`projectProfiles`). Because the authorizer refuses actor
+equivocation, that order is total — every replica converges to the same name
+and bio no matter the arrival order. `saveUserProfile` (the single funnel for
+every profile patch in the app) also publishes the operation, and an accepted
+inbound one feeds `rememberNames`, so peers resolve the latest signed display
+name without asking a node. The protocol caps are deliberately looser than the
+app's own caps (`MAX_DISPLAY_NAME_LENGTH` = 50, bio = 150): a wire limit
+tighter than a writer's would silently stop valid local names from
+replicating.
+
 ### Deletion is a tombstone plus a purge, with an honest boundary (2026-10-22)
 
 - A validated `post.delete` hides the post from the feed (tombstones never

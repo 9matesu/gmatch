@@ -271,6 +271,82 @@ export async function publishReport(
   }, history)
 }
 
+export interface ProfileFields {
+  displayName?: string
+  bio?: string
+}
+
+/**
+ * Profile FIELDS as a versioned replicated operation (roadmap P1): the
+ * display name and bio are the actor's last signed statement, not a row on a
+ * node. Replication = everyone replaying the log converges to the same
+ * answer, because the per-actor resolution (below) is deterministic.
+ *
+ * Deletion semantics: an EMPTY string is an explicit clear ("remove this
+ * field"); an omitted key means "unchanged". There is no op that removes the
+ * profile itself — the actor identity cannot be hotter-deleted, its presence
+ * is what anchors the ops.
+ */
+export async function publishProfileUpdate(
+  identity: OrbitIdentityLike,
+  fields: ProfileFields,
+  log: SocialOperationLog,
+): Promise<SocialOperation> {
+  const payload: Record<string, string> = {}
+  if (fields.displayName !== undefined) payload.displayName = fields.displayName.trim()
+  if (fields.bio !== undefined) payload.bio = fields.bio
+  if (Object.keys(payload).length === 0) throw new Error('profile update must name at least one field')
+  const { actorSequence, previousOperationId } = await log.nextActorSlot(identity.orbitId)
+  const history = await acceptedHistory(log)
+  return signAndAppend(identity, log, {
+    protocol: 'gmatch-social',
+    version: 1,
+    type: 'profile.update',
+    actorId: identity.orbitId,
+    signingKey: identity.publicKeyHex,
+    actorSequence,
+    previousOperationId,
+    createdAt: Date.now(),
+    objectId: identity.orbitId,
+    payload,
+  }, history)
+}
+
+/**
+ * Deterministic profile projection (roadmap P1): replay the accepted log and
+ * fold, per actor, each profile.update in actorSequence order, carrying
+ * forward fields the newer operation did not name. That total order is
+ * clock-free (the actor's own chain is unique per sequence in an accepted
+ * history — equivocation is refused by the authorizer), so every replica
+ * converges to the same fields no matter the arrival order. Two actors can
+ * never claim the same profile: each profile is keyed by the actor's own id.
+ */
+export function projectProfiles(
+  entries: readonly { record: unknown }[],
+): Map<string, { displayName?: string; bio?: string; operationId: string; actorSequence: number }> {
+  const byActor = new Map<string, SocialOperation[]>()
+  for (const entry of entries) {
+    const record = entry.record as Partial<SocialOperation> | null
+    if (!record || typeof record !== 'object' || record.type !== 'profile.update' || typeof record.actorId !== 'string') continue
+    const list = byActor.get(record.actorId) ?? []
+    list.push(record as SocialOperation)
+    byActor.set(record.actorId, list)
+  }
+  const projected = new Map<string, { displayName?: string; bio?: string; operationId: string; actorSequence: number }>()
+  for (const [actorId, ops] of byActor) {
+    ops.sort((a, b) => a.actorSequence - b.actorSequence)
+    const fields: { displayName?: string; bio?: string } = {}
+    for (const op of ops) {
+      const payload = op.payload as { displayName?: unknown; bio?: unknown }
+      if (typeof payload.displayName === 'string') fields.displayName = payload.displayName
+      if (typeof payload.bio === 'string') fields.bio = payload.bio
+    }
+    const last = ops[ops.length - 1]
+    projected.set(actorId, { ...fields, operationId: last.operationId, actorSequence: last.actorSequence })
+  }
+  return projected
+}
+
 export interface CommentInput {
   /** The post's objectId — it must exist in the local operation log. */
   postId: string

@@ -7,6 +7,7 @@ import {
   type SocialOperation,
 } from '@orbit/protocol'
 import type { SocialOperationLog } from './socialOperationLog'
+import { rememberNames } from '../game/nameDirectory'
 import { purgeSwarmObject } from '../utils/p2pSwarm'
 
 /**
@@ -107,6 +108,16 @@ export async function acceptInboundOperation(
       createdAt: operation.createdAt,
       record: operation as unknown as Record<string, unknown>,
     })
+    if (outcome === 'appended' && operation.type === 'profile.update') {
+      // Profile names are replicated fields now: an accepted profile.update
+      // feeds the durable name directory so every surface resolves the
+      // actor's latest signed display name (an empty string is a clear;
+      // the directory keeps hints, the projection is authoritative).
+      const name = (operation.payload as { displayName?: unknown }).displayName
+      if (typeof name === 'string' && name.trim()) {
+        rememberNames([{ id: operation.actorId, display_name: name.trim() }])
+      }
+    }
     if (outcome === 'appended' && operation.type === 'post.delete') {
       // Deletion semantics (roadmap P1): a tombstone withdraws the author's
       // consent, so our replica withdraws too. Resolve the tombstoned

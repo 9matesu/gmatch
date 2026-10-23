@@ -4,6 +4,12 @@ import { deriveProfileTags, profileIsComplete, saveUserProfile } from './profile
 const apiMock = vi.hoisted(() => ({ orbitFetch: vi.fn(), invalidateCache: vi.fn() }));
 vi.mock('./api', () => ({ orbitFetch: apiMock.orbitFetch, invalidateCache: apiMock.invalidateCache }));
 
+// The replication op rides on every name/bio save — observe, never execute
+// (the real publish signature-checks the fake identity keys used here).
+const profileOpMock = vi.hoisted(() => ({ publishProfileUpdate: vi.fn().mockResolvedValue({}) }));
+vi.mock('../services/socialInteraction', () => ({ publishProfileUpdate: profileOpMock.publishProfileUpdate }));
+vi.mock('../services/socialOperationLog', () => ({ sharedSocialOperationLog: () => ({}) }));
+
 const identity = { orbitId: 'a'.repeat(64), publicKeyHex: 'pk', privateKeyHex: 'sk' } as any;
 
 describe('deriveProfileTags', () => {
@@ -92,5 +98,20 @@ describe('saveUserProfile', () => {
     expect(res.ok).toBe(true);
     const [, init] = apiMock.orbitFetch.mock.calls[0];
     expect(JSON.parse(init.body).pfp_url).toBe(largeDataUrl);
+  });
+
+  it('rides a versioned profile.update op onto every name/bio save (never on pfp-only patches)', async () => {
+    apiMock.orbitFetch.mockResolvedValue({ ok: true, status: 200 });
+    profileOpMock.publishProfileUpdate.mockClear();
+    await saveUserProfile(identity, { display_name: 'alex', bio: 'oi' });
+    // Awaited indirectly: the publication is async fire-and-forget; give it a tick.
+    await new Promise((r) => setTimeout(r, 0));
+    expect(profileOpMock.publishProfileUpdate).toHaveBeenCalledTimes(1);
+    expect(profileOpMock.publishProfileUpdate).toHaveBeenCalledWith(identity, { displayName: 'alex', bio: 'oi' }, {});
+
+    profileOpMock.publishProfileUpdate.mockClear();
+    await saveUserProfile(identity, { pfp_url: 'data:image/jpeg;base64,x' });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(profileOpMock.publishProfileUpdate).not.toHaveBeenCalled();
   });
 });
