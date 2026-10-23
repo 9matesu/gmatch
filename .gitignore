@@ -66,3 +66,7 @@ storage.key
 .env.local
 apps/api/.env
 apps/api/.env.local
+
+# internal agent/planning scratch
+/.hermes/
+

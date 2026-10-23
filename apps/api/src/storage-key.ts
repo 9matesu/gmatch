@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync } from 'node:fs'
+import { randomBytes } from 'node:crypto'
 import { join } from 'node:path'
 
 /**
@@ -40,11 +41,5 @@ function dirnameOf(p: string): string {
 }
 
 export function generateHexKey(): string {
-  const bytes = new Uint8Array(32)
-  if (typeof globalThis.crypto?.getRandomValues === 'function') {
-    globalThis.crypto.getRandomValues(bytes)
-  } else {
-    for (let i = 0; i < 32; i++) bytes[i] = Math.floor(Math.random() * 256)
-  }
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+  return randomBytes(32).toString('hex')
 }

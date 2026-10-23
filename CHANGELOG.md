@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — repository hygiene
+
+- The development `apps/api/storage.key` is no longer tracked (`storage.key` is
+  ignored at any depth) and is documented as compromised in `SECURITY.md`;
+  `generateHexKey()` now uses the platform CSPRNG exclusively.
+- Internal dated planning notes under `.hermes/` are no longer tracked.
+
 ## 1.6.0
 
 - Domination: honest execution end to end — every effect now reports what
