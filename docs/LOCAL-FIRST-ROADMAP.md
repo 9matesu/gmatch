@@ -36,9 +36,11 @@ run the narrow checks, then commit only the files in that slice.
   to SHA-256 of the included Ed25519 public key on both write and apply paths.
   This authenticates authorship; it does not define deletion, edits, ACLs,
   conflict resolution, or media availability.
-- Public posts/media are not end-to-end encrypted. Keep the existing DM
-  envelope unless a concrete cryptographic defect is shown; do not silently
-  change its wire format.
+- Public posts/media METADATA is not confidential: captions, manifests and
+  operations travel signed but public. The media BYTES of a swarm transfer are
+  sealed end to end since swarm-v1 (2026-10-22), including over the relay.
+  Keep the existing DM envelope unless a concrete cryptographic defect is
+  shown; do not silently change its wire format.
 - The central deployment is configured as a blind courier and returns 404 for
   stateful routes. Do not make it a content host or open remote CORS as a
   workaround. Reproduce API routing/configuration errors against a recorded
@@ -47,6 +49,26 @@ run the narrow checks, then commit only the files in that slice.
   idempotent migrations and preserve legacy records until tested recovery is
   demonstrated. The single age gate and client-side prohibited-tag blocklist
   remain mandatory.
+
+## What changed on 2026-10-22, later (P2P hardening round)
+
+- **Swarm media is sealed end to end (swarm-v1)**: the fetcher offers a fresh
+  ephemeral X25519 key per transfer, the seeder ships a DEK sealed to it, and
+  every chunk is XChaCha20-Poly1305 with AAD binding object/transfer/index/
+  fetcher. Legacy plaintext is default-deny. The relay now carries ciphertext
+  it cannot read or alter (docs/ARCHITECTURE-P2P.md §4).
+- **Transport selection is explicit** (`utils/transportState.ts`): bounded
+  direct dials (12 s default), relay kept alive meanwhile, validated promotion
+  only on DataChannel open, exponential backoff + jitter for retries, and the
+  roster label reports the real path (`P2P direto` / `relay via nó (NAT)` /
+  `sem rota`). The relay guarantees the mesh works where a direct hole cannot
+  be punched; it does not solve symmetric NAT for the direct path.
+- **Evidence, executed vs not**: `apps/desktop/scripts/p2p-two-process.mjs`
+  runs the production engine in two real processes through an untrusted relay
+  — clean transfer byte-identical, one-byte tamper rejected at the AEAD check,
+  no plaintext media in any relayed frame (run it, don't trust it). Cross-NAT
+  evidence is NOT executed: `apps/desktop/nat-lab/README.md` is a runbook for
+  two real networks plus a Docker approximation of symmetric NAT.
 
 ## What changed on 2026-10-22 (the last central dependencies)
 
@@ -67,13 +89,11 @@ run the narrow checks, then commit only the files in that slice.
   `npm run dist` stages the built exe there. The updater asks the node it is
   connected to first. No hosted release host is needed any more.
 - **Still open**: the mesh-wide moderation story beyond "the author acts"
-  (there is no way to force a peer to remove content), profile fields as
-  operations (the display name/bio still live on the node), the
-  multi-process/NAT evidence, and **the swarm's relay fallback is not
-  end-to-end encrypted** (when the direct WebRTC channel is blocked, the
-  media chunks travel through the node in the clear — the DMs and the room
-  messages stay sealed, but encrypting the chunk stream itself is still L2
-  work).
+  (there is no way to force a peer to remove content), and REAL cross-NAT
+  evidence (see the 2026-10-22 hardening entry: the two-process relay harness
+  is executed, the symmetric-NAT lab is a runbook, not a result). The
+  swarm relay fallback IS now end-to-end encrypted (swarm-v1), and profile
+  fields are versioned operations — both landed after this entry was written.
 
 ## What changed on 2026-10-21 (the hosts went away)
 

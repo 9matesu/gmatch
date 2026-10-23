@@ -168,6 +168,48 @@ type CourierSignalPayload =
 - Peer connections configure STUN and TURN relays provided by the environment (`defaultIceConfig(readTurnEnv())`).
 - Private LAN IP candidates are stripped/sanitized before dispatch over the courier (`sanitizeCandidate`) to prevent internal network leakage.
 
+### Transport selection is explicit and bounded (2026-10-22)
+
+The mesh does not "try WebRTC and hope". Every peer has a transport phase in a
+component-scoped registry (`utils/transportState.ts`, wired in
+`hooks/useP2P.ts`):
+
+| phase | meaning |
+|---|---|
+| `idle` | no attempt yet |
+| `connecting-direct` | a direct dial is in flight; the relay session is alive meanwhile |
+| `direct` | **validated**: the DataChannel has opened. The only promotion path |
+| `relay` | the direct attempt failed or its deadline expired; frames ride the node |
+| `failed` | no path at all (the UI says `sem rota`, never "connecting" forever) |
+
+Rules the state machine enforces:
+
+- **Promotion requires validation.** A phase becomes `direct` only when the
+  DataChannel opens; a successful ICE trickle or a glare-handled offer proves
+  nothing. `markRelayInUse` never demotes a validated direct path.
+- **Attempts are bounded.** A direct dial has a deadline
+  (`createTransportRegistry` default `directDeadlineMs` = 12 s; the tick in
+  `useP2P` expires it and marks the failure with a reason).
+- **Failure is not a restart.** After a failed direct, the relay keeps
+  carrying frames and a retry is scheduled with exponential backoff
+  (`baseRetryMs` 1.5 s doubling, capped at `maxRetryMs` 30 s, ±25 % jitter so
+  two peers retrying do not lock-step). A later success promotes to `direct`
+  without tearing anything down.
+- **The label is the truth.** The chat roster shows `swarmTransportLabel`:
+  `P2P direto` only for a validated direct phase, `relay via nó (NAT)` for the
+  relay, `sem rota` for failed — no implied direct path that does not exist.
+
+ICE candidates are buffered until the remote description exists and deduped
+(`courierSignaling.ts`), and the mesh connection watcher reports terminal
+failures to the same registry instead of leaving a peer "connecting" forever.
+
+**What this does not claim:** the relay does not solve hard symmetric NAT for
+the DIRECT path. It guarantees the mesh still works (sealed, bounded) in
+exactly the cases where a direct hole cannot be punched. Real cross-NAT
+evidence needs two separate networks — the reproducible runbook is
+`apps/desktop/nat-lab/README.md` (explicitly **not executed** in this
+environment); the executed in-repo proof is the two-process harness in §4.
+
 ### Direct messages ride the same sealed path (no DM route)
 
 There is no direct-message route. `/api/pm` is retired and 404s on every node —
@@ -265,17 +307,22 @@ the node's WebSocket relay (`SWARM_FRAME`), which is the guaranteed path: the
 data still flows, through the node the user chose. Two things differ from the
 direct path, and both are worth stating plainly:
 
-- **The media is not end-to-end encrypted on that path.** The direct
-  DataChannel is DTLS-encrypted between the two peers; the relay fallback
-  carries the same chunk frames over the node's socket, so the node sees the
-  bytes it forwards (the chunks are hash-verified, not sealed). DMs and room
-  messages are unaffected: they are sealed envelopes the node cannot open.
+- **The transport is weaker than DTLS, but the media is still sealed.** The
+  direct DataChannel is DTLS-encrypted link-to-link between the two peers.
+  The relay fallback carries the same frames over the node's socket. Since
+  swarm-v1 (2026-10-22) the chunk stream itself is end-to-end encrypted —
+  a sealed per-transfer key bound to the fetcher's ephemeral offer — so the
+  node relays ciphertext it cannot open and cannot alter undetected
+  (§4 "swarm-v1"). What the node still learns: WHO wants WHICH object id,
+  and the object's size in chunks — metadata, not media. DMs and room
+  messages are sealed envelopes the node cannot open.
 - **The latency is the node's, not the peers'.**
 
-So the direct path is not a nicety: it is what keeps the media private from
-the node. A blocked direct path is a privacy downgrade, not just a slow
-one. Closing that gap means encrypting the chunk stream itself (a session key
-derived from the two peers), which is still open (L2).
+So the direct path is still the better path — no relay hop, lower latency, the
+node learns nothing — but it is no longer a privacy cliff: since swarm-v1 the
+chunk stream stays sealed end to end on either transport. What a blocked direct
+path still costs is latency and a metadata view for the node (who wants which
+id).
 
 **Node-hosted lanes are probed, not assumed.** `detectMailMode` reports "courier"
 for both a full node and the blind courier, so it cannot gate gameplay. The UI
@@ -328,7 +375,8 @@ Media and posts are exchanged over the established WebRTC DataChannel (`gmatch-m
 ```typescript
 type SwarmMessage =
   | { type: 'SWARM_HAVE'; ids: string[] }
-  | { type: 'SWARM_WANT'; id: string }
+  | { type: 'SWARM_WANT'; id: string; transferId?: string; offerPub?: string }
+  | { type: 'SWARM_KEY'; id: string; transferId: string; wrapped: string }
   | {
       type: 'SWARM_CHUNK'
       id: string
@@ -336,19 +384,73 @@ type SwarmMessage =
       total: number
       mimeType: string
       dataBase64: string
+      /** 'swarm-v1' means dataBase64 is DEK-sealed ciphertext (nonce + tag). */
+      enc?: 'swarm-v1'
+      transferId?: string
+      nonce?: string
     }
+  | { type: 'SWARM_CHALLENGE'; id: string; challenge: string }
+  | { type: 'SWARM_RECEIPT'; id: string; receipt: unknown }
+  | { type: 'SWARM_OP'; operation: unknown }        // signed social op (L4)
+  | { type: 'SWARM_OP_ACK'; operationId: string; actorId: string }
 ```
 
 ### Chunking Mechanics
 
-- **Chunk Size:** 5 KiB (`5 * 1024` bytes) per chunk. The smaller size keeps the base64 JSON frame under the relay's frame-splitting threshold (`MAX_SWARM_FRAME_BYTES` = 8 KiB); the "64 KB" figure in earlier versions of this document was stale.
+- **Chunk Size:** 5 KiB (`5 * 1024` bytes) per legacy (v0) chunk, 4 KiB
+  (`SWARM_CHUNK_PAYLOAD`) sealed payload per swarm-v1 chunk — the smaller
+  payload keeps the base64 AEAD frame inside the relay's frame-splitting
+  threshold (`MAX_SWARM_FRAME_BYTES` = 8 KiB); the "64 KB" figure in earlier
+  versions of this document was stale.
 - **Request Cycle:** When a peer sees an image announcement or post referencing `objectId`, it broadcasts `SWARM_WANT` with the ID across:
   1. Active WebRTC mesh data channels (`broadcastMeshFrame`).
   2. Local tab cross-process `BroadcastChannel('orbit_p2p_swarm')`.
   3. The node's WS relay, wrapped as `{ type: 'SWARM_FRAME', swarm }` — the
      guaranteed fallback when no direct channel exists.
-- **Response Cycle:** Any peer holding the object slices the binary buffer into 5 KiB chunks and sends sequential `SWARM_CHUNK` frames (4 MiB = 820 frames).
+- **Response Cycle:** Any peer holding the object slices the binary buffer and sends sequential `SWARM_CHUNK` frames (4 MiB = 820 frames at legacy size).
 - **Reassembly:** The requesting peer tracks received chunk indices in memory. Once all chunks are present, it assembles the final `Blob`, verifies the SHA-256 digest against `objectId`, and commits it to local IndexedDB.
+
+### swarm-v1: chunk transfers are sealed end to end (2026-10-22)
+
+The media path is the one place the node used to see bytes it forwarded.
+swarm-v1 closes that without changing what a receiver can prove:
+
+1. The FETCHER generates a fresh ephemeral X25519 keypair per transfer and
+   puts the public half in `SWARM_WANT.offerPub` (plus a per-transfer
+   `transferId`). The private half never leaves its process.
+2. The SEEDER creates a per-transfer data key (DEK) and seals it to that
+   offer public key — the `SWARM_KEY` frame (`wrapped`). A seeder cannot read
+   the DEK it hands out, and nobody but the offer holder can unseal it.
+3. Each chunk is XChaCha20-Poly1305 ciphertext (`enc: 'swarm-v1'`,
+   `nonce` fresh per chunk, unique per (transfer, chunk)). The AAD binds
+   `version | objectId | index | total | transferId | senderOrbitId |
+   receiverOfferPub` — a chunk cannot be replayed into another transfer,
+   reordered, or re-aimed at another fetcher.
+4. The receiver verifies the AEAD BEFORE hashing, and still verifies the
+   SHA-256 against the object id before persisting. Confidentiality (AEAD)
+   and integrity (content hash) stay separate, as they should.
+
+Default-deny on legacy: an offer-less/legacy plaintext serve is DROPPED
+unless ingest is explicitly opened (`setSwarmLegacyPlaintextEnabled` module
+seam / `legacyPlaintext` session option), and every modern fetcher always
+sends an offer. A public swarm joining peer never gets keys by joining:
+keys are per-transfer and sealed to the fetcher's ephemeral key, not to the
+object or the room. Multi-seeder races are bounded: a transfer keeps at most
+`MAX_TRANSFER_KEYS` (4) candidate DEKs and tries them per chunk, so two
+seeders answering the same WANT cost a bounded number of attempts, not a
+hang. A chunk that fails every candidate is dropped and counted
+(`badFrames`), with a flood threshold that fails the fetch instead of
+grinding.
+
+**Executed evidence (not a claim — a runnable harness):**
+`apps/desktop/scripts/p2p-two-process.mjs` runs the production engine in two
+real OS processes with the harness parent acting as an untrusted relay, and
+asserts: (a) a 48 KiB object arrives byte-identical (sha256), (b) flipping ONE
+byte of ONE relayed chunk fails the transfer at the AEAD check instead of
+persisting bad bytes, (c) scanning every frame that crossed the relay finds no
+plaintext media slice — only ciphertext and the sealed key. Run it with
+`node scripts/p2p-two-process.mjs` from `apps/desktop` (needs only Node ≥ 22;
+esbuild, already present via vite, compiles the worker once).
 
 ### SWARM_HAVE: advertise, don't broadcast the world (2026-10-19)
 

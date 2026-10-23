@@ -347,8 +347,15 @@ offline earnings). Each +5% click power. Persist across prestige.
   roster with 60s TTL and 120s drop threshold. Zero presence state stored on server.
 - **Signaling over Courier:** WebRTC signaling (SDP offer/answer, ICE) sealed with X25519 ECIES
   and routed as `kind: 'signal'` envelopes via `/api/mail/:token`.
-- **Swarm Media Distribution:** Media divided into 5 KiB chunks (`SWARM_WANT`, `SWARM_CHUNK`) — the chunk size keeps the base64 JSON frame under the relay's frame-splitting threshold
-  over direct WebRTC DataChannels (`gmatch-mesh`). All received/created media stored in local
+- **Swarm Media Distribution:** Media divided into 5 KiB legacy / 4 KiB sealed
+  payload chunks (`SWARM_WANT`, `SWARM_CHUNK`) — the chunk size keeps the base64
+  JSON frame under the relay's frame-splitting threshold — over direct WebRTC
+  DataChannels (`gmatch-mesh`) or the node relay. Since swarm-v1 (2026-10-22)
+  chunk transfers are end-to-end encrypted: the fetcher offers an ephemeral
+  X25519 key, the seeder seals a per-transfer DEK to it, and every chunk is
+  XChaCha20-Poly1305 with AAD binding object/transfer/index/fetcher; legacy
+  plaintext serving is default-deny. Relay nodes therefore carry ciphertext
+  they cannot read or alter. All received/created media stored in local
   IndexedDB and automatically seeded on boot (`hydrateLocalObjects`).
 - **Announcements ride the relay too (2026-10-19):** peer announcements
   (`IMAGE_ANNOUNCE`, `MESSAGE`, `STORY_ANNOUNCE`, `CHAT`, `PRESENCE`) are wrapped in
