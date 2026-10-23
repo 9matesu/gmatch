@@ -7,6 +7,7 @@ import {
   type SocialOperation,
 } from '@orbit/protocol'
 import type { SocialOperationLog } from './socialOperationLog'
+import { purgeSwarmObject } from '../utils/p2pSwarm'
 
 /**
  * Social-operation transport (roadmap L4 seed).
@@ -106,6 +107,26 @@ export async function acceptInboundOperation(
       createdAt: operation.createdAt,
       record: operation as unknown as Record<string, unknown>,
     })
+    if (outcome === 'appended' && operation.type === 'post.delete') {
+      // Deletion semantics (roadmap P1): a tombstone withdraws the author's
+      // consent, so our replica withdraws too. Resolve the tombstoned
+      // creation (it names the content hash) and purge those local bytes.
+      void (async () => {
+        try {
+          const targetId = (operation.payload as { targetOperationId?: unknown }).targetOperationId
+          if (typeof targetId !== 'string') return
+          const target = await log.getEntry(targetId)
+          const cid = target
+            ? (target.record as { payload?: { contentCid?: unknown } })?.payload?.contentCid
+            : null
+          if (typeof cid === 'string' && HEX64.test(cid)) {
+            await purgeSwarmObject(cid)
+          }
+        } catch {
+          /* the replica may never have had these bytes; nothing to purge */
+        }
+      })()
+    }
     return outcome === 'appended' ? 'accepted' : 'duplicate'
   } catch {
     return 'rejected'

@@ -364,6 +364,23 @@ otherwise. Server-side engagement rows (`Notifications`) are a separate,
 node-hosted system that does survive an offline client — the two are merged for
 display only (SPEC §15) and never written into each other.
 
+### Deletion is a tombstone plus a purge, with an honest boundary (2026-10-22)
+
+- A validated `post.delete` hides the post from the feed (tombstones never
+  resurrect: a replayed `post.create`, a re-announce, or a resync cannot
+  bring it back — the authorizer refuses the conflicting operation).
+- The same accepted tombstone makes replicas **withdraw the bytes**:
+  `purgeSwarmObject(contentCid)` drops the RAM entry, the durable
+  IndexedDB row and the on-disk vault copy for that content hash. After the
+  purge the peer no longer answers WANTs for it and a restart cannot
+  re-hydrate what is not stored.
+- Boundary: a deletion can only purge what the replica actually holds, and a
+  tombstone is only accepted after the author's chain is locally known (the
+  authorizer refuses a successor whose predecessor is missing). An offline
+  replica withdraws on the next operation wave — deletion is a request, not
+  remote control. No peer can force another peer's disk to change before it
+  hears the tombstone.
+
 ---
 
 ## 4. P2P Swarm & Content Sharing Protocol

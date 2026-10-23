@@ -96,8 +96,41 @@ function forgetLocalObject(id: string): void {
 }
 
 /** Test seam: cache contents (bytes, entries, keys in recency order). */
-export function __localObjectCacheForTests(): { bytes: number; keys: string[] } {
-  return { bytes: localObjectBytes, keys: [...localObjects.keys()] }
+export function __localObjectCacheForTests(): { bytes: number; entries: number; keys: string[] } {
+  return { bytes: localObjectBytes, entries: localObjects.size, keys: [...localObjects.keys()] }
+}
+
+/**
+ * Deletion semantics (roadmap P1): a tombstone is not just a hidden feed row.
+ * When a validated `post.delete` names content we hold a replica of, the
+ * replica goes too: RAM, the durable store (IndexedDB) and the on-disk vault
+ * are purged under that content id. Purging is best-effort and idempotent;
+ * what it must NOT be is loud. Best-effort is honest here: the AUTHOR's own
+ * delete already dropped their copy; a replica holder that is offline keeps
+ * resurfacing no tombstone evidence until the next op wave lands (and the
+ * next sweep purges then).
+ *
+ * After a purge the peer stops answering WANTS for the id: a lookup is a
+ * miss, and re-hydration on restart cannot resurrect the bytes (they are not
+ * in the store anymore). A re-transfer would need a fresh post.create op —
+ * which the authorizer refuses to re-accept for the same objectId.
+ */
+export async function purgeSwarmObject(id: string): Promise<void> {
+  if (!id || typeof id !== 'string' || id.length > 256) return
+  forgetLocalObject(id)
+  try {
+    if (typeof window !== 'undefined' && window.gmatch?.vaultRemove) {
+      window.gmatch.vaultRemove(id)
+    }
+  } catch {
+    /* the vault may not know this id; the durable path covers the rest */
+  }
+  try {
+    const { deleteObject } = await import('./storage')
+    await deleteObject(id)
+  } catch {
+    /* already gone or storage unavailable */
+  }
 }
 
 /** Test seam: drop the RAM cache without touching durability. */

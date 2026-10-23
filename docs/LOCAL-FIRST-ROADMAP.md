@@ -63,6 +63,10 @@ run the narrow checks, then commit only the files in that slice.
   roster label reports the real path (`P2P direto` / `relay via nó (NAT)` /
   `sem rota`). The relay guarantees the mesh works where a direct hole cannot
   be punched; it does not solve symmetric NAT for the direct path.
+- **Deletion is a tombstone plus a purge**: an accepted `post.delete` also
+  purges the replica's bytes (RAM + IndexedDB + vault) for that content hash.
+  Honest limits are documented: a tombstone is accepted only after the author's
+  chain is known, and an offline replica withdraws on the next wave.
 - **Evidence, executed vs not**: `apps/desktop/scripts/p2p-two-process.mjs`
   runs the production engine in two real processes through an untrusted relay
   — clean transfer byte-identical, one-byte tamper rejected at the AEAD check,

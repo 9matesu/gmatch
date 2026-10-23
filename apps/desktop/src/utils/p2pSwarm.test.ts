@@ -11,11 +11,20 @@ import {
   handleSwarmMessage,
   requestSwarmObject,
   cancelSwarmObject,
+  purgeSwarmObject,
   __localObjectCacheForTests,
   __resetLocalObjectCacheForTests,
   type SwarmMessage,
   type SwarmSession,
 } from './p2pSwarm'
+
+// Only deleteObject is observed: the durable store itself is not under test
+// here, and getLocalObject must still answer honestly (null) when offline.
+const storageMock = vi.hoisted(() => ({ deleteObject: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('./storage', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./storage')>()),
+  deleteObject: storageMock.deleteObject,
+}))
 
 describe('p2pSwarm (WebRTC Object Swarm Transfer)', () => {
   it('registers and retrieves local objects for swarm seeding', async () => {
@@ -363,5 +372,27 @@ describe('p2pSwarm RAM cache is bounded (memory)', () => {
     // No durable store in this environment: the honest answer is null, not a
     // phantom hit on the evicted RAM entry.
     await expect(getLocalObject('mem-durable')).resolves.toBeNull()
+  })
+
+  describe('purgeSwarmObject (P1 deletion semantics)', () => {
+    it('drops the RAM replica, the durable row and the vault copy', async () => {
+      const vaultRemove = vi.fn()
+      vi.stubGlobal('window', { gmatch: { vaultRemove } })
+      registerLocalObject('purge-me', new Blob(['bytes'], { type: 'image/jpeg' }))
+      expect(hasLocalObject('purge-me')).toBe(true)
+
+      await purgeSwarmObject('purge-me')
+      expect(hasLocalObject('purge-me')).toBe(false)
+      expect(vaultRemove).toHaveBeenCalledWith('purge-me')
+      expect(storageMock.deleteObject).toHaveBeenCalledWith('purge-me')
+
+      // Unknown ids and nonsense are no-ops, never crashes.
+      await purgeSwarmObject('')
+      await purgeSwarmObject('x'.repeat(999))
+      expect(vaultRemove).toHaveBeenCalledTimes(1)
+      expect(storageMock.deleteObject).toHaveBeenCalledTimes(1)
+      vi.unstubAllGlobals()
+      storageMock.deleteObject.mockClear()
+    })
   })
 })
