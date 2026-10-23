@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.6.3 — public world
+
+- Servers now offers a built-in **gmatch public** world — the full public node —
+  probed live and joinable in one click, so an install with no contacts can
+  reach players without knowing an address. It is a normal node, never assumed
+  reachable, and the row shows offline if the probe fails.
+- The Render deployment stays a directory courier (never a data base); the
+  public node is no longer refused as a destination.
+
 ## Unreleased — repository hygiene
 
 - The download page now derives its hash, size, build date and link from the

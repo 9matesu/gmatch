@@ -245,22 +245,38 @@ export function ServersView({
 
   const isLocalHost = (url: string) => url.includes('127.0.0.1') || url.includes('localhost')
 
-  // Decommissioned deployments (2026-10-21): the accounts cannot be paid
-  // for any more. These constants are kept ONLY to recognise and refuse a
-  // stale URL — they are never a destination and never a probe target.
+  // The Render deployment is a blind courier: recognised and refused as a
+  // data destination. It stays a directory only.
   const RENDER_COURIER_URL = 'https://gmatch-wcz1.onrender.com'
-  const GM_CENTRAL_URL = 'https://gmatch.fly.dev'
+  // The public world: a full node every install can join without knowing
+  // anyone. It is probed like any other server and is never assumed online.
+  const PUBLIC_WORLD_URL = 'https://gmatch.fly.dev'
+  const GM_CENTRAL_URL = PUBLIC_WORLD_URL
   const isDecommissioned = (hint?: string | null): boolean => {
     if (!hint) return false
-    const h = hint.trim().toLowerCase()
-    return h.includes('onrender.com') || h.includes('fly.dev')
+    return hint.trim().toLowerCase().includes('onrender.com')
   }
 
   const [centralProbe, setCentralProbe] = useState<{ online: boolean; count: number | null; total: number | null }>({ online: false, count: null, total: null })
+  const [publicProbe, setPublicProbe] = useState<{ online: boolean; total: number | null }>({ online: false, total: null })
 
-  // The configured directory hub. There is no built-in one any more (the
-  // central deployments are decommissioned), so this row exists only when the
-  // user configured a hub — and it points at THAT hub, never at a dead host.
+  // Built-in public row: always offered, joinable in one click, and drawn as
+  // offline until its own health probe answers.
+  const publicServer: DirectoryServer = useMemo(() => ({
+    id: 'public-world',
+    name: 'gmatch public',
+    description: 'Shared node — meet players from anywhere',
+    owner_id: 'public-world',
+    endpoint_hint: PUBLIC_WORLD_URL,
+    password_required: 0,
+    is_private: 0,
+    online_count: null,
+    user_count: publicProbe.total,
+    last_seen: publicProbe.online ? new Date().toISOString() : undefined,
+  }), [publicProbe])
+
+  // The configured directory hub (opt-in). Fly is offered by the public row
+  // above; this is only for a custom hub a host points at.
   const centralServer: DirectoryServer | null = useMemo(() => (central ? ({
     id: 'central-deprecated',
     name: 'gMatch Central',
@@ -340,6 +356,19 @@ export function ServersView({
       setCentralProbe({ online: isOnline, count: onlineCount, total: totalMembers })
     }
     void probeCentral()
+
+    // Built-in public world: its own liveness probe, independent of any hub.
+    const probePublic = async () => {
+      try {
+        const health = await fetch(`${PUBLIC_WORLD_URL}/api/health`, {
+          signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined,
+        }).catch(() => null)
+        setPublicProbe({ online: Boolean(health?.ok), total: null })
+      } catch {
+        setPublicProbe({ online: false, total: null })
+      }
+    }
+    void probePublic()
 
     // Anonymous browser: public directory only — never touch node routes
     // (no ID yet, nothing to sign with).
@@ -607,6 +636,7 @@ export function ServersView({
       !q || `${s.name} ${s.description ?? ''}`.toLowerCase().includes(q)
     const listed = dedupeServers([
       ...visibleServers,
+      ...(matches(publicServer) ? [publicServer] : []),
       ...(centralServer && matches(centralServer) ? [centralServer] : []),
     ])
     // The node on this machine IS a server even when the directory does not
@@ -616,12 +646,15 @@ export function ServersView({
       && !listed.some((s) => serverKey(s) === serverKey(ownServer))
     const rows = ownListed ? [...listed, ownServer!] : listed
     return rows.sort((a, b) => {
-      const ac = isCurrent(a) ? 0 : 1
-      const bc = isCurrent(b) ? 0 : 1
+      // The connected world first, then the built-in public world: it is the
+      // one destination a fresh install can join without knowing anyone.
+      const rank = (s: DirectoryServer) => (isCurrent(s) ? 0 : s.id === 'public-world' ? 1 : 2)
+      const ac = rank(a)
+      const bc = rank(b)
       if (ac !== bc) return ac - bc
       return (b.online_count ?? -1) - (a.online_count ?? -1) || a.name.localeCompare(b.name)
     })
-  }, [ownServer, visibleServers, centralServer, query, apiBaseTick])
+  }, [ownServer, visibleServers, publicServer, centralServer, query, apiBaseTick])
 
   const currentServerTitle = useMemo(() => {
     const apiBase = getEffectiveServerUrl()
@@ -630,7 +663,7 @@ export function ServersView({
       return 'gMatch Courier'
     }
     if (isCurrentServerUrl(apiBase, GM_CENTRAL_URL) || apiBase.includes('fly.dev')) {
-      return 'gMatch Central'
+      return 'gmatch public'
     }
     const matched = servers.find((s) => isCurrentServerUrl(apiBase, s.endpoint_hint || ''))
     if (matched?.name) return matched.name

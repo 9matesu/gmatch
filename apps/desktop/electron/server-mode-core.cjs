@@ -15,16 +15,16 @@ function isMode(v) {
 }
 
 /**
- * The central deployments (Render, Fly) are decommissioned (2026-10-21): the
- * accounts cannot be paid for. A pointer to one is never a destination, so it
- * is migrated to the node on this machine instead of dialing a dead address.
+ * A courier is infrastructure, never a world: the Render deployment keeps a
+ * directory and moves sealed mail, but 404s every stateful route. Fly is a
+ * full public node and stays joinable.
  */
-const DECOMMISSIONED_HOSTS = /(^|\.)(onrender\.com|fly\.dev)$/
+const COURIER_HOSTS = /(^|\.)onrender\.com$/
 
 function isDecommissionedUrl(v) {
   if (typeof v !== 'string' || !v) return false
   try {
-    return DECOMMISSIONED_HOSTS.test(new URL(v).hostname)
+    return COURIER_HOSTS.test(new URL(v).hostname)
   } catch {
     return false
   }

@@ -13,17 +13,16 @@ const { createHash } = require('node:crypto')
 const { spawn } = require('node:child_process')
 const core = require('./updater-core.cjs')
 
-// The repo is PRIVATE, so the canonical public release feed for installed
-// apps is the site's release.json (the hosts carry the exact sha256 we
-// verify). GitHub API shape also supported.
+// The canonical public release feed is the project's own Pages site
+// (release.json is generated from the shipped exe, so the sha256 describes the
+// bytes users download). A second feed keeps updates alive if one host is down.
 //
 // TWO feeds, tried in order and then merged: a single host being asleep or
 // down must not stop updates. The plan that wins is the one with the highest
 // version across the feeds that answered, and the download URL always comes
-// from the SAME host that served the feed (the hash and the bytes must match
-// the same origin).
+// from the SAME feed entry that served it (the hash and the bytes must match).
 const RELEASE_FEEDS = [
-  { url: 'https://gmatch-wcz1.onrender.com/release.json', base: 'https://gmatch-wcz1.onrender.com' },
+  { url: 'https://matesu.me/gmatch/release.json', base: 'https://matesu.me/gmatch' },
   { url: 'https://gmatch.fly.dev/release.json', base: 'https://gmatch.fly.dev' },
 ]
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000

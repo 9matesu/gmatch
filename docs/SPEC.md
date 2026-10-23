@@ -440,11 +440,11 @@ offline earnings). Each +5% click power. Persist across prestige.
   and `GET /u/:id` (profile), XSS-escaped, unauthenticated; `GET /api/users/:id`
   serves sanitized profiles. Deep links `#/feed?post=<id>` open the lightbox.
 - Build: `cd apps/desktop && npm run dist`. The canonical download is the
-  fly-hosted site (`https://gmatch-wcz1.onrender.com/releases/gmatch-<version>-portable.exe`
-  + hash in release.json, see site/build-release.mjs); tagging `v*` also fires
+  GitHub Release asset, linked from the Pages manifest `site/release.json`
+  (hash, size and build date derived from the shipped exe by
+  `site/build-release.mjs`); tagging `v*` also fires
   `.github/workflows/release.yml` (lint+typecheck+test gate → GitHub Release
-  asset), used for mirrors, not the primary link. Unsigned exe → SmartScreen
-  "More info → Run anyway".
+  asset). Unsigned exe → SmartScreen "More info → Run anyway".
 - Portable self-updater (`electron/updater.cjs` + `updater-core.cjs`,
   packaged builds only): daily + manual check of the site `release.json`,
   auto-download verified against the published SHA-256 **and** size, then the
@@ -505,10 +505,12 @@ ADR-002 (`docs/ADR-002-servers.md`) é canônico; resumo de operação:
   no SQLite do host — sem token forjável.
 - **Lista**: um nó que hospeda um mundo é um servidor, inclusive o que roda nesta
   máquina — uma linha por endereço (`dedupeServers`), nunca por nome. O courier
-  central (mail/turn/diretório) é infraestrutura e não aparece; o mundo oficial
-  `gMatch Central` continua visível, como qualquer outro destino, sem etiqueta de
-  tipo. Grupos locais são rótulo só deste dispositivo (rodapé → diálogo), nunca
-  um destino.
+  central (mail/turn/diretório) é infraestrutura e não aparece; o mundo público
+  `gmatch public` (`https://gmatch.fly.dev`) é embutido na lista, com probe de
+  saúde próprio, e é o caminho para encontrar players sem conhecer um endereço.
+  Grupos locais são rótulo só deste dispositivo (rodapé → diálogo), nunca um
+  destino. O app nunca assume o nó público online: sem resposta do probe, a linha
+  aparece offline e o join falha com aviso, sem inventar conexão.
 - **Admin**: quem HOSTEIA o nó vê o botão Admin no rodapé da sidebar (PIN da
   suíte admin existente). A suíte de moderação funciona igual em qualquer nó.
 - **Dashboard**: `GET /api/servers/dashboard` no nó atual → userlist (ids

@@ -11,13 +11,14 @@ export function normalizeServerUrl(v: string): string | null {
 }
 
 /**
- * True for a decommissioned deployment (mirror of the CJS core): those hosts
- * cannot be paid for any more, so they are never a destination.
+ * True for a node that is a directory courier, never a data destination
+ * (the Render deployment 404s every stateful route). A regular node — the
+ * local sidecar, a friend's node, the public Fly node — is fine.
  */
 export function isDecommissionedUrl(v: unknown): boolean {
   if (typeof v !== 'string' || !v) return false
   try {
-    return /(^|\.)(onrender\.com|fly\.dev)$/.test(new URL(v).hostname)
+    return /(^|\.)onrender\.com$/.test(new URL(v).hostname)
   } catch {
     return false
   }

@@ -62,9 +62,8 @@ function shaFromReleaseJson(meta, version) {
 
 /**
  * Normalize the site release.json ({ file, version, sha256, downloadUrl? })
- * into a download plan source. The repo is PRIVATE, so the public fly-dev
- * site (which mirrors the GitHub Release artifact) is the canonical release
- * feed for installed apps.
+ * into a download plan source. The public site publishes the manifest derived
+ * from the shipped artifact; the download URL may point at the GitHub Release.
  */
 function parseSiteRelease(meta, base = 'https://gmatch-wcz1.onrender.com') {
   if (!meta || typeof meta !== 'object') return null

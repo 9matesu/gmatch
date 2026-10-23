@@ -31,6 +31,20 @@ client-side prohibited-tag blocklist (`shared/blocklist.json`, guarded against
 drift by a parity test), and report-driven moderation where a moderator sees a
 conversation only after the person involved discloses that one item.
 
+## Find players
+
+Servers ships one built-in destination: **gmatch public** — a full node, probed
+on the screen and joined in one click, so a fresh install with no contacts can
+reach people without knowing an address. The row is drawn offline when the probe
+fails; nothing is simulated. Verify it from a terminal with:
+
+```bash
+cd apps/desktop && node scripts/probe-public-world.mjs
+```
+
+Any other node can be joined the same way (`+ Add server`): your own, a
+friend's, or one you host for a community.
+
 ## Repository layout
 
 ```

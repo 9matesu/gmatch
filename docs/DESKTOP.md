@@ -164,20 +164,15 @@ Two edges matter when debugging a user's "my keepsake is gone":
 
 ## Self-update (`electron/updater.cjs`, `updater-core.cjs`)
 
-Feed: the site's `release.json`, tried on **two hosts** (Render, then Fly):
-`https://gmatch-wcz1.onrender.com/release.json` and
-`https://gmatch.fly.dev/release.json`. Both are asked in parallel on every
-check; the winner is the highest version among the hosts that answered, and
-the download URL always comes from the SAME host that served the feed (the
-hash and the bytes must share an origin). A host that is asleep, **stuck** or
-down is skipped (8 s budget each) instead of blocking the check, and a stale
-host cannot hide a newer release. GitHub Releases is a mirror, not the feed
-(the repo is private).
-
-Both hosts are **being decommissioned** (SPEC §12b): `fly.dev` is frozen and
-stuck on an old release, and the Render host is the temporary stand-in. This
-two-host fallback is a stopgap — the end state is the release artifact served
-by peers, with the app saying "no host answered" honestly in the meantime.
+Feed: the project site's `release.json`, tried on **two hosts** — the Pages
+site at `https://matesu.me/gmatch/release.json` (custom domain; the
+`9matesu.github.io` alias redirects to plain HTTP, so it is not the feed URL)
+and `https://gmatch.fly.dev/release.json`. Both are asked on every check; the
+winner is the highest version among the hosts that answered. The manifest
+carries the absolute `downloadUrl` (the GitHub Release asset) plus the
+sha256/size of those exact bytes, and the updater verifies both before the
+swap. A host that is asleep, **stuck** or down is skipped (8 s budget each)
+instead of blocking the check, and a stale host cannot hide a newer release.
 
 Check on boot + every 24h. Auto-downloads the new portable exe with a
 progress percent, **verifies SHA-256 and the published size** (an

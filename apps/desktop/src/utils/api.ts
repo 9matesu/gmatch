@@ -12,11 +12,11 @@ import { logger } from './logger';
 const COURIER_HOSTS = /(^|\.)onrender\.com$/;
 
 /**
- * The Fly deployment is decommissioned too (same reason as Render: the
- * account cannot be paid for). A stored URL pointing at either host is
- * dropped on sight — it is a dead address, never a data base.
+ * Hosts that can never be a data base: the Render deployment is a blind
+ * courier (directory/mail/TURN only) and 404s every stateful route. Fly is a
+ * full public node and is a valid destination; it is not listed here.
  */
-const DEAD_HOSTS = /(^|\.)fly\.dev$/;
+const DEAD_HOSTS = /(^|\.)onrender\.com$/;
 
 /**
  * The node this install runs (host mode is the default since 2026-10-21).

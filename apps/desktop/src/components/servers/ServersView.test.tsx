@@ -119,8 +119,9 @@ describe('ServersView', () => {
     render(<ServersView identity={identity} toast={() => {}} />)
     await screen.findByText(/other\.test:8790/)
     const rows = screen.getAllByRole('listitem')
-    // current node (2 records collapsed) + the namesake on another address + gMatch Central
-    expect(rows).toHaveLength(3)
+    // current node (2 records collapsed) + the namesake on another address +
+    // gMatch Central (configured hub) + the built-in public world
+    expect(rows).toHaveLength(4)
     expect(screen.getAllByText('My Realm')).toHaveLength(2)
   })
 
@@ -469,8 +470,9 @@ describe('ServersView', () => {
     })
     render(<ServersView identity={identity} toast={() => {}} />)
     await screen.findByText('gMatch Central')
-    // a label is never a server and adds no list row
-    expect(screen.getAllByRole('listitem')).toHaveLength(1)
+    // the node on this machine + the built-in public world; a label is never a
+    // server and adds no list row
+    expect(screen.getAllByRole('listitem')).toHaveLength(2)
     fireEvent.click(screen.getByRole('button', { name: /local groups/i }))
     expect(screen.getByRole('dialog', { name: /local groups/i })).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText(/new group name/i), { target: { value: 'Friday crew' } })
@@ -478,8 +480,8 @@ describe('ServersView', () => {
     expect(await screen.findByText('Friday crew')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /forget group friday crew/i }))
     await waitFor(() => expect(screen.queryByText('Friday crew')).toBeNull())
-    // still exactly one server row: the group never became a destination
-    expect(screen.getAllByRole('listitem')).toHaveLength(1)
+    // still the same two server rows: the group never became a destination
+    expect(screen.getAllByRole('listitem')).toHaveLength(2)
   })
 
   it('register form posts name and shows created server', async () => {
