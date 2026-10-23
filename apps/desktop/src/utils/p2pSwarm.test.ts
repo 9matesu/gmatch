@@ -306,14 +306,20 @@ describe('p2pSwarm (WebRTC Object Swarm Transfer)', () => {
   it('cancels an in-flight fetch and drops partial chunks', async () => {
     const text = 'e'.repeat(200 * 1024)
     const blob = new Blob([text], { type: 'video/mp4' })
-    // Bridge through a throttled seeder so cancel lands mid-transfer.
+    // Bridge through a throttled seeder so cancel lands mid-transfer. The
+    // delays ACCUMULATE: scheduling every chunk at the same 25ms made the
+    // whole transfer land as one burst (and could finish before the cancel,
+    // which flaked depending on machine load). Spacing them 25ms apart keeps
+    // ~1s of transfer in flight, so the cancel is deterministic.
+    let spacing = 0
     const seeder = createSwarmSession({
       send: (m) => {
         if (m.type !== 'SWARM_CHUNK') {
           void handleSwarmMessage(m)
           return
         }
-        void new Promise((r) => setTimeout(r, 25)).then(() => { void handleSwarmMessage(m) })
+        spacing += 25
+        void new Promise((r) => setTimeout(r, spacing)).then(() => { void handleSwarmMessage(m) })
       },
       localStore: new Map([['cancel-1', blob]]),
     })
