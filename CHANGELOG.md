@@ -2,6 +2,11 @@
 
 ## Unreleased — repository hygiene
 
+- The download page now derives its hash, size, build date and link from the
+  **GitHub Release asset** (`v1.6.2`). This corrects a previously published
+  SHA-256 that described a different local build; the ~100 MB binary is no
+  longer tracked in Git (the Pages artifact strips it and the page links the
+  Release directly).
 - The development `apps/api/storage.key` is no longer tracked (`storage.key` is
   ignored at any depth) and is documented as compromised in `SECURITY.md`;
   `generateHexKey()` now uses the platform CSPRNG exclusively.

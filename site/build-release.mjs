@@ -19,7 +19,7 @@ copyFileSync(src, join('releases', name))
 const buf = readFileSync(join('releases', name))
 const sha = createHash('sha256').update(buf).digest('hex')
 const sha512 = createHash('sha512').update(buf).digest('hex')
-const buildDate = statSync(join('releases', name)).mtime.toISOString()
+const buildDate = process.env.BUILD_DATE || statSync(join('releases', name)).mtime.toISOString()
 const version = name.match(/(\d+\.\d+\.\d+)/)[1]
 // downloadUrl is OPT-IN: the canonical public link is the on-site
 // /releases/<file> copy (fly serves it). GitHub Releases URLs are only

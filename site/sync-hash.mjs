@@ -24,7 +24,7 @@ for (const file of ['index.html']) {
   // Publish link: prefer the canonical GitHub Release URL (Pages artifact
   // stays binary-free); local dev without downloadUrl keeps releases/<file>.
   const want = rel.downloadUrl || `releases/${rel.file}`
-  html = html.replace(/href="(?:releases\/[^"]+|https:\/\/github\.com\/9matesu\/goongrid\/releases\/download\/[^"]+)-portable\.exe"/g, `href="${want}"`)
+  html = html.replace(/href="(?:releases\/[^"]+|https:\/\/github\.com\/9matesu\/gmatch\/releases\/download\/[^"]+)-portable\.exe"/g, `href="${want}"`)
   if (html !== before) {
     writeFileSync(file, html)
     touched++

@@ -31,21 +31,33 @@ jobs:
           cd apps/desktop
           node scripts/gen-legal.cjs
           git diff --exit-code public/legal/ || { echo "::error::public/legal/ is stale — run: node apps/desktop/scripts/gen-legal.cjs and commit"; exit 1; }
-      - name: Fetch latest release exe + build release.json
+      - name: Fetch release exe + build release.json from the file
         run: |
           cd site
           V=$(gh release list --limit 1 --json tagName --jq '.[0].tagName') || V=""
           F="gMatch-${V#v}-portable.exe"
-          gh release download "$V" -p "$F" -D releases/ 2>/dev/null || true
-          # No GitHub Release (private repo era): the canonical artifact is the
-          # copy hosted on the fly homepage — hash what we actually fetch.
+          if [ -n "$V" ]; then
+            gh release download "$V" -p "$F" -D releases/ --clobber || true
+          fi
+          # No GitHub Release yet: hash the file a node actually serves and
+          # claim exactly that URL (never a link that 404s).
           if ! ls releases/gMatch-*-portable.exe >/dev/null 2>&1; then
             RJ=$(curl -fsS https://gmatch-wcz1.onrender.com/release.json || echo "")
             F=$(node -e "process.stdout.write(JSON.parse(process.argv[1]).file||'')" "$RJ" 2>/dev/null) || F=""
-            if [ -n "$F" ]; then curl -fsS -o "releases/$F" "https://gmatch-wcz1.onrender.com/releases/$F" || echo "WARN: fly-hosted $F not fetched"; fi
+            if [ -n "$F" ]; then curl -fsS -o "releases/$F" "https://gmatch-wcz1.onrender.com/releases/$F" || echo "WARN: node-hosted $F not fetched"; fi
           fi
-          for E in releases/gMatch-*-portable.exe; do [ -f "$E" ] && GH_DOWNLOAD_URL="https://gmatch-wcz1.onrender.com/releases/$(basename $E)" node build-release.mjs "$E"; done
-          ls releases/gMatch-*-portable.exe >/dev/null 2>&1 || echo "WARN: no portable exe — publishing text-only"
+          for E in releases/gMatch-*-portable.exe; do
+            [ -f "$E" ] || continue
+            if [ -n "$V" ] && [ "$(basename "$E")" = "gMatch-${V#v}-portable.exe" ]; then
+              GH_DOWNLOAD_URL="https://github.com/9matesu/gmatch/releases/download/$V/$(basename "$E")" \
+              BUILD_DATE="$(gh release view "$V" --json publishedAt --jq .publishedAt)" \
+                node build-release.mjs "$E"
+            else
+              GH_DOWNLOAD_URL="https://gmatch-wcz1.onrender.com/releases/$(basename "$E")" \
+                node build-release.mjs "$E"
+            fi
+          done
+          ls releases/gMatch-*-portable.exe >/dev/null 2>&1 || echo "WARN: no portable exe — keeping committed release.json"
       - name: Render legal pages + sync hash
         run: cd site && node build-legal.mjs && node sync-hash.mjs
       - name: HONESTY GATE (page may not claim what the files do not back)
