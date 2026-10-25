@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import app from '../index'
 import { createTestIdentity, signRequestHeaders, createMockEnv } from '../test-utils'
 import { CardService } from '../cards'
+import { saveBotConfig } from '../bot-image-api'
 
 function authHeaders(identity: ReturnType<typeof createTestIdentity>, method: string, url: string, body?: string) {
   return signRequestHeaders(identity, method, url, body)
@@ -88,23 +89,45 @@ describe('open-pack canonical mint', () => {
 describe('starter-deck canonical init', () => {
   let env: Awaited<ReturnType<typeof createMockEnv>>
   const user = createTestIdentity()
+  const provider = {
+    id: 'prov_rule34',
+    name: 'Test booru',
+    providerType: 'dapi',
+    url: 'https://booru.test/posts',
+    apiKey: '',
+    userId: '',
+    customHeaders: {},
+    tags: ['highres'],
+    enabled: true,
+    weight: 10,
+  }
 
   beforeEach(async () => {
     env = await createMockEnv()
     await app.request('/api/users', { headers: authHeaders(user, 'GET', '/api/users') }, env)
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
   })
 
   afterEach(() => {
     vi.unstubAllGlobals()
   })
 
-  it('mints 5 canonical starter cards and replays idempotently', async () => {
+  it('mints 5 cards from the configured provider and replays idempotently', async () => {
+    await saveBotConfig(env.DB, { providers: [provider] })
+    const payload = Array.from({ length: 5 }, (_, i) => ({
+      file_url: `https://img.test/starter-${i}.jpg`,
+      tags: 'highres, 1girl',
+    }))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => payload,
+    }))
+
     const headers = authHeaders(user, 'POST', '/api/starter-deck/init', '')
     const res = await app.request('/api/starter-deck/init', { method: 'POST', headers }, env)
     expect(res.status).toBe(200)
     const data: any = await res.json()
     expect(data.cards_created).toBe(5)
+    expect(data.cards.every((c: any) => c.content_url.startsWith('https://img.test/'))).toBe(true)
 
     const replay = await app.request('/api/starter-deck/init', { method: 'POST', headers }, env)
     expect(replay.status).toBe(200)
@@ -113,5 +136,16 @@ describe('starter-deck canonical init', () => {
 
     const collection = await new CardService(env.DB).getCollection(user.orbitId)
     expect(collection).toHaveLength(5)
+  })
+
+  it('mints nothing (and never a placeholder deck) when no provider is configured', async () => {
+    const headers = authHeaders(user, 'POST', '/api/starter-deck/init', '')
+    const res = await app.request('/api/starter-deck/init', { method: 'POST', headers }, env)
+    expect(res.status).toBe(409)
+    const data: any = await res.json()
+    expect(data.error).toMatch(/provider/i)
+
+    const collection = await new CardService(env.DB).getCollection(user.orbitId)
+    expect(collection).toHaveLength(0)
   })
 })

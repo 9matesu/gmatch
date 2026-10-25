@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import app from '../index'
 import { createTestIdentity, signRequestHeaders, createMockEnv } from '../test-utils'
-import { getBotConfig, saveBotConfig, extractImageUrlsFromJson, pickSlideshowSearchTags, getBotProfiles, saveBotProfile, deleteBotProfile, buildApiRequestUrl } from '../bot-image-api'
+import { getBotConfig, saveBotConfig, extractImageUrlsFromJson, getBotProfiles, saveBotProfile, deleteBotProfile, buildApiRequestUrl } from '../bot-image-api'
 
 const adminId = createTestIdentity()
 const regularId = createTestIdentity()
@@ -385,13 +385,6 @@ describe('Bot & External Image API Integration', () => {
     expect(getRes.status).toBe(200)
     const fetched = await getRes.json()
     expect(fetched.tags).toEqual(['landscape', 'night', 'rain'])
-  })
-
-  it('pickSlideshowSearchTags prefers global bot tags, then provider tags, then fallback', () => {
-    expect(pickSlideshowSearchTags(['cyberpunk', 'neon'], ['1girl'])).toEqual(['cyberpunk', 'neon'])
-    expect(pickSlideshowSearchTags([], ['1girl', 'solo'])).toEqual(['1girl', 'solo'])
-    expect(pickSlideshowSearchTags([], [])).toEqual(['futa', 'bbc', 'cum', 'veiny_cock', 'explicit'])
-    expect(pickSlideshowSearchTags(['  neon  ', ''], ['1girl'])).toEqual(['neon'])
   })
 
   // ─── Persistent bot duelist profiles ───

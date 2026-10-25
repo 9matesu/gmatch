@@ -35,23 +35,6 @@ export function isCourierApiUrl(url: string | null | undefined): boolean {
   return isCourierHost(url);
 }
 
-/**
- * Hosts that were decommissioned outright (Render courier, the Fly full node).
- * They can never serve data again, so any stored pointer to them is stale by
- * definition and the boot migration must drop it — otherwise an install that
- * joined the old public world keeps its data API aimed at a dead host.
- */
-const RETIRED_HOSTS = /(^|\.)(onrender\.com|fly\.dev)$/;
-
-export function isRetiredApiUrl(url: string | null | undefined): boolean {
-  if (!url?.trim()) return false;
-  try {
-    return RETIRED_HOSTS.test(new URL(url.trim()).hostname);
-  } catch {
-    return false;
-  }
-}
-
 
 function computeApiBase(): string {
   // A manual override is explicit intent — it wins everywhere, including
@@ -274,16 +257,13 @@ const SERVER_MARKER = 'gmatch.onboarding.serverUrl'
  * wrote the BLIND COURIER into `gmatch.api.url`, the marker key and a 1-year
  * `gmatch_server_url` cookie. A courier 404s (now 503s) every stateful route, so
  * that state wedges dev and packaged clients alike until it is cleared by hand.
- * Retired hosted nodes (Render, Fly) get the same treatment: they cannot serve
- * data again, and a stored pointer keeps the data API aimed at a dead host.
  * The courier is a directory/mail node, never a data base — drop it and
  * let API_BASE fall through to the sidecar / dev node. Returns true when
  * something was purged.
  */
 export function purgeCourierApiState(): boolean {
   let purged = false
-  const stale = (value: string | null | undefined): boolean =>
-    isCourierApiUrl(value) || isRetiredApiUrl(value)
+  const stale = (value: string | null | undefined): boolean => isCourierApiUrl(value)
   try {
     if (typeof localStorage !== 'undefined') {
       for (const key of ['gmatch.api.url', SERVER_MARKER]) {
@@ -339,6 +319,43 @@ export async function clearDeadLoopbackApiBase(): Promise<boolean> {
     return true
   } catch {
     return false
+  }
+}
+
+/**
+ * A stored data base that does not answer is a dead address, not a fallback.
+ * The boot migration used to name the retired deployments; a hostname list can
+ * only ever cover the addresses we already know about, so it is gone. One short
+ * health probe answers the only question that matters: is there a node there?
+ * A silent base is dropped (with the marker and the dev-proxy cookie) so
+ * API_BASE falls through to this machine. A healthy node — local, LAN or a
+ * friend's — is kept untouched. Returns the dropped base, or null.
+ *
+ * Loopback is handled by clearDeadLoopbackApiBase; the courier by
+ * purgeCourierApiState (it answers /api/health but is never a data base).
+ */
+export async function clearUnreachableApiBase(timeoutMs = 2500): Promise<string | null> {
+  try {
+    if (typeof localStorage === 'undefined') return null
+    const manual = localStorage.getItem('gmatch.api.url')?.trim()
+    if (!manual || !/^https?:\/\//i.test(manual)) return null
+    if (isLoopbackApiUrl(manual) || isCourierApiUrl(manual)) return null
+    const base = manual.replace(/\/+$/, '')
+    try {
+      const res = await fetch(`${base}/api/health`, { signal: AbortSignal.timeout(timeoutMs) })
+      if (res.ok) return null // a node answers: the pointer is legitimate
+    } catch { /* unreachable: drop it below */ }
+    localStorage.removeItem('gmatch.api.url')
+    localStorage.removeItem(SERVER_MARKER)
+    try {
+      if (typeof document !== 'undefined') {
+        const cookie = readCookie(SERVER_COOKIE)
+        if (cookie) document.cookie = `${SERVER_COOKIE}=; path=/; max-age=0`
+      }
+    } catch { /* cookies disabled */ }
+    return base
+  } catch {
+    return null
   }
 }
 

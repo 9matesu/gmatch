@@ -123,7 +123,7 @@ grep -rhoE "text-\[(6|7|8|9|11)px\]" src --include=*.tsx
 grep -rho "rounded-3xl" src --include=*.tsx
 grep -rhoE "rounded-(2xl|3xl)" src --include=*.tsx
 grep -rn "#[0-9a-fA-F]\{6\}" src --include=*.tsx | grep -v test | grep -viE "e08a4c|cfd6e6|ffd75e|5ee0ff|b8b8c4|9fe3ff|sparkline|color=|avatar.tsx|babecockpanel|0b0e14|0095f6|d6c6ff|ffd6f0"
-grep -rn "bg-white/\|border-white/" src --include=*.tsx | grep -v test | grep -v holo | grep -v "bg-black/" | grep -v BooruSlideshow
+grep -rn "bg-white/\|border-white/" src --include=*.tsx | grep -v test | grep -v holo | grep -v "bg-black/"
 grep -rhoE "duration-(75|100|200|1000)\b" src --include=*.tsx
 grep -rhoE "duration-\[[0-9]+ms\]" src --include=*.tsx
 grep -rhoE "scale-\[1\.0" src --include=*.tsx

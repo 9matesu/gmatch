@@ -46,7 +46,11 @@ Root commands fan out with `--workspaces --if-present`.
 
 ## Runtime wiring worth knowing
 
-- The renderer never calls booru APIs directly: main-process fetches over IPC for the idle feed, server proxy (`apps/api/src/routes/booru.ts`) for the social feed — two clients by design. Any fetch failure must fall back to offline SVG placeholders (SPEC §6), never crash or fabricate.
+- The renderer never calls booru APIs directly: the idle feed fetches in the
+  main process over IPC (one client, `apps/desktop/src/services/booru.ts`); the
+  social feed carries peer uploads over the swarm, never from a booru. Any
+  fetch failure must fall back to offline SVG placeholders (SPEC §6), never
+  crash or fabricate.
 - `npm run dev` boots a local Bun sidecar and talks to it only (`vite.config.ts`); there is no remote dev mode. The Cloudflare Pages project (`site/functions/`) is a **blind courier** (directory + sealed mail only) and 404s every stateful route — the local sidecar (or a self-hosted full node) is required for feed/DMs. Sealed mail defaults to that courier so peers on different worlds still reach each other; the courier has no WebSocket, so `MailClient` polls it.
 - Two separate economies, never bridged (SPEC §2): idle `pts` live only in the localStorage save (`gmatch.save.v1`); server `g$` is the authoritative `EconomyService` ledger.
 - Single 18+ gate is the shell's `AgeGateModal` (mirrored into the idle store); don't add a second one.

@@ -35,11 +35,6 @@ const memoryImageCache: CachedImage[] = []
 const MAX_CACHE_SIZE = 150
 const CACHE_TTL_MS = 2 * 60 * 60 * 1000 // 2 hours
 
-// Landing-page slideshow cache: small, short-lived, refreshed lazily so the
-// public /api/booru/slideshow endpoint never floods the providers.
-const slideshowCache: CachedImage[] = []
-const SLIDESHOW_TTL_MS = 1 * 60 * 1000 // 1 minute
-const MAX_SLIDESHOW_SIZE = 60
 const SLIDESHOW_FALLBACK_TAGS = ['futa', 'bbc', 'cum', 'veiny_cock', 'explicit']
 
 const PALETTE = ['#ec4899', '#38bdf8', '#fbbf24', '#a855f7', '#10b981', '#f43f5e', '#6366f1', '#06b6d4']
@@ -1109,106 +1104,6 @@ export async function pickBotDuelCard(
     url: dataUrl,
     caption: `${botName} Duel Card`,
   }
-}
-
-// Landing-page fallback set (procedural gradient SVGs) used when no provider
-// is reachable or configured, so the public slideshow never renders blank.
-function slideshowFallbackPlaceholders(limit: number): CachedImage[] {
-  const colors = ['#ec4899', '#38bdf8', '#a855f7', '#f43f5e', '#10b981', '#6366f1', '#fbbf24', '#06b6d4']
-  const labels = ['Share Moments', 'Collect Cards', 'Live & Decentralized', 'Encrypted DMs', 'P2P Social', 'Arcade Games']
-  const now = Date.now()
-  return Array.from({ length: Math.max(1, Math.min(limit, 8)) }).map((_, i) => {
-    const c1 = colors[i % colors.length]
-    const c2 = colors[(i + 3) % colors.length]
-    const label = labels[i % labels.length]
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" viewBox="0 0 600 900"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="${c1}"/><stop offset="100%" stop-color="${c2}"/></linearGradient></defs><rect width="600" height="900" fill="#09090b"/><rect x="24" y="24" width="552" height="852" rx="40" fill="url(#g)" fill-opacity="0.25" stroke="url(#g)" stroke-width="3"/><circle cx="300" cy="360" r="140" fill="url(#g)" fill-opacity="0.8"/><text x="300" y="380" font-family="sans-serif" font-size="72" font-weight="900" fill="#ffffff" text-anchor="middle">♠</text><text x="300" y="600" font-family="sans-serif" font-size="40" font-weight="900" fill="#ffffff" text-anchor="middle">${label}</text><text x="300" y="650" font-family="sans-serif" font-size="18" font-weight="600" fill="#d4d4d8" text-anchor="middle">gMatch</text></svg>`
-    return {
-      url: `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`,
-      caption: label,
-      tags: [],
-      cachedAt: now,
-    }
-  })
-}
-
-/** Pick the search-tag pool for the landing-page slideshow: the admin's
- * configured global bot tags win, then the provider's own pool, then the
- * hardcoded slideshow fallback set. */
-export function pickSlideshowSearchTags(globalTags: string[], providerTags: string[]): string[] {
-  const global = (Array.isArray(globalTags) ? globalTags : [])
-    .map((t) => String(t).trim())
-    .filter(Boolean)
-  if (global.length > 0) return global
-
-  const provider = (Array.isArray(providerTags) ? providerTags : [])
-    .map((t) => String(t).trim())
-    .filter(Boolean)
-  if (provider.length > 0) return provider
-
-  return SLIDESHOW_FALLBACK_TAGS
-}
-
-/** Fetch a small slideshow batch for the public landing page from the
- * configured booru providers (reusing their configured tags). Never throws —
- * falls back to cached images or procedural placeholders so the landing page
- * always has visuals to show. */
-export async function getLandingSlideshowImages(
-  db: D1Turso,
-  limit = 8
-): Promise<Array<{ url: string; caption?: string }>> {
-  const safeLimit = Math.max(1, Math.min(limit, 20))
-  const now = Date.now()
-
-  const fresh = slideshowCache.filter((c) => now - c.cachedAt < SLIDESHOW_TTL_MS)
-  if (fresh.length >= safeLimit) {
-    return fresh.slice(0, safeLimit).map((c) => ({ url: c.url, caption: c.caption }))
-  }
-
-  const config = await getBotConfig(db).catch(() => null)
-  const activeProviders = config?.enabled ? (config.providers || []).filter((p) => p.enabled && p.url) : []
-  const globalSearchTags = config?.tags || []
-  const collected: CachedImage[] = []
-
-  for (const provider of activeProviders) {
-    try {
-      const searchTags = pickSlideshowSearchTags(globalSearchTags, provider.tags)
-      const { url, headers } = buildApiRequestUrl(provider, searchTags, provider.apiKey, safeLimit, provider.userId)
-      const res = await fetch(url, { method: 'GET', headers })
-      if (!res.ok) continue
-      const data = await res.json()
-      const extracted = extractImageUrlsFromJson(data)
-      for (const item of extracted) {
-        if (!collected.some((c) => c.url === item.url)) {
-          collected.push({
-            url: item.url,
-            caption: item.caption || provider.tags.slice(0, 2).join(' ') || provider.name,
-            tags: item.tags || provider.tags,
-            providerId: provider.id,
-            cachedAt: now,
-          })
-        }
-      }
-      if (collected.length >= safeLimit) break
-    } catch { }
-  }
-
-  if (collected.length > 0) {
-    slideshowCache.splice(0, slideshowCache.length, ...collected.slice(0, MAX_SLIDESHOW_SIZE))
-    return collected.slice(0, safeLimit).map((c) => ({ url: c.url, caption: c.caption }))
-  }
-
-  if (fresh.length > 0) {
-    return fresh.slice(0, safeLimit).map((c) => ({ url: c.url, caption: c.caption }))
-  }
-
-  return slideshowFallbackPlaceholders(safeLimit).map((c) => ({ url: c.url, caption: c.caption }))
-}
-
-/** Fetch the list of models available to the public landing page (from config). */
-export async function getLandingSlideshowModels(db: D1Turso): Promise<string[]> {
-  const config = await getBotConfig(db).catch(() => null)
-  const models = config?.models && config.models.length > 0 ? config.models : []
-  return models
 }
 
 /** Fetch a batch of images from the configured booru providers for a specific

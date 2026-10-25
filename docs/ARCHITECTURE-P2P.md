@@ -12,8 +12,8 @@ the app runs **its own node** (host mode is the default). What remains shared is
 a blind rendezvous at `https://gmatch.pages.dev` — a Cloudflare Pages Function
 that serves a signed public-node directory and a sealed-mail relay (D1), with
 no content tables, no accounts, no presence and no TURN. It is not a node and
-never a data base. The old hosts (a Render courier and a Fly full node) are
-retired and no longer appear in the code.
+never a data base. The old hosted courier and full node are retired and no
+longer appear in the code.
 
 A node is still a *blind, stateless courier* for its own clients: it holds no
 user profiles, no presence, no posts, no feeds and no media objects. It only

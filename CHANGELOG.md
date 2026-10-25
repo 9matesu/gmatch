@@ -1,11 +1,24 @@
 # Changelog
 
-## Unreleased — Cloudflare rendezvous, no hosted world
+## 1.6.5 — Cloudflare rendezvous, no hosted world
 
-- **No hosted full node.** `gmatch.fly.dev` (full node) and
-  `gmatch-wcz1.onrender.com` (Render courier) are gone from the code, tests,
-  docs and release page. A packaged install runs its own node; peers meet
-  through a node code or the public directory.
+- **No hosted full node.** The old hosted courier and full node are gone from
+  the code, tests, docs and release page. A packaged install runs its own node;
+  peers meet through a node code or the public directory.
+- **The bundled node actually starts again.** `apiSidecar.cjs` referenced two
+  identifiers it never defined (`injectingPin`, `fs`), so since
+  `fix(admin): the passcode in .env.local was being silently overridden`
+  (2026-09-29) every packaged host-mode launch threw a ReferenceError *before*
+  spawning the bundled server. Behind that, `migrate.ts` resolved `schema.sql`
+  one level above the running file — true for `apps/api/src/migrate.ts`, false
+  for the single-file `apps/api/serve.js` that `stage-api.cjs` ships — so a
+  packaged node that did spawn died at startup with ENOENT (HTTP 500/503 and no
+  tables). Both fixed and covered: `electron/apiSidecar.test.cjs` drives a real
+  spawn, and `apiRootFor` is tested against both layouts. `no-undef` is now an
+  error for `electron/**`/`scripts/**` in eslint (it was off, which is how the
+  ReferenceErrors shipped). The window opened over an empty world while the
+  local database sat there intact — and host mode has been the default since
+  2026-10-21.
 - `https://gmatch.pages.dev` is now the release page **and** the rendezvous:
   a Cloudflare Pages Function (`site/functions/api/[[path]].ts`) serves a
   signed public-node directory and a sealed-mail relay backed by D1. It keeps
@@ -31,8 +44,30 @@
   In the app, the Servers empty state no longer claims there is no public
   directory, and the guide copy stops calling the old hosted node a "legacy
   server" or a "WebTorrent mesh".
+- **A saved node is resolved by provenance, not by hope.** The installed app
+  could boot into client mode pointed at someone else's world, so the feed
+  looked empty while the local database was intact. Evidence from the field:
+  the old deployment still answered `/api/health`, so a reachability-only check
+  would have kept the user exactly where they were. A pointer written before
+  `v2` is therefore **not dialed at all** — it is paused (kept on disk, shown as
+  "an older version's server") and the launch runs the bundled node. A pointer
+  this app wrote (`v2`) is health-checked once per launch and paused when it
+  goes silent. `server:state` carries `pausedUrl`/`pausedReason`, explained in
+  Settings → Server (Reconnect is health-probed, writes `v2`; Forget it is one
+  click) and in Servers. Nothing is deleted, nothing is blacklisted by name, and
+  a resolver cannot hold up the window (hard 3 s bound).
+- **The renderer applies the same rule.** `clearUnreachableApiBase()` probes a
+  stored non-loopback base and drops it (with the onboarding marker and dev
+  proxy cookie) only when no node answers, so a stale `gmatch.api.url` cannot
+  keep every surface empty.
+- **No placeholder content.** The starter deck mints nothing and answers 409
+  when no booru provider is configured (it used to ship five Unsplash cards);
+  the hack lock screen no longer falls back to stock photos; the unused
+  `BooruSlideshow`, `universalImageFeeder` (with a hardcoded API key) and the
+  `/api/booru/slideshow` route with its fallback placeholders were deleted.
+  `apps/api/scripts/purge-nameless-cards.ts` is gone too.
 
-## Unreleased — direct NAT traversal, silent probes
+### Direct NAT traversal, silent probes
 
 - Direct NAT traversal: STUN moved to Cloudflare (`stun.cloudflare.com:3478` —
   stateless, anonymous, a few packets per connection) and `srflx` reflexive

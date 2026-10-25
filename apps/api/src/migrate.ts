@@ -3,9 +3,26 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import type { Client } from '@libsql/client'
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
+const ROOT = apiRootFor(import.meta.url)
 const SCHEMA_FILE = join(ROOT, 'schema.sql')
 const MIGRATIONS_DIR = join(ROOT, 'migrations')
+
+/**
+ * Root of the API package: `apps/api`, whichever way this code is running.
+ *
+ * In the repo the schema sits one level above this file
+ * (`apps/api/src/migrate.ts` -> `apps/api`). A packaged install runs a
+ * single-file bundle instead — `scripts/stage-api.cjs` builds
+ * `apps/api/serve.js` — so the schema sits NEXT TO the running file. Resolving
+ * "one level up" unconditionally pointed at `apps/`, schema.sql was never
+ * found, and the bundled node died at startup while its HTTP shell still
+ * answered 500/503: an empty world over an intact database. Look for the file
+ * that has to exist rather than assuming a depth.
+ */
+export function apiRootFor(fileUrl: string): string {
+  const here = dirname(fileURLToPath(fileUrl))
+  return existsSync(join(here, 'schema.sql')) ? here : join(here, '..')
+}
 
 function splitStatements(sql: string): string[] {
   return sql

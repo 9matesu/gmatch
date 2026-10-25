@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import { createClient } from '@libsql/client'
-import { migrate } from './migrate'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { apiRootFor, migrate } from './migrate'
 
 // Verifies the gMatch Phase 1 migrations (014-017) bring an existing
 // pre-gMatch database up to the current canonical schema, and that the
@@ -394,6 +398,38 @@ describe('gMatch Phase 1 migrations', () => {
     expect(await indexExists(client, 'idx_saves_user')).toBe(true)
     expect(await indexExists(client, 'idx_post_likes_object')).toBe(true)
     expect(await columnExists(client, 'Users', 'is_moderator')).toBe(true)
+  })
+})
+
+/**
+ * A packaged install does not run apps/api/src/migrate.ts: stage-api.cjs
+ * bundles the server into apps/api/serve.js. Resolving the schema by walking
+ * one level up from the file therefore landed on apps/ in the bundle, the
+ * bundled node threw on startup, and host mode looked like an empty world.
+ * These two shapes are exactly what ships.
+ */
+describe('apiRootFor', () => {
+  it('finds the schema next to a bundled serve.js', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gmatch-api-root-bundle-'))
+    try {
+      writeFileSync(join(dir, 'schema.sql'), '')
+      writeFileSync(join(dir, 'serve.js'), '')
+      expect(apiRootFor(pathToFileURL(join(dir, 'serve.js')).href)).toBe(dir)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('finds the schema one level above src/ in the repo layout', () => {
+    const root = mkdtempSync(join(tmpdir(), 'gmatch-api-root-src-'))
+    try {
+      writeFileSync(join(root, 'schema.sql'), '')
+      mkdirSync(join(root, 'src'))
+      writeFileSync(join(root, 'src', 'migrate.ts'), '')
+      expect(apiRootFor(pathToFileURL(join(root, 'src', 'migrate.ts')).href)).toBe(root)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })
 

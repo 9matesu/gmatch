@@ -20,6 +20,7 @@
 // Default dir: %APPDATA%\gmatch\releases (the packaged app's userData, where
 // the bundled node looks for it).
 const fs = require('node:fs')
+const os = require('node:os')
 const path = require('node:path')
 const crypto = require('node:crypto')
 
@@ -31,8 +32,17 @@ function arg(name) {
 }
 
 function defaultReleasesDir() {
-  const base = process.env.APPDATA || path.join(process.homedir(), 'AppData', 'Roaming')
-  return path.join(base, 'gmatch', 'releases')
+  const base = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming')
+  // Electron's userData is appData/<package.json name> — NOT productName
+  // (that lives under `build` and names the exe). The name is scoped
+  // ("@gmatch/desktop"), i.e. a nested folder; the sidecar is started with
+  // RELEASES_DIR = userData/releases (electron/apiSidecar.cjs), so staging
+  // anywhere else means the node serves nothing.
+  let appName = 'gmatch'
+  try {
+    appName = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).name || appName
+  } catch { /* keep the fallback */ }
+  return path.join(base, appName, 'releases')
 }
 
 function version() {
