@@ -17,15 +17,17 @@ if (!pages.includes('index.html')) {
 const fail = []
 
 // 1) nenhum recurso/destino externo além dos allowlisted
-const ALLOW = /^https:\/\/(www\.virustotal\.com|github\.com\/9matesu\/gmatch|gmatch\.fly\.dev|gmatch-wcz1\.onrender\.com)(\/|$)/
+const ALLOW = /^https:\/\/(www\.virustotal\.com|github\.com\/9matesu\/gmatch|gmatch\.pages\.dev|gmatch\.fly\.dev|gmatch-wcz1\.onrender\.com)(\/|$)/
 for (const p of pages) {
   const html = readFileSync(join(ROOT, p), 'utf8')
   for (const m of html.matchAll(/(?:src|href|action)="(https?:[^"]+)"/g))
     if (!ALLOW.test(m[1])) fail.push(`${p}: external URL ${m[1]}`)
   for (const m of html.matchAll(/<(script|style|link|iframe|img)[^>]*>/gi)) {
     const tag = m[0]
-    // inline <style> is allowed; scripts and EXTERNAL resources (<link>) are not
-    if (/<link\b/i.test(tag) || /<script\b/i.test(tag)) fail.push(`${p}: script/external-resource tag banned: ${tag.slice(0, 60)}`)
+    // inline <style> and a local favicon are allowed; scripts and other
+    // external resources (<link>) are not
+    const localIcon = /rel="(icon|apple-touch-icon)"/i.test(tag) && /href="(?:img\/[a-z0-9-]+\.(?:png|ico))"/.test(tag)
+    if ((/<link\b/i.test(tag) && !localIcon) || /<script\b/i.test(tag)) fail.push(`${p}: script/external-resource tag banned: ${tag.slice(0, 60)}`)
     if (/<img\b/i.test(tag) && !/src="(?:data:image|img\/[a-z0-9-]+\.png)"/.test(tag)) fail.push(`${p}: banned <img> src`);
   }
 }

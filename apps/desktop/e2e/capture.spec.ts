@@ -24,38 +24,30 @@ test('capture landing screenshots', async ({ browser }) => {
   })
   const page = await ctx.newPage()
 
-  // 1. Idle grid (clicker stage).
-  await seedApp(page, { points: 15234 })
+  // Seed a returning user and drop the help-modal flag so the capture shows
+  // the views themselves instead of the guide overlay.
+  const identity = await seedApp(page, { points: 15234 })
+  await page.addInitScript(
+    (id: string) => localStorage.setItem(`gmatch_help_seen_${id}`, '1'),
+    identity.orbitId,
+  )
   await mockBooruFeed(page)
-  await page.goto('/#/grid')
-  await page.getByRole('button', { name: /attack the current foe/i }).waitFor({ timeout: 30_000 })
-  await page.waitForTimeout(1500)
-  await shot(page, 'idle-grid')
 
-  // 2. Games hub with sub-tabs.
-  await page.goto('/#/games')
-  await page.getByRole('button', { name: '1v1 Arena' }).first().waitFor({ timeout: 20_000 })
-  await page.waitForTimeout(800)
-  await shot(page, 'games-hub')
-
-  // 3. Card game (Play tab).
-  await page.waitForTimeout(1500)
-  await shot(page, 'cards')
-
-  // 4. Social feed.
-  await mockBooruFeed(page)
+  // 1. Social feed. First paint also fires first-run toasts (achievements);
+  //    wait them out so the capture shows the view, not a notification.
   await page.goto('/#/feed')
-  await page.waitForTimeout(2500)
+  await page.waitForTimeout(6000)
   await shot(page, 'feed')
 
-  // 5. Servers view (join/host).
+  // 2. Servers view: the built-in public world plus anything added locally.
   await page.goto('/#/servers')
-  await page.waitForTimeout(2000)
+  await page.getByText('gmatch public').first().waitFor({ timeout: 15_000 }).catch(() => {})
+  await page.waitForTimeout(1200)
   await shot(page, 'servers')
 
-  // 6. Watch party gallery
+  // 3. Watch party gallery.
   await page.goto('/#/watch')
-  await page.waitForTimeout(2000)
+  await page.waitForTimeout(1500)
   await shot(page, 'watch')
 
   await ctx.close()

@@ -409,11 +409,12 @@ describe('ServersView', () => {
     delete (window as unknown as { gmatch?: unknown }).gmatch
   })
 
-  it('without a configured central, explains instead of crashing', async () => {
+  it('without a configured central, still offers the public world', async () => {
     stubLocalStorage({ 'gmatch.central.url': 'none' })
     mockFetch(async () => json({ servers: [] }))
     render(<ServersView identity={identity} toast={() => {}} />)
-    await waitFor(() => expect(screen.getByText(/no central/i)).toBeInTheDocument())
+    expect(await screen.findByText('gmatch public')).toBeInTheDocument()
+    expect(screen.queryByText(/no central/i)).toBeNull()
   })
 
   it('keeps known servers and offers a retry when the directory is unreachable', async () => {

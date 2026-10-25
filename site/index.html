@@ -4,14 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>gmatch — private peer-to-peer social software</title>
-<meta name="description" content="gmatch is peer-to-peer social software for Windows: local-first data, end-to-end encrypted media, signed state, and a relay that reads nothing. Single portable file, verifiable hashes.">
+<meta name="description" content="gmatch is peer-to-peer social software for Windows: local-first data, end-to-end encrypted media, signed state, and a relay that moves ciphertext. Single portable file, verifiable hashes.">
+<link rel="icon" type="image/png" href="img/icon.png">
 <style>
 *, *::before, *::after { box-sizing: border-box; }
 :root { color-scheme: dark; }
 html { background: #09090b; scroll-behavior: smooth; }
 body {
   margin: 0;
-  padding: 56px 32px 96px;
+  padding: 48px 32px 96px;
   background: #09090b;
   color: #d4d4d8;
   font: 14px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -19,47 +20,39 @@ body {
   text-align: left;
   -webkit-font-smoothing: antialiased;
 }
-.layout {
-  display: flex;
-  gap: 48px;
-  align-items: flex-start;
-  max-width: 1040px;
+.shell {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr) 330px;
+  gap: 44px;
+  align-items: start;
+  max-width: 1380px;
   margin: 0 auto;
 }
-aside.sidebar {
-  position: sticky;
-  top: 40px;
-  flex: 0 0 180px;
-  font-size: 12px;
-  line-height: 2;
-  border-left: 1px solid #1f1f23;
-  padding-left: 16px;
-}
-aside.sidebar .group { color: #71717a; text-transform: uppercase; letter-spacing: 0.08em; font-size: 10px; margin: 18px 0 2px; font-weight: 600; }
-aside.sidebar .group:first-child { margin-top: 0; }
-aside.sidebar a { color: #a1a1aa; text-decoration: none; display: block; }
-aside.sidebar a:hover { color: #fafafa; }
-.content { flex: 1 1 auto; min-width: 0; max-width: 720px; }
+.col-nav { position: sticky; top: 40px; font-size: 12px; line-height: 2; border-left: 1px solid #1f1f23; padding-left: 16px; }
+.col-nav .group { color: #71717a; text-transform: uppercase; letter-spacing: 0.08em; font-size: 10px; margin: 18px 0 2px; font-weight: 600; }
+.col-nav .group:first-child { margin-top: 0; }
+.col-nav a { color: #a1a1aa; text-decoration: none; display: block; }
+.col-nav a:hover { color: #fafafa; }
+.col-main { min-width: 0; max-width: 780px; }
+.col-shots { position: sticky; top: 40px; }
+.col-shots h2 { margin: 0 0 6px; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: #71717a; scroll-margin-top: 24px; }
+.col-shots p.note { margin: 0 0 18px; font-size: 11px; color: #71717a; }
+figure { margin: 0 0 18px; }
+figure img { display: block; width: 100%; height: auto; border: 1px solid #27272a; border-radius: 6px; background: #121215; }
+figcaption { margin-top: 6px; font-size: 11px; color: #71717a; line-height: 1.5; }
 h1, h2, h3, strong { color: #fafafa; font-weight: 600; }
-h1 { font-size: 22px; line-height: 1.25; margin: 0 0 16px; }
-h2 { font-size: 15px; margin: 56px 0 14px; scroll-margin-top: 24px; }
-h3 { font-size: 13px; margin: 30px 0 10px; }
+h1 { font-size: 23px; line-height: 1.25; margin: 0 0 14px; }
+h2 { font-size: 15px; margin: 54px 0 14px; scroll-margin-top: 24px; }
+h3 { font-size: 13px; margin: 28px 0 8px; }
 p { margin: 0 0 14px; }
 em { color: #71717a; }
-a {
-  color: #fafafa;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  text-decoration-color: #3f3f46;
-}
+a { color: #fafafa; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: #3f3f46; }
 a:hover { color: #fff; text-decoration-color: #fff; }
-nav.topnav { margin: 20px 0 0; line-height: 2; }
-nav.topnav a { color: #a1a1aa; text-decoration: none; }
-nav.topnav a:hover { color: #fafafa; text-decoration: underline; text-underline-offset: 3px; }
+.lede { font-size: 15px; color: #e4e4e7; margin-bottom: 14px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; padding: 0; list-style: none; }
+.chips li { margin: 0; font-size: 11px; color: #a1a1aa; border: 1px solid #27272a; border-radius: 999px; padding: 2px 10px; }
 ul { margin: 0 0 16px; padding-left: 20px; }
 li { margin: 7px 0; }
-ol { margin: 0 0 16px; padding-left: 20px; }
-ol li { margin: 8px 0; }
 code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
@@ -71,7 +64,6 @@ code {
   color: #e4e4e7;
 }
 pre {
-  box-sizing: border-box;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
   letter-spacing: 0.02em;
@@ -88,32 +80,35 @@ pre {
   width: 100%;
   max-width: 100%;
 }
-footer {
-  margin-top: 72px;
-  padding-top: 20px;
-  border-top: 1px solid #1f1f23;
-  color: #71717a;
-}
+footer { margin-top: 64px; padding-top: 20px; border-top: 1px solid #1f1f23; color: #71717a; }
 ::selection { background: rgba(255, 255, 255, 0.15); }
+@media (max-width: 1180px) {
+  .shell { grid-template-columns: 170px minmax(0, 1fr); }
+  .col-shots { grid-column: 1 / -1; position: static; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+  .col-shots h2, .col-shots p.note { grid-column: 1 / -1; }
+}
 @media (max-width: 820px) {
-  body { padding: 40px 20px 72px; }
-  .layout { display: block; }
-  aside.sidebar { position: static; flex: none; border-left: 0; padding-left: 0; margin: 0 0 32px; columns: 2; }
+  body { padding: 36px 20px 72px; }
+  .shell { display: block; }
+  .col-nav { position: static; border-left: 0; padding-left: 0; margin: 0 0 32px; columns: 2; }
+  .col-shots { display: block; }
 }
 </style>
 </head>
 <body>
-<div class="layout">
-<aside class="sidebar" aria-label="Page sections">
+<div class="shell">
+
+<aside class="col-nav" aria-label="Page sections">
 <nav>
 <div class="group">Release</div>
 <a href="#download">Download</a>
 <a href="#verify">Verify the file</a>
 <a href="#updates">Updates</a>
 <div class="group">Product</div>
-<a href="#what-it-is">What it is</a>
-<a href="#watchparty">Watch Party</a>
-<a href="#faq">FAQ</a>
+<a href="#what-it-is">Overview</a>
+<a href="#watchparty">Watch party</a>
+<a href="#servers">Servers</a>
+<a href="#faq">Questions</a>
 <div class="group">Design</div>
 <a href="#security">Security</a>
 <a href="#crypto">Cryptography</a>
@@ -121,89 +116,97 @@ footer {
 <a href="#topology">Topology</a>
 <a href="#admin">Moderation</a>
 <a href="#limits">Known limits</a>
-<a href="legal/security.html">Security audit</a>
+<a href="#screens">Screens</a>
 <div class="group">Legal</div>
 <a href="#terms">Documents</a>
 <a href="#privacy">Privacy</a>
+<a href="legal/security.html">Security audit</a>
 </nav>
 </aside>
-<div class="content">
+
+<div class="col-main">
 <header>
 <h1>gmatch</h1>
-<p><strong>Private, peer-to-peer social software for Windows.</strong> A social feed, encrypted conversations and shared media — with the data kept on your machine and the media sealed end to end. No sign-up, no telemetry, no ads. One portable file.</p>
-<nav class="topnav" aria-label="Sections">
-<a href="#download">Download</a> ·
-<a href="#verify">Verify</a> ·
-<a href="#what-it-is">Overview</a> ·
-<a href="#security">Security</a> ·
-<a href="#crypto">Cryptography</a> ·
-<a href="#topology">Topology</a> ·
-<a href="#limits">Limits</a> ·
-<a href="#terms">Documents</a> ·
-<a href="#privacy">Privacy</a>
-</nav>
+<p class="lede"><strong>Private, peer-to-peer social software for Windows.</strong> A social feed, sealed conversations and shared media — with the data kept on your machine and the media encrypted end to end. No sign-up, no telemetry, no ads. One portable file.</p>
+<ul class="chips">
+<li>Windows x64</li>
+<li>Portable · no installer</li>
+<li>No account anywhere</li>
+<li>SHA-256 published</li>
+</ul>
 </header>
 
 <main>
 <section id="download">
-<h2>Download — Windows x64, single portable file</h2>
-<p>Version <strong id="version">1.6.3</strong> · file <code>gMatch-1.6.3-portable.exe</code> · 110,818,002 bytes (105.7 MiB) · built <span id="build-date">2026-10-23T12:16:00Z</span> (UTC).</p>
-<p><a href="https://github.com/9matesu/gmatch/releases/download/v1.6.3/gMatch-1.6.3-portable.exe" download>gMatch-1.6.3-portable.exe</a></p>
+<h2>Download</h2>
+<p>Version <strong id="version">1.6.4</strong> · file <code>gMatch-1.6.4-portable.exe</code> · 110,818,200 bytes (105.7 MiB) · built <span id="build-date">2026-10-25T00:23:00Z</span> (UTC).</p>
+<p><a href="https://github.com/9matesu/gmatch/releases/download/v1.6.4/gMatch-1.6.4-portable.exe" download>Download the portable executable</a></p>
 <p>Verify the <strong>SHA-256</strong> below against the downloaded file before running it:</p>
-<pre id="sha256">45a205e8161a0782cf72d4419ac9f1dfb946939613ca2eb85507399d23dbbcac</pre>
-<p>And the <strong>SHA-512</strong>, for an independent second check:</p>
-<pre id="sha512">ddc7bfce1670fdbee40f4311b83ddec53e0fb8af392bb4843865b8abb7d47b605def253a63cc57a60080bcdc5084c30a9d4c15c022cfbdab071b4d724beb6dad</pre>
-<p><em>The hashes, build date and byte count are derived mechanically from the release asset (<code>release.json</code> is generated by <code>site/build-release.mjs</code>), never hand-typed.</em></p>
+<pre id="sha256">22f83283be21757059132e49b37add7341a2142330bb423c270fffb9aabb5928</pre>
+<p>And the <strong>SHA-512</strong> as an independent second check:</p>
+<pre id="sha512">8716d857f2ef4f4100fee05213518c1b7489dd2a3ddb8d948d3281010b3f934ce2ad1b48a7bedc12b181fb56976ea9866e19fef0d07f6d41e3ef0839d4b58966</pre>
+<p><em>Hashes, byte count and build date are derived mechanically from the published asset — <code>release.json</code> is generated by <code>site/build-release.mjs</code> from the exact file, never hand-typed.</em></p>
 <h3>Code signing</h3>
-<p>This binary is not Authenticode-signed, so Windows SmartScreen may show its generic warning for unknown publishers. The integrity guarantee is the digest you can compute yourself from the exact bytes GitHub serves for that asset.</p>
+<p>The binary is not Authenticode-signed, so Windows SmartScreen may show its generic warning for unknown publishers. The integrity guarantee is the digest you compute yourself from the bytes GitHub serves for that asset.</p>
 </section>
 
 <section id="verify">
-<h2>Verify on Windows (20 seconds, nothing to install)</h2>
+<h2>Verify on Windows</h2>
 <p>Open PowerShell and run (adjust the path if needed):</p>
-<pre>Get-FileHash "$env:USERPROFILE\Downloads\gMatch-1.6.3-portable.exe" -Algorithm SHA256</pre>
-<p>Compare the <code>Hash</code> value with the SHA-256 published above. If it differs by even one character, delete the file and report it through the <a href="legal/abuse.html">abuse page</a>. Use <code>-Algorithm SHA512</code> for the second digest.</p>
+<pre>Get-FileHash "$env:USERPROFILE\Downloads\gMatch-1.6.4-portable.exe" -Algorithm SHA256</pre>
+<p>Compare the <code>Hash</code> value with the SHA-256 above. If it differs by even one character, delete the file and report it through the <a href="legal/abuse.html">abuse page</a>. Use <code>-Algorithm SHA512</code> for the second digest.</p>
 </section>
 
 <section id="updates">
 <h2>Updates</h2>
-<p>The app checks this site's <code>release.json</code> shortly after start and once a day after that. A newer build is downloaded, verified against the published SHA-256, and installed only on an explicit <strong>Install &amp; Restart</strong> action in Settings. If installation is blocked, the running build is kept and every step is logged to <code>%APPDATA%\gmatch\main.log</code>.</p>
+<p>The app checks this site's <code>release.json</code> shortly after start and once a day after that, with the public node's manifest as a fallback if this host is unreachable. A newer build is downloaded, checked against the published SHA-256 <em>and</em> byte count, and installed only on an explicit <strong>Install &amp; Restart</strong> action. If the swap is blocked, the running build is kept and every step is written to <code>%APPDATA%\@gmatch\desktop\main.log</code>.</p>
 </section>
 
 <section id="what-it-is">
 <h2>What it is</h2>
-<p>gmatch is a desktop social client built around local-first data and peer-to-peer transport:</p>
+<p>A desktop client built around local-first data and peer-to-peer transport:</p>
 <ul>
-<li>A feed of media <strong>you</strong> publish, with per-post audience;</li>
-<li>Private and group conversations, end-to-end encrypted, addressed through rotating masks (see <a href="#masks">Masks &amp; metadata</a>);</li>
-<li>A shared Watch Party with persistent rooms;</li>
-<li>A small card and idle-game arcade that runs entirely locally;</li>
-<li>A built-in <strong>public world</strong> in Servers, probed live, so a fresh install can meet people without an invite;</li>
-<li>Report-driven moderation: a moderator sees a conversation only when the person involved chooses to disclose that one message.</li>
+<li>A feed of media you publish, with a per-post audience;</li>
+<li>One-to-one and group conversations, sealed end to end and addressed through rotating masks;</li>
+<li>A watch party with persistent rooms;</li>
+<li>A card and idle-game arcade that runs entirely locally;</li>
+<li>Servers: your own node, a friend's, or the built-in public world — all probed, none assumed online;</li>
+<li>Report-driven moderation: a moderator sees a reported item only when the person involved discloses that one item.</li>
 </ul>
 <p>There is no sign-up, e-mail or phone number. Your account is a keypair generated on your own machine; the app asks you to export a backup because nobody can reset a key that never left your device.</p>
 </section>
 
 <section id="watchparty">
-<h2>Watch Party</h2>
+<h2>Watch party</h2>
 <ul>
 <li><strong>Cinema grid:</strong> persistent 16:9 rooms with live member counts and room status.</li>
-<li><strong>Persistent rooms:</strong> a room remains in the directory when everyone leaves, so a group can reconvene without recreating it.</li>
-<li><strong>Background playback:</strong> renderer throttling and occlusion checks are relaxed so playback keeps running while you are in another window or screen-sharing.</li>
+<li><strong>Persistent rooms:</strong> a room stays in the directory when everyone leaves, so a group can reconvene without recreating it.</li>
+<li><strong>Background playback:</strong> renderer throttling and occlusion checks are relaxed so playback continues while you are in another window.</li>
 <li><strong>Low-latency room chat:</strong> ephemeral messages sized for watch-along conversation.</li>
 </ul>
 </section>
 
-<section id="security">
-<h2>Security model: what the relay can and cannot see</h2>
-<p>The hosted side of this project runs a download surface and a <strong>blind relay</strong>. By design, and documented in the audit report:</p>
+<section id="servers">
+<h2>Servers and the public world</h2>
 <ul>
-<li><strong>Content travels sealed.</strong> Messages, media and rooms are encrypted before they leave your machine. The relay forwards opaque envelopes addressed to rotating tokens; it does not learn sender, recipient or payload.</li>
-<li><strong>No online directory.</strong> Presence is exchanged only between contacts; the server keeps no list of connected users.</li>
+<li><strong>Local node by default:</strong> a packaged install starts its own node, so feed, chat and media data live on the machine that produced them.</li>
+<li><strong>gmatch public:</strong> a built-in full node in the Servers list, probed on screen and joined in one click. A fresh install can meet people without an invite; the row is drawn offline when the probe fails, and nothing is simulated.</li>
+<li><strong>Friends' nodes:</strong> join by address (and password, if the host set one). The directory carries metadata only — name, description, endpoint hint, owner public key, password flag and counts — never content.</li>
+<li><strong>The courier:</strong> the hosted relay moves sealed mail, TURN credentials and directory rows, and answers 404 on stateful routes. It is infrastructure, never a data base.</li>
+<li><strong>Direct when possible, relay when not:</strong> two clients try a direct WebRTC path first; the relay carries frames meanwhile. The UI says which path is in use — <em>direct</em> only after the data channel is validated, <em>relay</em> when a direct hole cannot be punched.</li>
+</ul>
+</section>
+
+<section id="security">
+<h2>Security model</h2>
+<p>What a relay, the public node and an observer can and cannot see:</p>
+<ul>
+<li><strong>Content travels sealed.</strong> Messages, media and room frames are encrypted before they leave your machine; the relay forwards opaque envelopes addressed to rotating tokens.</li>
 <li><strong>API calls are sealed too.</strong> Identity headers and request bodies are encrypted to the node's transport key, so an observer sees ciphertext, not which route or record you touched.</li>
 <li><strong>Media at rest is encrypted.</strong> Cached images are stored with AES-256-GCM under a local key that never leaves the machine, bounded by a size cap; private keys live in the OS vault (DPAPI on Windows).</li>
-<li><strong>Self-hostable.</strong> A packaged install can run its own node: your machine becomes the server, friends join by address, and the public directory carries names and descriptions only.</li>
-<li><strong>Media transfers are end-to-end encrypted (swarm-v1).</strong> The requester advertises a fresh ephemeral X25519 key per transfer, the sender seals a per-transfer data key to it, and every chunk is XChaCha20-Poly1305 with associated data binding the object, transfer, chunk index and requester key. A relay node sees ciphertext and sealed keys.</li>
+<li><strong>Media transfers are end-to-end encrypted (swarm-v1).</strong> The requester advertises a fresh ephemeral X25519 key per transfer, the sender seals a per-transfer data key to it, and every chunk is XChaCha20-Poly1305 with associated data binding the object, transfer, chunk index and requester key. A relay sees ciphertext and sealed keys.</li>
+<li><strong>A full community node stores its community's data.</strong> That is the trade for running a world: the host of the node you join can read the database it keeps. The courier keeps none, and the public node is adminstered like any other community.</li>
+<li><strong>Self-hostable.</strong> Your machine can be the node; friends join by address, and the public directory carries metadata only.</li>
 </ul>
 <p>Read the full white-box report: <a href="legal/security.html">security audit</a>.</p>
 </section>
@@ -213,9 +216,9 @@ footer {
 <ul>
 <li><strong>Identity:</strong> an Ed25519 signing keypair and an X25519 encryption keypair generated on first start. Your public identifier is a SHA-256 digest of the public key. Private keys never leave the device.</li>
 <li><strong>One-to-one messages:</strong> ECIES (X25519 + BLAKE3 + XChaCha20-Poly1305). Only the holder of the recipient's private key can open a message — not the relay, not the sender afterwards.</li>
-<li><strong>Group rooms:</strong> a shared content key circulates sealed from member to member; when a member leaves, the key rotates (epoch), so history stays readable to members while new content is not opened by the retired key.</li>
-<li><strong>Signed, versioned state:</strong> posts, edits, deletions, reactions, follows and profile fields are signed operations with monotonic per-actor sequences. Replicas resolve conflicts deterministically, and a deletion withdraws the replica's stored bytes.</li>
-<li><strong>Media swarm:</strong> per-transfer ephemeral keys and AEAD chunk sealing (see above); plaintext transfer is disabled by default, and content hashes are verified before anything is persisted.</li>
+<li><strong>Group rooms:</strong> the content key is created once and shipped inside the sealed 1:1 invite; each message is group-sealed once and then ECIES-copied to every member's mailbox, so the node relays ciphertext it cannot open. A leave raises the epoch — an equal epoch never replaces a key, a higher one does.</li>
+<li><strong>Signed, versioned state:</strong> posts, edits, deletions, reactions, follows and profile fields are signed operations with monotonic per-actor sequences. Replicas resolve conflicts deterministically, and a deletion withdraws the stored bytes instead of hiding them.</li>
+<li><strong>Media swarm:</strong> per-transfer ephemeral keys and AEAD chunk sealing (above); content hashes are verified before anything is persisted, and a replayed chunk is an idempotent no-op.</li>
 <li><strong>Masks and metadata:</strong> peers address rotating delivery tokens, never raw addresses, and images are stripped of EXIF/GPS, XMP and text containers before they are shared.</li>
 <li><strong>The honest limit:</strong> cryptography protects content in transit and at rest; it does not protect an unlocked computer or a leaked key backup.</li>
 </ul>
@@ -234,9 +237,9 @@ footer {
 <section id="topology">
 <h2>Topology</h2>
 <ul>
-<li><strong>Local node by default:</strong> the packaged app starts its own node, so feed, chat and media data live on the machine that produced them.</li>
-<li><strong>Join a friend's node:</strong> a community node is a complete instance; the directory gossips between nodes so the mesh keeps working without a central hub.</li>
-<li><strong>The hosted relay moves ciphertext only.</strong> It exists so peers behind restrictive networks can still exchange sealed envelopes; it stores no content tables.</li>
+<li><strong>Peer-first.</strong> Clients on the same node find each other through it, then talk directly over WebRTC; clients on different nodes meet through the directory and then try a direct path.</li>
+<li><strong>Relay as a floor, not a ceiling.</strong> When a direct path fails or its deadline expires, frames keep flowing over the node so the mesh still works behind NAT. A later success promotes to direct; the state is never faked.</li>
+<li><strong>No central data store.</strong> The public node is one community among many; the courier stores no content tables, and any node can be replaced by a peer.</li>
 <li><strong>Updates</strong> come from this site's <code>release.json</code> and are hash-verified before installation.</li>
 </ul>
 </section>
@@ -255,6 +258,7 @@ footer {
 <ul>
 <li><strong>Network edge:</strong> any server (and its CDN) sees the client IP at the TCP layer. The application never stores, echoes, logs or renders an IP; that is the boundary of what application code can do.</li>
 <li><strong>Traffic analysis:</strong> without onion routing, an observer can correlate timing and volume. Padding and jitter reduce it; they do not eliminate it.</li>
+<li><strong>Hard NAT:</strong> the relay keeps the mesh working when a direct hole cannot be punched. Cross-network symmetric-NAT behaviour is documented as a runbook and has not yet been exercised end to end.</li>
 <li><strong>Video metadata</strong> (mp4/webm) is not stripped — a parser limitation recorded in the audit.</li>
 <li><strong>No forward secrecy yet:</strong> account keys are static; ratcheting is planned hardening.</li>
 <li><strong>The audit is static</strong> (white-box, reproducible checks), not an external dynamic penetration test.</li>
@@ -290,16 +294,25 @@ footer {
 <h3>Why a desktop executable instead of a website?</h3><p>So media and conversations never transit or rest on a third-party web host. The client runs on your machine and talks to peers or to a node you choose.</p>
 <h3>Can I recover my account if I lose my key?</h3><p>No, by design. Nobody — including this project — can enter an account whose key is gone, which is why the app insists on a key backup.</p>
 <h3>Any telemetry, ads or sign-up?</h3><p>No. Zero analytics, zero cookies on this page, zero registration in the app.</p>
-<h3>What does the hosted relay store?</h3><p>Sealed envelopes with an expiry until the recipient fetches them, plus rotating delivery tokens that are digests of the recipient's public key. Nothing that points to a person.</p>
+<h3>What does the public node store?</h3><p>It is a full community node: the posts, media and conversations of the community that joins it, under the same encryption rules as any other node. The courier stores no content — only sealed envelopes with an expiry and rotating delivery tokens.</p>
 <h3>Does the server see my IP?</h3><p>Any network edge sees it, as with any website visit. The application never stores, logs or displays it, and conversations address rotating masks rather than addresses. See <a href="#limits">known limits</a>.</p>
 <h3>How do I report abuse or a mismatched download?</h3><p>Through the app (Settings → Help) or the <a href="legal/abuse.html">abuse page</a>.</p>
 </section>
 </main>
-</div>
-</div>
 
 <footer>
 <p>Source and audit trail: <a href="https://github.com/9matesu/gmatch">github.com/9matesu/gmatch</a> · Reports: <a href="legal/abuse.html">abuse page</a> · This page makes no requests to third parties.</p>
 </footer>
+</div>
+
+<aside class="col-shots" id="screens" aria-label="Screenshots">
+<h2>Screens — current build</h2>
+<p class="note">Real UI shell; synthetic placeholder media, no external image traffic.</p>
+<figure><img src="img/feed.png" alt="The social feed with a post composer and media grid"><figcaption>The feed: per-post audience, local storage, encrypted media cache.</figcaption></figure>
+<figure><img src="img/servers.png" alt="The Servers list showing the built-in public world and a local node"><figcaption>Servers: your node, friends' nodes and the built-in public world.</figcaption></figure>
+<figure><img src="img/watch.png" alt="Watch party room grid"><figcaption>Watch party: persistent rooms and live member counts.</figcaption></figure>
+</aside>
+
+</div>
 </body>
 </html>

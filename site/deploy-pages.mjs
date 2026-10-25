@@ -1,8 +1,9 @@
 // Deploy the release page to Cloudflare Pages (project `gmatch`).
 //
-// Only the public files ship — index.html, release.json and legal/ — staged in
-// a temp dir outside the workspace (wrangler refuses to run at a workspace
-// root, and the 100 MB exe must never be uploaded). Run from site/:
+// Only the public files ship — index.html, release.json, img/ (favicon +
+// screenshots) and legal/ — staged in a temp dir outside the workspace
+// (wrangler refuses to run at a workspace root, and the 100 MB exe must never
+// be uploaded). Run from site/:
 //
 //   node deploy-pages.mjs
 //
@@ -18,6 +19,7 @@ const stage = mkdtempSync(join(tmpdir(), 'gmatch-site-'))
 try {
   cpSync(join(here, 'index.html'), join(stage, 'index.html'))
   cpSync(join(here, 'release.json'), join(stage, 'release.json'))
+  cpSync(join(here, 'img'), join(stage, 'img'), { recursive: true })
   cpSync(join(here, 'legal'), join(stage, 'legal'), { recursive: true })
 
   const args = [

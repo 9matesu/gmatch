@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased — release page redesign
+
+- `gmatch.pages.dev` is now a three-column page: section index, main content and
+  a column of current-build screenshots. The copy was rewritten against
+  `docs/SPEC.md` and `docs/ARCHITECTURE-P2P.md`; deprecated statements are gone
+  (no "no online directory", no WebTorrent/infohash claims, and the relay is no
+  longer described as the only hosted side).
+- The page uses the application icon as its favicon. Screenshots are produced by
+  `apps/desktop/e2e/capture.spec.ts` from the real UI over synthetic 1x1
+  placeholder media, and `site/deploy-pages.mjs` stages `img/` with the page.
+- In the app, the Servers empty state no longer claims there is no public
+  directory, and the guide/backfill copy stops calling `gmatch.fly.dev` a
+  "legacy server" or a "WebTorrent mesh".
+
 ## 1.6.4 — release feed on Cloudflare Pages
 
 - The project site moved to Cloudflare Pages at `https://gmatch.pages.dev`

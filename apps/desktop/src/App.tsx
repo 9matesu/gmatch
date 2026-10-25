@@ -1502,7 +1502,7 @@ export default function Home() {
   const apiNodeLabel = useMemo(() => {
     try {
       const base = getApiBaseUrl()
-      if (!base) return 'central relay'
+      if (!base) return 'relay'
       return new URL(base, 'http://localhost').hostname || base
     } catch {
       return 'this node'

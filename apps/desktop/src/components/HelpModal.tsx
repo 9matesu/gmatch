@@ -260,7 +260,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                 <div>
                   <h3 className="text-sm font-bold text-retro-fg">Quickstart</h3>
                   <p className="text-xs text-retro-muted mt-0.5">
-                    gMatch is a decentralized media and card gaming app running over a peer-to-peer WebTorrent mesh.
+                    gMatch is peer-to-peer social software: a feed, sealed conversations, watch parties and a card game, with the data kept on your device.
                   </p>
                 </div>
 
@@ -290,7 +290,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                     <div className="p-3 bg-surface-interactive/60 border border-border-glass rounded-lg space-y-1">
                       <span className="font-bold text-retro-fg">2. Zero central storage</span>
                       <p className="text-retro-muted leading-relaxed">
-                        Media is addressed by BitTorrent infohashes. Every post you view is retrieved from and seeded to other players over the mesh.
+                        Media is addressed by content hashes. A post you view is fetched from peers in encrypted chunks and cached locally; a full community node keeps its own community's copy.
                       </p>
                     </div>
                     <div className="p-3 bg-surface-interactive/60 border border-border-glass rounded-lg space-y-1">

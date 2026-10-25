@@ -25,9 +25,20 @@ node check.mjs                            # must print OK
 node deploy-pages.mjs                     # stages + uploads, no exe
 ```
 
-`deploy-pages.mjs` copies only `index.html`, `release.json` and `legal/` into a
-temp dir and deploys that, so no binary can leak into the artifact. It must run
-wrangler from outside this workspace (wrangler refuses the workspace root).
+`deploy-pages.mjs` copies only `index.html`, `release.json`, `img/` (favicon and
+capture screenshots) and `legal/` into a temp dir and deploys that, so no binary
+can leak into the artifact. It must run wrangler from outside this workspace
+(wrangler refuses the workspace root).
+
+Screenshots are regenerated from the app itself, never hand-made:
+
+```bash
+cd ../apps/desktop && NODE_ENV=test npx playwright test e2e/capture.spec.ts
+```
+
+That spec drives the real UI against synthetic 1x1 placeholder media, so no
+external image is fetched and nothing adult is captured. Output lands in
+`site/img/` (`feed`, `servers`, `watch`, `games-hub`, `idle-grid`, `cards`).
 
 The download link always points at the GitHub Release asset. `release.json` is
 derived from the published bytes, so its sha256/size describe exactly what

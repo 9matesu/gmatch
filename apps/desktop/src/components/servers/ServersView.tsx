@@ -1882,12 +1882,6 @@ export function ServersView({
               </div>
             )}
 
-            {!central && (
-              <div className="px-3 py-1.5 border-b border-border-subtle text-[10px] text-retro-muted shrink-0">
-                No central node is configured, so there is no public directory to discover servers on. Add its address under the directory menu.
-              </div>
-            )}
-
             {/* ONE list: every server this client knows, the current one first. */}
             <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar px-4 py-2">
               {/* A failed directory request never erases servers we already know. */}

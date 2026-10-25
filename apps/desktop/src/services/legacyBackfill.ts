@@ -177,10 +177,10 @@ export async function runLegacyBackfill(
     total: 0,
     current: 0,
     migratedCount: 0,
-    message: 'Connecting to legacy server (gmatch.fly.dev)...',
+    message: 'Connecting to gmatch.fly.dev...',
   })
 
-  // 1. Probe legacy server health
+  // 1. Probe gmatch public health
   try {
     const healthProbe = await legacyGet('/api/health', identity, fetchImpl, 5000)
     if (!healthProbe.ok) {
@@ -189,7 +189,7 @@ export async function runLegacyBackfill(
         total: 0,
         current: 0,
         migratedCount: 0,
-        message: 'Legacy server is currently offline or unreachable.',
+        message: 'gmatch public is currently offline or unreachable.',
       })
       return { migratedCount: 0 }
     }
@@ -200,7 +200,7 @@ export async function runLegacyBackfill(
       total: 0,
       current: 0,
       migratedCount: 0,
-      message: `Legacy server unreachable: ${msg}`,
+      message: `gmatch public unreachable: ${msg}`,
     })
     return { migratedCount: 0 }
   }
