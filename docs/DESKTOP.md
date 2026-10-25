@@ -164,10 +164,9 @@ Two edges matter when debugging a user's "my keepsake is gone":
 
 ## Self-update (`electron/updater.cjs`, `updater-core.cjs`)
 
-Feed: the project site's `release.json`, tried on **two hosts** — the Pages
-site at `https://matesu.me/gmatch/release.json` (custom domain; the
-`9matesu.github.io` alias redirects to plain HTTP, so it is not the feed URL)
-and `https://gmatch.fly.dev/release.json`. Both are asked on every check; the
+Feed: the project site's `release.json`, tried on **two hosts** — Cloudflare
+Pages `https://gmatch.pages.dev/release.json` and the public node
+`https://gmatch.fly.dev/release.json`. Both are asked on every check; the
 winner is the highest version among the hosts that answered. The manifest
 carries the absolute `downloadUrl` (the GitHub Release asset) plus the
 sha256/size of those exact bytes, and the updater verifies both before the

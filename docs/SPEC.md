@@ -440,11 +440,13 @@ offline earnings). Each +5% click power. Persist across prestige.
   and `GET /u/:id` (profile), XSS-escaped, unauthenticated; `GET /api/users/:id`
   serves sanitized profiles. Deep links `#/feed?post=<id>` open the lightbox.
 - Build: `cd apps/desktop && npm run dist`. The canonical download is the
-  GitHub Release asset, linked from the Pages manifest `site/release.json`
+  GitHub Release asset, linked from the site manifest `site/release.json`
   (hash, size and build date derived from the shipped exe by
-  `site/build-release.mjs`); tagging `v*` also fires
+  `site/build-release.mjs`); tagging `v*` fires
   `.github/workflows/release.yml` (lint+typecheck+test gate → GitHub Release
-  asset). Unsigned exe → SmartScreen "More info → Run anyway".
+  asset). The page is served by Cloudflare Pages at `https://gmatch.pages.dev`
+  from `site/` (binaries are never part of that artifact). Unsigned exe →
+  SmartScreen "More info → Run anyway".
 - Portable self-updater (`electron/updater.cjs` + `updater-core.cjs`,
   packaged builds only): daily + manual check of the site `release.json`,
   auto-download verified against the published SHA-256 **and** size, then the
@@ -467,13 +469,13 @@ offline earnings). Each +5% click power. Persist across prestige.
 purpose.** The end state is **direct peer-to-peer**: no central host stores
 posts, media, comments, likes, profiles or presence.
 
-- `gmatch.fly.dev` is **frozen and decommissioning**. It is stuck on an old
-  release and is not being redeployed; nothing may depend on it. It stays
-  visible in the server list only as an ordinary destination.
-- `gmatch-wcz1.onrender.com` (Render) is the current stand-in for the blind
-  courier and the release feed. It is expected to go the same way once the
-  stateful routes it still answers are gone (see `docs/API-INVENTORY.md` for
-  what each route is and what replaces it).
+- `gmatch.fly.dev` is a **live full node** and the built-in public world
+  ("gMatch Central") in Servers: probed on screen, joinable in one click, and
+  drawn offline when the probe fails. Nothing assumes it is reachable.
+- `gmatch-wcz1.onrender.com` (Render) is a **blind courier** (sealed mail,
+  TURN, node directory) and 404s every stateful route; it is never a data
+  base. See `docs/API-INVENTORY.md` for what each route is and what replaces
+  it.
 - What legitimately remains central is a **rendezvous** (sealed mail, TURN,
   the node directory) and — optionally — a node one of the players hosts.
   Both are replaceable by any peer; the app must keep working with neither.
@@ -482,9 +484,10 @@ Consequences that are already implemented:
 - The updater asks **two** release hosts and takes the highest version among
   the ones that answer; a host that is asleep, stuck or down is skipped
   (8 s budget each) instead of blocking the check.
-- `site/releases/` carries **only the current artifact**; older versions live
-  in their GitHub Releases. A tree with every historical exe is a
-  build-context problem, not a convenience.
+- `site/releases/` is **local staging only** (gitignored): the published
+  artifact lives in its GitHub Release and the site links it by absolute URL
+  with the hash in `release.json`. A site artifact carrying every historical
+  exe is a build-context problem, not a convenience.
 - The last host-dependent piece is the **release feed itself**: when the
   hosts are gone, the artifact has to be served by peers (or by the user),
   and until then the updater must say "no host answered" honestly rather than

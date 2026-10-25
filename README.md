@@ -55,7 +55,7 @@ packages/protocol    Signed operations, swarm-v1 chunk crypto, replication recei
 packages/shared      Shared types and tag/taxonomy helpers
 shared/              blocklist.json and sources.json (single source of truth)
 docs/                Architecture, protocol, security audits, roadmap
-site/                GitHub Pages release page (static, no JavaScript)
+site/                Cloudflare Pages release page (static, no JavaScript)
 ```
 
 ## Build and verify

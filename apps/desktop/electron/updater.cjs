@@ -22,7 +22,7 @@ const core = require('./updater-core.cjs')
 // version across the feeds that answered, and the download URL always comes
 // from the SAME feed entry that served it (the hash and the bytes must match).
 const RELEASE_FEEDS = [
-  { url: 'https://matesu.me/gmatch/release.json', base: 'https://matesu.me/gmatch' },
+  { url: 'https://gmatch.pages.dev/release.json', base: 'https://gmatch.pages.dev' },
   { url: 'https://gmatch.fly.dev/release.json', base: 'https://gmatch.fly.dev' },
 ]
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000

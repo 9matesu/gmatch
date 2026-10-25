@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.4 — release feed on Cloudflare Pages
+
+- The project site moved to Cloudflare Pages at `https://gmatch.pages.dev`
+  (GitHub Pages redirected every project page to the maintainer's personal
+  domain). The updater's first feed is that manifest; the public node stays as
+  the fallback. `site/DEPLOY.md` documents the deploy.
+- Removed the GitHub Pages workflow; the site artifact never carries binaries.
+
 ## 1.6.3 — public world
 
 - Servers now offers a built-in **gmatch public** world — the full public node —

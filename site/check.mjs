@@ -68,10 +68,10 @@ for (const [file, ids] of Object.entries(SECTIONS)) {
   for (const m of html.matchAll(/href="#([^"]+)"/g))
     if (!new RegExp(`id="${m[1]}"`).test(html)) fail.push(`${file}: broken anchor #${m[1]}`)
   for (const id of ids) if (!html.includes(`id="${id}"`)) fail.push(`${file}: missing section #${id}`)
-  // The Pages artifact strips releases/*.exe, so the only honest href is the
+  // The site artifact never carries binaries, so the only honest href is the
   // canonical asset URL recorded in release.json. A local href ships dead.
   const remote = rel.downloadUrl ? html.includes(`href="${rel.downloadUrl}"`) : false
-  if (!remote) fail.push(`${file}: download href must be the canonical downloadUrl in release.json (Pages strips releases/*.exe)`)
+  if (!remote) fail.push(`${file}: download href must be the canonical downloadUrl in release.json (binaries live in GitHub Releases)`)
 }
 
 if (fail.length) {
