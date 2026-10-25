@@ -21,20 +21,33 @@
   mode); the dev port stays strict (`5173`). Local storage, IndexedDB and the
   identity are origin-bound, so a silent fallback to `5174` made a returning
   user's posts and keys look deleted.
-
-## Unreleased — release page redesign
-
-- `gmatch.pages.dev` is now a three-column page: section index, main content and
+- The page is now a three-column release page: section index, main content and
   a column of current-build screenshots. The copy was rewritten against
   `docs/SPEC.md` and `docs/ARCHITECTURE-P2P.md`; deprecated statements are gone
   (no "no online directory", no WebTorrent/infohash claims, and the relay is no
-  longer described as the only hosted side).
-- The page uses the application icon as its favicon. Screenshots are produced by
+  longer described as the only hosted side). Screenshots are produced by
   `apps/desktop/e2e/capture.spec.ts` from the real UI over synthetic 1x1
   placeholder media, and `site/deploy-pages.mjs` stages `img/` with the page.
-- In the app, the Servers empty state no longer claims there is no public
+  In the app, the Servers empty state no longer claims there is no public
   directory, and the guide copy stops calling the old hosted node a "legacy
   server" or a "WebTorrent mesh".
+
+## Unreleased — direct NAT traversal, silent probes
+
+- Direct NAT traversal: STUN moved to Cloudflare (`stun.cloudflare.com:3478` —
+  stateless, anonymous, a few packets per connection) and `srflx` reflexive
+  candidates are exchanged, so peers on different NATs hole-punch into a real
+  direct DataChannel instead of always falling back to the relay. Literal-IP
+  `host` candidates still never leave the machine (mDNS only); TURN env still
+  forces full relay for a zero-exposure posture. SPEC §10c, SECURITY.md and
+  README updated to the same posture.
+- The node-capability probe (`/api/lobby/invites`) is signed when an identity
+  is available: a full node answers 200 and the browser console stays clean
+  (the unsigned probe logged a 401 on every boot). Mail-mode detection
+  short-circuits the Cloudflare courier and the loopback sidecar without a
+  wire probe, and the legacy DM fetch waits for the probe — the three boot
+  console errors (401 on `/api/lobby/invites`, 404 on `HEAD /api/pm`, 404 on
+  `GET /api/pm?peer=`) are gone.
 
 ## 1.6.4 — release feed on Cloudflare Pages
 

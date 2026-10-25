@@ -18,11 +18,11 @@ function isParticipant(offer: { sender_id: string; receiver_id: string }, orbitI
 }
 
 /**
- * ICE hygiene (server-side gate, defense in depth): a candidate carrying a
- * literal IPv4/IPv6 host/srflx/prflx address leaks the sender's IP to the
- * peer. Only mDNS host candidates (.local) and TURN relay candidates pass.
- * Mirrors apps/desktop/src/utils/ice-hygiene.ts (trust-domain boundary —
- * the vendored API stays dependency-only, so the rule is duplicated).
+ * ICE hygiene (server-side gate, defense in depth): literal IPv4/IPv6 `host`
+ * addresses leak the LAN — those stay blocked. mDNS host candidates (.local),
+ * `srflx`/`prflx` reflexive candidates (the NAT traversal) and TURN relay
+ * candidates pass. Mirrors apps/desktop/src/utils/ice-hygiene.ts (trust-domain
+ * boundary — the vendored API stays dependency-only, so the rule is duplicated).
  */
 export function candidateLeaksIp(candidate: unknown): boolean {
   try {
@@ -36,7 +36,7 @@ export function candidateLeaksIp(candidate: unknown): boolean {
     const type = typIdx >= 0 ? parts[typIdx + 1] : ''
     if (type === 'relay') return false
     if (type === 'host') return !address.endsWith('.local')
-    if (type === 'srflx' || type === 'prflx') return true // public IPs by definition
+    if (type === 'srflx' || type === 'prflx') return false // reflexive = NAT traversal
     return true
   } catch {
     return true

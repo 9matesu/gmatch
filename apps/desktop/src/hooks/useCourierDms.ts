@@ -7,7 +7,7 @@ import { deliveryToken } from '@orbit/protocol'
 import { rotateEpoch, peerAddressToken, type EpochState } from '../utils/handleRotation'
 import { getSecureItem, setSecureItem } from '../utils/secure-storage'
 import { RoomManager, type Room, type RoomMessage } from '../utils/rooms'
-import { detectMailMode, cachedMailMode, isKnownSiteCourier, type MailMode } from '../utils/mail-mode'
+import { detectMailMode, staticMailMode, cachedMailMode, isKnownSiteCourier, type MailMode } from '../utils/mail-mode'
 import { getApiBaseUrl } from '../utils/api'
 import { getCentralApiUrl } from '../utils/central'
 import { logger } from '../utils/logger'
@@ -53,8 +53,11 @@ export interface CourierDeps {
  */
 export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps = {}) {
   const [mode, setMode] = useState<MailMode>(() => {
+    // Known courier hosts / the loopback sidecar run current code: start in
+    // courier mode right away so no legacy fetch fires before the probe
+    // resolves. A bare/relative base still waits for the wire probe.
     const base = mailBase()
-    if (isKnownSiteCourier(base)) return 'courier'
+    if (isKnownSiteCourier(base) || staticMailMode(base)) return 'courier'
     return cachedMailMode(base) || 'legacy'
   })
   const [threads, setThreads] = useState<Record<string, DmMessage[]>>({})

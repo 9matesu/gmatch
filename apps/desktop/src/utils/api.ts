@@ -35,6 +35,24 @@ export function isCourierApiUrl(url: string | null | undefined): boolean {
   return isCourierHost(url);
 }
 
+/**
+ * Hosts that were decommissioned outright (Render courier, the Fly full node).
+ * They can never serve data again, so any stored pointer to them is stale by
+ * definition and the boot migration must drop it — otherwise an install that
+ * joined the old public world keeps its data API aimed at a dead host.
+ */
+const RETIRED_HOSTS = /(^|\.)(onrender\.com|fly\.dev)$/;
+
+export function isRetiredApiUrl(url: string | null | undefined): boolean {
+  if (!url?.trim()) return false;
+  try {
+    return RETIRED_HOSTS.test(new URL(url.trim()).hostname);
+  } catch {
+    return false;
+  }
+}
+
+
 function computeApiBase(): string {
   // A manual override is explicit intent — it wins everywhere, including
   // browser dev on localhost (that is how the courier E2E points two
@@ -256,17 +274,21 @@ const SERVER_MARKER = 'gmatch.onboarding.serverUrl'
  * wrote the BLIND COURIER into `gmatch.api.url`, the marker key and a 1-year
  * `gmatch_server_url` cookie. A courier 404s (now 503s) every stateful route, so
  * that state wedges dev and packaged clients alike until it is cleared by hand.
- * The courier is a directory/mail/TURN node, never a data base — drop it and
+ * Retired hosted nodes (Render, Fly) get the same treatment: they cannot serve
+ * data again, and a stored pointer keeps the data API aimed at a dead host.
+ * The courier is a directory/mail node, never a data base — drop it and
  * let API_BASE fall through to the sidecar / dev node. Returns true when
  * something was purged.
  */
 export function purgeCourierApiState(): boolean {
   let purged = false
+  const stale = (value: string | null | undefined): boolean =>
+    isCourierApiUrl(value) || isRetiredApiUrl(value)
   try {
     if (typeof localStorage !== 'undefined') {
       for (const key of ['gmatch.api.url', SERVER_MARKER]) {
         const value = localStorage.getItem(key)
-        if (value?.trim() && isCourierApiUrl(value)) {
+        if (value?.trim() && stale(value)) {
           localStorage.removeItem(key)
           purged = true
         }
@@ -276,7 +298,7 @@ export function purgeCourierApiState(): boolean {
   try {
     if (typeof document !== 'undefined' && document.cookie.includes(`${SERVER_COOKIE}=`)) {
       const value = readCookie(SERVER_COOKIE)
-      if (isCourierApiUrl(value)) {
+      if (stale(value)) {
         document.cookie = `${SERVER_COOKIE}=; path=/; max-age=0`
         purged = true
       }

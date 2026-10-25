@@ -393,11 +393,11 @@ describe('Signal API — authorization (only participants)', () => {
 })
 
 describe('candidateLeaksIp (ICE hygiene gate)', () => {
-  it('passes mDNS host + relay, drops literal-IP host + srflx', () => {
+  it('passes mDNS host, relay and srflx; drops literal-IP host + junk', () => {
     expect(candidateLeaksIp({ candidate: 'candidate:1 1 udp 100 me.local 54321 typ host' })).toBe(false)
     expect(candidateLeaksIp({ candidate: 'candidate:3 1 udp 150 198.51.100.9 50000 typ relay' })).toBe(false)
+    expect(candidateLeaksIp({ candidate: 'candidate:2 1 udp 100 203.0.113.7 41234 typ srflx' })).toBe(false)
     expect(candidateLeaksIp({ candidate: 'candidate:1 1 udp 100 192.168.1.5 54321 typ host' })).toBe(true)
-    expect(candidateLeaksIp({ candidate: 'candidate:2 1 udp 100 203.0.113.7 41234 typ srflx' })).toBe(true)
   })
   it('end-of-candidates marker passes; junk fails closed', () => {
     expect(candidateLeaksIp({ candidate: '' })).toBe(false)

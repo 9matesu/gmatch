@@ -1980,10 +1980,15 @@ export default function Home() {
   // of letting the click fail as a bare 404 toast.
   const [statefulNode, setStatefulNode] = useState<boolean | null>(null)
   useEffect(() => {
+    // The probe is signed when an identity exists (a full node answers 200 and
+    // the console stays clean; unsigned it answers 401 = mounted, which still
+    // proves the route). Until the keypair hydrates, state stays null —
+    // invites stay enabled and a click falls back to the honest toast.
+    if (!identity) return
     let alive = true
-    void hasStatefulRoutes(getApiBaseUrl()).then((v) => { if (alive) setStatefulNode(v) })
+    void hasStatefulRoutes(getApiBaseUrl(), identity).then((v) => { if (alive) setStatefulNode(v) })
     return () => { alive = false }
-  }, [])
+  }, [identity])
   const inviteUnavailableReason = statefulNode === false
     ? 'This node only relays sealed mail — game invites need a node that hosts matches.'
     : null
@@ -2359,7 +2364,11 @@ export default function Home() {
       // Server /api/pm/read is retired; unread state tracked locally
       void loadPmUnreadCount();
     }
-    return orbitFetch(`/api/pm?peer=${encodeURIComponent(peerId)}&_t=${Date.now()}`, {}, identity)
+    // Await the mode probe before deciding: firing the legacy fetch while the
+    // node is courier-only 404-spams the console (same gate as loadPmThreads).
+    return detectMailMode(getApiBaseUrl()).then((mode) => {
+      if (mode === 'courier') return
+      return orbitFetch(`/api/pm?peer=${encodeURIComponent(peerId)}&_t=${Date.now()}`, {}, identity)
       .then(async (res) => {
         if (!res.ok) return
         const data = await res.json()
@@ -2393,6 +2402,7 @@ export default function Home() {
         }
       })
       .catch(() => { })
+    })
   }, [identity, users, myProfile.displayName, loadPmUnreadCount, courierActive, courierPull, courierThreadFor, courierMarkRead, stampDmSeen])
 
   // Courier threads ARE the local source of truth. Mirror the open thread into

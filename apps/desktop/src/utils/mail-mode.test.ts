@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { detectMailMode, cachedMailMode, _resetMailModeCache } from './mail-mode'
+import { detectMailMode, staticMailMode, cachedMailMode, _resetMailModeCache } from './mail-mode'
 
 function fetchReturning(status: number) {
   return vi.fn(async () => new Response('{}', { status })) as unknown as typeof fetch
@@ -51,5 +51,25 @@ describe('courier-mode detection', () => {
     expect(await detectMailMode('https://gmatch.pages.dev', fetchFn)).toBe('courier')
     expect(await detectMailMode('https://preview.gmatch.pages.dev/', fetchFn)).toBe('courier')
     expect(fetchFn).not.toHaveBeenCalled()
+  })
+
+  it('loopback (bundled sidecar / dev node) is courier without probing', async () => {
+    const fetchFn = vi.fn() as unknown as typeof fetch
+    for (const base of ['http://127.0.0.1:8790', 'http://localhost:8790']) {
+      _resetMailModeCache()
+      expect(await detectMailMode(base, fetchFn)).toBe('courier')
+      expect(staticMailMode(base)).toBe('courier')
+    }
+    expect(fetchFn).not.toHaveBeenCalled()
+  })
+
+  it('a bare/relative base still goes to the wire (directory-disabled may front a legacy node)', async () => {
+    expect(staticMailMode('')).toBeUndefined()
+    expect(await detectMailMode('', fetchReturning(401))).toBe('legacy')
+  })
+
+  it('an unknown remote host still goes to the wire', async () => {
+    expect(staticMailMode('http://node.example')).toBeUndefined()
+    expect(await detectMailMode('http://node.example', fetchReturning(404))).toBe('courier')
   })
 })

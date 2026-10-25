@@ -8,6 +8,13 @@
  * /api/pm to a current node used to 404 with "Could not send message".
  * Result is cached per API base; failures fall back to 'courier' (the
  * sealed-envelope path is the only one that still works everywhere).
+ *
+ * Bases that can only ever run current code skip the wire probe entirely:
+ * the Cloudflare courier (isKnownSiteCourier) and the bundled loopback
+ * sidecar (staticMailMode). Probing them only produced console 404 noise.
+ * A bare/relative base (browser-dev proxy) is NOT short-circuited: with the
+ * directory disabled it may front a legacy node, and the probe is the only
+ * way to tell.
  */
 
 export type MailMode = 'courier' | 'legacy'
@@ -15,19 +22,32 @@ export type MailMode = 'courier' | 'legacy'
 const cache = new Map<string, MailMode>()
 const inflight = new Map<string, Promise<MailMode>>()
 
-export function cachedMailMode(apiBase: string): MailMode | undefined {
-  return cache.get(apiBase.replace(/\/+$/, ''))
-}
-
+/**
+ * Hosted nodes we know run current code — no wire probe needed. Cloudflare
+ * Pages serves the release page and the blind courier on the same origin,
+ * preview subdomains included.
+ */
 export function isKnownSiteCourier(url: string): boolean {
   try {
     const host = new URL(url.startsWith('http') ? url : `http://${url}`).hostname.toLowerCase()
-    // Cloudflare Pages serves the release page and the blind courier on the
-    // same origin, preview subdomains included.
     return /(^|\.)gmatch\.pages\.dev$/.test(host)
   } catch {
     return false
   }
+}
+
+/** Loopback (the bundled sidecar / dev node): current code, always courier. */
+export function staticMailMode(apiBase: string): MailMode | undefined {
+  const base = (apiBase || '').trim()
+  try {
+    const host = new URL(base.startsWith('http') ? base : `http://${base}`).hostname.toLowerCase()
+    if (host === '127.0.0.1' || host === 'localhost' || host === '[::1]' || host === '0.0.0.0') return 'courier'
+  } catch { /* unparseable — fall through to the probe */ }
+  return undefined
+}
+
+export function cachedMailMode(apiBase: string): MailMode | undefined {
+  return cache.get(apiBase.replace(/\/+$/, ''))
 }
 
 export async function detectMailMode(
@@ -41,8 +61,9 @@ export async function detectMailMode(
   if (ongoing) return ongoing
   const p = (async (): Promise<MailMode> => {
     try {
-      // 1. Central official site runs strictly in courier mode
-      if (isKnownSiteCourier(base)) {
+      // 1. Cloudflare courier / loopback sidecar run current code: courier,
+      //    no wire probe.
+      if (isKnownSiteCourier(base) || staticMailMode(base)) {
         cache.set(base, 'courier')
         return 'courier'
       }
