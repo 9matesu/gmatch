@@ -33,7 +33,7 @@ conversation only after the person involved discloses that one item.
 
 ## Find players
 
-Servers ships one built-in destination: **gmatch public** — a full node, probed
+Servers ships one built-in destination: **gmatch Node** — a full node, probed
 on the screen and joined in one click, so a fresh install with no contacts can
 reach people without knowing an address. The row is drawn offline when the probe
 fails; nothing is simulated. Verify it from a terminal with:

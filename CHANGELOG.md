@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased — gmatch Node, direct-first dev
+
+- Servers lists **gmatch Node** (the maintainer's full node at `gmatch.fly.dev`)
+  instead of "gmatch public"; the separate "gMatch Central" row is gone. A
+  configured hub is a directory, not a destination, so it is never listed as a
+  server. Anyone can still run another node and share it.
+- `npm run dev` now uses the local Bun sidecar (the same full node a packaged
+  install runs) unless `GMATCH_DEV_API=remote` is set; it no longer logs that it
+  is using the hosted courier.
+- The dev port is strict (`5173`). Local storage, IndexedDB and the identity are
+  bound to the origin, so a silent fallback to `5174` made a returning user's
+  posts and keys look deleted (and their own media "waiting for a seeder").
+  A busy port is now an error.
+
 ## Unreleased — release page redesign
 
 - `gmatch.pages.dev` is now a three-column page: section index, main content and

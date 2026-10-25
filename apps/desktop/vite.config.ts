@@ -611,6 +611,10 @@ export default defineConfig({
     },
   },
   server: {
+    // Origin = storage: keep the dev port stable (see scripts/dev.cjs). A busy
+    // port must fail loudly instead of silently forking localStorage/IndexedDB.
+    port: 5173,
+    strictPort: true,
     // Dev-only proxy: routes booru mirrors and legacy fly endpoints for browser dev.
     proxy: {
       '^/fly-api': {

@@ -469,9 +469,12 @@ offline earnings). Each +5% click power. Persist across prestige.
 purpose.** The end state is **direct peer-to-peer**: no central host stores
 posts, media, comments, likes, profiles or presence.
 
-- `gmatch.fly.dev` is a **live full node** and the built-in public world
-  ("gMatch Central") in Servers: probed on screen, joinable in one click, and
-  drawn offline when the probe fails. Nothing assumes it is reachable.
+- `gmatch.fly.dev` is a **live full node** run by the maintainer and offered as
+  **gmatch Node** in Servers: probed on screen, joinable in one click, and drawn
+  offline when the probe fails. Nothing assumes it is reachable.
+- There is no "gMatch Central" row any more (2026-10-24): the configured
+  directory hub is not a destination and is never listed as one. A hub only
+  publishes directory rows.
 - `gmatch-wcz1.onrender.com` (Render) is a **blind courier** (sealed mail,
   TURN, node directory) and 404s every stateful route; it is never a data
   base. See `docs/API-INVENTORY.md` for what each route is and what replaces
@@ -509,7 +512,7 @@ ADR-002 (`docs/ADR-002-servers.md`) é canônico; resumo de operação:
 - **Lista**: um nó que hospeda um mundo é um servidor, inclusive o que roda nesta
   máquina — uma linha por endereço (`dedupeServers`), nunca por nome. O courier
   central (mail/turn/diretório) é infraestrutura e não aparece; o mundo público
-  `gmatch public` (`https://gmatch.fly.dev`) é embutido na lista, com probe de
+  `gmatch Node` (`https://gmatch.fly.dev`) é embutido na lista, com probe de
   saúde próprio, e é o caminho para encontrar players sem conhecer um endereço.
   Grupos locais são rótulo só deste dispositivo (rodapé → diálogo), nunca um
   destino. O app nunca assume o nó público online: sem resposta do probe, a linha

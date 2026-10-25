@@ -190,8 +190,8 @@ footer { margin-top: 64px; padding-top: 20px; border-top: 1px solid #1f1f23; col
 <h2>Servers and the public world</h2>
 <ul>
 <li><strong>Local node by default:</strong> a packaged install starts its own node, so feed, chat and media data live on the machine that produced them.</li>
-<li><strong>gmatch public:</strong> a built-in full node in the Servers list, probed on screen and joined in one click. A fresh install can meet people without an invite; the row is drawn offline when the probe fails, and nothing is simulated.</li>
-<li><strong>Friends' nodes:</strong> join by address (and password, if the host set one). The directory carries metadata only — name, description, endpoint hint, owner public key, password flag and counts — never content.</li>
+<li><strong>gmatch Node:</strong> the maintainer's full node, built into the Servers list, probed on screen and joined in one click. A fresh install can meet people without an invite; the row is drawn offline when the probe fails, and nothing is simulated.</li>
+<li><strong>Anyone can run another node:</strong> host your own from the desktop app, or join a friend's by address (and password, if they set one) — it is a different server, with its own database and its own admin. The directory carries metadata only — name, description, endpoint hint, owner public key, password flag and counts — never content.</li>
 <li><strong>The courier:</strong> the hosted relay moves sealed mail, TURN credentials and directory rows, and answers 404 on stateful routes. It is infrastructure, never a data base.</li>
 <li><strong>Direct when possible, relay when not:</strong> two clients try a direct WebRTC path first; the relay carries frames meanwhile. The UI says which path is in use — <em>direct</em> only after the data channel is validated, <em>relay</em> when a direct hole cannot be punched.</li>
 </ul>

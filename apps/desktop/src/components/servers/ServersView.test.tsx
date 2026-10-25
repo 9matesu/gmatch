@@ -120,8 +120,8 @@ describe('ServersView', () => {
     await screen.findByText(/other\.test:8790/)
     const rows = screen.getAllByRole('listitem')
     // current node (2 records collapsed) + the namesake on another address +
-    // gMatch Central (configured hub) + the built-in public world
-    expect(rows).toHaveLength(4)
+    // the built-in gmatch Node
+    expect(rows).toHaveLength(3)
     expect(screen.getAllByText('My Realm')).toHaveLength(2)
   })
 
@@ -171,33 +171,11 @@ describe('ServersView', () => {
       return json({})
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('gMatch Central')
+    await screen.findByText('gmatch Node')
     // the courier is a directory, not a destination: no row, no transport chip
-    expect(screen.queryByText(/gMatch Central \(p2p\)/i)).toBeNull()
+    expect(screen.queryByText(/gmatch Node \(p2p\)/i)).toBeNull()
     expect(screen.queryByText('Relay')).toBeNull()
     expect(screen.queryByText(/relay transport/i)).toBeNull()
-  })
-
-  it('keeps the configured hub as an ordinary row with a menu-only connect', async () => {
-    mockFetch(async (url) => {
-      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
-      if (url.includes('/api/servers')) return json({ servers: [] })
-      return json({})
-    })
-    const onServerJoined = vi.fn()
-    render(<ServersView identity={identity} toast={() => {}} onServerJoined={onServerJoined} />)
-    await screen.findByText('gMatch Central')
-
-    const centralRow = rowOf('gMatch Central')
-    // The row points at the CONFIGURED hub. The built-in central deployments
-    // are decommissioned and are never offered as a destination.
-    expect(within(centralRow).getByText(/central\.test/)).toBeInTheDocument()
-    expect(within(centralRow).queryByText(/fly\.dev/)).toBeNull()
-    expect(within(centralRow).getByRole('button', { name: /connect to gmatch central/i })).toBeInTheDocument()
-    fireEvent.click(within(centralRow).getByRole('button', { name: /more actions/i }))
-    fireEvent.click(await within(centralRow).findByText('Connect to gMatch Central'))
-    expect(onServerJoined).toHaveBeenCalledWith(expect.objectContaining({ id: 'central-deprecated' }))
-    expect(localStorage.getItem('gmatch.api.url')).toBe('https://central.test')
   })
 
   it('never offers a decommissioned deployment as a destination', async () => {
@@ -210,23 +188,9 @@ describe('ServersView', () => {
     })
     const toast = vi.fn()
     render(<ServersView identity={identity} toast={toast} />)
-    await screen.findByText('gMatch Central')
+    await screen.findByText('gmatch Node')
     // The dead row is filtered out of the list entirely.
     expect(screen.queryByText('Old Central')).toBeNull()
-  })
-
-  it('shows an unavailable destination as unavailable, not as ready to connect', async () => {
-    mockFetch(async (url) => {
-      if (url.includes('central.test')) return json({}, 503)
-      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
-      if (url.includes('/api/servers')) return json({ servers: [] })
-      return json({})
-    })
-    render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('gMatch Central')
-    const centralRow = rowOf('gMatch Central')
-    expect(within(centralRow).getByText('Unavailable')).toBeInTheDocument()
-    expect(within(centralRow).getByRole('button', { name: /connect to gmatch central/i })).toBeDisabled()
   })
 
   it('a listed server with no address is not offered as ready to connect', async () => {
@@ -252,10 +216,8 @@ describe('ServersView', () => {
       return json({})
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('gMatch Central')
-    // the hub entry stays visible and reports its real state...
-    const centralRow = rowOf('gMatch Central')
-    expect(within(centralRow).getByText('Unavailable')).toBeInTheDocument()
+    await screen.findByText('gmatch Node')
+    // the built-in row stays visible even when nothing measured it...
     // ...and no row invents a member figure out of nothing
     expect(screen.queryByText(/\d+ \/ \d+/)).toBeNull()
     // one header action, and no second "Add server" entry point outside it
@@ -413,7 +375,7 @@ describe('ServersView', () => {
     stubLocalStorage({ 'gmatch.central.url': 'none' })
     mockFetch(async () => json({ servers: [] }))
     render(<ServersView identity={identity} toast={() => {}} />)
-    expect(await screen.findByText('gmatch public')).toBeInTheDocument()
+    expect(await screen.findByText('gmatch Node')).toBeInTheDocument()
     expect(screen.queryByText(/no central/i)).toBeNull()
   })
 
@@ -426,7 +388,7 @@ describe('ServersView', () => {
     await waitFor(() => expect(screen.getByText(/directory unreachable/i)).toBeInTheDocument())
     expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument()
     // the list still renders what it knows instead of a blank page
-    expect(screen.getByText('gMatch Central')).toBeInTheDocument()
+    expect(screen.getByText('gmatch Node')).toBeInTheDocument()
   })
 
   it('central admin door lives behind the directory menu', async () => {
@@ -437,7 +399,7 @@ describe('ServersView', () => {
       return json({})
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('gMatch Central')
+    await screen.findByText('gmatch Node')
     // The button no longer pre-gates on node.isAdmin: the user's .exe is the
     // central admin. CentralAdminPanel itself refuses until the PIN unlocks.
     fireEvent.click(screen.getByRole('button', { name: /directory options/i }))
@@ -452,7 +414,7 @@ describe('ServersView', () => {
       return json({})
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('gMatch Central')
+    await screen.findByText('gmatch Node')
     await openJoinForm()
     expect(screen.getByRole('dialog', { name: /add server/i })).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText(/invite code/i), { target: { value: 'not-a-code' } })
@@ -470,10 +432,10 @@ describe('ServersView', () => {
       return json({})
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('gMatch Central')
-    // the node on this machine + the built-in public world; a label is never a
-    // server and adds no list row
-    expect(screen.getAllByRole('listitem')).toHaveLength(2)
+    await screen.findByText('gmatch Node')
+    // with no node configured, only the built-in gmatch Node is a row; a label
+    // is never a server and adds no list row
+    expect(screen.getAllByRole('listitem')).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: /local groups/i }))
     expect(screen.getByRole('dialog', { name: /local groups/i })).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText(/new group name/i), { target: { value: 'Friday crew' } })
@@ -481,8 +443,8 @@ describe('ServersView', () => {
     expect(await screen.findByText('Friday crew')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /forget group friday crew/i }))
     await waitFor(() => expect(screen.queryByText('Friday crew')).toBeNull())
-    // still the same two server rows: the group never became a destination
-    expect(screen.getAllByRole('listitem')).toHaveLength(2)
+    // still the same single server row: the group never became a destination
+    expect(screen.getAllByRole('listitem')).toHaveLength(1)
   })
 
   it('register form posts name and shows created server', async () => {
@@ -751,7 +713,7 @@ describe('ServersView', () => {
     expect(screen.queryByTestId('admin-pin-banner')).toBeNull()
     unmount()
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('gMatch Central')
+    await screen.findByText('gmatch Node')
     expect(screen.queryByTestId('admin-pin-banner')).toBeNull()
     spy.mockRestore()
     delete (window as unknown as { gmatch?: unknown }).gmatch

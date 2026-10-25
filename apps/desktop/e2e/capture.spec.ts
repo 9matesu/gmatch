@@ -41,7 +41,7 @@ test('capture landing screenshots', async ({ browser }) => {
 
   // 2. Servers view: the built-in public world plus anything added locally.
   await page.goto('/#/servers')
-  await page.getByText('gmatch public').first().waitFor({ timeout: 15_000 }).catch(() => {})
+  await page.getByText('gmatch Node').first().waitFor({ timeout: 15_000 }).catch(() => {})
   await page.waitForTimeout(1200)
   await shot(page, 'servers')
 
