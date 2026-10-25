@@ -20,19 +20,20 @@ Two topologies, chosen once per launch in Settings → Server
   friends. No cloud account, no telemetry, no hosted dependency — the machine
   you are sitting at IS the node.
 - **client (opt-in):** talks to someone else's node (a friend's machine, or any
-  `http(s)://host[:port]` you were given). The central Render deployment is
-  **gone** (decommissioned 2026-10-21 — the account can no longer be paid
-  for), so nothing falls back to it: a packaged build with no stored mode
-  starts its own server instead of dialing a dead host.
+  `http(s)://host[:port]` you were given). There is no hosted data default: the
+  Cloudflare project at `gmatch.pages.dev` is only a directory/mail rendezvous,
+  so a packaged build with no stored mode starts its own server instead of
+  dialing a host that cannot hold a world.
 
-## Running with no hosted server (2026-10-21)
+## Running with no hosted world (2026-10-24)
 
-Both hosted deployments are gone (the accounts cannot be paid for), so the app
-is self-sufficient: **host mode is the default** and the bundled node is the
-world. Nothing in the client resolves to a hosted address any more — the API
-base falls back to `http://127.0.0.1:8790`, a stored URL pointing at a dead
-host is dropped on sight, and the server directory is read from the node you
-are on.
+There is no hosted full node, so the app is self-sufficient: **host mode is the
+default** and the bundled node is the world. The only shared infrastructure is
+the Cloudflare rendezvous at `gmatch.pages.dev` (a signed node directory plus
+sealed mail in D1), which can be disabled with `gmatch.central.url = none`.
+Nothing else in the client resolves to a hosted address — the API base falls
+back to `http://127.0.0.1:8790`, a stored URL pointing at a dead host is
+dropped on sight, and the server directory is read from the node you are on.
 
 What the local node gives you, with no third party involved:
 
@@ -59,16 +60,17 @@ yours and your friend's must be reachable from each other:
    the sealed messages pass through it (it cannot read them) and the media and
    the signed operations travel **directly** between the two apps over WebRTC.
 
-**Updates without a release host.** The central release hosts are gone with
-the rest, so the update feed travels between the people who use the app: a
-node serves `/release.json` and `/releases/<file>` from
-`userData/releases`, and `npm run dist` ends with `stage:release`, which
-copies the built exe there and writes the manifest (version + sha256 + size).
-The updater asks the node this install is connected to first, then the node on
-this machine, then the old central hosts (skipped when they are down). The
-sha256 in the manifest is what makes it safe: the updater verifies it and
-discards a mismatch. A plain-http feed is accepted only for a host on the
-user's own network (loopback or a private LAN address).
+**Updates from a page and from peers.** The public manifest is
+`https://gmatch.pages.dev/release.json`, staged from the shipped exe so its
+sha256 describes the bytes users download. A node can also serve
+`/release.json` and `/releases/<file>` from `userData/releases`: `npm run dist`
+ends with `stage:release`, which copies the built exe there and writes the
+manifest (version + sha256 + size), so the builder's own node serves the new
+build to its peers. The updater asks the node this install is connected to
+first, then the Pages manifest (skipped when it does not answer). The sha256
+in the manifest is what makes it safe: the updater verifies it and discards a
+mismatch. A plain-http feed is accepted only for a host on the user's own
+network (loopback or a private LAN address).
 
 **The honest limits.** Two nodes that are both unreachable from the public
 internet cannot meet — that is NAT, not architecture, and no client-side code
@@ -77,9 +79,10 @@ node or a TURN relay. And when the direct WebRTC channel is blocked, the
 swarm falls back to the node's WebSocket relay: the media still arrives, but
 it travels through that node in the clear (the chunks are hash-verified, not
 sealed — the DMs and the room messages stay sealed either way). The direct
-path is what keeps the media private from the node. The **self-update feed is offline** for the same
-reason (both release hosts are decommissioned): the app says "no host
-answered" and the artifact has to be copied by hand until a host exists again.
+path is what keeps the media private from the node. When neither the Pages
+manifest nor the connected node answers, the updater says "no host answered"
+rather than pretend the app is current, and the artifact can still be copied
+by hand.
 
 ## Boot flow (`electron/main.cjs`)
 
@@ -164,14 +167,15 @@ Two edges matter when debugging a user's "my keepsake is gone":
 
 ## Self-update (`electron/updater.cjs`, `updater-core.cjs`)
 
-Feed: the project site's `release.json`, tried on **two hosts** — Cloudflare
-Pages `https://gmatch.pages.dev/release.json` and the public node
-`https://gmatch.fly.dev/release.json`. Both are asked on every check; the
+Feed: the project site's `release.json` at
+`https://gmatch.pages.dev/release.json`, plus the manifest of the node this
+install talks to when that node serves one. Both are asked on every check; the
 winner is the highest version among the hosts that answered. The manifest
 carries the absolute `downloadUrl` (the GitHub Release asset) plus the
 sha256/size of those exact bytes, and the updater verifies both before the
 swap. A host that is asleep, **stuck** or down is skipped (8 s budget each)
 instead of blocking the check, and a stale host cannot hide a newer release.
+There is no second public deployment to keep alive.
 
 Check on boot + every 24h. Auto-downloads the new portable exe with a
 progress percent, **verifies SHA-256 and the published size** (an

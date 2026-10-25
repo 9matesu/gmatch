@@ -1,5 +1,5 @@
 /**
- * P2P Swarm Engine over WebRTC DataChannel (Zero-Fly Media)
+ * P2P Swarm Engine over WebRTC DataChannel (zero-upload media)
  *
  * Peers in a lobby, arena duel, or chat exchange object chunks directly
  * without routing heavy media blobs through the central server.

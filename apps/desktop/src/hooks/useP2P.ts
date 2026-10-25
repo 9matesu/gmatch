@@ -4,7 +4,7 @@ import { OrbitP2PNode } from '@orbit/protocol';
 import { User, OrbitObject } from '@orbit/shared';
 import { saveObject, getObject } from '../utils/storage';
 import { OrbitPeerRelay } from '../utils/peer-relay';
-import { getApiBaseUrl, getApiWebSocketUrl, orbitFetch, subscribeApiBase } from '../utils/api';
+import { getApiBaseUrl, getApiWebSocketUrl, isCourierHost, orbitFetch, subscribeApiBase } from '../utils/api';
 import { mergeRoster } from '../utils/peerRoster';
 import { presenceBucket } from '../utils/compare';
 import { CHAT_WIPE_SECONDS } from '@orbit/shared';
@@ -563,7 +563,7 @@ export function useP2P(identity: OrbitIdentity | null) {
 
     // 3. Setup WebSocket relay via the API worker
     const API_WS = getApiWebSocketUrl('/api/ws');
-    let courierOnlyWs = /gmatch-wcz1\.onrender\.com/i.test(API_WS);
+    let courierOnlyWs = isCourierHost(API_WS);
     // Hostname alone misses every OTHER blind courier (a friend's node set
     // to SITE_SERVICES=mail,turn and joined via a server URL would get no
     // presence at all). The node self-declares: /api/health answers

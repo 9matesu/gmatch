@@ -9,10 +9,20 @@ import { getSecureItem, setSecureItem } from '../utils/secure-storage'
 import { RoomManager, type Room, type RoomMessage } from '../utils/rooms'
 import { detectMailMode, cachedMailMode, isKnownSiteCourier, type MailMode } from '../utils/mail-mode'
 import { getApiBaseUrl } from '../utils/api'
+import { getCentralApiUrl } from '../utils/central'
 import { logger } from '../utils/logger'
 import { handleInboundSignal } from '../utils/courierSignaling'
 import { ownDisplayName } from '../utils/displayName'
 import { activeTypists, pruneTypingState } from '../utils/dmTyping'
+
+/**
+ * Where sealed mail is relayed. The Cloudflare courier is the default
+ * (directory origin): two peers on different worlds still share one mailbox
+ * relay. A deployment that disables the directory falls back to its own node.
+ */
+function mailBase(): string {
+  return (getCentralApiUrl() || getApiBaseUrl()).replace(/\/+$/, '')
+}
 
 export interface CourierDeps {
   webSocketFactory?: (url: string) => MailSocket
@@ -43,7 +53,7 @@ export interface CourierDeps {
  */
 export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps = {}) {
   const [mode, setMode] = useState<MailMode>(() => {
-    const base = getApiBaseUrl()
+    const base = mailBase()
     if (isKnownSiteCourier(base)) return 'courier'
     return cachedMailMode(base) || 'legacy'
   })
@@ -61,7 +71,7 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
 
   useEffect(() => {
     let cancelled = false
-    void detectMailMode(getApiBaseUrl(), depsRef.current.fetchImpl).then((m) => {
+    void detectMailMode(mailBase(), depsRef.current.fetchImpl).then((m) => {
       if (!cancelled) setMode(m)
     })
     return () => { cancelled = true }
@@ -163,7 +173,7 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
       },
     })
     const client = new MailClient({
-      apiBase: getApiBaseUrl(),
+      apiBase: mailBase(),
       identity,
       webSocketFactory: depsRef.current.webSocketFactory,
       fetchImpl: depsRef.current.fetchImpl,

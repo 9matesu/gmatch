@@ -96,7 +96,7 @@ describe('SharePostModal (P3.4)', () => {
     expect(vi.mocked(orbitFetch)).not.toHaveBeenCalled()
   })
 
-  it('copy link copies a post deep link, never the bare fly.dev root', async () => {
+  it('copy link copies a post deep link, never the bare host root', async () => {
     render(
       <SharePostModal
         post={post}
@@ -111,6 +111,6 @@ describe('SharePostModal (P3.4)', () => {
       expect.stringContaining('/p/p-9'),
     )
     const copied = vi.mocked(navigator.clipboard.writeText).mock.calls[0][0]
-    expect(copied).not.toBe('https://goonmatch.fly.dev')
+    expect(copied).not.toBe('https://gmatch.pages.dev')
   })
 })

@@ -119,9 +119,8 @@ describe('ServersView', () => {
     render(<ServersView identity={identity} toast={() => {}} />)
     await screen.findByText(/other\.test:8790/)
     const rows = screen.getAllByRole('listitem')
-    // current node (2 records collapsed) + the namesake on another address +
-    // the built-in gmatch Node
-    expect(rows).toHaveLength(3)
+    // this machine's node (2 records collapsed) + the namesake on another address
+    expect(rows).toHaveLength(2)
     expect(screen.getAllByText('My Realm')).toHaveLength(2)
   })
 
@@ -171,8 +170,10 @@ describe('ServersView', () => {
       return json({})
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('gmatch Node')
-    // the courier is a directory, not a destination: no row, no transport chip
+    await screen.findByText('n')
+    // there is no built-in world row any more, and the courier is a
+    // directory, not a destination: no row, no transport chip.
+    expect(screen.queryByText(/gmatch Node/)).toBeNull()
     expect(screen.queryByText(/gmatch Node \(p2p\)/i)).toBeNull()
     expect(screen.queryByText('Relay')).toBeNull()
     expect(screen.queryByText(/relay transport/i)).toBeNull()
@@ -182,13 +183,13 @@ describe('ServersView', () => {
     mockFetch(async (url) => {
       if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
       if (url.includes('/api/servers')) return json({ servers: [
-        { id: 'dead', name: 'Old Central', description: '', owner_id: 'o1', password_required: 0, endpoint_hint: 'https://gmatch-wcz1.onrender.com', last_seen: 'x' },
+        { id: 'dead', name: 'Old Central', description: '', owner_id: 'o1', password_required: 0, endpoint_hint: 'https://gmatch.pages.dev', last_seen: 'x' },
       ] })
       return json({})
     })
     const toast = vi.fn()
     render(<ServersView identity={identity} toast={toast} />)
-    await screen.findByText('gmatch Node')
+    await screen.findByText('n')
     // The dead row is filtered out of the list entirely.
     expect(screen.queryByText('Old Central')).toBeNull()
   })
@@ -212,14 +213,15 @@ describe('ServersView', () => {
     mockFetch(async (url) => {
       if (url.includes('central.test')) return json({}, 503)
       if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
-      if (url.includes('/api/servers')) return json({ servers: [] })
+      if (url.includes('/api/servers')) return json({ servers: [
+        { id: 'quiet', name: 'Quiet Node', description: '', owner_id: 'o2', password_required: 0, endpoint_hint: 'https://quiet.test:8790', last_seen: 'x' },
+      ] })
       return json({})
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('gmatch Node')
-    // the built-in row stays visible even when nothing measured it...
-    // ...and no row invents a member figure out of nothing
-    expect(screen.queryByText(/\d+ \/ \d+/)).toBeNull()
+    await screen.findByText('Quiet Node')
+    // an unmeasured directory row invents no member figure
+    expect(within(rowOf('Quiet Node')).queryByText(/\d+ \/ \d+/)).toBeNull()
     // one header action, and no second "Add server" entry point outside it
     expect(screen.getAllByRole('button', { name: /add server/i })).toHaveLength(1)
   })
@@ -371,11 +373,14 @@ describe('ServersView', () => {
     delete (window as unknown as { gmatch?: unknown }).gmatch
   })
 
-  it('without a configured central, still offers the public world', async () => {
+  it('without a configured directory, still lists this machine’s node', async () => {
     stubLocalStorage({ 'gmatch.central.url': 'none' })
-    mockFetch(async () => json({ servers: [] }))
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'This Machine', users: [], posts_24h: 0, members_total: 0 })
+      return json({ servers: [] })
+    })
     render(<ServersView identity={identity} toast={() => {}} />)
-    expect(await screen.findByText('gmatch Node')).toBeInTheDocument()
+    expect(await screen.findByText('This Machine')).toBeInTheDocument()
     expect(screen.queryByText(/no central/i)).toBeNull()
   })
 
@@ -388,7 +393,7 @@ describe('ServersView', () => {
     await waitFor(() => expect(screen.getByText(/directory unreachable/i)).toBeInTheDocument())
     expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument()
     // the list still renders what it knows instead of a blank page
-    expect(screen.getByText('gmatch Node')).toBeInTheDocument()
+    expect(screen.getByText('n')).toBeInTheDocument()
   })
 
   it('central admin door lives behind the directory menu', async () => {
@@ -399,7 +404,7 @@ describe('ServersView', () => {
       return json({})
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('gmatch Node')
+    await screen.findByText('hub')
     // The button no longer pre-gates on node.isAdmin: the user's .exe is the
     // central admin. CentralAdminPanel itself refuses until the PIN unlocks.
     fireEvent.click(screen.getByRole('button', { name: /directory options/i }))
@@ -414,7 +419,7 @@ describe('ServersView', () => {
       return json({})
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('gmatch Node')
+    await screen.findByText('n')
     await openJoinForm()
     expect(screen.getByRole('dialog', { name: /add server/i })).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText(/invite code/i), { target: { value: 'not-a-code' } })
@@ -432,9 +437,9 @@ describe('ServersView', () => {
       return json({})
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('gmatch Node')
-    // with no node configured, only the built-in gmatch Node is a row; a label
-    // is never a server and adds no list row
+    await screen.findByText('n')
+    // with no directory configured, this machine's node is the only row; a
+    // label is never a server and adds no list row
     expect(screen.getAllByRole('listitem')).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: /local groups/i }))
     expect(screen.getByRole('dialog', { name: /local groups/i })).toBeInTheDocument()
@@ -628,8 +633,8 @@ describe('ServersView', () => {
     ;(window as unknown as { confirm: () => boolean }).confirm = () => true
     mockFetch(async (url, init) => {
       if (init?.method === 'DELETE' && url.includes('/api/servers/bbb')) return json({ ok: true })
-      if (url.includes('/api/servers/dashboard')) return json({ name: 'My Realm', users: [], posts_24h: 0, members_total: 1 })
-      if (url.includes('/api/servers/node')) return json({ name: 'My Realm', description: '', isAdmin: true })
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'My Laptop', users: [], posts_24h: 0, members_total: 1 })
+      if (url.includes('/api/servers/node')) return json({ name: 'My Laptop', description: '', isAdmin: true })
       return json({ servers: [{ id: 'bbb', name: 'My Realm', owner_id: ownId, password_required: 0, endpoint_hint: '10.0.0.1:8790' }] })
     })
     render(<ServersView identity={identity} toast={() => {}} />)
@@ -713,7 +718,7 @@ describe('ServersView', () => {
     expect(screen.queryByTestId('admin-pin-banner')).toBeNull()
     unmount()
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('gmatch Node')
+    await screen.findByText('My Realm')
     expect(screen.queryByTestId('admin-pin-banner')).toBeNull()
     spy.mockRestore()
     delete (window as unknown as { gmatch?: unknown }).gmatch

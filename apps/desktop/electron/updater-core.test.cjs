@@ -37,7 +37,7 @@ async function main() {
     'a node on the user\'s LAN may serve the feed over http')
   assert.strictEqual(core.isPrivateFeedUrl('http://93.184.216.34/release.json'), false,
     'a public host may NOT serve the feed over http')
-  assert.strictEqual(core.isPrivateFeedUrl('https://gmatch-wcz1.onrender.com/release.json'), false)
+  assert.strictEqual(core.isPrivateFeedUrl('https://gmatch.pages.dev/release.json'), false)
 
   // ---- planCheck: site release.json shape ----
   const site = {

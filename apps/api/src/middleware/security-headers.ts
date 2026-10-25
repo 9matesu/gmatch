@@ -30,8 +30,8 @@ export async function securityHeaders(c: Context, next: Next) {
 /**
  * connect-src built from EXACT origins only (security plan B.5): 'self' plus
  * a comma-separated allow-list from CSP_CONNECT_ORIGINS. Wildcard hosts are
- * rejected — the old *.fly.dev / *.workers.dev broad grants meant any tenant
- * of those platforms could have been an exfil target.
+ * rejected — the old wildcard grants (any tenant of a PaaS domain) meant any
+ * host there could have been an exfil target.
  */
 export function connectSrcFromEnv(env: Record<string, string | undefined> = process.env): string {
   const parts = ["connect-src 'self'"]

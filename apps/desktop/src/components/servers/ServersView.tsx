@@ -12,7 +12,7 @@ import { Lock, Globe, ShieldCheck, RefreshCw, Pencil, Check, X, Search, Share2, 
 import { generateIdentity } from '@orbit/crypto'
 import { getCentralApiUrl, setCentralApiUrl } from '../../utils/central'
 import { rememberKnownNodeHint } from '../../utils/peerNodes'
-import { orbitFetch, getApiBaseUrl, isCourierApiUrl } from '../../utils/api'
+import { orbitFetch, getApiBaseUrl, isCourierApiUrl, LOCAL_NODE_BASE } from '../../utils/api'
 import { normalizeServerUrl, isCurrentServerUrl } from '../../utils/serverUrl'
 import { joinServer } from '../../utils/join-server'
 import { switchClientWorld } from '../../utils/server-switch'
@@ -229,36 +229,11 @@ export function ServersView({
     (typeof window !== 'undefined' &&
       (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1'))
 
-  const isLocalHost = (url: string) => url.includes('127.0.0.1') || url.includes('localhost')
 
-  // The Render deployment is a blind courier: recognised and refused as a
-  // data destination. It stays a directory only.
-  const RENDER_COURIER_URL = 'https://gmatch-wcz1.onrender.com'
-  // The public world: a full node every install can join without knowing
-  // anyone. It is probed like any other server and is never assumed online.
-  const PUBLIC_WORLD_URL = 'https://gmatch.fly.dev'
-  const GM_CENTRAL_URL = PUBLIC_WORLD_URL
-  const isDecommissioned = (hint?: string | null): boolean => {
-    if (!hint) return false
-    return hint.trim().toLowerCase().includes('onrender.com')
-  }
-
-  const [publicProbe, setPublicProbe] = useState<{ online: boolean; total: number | null }>({ online: false, total: null })
-
-  // Built-in admin row: the node the maintainer runs. Always offered,
-  // joinable in one click, drawn as offline until its own health probe answers.
-  const publicServer: DirectoryServer = useMemo(() => ({
-    id: 'public-world',
-    name: 'gmatch Node',
-    description: 'Shared node — meet players from anywhere',
-    owner_id: 'public-world',
-    endpoint_hint: PUBLIC_WORLD_URL,
-    password_required: 0,
-    is_private: 0,
-    online_count: null,
-    user_count: publicProbe.total,
-    last_seen: publicProbe.online ? new Date().toISOString() : undefined,
-  }), [publicProbe])
+  // There is no built-in world any more: a fresh install runs its OWN node
+  // (packaged sidecar) and finds others through the directory. A blind
+  // courier is a directory, never a destination (isCourierApiUrl guards the
+  // switch paths), so it is not listed as a row either.
 
 
   // Mirror the connected server into the dev-proxy cookie so browser /api
@@ -292,19 +267,6 @@ export function ServersView({
     // server's dashboard/node overwrite the new world's state.
     const runBase = getApiBaseUrl()
     const switchedAway = () => getApiBaseUrl() !== runBase
-
-    // Built-in admin node: its own liveness probe, independent of any hub.
-    const probePublic = async () => {
-      try {
-        const health = await fetch(`${PUBLIC_WORLD_URL}/api/health`, {
-          signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(4000) : undefined,
-        }).catch(() => null)
-        setPublicProbe({ online: Boolean(health?.ok), total: null })
-      } catch {
-        setPublicProbe({ online: false, total: null })
-      }
-    }
-    void probePublic()
 
     // Anonymous browser: public directory only — never touch node routes
     // (no ID yet, nothing to sign with).
@@ -416,7 +378,7 @@ export function ServersView({
       } catch { /* hub offline; the node's own list stands */ }
     }
     // A decommissioned deployment is never a destination.
-    merged = merged.filter((s) => !isDecommissioned(s.endpoint_hint))
+    merged = merged.filter((s) => !isCourierApiUrl(s.endpoint_hint))
     // Every node the directory knows becomes a node we can read beacons from
     // (and drop sealed envelopes into) — the discovery path for peers that
     // live on another machine.
@@ -511,7 +473,10 @@ export function ServersView({
   const nodeUrl = useMemo(() => {
     const base = getEffectiveServerUrl()
     if (base && !isCourierApiUrl(base)) return base
-    if (isDev && isLocalHost(central)) return central
+    // Browser dev rides the Vite proxy: the base is relative, and the node it
+    // proxies is the local sidecar. Without this the Servers tab would show no
+    // row for the machine the app is actually talking to.
+    if (isDev) return LOCAL_NODE_BASE
     return ''
   }, [getEffectiveServerUrl, apiBaseTick, central])
 
@@ -542,16 +507,12 @@ export function ServersView({
 
   const visibleServers = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const p2pNorm = RENDER_COURIER_URL.trim().replace(/\/+$/, '').toLowerCase()
-    const centralNorm = GM_CENTRAL_URL.trim().replace(/\/+$/, '').toLowerCase()
     return servers.filter((s) => {
       if (s.id === 'central-node' || s.id === 'central-p2p' || s.id === 'central-local') return false
       if (s.name.trim().toLowerCase() === 'gmatch') return false
-      const hintNorm = s.endpoint_hint ? (normalizeServerUrl(s.endpoint_hint)?.toLowerCase() || '') : ''
-      // The courier is infrastructure, never a destination, and the admin node
-      // is drawn from its own row; a stale directory mirror of either is never a
-      // second destination.
-      if (hintNorm && (hintNorm === p2pNorm || hintNorm === centralNorm)) return false
+      // A blind courier is infrastructure, never a destination: a stale
+      // directory mirror of it is never a row.
+      if (isCourierApiUrl(s.endpoint_hint)) return false
       // A localhost row is a real destination only for the node on THIS machine;
       // someone else's localhost is not joinable from here.
       if (!mine(s) && isLocalHint(s.endpoint_hint)) return false
@@ -560,17 +521,13 @@ export function ServersView({
     })
   }, [servers, query, apiBaseTick, identity])
 
-  // ONE list. The node on this machine, shared destinations and the admin's
-  // gmatch Node share the same row, deduped by address. The committed server
-  // sorts first.
+  // ONE list: the node on this machine plus every world the directory knows,
+  // deduped by address. The committed server sorts first.
   const serverRows: DirectoryServer[] = useMemo(() => {
     const q = query.trim().toLowerCase()
     const matches = (s: DirectoryServer) =>
       !q || `${s.name} ${s.description ?? ''}`.toLowerCase().includes(q)
-    const listed = dedupeServers([
-      ...visibleServers,
-      ...(matches(publicServer) ? [publicServer] : []),
-    ])
+    const listed = dedupeServers([...visibleServers])
     // The node on this machine IS a server even when the directory does not
     // list it. Its own directory record wins when there is one (that is the
     // name it registered under); the synthetic row is only the fallback.
@@ -578,25 +535,20 @@ export function ServersView({
       && !listed.some((s) => serverKey(s) === serverKey(ownServer))
     const rows = ownListed ? [...listed, ownServer!] : listed
     return rows.sort((a, b) => {
-      // The connected world first, then the built-in public world: it is the
-      // one destination a fresh install can join without knowing anyone.
-      const rank = (s: DirectoryServer) => (isCurrent(s) ? 0 : s.id === 'public-world' ? 1 : 2)
+      // The connected world first, then by measured population.
+      const rank = (s: DirectoryServer) => (isCurrent(s) ? 0 : 1)
       const ac = rank(a)
       const bc = rank(b)
       if (ac !== bc) return ac - bc
       return (b.online_count ?? -1) - (a.online_count ?? -1) || a.name.localeCompare(b.name)
     })
-  }, [ownServer, visibleServers, publicServer, query, apiBaseTick])
+  }, [ownServer, visibleServers, query, apiBaseTick])
 
   const currentServerTitle = useMemo(() => {
     const apiBase = getEffectiveServerUrl()
-    // The onrender node is a directory courier (transport), not a world.
-    if (isCurrentServerUrl(apiBase, RENDER_COURIER_URL) || apiBase.includes('onrender.com')) {
-      return 'gMatch Courier'
-    }
-    if (isCurrentServerUrl(apiBase, GM_CENTRAL_URL) || apiBase.includes('fly.dev')) {
-      return 'gmatch Node'
-    }
+    // A courier is transport, not a world; the title says so instead of
+    // pretending the directory is a place to play.
+    if (isCourierApiUrl(apiBase)) return 'Courier'
     const matched = servers.find((s) => isCurrentServerUrl(apiBase, s.endpoint_hint || ''))
     if (matched?.name) return matched.name
     return serverName || 'Hub'
@@ -886,14 +838,14 @@ export function ServersView({
 
   const join = async (s: DirectoryServer) => {
     if (connectingId) return
-    if (isDecommissioned(s.endpoint_hint)) {
-      toast('That deployment was decommissioned — pick a node that is running.', 'warning')
+    // A blind courier is transport status, not a world — there is no data
+    // base to join (pointing data traffic at it 404s by design).
+    if (isCourierApiUrl(s.endpoint_hint)) {
+      toast('That is the courier (directory + mail), not a world. Pick a server.', 'info')
       return
     }
-    // The courier row is transport status, not a world — there is no data
-    // base to join (pointing data traffic at it 404s by design).
     if (s.id === 'central-p2p') {
-      toast('Central relay is transport, not a world. Pick a server below.', 'info')
+      toast('The relay is transport, not a world. Pick a server below.', 'info')
       return
     }
     setConnectingId(s.id)
@@ -901,10 +853,7 @@ export function ServersView({
       if (
         s.id === 'central-p2p' ||
         s.id === 'central-node' ||
-        (s.endpoint_hint && (
-          s.endpoint_hint === central ||
-          isDecommissioned(s.endpoint_hint)
-        ))
+        (s.endpoint_hint && s.endpoint_hint === central)
       ) {
         const rawTarget = s.endpoint_hint || central
         const target = normalizeServerUrl(rawTarget) || normalizeServerUrl('http://' + rawTarget) || rawTarget
@@ -1471,7 +1420,7 @@ export function ServersView({
                       </div>
                     </div>
                   )}
-                  {central && (
+                  {central && !isCourierApiUrl(central) && (
                     <button
                       type="button"
                       onClick={() => { setShowCentralPopover(false); playPress(760); setShowAdmin((v) => !v) }}

@@ -91,7 +91,7 @@ export async function forgeMediaLocally(
   }
   let socialOperationId: string | undefined
 
-  // 3. Register metadata ONLY with the backend — ZERO BINARY BYTES SENT TO FLY.IO
+  // 3. Register metadata ONLY with the backend - no binary bytes leave this machine
   const payload = {
     id: objectId,
     content_hash: contentHash,

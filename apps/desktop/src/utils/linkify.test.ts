@@ -34,6 +34,6 @@ describe('tokenizeUrls', () => {
 
   it('containsUrl detects URLs', () => {
     expect(containsUrl('no links here')).toBe(false)
-    expect(containsUrl('visit https://goonmatch.fly.dev')).toBe(true)
+    expect(containsUrl('visit https://gmatch.pages.dev')).toBe(true)
   })
 })

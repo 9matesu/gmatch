@@ -63,6 +63,37 @@ describe('MailClient (blind courier)', () => {
     expect(sockets[0].sent.join()).not.toContain(bob.publicKeyHex)
   })
 
+  it('polls the Cloudflare courier instead of holding a websocket', async () => {
+    vi.useFakeTimers()
+    try {
+      const fetchImpl = makeFetch(async () => okJson({ envelopes: [] }))
+      const sockets: FakeSocket[] = []
+      const c = new MailClient({
+        apiBase: 'https://gmatch.pages.dev',
+        identity: bob,
+        fetchImpl,
+        onMail: () => {},
+        webSocketFactory: () => {
+          const s = new FakeSocket()
+          sockets.push(s)
+          return s
+        },
+      })
+      c.start()
+      // No socket: pages.dev has no shared live state across isolates.
+      expect(sockets).toHaveLength(0)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(fetchImpl).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(20_000)
+      expect(fetchImpl).toHaveBeenCalledTimes(2)
+      c.stop()
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(fetchImpl).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('a mail notice for my token triggers a pull, opens envelopes, acks consumed', async () => {
     // Alice -> bob sealed message, pre-generated through the protocol:
     const { seal1to1 } = await import('@orbit/protocol')

@@ -83,7 +83,7 @@ test.describe('dev API node', () => {
     // that cookie and answered 503 for every data route, wedging the session.
     // Seeded with evaluate() (NOT addInitScript) on purpose: an init script
     // re-seeds on every navigation, so the purge+reload would loop forever.
-    const COURIER = 'https://gmatch-wcz1.onrender.com'
+    const COURIER = 'https://gmatch.pages.dev'
     await seedApp(page)
     await mockBooruFeed(page)
     await page.goto('/#/grid')
@@ -112,12 +112,20 @@ test.describe('dev API node', () => {
     // one arbitrary instant.
     await expect
       .poll(
-        () =>
-          page.evaluate(() => ({
-            api: localStorage.getItem('gmatch.api.url'),
-            marker: localStorage.getItem('gmatch.onboarding.serverUrl'),
-            cookie: document.cookie.includes('gmatch_server_url='),
-          })),
+        async () => {
+          try {
+            return await page.evaluate(() => ({
+              api: localStorage.getItem('gmatch.api.url'),
+              marker: localStorage.getItem('gmatch.onboarding.serverUrl'),
+              cookie: document.cookie.includes('gmatch_server_url='),
+            }))
+          } catch (err) {
+            // The heal IS a navigation. A read that lands while the document
+            // is being replaced dies with "Execution context was destroyed" —
+            // that is the fix working, not a failure, so retry the read.
+            return { navigating: String(err).slice(0, 80) }
+          }
+        },
         { timeout: 30_000, message: 'stale courier state survived the boot migration' },
       )
       .toEqual({

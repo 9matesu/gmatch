@@ -159,7 +159,7 @@ footer { margin-top: 64px; padding-top: 20px; border-top: 1px solid #1f1f23; col
 
 <section id="updates">
 <h2>Updates</h2>
-<p>The app checks this site's <code>release.json</code> shortly after start and once a day after that, with the public node's manifest as a fallback if this host is unreachable. A newer build is downloaded, checked against the published SHA-256 <em>and</em> byte count, and installed only on an explicit <strong>Install &amp; Restart</strong> action. If the swap is blocked, the running build is kept and every step is written to <code>%APPDATA%\@gmatch\desktop\main.log</code>.</p>
+<p>The app checks this site's <code>release.json</code> shortly after start and once a day after that, and also asks the node it is connected to when that node publishes a manifest. A newer build is downloaded, checked against the published SHA-256 <em>and</em> byte count, and installed only on an explicit <strong>Install &amp; Restart</strong> action. If the swap is blocked, the running build is kept and every step is written to <code>%APPDATA%\@gmatch\desktop\main.log</code>.</p>
 </section>
 
 <section id="what-it-is">
@@ -170,7 +170,7 @@ footer { margin-top: 64px; padding-top: 20px; border-top: 1px solid #1f1f23; col
 <li>One-to-one and group conversations, sealed end to end and addressed through rotating masks;</li>
 <li>A watch party with persistent rooms;</li>
 <li>A card and idle-game arcade that runs entirely locally;</li>
-<li>Servers: your own node, a friend's, or the built-in public world — all probed, none assumed online;</li>
+<li>Servers: your own node, a friend's, or any community node you choose — all probed, none assumed online;</li>
 <li>Report-driven moderation: a moderator sees a reported item only when the person involved discloses that one item.</li>
 </ul>
 <p>There is no sign-up, e-mail or phone number. Your account is a keypair generated on your own machine; the app asks you to export a backup because nobody can reset a key that never left your device.</p>
@@ -187,26 +187,25 @@ footer { margin-top: 64px; padding-top: 20px; border-top: 1px solid #1f1f23; col
 </section>
 
 <section id="servers">
-<h2>Servers and the public world</h2>
+<h2>Servers, peers and the directory</h2>
 <ul>
 <li><strong>Local node by default:</strong> a packaged install starts its own node, so feed, chat and media data live on the machine that produced them.</li>
-<li><strong>gmatch Node:</strong> the maintainer's full node, built into the Servers list, probed on screen and joined in one click. A fresh install can meet people without an invite; the row is drawn offline when the probe fails, and nothing is simulated.</li>
-<li><strong>Anyone can run another node:</strong> host your own from the desktop app, or join a friend's by address (and password, if they set one) — it is a different server, with its own database and its own admin. The directory carries metadata only — name, description, endpoint hint, owner public key, password flag and counts — never content.</li>
-<li><strong>The courier:</strong> the hosted relay moves sealed mail, TURN credentials and directory rows, and answers 404 on stateful routes. It is infrastructure, never a data base.</li>
-<li><strong>Direct when possible, relay when not:</strong> two clients try a direct WebRTC path first; the relay carries frames meanwhile. The UI says which path is in use — <em>direct</em> only after the data channel is validated, <em>relay</em> when a direct hole cannot be punched.</li>
+<li><strong>No built-in world:</strong> there is no central server to join. You meet people by sharing your node code, or by joining a node a friend runs — it is a different server, with its own database and its own admin. The directory carries metadata only — name, description, endpoint hint, owner public key, password flag and counts — never content.</li>
+<li><strong>The directory:</strong> a small Cloudflare service lists public node metadata and moves sealed mail. It has no content tables, no accounts and no presence feed; every stateful route answers 404. It is a meeting point, never a place to play.</li>
+<li><strong>Direct when possible:</strong> peers talk over a WebRTC data channel once the node has introduced them; the node relays frames meanwhile. The UI says which path is in use — <em>direct</em> only after the data channel is validated, <em>relay</em> when no direct path exists.</li>
 </ul>
 </section>
 
 <section id="security">
 <h2>Security model</h2>
-<p>What a relay, the public node and an observer can and cannot see:</p>
+<p>What a relay, a node and an observer can and cannot see:</p>
 <ul>
-<li><strong>Content travels sealed.</strong> Messages, media and room frames are encrypted before they leave your machine; the relay forwards opaque envelopes addressed to rotating tokens.</li>
-<li><strong>API calls are sealed too.</strong> Identity headers and request bodies are encrypted to the node's transport key, so an observer sees ciphertext, not which route or record you touched.</li>
+<li><strong>Content travels sealed.</strong> Messages, media and room frames are encrypted before they leave your machine; the directory forwards opaque envelopes addressed to rotating tokens.</li>
+<li><strong>API calls to a node are sealed too.</strong> Identity headers and request bodies are encrypted to the node's transport key, so an observer sees ciphertext, not which route or record you touched. The Cloudflare directory publishes no transport key: it only ever receives sealed envelopes and public metadata.</li>
 <li><strong>Media at rest is encrypted.</strong> Cached images are stored with AES-256-GCM under a local key that never leaves the machine, bounded by a size cap; private keys live in the OS vault (DPAPI on Windows).</li>
 <li><strong>Media transfers are end-to-end encrypted (swarm-v1).</strong> The requester advertises a fresh ephemeral X25519 key per transfer, the sender seals a per-transfer data key to it, and every chunk is XChaCha20-Poly1305 with associated data binding the object, transfer, chunk index and requester key. A relay sees ciphertext and sealed keys.</li>
-<li><strong>A full community node stores its community's data.</strong> That is the trade for running a world: the host of the node you join can read the database it keeps. The courier keeps none, and the public node is adminstered like any other community.</li>
-<li><strong>Self-hostable.</strong> Your machine can be the node; friends join by address, and the public directory carries metadata only.</li>
+<li><strong>A community node stores its community's data.</strong> That is the trade for running a world: the host of the node you join can read the database it keeps. The directory keeps none.</li>
+<li><strong>Self-hostable.</strong> Your machine can be the node; friends join by address, and the directory carries metadata only.</li>
 </ul>
 <p>Read the full white-box report: <a href="legal/security.html">security audit</a>.</p>
 </section>
@@ -239,7 +238,7 @@ footer { margin-top: 64px; padding-top: 20px; border-top: 1px solid #1f1f23; col
 <ul>
 <li><strong>Peer-first.</strong> Clients on the same node find each other through it, then talk directly over WebRTC; clients on different nodes meet through the directory and then try a direct path.</li>
 <li><strong>Relay as a floor, not a ceiling.</strong> When a direct path fails or its deadline expires, frames keep flowing over the node so the mesh still works behind NAT. A later success promotes to direct; the state is never faked.</li>
-<li><strong>No central data store.</strong> The public node is one community among many; the courier stores no content tables, and any node can be replaced by a peer.</li>
+<li><strong>No central data store.</strong> Every node is one community among many; the directory stores no content tables, and any node can be replaced by another.</li>
 <li><strong>Updates</strong> come from this site's <code>release.json</code> and are hash-verified before installation.</li>
 </ul>
 </section>
@@ -294,7 +293,7 @@ footer { margin-top: 64px; padding-top: 20px; border-top: 1px solid #1f1f23; col
 <h3>Why a desktop executable instead of a website?</h3><p>So media and conversations never transit or rest on a third-party web host. The client runs on your machine and talks to peers or to a node you choose.</p>
 <h3>Can I recover my account if I lose my key?</h3><p>No, by design. Nobody — including this project — can enter an account whose key is gone, which is why the app insists on a key backup.</p>
 <h3>Any telemetry, ads or sign-up?</h3><p>No. Zero analytics, zero cookies on this page, zero registration in the app.</p>
-<h3>What does the public node store?</h3><p>It is a full community node: the posts, media and conversations of the community that joins it, under the same encryption rules as any other node. The courier stores no content — only sealed envelopes with an expiry and rotating delivery tokens.</p>
+<h3>What does the directory store?</h3><p>Public node metadata (name, description, endpoint hint, owner public key, password flag, counts) and sealed mail envelopes with an expiry. It stores no posts, media, profiles, conversations or presence — and it is not a data base: every stateful route answers 404.</p>
 <h3>Does the server see my IP?</h3><p>Any network edge sees it, as with any website visit. The application never stores, logs or displays it, and conversations address rotating masks rather than addresses. See <a href="#limits">known limits</a>.</p>
 <h3>How do I report abuse or a mismatched download?</h3><p>Through the app (Settings → Help) or the <a href="legal/abuse.html">abuse page</a>.</p>
 </section>
@@ -309,7 +308,7 @@ footer { margin-top: 64px; padding-top: 20px; border-top: 1px solid #1f1f23; col
 <h2>Screens — current build</h2>
 <p class="note">Real UI shell; synthetic placeholder media, no external image traffic.</p>
 <figure><img src="img/feed.png" alt="The social feed with a post composer and media grid"><figcaption>The feed: per-post audience, local storage, encrypted media cache.</figcaption></figure>
-<figure><img src="img/servers.png" alt="The Servers list showing the built-in public world and a local node"><figcaption>Servers: your node, friends' nodes and the built-in public world.</figcaption></figure>
+<figure><img src="img/servers.png" alt="The Servers list showing this machine's node and community nodes"><figcaption>Servers: your node and the community nodes you know.</figcaption></figure>
 <figure><img src="img/watch.png" alt="Watch party room grid"><figcaption>Watch party: persistent rooms and live member counts.</figcaption></figure>
 </aside>
 

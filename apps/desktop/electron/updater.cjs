@@ -15,15 +15,11 @@ const core = require('./updater-core.cjs')
 
 // The canonical public release feed is the project's own Pages site
 // (release.json is generated from the shipped exe, so the sha256 describes the
-// bytes users download). A second feed keeps updates alive if one host is down.
-//
-// TWO feeds, tried in order and then merged: a single host being asleep or
-// down must not stop updates. The plan that wins is the one with the highest
-// version across the feeds that answered, and the download URL always comes
-// from the SAME feed entry that served it (the hash and the bytes must match).
+// bytes users download). It is the ONLY hosted feed: there is no second
+// deployment to keep alive, and the node this install talks to can still
+// serve release.json to its peers (resolved at check time, below).
 const RELEASE_FEEDS = [
   { url: 'https://gmatch.pages.dev/release.json', base: 'https://gmatch.pages.dev' },
-  { url: 'https://gmatch.fly.dev/release.json', base: 'https://gmatch.fly.dev' },
 ]
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
 const FIRST_CHECK_DELAY_MS = 12 * 1000
@@ -124,8 +120,7 @@ function createUpdater({ app, webContents, log = () => {}, spawnFn = spawn, feed
   }
   // The release feed, resolved AT CHECK TIME: the node this install talks
   // to can serve the artifact to its peers, and the user can switch worlds
-  // between two checks. Then the old central hosts (decommissioned — they are
-  // skipped when they are down).
+  // between two checks. Then the public Pages manifest (skipped when down).
   const resolveFeeds = () => {
     if (injectedFeeds) return injectedFeeds
     if (process.env.GMATCH_RELEASE_URL) {

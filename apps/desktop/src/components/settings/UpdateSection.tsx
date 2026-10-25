@@ -68,7 +68,7 @@ export function UpdateSection({ toast }: {
     try {
       const cur = bridge?.appVersion ? await bridge.appVersion() : (installed || '1.5.2');
       setInstalled(cur);
-      const base = getApiBaseUrl() || (typeof window !== 'undefined' ? window.location.origin : 'https://gmatch-wcz1.onrender.com');
+      const base = getApiBaseUrl() || (typeof window !== 'undefined' ? window.location.origin : 'https://gmatch.pages.dev');
       const res = await fetch(`${base.replace(/\/+$/, '')}/release.json`, { cache: 'no-store' });
       if (!res.ok) { toast?.('Update server has no release.json yet', 'warning'); return; }
       const meta = (await res.json()) as ReleaseMeta;
@@ -138,7 +138,7 @@ export function UpdateSection({ toast }: {
               type="button"
               onClick={() => {
                 playPress(820);
-                const base = getApiBaseUrl() || (typeof window !== 'undefined' ? window.location.origin : 'https://gmatch-wcz1.onrender.com');
+                const base = getApiBaseUrl() || (typeof window !== 'undefined' ? window.location.origin : 'https://gmatch.pages.dev');
                 const url = new URL(`/releases/${latest.file}`, base).href;
                 if (bridge?.openExternal) void bridge.openExternal(url);
                 else if (typeof window !== 'undefined') window.open(url, '_blank');

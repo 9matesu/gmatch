@@ -3,20 +3,26 @@ import { sealApiRequest } from '@orbit/protocol';
 import { logger } from './logger';
 
 /**
- * Courier nodes (the central Render deployment) are BLIND: `SITE_SERVICES`
- * makes every route outside directory/mail/TURN/admin 404 at the edge
- * (apps/api/src/serve.ts + site-services.ts). They are a valid *directory*,
- * never a valid *data* base — pointing the data API at one turns every
- * lobby/feed/users poll into a 404. Used by computeApiBase + the WS builder.
+ * Courier nodes are BLIND: `SITE_SERVICES` makes every route outside
+ * directory/mail 404 at the edge (apps/api/src/serve.ts + site-services.ts).
+ * They are a valid *directory*, never a valid *data* base — pointing the data
+ * API at one turns every lobby/feed/users poll into a 404.
+ *
+ * The courier lives on the same Cloudflare Pages origin as the release page
+ * (site/functions/api/[[path]].ts), including its preview subdomains.
+ * Used by computeApiBase + the WS builder.
  */
-const COURIER_HOSTS = /(^|\.)onrender\.com$/;
+const COURIER_HOSTS = /(^|\.)gmatch\.pages\.dev$/;
 
-/**
- * Hosts that can never be a data base: the Render deployment is a blind
- * courier (directory/mail/TURN only) and 404s every stateful route. Fly is a
- * full public node and is a valid destination; it is not listed here.
- */
-const DEAD_HOSTS = /(^|\.)onrender\.com$/;
+/** True for the Cloudflare courier origin (a directory, never a world). */
+export function isCourierHost(url: string | null | undefined): boolean {
+  if (!url?.trim()) return false;
+  try {
+    return COURIER_HOSTS.test(new URL(url.trim()).hostname);
+  } catch {
+    return false;
+  }
+}
 
 /**
  * The node this install runs (host mode is the default since 2026-10-21).
@@ -26,13 +32,7 @@ const DEAD_HOSTS = /(^|\.)onrender\.com$/;
 export const LOCAL_NODE_BASE = 'http://127.0.0.1:8790';
 
 export function isCourierApiUrl(url: string | null | undefined): boolean {
-  if (!url?.trim()) return false;
-  try {
-    const host = new URL(url.trim()).hostname;
-    return COURIER_HOSTS.test(host) || DEAD_HOSTS.test(host);
-  } catch {
-    return false;
-  }
+  return isCourierHost(url);
 }
 
 function computeApiBase(): string {
@@ -71,8 +71,8 @@ function computeApiBase(): string {
   }
 
   // Last resort (no preload/env/stored server, e.g. a browser build served
-  // from a public host): the node on this machine. There is no hosted
-  // fallback anymore — the central deployments are decommissioned, and a
+  // from a public host): the node on this machine. There is no hosted data
+  // fallback — the Cloudflare courier is a directory/mail relay only, and a
   // dead address is worse than an honest "no node".
   return LOCAL_NODE_BASE
 }
@@ -409,8 +409,6 @@ async function getNodePubkey(fetchImpl: typeof globalThis.fetch, targetUrl: stri
  * Builds signed auth headers for a request. Timestamp + nonce are generated
  * fresh on every call so retries re-sign instead of reusing a stale timestamp.
  */
-export const LEGACY_FLY_ORIGIN = 'https://gmatch.fly.dev'
-
 export function signRequestHeaders(
   method: string,
   pathname: string,

@@ -126,19 +126,7 @@ function devApiProxyPlugin(): Plugin {
     name: 'gmatch-dev-api-proxy',
     configureServer(server) {
       server.middlewares.use((req: IncomingMessage, res: ServerResponse, next: () => void) => {
-        if (!req.url?.startsWith('/api')) {
-          if (req.url?.startsWith('/fly-api')) {
-            res.setHeader('Access-Control-Allow-Origin', '*')
-            res.setHeader('Access-Control-Allow-Headers', '*')
-            res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH')
-            if (req.method === 'OPTIONS') {
-              res.statusCode = 204
-              res.end()
-              return
-            }
-          }
-          return next()
-        }
+        if (!req.url?.startsWith('/api')) return next()
 
         // Handle preflight OPTIONS
         res.setHeader('Access-Control-Allow-Origin', '*')
@@ -247,21 +235,15 @@ function devApiProxyPlugin(): Plugin {
 // ---------------------------------------------------------------------------
 // Dev data node.
 //
-// The central Render deployment is a BLIND COURIER (`SITE_SERVICES=mail,turn`):
-// every stateful route 404s at the edge (apps/api/src/serve.ts:237 +
-// site-services.ts:23). It is the directory/mail/TURN node, NOT a data node.
-// Dev used to default /api to it, so every lobby/feed/users poll came back 404.
-// The packaged app never had that problem: Electron boots the local Bun
-// sidecar and the preload hands us its URL. Browser dev now does the same
-// (docs/DEPLOY.md "Dev sidecar"); `GMATCH_DEV_API=remote` opts back out to a
-// remote FULL node.
+// Browser dev talks to the local Bun sidecar — the same full node a packaged
+// install runs (docs/DEPLOY.md "Dev sidecar"). There is no hosted data node to
+// fall back to: a blind courier (Cloudflare Pages Functions) keeps only the
+// directory and sealed mail, and 404s every stateful route.
 const DEV_API_PORT = Number(process.env.GMATCH_API_PORT || 8790)
 const DEV_API_LOCAL = `http://127.0.0.1:${DEV_API_PORT}`
-const DEV_API_REMOTE_URL = 'https://gmatch.fly.dev'
-const DEV_API_REMOTE = process.env.GMATCH_DEV_API === 'remote'
 
 /** Courier hosts answer only the allow-list below; everything else is 404. */
-const COURIER_HOSTS = /(^|\.)onrender\.com$/
+const COURIER_HOSTS = /(^|\.)gmatch\.pages\.dev$/
 const COURIER_ALLOWED =
   /^\/(api\/(health|identity|servers(\/.*)?|mail(\/.*)?|turn(\/.*)?|admin(\/.*)?)|\.well-known\/.*|\/(p|u)\/.*)$/
 
@@ -273,7 +255,7 @@ function isCourierNode(target: string): boolean {
   }
 }
 
-/** Connected server (cookie / header) wins; else the dev default node. */
+/** Connected server (cookie / header) wins; else the local dev node. */
 function resolveDevApiTarget(req: IncomingMessage): string {
   const cookie = req.headers.cookie || ''
   const match = cookie.match(/gmatch_server_url=([^;]+)/)
@@ -287,7 +269,6 @@ function resolveDevApiTarget(req: IncomingMessage): string {
   if (typeof custom === 'string' && (custom.startsWith('http://') || custom.startsWith('https://'))) {
     return custom.trim().replace(/\/+$/, '')
   }
-  if (DEV_API_REMOTE) return DEV_API_REMOTE_URL
   return (process.env.VITE_API_URL || DEV_API_LOCAL).replace(/\/+$/, '')
 }
 
@@ -389,7 +370,7 @@ function devSidecarPlugin(): Plugin {
           /* already torn down */
         }
       })
-      if (DEV_API_REMOTE) return
+      // Dev always owns its sidecar; there is no remote mode to opt out to.
 
       // Tear the sidecar down with the dev server. Nothing did this before, so
       // every e2e run left an orphaned `bun run src/serve.ts` holding port
@@ -491,7 +472,7 @@ function devSidecarPlugin(): Plugin {
         stdio: ['ignore', 'inherit', 'inherit'],
       })
       proc.on('error', (err: Error) => {
-        console.warn(`[dev-api] could not spawn bun (${err.message}). Install bun or set GMATCH_DEV_API=remote.`)
+        console.warn(`[dev-api] could not spawn bun (${err.message}). Install bun from https://bun.sh to run the local node.`)
       })
       server.httpServer?.once('close', stop)
       process.once('exit', stop)
@@ -617,19 +598,6 @@ export default defineConfig({
     strictPort: true,
     // Dev-only proxy: routes booru mirrors and legacy fly endpoints for browser dev.
     proxy: {
-      '^/fly-api': {
-        target: 'https://gmatch.fly.dev',
-        changeOrigin: true,
-        secure: true,
-        rewrite: (p) => p.replace(/^\/fly-api/, ''),
-        configure: (proxy) => {
-          proxy.on('proxyRes', (proxyRes) => {
-            proxyRes.headers['access-control-allow-origin'] = '*'
-            proxyRes.headers['access-control-allow-headers'] = '*'
-            proxyRes.headers['access-control-allow-methods'] = '*'
-          })
-        },
-      },
       '^/pmv-api': {
         target: 'https://pmvhaven.com',
         changeOrigin: true,

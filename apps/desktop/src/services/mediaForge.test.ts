@@ -32,7 +32,7 @@ describe('mediaForge durable publish (Phase 3)', () => {
   })
 })
 
-describe('mediaForge (Zero-Fly Local Seeding)', () => {
+describe('mediaForge (local-first seeding)', () => {
   it('computes SHA-256 hex digest of a blob using Web Crypto', async () => {
     const text = 'hello world zero media'
     const blob = new Blob([text], { type: 'text/plain' })

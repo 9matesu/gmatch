@@ -22,7 +22,9 @@ export function cachedMailMode(apiBase: string): MailMode | undefined {
 export function isKnownSiteCourier(url: string): boolean {
   try {
     const host = new URL(url.startsWith('http') ? url : `http://${url}`).hostname.toLowerCase()
-    return host === 'gmatch-wcz1.onrender.com' || host === 'goonmatch.fly.dev'
+    // Cloudflare Pages serves the release page and the blind courier on the
+    // same origin, preview subdomains included.
+    return /(^|\.)gmatch\.pages\.dev$/.test(host)
   } catch {
     return false
   }

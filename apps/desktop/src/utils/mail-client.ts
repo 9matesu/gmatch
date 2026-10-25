@@ -11,6 +11,7 @@ import {
 } from '@orbit/protocol'
 import { watchedTokens, isEpoch, type EpochState } from './handleRotation'
 import { wsUrlForBase } from './api'
+import { isKnownSiteCourier } from './mail-mode'
 
 /**
  * Blind-courier mail client (plan Phase 3.1).
@@ -52,6 +53,9 @@ export interface MailClientDeps {
 
 const BACKOFF_BASE_MS = 1000
 const BACKOFF_MAX_MS = 60_000
+/** Courier polling: the Cloudflare relay has no shared socket state, so the
+ *  client asks for its box on a slow timer instead of holding a WS. */
+const POLL_INTERVAL_MS = 20_000
 
 /** Ed25519 ack body proving box ownership: sig over `<token>|<ids>`. */
 export function ackBody(identity: OrbitIdentity, token: string, ids: string[], epoch?: string): { ids: string[]; pubkey: string; sig: string; epoch?: string } {
@@ -87,6 +91,7 @@ export class MailClient {
   private started = false
   private pulling: Promise<OpenedEnvelope[]> | null = null
   private pullQueued = false
+  private pollTimer: ReturnType<typeof setInterval> | null = null
 
   constructor(private readonly deps: MailClientDeps) {
     this.token = deliveryToken(deps.identity.publicKeyHex)
@@ -101,16 +106,41 @@ export class MailClient {
   start(): void {
     if (this.started || this.closed) return
     this.started = true
+    // The Cloudflare courier is stateless across isolates: no socket can be
+    // notified from the isolate that stored the envelope. Poll its boxes
+    // instead (a few hundred bytes per tick, no identity attached).
+    if (this.courierOnly()) {
+      void this.pull()
+      this.startPolling()
+      return
+    }
     this.connect()
   }
 
   stop(): void {
     this.closed = true
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer)
+    this.stopPolling()
     try {
       this.ws?.close()
     } catch { /* already dead */ }
     this.ws = null
+  }
+
+  private courierOnly(): boolean {
+    return isKnownSiteCourier(this.deps.apiBase)
+  }
+
+  private startPolling(): void {
+    if (this.pollTimer || this.closed) return
+    this.pollTimer = setInterval(() => void this.pull(), POLL_INTERVAL_MS)
+  }
+
+  private stopPolling(): void {
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer)
+      this.pollTimer = null
+    }
   }
 
   private socketFactory(): (url: string) => MailSocket {

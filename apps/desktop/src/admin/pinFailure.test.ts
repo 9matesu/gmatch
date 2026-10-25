@@ -8,12 +8,12 @@ import { describePinFailure } from './pinFailure'
  * passcode to compare against" stop looking the same.
  */
 
-const NODE = 'https://gmatch-wcz1.onrender.com'
+const NODE = 'https://gmatch.pages.dev'
 
 describe('describePinFailure', () => {
   it('names the node on a wrong passcode', () => {
     const msg = describePinFailure(401, 'Invalid secret admin passcode', NODE)
-    expect(msg).toContain('gmatch-wcz1.onrender.com')
+    expect(msg).toContain('gmatch.pages.dev')
     expect(msg).toMatch(/wrong passcode/i)
   })
 

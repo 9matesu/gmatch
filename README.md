@@ -33,17 +33,19 @@ conversation only after the person involved discloses that one item.
 
 ## Find players
 
-Servers ships one built-in destination: **gmatch Node** — a full node, probed
-on the screen and joined in one click, so a fresh install with no contacts can
-reach people without knowing an address. The row is drawn offline when the probe
-fails; nothing is simulated. Verify it from a terminal with:
+A packaged install starts **its own node**, so the first world is the machine
+you are on. To meet other people, share your node code or join a node a friend
+runs (`+ Add server` → *Join with code*). The Servers list also shows the nodes
+published in the public directory; the Cloudflare rendezvous at
+`gmatch.pages.dev` carries that metadata and sealed mail only, never content,
+and can be switched off with `gmatch.central.url = none`.
+
+Check what the rendezvous answers (it must 404 every stateful route):
 
 ```bash
-cd apps/desktop && node scripts/probe-public-world.mjs
+curl -s https://gmatch.pages.dev/api/health
+curl -s -o /dev/null -w "%{http_code}\n" https://gmatch.pages.dev/api/posts
 ```
-
-Any other node can be joined the same way (`+ Add server`): your own, a
-friend's, or one you host for a community.
 
 ## Repository layout
 

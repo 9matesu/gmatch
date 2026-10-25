@@ -15,11 +15,11 @@ function isMode(v) {
 }
 
 /**
- * A courier is infrastructure, never a world: the Render deployment keeps a
- * directory and moves sealed mail, but 404s every stateful route. Fly is a
- * full public node and stays joinable.
+ * A courier is infrastructure, never a world: the Cloudflare deployment keeps
+ * a directory and moves sealed mail, but 404s every stateful route. A client
+ * pointed at it becomes a local HOST instead of a broken client.
  */
-const COURIER_HOSTS = /(^|\.)onrender\.com$/
+const COURIER_HOSTS = /(^|\.)gmatch\.pages\.dev$/
 
 function isDecommissionedUrl(v) {
   if (typeof v !== 'string' || !v) return false

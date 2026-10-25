@@ -119,10 +119,10 @@ this machine. Now:
   (`serverKey`/`dedupeServers` in `directoryMerge.ts`), so a directory record
   and the local node collapse into one entry; never by display name, since two
   servers can share one. Current first, then most populated, then name.
-- **The courier is not a destination.** `onrender.com` and its roster probe
-  left the view entirely (mail/turn/directory only). The official `gMatch
-  Central` world (address `gmatch.fly.dev`) stays visible as an ordinary row,
-  with no type label and only the actions it already had.
+- **The courier is not a destination.** The Cloudflare directory and its
+  roster probe left the view entirely (mail/directory only). The node on this
+  machine stays visible as an ordinary row, with no type label and only the
+  actions it already had.
 - **One header**: `Servers`, one primary `+ Add server`, one quiet search, a
   quiet refresh, and the directory gear (central address, admin panel, dev
   switch). Local groups became a footer link opening a small dialog — a label is
@@ -190,5 +190,5 @@ Verified live this sweep: `POST /api/admin/verify-pin` → 200 with the PIN,
 system/user env var `ADMIN_PIN` reaches the bundled server on next launch.
 PIN for this machine: 318b98f8 (LOCAL DEV ONLY — plaintext PIN is a dev
 convenience; central keeps the hash). Wrong PIN → 401;
-5 tries/15 min → 429 lockout. Central node (gmatch-wcz1.onrender.com) keeps
-`ADMIN_PIN_HASH` — untouched.
+5 tries/15 min → 429 lockout. A node keeps `ADMIN_PIN_HASH` — the Cloudflare
+courier has no admin service at all (it 404s those routes).

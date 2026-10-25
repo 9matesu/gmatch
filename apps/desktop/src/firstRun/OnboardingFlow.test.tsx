@@ -65,8 +65,8 @@ describe('OnboardingFlow', () => {
   it('mounts directly at profile step when server marker is already set and creates account', async () => {
     stubLocalStorage({
       'gmatch.central.url': 'https://central.test',
-      [SERVER_MARKER_KEY]: 'https://gmatch.fly.dev',
-      'gmatch.api.url': 'https://gmatch.fly.dev',
+      [SERVER_MARKER_KEY]: 'https://node.example.test',
+      'gmatch.api.url': 'https://node.example.test',
     });
 
     const onCreateAccount = vi.fn().mockResolvedValue(undefined);

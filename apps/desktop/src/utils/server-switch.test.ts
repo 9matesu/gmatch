@@ -60,7 +60,7 @@ describe('switchClientWorld', () => {
   it('rejects courier hosts as data destinations', async () => {
     const toast = vi.fn()
     const out = await switchClientWorld(
-      { name: 'Central', endpointHint: 'https://gmatch-wcz1.onrender.com' },
+      { name: 'Central', endpointHint: 'https://gmatch.pages.dev' },
       { toast, fetchImpl: okFetch() },
     )
     expect(out).toBe('failed')

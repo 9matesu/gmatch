@@ -44,7 +44,7 @@ function makeFeedServer() {
       case '/old.json':
         return json(res, { file: 'gMatch-9.9.8-portable.exe', version: '9.9.8', sha256: NEW_SHA, sizeBytes: NEW_EXE.length, downloadUrl: dl('exe') })
       case '/stuck.json':
-        // A host that never answers (the fly.dev case).
+        // A host that never answers.
         return setTimeout(() => {}, 60000)
       case '/exe':
         hits.exe += 1

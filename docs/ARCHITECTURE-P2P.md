@@ -7,12 +7,17 @@
 
 ## 1. System Overview
 
-Since 2026-10-21 there is **no central deployment at all**. Both hostings
-(`gmatch-wcz1.onrender.com` and `gmatch.fly.dev`) were decommissioned — the
-accounts cannot be paid for — and every packaged copy of the app runs **its own
-node** (host mode is the default). A node is still a *blind, stateless courier*
-for its own clients: it holds no user profiles, no presence, no posts, no feeds
-and no media objects. It only moves sealed envelopes and relays swarm frames.
+Since 2026-10-24 there is **no central data deployment**: every packaged copy of
+the app runs **its own node** (host mode is the default). What remains shared is
+a blind rendezvous at `https://gmatch.pages.dev` — a Cloudflare Pages Function
+that serves a signed public-node directory and a sealed-mail relay (D1), with
+no content tables, no accounts, no presence and no TURN. It is not a node and
+never a data base. The old hosts (a Render courier and a Fly full node) are
+retired and no longer appear in the code.
+
+A node is still a *blind, stateless courier* for its own clients: it holds no
+user profiles, no presence, no posts, no feeds and no media objects. It only
+moves sealed envelopes and relays swarm frames.
 
 The courier role moved from "one central host" to "the node each client is
 connected to":
@@ -43,10 +48,11 @@ node's mailbox — the node still cannot open it.
    - The courier only handles sealed binary envelopes (`Envelope v2`) addressed by 64-hex BLAKE3 delivery tokens.
    - The courier learns nothing about the sender's identity, the message body, or the routing kind.
    - Deliberately returns `404 Not Found` for legacy central endpoints: `/api/users/online`, `/api/posts`, `/api/objects`, and `/api/signal/*`.
+   - The Cloudflare courier (`gmatch.pages.dev`) offers the HTTP mailbox only — a Pages isolate cannot hold another isolate's socket — so `MailClient` polls that origin every 20 s instead of opening `/api/mail/ws`.
 
 2. **Ephemeral Presence Discovery:**
    - Peers discover each other by broadcasting signed presence beacons to a shared public presence mailbox token (`sha256Hex('orbit-global-presence-v1')`).
-   - The courier stores no roster database. Beacons have a 60-second TTL. Clients query the mailbox or watch it via WebSocket, maintaining an in-memory roster of currently active peers.
+   - The courier stores no roster database. Beacons have a 60-second TTL. Clients query the mailbox, or watch it via WebSocket on a node that offers one, maintaining an in-memory roster of currently active peers.
 
 3. **Courier-Routed WebRTC Signaling:**
    - Peer connection setup (SDP Offers, SDP Answers, ICE Candidates) is routed via sealed 1-to-1 envelopes over the blind courier (`/api/mail/:token`).
@@ -238,22 +244,23 @@ courier until something unrelated pulled. The watch socket is built by
 `wsUrlForBase` (`utils/api.ts`) so a relative API base (browser dev, riding the
 Vite proxy) resolves to the page origin instead of the invalid `ws:///api/mail/ws`.
 
-### The release feed travels between peers (2026-10-22)
+### The release feed (2026-10-24)
 
-The central release hosts are decommissioned with the rest, so the update
-feed cannot be a website any more. A NODE serves it instead:
+`release.json` is served by the Cloudflare Pages project
+(`https://gmatch.pages.dev`, staged by `site/deploy-pages.mjs`) and, when it
+publishes one, by the node this install is connected to:
 
 | route | what |
 |---|---|
 | `GET /release.json` | `{ file, version, sha256, sizeBytes }` — the manifest |
 | `GET /releases/<file>` | the portable build |
 
-The directory is `userData/releases` on a packaged install (empty by
+The node directory is `userData/releases` on a packaged install (empty by
 default). `npm run dist` ends with `stage:release`, which copies the built
 exe there and writes the manifest — so the builder's own node serves the new
 build to everyone who joined it. The updater asks, in order: the node this
-install is connected to, the node on this machine, then the old central hosts
-(skipped when they are down). The manifest's sha256 is what makes the
+install is connected to, then the Pages manifest (skipped when it does not
+answer within its budget). The manifest's sha256 is what makes the
 download safe: the updater verifies it and discards a mismatch, and a plain
 http feed is accepted only for a host on the user's own network (loopback or
 a private LAN address) — never for a public one.

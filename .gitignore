@@ -70,3 +70,6 @@ apps/api/.env.local
 # internal agent/planning scratch
 /.hermes/
 
+
+# wrangler staging for the Cloudflare Pages deploy (site/deploy-pages.mjs)
+.pages-stage/

@@ -9,16 +9,16 @@ run the narrow checks, then commit only the files in that slice.
 
 ## Current state and constraints
 
-- **The central hosts are GONE (2026-10-21).** `gmatch.fly.dev` was frozen
-  on an old release and `gmatch-wcz1.onrender.com` could not be paid for any
-  more. Nothing resolves to them any more: the API base falls back to the node
-  on this machine, a stored URL pointing at a dead host is dropped on sight,
-  and the packaged app starts its OWN node (host mode is the default). The
-  courier role moved from "one central host" to "the node each client is
-  connected to" — still blind, still stateless, still only moving ciphertext.
-  The end state is **direct peer-to-peer** — no central host storing posts,
-  media, comments, likes, profiles or presence (SPEC §12b). Every route's fate
-  is written down in `docs/API-INVENTORY.md`.
+- **No hosted world (2026-10-24).** The Fly full node and the Render courier
+  were retired. Nothing resolves to them any more: packaged installs start
+  their OWN node (host mode is the default), and the only shared piece is a
+  blind Cloudflare rendezvous at `gmatch.pages.dev` — a signed public-node
+  directory plus a sealed-mail relay in D1, with no content tables, accounts,
+  presence or TURN. The courier role is still "the node each client is
+  connected to": blind, stateless, only moving ciphertext. The end state is
+  **direct peer-to-peer** — no third-party host storing posts, media, comments,
+  likes, profiles or presence (SPEC §12b). Every route's fate is written down
+  in `docs/API-INVENTORY.md`.
 - The desktop app still uses API nodes for feed reads and writes, comments,
   likes, profile/directory data, notifications, Lobby chat, and other social
   state. Public gossip replicates signed post metadata between hosts, but that
@@ -524,15 +524,35 @@ routes disabled.
 cross-platform test results, green required gates, and no unverified claims in
 UI or documentation.
 
+## Evidence log (2026-10-24, the Cloudflare rendezvous)
+
+- The Render courier and the Fly full node were **removed from the code**:
+  `isCourierApiUrl` now knows only `gmatch.pages.dev`; `DEFAULT_CENTRAL_URL`
+  points at that courier; `ServersView` has no built-in world row; the legacy
+  backfill service/hook, `probe-public-world.mjs`, `fly.toml` and
+  `render.yaml` are deleted.
+- The rendezvous is `site/functions/api/[[path]].ts` on Cloudflare Pages:
+  `GET /api/health` (mode `courier`, services `mail,directory`),
+  `GET /api/identity` (`sealed_available:false`), signed directory writes,
+  and sealed mail in D1. `/api/posts`, `/api/turn` and every other stateful
+  route answer 404 — `site/check.mjs` and the live curls above are the gate.
+- Because a Pages isolate cannot notify another isolate's socket, `MailClient`
+  detects the courier and polls every 20 s (`mail-client.test.ts` pins it).
+- Verified live: health/identity/servers 200, mail roundtrip 202 → 1 → signed
+  ack 200 → 0, forged ack 403, directory POST 201 → anonymous list hides the
+  endpoint hint → owner DELETE 200.
+
 ## Evidence log (2026-10-21, the hosts went away)
 
 - The packaged app no longer resolves to a hosted address: the API base falls
   back to the node on this machine (`utils/api.ts`, `LOCAL_NODE_BASE`), a
   stored URL pointing at a decommissioned host is dropped
-  (`isCourierApiUrl` covers Render AND Fly), and the server directory is read
-  from the node you are on (`/api/servers`). A stored *client mode* that
-  pointed at a dead deployment now migrates to the local node
-  (`server-mode-core.resolveServerUrl` + the renderer mirror, drift-guarded).
+  (`isCourierApiUrl` covered both old hosts at the time; both were removed
+  from the code on 2026-10-24 — see the next log entry), and the server
+  directory is read from the node you are on (`/api/servers`). A stored
+  *client mode* that pointed at a dead deployment now migrates to the local
+  node (`server-mode-core.resolveServerUrl` + the renderer mirror,
+  drift-guarded).
 - The presence beacon carries the node URL the peer is connected to, INSIDE the
   signed payload; a rewritten address breaks the signature and the beacon is
   dropped (test: `courierPresence.crossNode.test.ts`). A beacon without the

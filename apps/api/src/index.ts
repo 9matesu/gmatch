@@ -100,8 +100,8 @@ app.get('/.well-known/security.txt', (c) => {
   const securityTxt = `Contact: mailto:security@goonmatch.app
 Expires: 2027-12-31T23:59:59.000Z
 Preferred-Languages: en
-Canonical: https://goonmatch.fly.dev/.well-known/security.txt
-Policy: https://goonmatch.fly.dev/docs/SECURITY.md
+Canonical: https://gmatch.pages.dev/.well-known/security.txt
+Policy: https://gmatch.pages.dev/legal/security.html
 `
   return c.text(securityTxt, 200, { 'Content-Type': 'text/plain; charset=utf-8' })
 })

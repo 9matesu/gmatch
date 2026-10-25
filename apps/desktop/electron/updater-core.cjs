@@ -65,7 +65,7 @@ function shaFromReleaseJson(meta, version) {
  * into a download plan source. The public site publishes the manifest derived
  * from the shipped artifact; the download URL may point at the GitHub Release.
  */
-function parseSiteRelease(meta, base = 'https://gmatch-wcz1.onrender.com') {
+function parseSiteRelease(meta, base = 'https://gmatch.pages.dev') {
   if (!meta || typeof meta !== 'object') return null
   const urlHint = String(meta.downloadUrl || '')
   const name = String(meta.file || '') || decodeURIComponent(urlHint.split('/').pop() || '')

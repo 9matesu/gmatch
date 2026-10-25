@@ -332,11 +332,12 @@ offline earnings). Each +5% click power. Persist across prestige.
 
 ## 10d. P2P Swarm & Blind Courier Presence (ARCHITECTURE-P2P.md)
 
-- **The courier is the node each client is connected to** (2026-10-21: the central
-  deployments are decommissioned — the accounts cannot be paid for — and every packaged
-  app runs its own node). A node is strictly a blind, zero-knowledge forwarder for its
-  clients: it holds no profiles, presence, posts or media, only sealed envelopes and
-  relayed swarm frames. All legacy central routes (`/api/users/online`, `/api/posts`,
+- **The courier is the node each client is connected to** (since 2026-10-24 there
+  is no hosted full node: every packaged app runs its own node, and the public
+  rendezvous is a blind Cloudflare directory/mail relay that is never a data
+  base). A node is strictly a blind, zero-knowledge forwarder for its clients: it
+  holds no profiles, presence, posts or media, only sealed envelopes and relayed
+  swarm frames. All legacy central routes (`/api/users/online`, `/api/posts`,
   `/api/objects`, `/api/signal/*`) intentionally 404.
 - **A peer on another node is reachable:** the signed presence beacon carries the node
   URL the peer is connected to, and a sealed envelope addressed to that peer is dropped
@@ -418,9 +419,9 @@ offline earnings). Each +5% click power. Persist across prestige.
   - **host** (default since 2026-10-21): spawns the bundled server on
     `:8790` (world data lives in `userData/orbit.sqlite` + `userData/blobs`);
     the Server tab lists this machine's LAN URLs (`http://<ip>:8790`) to share
-    with friends. The central Render host was decommissioned (the account can
-    no longer be paid for), so a packaged build with no stored mode starts its
-    own node instead of dialing a dead one.
+    with friends. There is no hosted world to dial (Cloudflare only encodes a
+    directory/mail rendezvous), so a packaged build with no stored mode starts
+    its own node.
   - **client** (opt-in in Settings → Server): talks to someone else's node —
     a friend's machine or any `http(s)://host[:port]` the user was given
     (validated, applied on relaunch). `gmatch_SERVER_URL` env overrides both.
@@ -463,44 +464,47 @@ offline earnings). Each +5% click power. Persist across prestige.
   hidden. A 503 from the release host is the free-tier dyno waking up — an
   error to retry, not a missing release.
 
-### 12b. Host decommissioning — the central hosts are scaffolding, not the target
+### 12b. No hosted data node — Cloudflare is a meeting point, not a world
 
-**Decision (2026-10-21): the central hosts are temporary and are being left on
-purpose.** The end state is **direct peer-to-peer**: no central host stores
-posts, media, comments, likes, profiles or presence.
+**Decision (2026-10-24): there is no hosted full node.** The end state is
+**direct peer-to-peer**: no third-party host stores posts, media, comments,
+likes, profiles or presence.
 
-- `gmatch.fly.dev` is a **live full node** run by the maintainer and offered as
-  **gmatch Node** in Servers: probed on screen, joinable in one click, and drawn
-  offline when the probe fails. Nothing assumes it is reachable.
-- There is no "gMatch Central" row any more (2026-10-24): the configured
-  directory hub is not a destination and is never listed as one. A hub only
-  publishes directory rows.
-- `gmatch-wcz1.onrender.com` (Render) is a **blind courier** (sealed mail,
-  TURN, node directory) and 404s every stateful route; it is never a data
-  base. See `docs/API-INVENTORY.md` for what each route is and what replaces
-  it.
-- What legitimately remains central is a **rendezvous** (sealed mail, TURN,
-  the node directory) and — optionally — a node one of the players hosts.
-  Both are replaceable by any peer; the app must keep working with neither.
+- A packaged install starts its **own** full node (local Bun sidecar). That is
+  the default world and the only one the app assumes.
+- `https://gmatch.pages.dev` is the **release page and a blind courier** in one
+  Cloudflare Pages project (`site/functions/api/[[path]].ts`): a public node
+  directory plus a sealed-mail relay, with the only state in D1 (mailbox rows
+  with a TTL and public metadata). Every stateful route answers 404. It
+  advertises `sealed_available:false`, so clients never seal to it.
+- There is **no built-in world row** in Servers: joining is a node code from a
+  friend or a row published in the directory. A hub/directory is never a
+  destination.
+- What remains shared is a **rendezvous**: the directory (who exists and where)
+  and sealed mail (signalling, DMs, presence beacons). Both are replaceable;
+  the app keeps working with `gmatch.central.url = none`.
+- The Cloudflare courier has no WebSocket (a Pages isolate cannot notify a
+  socket held by another isolate), so `MailClient` polls its boxes every 20 s
+  when that origin is the mail base.
 
 Consequences that are already implemented:
-- The updater asks **two** release hosts and takes the highest version among
-  the ones that answer; a host that is asleep, stuck or down is skipped
-  (8 s budget each) instead of blocking the check.
+- The updater asks **one** public feed (`gmatch.pages.dev/release.json`) and the
+  manifest of the node this install talks to, when that node serves one. A host
+  that does not answer is skipped instead of blocking the check.
 - `site/releases/` is **local staging only** (gitignored): the published
   artifact lives in its GitHub Release and the site links it by absolute URL
   with the hash in `release.json`. A site artifact carrying every historical
   exe is a build-context problem, not a convenience.
-- The last host-dependent piece is the **release feed itself**: when the
-  hosts are gone, the artifact has to be served by peers (or by the user),
-  and until then the updater must say "no host answered" honestly rather than
-  pretend the app is up to date.
+- The release feed itself is still a single origin. When it is gone, the
+  artifact has to be served by the node (or by the user), and until then the
+  updater says "no host answered" honestly rather than pretend the app is up
+  to date.
 
 ## 13. Servers (directory, federation, admin) — v1.1+
 ADR-002 (`docs/ADR-002-servers.md`) é canônico; resumo de operação:
 
 - **Criar**: Servers → "+ Add server" → passo "Host a server" → publica
-  nome/descrição/hint no diretório do central (metadados assinados; conteúdo
+  nome/descrição/hint no diretório (metadados assinados; conteúdo
   NUNCA sai do seu PC). Heartbeat de 15 min mantém o listing vivo (24h sem ping
   = some da lista).
 - **Entrar**: lista única de servidores → clicar a linha (a linha do servidor
@@ -510,13 +514,13 @@ ADR-002 (`docs/ADR-002-servers.md`) é canônico; resumo de operação:
   uma vez; ela é verificada NO HOST (scrypt, lockout 5/15min) e a allowlist fica
   no SQLite do host — sem token forjável.
 - **Lista**: um nó que hospeda um mundo é um servidor, inclusive o que roda nesta
-  máquina — uma linha por endereço (`dedupeServers`), nunca por nome. O courier
-  central (mail/turn/diretório) é infraestrutura e não aparece; o mundo público
-  `gmatch Node` (`https://gmatch.fly.dev`) é embutido na lista, com probe de
-  saúde próprio, e é o caminho para encontrar players sem conhecer um endereço.
-  Grupos locais são rótulo só deste dispositivo (rodapé → diálogo), nunca um
-  destino. O app nunca assume o nó público online: sem resposta do probe, a linha
-  aparece offline e o join falha com aviso, sem inventar conexão.
+  máquina — uma linha por endereço (`dedupeServers`), nunca por nome. Não há
+  mundo embutido: o app lista o próprio nó, os nós do diretório e os que você
+  adicionou por código. O diretório do Cloudflare (metadados + mail selado) é
+  infraestrutura e não aparece como destino. Grupos locais são rótulo só deste
+  dispositivo (rodapé → diálogo), nunca um destino. Nada é assumido online: sem
+  resposta do probe, a linha aparece offline e o join falha com aviso, sem
+  inventar conexão.
 - **Admin**: quem HOSTEIA o nó vê o botão Admin no rodapé da sidebar (PIN da
   suíte admin existente). A suíte de moderação funciona igual em qualquer nó.
 - **Dashboard**: `GET /api/servers/dashboard` no nó atual → userlist (ids
@@ -524,8 +528,10 @@ ADR-002 (`docs/ADR-002-servers.md`) é canônico; resumo de operação:
 - **Snapshot**: admin exporta/importa o JSON do mundo (`/api/snapshot`), o
   mecanismo honesto de handoff v1. Tabelas de segurança/transporte do nó
   (SystemMeta, Sessions, ServerDirectory…) são excluídas por design.
-- **Central** (`VITE_CENTRAL_URL` / Settings→Server): diretório + nada mais;
-  o central não consegue ler conteúdo de nenhum servidor federado.
+- **Central** (`VITE_CENTRAL_URL` / Settings→Server): diretório + mail selado,
+  nada mais; o padrão é o courier do Cloudflare (`gmatch.pages.dev`) e um nó
+  próprio pode substituí-lo (`none` desliga). O diretório nunca lê conteúdo de
+  nenhum servidor federado.
 
 ## 14. Chat (`#/messages`) — reconstruction
 

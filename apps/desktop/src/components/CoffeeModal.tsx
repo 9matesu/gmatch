@@ -58,7 +58,7 @@ export function CoffeeModal({ open, reason, onDismiss }: Props) {
               </li>
               <li className="flex items-center gap-2">
                 <Database className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                <span>Persistent Fly.io volume storage so cards survive every deploy</span>
+                <span>Local-first storage: posts, cards and media live on your machine, not a rented volume</span>
               </li>
               <li className="flex items-center gap-2">
                 <MessageSquare className="w-3.5 h-3.5 text-purple-400 shrink-0" />

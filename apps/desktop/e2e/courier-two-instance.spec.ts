@@ -2,7 +2,7 @@
  * Two-instance sealed-mail E2E against a REAL blind courier.
  *
  * Both instances run against one sidecar booted with SITE_SERVICES=mail,turn,
- * admin — the onrender-courier topology, where /api/users, /api/users/online
+ * admin — the blind-courier topology, where /api/users, /api/users/online
  * and /api/servers/dashboard all 404. The ONLY way two strangers find each
  * other out here is the presence-beacon roster: each instance signs a beacon
  * (Ed25519 + X25519 keys inside), fetches the roster, and the app must feed
@@ -140,7 +140,7 @@ async function openDmTo(page: Page, peerName: string): Promise<void> {
 
 test.fixme(
   'two instances bootstrap sealed DMs from presence beacons alone',
-  'WIP: the courier sidecar boots and both instances open, but the beacon roster never reaches the chat player list yet. Fixed along the way: App.tsx feeds roster keys into the TOFU registry and ingests the roster into the presence store; useP2P now detects swarm-couriers via /api/health mode instead of the onrender hostname; computeApiBase honors gmatch.api.url on localhost. Next: instrument in-page (dump the roster response and the presence store) to find where the chain still drops.',
+  'WIP: the courier sidecar boots and both instances open, but the beacon roster never reaches the chat player list yet. Fixed along the way: App.tsx feeds roster keys into the TOFU registry and ingests the roster into the presence store; useP2P now detects swarm-couriers via /api/health mode instead of the hostname; computeApiBase honors gmatch.api.url on localhost. Next: instrument in-page (dump the roster response and the presence store) to find where the chain still drops.',
   async ({ browser }) => {
   test.setTimeout(300_000);
   // Cold schema+VACUUM on a brand-new database — same budget rationale as

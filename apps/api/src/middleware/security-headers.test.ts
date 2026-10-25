@@ -20,8 +20,8 @@ describe('B.5 — CSP origin lockdown', () => {
   })
 
   it('CSP_CONNECT_ORIGINS extends connect-src with EXACT origins only', () => {
-    const src = connectSrcFromEnv({ CSP_CONNECT_ORIGINS: 'https://goonmatch.fly.dev,wss://goonmatch.fly.dev' })
-    expect(src).toContain("'self' https://goonmatch.fly.dev wss://goonmatch.fly.dev")
+    const src = connectSrcFromEnv({ CSP_CONNECT_ORIGINS: 'https://gmatch.pages.dev,wss://gmatch.pages.dev' })
+    expect(src).toContain("'self' https://gmatch.pages.dev wss://gmatch.pages.dev")
     expect(src).not.toContain('*.')
   })
 

@@ -2,9 +2,10 @@
 // Stage the built portable build into a NODE's releases directory, so the
 // node serves it to its peers.
 //
-// Why: the central release hosts are decommissioned (the accounts cannot be
-// paid for). The update feed now travels between the people who use the app:
-// a node that has the artifact serves it at
+// Why: the public manifest lives on gmatch.pages.dev, but a node can also
+// serve its own artifact to the people connected to it — so the update feed
+// travels between peers as well as from the project page. A node that has the
+// artifact serves it at
 //
 //   GET /release.json        -> { file, version, sha256, sizeBytes }
 //   GET /releases/<file>     -> the bytes

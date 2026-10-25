@@ -34,13 +34,13 @@ describe('server-mode-core (no central server, P-R3)', () => {
     expect(resolveServerUrl({ hostUrl: 'http://127.0.0.1:8790' })).toEqual({ mode: 'host', url: 'http://127.0.0.1:8790' })
   })
 
-  it('a stored courier pointer becomes the local node; the public node stays a destination', () => {
+  it('a stored courier pointer becomes the local node; a friends node stays a destination', () => {
     expect(
-      resolveServerUrl({ stored: { mode: 'client', url: 'https://gmatch-wcz1.onrender.com' }, hostUrl: 'http://127.0.0.1:8790' }),
+      resolveServerUrl({ stored: { mode: 'client', url: 'https://gmatch.pages.dev' }, hostUrl: 'http://127.0.0.1:8790' }),
     ).toEqual({ mode: 'host', url: 'http://127.0.0.1:8790' })
     expect(
-      resolveServerUrl({ stored: { mode: 'client', url: 'https://gmatch.fly.dev' }, hostUrl: 'http://127.0.0.1:8790' }),
-    ).toEqual({ mode: 'client', url: 'https://gmatch.fly.dev' })
+      resolveServerUrl({ stored: { mode: 'client', url: 'http://friend:8790' }, hostUrl: 'http://127.0.0.1:8790' }),
+    ).toEqual({ mode: 'client', url: 'http://friend:8790' })
     // A friend's node is still a destination.
     expect(
       resolveServerUrl({ stored: { mode: 'client', url: 'http://friend:8790' }, hostUrl: 'http://127.0.0.1:8790' }),
@@ -48,11 +48,10 @@ describe('server-mode-core (no central server, P-R3)', () => {
   })
 
   it('renderer TS mirror behaves identically (drift guard)', () => {
-    expect(isDecommissionedUrlTs('https://gmatch-wcz1.onrender.com')).toBe(true)
-    expect(isDecommissionedUrlTs('https://gmatch.fly.dev')).toBe(false)
+    expect(isDecommissionedUrlTs('https://gmatch.pages.dev')).toBe(true)
+    expect(isDecommissionedUrlTs('https://x.gmatch.pages.dev')).toBe(true)
     expect(isDecommissionedUrlTs('http://friend:8790')).toBe(false)
-    expect(isDecommissionedUrl('https://gmatch-wcz1.onrender.com')).toBe(true)
-    expect(isDecommissionedUrl('https://gmatch.fly.dev')).toBe(false)
+    expect(isDecommissionedUrl('https://gmatch.pages.dev')).toBe(true)
     expect(isDecommissionedUrl('http://friend:8790')).toBe(false)
     expect(isServerUrlTs('http://192.168.0.42:8790')).toBe(true)
     expect(isServerUrlTs('javascript:alert(1)')).toBe(false)

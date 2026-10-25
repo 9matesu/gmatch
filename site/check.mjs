@@ -17,7 +17,7 @@ if (!pages.includes('index.html')) {
 const fail = []
 
 // 1) nenhum recurso/destino externo além dos allowlisted
-const ALLOW = /^https:\/\/(www\.virustotal\.com|github\.com\/9matesu\/gmatch|gmatch\.pages\.dev|gmatch\.fly\.dev|gmatch-wcz1\.onrender\.com)(\/|$)/
+const ALLOW = /^https:\/\/(www\.virustotal\.com|github\.com\/9matesu\/gmatch|gmatch\.pages\.dev)(\/|$)/
 for (const p of pages) {
   const html = readFileSync(join(ROOT, p), 'utf8')
   for (const m of html.matchAll(/(?:src|href|action)="(https?:[^"]+)"/g))

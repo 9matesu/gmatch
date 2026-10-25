@@ -12,13 +12,13 @@ export function normalizeServerUrl(v: string): string | null {
 
 /**
  * True for a node that is a directory courier, never a data destination
- * (the Render deployment 404s every stateful route). A regular node — the
- * local sidecar, a friend's node, the public Fly node — is fine.
+ * (the Cloudflare courier 404s every stateful route). A regular node — the
+ * local sidecar or a friend's node — is fine.
  */
 export function isDecommissionedUrl(v: unknown): boolean {
   if (typeof v !== 'string' || !v) return false
   try {
-    return /(^|\.)onrender\.com$/.test(new URL(v).hostname)
+    return /(^|\.)gmatch\.pages\.dev$/.test(new URL(v).hostname)
   } catch {
     return false
   }

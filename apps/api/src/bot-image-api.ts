@@ -548,7 +548,7 @@ export function buildApiRequestUrl(
 
   const headers: Record<string, string> = {
     Accept: 'application/json',
-    'User-Agent': 'OrbitBotImageFetcher/1.0 (https://goonmatch.fly.dev; contact@goonmatch.fly.dev)',
+    'User-Agent': 'OrbitBotImageFetcher/1.0 (https://gmatch.pages.dev; contact@gmatch.pages.dev)',
     ...customHeaders,
   }
 

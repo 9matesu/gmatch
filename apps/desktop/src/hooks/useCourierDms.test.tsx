@@ -62,6 +62,10 @@ beforeEach(() => {
 
 describe('useCourierDms', () => {
   it('legacy mode (inbox answers): hook is inert', async () => {
+    // Directory disabled: mail falls back to this node, where the legacy
+    // inbox probe answers. With the courier configured the mode is always
+    // 'courier' without a probe.
+    localStorage.setItem('gmatch.central.url', 'none')
     const f = mockFetch({ value: [] }, [], 401)
     const { result } = renderHook(
       () => useCourierDms(bob, { fetchImpl: f, webSocketFactory: () => new FakeSocket() }),

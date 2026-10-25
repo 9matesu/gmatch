@@ -21,7 +21,7 @@ beforeEach(() => {
   Object.defineProperty(window, 'gmatch', {
     configurable: true,
     value: {
-      serverState: async () => ({ packaged: true, mode: 'client', url: 'https://gmatch-wcz1.onrender.com', lanUrls: [] }),
+      serverState: async () => ({ packaged: true, mode: 'client', url: 'https://gmatch.pages.dev', lanUrls: [] }),
       serverSet,
       serverRelaunch,
     },

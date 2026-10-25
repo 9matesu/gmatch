@@ -5,6 +5,7 @@ import {
   type OpenedEnvelope,
 } from '@orbit/protocol'
 import { getApiBaseUrl } from './api'
+import { getCentralApiUrl } from './central'
 import { defaultIceConfig, sanitizeCandidate } from './ice-hygiene'
 import { peerNodeFor } from './peerNodes'
 import { logger } from './logger'
@@ -185,9 +186,10 @@ export async function sendCourierSignal(
   )
 
   try {
-    // The recipient's mailbox is on the node THEY are connected to: a peer on
-    // another node gets the signal there, not on ours.
-    const base = (opts?.base || getApiBaseUrl()).replace(/\/+$/, '')
+    // Sealed mail is relayed by the courier (Cloudflare by default), so the
+    // signal reaches a peer on ANY world. Only a deployment that disabled the
+    // directory falls back to the peer's node / our node.
+    const base = (getCentralApiUrl() || opts?.base || getApiBaseUrl()).replace(/\/+$/, '')
     const url = `${base}/api/mail/${token}`
     const res = await fetchImpl(url, {
       method: 'PUT',

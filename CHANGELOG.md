@@ -1,18 +1,26 @@
 # Changelog
 
-## Unreleased — gmatch Node, direct-first dev
+## Unreleased — Cloudflare rendezvous, no hosted world
 
-- Servers lists **gmatch Node** (the maintainer's full node at `gmatch.fly.dev`)
-  instead of "gmatch public"; the separate "gMatch Central" row is gone. A
-  configured hub is a directory, not a destination, so it is never listed as a
-  server. Anyone can still run another node and share it.
-- `npm run dev` now uses the local Bun sidecar (the same full node a packaged
-  install runs) unless `GMATCH_DEV_API=remote` is set; it no longer logs that it
-  is using the hosted courier.
-- The dev port is strict (`5173`). Local storage, IndexedDB and the identity are
-  bound to the origin, so a silent fallback to `5174` made a returning user's
-  posts and keys look deleted (and their own media "waiting for a seeder").
-  A busy port is now an error.
+- **No hosted full node.** `gmatch.fly.dev` (full node) and
+  `gmatch-wcz1.onrender.com` (Render courier) are gone from the code, tests,
+  docs and release page. A packaged install runs its own node; peers meet
+  through a node code or the public directory.
+- `https://gmatch.pages.dev` is now the release page **and** the rendezvous:
+  a Cloudflare Pages Function (`site/functions/api/[[path]].ts`) serves a
+  signed public-node directory and a sealed-mail relay backed by D1. It keeps
+  no content tables, no accounts, no presence and no TURN, and answers 404 on
+  every stateful route.
+- The directory default is that courier (`DEFAULT_CENTRAL_URL`), so sealed mail
+  (DMs and signalling) still reaches peers on other worlds. It has no
+  WebSocket, so `MailClient` polls every 20 s when the mail base is the courier.
+- Servers no longer lists a built-in world: the list is this machine's node
+  plus the nodes the directory knows. The legacy Fly backfill feature, its UI
+  and `probe-public-world.mjs` were deleted.
+- `npm run dev` boots a local Bun sidecar and talks to it only (no remote
+  mode); the dev port stays strict (`5173`). Local storage, IndexedDB and the
+  identity are origin-bound, so a silent fallback to `5174` made a returning
+  user's posts and keys look deleted.
 
 ## Unreleased — release page redesign
 
@@ -25,15 +33,16 @@
   `apps/desktop/e2e/capture.spec.ts` from the real UI over synthetic 1x1
   placeholder media, and `site/deploy-pages.mjs` stages `img/` with the page.
 - In the app, the Servers empty state no longer claims there is no public
-  directory, and the guide/backfill copy stops calling `gmatch.fly.dev` a
-  "legacy server" or a "WebTorrent mesh".
+  directory, and the guide copy stops calling the old hosted node a "legacy
+  server" or a "WebTorrent mesh".
 
 ## 1.6.4 — release feed on Cloudflare Pages
 
 - The project site moved to Cloudflare Pages at `https://gmatch.pages.dev`
   (GitHub Pages redirected every project page to the maintainer's personal
-  domain). The updater's first feed is that manifest; the public node stays as
-  the fallback. `site/DEPLOY.md` documents the deploy.
+  domain). The updater's first feed is that manifest; the then-live public node
+  stayed as the fallback (both hosts were retired in the next unreleased
+  cycle). `site/DEPLOY.md` documents the deploy.
 - Removed the GitHub Pages workflow; the site artifact never carries binaries.
 
 ## 1.6.3 — public world
@@ -99,8 +108,9 @@
 
 - Servers: the browser rebuilt as one page, one list, one row per server
   (`serverKey`/`dedupeServers` dedupe by address, never by name); the official
-  world is named **gMatch Central**, the onrender courier is infrastructure and
-  leaves the list, and the `Legacy` status label is gone (ADR-002, BROWSER-PERF §10).
+  world is named **gMatch Central**, the hosted courier (retired in 1.6.5) is
+  infrastructure and leaves the list, and the `Legacy` status label is gone
+  (ADR-002, BROWSER-PERF §10).
 - Feed: media-first post cards (author overlay rides inside the media), absolute
   timestamps render in the viewer's own timezone, and the timeline speaks one
   body size (`text-xs`) with `text-[10px]` meta.
