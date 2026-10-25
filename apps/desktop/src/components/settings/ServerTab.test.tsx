@@ -46,4 +46,90 @@ describe('ServerTab', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Restart now' }));
     expect(serverRelaunch).toHaveBeenCalled();
   });
+
+  it('explains a paused saved node and can forget it', async () => {
+    Object.defineProperty(window, 'gmatch', {
+      configurable: true,
+      value: {
+        serverState: async () => ({
+          packaged: true,
+          mode: 'host',
+          url: 'http://127.0.0.1:8790',
+          lanUrls: [],
+          pausedUrl: 'http://192.168.0.42:8790',
+          pausedReason: 'unreachable',
+        }),
+        serverSet,
+        serverRelaunch,
+      },
+    });
+    serverSet.mockClear();
+    render(<ServerTab />);
+
+    const banner = await screen.findByRole('status');
+    // The address is masked on screen like every other server address.
+    expect(banner.textContent).toContain('192.168.');
+    expect(banner.textContent).not.toContain('192.168.0.42');
+    expect(banner.textContent).toMatch(/did not answer/i);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Forget it' }));
+    await waitFor(() => expect(serverSet).toHaveBeenCalledWith({ mode: 'host' }));
+    await waitFor(() => expect(screen.queryByRole('status')).toBeNull());
+  });
+
+  it('says a pre-1.6.5 address was kept, not that it failed', async () => {
+    Object.defineProperty(window, 'gmatch', {
+      configurable: true,
+      value: {
+        serverState: async () => ({
+          packaged: true,
+          mode: 'host',
+          url: 'http://127.0.0.1:8790',
+          lanUrls: [],
+          pausedUrl: 'https://old.example.test',
+          pausedReason: 'legacy',
+        }),
+        serverSet,
+        serverRelaunch,
+      },
+    });
+    render(<ServerTab />);
+
+    const banner = await screen.findByRole('status');
+    // An old address may still answer and still not be this install's world,
+    // so the copy never claims it is down.
+    expect(banner.textContent).toMatch(/older version/i);
+    expect(banner.textContent).not.toMatch(/did not answer/i);
+  });
+
+  it('reconnects only when the paused node answers now', async () => {
+    const serverProbe = vi.fn(async () => ({ ok: false }));
+    Object.defineProperty(window, 'gmatch', {
+      configurable: true,
+      value: {
+        serverState: async () => ({
+          packaged: true,
+          mode: 'host',
+          url: 'http://127.0.0.1:8790',
+          lanUrls: [],
+          pausedUrl: 'http://192.168.0.42:8790',
+        }),
+        serverSet,
+        serverRelaunch,
+        serverProbe,
+      },
+    });
+    serverSet.mockClear();
+    render(<ServerTab />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Reconnect' }));
+    await waitFor(() => expect(serverProbe).toHaveBeenCalledWith('http://192.168.0.42:8790'));
+    expect(serverSet).not.toHaveBeenCalled();
+
+    serverProbe.mockResolvedValue({ ok: true });
+    await userEvent.click(screen.getByRole('button', { name: 'Reconnect' }));
+    await waitFor(() =>
+      expect(serverSet).toHaveBeenCalledWith({ mode: 'client', url: 'http://192.168.0.42:8790' }),
+    );
+  });
 });

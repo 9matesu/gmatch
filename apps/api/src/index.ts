@@ -124,7 +124,6 @@ import { stats } from './routes/stats'
 import { notifications, matchInvites } from './routes/notifications'
 import { posts } from './routes/posts'
 import { gossip } from './routes/gossip'
-import { booru } from './routes/booru'
 import { moderation } from './routes/moderation'
 import { starterDeck } from './routes/starter-deck'
 import { economy } from './routes/economy'
@@ -176,7 +175,6 @@ app.route('/api/notifications', notifications)
 app.route('/api/lobby/invites', matchInvites)
 app.route('/api/posts', posts)
 app.route('/api/gossip', gossip)
-app.route('/api/booru', booru)
 app.route('/api/moderation', moderation)
 app.route('/api/economy', economy)
 app.route('/api/cards', cards)

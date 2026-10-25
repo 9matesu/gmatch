@@ -152,12 +152,11 @@ curl -sI "$API_BASE/api/objects/&lt;own-id&gt;" | grep -i cache-control         
 </table>
 <h2>What we did NOT solve (honest)</h2>
 <ul>
-<li><strong>TCP-layer IP</strong>: the network edge (fly.io; Cloudflare once the official</li>
+<li><strong>TCP-layer IP</strong>: the Cloudflare edge (directory and sealed mail) and
+  whichever node a peer connects to still see client IPs; code cannot fix that.
+  What the code guarantees: the application layer never stores, echoes, logs or
+  renders an IP (F25/B3/B4; <code>scripts/security-greps.sh</code> is the gate).</li>
 </ul>
-<p>  node is proxied) still sees client IPs, code cannot fix that. What the code</p>
-<p>  guarantees: the application layer never stores, echoes, logs or renders an</p>
-<p>  IP (F25/B3/B4; <code>scripts/security-greps.sh</code> is the gate). Pending ops step:</p>
-<p>  front the official node behind a reverse proxy (CF Proxied).</p>
 <ul>
 <li><strong>Traffic×time correlation</strong> on the courier remains possible (padding/jitter</li>
 </ul>

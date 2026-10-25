@@ -27,7 +27,12 @@ export default tseslint.config(
       globals: { ...globals.node, ...globals.browser },
     },
     rules: {
-      'no-undef': 'off',
+      // Identifier resolution is ON here on purpose. It was off, and two
+      // ReferenceErrors shipped in apiSidecar.cjs because of it (`injectingPin`,
+      // then `fs`): every packaged host-mode launch threw BEFORE spawning the
+      // bundled node, so the window opened over an empty world while the local
+      // database was intact. A spawn test guards the path; this guards the rest.
+      'no-undef': 'error',
       'no-redeclare': 'off',
       'no-empty': ['error', { allowEmptyCatch: true }],
       '@typescript-eslint/no-require-imports': 'off',

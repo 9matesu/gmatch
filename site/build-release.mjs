@@ -22,8 +22,8 @@ const sha512 = createHash('sha512').update(buf).digest('hex')
 const buildDate = process.env.BUILD_DATE || statSync(join('releases', name)).mtime.toISOString()
 const version = name.match(/(\d+\.\d+\.\d+)/)[1]
 // downloadUrl is OPT-IN: the canonical public link is the on-site
-// /releases/<file> copy (fly serves it). GitHub Releases URLs are only
-// written when explicitly provided (private repo has none — do not lie).
+// /releases/<file> copy (Cloudflare Pages serves it). GitHub Releases URLs are
+// only written when explicitly provided (private repo has none — do not lie).
 const out = { file: name, version, sha256: sha, sha512, buildDate, sizeBytes: buf.length }
 if (process.env.GH_DOWNLOAD_URL) out.downloadUrl = process.env.GH_DOWNLOAD_URL
 writeFileSync('release.json', JSON.stringify(out, null, 2) + '\n')

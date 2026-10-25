@@ -62,7 +62,7 @@ export interface GmatchBridge {
   secureGet?: (key: string) => Promise<string | null>
   secureSet?: (key: string, value: string) => Promise<void>
   secureDelete?: (key: string) => Promise<void>
-  serverState?: () => Promise<{ packaged: boolean; mode: 'host' | 'client'; url: string; lanUrls: string[]; adminPin?: string }>
+  serverState?: () => Promise<{ packaged: boolean; mode: 'host' | 'client'; url: string; lanUrls: string[]; adminPin?: string; pausedUrl?: string; pausedReason?: 'legacy' | 'unreachable' }>
   winMinimize?: () => void
   winToggleMaximize?: () => void
   winClose?: () => void

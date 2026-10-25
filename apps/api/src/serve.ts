@@ -130,7 +130,7 @@ dbReadyPromise.then(() => {
 // ADMIN_PIN / ADMIN_PIN_HASH must reach routes via c.env — pre-B.4 neither was
 // wired here, so verify-pin silently ran on the hardcoded fallback forever.
 const nodeKey = resolveNodeKey(SNAPSHOT_PATH)
-const isDev = !process.env.FLY_APP_NAME && process.env.NODE_ENV !== 'production'
+const isDev = process.env.NODE_ENV !== 'production'
 const devAdminPin = isDev && !process.env.ADMIN_PIN && !process.env.ADMIN_PIN_HASH ? 'admin' : undefined
 const env = {
   DB: db,

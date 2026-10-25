@@ -141,11 +141,19 @@ export default function Home() {
   // tab, with no persisted key, was the only surface that still worked).
   // API_BASE is computed at import time, so clear + reload once when stale.
   // A healthy opt-in local sidecar (GMATCH_LOCAL_API=1) keeps its override.
+  // A stored non-loopback node gets the same treatment when its /api/health
+  // does not answer: a dead address is not a world, and the fallback is the
+  // node on this machine (never a hosted host).
   useEffect(() => {
     let dead = false;
     void (async () => {
       try {
-        const { clearDeadLoopbackApiBase, getApiBaseUrl, purgeCourierApiState } = await import('./utils/api');
+        const {
+          clearDeadLoopbackApiBase,
+          clearUnreachableApiBase,
+          getApiBaseUrl,
+          purgeCourierApiState,
+        } = await import('./utils/api');
         if (dead) return;
         // Older builds auto-joined the central courier, which is a directory
         // node: it cannot serve lobby/feed/users at all. Purge that state and
@@ -156,6 +164,10 @@ export default function Home() {
         }
         if (await clearDeadLoopbackApiBase()) {
           if (!dead && /127\.0\.0\.1|localhost/.test(getApiBaseUrl())) window.location.reload();
+          return;
+        }
+        if (await clearUnreachableApiBase()) {
+          if (!dead) window.location.reload();
         }
       } catch { /* browser dev: no bridge */ }
     })();

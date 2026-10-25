@@ -34,17 +34,10 @@ export async function generateStarterCards(
   const botConfig = await getBotConfig(db)
   const provider = botConfig.providers.find((p) => p.id === configuredProvId)
 
-  if (!provider) {
-    // No provider configured - return resilient fallback starter set
-    const fallbacks = [
-      { url: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800', caption: 'Cyber Vanguard #1', tags: ['cyberpunk', 'holo'] },
-      { url: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=800', caption: 'Astral Valkyrie #2', tags: ['anime', 'valkyrie'] },
-      { url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800', caption: 'Iridescent Pulse #3', tags: ['rare', 'shiny'] },
-      { url: 'https://images.unsplash.com/photo-1563089145-599997674d42?w=800', caption: 'Neon Sovereign #4', tags: ['neon', 'legendary'] },
-      { url: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=800', caption: 'Chrono Mirage #5', tags: ['synthwave', 'epic'] },
-    ]
-    return fallbacks.slice(0, count)
-  }
+  // No provider configured is an answer, not a reason to invent cards. The
+  // starter deck only exists when a real booru can fill it; the caller reports
+  // the reason instead of minting placeholder art.
+  if (!provider) return []
 
   try {
     const { url, headers } = buildApiRequestUrl(provider, tags, provider.apiKey, Math.max(15, count * 3), provider.userId)
@@ -74,15 +67,10 @@ export async function generateStarterCards(
     console.error('Failed to fetch booru starter cards:', err)
   }
 
-  // Resilient fallback starter set
-  const fallbacks = [
-    { url: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800', caption: 'Cyber Vanguard #1', tags: ['cyberpunk', 'holo'] },
-    { url: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=800', caption: 'Astral Valkyrie #2', tags: ['anime', 'valkyrie'] },
-    { url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800', caption: 'Iridescent Pulse #3', tags: ['rare', 'shiny'] },
-    { url: 'https://images.unsplash.com/photo-1563089145-599997674d42?w=800', caption: 'Neon Sovereign #4', tags: ['neon', 'legendary'] },
-    { url: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=800', caption: 'Chrono Mirage #5', tags: ['synthwave', 'epic'] },
-  ]
-  return fallbacks.slice(0, count)
+  // The provider exists but did not answer (or answered with too few unique
+  // images). Returning nothing is honest: minting a placeholder deck would make
+  // every later "where did this card come from" question unanswerable.
+  return []
 }
 
 // User Endpoint: Initialize 5 starter cards for newcomers
@@ -92,6 +80,15 @@ starterDeck.post('/init', orbitAuth, async (c) => {
 
   try {
     const cards = await generateStarterCards(db, 5)
+    if (cards.length === 0) {
+      // No provider, or the provider answered with nothing: mint nothing and
+      // leave the init marker unwritten, so a later configured provider can
+      // still hand this account its deck.
+      return c.json(
+        { error: 'No starter cards could be fetched. Configure a booru provider in Admin → Starter cards.' },
+        409,
+      )
+    }
     const nowIso = new Date().toISOString()
 
     // Idempotent + concurrency-safe init gate. If the marker already exists the

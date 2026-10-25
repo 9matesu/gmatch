@@ -4,14 +4,6 @@ import { useState, useEffect } from 'react';
 import { ShieldAlert } from 'lucide-react';
 import type { OrbitObject as CardItem } from '@orbit/shared';
 
-const SAMPLE_IMAGES = [
-  'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=800&q=80',
-  'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80',
-  'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=800&q=80',
-  'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=800&q=80',
-  'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=800&q=80',
-];
-
 function useReducedMotion(): boolean {
   const [reduce, setReduce] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
@@ -43,9 +35,12 @@ export function MobileVirusOverlay({
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const reduceMotion = useReducedMotion();
 
-  const images = cards.length > 0
-    ? cards.map((c) => c.content_url || (c as any).url || (c as any).data).filter(Boolean)
-    : SAMPLE_IMAGES;
+  // Only the attacker's own cards are shown. With none, the lock screen still
+  // works — inventing stock photos would put fake content behind someone's
+  // name.
+  const images = cards
+    .map((c) => c.content_url || (c as any).url || (c as any).data)
+    .filter(Boolean);
 
   useEffect(() => {
     if (reduceMotion || images.length < 2) return;
@@ -98,14 +93,16 @@ export function MobileVirusOverlay({
         </div>
       </div>
 
-      <div className="relative w-full max-w-md aspect-square rounded-xl overflow-hidden border border-red-500/40 shadow-2xl z-10">
-        <img
-          src={images[activeImageIndex] || SAMPLE_IMAGES[0]}
-          alt=""
-          className={`w-full h-full object-cover ${reduceMotion ? '' : 'transition-transform duration-700'}`}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/40 pointer-events-none" />
-      </div>
+      {images.length > 0 && (
+        <div className="relative w-full max-w-md aspect-square rounded-xl overflow-hidden border border-red-500/40 shadow-2xl z-10">
+          <img
+            src={images[activeImageIndex] || images[0]}
+            alt=""
+            className={`w-full h-full object-cover ${reduceMotion ? '' : 'transition-transform duration-700'}`}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/40 pointer-events-none" />
+        </div>
+      )}
 
       <p className="text-xs text-retro-muted z-20 text-center">
         Navigation unlocks when the timer runs out &mdash; or press Escape.

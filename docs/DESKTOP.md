@@ -24,6 +24,19 @@ Two topologies, chosen once per launch in Settings → Server
   Cloudflare project at `gmatch.pages.dev` is only a directory/mail rendezvous,
   so a packaged build with no stored mode starts its own server instead of
   dialing a host that cannot hold a world.
+- **A stored client pointer is resolved, never assumed.** Two shapes, two rules,
+  because provenance and reachability answer different questions. A pointer
+  written by an **older app** carries no `v` stamp and is **not dialed at all**:
+  it is written `{ "paused": true, "pausedReason": "legacy" }`, keeping the
+  address for a one-click Reconnect. An old deployment can still answer
+  `/api/health` and still not be this install's world — evidence from the field,
+  where exactly that left a user in an empty world while their own posts sat in
+  local sqlite. A pointer **this app** wrote (`v: 2`) is health-checked once per
+  launch (2.5 s bound, resolver-proof): an answer keeps it as the destination, a
+  silent one is paused with `pausedReason: "unreachable"`. Either way the launch
+  runs the bundled node and `server:state` carries `pausedUrl`/`pausedReason`,
+  so Settings → Server explains which of the two happened and offers Reconnect /
+  Forget it. No hostname list exists; nothing is deleted.
 
 ## Running with no hosted world (2026-10-24)
 
@@ -32,8 +45,10 @@ default** and the bundled node is the world. The only shared infrastructure is
 the Cloudflare rendezvous at `gmatch.pages.dev` (a signed node directory plus
 sealed mail in D1), which can be disabled with `gmatch.central.url = none`.
 Nothing else in the client resolves to a hosted address — the API base falls
-back to `http://127.0.0.1:8790`, a stored URL pointing at a dead host is
-dropped on sight, and the server directory is read from the node you are on.
+back to `http://127.0.0.1:8790`, a stored node is kept only while it answers
+(the launch probe above; the renderer also drops a stored base that fails its
+own `/api/health` probe), and the server directory is read from the node you
+are on.
 
 What the local node gives you, with no third party involved:
 
@@ -211,8 +226,7 @@ the bytes that are actually served, so the published hash is never hand-typed.
 Host-mode installs show the admin passcode in Settings → Server
 (click-to-copy; `electron/admin-pin.cjs`). Trust argument (in the file
 header): whoever can read `userData` already owns the sqlite, so the PIN
-keeps casual LAN visitors out, not the disk owner. The central fly node stays
-dark by design.
+keeps casual LAN visitors out, not the disk owner.
 
 ## Troubleshooting quick table
 
@@ -232,9 +246,15 @@ dark by design.
 1. `apps/desktop/package.json`: bump `version`.
 2. `npm run lint && npm run typecheck && npm run test` (0 errors, green).
 3. `node electron/*.test.cjs` battery (admin-pin, customFolders, imageCache,
-   secureStore, mainlog, window-bounds, booru-sources). `imageCacheMemory` was
+   secureStore, mainlog, window-bounds, booru-sources, server-mode,
+   apiSidecar). `imageCacheMemory` was
    removed with the RAM cache it covered — the disk cache is exercised by
-   `imageCache.test.cjs` plus the vitest suites.
+   `imageCache.test.cjs` plus the vitest suites. `apiSidecar.test.cjs` exists
+   because two undefined identifiers in that file meant **every packaged
+   host-mode launch threw before spawning the node** (empty world over an intact
+   database); it asserts the spawn actually happens and that dev still lets
+   `apps/api/.env.local` own `ADMIN_PIN`. `no-undef` is an eslint **error** for
+   `electron/**`/`scripts/**` for the same reason.
 4. `cd apps/desktop && npm run dist` → `release/gmatch-<version>-portable.exe`.
 5. Smoke the artifact: single-instance, log writes, server switch panel,
    window bounds restore, update check.

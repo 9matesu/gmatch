@@ -35,11 +35,12 @@ trades — two separate economies, no bridge between them.
   validate). Contract in `picker.ts` (`MediaSelection`, `selectionToFile`):
   keepsake/loopback URLs are fetched to real Files before upload, popup_video
   stays URL-only (a local File has no URL a remote peer could open).
-- Two booru clients by design: idle feed via Electron IPC
-  (`apps/desktop/src/services/booru.ts`, SPEC §6) and social feed via the
-  server proxy (`apps/api/src/routes/booru.ts`) — different trust domains.
+- One booru client: the idle feed fetches in the Electron main via IPC
+  (`apps/desktop/src/services/booru.ts`, SPEC §6). The social feed never asks a
+  booru for media — peer uploads travel over the swarm
+  (`docs/ARCHITECTURE-P2P.md`).
 - Excluded from the merge (documented, not silently dropped): `apps/discord`
-  bridge, fly.io infra, Rust `image-processor` (unused).
+  bridge, the old hosted infrastructure, Rust `image-processor` (unused).
 
 ## 1. Core loop
 
@@ -433,6 +434,21 @@ offline earnings). Each +5% click power. Persist across prestige.
     There is **no fallback to a hosted default**: a machine with no node and no
     stored URL is a machine whose node is not running, and the UI says so
     instead of silently dialing a dead host.
+  - **A stored client pointer is resolved, never assumed (1.6.5).** Two shapes,
+    two rules. A pointer written by an **older app** (no `v` stamp) is moved to
+    `paused:true` without being dialed — an old deployment can still answer
+    `/api/health` and still not be this install's world, so provenance, not
+    reachability, decides (`pausedReason:'legacy'`). A pointer this app wrote
+    (`v:2`) is probed once at launch (`GET /api/health`, 2.5 s bound): an answer
+    keeps it as the destination, silence pauses it
+    (`pausedReason:'unreachable'`). Either way the launch runs the bundled node
+    instead of showing an empty world, `server:state` carries
+    `pausedUrl`/`pausedReason`, and Settings → Server explains it with Reconnect
+    (health-probed, writes `v:2`) / Forget it; Servers shows the same notice.
+    Nothing is deleted and no hostname blacklist exists to drift out of date.
+    The renderer applies the same standard to its own stored base
+    (`clearUnreachableApiBase`): one short probe, then fall through to this
+    machine.
   - Nodes are reachable WITHOUT the hub (wave 2): the directory gossips
     through whichever node you are on into `orbit_node_directory_v1`, and
     `gmatch://node/...` codes (`utils/nodeMask.ts`) join a node out-of-band.

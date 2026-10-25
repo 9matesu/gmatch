@@ -1,9 +1,9 @@
 /**
  * gmatch courier on Cloudflare Pages Functions.
  *
- * This is the replacement for the Render courier (gmatch-wcz1.onrender.com)
- * and the Fly full node (gmatch.fly.dev): one origin, `gmatch.pages.dev`,
- * serving the release page AND the blind courier.
+ * One origin, `gmatch.pages.dev`, serves the release page AND the blind
+ * courier. There is no other hosted component: every install runs its own
+ * node, and this deployment is only where peers meet.
  *
  * It is deliberately small. A courier moves opaque envelopes, keeps the
  * public server directory, and answers health/identity. It stores NO posts,

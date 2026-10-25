@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach } from 'vitest'
-import { isCourierApiUrl, isRetiredApiUrl, LOCAL_NODE_BASE, purgeCourierApiState, resolveLiveApiBase } from './api'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { clearUnreachableApiBase, isCourierApiUrl, LOCAL_NODE_BASE, purgeCourierApiState, resolveLiveApiBase } from './api'
 
 // jsdom in this repo does not expose localStorage; stub it like useCourierDms.test.tsx.
 const storage: Record<string, string> = {}
@@ -22,6 +22,10 @@ describe('api base without a hosted fallback', () => {
     localStorage.clear()
   })
 
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('treats the courier as never-a-data-base but keeps the public node joinable', () => {
     expect(isCourierApiUrl('https://gmatch.pages.dev')).toBe(true)
     expect(isCourierApiUrl('https://node.example.test')).toBe(false)
@@ -35,14 +39,42 @@ describe('api base without a hosted fallback', () => {
     expect(resolveLiveApiBase()).not.toMatch(/pages\.dev/)
   })
 
-  it('boot migration purges stored pointers to retired hosts (Render, Fly)', () => {
-    expect(isRetiredApiUrl('https://gmatch.fly.dev')).toBe(true)
-    expect(isRetiredApiUrl('https://gmatch-wcz1.onrender.com')).toBe(true)
-    expect(isRetiredApiUrl('https://node.example.test')).toBe(false)
-    localStorage.setItem('gmatch.api.url', 'https://gmatch.fly.dev')
-    localStorage.setItem('gmatch.onboarding.serverUrl', 'https://gmatch.fly.dev')
+  it('boot migration purges stored pointers to the courier', () => {
+    localStorage.setItem('gmatch.api.url', 'https://gmatch.pages.dev')
+    localStorage.setItem('gmatch.onboarding.serverUrl', 'https://gmatch.pages.dev')
     expect(purgeCourierApiState()).toBe(true)
     expect(localStorage.getItem('gmatch.api.url')).toBeNull()
     expect(localStorage.getItem('gmatch.onboarding.serverUrl')).toBeNull()
+  })
+
+  it('drops a stored node that does not answer instead of trusting the hostname', async () => {
+    localStorage.setItem('gmatch.api.url', 'https://dead.example.test')
+    localStorage.setItem('gmatch.onboarding.serverUrl', 'https://dead.example.test')
+    const fetchMock = vi.fn().mockRejectedValue(new Error('unreachable'))
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect(await clearUnreachableApiBase(50)).toBe('https://dead.example.test')
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://dead.example.test/api/health',
+      expect.objectContaining({ signal: expect.anything() }),
+    )
+    expect(localStorage.getItem('gmatch.api.url')).toBeNull()
+    expect(localStorage.getItem('gmatch.onboarding.serverUrl')).toBeNull()
+  })
+
+  it('keeps a stored node that answers, and never probes the courier or loopback', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true })
+    vi.stubGlobal('fetch', fetchMock)
+
+    localStorage.setItem('gmatch.api.url', 'https://alive.example.test')
+    expect(await clearUnreachableApiBase(50)).toBeNull()
+    expect(localStorage.getItem('gmatch.api.url')).toBe('https://alive.example.test')
+
+    fetchMock.mockClear()
+    localStorage.setItem('gmatch.api.url', 'https://gmatch.pages.dev')
+    expect(await clearUnreachableApiBase(50)).toBeNull()
+    localStorage.setItem('gmatch.api.url', 'http://127.0.0.1:8790')
+    expect(await clearUnreachableApiBase(50)).toBeNull()
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })

@@ -67,6 +67,22 @@
 - Fly/Render host at most a rendezvous/relay volunteers opt into. The app must
   start, persist, and sync PC↔PC with all hosted infrastructure disabled.
   Relayed traffic is labeled relayed in the UI (`docs/P2P.md` glossary).
+- **Superseded by ADR-2026-10-25-01.** The hosted deployments are gone; the
+  offline-first requirement below survived the replacement.
+
+## ADR-2026-10-25-01 — No hosted data base: Cloudflare is a meeting point (accepted, supersedes ADR-1.5.5-06)
+
+- Every install runs its own node (bundled Bun sidecar, host mode by default).
+  The only hosted component is the Cloudflare Pages courier
+  (`gmatch.pages.dev`): a signed public-node directory and a sealed-mail relay
+  backed by D1. It stores no content, no accounts, no presence and no TURN, and
+  answers 404 on every stateful route. The app still starts, persists and syncs
+  PC↔PC with it disabled (`gmatch.central.url=none`).
+- No stored server pointer is trusted by hostname: an older config is probed
+  once against `/api/health`. A silent node is paused (this install runs its own
+  node and the UI says why); a node that answers is kept. A hostname blacklist
+  can only ever name the deployments we already know about, so reachability is
+  the rule.
 
 ## ADR-1.5.5-07 — Minimization policy (accepted)
 

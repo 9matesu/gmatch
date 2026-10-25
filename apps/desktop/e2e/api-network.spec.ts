@@ -2,10 +2,10 @@ import { expect, test } from '@playwright/test'
 import { seedApp, mockBooruFeed, watchApiNetwork, allowExpected } from './helpers'
 
 // The dev 404 storm. Every app poll (/api/lobby, /api/users, /api/groups, ...)
-// came back 404 because browser dev proxied /api to the central Render node —
-// a BLIND COURIER (`SITE_SERVICES=mail,turn`) that 404s every stateful route
-// at the edge (apps/api/src/serve.ts + site-services.ts). It is the
-// directory/mail/TURN node, never a data node.
+// came back 404 because browser dev proxied /api to a BLIND COURIER
+// (`SITE_SERVICES=mail`) that 404s every stateful route at the edge
+// (apps/api/src/serve.ts + site-services.ts). A courier is the directory/mail
+// node, never a data node.
 //
 // These tests pin the contract: the node dev/e2e serve data from is a FULL
 // node, and no app request may come back 404.

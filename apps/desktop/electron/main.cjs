@@ -1918,8 +1918,9 @@ app.whenReady().then(async () => {
   })
   ipcMain.handle('server:probe', async (_event, url) => {
     try {
-      const res = await net.fetch(String(url || ''))
-      return { ok: res.ok, status: res.status }
+      // Health, not TCP: a live host that 404s is not a node. The same rule
+      // the launch check uses, so Reconnect and boot agree.
+      return await serverMode.probeServer(url)
     } catch (err) {
       return { ok: false, error: err?.message || String(err) }
     }
@@ -2018,10 +2019,22 @@ app.whenReady().then(async () => {
     if (sidecarLogCount++ < 40) mainLog(`[sidecar] ${line}`)
   })
   apiSidecar.sidecarEvents.on('crashed', (code) => void onSidecarCrash(code))
-  // Read topology early (sync, cheap) so the window gets the right --api-base.
+  // Read topology early so the window gets the right --api-base. A stored
+  // client pointer is resolved ONCE here: an older app's choice is kept but not
+  // dialed, a node this app verified is health-checked, and either way a launch
+  // that cannot reach the chosen node hosts locally instead of showing an empty
+  // world. The renderer is told which one happened.
   try {
     if (app.isPackaged) {
-      packagedServer = serverMode.readServerMode()
+      const revalidated = await serverMode.revalidateServerMode()
+      packagedServer = revalidated || serverMode.readServerMode()
+      if (revalidated?.pausedUrl) {
+        mainLog(
+          revalidated.pausedReason === 'legacy'
+            ? `boot: saved node ${revalidated.pausedUrl} predates this app; kept paused, hosting locally`
+            : `boot: saved node ${revalidated.pausedUrl} did not answer; hosting locally (paused)`,
+        )
+      }
       mainLog(`boot: server mode=${packagedServer.mode} url=${packagedServer.url}`)
     }
   } catch (err) {

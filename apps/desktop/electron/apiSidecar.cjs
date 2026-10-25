@@ -3,6 +3,7 @@
 const { spawn } = require('node:child_process')
 const { EventEmitter } = require('node:events')
 const { app } = require('electron')
+const fs = require('node:fs')
 const path = require('node:path')
 const { adminPin } = require('./admin-pin.cjs')
 
@@ -21,7 +22,6 @@ function bunBin() {
     path.join(process.env.APPDATA || '', 'npm', 'node_modules', 'bun', 'bin', 'bun.exe'),
     path.join(process.env.USERPROFILE || '', '.bun', 'bin', 'bun.exe'),
   ]
-  const fs = require('node:fs')
   for (const c of candidates) {
     try {
       if (fs.existsSync(c)) return c
@@ -40,7 +40,6 @@ async function startApi() {
   // uploads without the user installing anything.
   let storageKey = process.env.STORAGE_ENCRYPTION_KEY
   if (!storageKey) {
-    const fs = require('node:fs')
     const keyPath = path.join(app.getPath('userData'), 'storage.key')
     try {
       storageKey = fs.readFileSync(keyPath, 'utf8').trim()
@@ -104,7 +103,7 @@ async function startApi() {
   // sidecar overrode it with a random 8-hex, and their passcode silently did
   // not work with nothing in the UI to explain why. In dev, .env.local is the
   // single source of truth and the launcher stops fighting it.
-  const injected = injectingPin ? adminPin(app.getPath('userData')) : null
+  const injected = app.isPackaged ? adminPin(app.getPath('userData')) : null
   if (!injected) {
     console.log(
       '[api] no ADMIN_PIN injected — the node reads ADMIN_PIN/ADMIN_PIN_HASH ' +
@@ -131,9 +130,9 @@ async function startApi() {
           ? path.join(process.resourcesPath, 'shared', 'blocklist.json')
           : path.join(__dirname, '..', '..', '..', 'shared', 'blocklist.json')
       })(),
-      // Gossip pull (plan G1): packaged hosts replicate public posts from
-      // an upstream relay. Opt-in only — set GMATCH_GOSSIP_UPSTREAM to a
-      // full node URL, or 'off' to disable. No Render traffic by default.
+      // Gossip pull (plan G1): packaged hosts replicate public posts from an
+      // upstream relay. Opt-in only — set GMATCH_GOSSIP_UPSTREAM to a full node
+      // URL, or 'off' to disable. No hosted upstream by default.
       ...(process.env.GMATCH_GOSSIP_UPSTREAM && process.env.GMATCH_GOSSIP_UPSTREAM !== 'off'
         ? { GOSSIP_UPSTREAM: process.env.GMATCH_GOSSIP_UPSTREAM }
         : {}),

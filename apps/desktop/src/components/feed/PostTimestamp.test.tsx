@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { PostTimestamp } from './PostTimestamp'
 
@@ -16,6 +16,10 @@ const ISO = '2026-09-20T15:28:19.867Z'
 const mem = new Map<string, string>();
 
 beforeEach(() => {
+  // The relative form only lives for five weeks (utils/timeAgo returns a date
+  // after that). Pin the clock so this suite never turns red because the
+  // calendar moved: 4 days after ISO is the "4d" branch.
+  vi.useFakeTimers({ now: new Date('2026-09-24T15:28:19.867Z') });
   mem.clear();
   // Node 22+ ships a global `localStorage` that throws unless
   // --localstorage-file is set, and it shadows jsdom's. Stub it the way
@@ -28,6 +32,10 @@ beforeEach(() => {
     key: () => null,
     length: 0,
   } as Storage);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('PostTimestamp', () => {
@@ -86,5 +94,12 @@ describe('PostTimestamp', () => {
   it('exposes a machine-readable datetime for the absolute value', () => {
     render(<PostTimestamp createdAt={ISO} />)
     expect(stamp()).toHaveAttribute('dateTime')
+  })
+
+  it('is already absolute once the post is older than five weeks', () => {
+    vi.setSystemTime(new Date('2026-11-15T00:00:00Z'))
+    render(<PostTimestamp createdAt={ISO} />)
+    // timeAgo's contract: weeks up to <5, then the calendar date.
+    expect(stamp().textContent).toMatch(/\d{4}/)
   })
 })
