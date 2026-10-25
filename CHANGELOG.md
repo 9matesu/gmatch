@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased — direct P2P, silent probes, gmatch Node
+
+- Direct NAT traversal: STUN moved to Cloudflare (`stun.cloudflare.com:3478` —
+  stateless, anonymous, a few packets per connection) and `srflx` reflexive
+  candidates are exchanged, so peers on different NATs hole-punch into a real
+  direct DataChannel instead of always falling back to the relay. Literal-IP
+  `host` candidates still never leave the machine (mDNS only); TURN env still
+  forces full relay for a zero-exposure posture. SPEC §10c, SECURITY.md and
+  README updated to the same posture.
+- The node-capability probe (`/api/lobby/invites`) is signed when an identity
+  is available: a full node answers 200 and the browser console stays clean
+  (the unsigned probe logged a 401 on every boot). Mail-mode detection
+  short-circuits loopback/dev and known hosts without a wire probe, and the
+  legacy DM fetch waits for the probe — the three boot console errors
+  (401 on `/api/lobby/invites`, 404 on `HEAD /api/pm`, 404 on
+  `GET /api/pm?peer=`) are gone.
+- The built-in public node row is renamed **gmatch Node**; the retired Render
+  courier is no longer any updater fallback (`gmatch.pages.dev` is).
+
 ## 1.6.4 — release feed on Cloudflare Pages
 
 - The project site moved to Cloudflare Pages at `https://gmatch.pages.dev`

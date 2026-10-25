@@ -264,7 +264,7 @@ export function ServersView({
   // offline until its own health probe answers.
   const publicServer: DirectoryServer = useMemo(() => ({
     id: 'public-world',
-    name: 'gmatch public',
+    name: 'gmatch Node',
     description: 'Shared node — meet players from anywhere',
     owner_id: 'public-world',
     endpoint_hint: PUBLIC_WORLD_URL,
@@ -663,7 +663,7 @@ export function ServersView({
       return 'gMatch Courier'
     }
     if (isCurrentServerUrl(apiBase, GM_CENTRAL_URL) || apiBase.includes('fly.dev')) {
-      return 'gmatch public'
+      return 'gmatch Node'
     }
     const matched = servers.find((s) => isCurrentServerUrl(apiBase, s.endpoint_hint || ''))
     if (matched?.name) return matched.name

@@ -308,19 +308,24 @@ offline earnings). Each +5% click power. Persist across prestige.
   ATTACKER of a still-active hack (403 otherwise). HackSpyView polls it every
   15s and renders actual data — no hardcoded fake logs.
 
-## 10c. P2P privacy (ICE hygiene — non-negotiable)
+## 10c. P2P transport (ICE hygiene)
 
 - Single source of truth: `apps/desktop/src/utils/ice-hygiene.ts` (client) +
   `candidateLeaksIp` in `apps/api/src/routes/signal.ts` (server gate).
-- Outgoing ICE candidates are sanitized on both P2P stacks (file-transfer
-  OrbitPeer + PeerJS relay): literal-IP `host` candidates and ALL `srflx`/
-  `prflx` candidates are dropped — only mDNS `.local` hosts and TURN `relay`
-  candidates ever reach a peer. Unknown shapes fail closed.
-- The signal server re-validates every posted candidate (defense in depth
-  against a malicious peer) and 400s raw-IP ones.
+- **Direct first.** STUN is Cloudflare (`stun.cloudflare.com:3478` —
+  stateless UDP, no account, a few packets per connection). Reflexive
+  (`srflx`/`prflx`) candidates are exchanged, so peers on different NATs
+  hole-punch into a direct DataChannel. A peer necessarily learns the
+  address it connects to; Cloudflare learns nothing but an anonymous query.
+- Literal-IP `host` candidates NEVER leave the machine (mDNS `.local` hosts
+  only) — the LAN stays private. Unknown shapes fail closed. The signal
+  server re-validates every posted candidate (defense in depth against a
+  malicious peer) and 400s raw-IP `host` ones.
 - TURN env (`NEXT_PUBLIC_TURN_URL/USERNAME/CREDENTIAL`) flips the config to
-  `iceTransportPolicy: 'relay'` — fully relayed calls, zero IP exposure.
-  Without TURN, STUN stays for connectivity but srflx never leaks onward.
+  `iceTransportPolicy: 'relay'` — fully relayed connections, zero IP
+  exposure, for users who choose that posture.
+- Symmetric-NAT pairs (which STUN cannot traverse) fall back to the sealed
+  WS-relay swarm; the UI reports the real path.
 - Wave 2 (masks): peers address each other ONLY through delivery tokens
   rendered as `handle.gmatch.com/<token>` (`utils/maskAdapter.ts`); tokens
   rotate per boot (`utils/handleRotation.ts`, epoch travels sealed inside

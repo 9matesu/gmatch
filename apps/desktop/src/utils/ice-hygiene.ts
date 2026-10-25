@@ -1,16 +1,18 @@
-// P2P ICE hygiene (privacy gate): never let a raw IP leave the machine.
-// - sanitizeCandidate drops every `host`/`srflx`/`prflx` candidate that
-//   carries a literal IPv4/IPv6 and keeps only `.local` (mDNS) host
-//   candidates; `relay` candidates carry the TURN server's address, not yours.
-// - Without TURN configured, srflx is dropped too: a server-reflexive
-//   candidate IS the machine's public IP as seen by the STUN server.
+// P2P ICE hygiene: peers connect DIRECTLY, with the minimum address exposure
+// that direct connections require.
+// - STUN (Cloudflare, stateless UDP, no account) tells a peer its own
+//   public reflexive address so peers on different NATs can hole-punch.
+// - sanitizeCandidate drops every literal-IP `host` candidate — the LAN
+//   address never leaves the machine (mDNS `.local` hosts only). `srflx`
+//   candidates ARE exchanged: without them cross-NAT peers can never meet,
+//   and a reflexive address is exactly what any direct connection reveals.
+// - `relay` candidates carry the TURN server's address, not yours; with TURN
+//   configured the whole connection is forced through it (zero exposure).
 // - peerConnectionConfig() is the single source of truth for both the
 //   file-transfer peer (webrtc.ts) and the payload relay (peer-relay.ts).
 
 export const STUN_SERVERS: RTCIceServer[] = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun2.l.google.com:19302' },
+  { urls: 'stun:stun.cloudflare.com:3478' },
 ]
 
 /** Literal IPv4 (dotted quad) or IPv6 (contains ':') — never `.local`. */
@@ -41,15 +43,14 @@ export function parseCandidate(candidate: string): { address: string; type: stri
   return { address, type }
 }
 
-/** True when the candidate must NOT be sent to the peer (raw IP leak). */
+/** True when the candidate must NOT be sent to the peer. */
 export function candidateLeaksIp(candidate: string): boolean {
   const parsed = parseCandidate(candidate)
   if (!parsed) return true // unknown shape — drop, fail closed
   if (parsed.type === 'host') return isLiteralIp(parsed.address)
-  // srflx/prflx addresses ARE public IPs (as seen by the STUN peer) — always
-  // a leak. With TURN configured, iceTransportPolicy:'relay' stops them from
-  // ever being gathered; without TURN they must never reach the peer.
-  if (parsed.type === 'srflx' || parsed.type === 'prflx') return true
+  // srflx/prflx ARE the NAT traversal: the reflexive address (learned from
+  // the STUN server) is what lets peers on different NATs connect directly.
+  if (parsed.type === 'srflx' || parsed.type === 'prflx') return false
   // 'relay' candidates carry the TURN server's address, not the user's.
   if (parsed.type === 'relay') return false
   return true
@@ -85,12 +86,12 @@ export function effectiveTurn(env: Record<string, string | undefined> = {}): { u
 }
 
 /**
- * The config both P2P stacks use. Two modes (SPEC §10c semantics kept):
+ * The config both P2P stacks use. Two modes (SPEC §10c semantics):
  * - explicit NEXT_PUBLIC_TURN_* env → relay-forced, zero IP exposure posture.
- * - otherwise → STUN only: same-LAN and same-server pairs connect directly;
- *   symmetric-NAT pairs rely on the WS-relay swarm (server/peer-hosted) as
- *   the no-dead-end fallback. Outgoing candidates are always sanitized (no
- *   literal IPs, no srflx onward), so the peer never learns anyone's address.
+ * - otherwise → STUN (Cloudflare): LAN pairs meet via mDNS hosts, cross-NAT
+ *   pairs hole-punch through the exchanged reflexive candidates; symmetric-
+ *   NAT pairs (STUN can't traverse) fall back to the WS-relay swarm. Literal
+ *   LAN IPs are never signaled — the mDNS host gate stays on either way.
  */
 export function defaultIceConfig(env: Record<string, string | undefined> = {}): RTCConfiguration {
   const envTurn = turnCredentials(env)
@@ -106,9 +107,9 @@ export function iceServersFor(turn: { url: string; username: string; credential:
 }
 
 /**
- * The privacy gate for RTCPeerConnection: non-relay candidates are never
- * gathered (mDNS-only host candidates), and when TURN is configured the
- * connection is forced through it — no direct P2P, no IP exposure at all.
+ * The config for RTCPeerConnection: literal LAN IPs are never signaled
+ * (mDNS-only host candidates), and when TURN is configured the connection is
+ * forced through it — no direct P2P, no IP exposure at all.
  */
 export function peerConnectionConfig(turn: { url: string; username: string; credential: string } | null): RTCConfiguration {
   return {

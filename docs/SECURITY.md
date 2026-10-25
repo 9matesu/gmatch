@@ -22,9 +22,12 @@
 - Private keys never leave the device (DPAPI/`secure-kv.bin`, or browser
   `localStorage` in dev). No telemetry, no personal-data upload; media bytes
   leave disk only via swarm fetches.
-- ICE hygiene: only mDNS `.local` + TURN relay candidates cross the wire;
-  `srflx`/`prflx`/literal-IP hosts dropped client-side and re-gated
-  server-side. Tracker URLs derived in main, never from the renderer.
+- ICE hygiene: literal-IP `host` candidates never cross the wire (mDNS
+  `.local` hosts only), re-gated server-side. `srflx` reflexive candidates
+  ARE exchanged — that is the NAT traversal that makes direct P2P work;
+  NAT discovery is a stateless, anonymous Cloudflare STUN query. TURN env
+  still forces full relay for a zero-exposure posture.
+- Tracker URLs derived in main, never from the renderer.
 - Media entering/leaving is metadata-stripped; tags live in the DB, never in files.
 
 ## 3. What observers can see

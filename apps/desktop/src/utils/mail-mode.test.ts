@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { detectMailMode, cachedMailMode, _resetMailModeCache } from './mail-mode'
+import { detectMailMode, staticMailMode, cachedMailMode, _resetMailModeCache } from './mail-mode'
 
 function fetchReturning(status: number) {
   return vi.fn(async () => new Response('{}', { status })) as unknown as typeof fetch
@@ -46,10 +46,26 @@ describe('courier-mode detection', () => {
     expect(slowFn).toHaveBeenCalledTimes(1)
   })
 
-  it('identifies official gmatch-wcz1.onrender.com and goonmatch.fly.dev without probing', async () => {
+  it('identifies known hosted nodes without probing', async () => {
     const fetchFn = vi.fn() as unknown as typeof fetch
     expect(await detectMailMode('https://gmatch-wcz1.onrender.com', fetchFn)).toBe('courier')
-    expect(await detectMailMode('https://goonmatch.fly.dev/', fetchFn)).toBe('courier')
+    expect(await detectMailMode('https://gmatch.fly.dev/', fetchFn)).toBe('courier')
+    expect(await detectMailMode('https://goonmatch.fly.dev', fetchFn)).toBe('courier')
     expect(fetchFn).not.toHaveBeenCalled()
+  })
+
+  it('loopback (sidecar/dev node) and same-origin dev base are courier without probing', async () => {
+    const fetchFn = vi.fn() as unknown as typeof fetch
+    for (const base of ['http://127.0.0.1:8790', 'http://localhost:8790', '']) {
+      _resetMailModeCache()
+      expect(await detectMailMode(base, fetchFn)).toBe('courier')
+      expect(staticMailMode(base)).toBe('courier')
+    }
+    expect(fetchFn).not.toHaveBeenCalled()
+  })
+
+  it('an unknown remote host still goes to the wire', async () => {
+    expect(staticMailMode('http://node.example')).toBeUndefined()
+    expect(await detectMailMode('http://node.example', fetchReturning(404))).toBe('courier')
   })
 })

@@ -21,7 +21,9 @@ Single portable `.exe`, no installer, no sign-up, no telemetry, no ads.
   and never sees a message body.
 - **Explicit transport selection.** Direct WebRTC is attempted under a bounded
   deadline; the relay stays available meanwhile; a peer is labelled direct
-  only after the DataChannel opens. The UI reports the real path.
+  only after the DataChannel opens. The UI reports the real path. NAT
+  discovery is a stateless, anonymous Cloudflare STUN query; literal LAN
+  addresses are never signaled (mDNS only).
 - **Verifiable downloads.** Release hashes are derived mechanically from the
   shipped file (`site/release.json` + `site/check.mjs`, the release honesty
   gate that fails the build on any mismatch).
@@ -33,7 +35,7 @@ conversation only after the person involved discloses that one item.
 
 ## Find players
 
-Servers ships one built-in destination: **gmatch public** — a full node, probed
+Servers ships one built-in destination: **gmatch Node** — a full node, probed
 on the screen and joined in one click, so a fresh install with no contacts can
 reach people without knowing an address. The row is drawn offline when the probe
 fails; nothing is simulated. Verify it from a terminal with:

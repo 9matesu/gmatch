@@ -7,7 +7,7 @@ import { deliveryToken } from '@orbit/protocol'
 import { rotateEpoch, peerAddressToken, type EpochState } from '../utils/handleRotation'
 import { getSecureItem, setSecureItem } from '../utils/secure-storage'
 import { RoomManager, type Room, type RoomMessage } from '../utils/rooms'
-import { detectMailMode, cachedMailMode, isKnownSiteCourier, type MailMode } from '../utils/mail-mode'
+import { detectMailMode, staticMailMode, cachedMailMode, type MailMode } from '../utils/mail-mode'
 import { getApiBaseUrl } from '../utils/api'
 import { logger } from '../utils/logger'
 import { handleInboundSignal } from '../utils/courierSignaling'
@@ -43,9 +43,10 @@ export interface CourierDeps {
  */
 export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps = {}) {
   const [mode, setMode] = useState<MailMode>(() => {
+    // Loopback / known hosts run current code: start in courier mode right
+    // away so no legacy fetch fires before the probe resolves.
     const base = getApiBaseUrl()
-    if (isKnownSiteCourier(base)) return 'courier'
-    return cachedMailMode(base) || 'legacy'
+    return staticMailMode(base) ?? cachedMailMode(base) ?? 'legacy'
   })
   const [threads, setThreads] = useState<Record<string, DmMessage[]>>({})
   const [rooms, setRoomsState] = useState<Room[]>([])

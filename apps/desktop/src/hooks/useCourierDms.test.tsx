@@ -10,6 +10,14 @@ import { encodeDmBody } from '../utils/mail-dm'
 import { _resetMailModeCache } from '../utils/mail-mode'
 import type { MailSocket } from '../utils/mail-client'
 
+// Pin the API base to a remote host: the real loopback/dev base is now a
+// known-courier fast path (no wire probe), which would make the "legacy
+// inbox" scenario unreachable in these tests.
+vi.mock('../utils/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/api')>()
+  return { ...actual, getApiBaseUrl: () => 'http://node.test' }
+})
+
 const alice = generateIdentity()
 const bob = generateIdentity()
 

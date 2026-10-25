@@ -1,4 +1,4 @@
-// Reachability check for the built-in public world (Servers → gmatch public).
+// Reachability check for the built-in public node (Servers → gmatch Node).
 // Usage: node scripts/probe-public-world.mjs [baseUrl]
 //
 // This is a liveness probe, not a simulation of the in-app join: it asserts the

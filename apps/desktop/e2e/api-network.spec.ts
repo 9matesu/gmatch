@@ -107,17 +107,20 @@ test.describe('dev API node', () => {
 
     // Polled, not read once: the heal itself is a navigation, and a single
     // evaluate issued while the app is replacing the document dies with
-    // "Execution context was destroyed". What the test asserts is that the
-    // stale state is gone once the app has settled — not that it was gone at
-    // one arbitrary instant.
+    // "Execution context was destroyed". Catch that (a destroyed context is
+    // "not settled yet", so a non-matching value makes the poll retry) — what
+    // the test asserts is that the stale state is gone once the app has
+    // settled, not that it was gone at one arbitrary instant.
     await expect
       .poll(
         () =>
-          page.evaluate(() => ({
-            api: localStorage.getItem('gmatch.api.url'),
-            marker: localStorage.getItem('gmatch.onboarding.serverUrl'),
-            cookie: document.cookie.includes('gmatch_server_url='),
-          })),
+          page
+            .evaluate(() => ({
+              api: localStorage.getItem('gmatch.api.url'),
+              marker: localStorage.getItem('gmatch.onboarding.serverUrl'),
+              cookie: document.cookie.includes('gmatch_server_url='),
+            }))
+            .catch(() => ({ api: 'navigating', marker: 'navigating', cookie: true })),
         { timeout: 30_000, message: 'stale courier state survived the boot migration' },
       )
       .toEqual({
