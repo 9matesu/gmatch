@@ -1,6 +1,6 @@
 {
   "name": "@gmatch/desktop",
-  "version": "1.6.5",
+  "version": "1.6.6",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
@@ -21,16 +21,8 @@
     "stage:release": "node scripts/stage-release.cjs"
   },
   "dependencies": {
-    "@chainsafe/libp2p-noise": "^17.0.0",
-    "@chainsafe/libp2p-yamux": "^8.0.1",
-    "@libp2p/crypto": "^5.1.24",
-    "@libp2p/mdns": "^12.0.33",
-    "@libp2p/ping": "^3.1.14",
-    "@libp2p/tcp": "^11.0.29",
-    "@multiformats/multiaddr": "^13.0.0",
     "@noble/curves": "^1.9.0",
-    "@noble/hashes": "^1.8.0",
-    "libp2p": "^3.3.12"
+    "@noble/hashes": "^1.8.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

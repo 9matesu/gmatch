@@ -83,6 +83,33 @@
   node and the UI says why); a node that answers is kept. A hostname blacklist
   can only ever name the deployments we already know about, so reachability is
   the rule.
+- **Amended 2026-10-28 (1.6.5):** neither hostname nor bare reachability decides
+  — the pointer's **provenance** does. A pre-`v2` pointer is paused
+  (`pausedReason: 'legacy'`) and never dialed; a `v2` pointer gets one bounded
+  `/api/health` probe, and silence pauses it (`pausedReason: 'unreachable'`).
+  `gmatch.fly.dev` answered while serving a different world, which is exactly
+  what reachability cannot see. See `apps/desktop/electron/server-mode-core.cjs`
+  and `docs/DESKTOP.md`.
+
+## ADR-2026-10-28-01 — libp2p slice retired (accepted, supersedes ADR-1.5.5-02/08)
+
+- The Slice 1-3 libp2p code (`electron/p2p-{host,node,protocol}.mjs`, the
+  `p2p:*` IPC bridge in main/preload, `useP2PNode` + `p2pBridge`, the protocol
+  `peer-binding` / `blockstore` / `p2p-node` modules and their tests) was never
+  reachable from a shipping renderer path, and it could not run in a packaged
+  build at all: electron-builder's `files` list excludes `node_modules`, so the
+  main-process `import 'libp2p'` had no module to load. Their `.test.mjs` files
+  ran under no script and failed with `ERR_MODULE_NOT_FOUND`.
+- Removed 2026-10-28 together with the eight libp2p dependencies
+  (`libp2p`, `@libp2p/{crypto,mdns,ping,tcp}`, `@chainsafe/libp2p-{noise,yamux}`,
+  `@multiformats/multiaddr`); `@noble/{curves,hashes}` stay because
+  `apps/desktop/src/identity.cjs` uses them. The production transport is the
+  WebRTC DataChannel mesh with the node's sealed relay fallback
+  (`docs/ARCHITECTURE-P2P.md` §3-4, `docs/P2P.md`); executed proof is
+  `apps/desktop/scripts/p2p-two-process.mjs`.
+- Reintroducing a second transport requires: bundling its dependencies into
+  `dist/` (or `extraResources`), wiring it to a real renderer path, and a test
+  that runs against the packaged layout. A dormant seam is not a feature.
 
 ## ADR-1.5.5-07 — Minimization policy (accepted)
 

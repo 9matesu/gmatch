@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { OrbitIdentity } from '@orbit/crypto';
-import { OrbitP2PNode } from '@orbit/protocol';
 import { User, OrbitObject } from '@orbit/shared';
 import { saveObject, getObject } from '../utils/storage';
 import { OrbitPeerRelay } from '../utils/peer-relay';
@@ -227,7 +226,6 @@ export function useP2P(identity: OrbitIdentity | null) {
   const [baseGen, setBaseGen] = useState(0);
   const lastBaseRef = useRef<string>('');
   useEffect(() => subscribeApiBase(() => setBaseGen((g) => g + 1)), []);
-  const nodeRef = useRef<OrbitP2PNode | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const relayRef = useRef<OrbitPeerRelay | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
@@ -329,11 +327,7 @@ export function useP2P(identity: OrbitIdentity | null) {
       processSwarmMessage(msg as P2PSwarmMessage);
     };
 
-    // 2. Initialize P2P Node
-    const node = new OrbitP2PNode(identity);
-    nodeRef.current = node;
-
-    // 3. Initialize Cross-Tab Broadcast Channel Swarm
+    // 2. Initialize Cross-Tab Broadcast Channel Swarm
     const channel = new BroadcastChannel('orbit_p2p_swarm');
     channelRef.current = channel;
     const selfUser = selfUserRef.current;
@@ -981,7 +975,6 @@ export function useP2P(identity: OrbitIdentity | null) {
       }
       relayRef.current?.destroy();
       relayRef.current = null;
-      nodeRef.current = null;
     };
   }, [identity, baseGen]);
 
