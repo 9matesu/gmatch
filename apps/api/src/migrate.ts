@@ -47,10 +47,25 @@ function readPendingMigrations(currentVersion: number): Array<{ version: number;
 export async function migrate(client: Client): Promise<void> {
   // 1. Apply the canonical schema. Every statement is idempotent
   //    (CREATE TABLE/INDEX IF NOT EXISTS), so this is safe on fresh and
-  //    existing databases alike. Failures here are hard errors.
+  //    existing databases alike. Failures here are hard errors — EXCEPT a
+  //    statement that names a column a later migration adds (e.g. the
+  //    idx_objects_is_avatar index over migration 053): on an old DB the table
+  //    already exists, so CREATE TABLE IF NOT EXISTS is a no-op and the column
+  //    is not there yet. Aborting there used to kill the whole boot, so an old
+  //    database could never upgrade (sidecar "could not keep the server
+  //    running"). Those statements are deferred and retried after step 2.
   const schemaSql = readFileSync(SCHEMA_FILE, 'utf8')
+  const deferred: string[] = []
   for (const statement of splitStatements(schemaSql)) {
-    await client.execute(statement)
+    try {
+      await client.execute(statement)
+    } catch (err: any) {
+      if (String(err?.message).includes('no such column')) {
+        deferred.push(statement)
+        continue
+      }
+      throw err
+    }
   }
 
   // 2. Apply versioned migrations newer than the recorded user_version.
@@ -72,6 +87,12 @@ export async function migrate(client: Client): Promise<void> {
     }
     await client.execute(`PRAGMA user_version = ${version}`)
     currentVersion = version
+  }
+
+  // 2b. Retry the schema statements the migrations unblocked. A failure here
+  //     is real: the column the statement names still does not exist.
+  for (const statement of deferred) {
+    await client.execute(statement)
   }
 
   // 3. Seed default community settings (idempotent). The discord invite is

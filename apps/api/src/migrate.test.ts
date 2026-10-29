@@ -358,6 +358,28 @@ describe('gMatch Phase 1 migrations', () => {
     expect(await columnExists(client, 'Users', 'is_moderator')).toBe(true)
   })
 
+  it('upgrades an old DB whose Objects predates is_avatar (053) instead of aborting at the schema index', async () => {
+    const client = createClient({ url: ':memory:' })
+    await migrate(client)
+
+    // Simulate a database created before migration 053: the column and its
+    // index do not exist but user_version says 052 is applied.
+    await client.execute('DROP INDEX IF EXISTS idx_objects_is_avatar')
+    await client.execute('ALTER TABLE Objects DROP COLUMN is_avatar')
+    await client.execute('PRAGMA user_version = 52')
+
+    // Before the fix, schema.sql's CREATE INDEX ... ON Objects (is_avatar)
+    // ran BEFORE the versioned migrations and threw "no such column", so the
+    // whole boot aborted and an old database could never upgrade (the sidecar
+    // died with "could not keep the bundled server running"). The index is now
+    // deferred until migration 053 has added the column.
+    await migrate(client)
+
+    expect(await userVersion(client)).toBe(57)
+    expect(await columnExists(client, 'Objects', 'is_avatar')).toBe(true)
+    expect(await indexExists(client, 'idx_objects_is_avatar')).toBe(true)
+  })
+
   it('upgrades a pre-gMatch snapshot (user_version 13) by applying 014-057', async () => {
     const client = createClient({ url: ':memory:' })
     await migrate(client)

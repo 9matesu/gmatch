@@ -1933,31 +1933,6 @@ app.whenReady().then(async () => {
     app.relaunch({ execPath })
     app.exit(0)
   })
-  // P2P mesh (Slice 3): lazy libp2p node in main (ESM, dynamic import — main
-  // stays CJS). The node boots on first p2p:* call, never at app launch, so
-  // Offline starts pay nothing. Renderer speaks sealed Envelope-v2 only.
-  let p2pHostPromise = null
-  async function p2pHostEnsure() {
-    if (!p2pHostPromise) {
-      p2pHostPromise = import('./p2p-host.mjs').then(({ createP2PHost }) =>
-        createP2PHost({
-          secureKV,
-          webContents: () => BrowserWindow.getAllWindows().map((w) => w.webContents),
-          log: mainLog,
-        }),
-      ).catch((err) => { p2pHostPromise = null; throw err })
-    }
-    return p2pHostPromise
-  }
-  ipcMain.handle('p2p:status', async () => {
-    try { return await (await p2pHostEnsure()).status() } catch (err) { return { started: false, error: err?.message || String(err) } }
-  })
-  ipcMain.handle('p2p:peers', async () => {
-    try { return await (await p2pHostEnsure()).peers() } catch { return [] }
-  })
-  ipcMain.handle('p2p:send', async (_event, payload) => {
-    try { return await (await p2pHostEnsure()).send(payload ?? {}) } catch (err) { return { ok: false, error: err?.message || String(err) } }
-  })
   // Portable self-update (GitHub Releases): check + auto-download in main,
   // the renderer's "Install & Restart" triggers the exe swap + relaunch.
   let updater = null

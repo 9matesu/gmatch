@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.6.6 — old worlds actually upgrade; dead libp2p slice removed
+
+- **An old database no longer bricks the node.** `migrate()` applied `schema.sql`
+  before the versioned migrations, so on a database created before migration
+  053 the `CREATE INDEX ... ON Objects (is_avatar)` statement threw
+  `no such column: is_avatar` and aborted the whole boot — migrations 052-057
+  never ran and host mode died with "gMatch could not keep its bundled server
+  running" (the dev world, already at v62, was unaffected). Schema statements
+  that name a column a migration provides are now deferred and retried after
+  the migrations; regression test drops the column from a current DB and
+  re-runs `migrate()`. Proven against the real packaged profile database
+  (user_version 51 → 57 with `is_avatar` + its index).
+- **libp2p slice retired** (ADR-2026-10-28-01). `electron/p2p-{host,node,protocol}.mjs`,
+  the `p2p:*` IPC bridge, `useP2PNode`/`p2pBridge`, the protocol
+  `peer-binding`/`blockstore`/`p2p-node` modules and the eight libp2p
+  dependencies are gone: they were never wired to a renderer path and could not
+  run in a packaged build (`files` excludes `node_modules`). The production
+  transport remains the WebRTC mesh + sealed relay, proven by
+  `scripts/p2p-two-process.mjs`.
+- **Docs rebuilt around the shipped system:** `docs/P2P.md` is now the current
+  map (discovery, signaling, transport phases, swarm-v1, DMs/rooms, durability,
+  honest boundaries, executed evidence); `docs/NET.md` is marked retired;
+  ADR-2026-10-25-01 is amended to the provenance rule 1.6.5 actually implements.
+
 ## 1.6.5 — Cloudflare rendezvous, no hosted world
 
 - **No hosted full node.** The old hosted courier and full node are gone from

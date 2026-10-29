@@ -1,5 +1,16 @@
 # NET — libp2p integration design (1.5.5 line)
 
+> **STATUS: RETIRED 2026-10-28 (ADR-2026-10-28-01).** The slice landed in
+> `apps/desktop/electron/p2p-{host,node,protocol}.mjs` but was never wired to a
+> shipping renderer path, and it could never run in a packaged build — the
+> electron-builder `files` list excludes `node_modules`, so the main-process
+> `import 'libp2p'` had nothing to resolve against. The files, the `p2p:*` IPC
+> bridge, the renderer seam (`useP2PNode`/`p2pBridge`), the protocol
+> `peer-binding`/`blockstore` modules and the libp2p dependencies were removed.
+> The production transport is the WebRTC mesh + sealed courier documented in
+> `docs/ARCHITECTURE-P2P.md` and `docs/P2P.md`. This file is kept as design
+> history only; do not implement from it.
+
 > **Status:** Accepted design for the vertical slice. Code lands per this doc;
 > deviations update this doc first. Parent decisions: ADR-02/04/05/07.
 
