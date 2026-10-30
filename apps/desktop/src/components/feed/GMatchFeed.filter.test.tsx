@@ -113,14 +113,14 @@ describe('GMatchFeed timeline filtering and resilience', () => {
     expect(screen.getByText('Offline P2P post still attempted')).toBeInTheDocument();
   });
 
-  it('hides a post from the timeline when its image media fails to load', async () => {
+  it('keeps a post on the timeline when its media fails to load (never silently removes it)', async () => {
     const posts: any[] = [
       {
         id: 'broken-img-post',
         author_id: 'online-author',
         author_name: 'Online User',
         created_at: new Date().toISOString(),
-        caption: 'Broken image post to hide',
+        caption: 'Broken image post stays visible',
         url: 'https://example.com/broken.jpg',
         like_count: 0,
         comment_count: 0,
@@ -137,54 +137,15 @@ describe('GMatchFeed timeline filtering and resilience', () => {
       />
     );
 
-    expect(screen.getByText('Broken image post to hide')).toBeInTheDocument();
+    expect(screen.getByText('Broken image post stays visible')).toBeInTheDocument();
 
     const img = container.querySelector('img[src="https://example.com/broken.jpg"]');
-    if (img) {
-      fireEvent.error(img);
-    }
+    if (img) fireEvent.error(img);
 
-    await waitFor(() => {
-      expect(screen.queryByText('Broken image post to hide')).toBeNull();
-    });
-  });
-
-  it('silently retries hidden posts when a peer comes online', async () => {
-    const posts: any[] = [
-      {
-        id: 'flaky-img-post',
-        author_id: 'online-author',
-        author_name: 'Online User',
-        created_at: new Date().toISOString(),
-        caption: 'Flaky post retried on peer online',
-        url: 'https://example.com/flaky.jpg',
-        like_count: 0,
-        comment_count: 0,
-      },
-    ];
-
-    const { container } = render(
-      <GMatchFeed
-        identity={mockIdentity}
-        posts={posts}
-        stories={[]}
-        users={mockUsers}
-        feedSort="latest"
-      />
-    );
-
-    const img = container.querySelector('img[src="https://example.com/flaky.jpg"]');
-    if (img) {
-      fireEvent.error(img);
-    }
-    await waitFor(() => {
-      expect(screen.queryByText('Flaky post retried on peer online')).toBeNull();
-    });
-
-    window.dispatchEvent(new Event('orbit-peer-online'));
-    await waitFor(() => {
-      expect(screen.getByText('Flaky post retried on peer online')).toBeInTheDocument();
-    });
+    // The tile may show its unavailable placeholder, but the post itself — and
+    // its caption/actions — must stay: a missing seeder is not a deleted post.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.getByText('Broken image post stays visible')).toBeInTheDocument();
   });
 
   it('opens post lightbox on media click without triggering user profile navigation', async () => {

@@ -12,32 +12,30 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('FeedStatusPills (selective: only empty/conflict states)', () => {
+describe('FeedStatusPills (offline conflict only)', () => {
   it('renders nothing when online with posts', () => {
     setOnline(true);
     const { container } = render(<FeedStatusPills postCount={5} />);
     expect(container.firstElementChild).toBeNull();
   });
 
-  it('offline with posts: offline pill, no empty pill', () => {
+  it('renders nothing when online and empty (the empty card says it once)', () => {
+    setOnline(true);
+    const { container } = render(<FeedStatusPills postCount={0} />);
+    expect(container.firstElementChild).toBeNull();
+    expect(screen.queryByText(/empty feed/i)).toBeNull();
+  });
+
+  it('offline with posts: offline pill', () => {
     setOnline(false);
     render(<FeedStatusPills postCount={5} />);
     expect(screen.getByRole('status')).toHaveTextContent(/offline/i);
-    expect(screen.queryByText(/empty feed/i)).toBeNull();
   });
 
-  it('online and empty: empty pill, no offline pill', () => {
-    setOnline(true);
-    render(<FeedStatusPills postCount={0} />);
-    expect(screen.getByRole('status')).toHaveTextContent(/empty feed/i);
-    expect(screen.queryByText(/offline/i)).toBeNull();
-  });
-
-  it('offline and empty: offline pill wins (the nudge card covers empty)', () => {
+  it('offline and empty: offline pill still discloses the stale cache', () => {
     setOnline(false);
     render(<FeedStatusPills postCount={0} />);
     expect(screen.getByRole('status')).toHaveTextContent(/offline/i);
-    expect(screen.queryByText(/empty feed/i)).toBeNull();
   });
 
   it('reacts to connectivity flips without remount', () => {

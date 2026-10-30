@@ -14,7 +14,6 @@ import { getCentralApiUrl, setCentralApiUrl } from '../../utils/central'
 import { rememberKnownNodeHint } from '../../utils/peerNodes'
 import { orbitFetch, getApiBaseUrl, isCourierApiUrl, LOCAL_NODE_BASE } from '../../utils/api'
 import { normalizeServerUrl, isCurrentServerUrl } from '../../utils/serverUrl'
-import { PausedServerBanner } from './PausedServerBanner'
 import { joinServer } from '../../utils/join-server'
 import { switchClientWorld } from '../../utils/server-switch'
 import { rememberPendingHost } from '../../utils/server-host-pending'
@@ -1285,10 +1284,6 @@ export function ServersView({
 
   return (
     <div className="h-full min-h-0 flex-1 overflow-hidden p-2 animate-orbit-fade-in flex flex-col items-center">
-      {/* A saved server that is not dialed on this launch: this machine hosts. */}
-      {hostState?.pausedUrl && (
-        <PausedServerBanner pausedUrl={hostState.pausedUrl} reason={hostState.pausedReason} />
-      )}
       {/* First-login admin passcode */}
       {serverMode === 'host' && node?.isAdmin && pinToDismiss && (
         <div role="alert" data-testid="admin-pin-banner" className="mb-2 bg-surface-interactive/90 border border-amber-400/40 p-3 rounded-lg space-y-1.5 shrink-0 shadow-lg">

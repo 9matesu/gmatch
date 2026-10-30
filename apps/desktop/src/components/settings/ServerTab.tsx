@@ -28,7 +28,6 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
   const [clientUrl, setClientUrl] = useState('')
   const [saving, setSaving] = useState(false)
   const [restartPending, setRestartPending] = useState(false)
-  const [probing, setProbing] = useState(false)
 
   useEffect(() => {
     window.gmatch?.serverState?.().then((s) => {
@@ -57,68 +56,8 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
     }
   }
 
-  // The saved node is not being dialed on this launch. Nothing is deleted: this
-  // computer is hosting its own world and the old address is one click away.
-  const reconnect = async (url: string) => {
-    if (!window.gmatch?.serverProbe) return
-    setProbing(true)
-    const res = await window.gmatch.serverProbe(url).catch(() => ({ ok: false } as const))
-    setProbing(false)
-    if (!res.ok) { toast?.('That server does not answer. Nothing was changed.'); return }
-    await save('client', url)
-  }
-
-  const forgetPaused = async () => {
-    if (!window.gmatch?.serverSet) return
-    setSaving(true)
-    const res = await window.gmatch.serverSet({ mode: 'host' })
-    setSaving(false)
-    if (!res.ok) { toast?.(res.error || 'Could not save.'); return }
-    setState((s) => (s ? { ...s, pausedUrl: undefined } : s))
-    toast?.('Saved server forgotten. This computer keeps hosting.', 'success')
-  }
-
   return (
     <div className="space-y-4 animate-orbit-fade-in">
-      {state.pausedUrl && (
-        <div
-          role="status"
-          className="glass-card p-4 space-y-2 border border-amber-500/40"
-        >
-          <p className="text-xs text-amber-200">
-            {state.pausedReason === 'unreachable' ? (
-              <>
-                The saved server (<span className="font-mono break-all">{maskedServerUrl(state.pausedUrl)}</span>) did not
-                answer on this launch, so this computer is hosting its own world.
-              </>
-            ) : (
-              <>
-                A server saved by an older version (<span className="font-mono break-all">{maskedServerUrl(state.pausedUrl)}</span>)
-                is not dialed by this one. This computer hosts its own world.
-              </>
-            )}{' '}
-            Nothing was deleted — posts made here are saved here.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={probing || saving}
-              onClick={() => { playPress(880); void reconnect(state.pausedUrl!) }}
-              className="glass-action glass-action-primary px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-50"
-            >
-              {probing ? 'Checking…' : 'Reconnect'}
-            </button>
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => { playPress(700); void forgetPaused() }}
-              className="rounded-lg border border-border-glass px-3 py-1.5 text-xs text-retro-muted hover:text-retro-fg cursor-pointer disabled:opacity-50"
-            >
-              Forget it
-            </button>
-          </div>
-        </div>
-      )}
       {state.mode === 'host' && identity && (
         <>
           <ServerPasswordSection identity={identity as never} isHost toast={(m, t) => toast?.(m, t)} />

@@ -1508,18 +1508,6 @@ export default function Home() {
     })()
   }, [forceRefreshFeed])
 
-  // Which node this feed reads — surfaced in the empty state so a pin to the
-  // wrong (e.g. fresh/empty local) node is visible instead of mysterious.
-  const apiNodeLabel = useMemo(() => {
-    try {
-      const base = getApiBaseUrl()
-      if (!base) return 'relay'
-      return new URL(base, 'http://localhost').hostname || base
-    } catch {
-      return 'this node'
-    }
-  }, [])
-
   const loadMoreFeedPosts = useCallback(async () => {
     if (isLoadingMoreFeed) return
     setIsLoadingMoreFeed(true)
@@ -4698,7 +4686,6 @@ export default function Home() {
                                 onForceRefresh={forceRefreshFeed}
                                 feedStatus={feedStatus}
                                 onResolveMissingPost={resolvePostById}
-                                apiNodeLabel={apiNodeLabel}
                                 onDeletePostApi={deletePostOnServer}
                                 onOpenNetwork={(userId) => openUserNetwork(userId)}
                                 onUserContext={(e, userId, displayName) => {
