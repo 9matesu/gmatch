@@ -422,6 +422,16 @@ export function GMatchFeed({
   const [optionsPost, setOptionsPost] = useState<FeedPost | null>(null);
   const [reportingPost, setReportingPost] = useState<FeedPost | null>(null);
 
+  // Media that resolved to a terminal miss (not on this device, no peer
+  // answered) is hidden from the timeline instead of showing a tile that
+  // loads forever. The count stays visible so posts never vanish silently,
+  // and "Show" remounts the tiles for one explicit retry.
+  const [missingMediaIds, setMissingMediaIds] = useState<Set<string>>(() => new Set());
+  const [showMissingMedia, setShowMissingMedia] = useState(false);
+  const markMediaMissing = useCallback((postId: string) => {
+    setMissingMediaIds((prev) => (prev.has(postId) ? prev : new Set(prev).add(postId)));
+  }, []);
+
   const handleAvatarClick = (userId: string) => {
     playPress(750);
     const hasStories = storyOwners.has(userId);
@@ -563,6 +573,17 @@ export function GMatchFeed({
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
   }, [posts, likeCounts, commentsMap, tagAffinities, now, feedSort, users, identity?.orbitId]);
+
+  // Missing media hides the post, not the world: the counter below the header
+  // says how many and can show them again with one explicit retry.
+  const missingMediaCount = useMemo(
+    () => displayPosts.filter((p) => missingMediaIds.has(p.id)).length,
+    [displayPosts, missingMediaIds],
+  );
+  const visiblePosts = useMemo(
+    () => (showMissingMedia ? displayPosts : displayPosts.filter((p) => !missingMediaIds.has(p.id))),
+    [displayPosts, missingMediaIds, showMissingMedia],
+  );
 
   const followSuggestions = useMemo(
     () => displayPosts.length === 0
@@ -938,9 +959,23 @@ export function GMatchFeed({
 
       {/* Feed Content Column (Posts) */}
       <div className="w-full max-w-[1400px] mx-auto flex flex-col px-2 sm:px-4 py-2 space-y-3">
+        {missingMediaCount > 0 && (
+          <div className="flex items-center gap-2 px-1 text-xs text-retro-muted">
+            <span>
+              {missingMediaCount} {missingMediaCount === 1 ? 'post' : 'posts'} hidden — media not on this device
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowMissingMedia((v) => !v)}
+              className="font-medium text-retro-fg underline decoration-border-glass hover:decoration-retro-fg cursor-pointer"
+            >
+              {showMissingMedia ? 'Hide' : 'Show'}
+            </button>
+          </div>
+        )}
         {/* Feed Posts List with Sharp Square Images */}
                   <div className={`mt-3 ${feedCols === '1' ? 'space-y-3' : 'grid grid-cols-1 sm:grid-cols-2 gap-3' + (feedCols === '3' ? ' lg:grid-cols-3' : feedCols === '4' ? ' lg:grid-cols-3 xl:grid-cols-4' : feedCols === '5' ? ' lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5' : '')}`}>
-           {displayPosts.map((post, _idx) => {
+           {visiblePosts.map((post, _idx) => {
             const isLiked = !!likedPosts[post.id];
             const isSaved = !!savedPosts[post.id];
              const currentLikes = likeCounts[post.id] ?? post.like_count ?? 0;
@@ -1102,6 +1137,7 @@ export function GMatchFeed({
                                 muted={true}
                                 loop={true}
                                 hideUnavailable={false}
+                                onMediaUnavailable={() => markMediaMissing(post.id)}
                                 onExpand={() => toggleExpand(post)}
                                 onDoubleTapLike={() => handleDoubleTap(post)}
                               />
@@ -1164,6 +1200,7 @@ export function GMatchFeed({
                           muted={true}
                           loop={true}
                           hideUnavailable={false}
+                          onMediaUnavailable={() => markMediaMissing(post.id)}
                           onExpand={() => toggleExpand(post)}
                           onDoubleTapLike={() => handleDoubleTap(post)}
                         />

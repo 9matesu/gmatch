@@ -182,6 +182,13 @@ async function main() {
   // Legacy url lookup worked all along; the CONTENT REF (the keep's own
   // identity) is what was broken.
   assert.strictEqual(vault.get(legacyUrl), `vault://f/${legacyFile}`, 'url lookup still works')
+  // A world move changes the serving URL; the post row keeps only its object id
+  // (and the DB keeps no media), so the id must find bytes cached under the old
+  // node URL. Without this every moved post waited for a seeder that never comes.
+  assert.strictEqual(
+    vault.get('aaa'), `vault://f/${legacyFile}`,
+    'bare object id resolves a row cached under the old /api/objects/ url',
+  )
   assert.strictEqual(
     vault.get(`vault://f/${legacyRef}`), `vault://f/${legacyFile}`,
     'content ref now resolves a legacy row (backfilled)',

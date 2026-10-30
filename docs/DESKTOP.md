@@ -159,6 +159,15 @@ Two edges matter when debugging a user's "my keepsake is gone":
   `{ state: 'local' }` / `{ state: 'absent' }` / `{ state: 'unreadable', reason }`
   (`missing-file` | `decrypt` | `read` | `ipc`) and never drops a row on a
   transient read failure. `vault.get()` still exists for internal callers.
+- **Object-id lookup** (`entryFor`): manifest keys are the URL that served the
+  bytes, so a post row that survives a world move (it knows only its
+  `/api/objects/<id>`) now matches any stored key ending in that id. The feed
+  probes this before asking the node (which stores no media) or a peer.
+- **Terminal miss:** when the vault has no bytes, the path is a P2P descriptor
+  and the bounded swarm ask times out, the tile reports a miss instead of
+  "waiting for poster" forever. The feed hides posts in that state behind
+  `N posts hidden - media not on this device` with Show/Hide (Show remounts the
+  tiles for one explicit retry); nothing is deleted.
 
 ## Failure paths (what the user sees when each layer breaks)
 

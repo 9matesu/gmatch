@@ -227,6 +227,16 @@ function entryFor(ref) {
   }
   const byFile = Object.keys(manifest).find((k) => fileOf(manifest[k]) === str)
   if (byFile) return { storeKey: byFile, entry: manifest[byFile] }
+  // Object ids survive world moves: the manifest was written with the node URL
+  // that served the bytes (https://gmatch.fly.dev/api/objects/<id>, a LAN
+  // origin, …). A post row only knows its id, so match any stored key that ends
+  // in /api/objects/<id>. Without this, media that is physically on disk reads
+  // as "absent" after switching worlds and the tile waits for a seeder forever.
+  if (!str.includes('/')) {
+    const suffix = `/api/objects/${str}`
+    const byObjectId = Object.keys(manifest).find((k) => k.endsWith(suffix))
+    if (byObjectId) return { storeKey: byObjectId, entry: manifest[byObjectId] }
+  }
   return null
 }
 

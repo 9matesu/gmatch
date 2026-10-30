@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { orbitFetch } from '../utils/api'
 import { getLocalObject, requestSwarmObject, PEER_ONLINE_EVENT } from '../utils/p2pSwarm'
+import { vaultProbe } from '../services/vault'
 import { resolveVideoMime, sniffFileHead } from '../utils/media'
 import { isMagnetUri } from '../utils/magnet'
 
@@ -181,6 +182,25 @@ async function resolveObject(cleanId: string, identity: IdentityLike): Promise<R
   }
 
   // P2P first; the network is only touched on a miss.
+  // The encrypted vault is local storage too: a row that moved worlds keeps its
+  // bytes on disk under the old node URL, so look the object id up there before
+  // asking the node (which keeps no media) or a peer (which may not exist).
+  try {
+    const vault = await vaultProbe(cleanId)
+    if (vault.state === 'local' && vault.local) {
+      return commit({
+        cardId: cleanId,
+        url: vault.local,
+        failed: false,
+        isVideo: /^video\//i.test(vault.mime || ''),
+        isLink: false,
+        linkUrl: null,
+      })
+    }
+  } catch {
+    /* no vault bridge (browser dev) — fall through */
+  }
+
   let localBlob: Blob | null = null
   try {
     localBlob = await getLocalObject(cleanId)
@@ -230,6 +250,25 @@ async function resolveObject(cleanId: string, identity: IdentityLike): Promise<R
       // Resolve order: local store (also keyed by content_hash) -> swarm peers.
       const hash: string | null = typeof data.content_hash === 'string' ? data.content_hash : null
       const mime: string = typeof data.mime_type === 'string' ? data.mime_type : 'application/octet-stream'
+      // Same world-less lookup by content hash: new uploads pin bytes under the
+      // sha256, and that key survives a DB move even when the id key does not.
+      if (hash) {
+        try {
+          const vault = await vaultProbe(hash)
+          if (vault.state === 'local' && vault.local) {
+            return commit({
+              cardId: cleanId,
+              url: vault.local,
+              failed: false,
+              isVideo: /^video\//i.test(mime),
+              isLink: false,
+              linkUrl: null,
+            })
+          }
+        } catch {
+          /* no vault bridge */
+        }
+      }
       let blob: Blob | null = null
       try {
         blob = (await getLocalObject(cleanId)) || (hash ? await getLocalObject(hash) : null)
@@ -272,14 +311,15 @@ async function resolveObject(cleanId: string, identity: IdentityLike): Promise<R
           linkUrl: null,
         })
       }
-      // Seeder offline (or still hydrating): fail WITHOUT caching so a later
-      // remount/scroll retries once the seeder is back. Marked awaitingSeeder
-      // so the tile reads "waiting for poster" and PEER_ONLINE_EVENT retries.
-      // Persist the id (+ content hash) so a restart/reconnect can resume.
+      // Terminal miss, not an endless "waiting for poster": the vault had no
+      // bytes, the node keeps no media and the bounded swarm ask timed out.
+      // Failed results are never cached, so an explicit remount (Show/Retry)
+      // or an actual PEER_ONLINE_EVENT is the only thing that re-asks.
+      // Persist the id (+ content hash) so the diagnostics can list it.
       void import('../utils/pendingTransfers')
         .then(({ enqueuePendingTransfer }) => enqueuePendingTransfer(cleanId, hash))
         .catch(() => {})
-      return { state: FAILED(cleanId), cache: false, awaitingSeeder: true }
+      return { state: FAILED(cleanId), cache: false, awaitingSeeder: false }
     }
     return commit({
       cardId: cleanId,

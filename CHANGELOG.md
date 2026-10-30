@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.6.7 - local media is found again; missing media stops spinning
+
+- **The vault answers by object id, not just by the old URL.** The media vault
+  was written under the node URL that served each file
+  (`https://<old-node>/api/objects/<id>`). After moving the world, a post row
+  knows only its id, so the lookup reported "no local bytes" while the file sat
+  on disk, and the tile waited for a seeder forever. `entryFor` now also matches
+  any stored key that ends in `/api/objects/<id>`; the renderer probes the vault
+  by object id (and by content hash for P2P rows) before it asks the node or a
+  peer.
+- **Missing media is terminal, and honest.** A failed resolution no longer
+  leaves "waiting for poster" on screen: the vault has no bytes, the node keeps
+  no media and the bounded swarm ask timed out, so the tile reports a miss.
+  Posts with missing media are hidden from the timeline behind one line -
+  `N posts hidden - media not on this device` with Show/Hide - instead of a
+  tile that loads forever. Show remounts the tiles for one explicit retry.
+
 ## 1.6.6 — old worlds actually upgrade; dead libp2p slice removed
 
 - **A post never disappears because its media is unreachable.** The feed used to
