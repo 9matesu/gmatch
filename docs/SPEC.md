@@ -759,3 +759,39 @@ badge, inbox affordance, courier rows), and the API suite
 `routes/posts-notifications.test.ts` (comment/reply/mention/comment-like
 coverage, self-notification guards, cross-post parent rejection, bounded
 idempotency).
+
+## 16. Discoverability and catch-up (2026-10-30)
+
+Three things were technically present and practically invisible: the community
+invite, the notification bell, and posts written while the window sat in the
+background. Each is a one-owner fix, not a second system.
+
+- **Community invite is one shared lookup.** `services/community.ts` reads the
+  node's public `GET /api/discord-invite` (`SystemMeta.discord_invite_url`,
+  set from the admin panel) and falls back to the constant
+  `https://discord.gg/Xkqb6U4Na` when a fresh local node has none or the node is
+  unreachable. The same hook feeds the header item
+  (`CommandIsland`), Settings → Preferences (`CommunitySection`) and the top of
+  the Help modal. Non-`http(s)` values are rejected, never opened.
+- **The bell says what it is.** `NotificationCenter` renders the bell at
+  `w-4 h-4` in a 7×7 chip, accent-filled when unread, with a visible
+  `Notifications` label above the preview (the preview stays for sm+). The
+  toggle, badge and keyboard behaviour are unchanged; only affordance is.
+- **Background and late-joiner sync.** `App` refreshes the feed on
+  `visibilitychange`/`focus` (at most once per 15s) and polls once a minute
+  while hidden, so the feed is warm before the user looks. A hidden window is no
+  longer skipped. On `PEER_ONLINE_EVENT`, `useP2P` still sends pending
+  operations and now also re-offers a bounded slice of recent log entries
+  (`broadcastRecentOperations`: newest 120, ≤7 days, throttled to one wave per
+  20s) so a peer that joined after an operation was acked still receives it.
+  Receivers dedupe by operation id; the wave never rewrites delivery status.
+- **Cross-world media asks the swarm.** A DM attachment's metadata row lives on
+  the sender's node only, so `/api/objects/<id>` 404s on the recipient's world.
+  `useObjectImage` now asks the swarm by object id before declaring a miss (and
+  before firing `orbit-object-404`), then caches the bytes locally. A node 404
+  alone is no longer proof that the bytes do not exist.
+
+**Tests:** `services/community.test.ts` (node value, fallback, offline,
+non-http rejection, cache), `services/socialOpTransport.test.ts`
+(re-offering delivered operations, count/age bounds),
+`hooks/useObjectImage.swarm404.test.ts` (swarm fallback + honest miss).

@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach, vi } from 'vitest'
 import { restoreIdentity } from '@orbit/crypto'
 import { SocialOperationLog, SENDING_EVICT_MS, type LoggedOperation, type OperationLogBackend } from './socialOperationLog'
 import { publishSignedPostOperation } from './socialPublish'
-import { acceptInboundOperation, broadcastPendingOperations } from './socialOpTransport'
+import { acceptInboundOperation, broadcastPendingOperations, broadcastRecentOperations } from './socialOpTransport'
 import { handleSwarmMessage, sendSwarmFrame, setSwarmOperationHandler, setSwarmTransport } from '../utils/p2pSwarm'
 
 const AUTHOR = restoreIdentity('00'.repeat(32), '11'.repeat(32))
@@ -103,6 +103,44 @@ describe('socialOpTransport (L4 seed)', () => {
     expect(statuses.get(second.operationId)).toBe('sending')
     // And the peer still accepts what it receives.
     expect(await acceptInboundOperation(peerLog, sent[0])).toBe('accepted')
+  })
+
+  it('re-offers recent delivered operations so peers that joined later still get them', async () => {
+    const first = await authorPost(authorLog, 1)
+    const second = await authorPost(authorLog, 2)
+    // Both were already acked by an earlier peer wave — exactly the state that
+    // used to make old posts permanently invisible to a newcomer.
+    await authorLog.advanceStatus(first.operationId, 'delivered')
+    await authorLog.advanceStatus(second.operationId, 'delivered')
+    expect(await authorLog.listPendingOperations()).toHaveLength(0)
+
+    const sent: Array<Record<string, unknown>> = []
+    const { sent: count } = await broadcastRecentOperations(authorLog, (operation) => { sent.push(operation) })
+    expect(count).toBe(2)
+    expect(sent.map((operation) => operation.operationId)).toEqual([second.operationId, first.operationId])
+    // Re-offering does not rewrite delivery state: it is a catch-up wave, not
+    // a re-ack. The receiving side dedupes by operation id.
+    const stored = new Map((await authorLog.listAllOperations())
+      .map((entry) => [entry.operationId, entry.status]))
+    expect(stored.get(first.operationId)).toBe('delivered')
+    expect(stored.get(second.operationId)).toBe('delivered')
+  })
+
+  it('bounds the catch-up wave by count and age', async () => {
+    await authorPost(authorLog, 1)
+    await authorPost(authorLog, 2)
+    await authorPost(authorLog, 3)
+
+    const limited: Array<Record<string, unknown>> = []
+    expect((await broadcastRecentOperations(authorLog, (operation) => { limited.push(operation) }, { limit: 2 })).sent).toBe(2)
+    // Newest first, so the head of the chain is always in the wave.
+    expect(limited[0].operationId).toBe((await authorLog.listAllOperations())
+      .sort((a, b) => b.createdAt - a.createdAt)[0].operationId)
+
+    // Nothing falls inside a zero-width window.
+    const none: Array<Record<string, unknown>> = []
+    expect((await broadcastRecentOperations(authorLog, (operation) => { none.push(operation) }, { maxAgeMs: 0 })).sent).toBe(0)
+    expect(none).toHaveLength(0)
   })
 
   it('evicts long-stuck sending entries at capacity but never the chain head', async () => {

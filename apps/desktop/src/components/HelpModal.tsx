@@ -15,8 +15,11 @@ import {
   MonitorPlay,
   ShieldAlert,
   Coins,
+  Users,
+  ArrowUpRight,
 } from 'lucide-react'
 import { HELP_TOPICS } from '../help/helpContent'
+import { useCommunityInvite, openCommunityInvite } from '../services/community'
 import feedImg from '../assets/screenshots/feed.png'
 import cardsImg from '../assets/screenshots/cards.png'
 import idleImg from '../assets/screenshots/idle-grid.png'
@@ -119,6 +122,7 @@ function TopicBody({ topicId }: { topicId: string }) {
 
 export function HelpModal({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState<TabId>('getting-started')
+  const communityUrl = useCommunityInvite()
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -253,6 +257,20 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
 
           {/* Right Content Area */}
           <main className="flex-1 min-w-0 overflow-y-auto p-4 sm:p-6 space-y-5 styled-scrollbar text-xs text-retro-body">
+            {/* Community first: the invite used to live only in old chat, so
+                nobody new could find it. One click here, always present. */}
+            <button
+              type="button"
+              onClick={() => openCommunityInvite(communityUrl)}
+              className="w-full flex items-center gap-2 rounded-lg border border-border-glass bg-glass-w5 hover:bg-glass-w8 px-3 py-2 text-left transition-colors cursor-pointer"
+            >
+              <Users className="w-4 h-4 shrink-0 text-retro-fg" />
+              <span className="flex-1 min-w-0">
+                <span className="block text-xs font-bold text-retro-fg">Community &amp; support</span>
+                <span className="block text-[11px] text-retro-muted truncate">Ask for help or report an issue on the community server</span>
+              </span>
+              <ArrowUpRight className="w-4 h-4 shrink-0 text-retro-muted" />
+            </button>
             {topic ? (
               <TopicBody topicId={topic.id} />
             ) : tab === 'getting-started' ? (

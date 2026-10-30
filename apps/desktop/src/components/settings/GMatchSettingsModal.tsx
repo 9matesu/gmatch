@@ -29,6 +29,7 @@ import { useGame, MAX_USER_EXCLUDES } from '../../game/store';
 import { FeedTuneStep } from '../../firstRun/FeedTuneStep';
 import { DeleteAccountSection } from './DeleteAccountSection';
 import { UpdateSection } from './UpdateSection';
+import { CommunitySection } from './CommunitySection';
 import { BlocklistSection } from './BlocklistSection';
 import {
   Settings,
@@ -807,6 +808,9 @@ export function GMatchSettingsModal({
 
             {/* Updates (desktop builds only — hides without the bridge). */}
             {activeTab === 'preferences' && <UpdateSection toast={toast} />}
+
+            {/* Community invite: node setting with a constant fallback. */}
+            {activeTab === 'preferences' && <CommunitySection toast={toast} />}
 
             {/* ──────── 2. ACCOUNT & SECURITY ──────── */}
             {activeTab === 'account' && (

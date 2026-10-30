@@ -399,7 +399,7 @@ export function useP2P(identity: OrbitIdentity | null) {
     // fire-and-forget ('sending', never 'delivered' — proof comes later).
     let teardownOperations: (() => void) | null = null
     void import('../services/socialOperationLog').then(async ({ sharedSocialOperationLog }) => {
-      const { acceptInboundOperation, applyOperationAck, broadcastPendingOperations } = await import('../services/socialOpTransport')
+      const { acceptInboundOperation, applyOperationAck, broadcastPendingOperations, broadcastRecentOperations } = await import('../services/socialOpTransport')
       const operationLog = sharedSocialOperationLog()
       // Inbound: validate + authorize + durable append, then ACK the sender
       // (a duplicate is already durable here, so it is acked too). Never ack a
@@ -421,10 +421,27 @@ export function useP2P(identity: OrbitIdentity | null) {
           sendSwarmFrame({ type: 'SWARM_OP', operation })
         }).catch(() => {})
       }
-      broadcastOperations()
-      window.addEventListener(PEER_ONLINE_EVENT, broadcastOperations)
+      // A peer that joined after an operation was already acked by someone else
+      // never receives it from `broadcastPendingOperations` (status='delivered').
+      // Re-offer a bounded recent slice on each peer-online wave, throttled so a
+      // busy roster cannot turn into a broadcast storm.
+      let lastRecentWave = 0
+      const broadcastRecent = () => {
+        const now = Date.now()
+        if (now - lastRecentWave < 20_000) return
+        lastRecentWave = now
+        void broadcastRecentOperations(operationLog, (operation) => {
+          sendSwarmFrame({ type: 'SWARM_OP', operation })
+        }).catch(() => {})
+      }
+      const broadcastAll = () => {
+        broadcastOperations()
+        broadcastRecent()
+      }
+      broadcastAll()
+      window.addEventListener(PEER_ONLINE_EVENT, broadcastAll)
       teardownOperations = () => {
-        window.removeEventListener(PEER_ONLINE_EVENT, broadcastOperations)
+        window.removeEventListener(PEER_ONLINE_EVENT, broadcastAll)
         setSwarmOperationHandler(null)
         setSwarmOperationAckHandler(null)
       }

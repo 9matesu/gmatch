@@ -20,8 +20,10 @@ import {
   Monitor,
   FilmSlate,
   User,
+  UsersThree,
 } from '@phosphor-icons/react';
 import { playPress } from '../../utils/sounds';
+import { useCommunityInvite, openCommunityInvite } from '../../services/community';
 import { resolveMediaUrl } from '../../utils/media';
 import { CountBadge } from './CountBadge';
 import { formatCount } from '../../ui/format';
@@ -119,6 +121,7 @@ export function CommandIsland({
   onGridSizeChange: _onGridSizeChange,
 }: CommandIslandProps) {
   const [satelliteOpen, setSatelliteOpen] = useState<boolean>(readSatelliteOpen);
+  const communityUrl = useCommunityInvite();
 
   const toggleSatellite = () => {
     playPress(760);
@@ -481,6 +484,23 @@ export function CommandIsland({
             >
               <Question className="w-3.5 h-3.5 shrink-0" />
               <span className="text-xs hidden xl:inline">Help</span>
+            </button>
+
+            {/* Community: the invite lives on the node's public settings, with
+                a constant fallback so it is never buried in old chat. */}
+            <button
+              type="button"
+              data-community-toggle="true"
+              onClick={() => {
+                playPress(740);
+                openCommunityInvite(communityUrl);
+              }}
+              aria-label="Community"
+              title="Join the community"
+              className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98] transition-all"
+            >
+              <UsersThree className="w-3.5 h-3.5 shrink-0" />
+              <span className="text-xs hidden xl:inline">Community</span>
             </button>
 
             {/* Admin: host mode or a node that says this identity administers

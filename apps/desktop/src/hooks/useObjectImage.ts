@@ -231,8 +231,41 @@ async function resolveObject(cleanId: string, identity: IdentityLike): Promise<R
   if (!res) return { state: FAILED(cleanId), cache: false, awaitingSeeder: false }
 
   if (!res.ok) {
-    if (res.status === 404 && typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('orbit-object-404', { detail: { cardId: cleanId } }))
+    if (res.status === 404) {
+      // The metadata row lives on the author's node, not necessarily on ours:
+      // a DM attachment is registered only on the sender's world, and a post
+      // from another world 404s here too. The bytes can still be seeded by a
+      // peer that knows this object id, so ask the swarm before declaring the
+      // tile dead (this is the difference between "their image never loads"
+      // and a working DM attachment).
+      let swarmBlob: Blob | null = null
+      try {
+        swarmBlob = await requestSwarmObject(cleanId, 5000)
+      } catch {
+        swarmBlob = null
+      }
+      if (swarmBlob) {
+        try {
+          const { registerLocalObject } = await import('../utils/p2pSwarm')
+          registerLocalObject(cleanId, swarmBlob)
+          void import('../utils/pendingTransfers')
+            .then(({ removePendingTransfer }) => removePendingTransfer(cleanId))
+            .catch(() => {})
+        } catch {
+          /* cache alias best-effort */
+        }
+        return commit({
+          cardId: cleanId,
+          url: URL.createObjectURL(swarmBlob),
+          failed: false,
+          isVideo: await isVideoBlob(swarmBlob, ''),
+          isLink: false,
+          linkUrl: null,
+        })
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('orbit-object-404', { detail: { cardId: cleanId } }))
+      }
     }
     // 502/503/504 = the node is waking up / restarting. Caching that failure
     // blanks the tile until LRU eviction, so leave it out of the cache.

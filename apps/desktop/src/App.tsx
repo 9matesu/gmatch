@@ -1470,13 +1470,12 @@ export default function Home() {
    * A peer coming online is the only signal this client gets that (a) a full
    * node may now list posts written while we were alone, and (b) P2P bytes that
    * failed earlier can be retried. One bounded, event-driven reconcile — never
-   * a poll: at most one refresh per 15s, and none while the window is hidden.
+   * a poll: at most one refresh per 15s, even while the window is hidden.
    */
   useEffect(() => {
     if (!identity || typeof window === 'undefined') return
     let last = 0
     const onPeerOnline = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
       const now = Date.now()
       if (now - last < 15_000) return
       last = now
@@ -1484,6 +1483,40 @@ export default function Home() {
     }
     window.addEventListener(PEER_ONLINE_EVENT, onPeerOnline)
     return () => window.removeEventListener(PEER_ONLINE_EVENT, onPeerOnline)
+  }, [identity, forceRefreshFeed])
+
+  /**
+   * Background sync. A hidden window used to skip every reconcile, so posts
+   * published while the app sat in the background only appeared after a manual
+   * refresh. Now: refresh on return to focus/visibility, and a slow (60s) poll
+   * while hidden so the feed and its unread badge are already warm.
+   *
+   * Both paths are bounded — one request per 15s on return, one per minute in
+   * the background — and reuse the same force-refresh (cache invalidation) path
+   * as the header button.
+   */
+  useEffect(() => {
+    if (!identity || typeof window === 'undefined') return
+    let last = 0
+    const refresh = (minGapMs: number) => {
+      const now = Date.now()
+      if (now - last < minGapMs) return
+      last = now
+      void forceRefreshFeed()
+    }
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refresh(15_000)
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'hidden') refresh(60_000)
+    }, 60_000)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
+      clearInterval(timer)
+    }
   }, [identity, forceRefreshFeed])
 
   /**

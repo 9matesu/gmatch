@@ -113,18 +113,28 @@ export function NotificationCenter(props: NotificationCenterProps) {
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
         aria-label={`Notifications${unreadCount > 0 ? `: ${unreadCount} unread` : ''}. ${preview}. Activate to ${expanded ? 'collapse' : 'expand'}.`}
-        className="w-full flex items-center gap-2 px-2.5 py-1 rounded-md hover:bg-glass-w10 text-left cursor-pointer transition-colors"
+        title="Notifications"
+        className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg border border-border-glass bg-glass-w5 hover:bg-glass-w10 text-left cursor-pointer transition-colors"
       >
-        <span className="relative shrink-0">
-          <Bell className="w-3.5 h-3.5 text-retro-muted" />
+        <span
+          className={`relative shrink-0 grid place-items-center w-7 h-7 rounded-md transition-colors ${
+            unreadCount > 0
+              ? 'bg-retro-accent text-retro-accent-text'
+              : 'bg-glass-w8 text-retro-fg'
+          }`}
+        >
+          <Bell className="w-4 h-4" />
           {unreadCount > 0 && (
-            <span aria-hidden className="absolute -top-1 -right-1 min-w-3.5 h-3.5 px-0.5 rounded-full bg-retro-accent text-black text-[9px] font-bold flex items-center justify-center tabular-nums">
+            <span aria-hidden className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-retro-accent text-retro-accent-text ring-2 ring-retro-bg text-[10px] font-bold flex items-center justify-center tabular-nums">
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}
         </span>
-        <span aria-live="polite" className="min-w-0 flex-1 truncate text-[11px] text-retro-muted hidden sm:block">
-          {preview}
+        <span aria-live="polite" className="min-w-0 flex-1 hidden sm:block leading-tight">
+          <span className="block text-[9px] font-bold uppercase tracking-wider text-retro-muted">
+            Notifications
+          </span>
+          <span className="block truncate text-[11px] text-retro-fg/80">{preview}</span>
         </span>
       </button>
 

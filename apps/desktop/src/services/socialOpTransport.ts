@@ -166,3 +166,44 @@ export async function broadcastPendingOperations(
   }
   return { sent: pending.length }
 }
+
+/**
+ * Re-offer recent public operations to whoever is online now.
+ *
+ * `broadcastPendingOperations` stops at `delivered`: once a peer acked an
+ * operation, a *new* peer (or one that was offline during the wave) never saw
+ * it, which is why older posts could be invisible to someone who joined later.
+ * This wave re-sends a bounded, recent slice of the log on every peer-online
+ * event; duplicate operation ids are a no-op on the receiving side.
+ */
+export async function broadcastRecentOperations(
+  log: SocialOperationLog,
+  sendOperation: (operation: Record<string, unknown>) => void,
+  options: { limit?: number; maxAgeMs?: number } = {},
+): Promise<{ sent: number }> {
+  const limit = options.limit ?? 120
+  const maxAgeMs = options.maxAgeMs ?? 7 * 24 * 60 * 60 * 1000
+  const cutoff = Date.now() - maxAgeMs
+  let entries
+  try {
+    entries = await log.listAllOperations()
+  } catch {
+    return { sent: 0 }
+  }
+  const recent = entries
+    .filter((entry) => entry.createdAt >= cutoff)
+    .filter((entry) => {
+      const type = (entry.record as { type?: unknown })?.type
+      return type === 'post.create' || type === 'post.edit' || type === 'post.delete' || type === 'profile.update'
+    })
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .slice(0, limit)
+  for (const entry of recent) {
+    try {
+      sendOperation(entry.record)
+    } catch {
+      /* best effort: the next peer-online wave retries */
+    }
+  }
+  return { sent: recent.length }
+}
