@@ -51,7 +51,6 @@ import { vaultPin, vaultBridge } from '../../services/vault';
 function siblingMimesFor(post: FeedPost): string[] {
   return Array.isArray(post.media) ? post.media.map((m) => m.mime_type) : [];
 }
-import { PEER_ONLINE_EVENT } from '../../utils/p2pSwarm';
 import { orbitFetch, postShareUrl } from '../../utils/api';
 import { GAME_AD_TEMPLATES } from '../../utils/gameAds';
 import { ExploreSearchModal } from './ExploreSearchModal';
@@ -178,7 +177,6 @@ export function GMatchFeed({
   onForceRefresh,
   feedStatus = 'ready',
   onResolveMissingPost,
-  apiNodeLabel,
 }: {
   identity: OrbitIdentity | null;
   posts: FeedPost[];
@@ -231,8 +229,6 @@ export function GMatchFeed({
    * became) part of `posts`.
    */
   onResolveMissingPost?: (postId: string) => Promise<boolean>;
-  /** Human label for the node this feed reads (e.g. central host or LAN IP). */
-  apiNodeLabel?: string;
 }) {
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
   const [savedPosts, setSavedPosts] = useState<Record<string, boolean>>({});
@@ -524,35 +520,16 @@ export function GMatchFeed({
     }
   }, [posts]);
 
-  // Track posts whose media failed to load or are unavailable.
-  // Failures are retryable, never permanent: a peer coming online clears the
-  // set so tiles silently re-attempt instead of staying hidden until reload.
-  const [failedPostIds, setFailedPostIds] = useState<Set<string>>(() => new Set());
-  const markPostUnavailable = useCallback((id: string) => {
-    setFailedPostIds((prev) => {
-      if (prev.has(id)) return prev;
-      const next = new Set(prev);
-      next.add(id);
-      return next;
-    });
-  }, []);
-  useEffect(() => {
-    const retryFailed = () => setFailedPostIds((prev) => (prev.size > 0 ? new Set() : prev));
-    window.addEventListener(PEER_ONLINE_EVENT, retryFailed);
-    return () => window.removeEventListener(PEER_ONLINE_EVENT, retryFailed);
-  }, []);
-
   // Algorithmic Sorting. Latest is strictly chronological; Trending is a
   // deterministic engagement + tag-affinity score with recency decay, matching
   // the server's scoring intent (see /api/posts).
     const displayPosts = useMemo(() => {
     const active = posts.filter((p) => {
       if (p.is_archived) return false;
-            if (failedPostIds.has(p.id)) return false;
       if (!p.is_sponsored && !p.url && (!p.media || p.media.length === 0)) return false;
-      // Try-first: object posts render even when the author looks offline —
-      // the tile attempts the swarm fetch and only hides on real failure
-      // (markPostUnavailable), which auto-retries when peers come online.
+      // Media that cannot be fetched right now keeps the post on screen (its
+      // tile shows the placeholder). Hiding the whole post here is what made a
+      // user's own old uploads disappear when no seeder held the bytes.
       return true;
     });
 
@@ -585,7 +562,7 @@ export function GMatchFeed({
       if (scoreA !== scoreB) return scoreB - scoreA;
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
-  }, [posts, likeCounts, commentsMap, tagAffinities, now, feedSort, failedPostIds, users, identity?.orbitId]);
+  }, [posts, likeCounts, commentsMap, tagAffinities, now, feedSort, users, identity?.orbitId]);
 
   const followSuggestions = useMemo(
     () => displayPosts.length === 0
@@ -603,7 +580,7 @@ export function GMatchFeed({
       case 'idle':
         return {
           title: 'Loading the feed…',
-          body: `Reading the first page from ${apiNodeLabel || 'this node'}.`,
+          body: 'Reading the first page.',
         };
       case 'offline':
         return {
@@ -613,7 +590,7 @@ export function GMatchFeed({
       case 'error':
         return {
           title: 'Could not read the feed.',
-          body: `The request to ${apiNodeLabel || 'this node'} failed. Nothing was lost — retry, or keep reading what is already local.`,
+          body: 'Nothing was lost — retry, or keep reading what is already local.',
         };
       default:
         return {
@@ -621,7 +598,7 @@ export function GMatchFeed({
           body: 'One upload, three tags. Posts are what grow followers.',
         };
     }
-  }, [feedStatus, apiNodeLabel]);
+  }, [feedStatus]);
 
   // First-like chime: session-local celebration when MY post crosses 0 -> 1
   // likes after mount. Pre-liked posts at mount are seeded into the baseline
@@ -1124,8 +1101,7 @@ export function GMatchFeed({
                                 autoPlay={true}
                                 muted={true}
                                 loop={true}
-                                hideUnavailable={true}
-                                onMediaUnavailable={() => markPostUnavailable(post.id)}
+                                hideUnavailable={false}
                                 onExpand={() => toggleExpand(post)}
                                 onDoubleTapLike={() => handleDoubleTap(post)}
                               />
@@ -1138,7 +1114,6 @@ export function GMatchFeed({
                                 autoPlay={true}
                                 muted={true}
                                 loop={true}
-                                onError={() => markPostUnavailable(post.id)}
                                 onExpand={() => toggleExpand(post)}
                                 onDoubleTapLike={() => handleDoubleTap(post)}
                               />
@@ -1148,7 +1123,6 @@ export function GMatchFeed({
                                 alt={post.caption || 'Post image'}
                                 className="w-full h-auto max-h-[min(680px,80vh)] group-data-[expanded=true]/post:max-h-[85vh] object-contain rounded-none"
                                 loading="lazy"
-                                onError={() => markPostUnavailable(post.id)}
                               />
                             )}
                           </>
@@ -1189,8 +1163,7 @@ export function GMatchFeed({
                           autoPlay={true}
                           muted={true}
                           loop={true}
-                          hideUnavailable={true}
-                          onMediaUnavailable={() => markPostUnavailable(post.id)}
+                          hideUnavailable={false}
                           onExpand={() => toggleExpand(post)}
                           onDoubleTapLike={() => handleDoubleTap(post)}
                         />
@@ -1203,7 +1176,6 @@ export function GMatchFeed({
                           autoPlay={true}
                           muted={true}
                           loop={true}
-                          onError={() => markPostUnavailable(post.id)}
                           onExpand={() => toggleExpand(post)}
                           onDoubleTapLike={() => handleDoubleTap(post)}
                         />
@@ -1213,7 +1185,6 @@ export function GMatchFeed({
                           alt={post.caption || 'Post image'}
                           className="w-full h-auto max-h-[min(680px,80vh)] group-data-[expanded=true]/post:max-h-[85vh] object-contain rounded-none"
                           loading="lazy"
-                          onError={() => markPostUnavailable(post.id)}
                         />
                       )}
                         </div>
@@ -1525,9 +1496,6 @@ export function GMatchFeed({
                 <h4 className="text-xs font-semibold text-retro-fg">{emptyCopy.title}</h4>
                 <p className="text-xs text-retro-muted mt-1 leading-relaxed">
                   {emptyCopy.body}
-                </p>
-                <p className="text-[10px] font-mono text-retro-muted mt-1">
-                  Reading from {apiNodeLabel || 'this node'} · {displayPosts.length} posts
                 </p>
               </div>
               {onForceRefresh && (

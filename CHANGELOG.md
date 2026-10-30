@@ -2,6 +2,16 @@
 
 ## 1.6.6 — old worlds actually upgrade; dead libp2p slice removed
 
+- **A post never disappears because its media is unreachable.** The feed used to
+  hide a whole post when its tile failed to load, so a user's own old upload
+  vanished whenever no seeder held the bytes. The post (caption, likes, actions)
+  now stays on the timeline and only the tile shows the placeholder.
+- **One empty state, no status noise.** The duplicate "Empty feed" pill above
+  the timeline and the "Reading from <node> · N posts" line are gone; the single
+  empty card explains the situation. Settings → Server no longer warns about a
+  paused/older saved node — hosting locally is the normal state, and nothing was
+  ever deleted (the media vault is untouched by the P2P switch).
+
 - **An old database no longer bricks the node.** `migrate()` applied `schema.sql`
   before the versioned migrations, so on a database created before migration
   053 the `CREATE INDEX ... ON Objects (is_avatar)` statement threw
