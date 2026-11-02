@@ -145,14 +145,44 @@ function dispatchMeshMessage(data: string, fromPeerId: string): void {
   }
 }
 
+/**
+ * Direct DataChannels have no reliable flow control for bursty swarm chunk
+ * traffic, and the browser does not: `channel.send()` on a slow consumer
+ * grows `bufferedAmount` without bound (the peer's queue, our memory).
+ *
+ * When a channel's `bufferedAmount` passes HIGH, that channel is marked
+ * saturated and skipped until its buffer drains below LOW again. Skipping is
+ * SAFE for the swarm protocol, not a lossy hack: chunk reassembly is by
+ * INDEX (reordered/duplicate/missing frames are expected), a missing chunk
+ * leaves the transfer incomplete (a failure, never corrupt bytes), the id
+ * stays wanted, and the next SWARM_HAVE wave re-issues `SWARM_WANT`s that
+ * re-answer only the missing indices. WANT/KEY/CHALLENGE/RECEIPT frames are
+ * equally order-insensitive at their handlers. Recovery never depends on the
+ * saturated channel; the node relay remains the guaranteed fallback path.
+ */
+export const MESH_BACKPRESSURE_HIGH_BYTES = 1 * 1024 * 1024
+export const MESH_BACKPRESSURE_LOW_BYTES = 256 * 1024
+
+const saturatedChannels = new WeakSet<RTCDataChannel>()
+
 export function broadcastMeshFrame(data: string): void {
   for (const conn of activeMeshPeers.values()) {
-    if (conn.channel.readyState === 'open') {
-      try {
-        conn.channel.send(data)
-      } catch (err) {
-        logger.warn('[Mesh] Error sending frame to peer:', conn.peerOrbitId, err)
-      }
+    const channel = conn.channel
+    if (channel.readyState !== 'open') continue
+    const buffered = typeof channel.bufferedAmount === 'number' ? channel.bufferedAmount : 0
+    if (buffered > MESH_BACKPRESSURE_HIGH_BYTES) {
+      // The consumer cannot take more right now: stop feeding it. The
+      // low-water mark below un-saturates on a later wave.
+      saturatedChannels.add(channel)
+      logger.warn('[Mesh] Channel saturated (', buffered, 'B buffered); frame withheld for:', conn.peerOrbitId)
+      continue
+    }
+    if (saturatedChannels.has(channel) && buffered > MESH_BACKPRESSURE_LOW_BYTES) continue
+    saturatedChannels.delete(channel)
+    try {
+      channel.send(data)
+    } catch (err) {
+      logger.warn('[Mesh] Error sending frame to peer:', conn.peerOrbitId, err)
     }
   }
 }

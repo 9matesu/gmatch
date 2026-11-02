@@ -11,7 +11,7 @@ import { logger } from '../utils/logger';
 import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, hydrateDurableReplications, announcePeerOnline, PEER_ONLINE_EVENT, announceHeldObjects, setSwarmReceiptIdentity, setSwarmOperationHandler, setSwarmOperationAckHandler, sendSwarmFrame, type SwarmMessage } from '../utils/p2pSwarm';
 import { broadcastPresence, fetchPresenceRosterFrom } from '../services/courierPresence';
 import { knownNodes, rememberKnownNode, rememberPeerNode } from '../utils/peerNodes';
-import { broadcastMeshFrame, onMeshMessage, connectToPeerMesh, setMeshIceFailureHandler } from '../utils/courierSignaling';
+import { broadcastMeshFrame, onMeshMessage, connectToPeerMesh, setMeshIceFailureHandler, MESH_BACKPRESSURE_HIGH_BYTES } from '../utils/courierSignaling';
 import { createTransportRegistry, type PeerTransportPhase } from '../utils/transportState';
 import { resolveDisplayName } from '../utils/displayName';
 import { parseApiTimestamp } from '../utils/timeAgo';
@@ -335,10 +335,15 @@ export function useP2P(identity: OrbitIdentity | null) {
     // Swarm transport wire: allow requestSwarmObject / handleSwarmMessage to
     // fan out WANT and CHUNK frames over BroadcastChannel (same-device tabs),
     // WebSocket relay (network peers), and direct WebRTC DataChannel mesh.
+    // Every pipe is best-effort per frame — chunk reassembly is index-based,
+    // so a withheld frame is a retry, never corruption; the relay socket
+    // carries the same low-water gate as the DataChannel send (one shared
+    // rule so a congested pipe cannot swallow RAM either).
     setSwarmTransport((msg: SwarmMessage) => {
       try { channel.postMessage({ type: 'SWARM_FRAME', swarm: msg }); } catch {}
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({ type: 'SWARM_FRAME', swarm: msg }));
+      const ws = wsRef.current
+      if (ws && ws.readyState === WebSocket.OPEN && ws.bufferedAmount <= MESH_BACKPRESSURE_HIGH_BYTES) {
+        ws.send(JSON.stringify({ type: 'SWARM_FRAME', swarm: msg }));
       }
       broadcastMeshFrame(JSON.stringify({ type: 'SWARM_FRAME', swarm: msg }));
     });

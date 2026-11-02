@@ -1,6 +1,15 @@
 // @vitest-environment jsdom
 import { afterEach, describe, it, expect, vi } from 'vitest'
-import { sendCourierSignal, handleInboundSignal, setMeshIceFailureHandler, type CourierSignalPayload } from './courierSignaling'
+import {
+  broadcastMeshFrame,
+  getActiveMeshPeers,
+  handleInboundSignal,
+  MESH_BACKPRESSURE_HIGH_BYTES,
+  MESH_BACKPRESSURE_LOW_BYTES,
+  sendCourierSignal,
+  setMeshIceFailureHandler,
+  type CourierSignalPayload,
+} from './courierSignaling'
 import { generateIdentity, type OrbitIdentity } from '@orbit/crypto'
 import { open1to1, deliveryToken, seal1to1 } from '@orbit/protocol'
 
@@ -145,5 +154,90 @@ describe('courierSignaling', () => {
       restore()
       vi.unstubAllGlobals()
     }
+  })
+
+  describe('broadcastMeshFrame backpressure (swarm frames over the DataChannel mesh)', () => {
+    /** A channel double with an observable send buffer. Each test uses fresh
+     *  objects — the saturation mark is a per-channel WeakSet in the module. */
+    function fakeChannel(buffered: () => number): RTCDataChannel & { sent: string[] } {
+      const record = { sent: [] as string[] }
+      return {
+        readyState: 'open',
+        get bufferedAmount() { return buffered() },
+        send: (data: string) => { record.sent.push(data) },
+        ...record,
+      } as never
+    }
+    function registerMeshPeer(peerOrbitId: string, channel: RTCDataChannel): void {
+      getActiveMeshPeers().set(peerOrbitId, {
+        peerOrbitId,
+        pc: {} as RTCPeerConnection,
+        channel,
+        send: () => {},
+        close: () => {},
+      })
+    }
+    /** 1 MiB high-water mark in the module under test. */
+    const HIGH = MESH_BACKPRESSURE_HIGH_BYTES
+
+    afterEach(() => {
+      getActiveMeshPeers().clear()
+    })
+
+    it('delivers a swarm frame to an open, healthy channel', () => {
+      const channel = fakeChannel(() => 0)
+      registerMeshPeer('peer-1', channel)
+      broadcastMeshFrame(JSON.stringify({ type: 'SWARM_FRAME', swarm: { type: 'SWARM_HAVE', ids: ['a'] } }))
+      expect(channel.sent).toHaveLength(1)
+      expect(JSON.parse(channel.sent[0])).toEqual({ type: 'SWARM_FRAME', swarm: { type: 'SWARM_HAVE', ids: ['a'] } })
+    })
+
+    it('withholds frames from a channel whose send buffer passed the high-water mark', () => {
+      const channel = fakeChannel(() => HIGH + 1)
+      registerMeshPeer('peer-saturated', channel)
+      broadcastMeshFrame(JSON.stringify({ type: 'SWARM_FRAME', swarm: { type: 'SWARM_CHUNK', id: 'x', index: 0, total: 8, dataBase64: 'AA==' } }))
+      expect(channel.sent).toHaveLength(0)
+    })
+
+    it('resumes a saturated channel after its buffer drains below the low-water mark', () => {
+      let buffered = HIGH + 1
+      const channel = fakeChannel(() => buffered)
+      registerMeshPeer('peer-recovering', channel)
+      broadcastMeshFrame(JSON.stringify({}))
+
+      // Still above HIGH: withheld...
+      expect(channel.sent).toHaveLength(0)
+      // ...and drained to between LOW and HIGH: still withheld (hysteresis —
+      // a channel is only un-saturated once it truly emptied its backlog).
+      buffered = MESH_BACKPRESSURE_LOW_BYTES + 1
+      broadcastMeshFrame(JSON.stringify({}))
+      expect(channel.sent).toHaveLength(0)
+      // ...and fully drained: feeding resumes on the next frame.
+      buffered = 0
+      const resumedFrame = JSON.stringify({ type: 'SWARM_FRAME', swarm: { type: 'SWARM_HAVE', ids: ['b'] } })
+      broadcastMeshFrame(resumedFrame)
+      expect(channel.sent).toEqual([resumedFrame])
+    })
+
+    it('never lets one saturated peer starve the others on the same broadcast', () => {
+      const healthy = fakeChannel(() => 0)
+      const saturated = fakeChannel(() => HIGH * 2)
+      registerMeshPeer('peer-healthy', healthy)
+      registerMeshPeer('peer-clogged', saturated)
+      broadcastMeshFrame(JSON.stringify({ type: 'SWARM_FRAME', swarm: { type: 'SWARM_CHUNK', id: 'x', index: 1, total: 8, dataBase64: 'AA==' } }))
+      expect(healthy.sent).toHaveLength(1)
+      expect(saturated.sent).toHaveLength(0)
+    })
+
+    it('skips channels that are not open, without touching healthy peers', () => {
+      const closed = fakeChannel(() => 0)
+      ;(closed as { readyState: string }).readyState = 'closing'
+      const open = fakeChannel(() => 0)
+      registerMeshPeer('peer-closed', closed)
+      registerMeshPeer('peer-open', open)
+      expect(() => broadcastMeshFrame(JSON.stringify({}))).not.toThrow()
+      expect(closed.sent).toHaveLength(0)
+      expect(open.sent).toHaveLength(1)
+    })
   })
 })
