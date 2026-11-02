@@ -20,6 +20,11 @@
  *   3. NO PLAINTEXT LEAK — every frame that crossed the relay is scanned for
  *          plaintext media (raw slices and their base64): the relay must see
  *          only AEAD ciphertext and sealed keys.
+ *   4. END-TO-END BEHAVIOR — the user-behavior reference test: A publishes a
+ *          signed post; B ingests the op (verified), resolves + fetches +
+ *          verifies + persists the media, B re-delivery is idempotent, B's
+ *          custody is receipt-attested to A, and after B restarts with the
+ *          swarm BLOCKED the post still resolves from local durable bytes.
  *
  * Exit code 0 = all phases pass. Evidence lines start with "evidence:".
  */
@@ -76,6 +81,8 @@ class Harness {
     this.waiters = []
     /** Inspector for A → B frames: return null to DROP, or the (mutated) msg. */
     this.aToBInspector = null
+    /** When true the relay stops forwarding frames: the swarm is offline. */
+    this.blockFrames = false
     this.a = this.start('A')
     this.b = this.start('B')
     this.stop = this.stop.bind(this)
@@ -127,14 +134,21 @@ class Harness {
   onEvent(peer, event) {
     if (event.kind === 'frame') {
       this.observed[peer].push(event.msg)
-      // Relay duty: forward to the OTHER peer, through any interceptor.
-      const other = peer === 'A' ? 'B' : 'A'
-      let forwarded = event.msg
-      if (peer === 'A' && this.aToBInspector) {
-        forwarded = this.aToBInspector(event.msg)
-        if (forwarded === null) return // the relay censored this frame
+      // Relay duty: forward to the OTHER peer, through any interceptor —
+      // unless the relay is blocked (the swarm went offline mid-run).
+      if (!this.blockFrames) {
+        const other = peer === 'A' ? 'B' : 'A'
+        let forwarded = event.msg
+        if (peer === 'A' && this.aToBInspector) {
+          forwarded = this.aToBInspector(event.msg)
+          if (forwarded === null) return // the relay censored this frame
+        }
+        this.send(other, { type: 'frame', msg: forwarded })
       }
-      this.send(other, { type: 'frame', msg: forwarded })
+    } else if (event.kind === 'op' && peer === 'A') {
+      // The parent is also the SWARM_OP transport: a signed operation travels
+      // exactly the way a peer operation does — one relay, no re-signing.
+      this.send('B', { type: 'op', operation: event.operation })
     }
     this.events.push({ peer, ...event })
     for (let i = this.waiters.length - 1; i >= 0; i -= 1) {
@@ -268,6 +282,121 @@ async function run(harness) {
   const totalFrames = harness.observed.A.length + harness.observed.B.length
   ev(`phase3 secrecy: all ${totalFrames} relayed frames scanned, ${leak ? 'plaintext media slices FOUND' : 'NO plaintext media slice (raw or base64) in any frame that crossed the relay — it saw only ciphertext and keys sealed to the fetcher’s offer key'}`)
   if (leak) exitCode = 1
+
+  // ---- Phase 4: the end-to-end user behavior (v1.4.0 restored, properly) --
+  // 1. Peer A publishes a post.            (seed + signed post.create)
+  // 2. Peer B discovers it.                (flow: swarm transport + op relay)
+  // 3. B receives and VERIFY the operation.   (acceptInboundOperation)
+  // 4. B resolves the media object FROM the op's manifest claim.
+  // 5. B retrieves the actual bytes.       (SWARM_WANT/KEY/CHUNK, swarm-v1)
+  // 6. B verifies + persists the media.    (sha256 == objectId, durable store)
+  // 7. Post renders from local bytes.      (here: durable-store resolution)
+  // 8. Post remains accessible after restarting B — with the swarm offline.
+  // Identity rules under test: B's actorId == A's orbitId (authorship), the
+  // objectId stays the content id, and a replayed op is a duplicate, never a
+  // second post. B's custody is attested back to A by a signed receipt.
+  const e2eBytes = seedBytes()
+  const e2eId = createHash('sha256').update(e2eBytes).digest('hex')
+  const peerIds = {}
+  for (const e of harness.events) {
+    if (e.kind === 'identity') peerIds[e.peer] = e.orbitId
+  }
+
+  harness.send('A', { type: 'seed', id: e2eId, b64: e2eBytes.toString('base64') })
+  await harness.waitFor((e) => e.peer === 'A' && e.kind === 'ready' && e.id === e2eId, PER_PHASE_BUDGET, 'seed ready (e2e)')
+  harness.send('A', { type: 'publish', id: e2eId, mime: 'image/jpeg' })
+  const opEvent = await harness.waitFor(
+    (e) => e.peer === 'A' && e.kind === 'op' && e.id === e2eId,
+    PER_PHASE_BUDGET, 'signed post.create published',
+  )
+  const operation = opEvent.operation
+  const opOk =
+    operation.type === 'post.create' &&
+    operation.actorId === peerIds.A &&
+    operation.objectId === e2eId &&
+    operation.payload?.contentCid === e2eId
+  if (opOk) {
+    ev(`phase4 publish: peer A signed a post.create bound to its own identity (actor ${peerIds.A.slice(0, 8)}…, objectId = content sha256, manifest claim inside the signature) — the object identity is content-addressed, the actor binding is cryptographic`)
+  } else {
+    ev(`phase4 publish FAILED: ${JSON.stringify({ type: operation.type, actorId: operation.actorId, objectId: operation.objectId })}`)
+    exitCode = 1
+  }
+
+  //Discovery over the swarm; ingest with full signature/actor validation.
+  harness.send('B', { type: 'op', operation })
+  const first = await harness.waitFor(
+    (e) => e.peer === 'B' && e.kind === 'accepted' && e.operationId === operation.operationId,
+    PER_PHASE_BUDGET, 'op ingest',
+  )
+  if (first.outcome === 'accepted' && first.actorId === peerIds.A) {
+    ev(`phase4 ingest: peer B accepted the signed operation (outcome=accepted, actor preserved as peer A) — identity propagation complete: authorship travels in the signature, not as client text`)
+  } else {
+    ev(`phase4 ingest FAILED: ${JSON.stringify(first)}`)
+    exitCode = 1
+  }
+
+  //Re-delivery is idempotent: no duplicate post, no overwrite.
+  harness.send('B', { type: 'op', operation })
+  const replay = await harness.waitFor(
+    (e) => e.peer === 'B' && e.kind === 'accepted' && e.outcome === 'duplicate' && e.operationId === operation.operationId,
+    PER_PHASE_BUDGET, 'duplicate ingest',
+  )
+  ev(`phase4 idempotency: a replayed operation is outcomed 'duplicate' (operationId ${String(replay.operationId).slice(0, 12)}…) — re-scans and retries can never double-import a post`)
+
+  //Media resolution FROM THE OPERATION (post → media binding): B looks up the
+  //accepted op in its own log, reads the manifest claim, must fetch with
+  //expectedHash == contentCid.
+  harness.send('B', { type: 'fetch-post', operationId: operation.operationId, timeoutMs: 20_000 })
+  const mediaResult = await harness.waitFor(
+    (e) => e.peer === 'B' && e.kind === 'result' && e.id === operation.operationId,
+    PER_PHASE_BUDGET, 'post media fetch',
+  )
+  if (mediaResult.ok && mediaResult.sha256 === e2eId && mediaResult.contentCid === e2eId) {
+    ev(`phase4 media: peer B resolved "${mediaResult.contentCid.slice(0, 12)}…" FROM the accepted operation's manifest claim, fetched the real bytes over the swarm and verified them against the author's content id (${((mediaResult.size || 0) / 1024).toFixed(0)} KiB, ${mediaResult.ms}ms) — a post NEVER arrives without its media while a valid source exists`)
+  } else {
+    ev(`phase4 media FAILED: ${JSON.stringify(mediaResult)}`)
+    exitCode = 1
+  }
+
+  //Custody attestation: after a durable persist+read-back B signs a receipt;
+  //A must record it (distinct, verified custody holder — the replication
+  //target counts these). Paced polling: every tick resolves fast on A's
+  //ok:false answer, so a fixed budget is burned only by elapsed time, never
+  //by attempt count — a real poller would pace the same way.
+  let attested = null
+  const attestationDeadline = Date.now() + 12_000
+  while (Date.now() < attestationDeadline && !(attested?.ok)) {
+    harness.send('A', { type: 'receipt', id: e2eId })
+    try {
+      attested = await harness.waitFor(
+        (e) => e.peer === 'A' && e.kind === 'durable' && e.id === e2eId,
+        250, 'attestation tick',
+      )
+    } catch { attested = null }
+  }
+  if (attested?.ok && attested.attestor === peerIds.B) {
+    ev(`phase4 receipt: peer B signed a durable-custody receipt (challenge-bound, read-back verified) and peer A recorded it — two REAL processes hold verified evidence of one replication, not two tabs`)
+  } else {
+    ev(`phase4 receipt diagnostics: A emitted challenges for [${harness.observed.A.filter((f) => f.type === 'SWARM_CHALLENGE').map((f) => f.id.slice(0, 8)).join(', ')}]; B emitted receipts for [${harness.observed.B.filter((f) => f.type === 'SWARM_RECEIPT').map((f) => `${String(f.id).slice(0, 8)}@${String(f.receipt?.challenge || '').slice(0, 6)}`).join(', ')}]`)
+    ev(`phase4 receipt locks: ${harness.events.filter((e) => e.kind === 'log' && /SWARM/.test(String(e.message))).map((e) => `${e.peer}:${e.message}`).join(' | ') || '(none)'}`)
+    ev(`phase4 receipt FAILED: ${JSON.stringify(attested)}`, )
+    exitCode = 1
+  }  //Restart: volatile state gone, transport severed, durable store only.
+  harness.blockFrames = true
+  harness.send('B', { type: 'restart' })
+  const restarted = await harness.waitFor((e) => e.peer === 'B' && e.kind === 'restarted', PER_PHASE_BUDGET, 'restart')
+  ev(`phase4 restart: peer B dropped all volatile engine state and re-hydrated from its durable store (${restarted.hydrated} objects; the relay no longer forwards any frame)`)
+  harness.send('B', { type: 'resolve', id: e2eId })
+  const resolved = await harness.waitFor(
+    (e) => e.peer === 'B' && e.kind === 'resolved' && e.id === e2eId,
+    PER_PHASE_BUDGET, 'offline resolve after restart',
+  )
+  if (resolved.ok && resolved.sha256 === e2eId) {
+    ev(`phase4 offline: with the swarm BLOCKED and no transport, the restarted peer B resolved the post's media from local durable bytes (${((resolved.size || 0) / 1024).toFixed(0)} KiB, sha256 identical) — the v1.4.0 behavior (a post stays complete across restarts) on the signed, content-addressed architecture`)
+  } else {
+    ev(`phase4 offline FAILED: ${JSON.stringify(resolved)}`)
+    exitCode = 1
+  }
 
   return exitCode
 }
