@@ -280,6 +280,26 @@ async function run(harness) {
     }
   }
   const totalFrames = harness.observed.A.length + harness.observed.B.length
+  // Wire-viability evidence: every frame the engine ever emitted (any type,
+  // both directions) must fit a DataChannel message AND the relay's
+  // frame-splitting threshold. The sealed 4 KiB chunk payload keeps the
+  // base64 AEAD frame under MAX_SWARM_FRAME_BYTES = 8 KiB; assert it on the
+  // whole run, not just one serve.
+  let maxFrameBytes = 0
+  let maxFrameType = ''
+  for (const msg of [...harness.observed.A, ...harness.observed.B]) {
+    const bytes = new TextEncoder().encode(JSON.stringify(msg)).byteLength
+    if (bytes > maxFrameBytes) {
+      maxFrameBytes = bytes
+      maxFrameType = msg.type ?? '?'
+    }
+  }
+  if (maxFrameBytes <= 8 * 1024) {
+    ev(`phase3 wire: largest of ${totalFrames} engine frames was ${maxFrameBytes}B (${maxFrameType}) <= 8 KiB — every frame fits a direct DataChannel message and the relay's split threshold, so chunk flow is transport-agnostic by construction`)
+  } else {
+    ev(`phase3 wire FAILED: frame ${maxFrameType} is ${maxFrameBytes}B (> 8 KiB) — it would be split or dropped on a direct DataChannel`)
+    exitCode = 1
+  }
   ev(`phase3 secrecy: all ${totalFrames} relayed frames scanned, ${leak ? 'plaintext media slices FOUND' : 'NO plaintext media slice (raw or base64) in any frame that crossed the relay — it saw only ciphertext and keys sealed to the fetcher’s offer key'}`)
   if (leak) exitCode = 1
 
