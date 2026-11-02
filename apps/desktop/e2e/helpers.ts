@@ -26,6 +26,11 @@ export const E2E_TAG = 'e2e'
 export function firstRunOverlayKeys(orbitId: string): [string, string][] {
   return [
     ['gmatch_last_seen_changelog', E2E_CHANGELOG_VERSION],
+    // First login opens Help once per identity (App's "tour replacement"). A
+    // seeded returning user must not be interrupted by it: an open Help modal
+    // duplicates the island's nav names (Feed, Clicker, Watch, Domination), so
+    // the duplicate-control audit failed on every view.
+    ['gmatch_help_seen_' + orbitId, '1'],
     ['orbit_tour_v1:' + orbitId, JSON.stringify({ version: 1, index: 0, status: 'done' })],
     [
       'orbit_onboarding_v2:' + orbitId,

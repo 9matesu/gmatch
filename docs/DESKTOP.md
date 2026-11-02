@@ -165,9 +165,9 @@ Two edges matter when debugging a user's "my keepsake is gone":
   probes this before asking the node (which stores no media) or a peer.
 - **Terminal miss:** when the vault has no bytes, the path is a P2P descriptor
   and the bounded swarm ask times out, the tile reports a miss instead of
-  "waiting for poster" forever. The feed hides posts in that state behind
-  `N posts hidden - media not on this device` with Show/Hide (Show remounts the
-  tiles for one explicit retry); nothing is deleted.
+  "waiting for poster" forever. The row itself stays on the timeline (author,
+  caption, counts are real even when the bytes are not on this device); only the
+  media frame says "No preview". Nothing is deleted or fabricated.
 
 ## Failure paths (what the user sees when each layer breaks)
 

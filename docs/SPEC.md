@@ -28,6 +28,11 @@ trades — two separate economies, no bridge between them.
   Single onboarding: `firstRun/OnboardingFlow` includes the feed-tune step
   (pick exactly 4 starter tags + excludes). Excludes editor lives in the
   settings modal's Feed tab.
+- Feed entry (1.6.8): the timeline opens with an inline composer strip (avatar
+  + "Share something…" + Post) wired to the same Create Post modal — one click
+  to write, no scroll. The shipping default is a 2-column grid; installs still
+  on the old `'1'` default migrate once (`gmatch.feed_cols_migrated.v1`) and the
+  column picker owns the choice afterwards.
 - Single media picker (2026-10-18): every media entry point (create post /
   story, profile photo, card forge, Domination wallpaper/game_bg/popup_video)
   opens the shared `MediaPickerModal` (`src/components/media/`) — Browse
@@ -39,6 +44,20 @@ trades — two separate economies, no bridge between them.
   (`apps/desktop/src/services/booru.ts`, SPEC §6). The social feed never asks a
   booru for media — peer uploads travel over the swarm
   (`docs/ARCHITECTURE-P2P.md`).
+- Content-addressed media (1.6.8): imported posts may carry `urn:sha256:<uuid>`
+  or `magnet:` in `content_url`. `resolveMediaUrl` maps the URN to
+  `/api/objects/<uuid>` (the node's local copy) and refuses magnet links instead
+  of firing a doomed HTTP request; the API serializer falls back to
+  `/api/objects/<id>` whenever `content_url` is not `http(s)`.
+- Node-held P2P bytes (1.6.8): a `urn:`/`magnet:` row normally returns a `p2p`
+  descriptor so the client resolves bytes from its local store/swarm. When THIS
+  node physically holds the blob (imported vault, replica, repaired upload),
+  `GET /api/objects/:id` serves the bytes instead of the descriptor — a preview
+  the node can stream beats a swarm lookup that can only fail. Rows with no
+  bytes anywhere still return the descriptor, honestly.
+- A row is never dropped for missing bytes (1.6.8): the tile shows "No preview"
+  while the post keeps its author, caption and counts. Hiding the row would
+  erase a real post just because this device does not hold its media.
 - Excluded from the merge (documented, not silently dropped): `apps/discord`
   bridge, the old hosted infrastructure, Rust `image-processor` (unused).
 

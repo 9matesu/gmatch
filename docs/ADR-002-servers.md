@@ -38,3 +38,13 @@ Sem mudanca de protocolo: e a mesma federacao, com uma superficie que diz a verd
 - **Grupos locais** (rotulo **so deste dispositivo**) sairam da lista: um rotulo nao e servidor nem destino. Ficam atras de um link discreto no rodape (`GroupsDialog.tsx`): listar, criar, `Forget`. `Local groups` nao cria rede alguma.
 - `create`/`join`/`switchTo`/`joinByCode`/`leave`/`switchClientWorld`/`shareServer`/`unregister` continuam intocados; o polling de 30s segue silencioso e o guard de conexao (`connectingId`) impede joins concorrentes.
 - Docs do que a tela promete: `docs/BROWSER-PERF.md` §10; contrato de comportamento em `ServersView.test.tsx` + `GroupsDialog.test.tsx` + `directoryMerge.test.ts` (identidade) e paridade de JSX em `ServersView.mask.test.ts` (sobre `ServersView.tsx` + `WorldRow.tsx`).
+
+## Mundos com identidade + transicao de entrada (revisao 1.6.8)
+
+Sem mudanca de protocolo; a lista continua sendo a mesma federacao.
+
+- **Identidade visual deterministica** (`worldIdentity.ts`): cada mundo ganha uma matiz estavel derivada da *chave canonica* (`serverKey`, nunca do nome) e um glifo com a primeira letra. E chrome, nao dado: nao afirma alcance, lotacao nem dono, e renomear nao repinta o mundo. O ponto de estado medido fica sobre o tile.
+- **O mundo conectado tem trilho de cor** (`WorldRow.tsx`): "onde eu estou" se le pela cor, sem depender de rotulo.
+- **Entrar num mundo pesa** (`ServersView.tsx`): enquanto `connectingId` estiver ativo, a lista escurece atras de um veu com o tile do mundo-alvo, o nome e a espera dita em texto (`Entering <world>…`). Nada e inventado — o veu existe somente durante a conexao real.
+- O teste de privacidade (`ServersView.mask.test.ts`) continua valendo: nem endereco nem `owner_name` chegam ao JSX.
+

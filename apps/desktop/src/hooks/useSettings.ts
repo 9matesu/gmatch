@@ -5,6 +5,10 @@ import { useState, useEffect, useCallback } from 'react'
 const STORAGE_KEY = 'goonmatch-settings'
 const SFX_MIGRATED_KEY = 'goonmatch-settings-sfx-on'
 const OPACITY_MIGRATED_KEY = 'gmatch.opacity_migrated.v2'
+// One-time layout nudge: the single-column timeline made an older feed read as
+// an endless scroll. Two columns is the shipping default now, and installs
+// still sitting on the old default ('1') move with it exactly once.
+const FEED_COLS_MIGRATED_KEY = 'gmatch.feed_cols_migrated.v1'
 
 export interface AppSettings {
   galleryCols: '2' | '3'
@@ -70,7 +74,7 @@ export interface AppSettings {
 
 const DEFAULTS: AppSettings = {
   galleryCols: '2',
-  feedCols: '1',
+  feedCols: '2',
   hideDuplicates: false,
   soundEffects: true,
   watchPartyEnabled: true,
@@ -135,6 +139,13 @@ function load(): AppSettings {
     if (!localStorage.getItem(OPACITY_MIGRATED_KEY)) {
       stored.panelOpacity = 0.75
       localStorage.setItem(OPACITY_MIGRATED_KEY, '1')
+      save(stored)
+    }
+    // Move the old single-column timeline to the denser two-column default
+    // once. After this run the picker owns the choice again.
+    if (!localStorage.getItem(FEED_COLS_MIGRATED_KEY)) {
+      if (stored.feedCols === '1') stored.feedCols = '2'
+      localStorage.setItem(FEED_COLS_MIGRATED_KEY, '1')
       save(stored)
     }
     return stored

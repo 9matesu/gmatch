@@ -639,8 +639,19 @@ objects.get('/:id', async (c, next) => {
   // server. Return a descriptor the client resolves from its local store /
   // swarm peers. NEVER fall through to BUCKET purge — there is no blob to
   // miss, and deleting the metadata row would destroy the only record.
+  //
+  // Exception: serve the bytes when THIS node actually holds them (an imported
+  // vault copy, a repaired upload, a replica). A preview the node can stream
+  // now beats a swarm lookup that can only fail; the descriptor stays the
+  // fallback for every row the node does not host.
   if (row.content_url && (row.content_url.startsWith('magnet:') || row.content_url.startsWith('urn:sha256:'))) {
-    return c.json({
+    const localBytes = c.env.BUCKET ? await c.env.BUCKET.get(`objects/${id}`) : null
+    // We only probed for existence; release the stream so a miss does not hold
+    // a file descriptor until GC.
+    if (localBytes?.body) {
+      try { await localBytes.body.cancel() } catch { /* already closed */ }
+    }
+    if (!localBytes) return c.json({
       type: 'p2p',
       id: row.id,
       content_url: row.content_url,

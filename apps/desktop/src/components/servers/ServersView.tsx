@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
-import { Lock, Globe, ShieldCheck, RefreshCw, Pencil, Check, X, Search, Share2, ArrowLeft, Plus, Trash2 } from 'lucide-react'
+import { Lock, Globe, ShieldCheck, RefreshCw, Pencil, Check, X, Search, Share2, ArrowLeft, Plus, Trash2, Loader2 } from 'lucide-react'
 import { generateIdentity } from '@orbit/crypto'
 import { getCentralApiUrl, setCentralApiUrl } from '../../utils/central'
 import { rememberKnownNodeHint } from '../../utils/peerNodes'
@@ -27,6 +27,7 @@ import { AddWorldDialog } from './AddWorldDialog'
 import { GroupsDialog } from './GroupsDialog'
 import { WorldRow, WorldMenuItem, formatDomain, formatRelativeTime } from './WorldRow'
 import type { WorldRowState } from './WorldRow'
+import { worldGlyph, worldTileStyle } from './worldIdentity'
 import { claimPendingHost } from '../../hooks/usePendingServerHost'
 import { SERVER_MARKER_KEY } from '../../firstRun/onboardingState'
 import { playPress } from '../../utils/sounds'
@@ -1746,7 +1747,37 @@ export function ServersView({
           </aside>
         ) : (
           /* BROWSE SERVERS VIEW */
-          <section className="flex flex-col min-h-0 h-full overflow-hidden" aria-label="Server directory">
+          <section className="relative flex flex-col min-h-0 h-full overflow-hidden" aria-label="Server directory">
+            {/* Entering a world is a transition, not a silent row swap: the
+                list dims, the target world's tile carries its own colour and
+                the wait is named. Weight where the action happens. */}
+            {connectingId && (() => {
+              const target = serverRows.find((s) => s.id === connectingId)
+              const worldName = target?.name || 'world'
+              const key = target ? serverKey(target) : worldName
+              return (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  data-testid="world-connecting"
+                  className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-retro-bg/80 backdrop-blur-sm"
+                >
+                  <span
+                    className="flex h-16 w-16 items-center justify-center rounded-2xl border text-2xl font-bold text-white/90 shadow-xl animate-orbit-pop"
+                    style={worldTileStyle(key)}
+                  >
+                    {worldGlyph(worldName)}
+                  </span>
+                  <p className="text-sm font-bold text-retro-fg">
+                    Entering <span className="text-retro-accent">{worldName}</span>…
+                  </p>
+                  <div className="flex items-center gap-2 text-[10px] font-mono text-retro-muted">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Connecting to this world's node
+                  </div>
+                </div>
+              )
+            })()}
             {!identity && (
               <div className="px-3 py-1.5 bg-surface-interactive/60 border-b border-border-subtle text-xs text-retro-muted shrink-0">
                 No account yet. One is created for you on the server you pick.

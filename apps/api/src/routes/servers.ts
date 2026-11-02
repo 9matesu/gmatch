@@ -208,6 +208,9 @@ servers.get('/node', orbitAuth, async (c) => {
     directoryId,
     tags: readStoredTags(tagsRaw),
     isAdmin: await isNodeAdmin(c.env.DB, orbitId),
+    // Every app now runs its own node (host-only since 1.6.8), so the shell can
+    // show the Admin door: the PIN verify inside the panel is the real boundary.
+    mode: 'host' as const,
   })
 })
 

@@ -275,6 +275,7 @@ describe('Server node API', () => {
     const body = (await res.json()) as any
     expect(body.name).toBe('gmatch')
     expect(body.isAdmin).toBe(true)
+    expect(body.mode).toBe('host')
   })
 
   it('host admin can rename the node and dashboard reflects it', async () => {

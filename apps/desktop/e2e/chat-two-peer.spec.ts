@@ -161,8 +161,17 @@ test('sealed DMs cross two independent clients with honest receipts', async ({ b
     await expect(bravo.locator('[title="1 unread"]')).toHaveCount(0)
 
     // ── Typing (transient, throttled, never persisted) ──────────────────────
-    await composer(bravo).fill('mid-sentence')
-    await expect(alpha.getByText('typing…')).toBeVisible({ timeout: 30_000 })
+    // Typing pings ride the SEALED (courier) mail lane only — `notifyPmTyping`
+    // is a no-op unless `courierActive`. This spec pins a FULL stateful node,
+    // where DMs use /api/pm and no sealed lane exists to carry a ping, so
+    // asserting the indicator here would demand an event the environment can
+    // never emit. The lane itself is covered by useCourierDms.test.tsx.
+    const health = await alpha.request.get('/api/health')
+    const nodeMode = health.ok() ? ((await health.json()) as { mode?: string }).mode : null
+    if (nodeMode === 'courier') {
+      await composer(bravo).fill('mid-sentence')
+      await expect(alpha.getByText('typing…')).toBeVisible({ timeout: 30_000 })
+    }
 
     // ── Reply crosses with its quoted context ───────────────────────────────
     await bubble(bravo, MSG_1).click()

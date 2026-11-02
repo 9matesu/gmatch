@@ -18,6 +18,24 @@ export function resolveMediaUrl(url?: string | null): string {
   if (/^(file|about|javascript|chrome|chrome-extension|moz-extension|safari-web-extension):/i.test(trimmed)) {
     return '';
   }
+  // Content-addressed media from imported posts (fly.dev bridge): urn:sha256:<uuid><padding>.
+  // Resolve to /api/objects/<uuid> so the server streams the local P2P copy.
+  const urnMatch = trimmed.match(/^urn:sha256:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+  if (urnMatch) {
+    const base = getApiBaseUrl().replace(/\/+$/, '');
+    return base ? `${base}/api/objects/${urnMatch[1]}` : `/api/objects/${urnMatch[1]}`;
+  }
+  // The same archive also carries sha256-hex object ids (no dashes) in the URN.
+  // Those ids ARE the canonical object ids, so stream them the same way.
+  const urnHex = trimmed.match(/^urn:sha256:([0-9a-f]{64})/i);
+  if (urnHex) {
+    const base = getApiBaseUrl().replace(/\/+$/, '');
+    return base ? `${base}/api/objects/${urnHex[1]}` : `/api/objects/${urnHex[1]}`;
+  }
+  // magnet: links cannot be rendered directly; no doomed request.
+  if (/^magnet:/i.test(trimmed)) {
+    return '';
+  }
   // A bare object id (UUID) is never a URL: treat it as the canonical
   // /api/objects/<id> route, else the browser resolves it relative to the
   // page (net::ERR_FILE_NOT_FOUND on a raw uuid in dev and packaged builds).

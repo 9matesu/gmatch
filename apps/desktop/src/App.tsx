@@ -962,10 +962,11 @@ export default function Home() {
     void orbitFetch('/api/servers/node', { method: 'GET' }, identity)
       .then(async (res) => {
         if (!res.ok || dead) return;
-        const nj = await res.json().catch(() => null) as { is_admin?: boolean; mode?: 'host' | 'client' } | null;
+        const nj = await res.json().catch(() => null) as { isAdmin?: boolean; is_admin?: boolean; mode?: 'host' | 'client' } | null;
         if (dead || !nj) return;
-        // Prefer the node's own admission; fall back to its reported mode.
-        if (nj.is_admin || nj.mode === 'host') setShellServerMode('host');
+        // The route answers camelCase `isAdmin` (the shell used to read
+        // snake_case and silently never showed the door).
+        if (nj.isAdmin || nj.is_admin || nj.mode === 'host') setShellServerMode('host');
         else if (nj.mode === 'client') setShellServerMode('client');
       }).catch(() => { /* offline: entry stays hidden; nothing breaks */ });
     return () => { dead = true; };

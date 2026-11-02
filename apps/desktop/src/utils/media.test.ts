@@ -47,6 +47,22 @@ describe('resolveMediaUrl', () => {
     expect(out).toContain(`/api/objects/${uuid}`);
     expect(out).not.toBe(uuid);
   });
+
+  it('maps urn:sha256 object refs to the /api/objects route', () => {
+    // Imported posts carry content-addressed URLs instead of http(s). The node
+    // streams its local copy under /api/objects/<id>; a raw urn: would 404.
+    const uuid = 'd23b54b8-61b4-4914-bce6-6826cacc5670';
+    const urnUuid = resolveMediaUrl(`urn:sha256:${uuid}00000000000000000000000000`);
+    expect(urnUuid).toContain(`/api/objects/${uuid}`);
+
+    const hex = '271612b281a35c951592f3fd0f2f3b0e4e9b7c1a2d3e4f5a6b7c8d9e0f1a2b3c';
+    const urnHex = resolveMediaUrl(`urn:sha256:${hex}`);
+    expect(urnHex).toContain(`/api/objects/${hex}`);
+  });
+
+  it('refuses magnet: links instead of firing a doomed request', () => {
+    expect(resolveMediaUrl('magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567')).toBe('');
+  });
 });
 
 describe('isMediaVideo', () => {

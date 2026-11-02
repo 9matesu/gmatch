@@ -9,7 +9,8 @@
 // never claims reachability it has not measured.
 import { Loader2, Lock, MoreVertical } from 'lucide-react'
 import type { ReactNode } from 'react'
-import type { DirectoryServer } from './directoryMerge'
+import { serverKey, type DirectoryServer } from './directoryMerge'
+import { worldAccentStyle, worldGlyph, worldTileStyle } from './worldIdentity'
 import { MONO } from '../../ui/styles'
 
 export interface WorldRowState {
@@ -86,12 +87,25 @@ export function WorldRow({
 }) {
   const status = state.status
   const current = status === 'Current'
+  const key = serverKey(server)
   const body = (
     <>
-      <span
-        className={`h-2 w-2 shrink-0 rounded-full ${status ? DOT[status] : 'bg-retro-muted/40'}`}
-        aria-hidden
-      />
+      {/* World identity: a deterministic colour + glyph so two worlds are
+          recognisable at a glance. It is chrome, never a reachability claim —
+          the measured status is the dot on the tile's corner. */}
+      <span className="relative shrink-0" aria-hidden>
+        <span
+          className="flex h-9 w-9 items-center justify-center rounded-lg border text-xs font-bold text-white/90 shadow-inner"
+          style={worldTileStyle(key)}
+        >
+          {worldGlyph(server.name)}
+        </span>
+        <span
+          className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-retro-bg ${
+            status ? DOT[status] : 'bg-retro-muted/40'
+          }`}
+        />
+      </span>
       <span className="min-w-0 flex-1">
         <span className="flex min-w-0 items-baseline gap-2">
           <span className="truncate text-sm font-semibold text-retro-fg group-hover:text-retro-accent transition-colors duration-150">
@@ -125,12 +139,21 @@ export function WorldRow({
 
   return (
     <li
-      className={`group flex items-center gap-3 px-3 py-2.5 transition-colors duration-150 ${
+      className={`group relative flex items-center gap-3 py-2.5 pl-4 pr-3 transition-colors duration-150 ${
         current ? 'bg-glass-w8' : 'hover:bg-glass-w5'
       }`}
       aria-current={current || undefined}
       aria-busy={status === 'Connecting' || undefined}
     >
+      {/* The connected world keeps a colour rail so "where am I" never needs
+          reading a label. */}
+      {current && (
+        <span
+          aria-hidden
+          className="absolute inset-y-1.5 left-0 w-0.5 rounded-full"
+          style={worldAccentStyle(key)}
+        />
+      )}
       {current ? (
         <span
           data-world-row-focus

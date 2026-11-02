@@ -61,12 +61,18 @@ async function postRow(db: D1Turso, orbitId: string, id: string): Promise<any> {
 }
 
 function serializePost(row: any): any {
+  // Prefer a resolvable media URL: content_url may be urn:sha256:/magnet: from
+  // imported posts; fall back to the canonical /api/objects/<id> route so the
+  // client can always stream the local P2P copy.
+  const mediaUrl = /^https?:/i.test(row.content_url || '')
+    ? row.content_url
+    : `/api/objects/${row.id}`;
   return {
     id: row.id,
     author_id: row.owner_id,
     author_name: row.author_name?.trim() || generateFallbackName(row.owner_id),
     author_avatar: row.author_pfp || null,
-    url: row.content_url || `/api/objects/${row.id}`,
+    url: mediaUrl,
     mime_type: row.mime_type || 'image/jpeg',
     media: Array.isArray(row.media) && row.media.length > 0 ? row.media : undefined,
     caption: row.caption || null,

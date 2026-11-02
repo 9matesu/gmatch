@@ -15,9 +15,9 @@ vi.mock('../../services/imageCache', () => ({
   devFetchable: vi.fn(() => null),
 }));
 
-// The real tile resolves over the network; this stub lets the test report the
-// terminal "media not on this device" result the tile produces after its
-// vault probe + bounded swarm attempt.
+// The real tile resolves over the network; this stub reports the terminal
+// "media not on this device" result the tile produces after its vault probe +
+// bounded swarm attempt.
 vi.mock('../ObjectImage', () => ({
   ObjectImage: ({ onMediaUnavailable }: { onMediaUnavailable?: () => void }) => (
     <button type="button" onClick={() => onMediaUnavailable?.()}>
@@ -47,7 +47,7 @@ describe('GMatchFeed missing media', () => {
     },
   ];
 
-  it('hides a post with terminal missing media and keeps a countable disclosure', () => {
+  it('keeps the post on the timeline when its media is not on this device', () => {
     render(
       <GMatchFeed identity={identity} posts={posts} stories={[]} users={[]} feedSort="latest" />,
     );
@@ -55,15 +55,10 @@ describe('GMatchFeed missing media', () => {
     expect(screen.getByText('My own post without local bytes')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'missing media' }));
 
-    expect(screen.queryByText('My own post without local bytes')).not.toBeInTheDocument();
-    expect(
-      screen.getByText('1 post hidden — media not on this device'),
-    ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Show' }));
+    // The tile reports the miss; the row (author, caption, counts) stays.
     expect(screen.getByText('My own post without local bytes')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Hide' }));
-    expect(screen.queryByText('My own post without local bytes')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/hidden — media not on this device/),
+    ).not.toBeInTheDocument();
   });
 });

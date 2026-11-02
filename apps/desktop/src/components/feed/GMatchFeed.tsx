@@ -422,16 +422,6 @@ export function GMatchFeed({
   const [optionsPost, setOptionsPost] = useState<FeedPost | null>(null);
   const [reportingPost, setReportingPost] = useState<FeedPost | null>(null);
 
-  // Media that resolved to a terminal miss (not on this device, no peer
-  // answered) is hidden from the timeline instead of showing a tile that
-  // loads forever. The count stays visible so posts never vanish silently,
-  // and "Show" remounts the tiles for one explicit retry.
-  const [missingMediaIds, setMissingMediaIds] = useState<Set<string>>(() => new Set());
-  const [showMissingMedia, setShowMissingMedia] = useState(false);
-  const markMediaMissing = useCallback((postId: string) => {
-    setMissingMediaIds((prev) => (prev.has(postId) ? prev : new Set(prev).add(postId)));
-  }, []);
-
   const handleAvatarClick = (userId: string) => {
     playPress(750);
     const hasStories = storyOwners.has(userId);
@@ -574,16 +564,10 @@ export function GMatchFeed({
     });
   }, [posts, likeCounts, commentsMap, tagAffinities, now, feedSort, users, identity?.orbitId]);
 
-  // Missing media hides the post, not the world: the counter below the header
-  // says how many and can show them again with one explicit retry.
-  const missingMediaCount = useMemo(
-    () => displayPosts.filter((p) => missingMediaIds.has(p.id)).length,
-    [displayPosts, missingMediaIds],
-  );
-  const visiblePosts = useMemo(
-    () => (showMissingMedia ? displayPosts : displayPosts.filter((p) => !missingMediaIds.has(p.id))),
-    [displayPosts, missingMediaIds, showMissingMedia],
-  );
+  // A post whose bytes are not on this device still exists: the tile carries
+  // its own honest "No preview" state, so the timeline keeps the author,
+  // caption and counts instead of silently dropping the row.
+  const visiblePosts = displayPosts;
 
   const followSuggestions = useMemo(
     () => displayPosts.length === 0
@@ -900,6 +884,36 @@ export function GMatchFeed({
         }
       />
 
+      {/* One-click composer: the feed opens with the door to writing on it.
+          It is the first thing on the page, so posting never needs a trip to
+          the dock or a scroll. */}
+      {onOpenPostCreator && identity && (
+        <div className="w-full px-2 pt-2 sm:px-4">
+          <button
+            type="button"
+            onClick={() => { playPress(900); onOpenPostCreator(); }}
+            aria-label="Create a post"
+            className="group flex w-full items-center gap-3 rounded-xl border border-border-glass bg-glass-w4 px-3 py-2.5 text-left transition-colors hover:bg-glass-w8 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-retro-accent cursor-pointer"
+          >
+            <span className="h-8 w-8 shrink-0 overflow-hidden rounded-full border border-border-glass bg-retro-panel">
+              <Avatar
+                id={identity.orbitId}
+                size={32}
+                imageUrl={profilePics[identity.orbitId]}
+                fill={true}
+              />
+            </span>
+            <span className="min-w-0 flex-1 truncate text-sm text-retro-muted">
+              Share something…
+            </span>
+            <span className="flex shrink-0 items-center gap-1 rounded-full bg-retro-accent px-3 py-1.5 text-xs font-bold text-retro-accent-text transition-transform group-active:scale-95">
+              <PlusSquare className="h-3.5 w-3.5" />
+              Post
+            </span>
+          </button>
+        </div>
+      )}
+
       {/* Selective status pills: only empty/conflict states, never a
           healthy timeline (see FeedStatusPills). */}
       <FeedStatusPills postCount={displayPosts.length} />
@@ -959,20 +973,6 @@ export function GMatchFeed({
 
       {/* Feed Content Column (Posts) */}
       <div className="w-full max-w-[1400px] mx-auto flex flex-col px-2 sm:px-4 py-2 space-y-3">
-        {missingMediaCount > 0 && (
-          <div className="flex items-center gap-2 px-1 text-xs text-retro-muted">
-            <span>
-              {missingMediaCount} {missingMediaCount === 1 ? 'post' : 'posts'} hidden — media not on this device
-            </span>
-            <button
-              type="button"
-              onClick={() => setShowMissingMedia((v) => !v)}
-              className="font-medium text-retro-fg underline decoration-border-glass hover:decoration-retro-fg cursor-pointer"
-            >
-              {showMissingMedia ? 'Hide' : 'Show'}
-            </button>
-          </div>
-        )}
         {/* Feed Posts List with Sharp Square Images */}
                   <div className={`mt-3 ${feedCols === '1' ? 'space-y-3' : 'grid grid-cols-1 sm:grid-cols-2 gap-3' + (feedCols === '3' ? ' lg:grid-cols-3' : feedCols === '4' ? ' lg:grid-cols-3 xl:grid-cols-4' : feedCols === '5' ? ' lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5' : '')}`}>
            {visiblePosts.map((post, _idx) => {
@@ -1137,7 +1137,6 @@ export function GMatchFeed({
                                 muted={true}
                                 loop={true}
                                 hideUnavailable={false}
-                                onMediaUnavailable={() => markMediaMissing(post.id)}
                                 onExpand={() => toggleExpand(post)}
                                 onDoubleTapLike={() => handleDoubleTap(post)}
                               />
@@ -1200,7 +1199,6 @@ export function GMatchFeed({
                           muted={true}
                           loop={true}
                           hideUnavailable={false}
-                          onMediaUnavailable={() => markMediaMissing(post.id)}
                           onExpand={() => toggleExpand(post)}
                           onDoubleTapLike={() => handleDoubleTap(post)}
                         />
