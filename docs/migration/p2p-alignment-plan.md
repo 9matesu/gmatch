@@ -239,6 +239,21 @@ compose.
   `recovered (under-replicated)` / `metadata only` / `corrupt`. Never report
   metadata import as media migration; the report is the Stage E artifact.
 
+Delivered — `services/migrationReconcile.ts` beside 9 tests (green): Stage D
+is a monotonic `created_at` watermark (`WATERMARK_KEY`, never rewinds — a
+stale manifest cannot re-watermark newer work) with the next bounded slice
+of the manifest deduped BY objectId (one repeated post is one row carrying
+its newest metadata) ordered oldest→newest and bounded (8/pass default);
+stage E's `classifyStageE`/`buildStageE` derive one honest class per object
+from the Phase 5 scan status + Phase 3 distinct custody holders:
+`cached` ≥ 3 holders → `recovered+replicated`; `cached` < 3 → `recovered
+(under-replicated)`; anything not locally verified (downloadable/retryable/
+missing) → `metadata only`; `corrupt` → `corrupt`. Nothing in the unit
+signs, re-authors, uploads or mutates metadata — the report rows are the
+artifact, and the totals distinguish MS import from media migration
+outright. localStorage-backed watermark follows the repo's stubbed
+convention in tests.
+
 ### Phase 7 — cleanup (Priority 8, only after post-verification)
 
 Exact removal list (each gated by its own test, no drive-by refactors):
