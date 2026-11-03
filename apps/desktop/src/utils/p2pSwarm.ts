@@ -679,9 +679,15 @@ export interface SwarmReceiptRoles {
   /** Inbound: a fetcher claims durable custody of an object we serve. */
   handleReceipt(id: string, receipt: unknown): void
   getDurableReplication(id: string): { receipt: ReplicationReceipt; confirmedAt: number } | null
+  /** DISTINCT identities this node has verified holding the object (from
+   *  accepted receipts). One identity is never counted twice. */
+  holderCount(id: string): number
+  holdersOf(id: string): { receiverId: string; confirmedAt: number }[]
   /** Hydration only: insert pre-validated persisted evidence. Callers must
-   *  have verified the record themselves — this path skips challenge state. */
-  note(id: string, entry: { receipt: ReplicationReceipt; confirmedAt: number }): void
+   *  have verified the record themselves — this path skips challenge state.
+   *  `holders` carries the persisted distinct-holder list when the row has
+   *  one (legacy rows default to the receipt's own receiverId). */
+  note(id: string, entry: { receipt: ReplicationReceipt; confirmedAt: number }, holders?: { receiverId: string; confirmedAt: number }[]): void
   reset(): void
 }
 
@@ -707,6 +713,27 @@ export function createSwarmReceiptRoles(options: SwarmReceiptRolesOptions): Swar
   const recentlyDurablyHeld = new Map<string, number>()
   /** Seeder side: recorded valid receipts (bounded, latest per object). */
   const durableReplications = new Map<string, { receipt: ReplicationReceipt; confirmedAt: number }>()
+  /** Seeder side: DISTINCT identities proven to durably hold each object we
+   *  serve (one map entry per accepted receipt's receiverId, timestamps
+   *  refreshed — an identity is never a second holder). Matches the persisted
+   *  per-row bound in utils/storage (MAX_HOLDERS_PER_OBJECT). */
+  const MAX_HOLDER_IDENTITIES = 8
+  const receiptHolders = new Map<string, Map<string, number>>()
+
+  function recordHolder(id: string, receiverId: string, confirmedAt: number): void {
+    if (typeof receiverId !== 'string' || !receiverId) return
+    let holders = receiptHolders.get(id)
+    if (!holders) {
+      holders = new Map()
+      receiptHolders.set(id, holders)
+    }
+    holders.set(receiverId, confirmedAt)
+    while (holders.size > MAX_HOLDER_IDENTITIES) {
+      const oldest = [...holders.entries()].sort((a, b) => a[1] - b[1])[0]
+      if (!oldest) break
+      holders.delete(oldest[0])
+    }
+  }
 
   async function signAndSendReceipt(id: string, challenge: string): Promise<void> {
     const identity = options.identity()
@@ -780,20 +807,39 @@ export function createSwarmReceiptRoles(options: SwarmReceiptRolesOptions): Swar
       const entry = { receipt: valid, confirmedAt: Date.now() }
       durableReplications.set(id, entry)
       boundMap(durableReplications, MAX_DURABLE_REPLICATIONS)
+      recordHolder(id, valid.receiverId, entry.confirmedAt)
       options.onRecord?.(id, entry)
     },
     getDurableReplication(id) {
       return durableReplications.get(id) ?? null
     },
-    note(id, entry) {
+    holderCount(id) {
+      return receiptHolders.get(id)?.size ?? 0
+    },
+    holdersOf(id) {
+      const holders = receiptHolders.get(id)
+      if (!holders) return []
+      return [...holders.entries()].map(([receiverId, confirmedAt]) => ({ receiverId, confirmedAt }))
+    },
+    /** Hydration only. `holders` lands pre-validated; a legacy row without
+     *  one still records the single receipt's receiverId. */
+    note(id, entry, holders) {
       durableReplications.set(id, entry)
       boundMap(durableReplications, MAX_DURABLE_REPLICATIONS)
+      if (Array.isArray(holders)) {
+        for (const h of holders) {
+          if (h && typeof h.receiverId === 'string') recordHolder(id, h.receiverId, h.confirmedAt ?? entry.confirmedAt)
+        }
+      } else {
+        recordHolder(id, entry.receipt.receiverId, entry.confirmedAt)
+      }
     },
     reset() {
       outstandingChallenges.clear()
       pendingChallenges.clear()
       recentlyDurablyHeld.clear()
       durableReplications.clear()
+      receiptHolders.clear()
     },
   }
 }
@@ -827,10 +873,16 @@ const moduleReceiptRoles = createSwarmReceiptRoles({
   onRecord: (id, entry) => {
     // Best-effort durable evidence: the session map keeps the receipt either
     // way; a failed write only costs restart survival, never correctness.
+    // The distinct-holder list rides the same row (one row per object).
     void (async () => {
       try {
         const { saveSwarmReceipt } = await import('./storage')
-        await saveSwarmReceipt({ objectCid: id, receipt: entry.receipt as unknown as Record<string, unknown>, confirmedAt: entry.confirmedAt })
+        await saveSwarmReceipt({
+          objectCid: id,
+          receipt: entry.receipt as unknown as Record<string, unknown>,
+          confirmedAt: entry.confirmedAt,
+          holders: holdersOf(id),
+        })
       } catch {
         /* quota/IDB unavailable: receipt stays session-only */
       }
@@ -853,7 +905,7 @@ export async function hydrateDurableReplications(): Promise<number> {
     if (!row?.objectCid || !row.receipt) continue
     const receipt = row.receipt as unknown as ReplicationReceipt
     if (validateReplicationReceipt(receipt, receipt.createdAt)) continue
-    moduleReceiptRoles.note(row.objectCid, { receipt, confirmedAt: row.confirmedAt ?? Date.now() })
+    moduleReceiptRoles.note(row.objectCid, { receipt, confirmedAt: row.confirmedAt ?? Date.now() }, row.holders ?? undefined)
     loaded += 1
   }
   return loaded
@@ -863,6 +915,23 @@ export async function hydrateDurableReplications(): Promise<number> {
 export function getDurableReplication(id: string): { receipt: ReplicationReceipt; confirmedAt: number } | null {
   return moduleReceiptRoles.getDurableReplication(id)
 }
+
+/** DISTINCT verified custody identities for an object we serve, plus this
+ *  node itself (we hold the bytes we serve — verified by read-back at
+ *  serve/accept time, not assumed). Used for replication targeting. */
+export function durableCustodyHolders(id: string): number {
+  return moduleReceiptRoles.holderCount(id) + 1
+}
+
+/** Distinct custody identities (without the implicit self) an object we
+ *  serve has receipts from. */
+export function holdersOf(id: string): { receiverId: string; confirmedAt: number }[] {
+  return moduleReceiptRoles.holdersOf(id)
+}
+
+/** Durable-custody holders below the replication target (the objects whose
+ *  HAVE advertisement should win when a peer comes online). */
+export const SWARM_REPLICATION_TARGET = 3
 
 // ---- SWARM_OP: signed social operations riding the same channel ---------
 // The frame is untrusted transport: the injected handler (wired by useP2P to
@@ -961,13 +1030,36 @@ export function heldSwarmObjectIds(limit = SWARM_HAVE_LIMIT): string[] {
 }
 
 /**
+ * Replication-targeting view of a held-id list: ids whose DISTINCT verified
+ * custody holders are below the target come first (most recent first within
+ * each partition), so a peer that comes online is advertised what actually
+ * needs a holder before what is already fully replicated. One identity is
+ * never counted twice (the holder map is keyed by receiverId), and the
+ * seeder itself counts as one holder.
+ */
+export function prioritizeUnderReplicated(ids: string[], target = SWARM_REPLICATION_TARGET): string[] {
+  const starving: string[] = []
+  const fed: string[] = []
+  for (const id of ids) {
+    if (durableCustodyHolders(id) < target) starving.push(id)
+    else fed.push(id)
+  }
+  return [...starving, ...fed]
+}
+
+/**
  * Tell the swarm which objects we can serve. Called when a peer comes online
  * (and after boot hydration), so a peer that failed a fetch learns it can ask
- * us instead of waiting for a broadcast it never saw.
+ * us instead of waiting for a broadcast it never saw. The wave is
+ * replication-targeting: objects under the custody target are advertised
+ * first, so the HAVE-retrigger re-considers exactly what needs a holder.
  */
 export function announceHeldObjects(limit = SWARM_HAVE_LIMIT): number {
   if (!swarmSend) return 0
-  const ids = heldSwarmObjectIds(limit)
+  // The RAM held-cache is bounded, so the full list is small; prioritize the
+  // WHOLE held set and only then apply the wave's bounded slice.
+  const ids = prioritizeUnderReplicated(heldSwarmObjectIds(SWARM_HAVE_LIMIT))
+    .slice(0, Math.max(0, limit))
   if (ids.length === 0) return 0
   try {
     swarmSend({ type: 'SWARM_HAVE', ids })

@@ -81,15 +81,30 @@ const STORE_RECEIPTS = 'swarm_receipts'
 
 /** Signed durable-replication receipts recorded by the swarm seeder side
  *  (p2pSwarm). Historical evidence — freshness was enforced at accept time;
- *  `confirmedAt` is when this node accepted the receipt. */
+ *  `confirmedAt` is when this node accepted the receipt.
+ *  `holders` lists the DISTINCT identities that durably hold this object
+ *  (each accepted receipt's receiverId); one identity is never counted
+ *  twice, and the list is bounded to `MAX_HOLDERS_PER_OBJECT`. Optional for
+ *  rows written before holding-holder bookkeeping existed (legacy rows read
+ *  back as a one-element list). */
+export interface StoredSwarmReceiptHolder {
+  receiverId: string
+  confirmedAt: number
+}
+
 export interface StoredSwarmReceipt {
   objectCid: string
   receipt: Record<string, unknown>
   confirmedAt: number
+  holders?: StoredSwarmReceiptHolder[]
 }
 
 /** Receipt store bound: matches the in-memory cap in p2pSwarm. */
 export const MAX_STORED_RECEIPTS = 256
+
+/** Distinct custody holders remembered per object (matches the in-session
+ *  bound in p2pSwarm). */
+export const MAX_HOLDERS_PER_OBJECT = 8
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
