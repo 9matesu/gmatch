@@ -2,7 +2,6 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { OrbitIdentity } from '@orbit/crypto';
 import { User, OrbitObject } from '@orbit/shared';
 import { saveObject, getObject } from '../utils/storage';
-import { OrbitPeerRelay } from '../utils/peer-relay';
 import { getApiBaseUrl, getApiWebSocketUrl, isCourierHost, orbitFetch, subscribeApiBase } from '../utils/api';
 import { mergeRoster } from '../utils/peerRoster';
 import { presenceBucket } from '../utils/compare';
@@ -18,7 +17,6 @@ import { parseApiTimestamp } from '../utils/timeAgo';
 import { mediaFlag, resolveClaimedOwner, descriptorUrlFromBytes } from '../utils/objectDescriptor';
 
 const CHAT_WIPE_MS = CHAT_WIPE_SECONDS * 1000;
-const DIRECT_WEBRTC_FANOUT_LIMIT = 3;
 /** Cap on frames parked while the relay socket is down. */
 const MAX_QUEUED_FRAMES = 200;
 /** How many nodes one roster round may read the presence mailbox of. */
@@ -227,7 +225,6 @@ export function useP2P(identity: OrbitIdentity | null) {
   const lastBaseRef = useRef<string>('');
   useEffect(() => subscribeApiBase(() => setBaseGen((g) => g + 1)), []);
   const wsRef = useRef<WebSocket | null>(null);
-  const relayRef = useRef<OrbitPeerRelay | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const chunkBuffersRef = useRef<Map<string, { total: number; chunks: Map<number, string>; startedAt: number }>>(new Map());
   const sendHeartbeatRef = useRef<() => void>(() => {});
@@ -318,16 +315,7 @@ export function useP2P(identity: OrbitIdentity | null) {
     }
     lastBaseRef.current = runBase;
 
-    // 1. Initialize PeerJS WebRTC Relay Engine
-    const peerRelay = new OrbitPeerRelay(identity.orbitId);
-    relayRef.current = peerRelay;
-
-    peerRelay.onMessage = (msg, fromPeerId) => {
-      logger.log('[ORBIT PeerJS Swarm] Received direct WebRTC DataChannel message from:', fromPeerId, 'Type:', msg.type);
-      processSwarmMessage(msg as P2PSwarmMessage);
-    };
-
-    // 2. Initialize Cross-Tab Broadcast Channel Swarm
+    // 1. Initialize Cross-Tab Broadcast Channel Swarm
     const channel = new BroadcastChannel('orbit_p2p_swarm');
     channelRef.current = channel;
     const selfUser = selfUserRef.current;
@@ -773,7 +761,7 @@ export function useP2P(identity: OrbitIdentity | null) {
 
     connectWebSocket();
 
-    // 4. Broadcast presence heartbeat over local BroadcastChannel, WebSocket network, & PeerJS DataChannels
+    // 4. Broadcast presence heartbeat over local BroadcastChannel & WebSocket network.
     const sendHeartbeat = () => {
       // Skip presence broadcasts from hidden tabs: browsers throttle background
       // timers anyway, and hidden tabs should not contribute swarm noise.
@@ -995,8 +983,6 @@ export function useP2P(identity: OrbitIdentity | null) {
       if (wsRef.current) {
         wsRef.current.close();
       }
-      relayRef.current?.destroy();
-      relayRef.current = null;
     };
   }, [identity, baseGen]);
 
@@ -1117,18 +1103,6 @@ export function useP2P(identity: OrbitIdentity | null) {
       // Broadcast over network WebSocket to remote swarm peers with chunking/queuing
       transmitOverWebSocket(wsRef.current, queuedMessagesRef.current, msg);
       broadcastMeshFrame(JSON.stringify(msg));
-
-      // Broadcast direct WebRTC DataChannel payloads to all discovered peers via PeerJS
-      if (relayRef.current) {
-        const directPeers = Array.from(peerMapRef.current.values())
-          .filter((peerUser) => peerUser.id !== selfUser.id && peerUser.online && relayRef.current?.canDial(peerUser.id))
-          .sort((a, b) => Date.parse(b.last_seen || '') - Date.parse(a.last_seen || ''))
-          .slice(0, DIRECT_WEBRTC_FANOUT_LIMIT);
-        for (const peerUser of directPeers) {
-          logger.log('[ORBIT PeerJS Swarm] Transmitting direct WebRTC P2P DataChannel payload to peer:', peerUser.display_name || peerUser.id);
-          relayRef.current.connectAndSend(peerUser.id, msg);
-        }
-      }
     },
     [identity]
   );  const sendChatMessage = useCallback((text: string, channel: string = 'global_lobby') => {
@@ -1172,16 +1146,6 @@ export function useP2P(identity: OrbitIdentity | null) {
 
     transmitOverWebSocket(wsRef.current, queuedMessagesRef.current, msg);
     broadcastMeshFrame(JSON.stringify(msg));
-
-    if (relayRef.current) {
-      const directPeers = Array.from(peerMapRef.current.values())
-        .filter((peerUser) => peerUser.id !== selfUser.id && peerUser.online && relayRef.current?.canDial(peerUser.id))
-        .sort((a, b) => Date.parse(b.last_seen || '') - Date.parse(a.last_seen || ''))
-        .slice(0, DIRECT_WEBRTC_FANOUT_LIMIT);
-      for (const peerUser of directPeers) {
-        relayRef.current.connectAndSend(peerUser.id, msg as any);
-      }
-    }
 
     // Persist to the server so the row is the source of truth for a page reload
     // or a late joiner. Fire-and-forget: if it fails we still have the local

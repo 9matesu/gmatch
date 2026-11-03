@@ -385,7 +385,8 @@ export async function getLocalObject(id: string): Promise<Blob | null> {
 
 // ---- Swarm transport: module-level WANT/CHUNK request/response ------------
 // The P2P hook (useP2P) wires every available pipe (BroadcastChannel, WS
-// relay, PeerJS direct) into one send fan-out; serving peers answer WANTs
+// relay, BroadcastChannel, and courierSignaling) into one send fan-out; serving
+// peers answer WANTs
 // from their local store. This keeps bytes moving peer-to-peer with zero
 // server storage.
 

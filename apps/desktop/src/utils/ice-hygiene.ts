@@ -9,7 +9,7 @@
 // - `relay` candidates carry the TURN server's address, not yours; with TURN
 //   configured the whole connection is forced through it (zero exposure).
 // - peerConnectionConfig() is the single source of truth for both the
-//   file-transfer peer (webrtc.ts) and the payload relay (peer-relay.ts).
+//   file-transfer peer (webrtc.ts) and the payload relay (removed).
 
 export const STUN_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun.cloudflare.com:3478' },
