@@ -211,6 +211,25 @@ never fabricated:
 - Regressions: no boot-time network flood — the campaign runs bounded and
   throttled, opt-in per installation.
 
+Delivered — two new thin units beside their tests (17 cases, green):
+`services/recoveryStatus.ts` (enum + `deriveStatus` — pure precedence,
+corrupt > cached > retryable > downloadable > missing, every rule from an
+evidence shape a scan can actually prove; nothing networked, nothing stored,
+nothing tombstoned) and `services/mediaRecovery.ts` (`scanMediaRecovery` —
+bounded batch of 8, 30s wall-clock throttle, empty input short-circuits;
+matches the register by content hash then id, verifies sha256 → `corrupt`
+on mismatch, aliases both identities, and covers a recovered batch with ONE
+`announceHeldObjects` frame; a content-hash-KEYED vault row is a match by
+the key itself; a miss re-reads the existing `pendingTransfers`
+bookkeeping — attempts>0 → `retryable` — and enqueues fresh misses for the
+existing resume machinery, idempotently (shared store; a re-run re-reads
+and never double-enqueues, registers twice, or invents bytes). Fully
+injectable deps like keepsake; magnet ids and empty ids filtered; app-owned
+stores only. `imgcache` remains excluded as a match source per plan A5.
+Wiring (which manifest drives a scan, and the peer-online re-eval) is
+Phase 6 Stage D/E — the campaign itself is the verifiedEngine all callers
+compose.
+
 ### Phase 6 — migration reconciliation (Priority 7 Stage D/E)
 
 - Stage D: watermark cursor (`created_at`) on the manifest; reconcile new
