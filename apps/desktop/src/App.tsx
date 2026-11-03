@@ -56,6 +56,7 @@ import { GMatchFeed, type FeedPost } from "./components/feed/GMatchFeed";
 import { reconcilePublishedPost } from "./utils/feedPublish";
 import { mergeRecentPushes, rememberPushed, type PushedEntry } from "./utils/feedMerge";
 import { PEER_ONLINE_EVENT } from "./utils/p2pSwarm";
+import { localHeldMediaUrl } from "./utils/localMedia";
 import { GMatchDMs } from "./components/chat/GMatchDMs";
 import { toChatPeer, type ChatPeer } from "./components/chat/chatPeer";
 import type { GroupMember } from "./components/chat/GroupMembersPopover";
@@ -663,34 +664,51 @@ export default function Home() {
 
   // Resolve a wallpaper source (remote API object / remote URL / blob / data)
   // into a renderable blob URL. `data:` URLs render directly.
+  // Local-first for content-addressed object media (Priority 4 order):
+  // vault bytes → swarm store → signed node fetch (utils/localMedia). A
+  // wallpaper whose bytes we hold must not depend on the author's node being
+  // reachable. The swarm ASK is deliberately not wired: a background
+  // wallpaper is never a fetch priority, and the honest miss just keeps
+  // whatever the settings already render.
   const resolveWallpaperUrl = useCallback((url: string): Promise<string> => {
     if (!url) return Promise.resolve('')
     if (url.startsWith('data:') || url.startsWith('blob:')) return Promise.resolve(url)
-    const isVideo = /\.(mp4|webm|ogv|mov)(\?|$)/i.test(url.split('?')[0]) || url.includes('/rg-media')
-    if (isVideo) {
-      if (url.startsWith('vault://')) {
-        return vaultHttpUrl(url).then(http => http || url)
-      }
-      const proxied = devFetchable(url)
-      if (proxied) return Promise.resolve(proxied)
-      return Promise.resolve(url)
+    // `urn:sha256:<uuid>` descriptors (imported posts) are not URLs — map to
+    // the node's object route so the signed fetch below can address them.
+    const urnMatch = url.match(/^urn:sha256:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i)
+    const objectUrl = urnMatch ? `/api/objects/${urnMatch[1]}` : url
+    const localPromise = localHeldMediaUrl(url)
+    if (/\.(mp4|webm|ogv|mov)(\?|$)/i.test(url.split('?')[0]) || url.includes('/rg-media')) {
+      // Videos: a locally held copy (vault loopback URL is Range-capable, a
+      // blob URL from the swarm store) finishes offline; otherwise the raw
+      // rendezvous URL is the only stream we have.
+      return localPromise.then((local) => {
+        if (local) return local
+        if (url.startsWith('vault://')) return vaultHttpUrl(url).then(http => http || url)
+        const proxied = devFetchable(url)
+        if (proxied) return proxied
+        return url
+      })
     }
-    if (/^https?:/i.test(url) || url.startsWith('gmcache://') || url.startsWith('vault://')) {
+    if (/^https?:/i.test(objectUrl) || objectUrl.startsWith('gmcache://') || objectUrl.startsWith('vault://')) {
       // Remote booru bytes: no ACAO there, so orbitFetch's signed headers
       // would preflight-block it. cacheMedia's ladder (gmcache bridge →
       // dev proxy → direct fetch) is the byte path for exactly this.
-      return mediaUrlToCachedFile(url)
-        .then(f => URL.createObjectURL(f))
-        .catch(() => url)
+      return localPromise
+        .then(local => local ?? mediaUrlToCachedFile(objectUrl).then(f => URL.createObjectURL(f)))
+        .catch(() => objectUrl)
     }
-    if (!identity) return Promise.resolve(url)
-    return orbitFetch(url, {}, identity)
-      .then(r => r.ok ? r.blob() : null)
-      .then(b => {
-        if (!b) return url
-        return URL.createObjectURL(b)
-      })
-      .catch(() => url)
+    return localPromise.then((local) => {
+      if (local) return local
+      if (!identity) return objectUrl
+      return orbitFetch(objectUrl, {}, identity)
+        .then(r => r.ok ? r.blob() : null)
+        .then(b => {
+          if (!b) return objectUrl
+          return URL.createObjectURL(b)
+        })
+        .catch(() => objectUrl)
+    })
   }, [identity])
 
   useEffect(() => {

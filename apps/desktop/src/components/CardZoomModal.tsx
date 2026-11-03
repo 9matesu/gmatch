@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { ZoomIn, ZoomOut, RotateCcw, X, ExternalLink } from 'lucide-react';
 import { isMediaVideo, resolveMediaUrl } from '../utils/media';
 import { orbitFetch } from '../utils/api';
+import { localHeldMediaUrl } from '../utils/localMedia';
 import { MediaBadge } from './MediaBadge';
 import { ObjectImage } from './ObjectImage';
 
@@ -204,6 +205,14 @@ export function CardZoomModal({
               onClick={() => {
                 void (async () => {
                   try {
+                    const local = await localHeldMediaUrl(imageUrl)
+                    if (local) {
+                      window.open(local, '_blank', 'noopener,noreferrer')
+                      if (local.startsWith('blob:')) {
+                        setTimeout(() => URL.revokeObjectURL(local), 60_000)
+                      }
+                      return
+                    }
                     const res = await orbitFetch(imageUrl as string, {}, identity)
                     if (!res.ok) return
                     const blob = await res.blob()

@@ -169,6 +169,20 @@ recovery statuses of Phase 5 (no invented bytes, tile stays visible).
 - Regressions: rendering must not gain synchronous vault churn (existing LRU
   bounds hold); descriptor rows keep their non-destructive recovery.
 
+Delivered — `useObjectImage` was already the canonical order and its 13 hook
+consumers (feed tiles, slideshows, admin media, match surfaces, watch party)
+converge through it. Two node-only bypasses fixed in place, overlaying the
+same order without a second engine: the shared vault→swarm-store ladder
+`utils/localMedia.ts` (`localHeldMediaUrl`, no network) is now ① the front of
+`resolveWallpaperUrl` (App) for object refs — including mapping
+`urn:sha256:<uuid>` onto `/api/objects/<id>`, which previously fired a doomed
+raw fetch — and ② the `CardZoomModal` open-original button before its signed
+node stream; nesting still mutates nothing and the swarm ASK stays absent on
+purpose (wallpaper is never a fetch priority). Documented-intentional, left
+as-is: `Avatar` remaps `/api/objects/` to the node pfp route by design;
+`BabecockPanel`/`ImageViewer` render booru/keepsake sources the hook does not
+own, and `handleDownload` stays node-only (a download wants fresh bytes).
+
 ### Phase 5 — historical recovery campaign (Priority 3)
 
 Idempotent recovery service over the *existing* pipeline, statuses derived,
