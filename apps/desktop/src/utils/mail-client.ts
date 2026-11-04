@@ -40,6 +40,13 @@ export interface MailSocket {
 export interface MailClientDeps {
   /** API base without trailing slash, e.g. http://127.0.0.1:8790 */
   apiBase: string
+  /** Additional mailbox bases where mail can legitimately land — typically
+   *  the node this client is CONNECTED to when the primary is the rendezvous
+   *  courier. A sender chooses the box: a peer who learned our node from a
+   *  signed beacon drops the envelope into THAT node's mailbox; one who
+   *  never learned a node uses the rendezvous. A receiver that drains only
+   *  the primary silently loses mail a peer addressed to its node. */
+  extraBases?: string[]
   identity: OrbitIdentity
   webSocketFactory?: (url: string) => MailSocket
   fetchImpl?: typeof fetch
@@ -56,6 +63,8 @@ const BACKOFF_MAX_MS = 60_000
 /** Courier polling: the Cloudflare relay has no shared socket state, so the
  *  client asks for its box on a slow timer instead of holding a WS. */
 const POLL_INTERVAL_MS = 20_000
+/** Bounded receiver fan-out: at most this many mailbox bases are drained. */
+const MAX_MAIL_BASES = 4
 
 /** Ed25519 ack body proving box ownership: sig over `<token>|<ids>`. */
 export function ackBody(identity: OrbitIdentity, token: string, ids: string[], epoch?: string): { ids: string[]; pubkey: string; sig: string; epoch?: string } {
@@ -84,9 +93,12 @@ export class MailClient {
   /** Rotating session epochs (wave 2 C2): cur is this boot's, prev drains
    * one boot of overlap. Persisted by the caller via secure-storage. */
   epoch: EpochState = { cur: '', prev: '' }
-  private ws: MailSocket | null = null
-  private reconnectAttempt = 0
+  /** One watch socket per mailbox base (a full node can push; the page
+   *  courier cannot). */
+  private sockets = new Map<string, MailSocket>()
+  private reconnectAttempts = new Map<string, number>()
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  private reconnectBase: string | null = null
   private closed = false
   private started = false
   private pulling: Promise<OpenedEnvelope[]> | null = null
@@ -97,38 +109,51 @@ export class MailClient {
     this.token = deliveryToken(deps.identity.publicKeyHex)
   }
 
+  /** [apiBase, ...extraBases] — distinct, normalized, bounded. */
+  private bases(): string[] {
+    const out: string[] = [this.deps.apiBase.replace(/\/+$/, '')]
+    for (const extra of this.deps.extraBases ?? []) {
+      const base = String(extra).replace(/\/+$/, '')
+      if (!base || out.includes(base)) continue
+      out.push(base)
+      if (out.length >= MAX_MAIL_BASES) break
+    }
+    return out
+  }
+
   /** All delivery tokens watched and pulled this session (home + cur + prev session tokens). */
   watchedTokens(): string[] {
     return watchedTokens(this.token, this.epoch, this.deps.identity.publicKeyHex)
   }
 
-  /** Open the anonymous watch channel. Idempotent. */
+  /** Open the anonymous watch channels (one per non-courier mailbox base).
+   *  Idempotent. Bases that are known page couriers (stateless across
+   *  isolates, no shared socket state) poll their boxes instead. */
   start(): void {
     if (this.started || this.closed) return
     this.started = true
-    // The Cloudflare courier is stateless across isolates: no socket can be
-    // notified from the isolate that stored the envelope. Poll its boxes
-    // instead (a few hundred bytes per tick, no identity attached).
-    if (this.courierOnly()) {
+    let anyPollBase = false
+    for (const base of this.bases()) {
+      if (isKnownSiteCourier(base)) {
+        anyPollBase = true
+        continue
+      }
+      this.connect(base)
+    }
+    if (anyPollBase) {
       void this.pull()
       this.startPolling()
-      return
     }
-    this.connect()
   }
 
   stop(): void {
     this.closed = true
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer)
     this.stopPolling()
-    try {
-      this.ws?.close()
-    } catch { /* already dead */ }
-    this.ws = null
-  }
-
-  private courierOnly(): boolean {
-    return isKnownSiteCourier(this.deps.apiBase)
+    for (const sock of this.sockets.values()) {
+      try { sock.close() } catch { /* already dead */ }
+    }
+    this.sockets.clear()
   }
 
   private startPolling(): void {
@@ -157,25 +182,25 @@ export class MailClient {
     this.deps.log?.(msg)
   }
 
-  private wsUrl(): string {
+  private wsUrl(base: string): string {
     // Shared with the swarm socket (utils/api.ts): a relative base rides the
     // page's own origin (dev proxy) instead of producing an invalid `ws:///…`.
-    return wsUrlForBase(this.deps.apiBase, '/api/mail/ws')
+    return wsUrlForBase(base, '/api/mail/ws')
   }
 
-  private connect(): void {
-    if (this.closed) return
+  private connect(base: string): void {
+    if (this.closed || this.sockets.has(base)) return
     let sock: MailSocket
     try {
-      sock = this.socketFactory()(this.wsUrl())
+      sock = this.socketFactory()(this.wsUrl(base))
     } catch (e) {
-      this.log(`[mail] socket create failed: ${(e as Error).message}`)
-      this.scheduleReconnect()
+      this.log(`[mail] socket create failed (${base}): ${(e as Error).message}`)
+      this.scheduleReconnect(base)
       return
     }
-    this.ws = sock
+    this.sockets.set(base, sock)
     sock.onopen = () => {
-      this.reconnectAttempt = 0
+      this.reconnectAttempts.delete(base)
       sock.send(JSON.stringify({ type: 'watch', tokens: this.watchedTokens() }))
       // Anything that arrived while disconnected is fetched once on connect.
       void this.pull()
@@ -190,17 +215,22 @@ export class MailClient {
       if (frame.type === 'mail' && this.watchedTokens().includes(frame.to || '')) void this.pull()
     }
     sock.onclose = () => {
-      this.ws = null
-      this.scheduleReconnect()
+      this.sockets.delete(base)
+      this.scheduleReconnect(base)
     }
   }
 
-  private scheduleReconnect(): void {
+  private scheduleReconnect(base: string): void {
     if (this.closed) return
-    const delay = Math.min(BACKOFF_BASE_MS * 2 ** this.reconnectAttempt, BACKOFF_MAX_MS)
+    const attempt = this.reconnectAttempts.get(base) ?? 0
+    const delay = Math.min(BACKOFF_BASE_MS * 2 ** attempt, BACKOFF_MAX_MS)
       * (0.5 + Math.random() * 0.5) // jitter: anti-correlation on the courier
-    this.reconnectAttempt++
-    this.reconnectTimer = setTimeout(() => this.connect(), delay)
+    this.reconnectAttempts.set(base, attempt + 1)
+    this.reconnectBase = base
+    this.reconnectTimer = setTimeout(() => {
+      if (this.reconnectBase === base) this.reconnectBase = null
+      this.connect(base)
+    }, delay)
   }
 
   /** Drop a sealed envelope into the recipient's box. Returns the envelope.
@@ -263,40 +293,42 @@ export class MailClient {
   }
 
   private async doPull(): Promise<OpenedEnvelope[]> {
-    const base = this.deps.apiBase.replace(/\/+$/, '')
     const opened: OpenedEnvelope[] = []
     const myPub = this.deps.identity.publicKeyHex
     const curToken = isEpoch(this.epoch.cur) ? sessionDeliveryToken(myPub, this.epoch.cur) : ''
     const prevToken = isEpoch(this.epoch.prev) ? sessionDeliveryToken(myPub, this.epoch.prev) : ''
 
-    // Wave 2 (C2): drain home + current + previous session boxes each pull.
-    for (const token of this.watchedTokens()) {
-      const res = await this.fetcher()(`${base}/api/mail/${token}`).catch(() => null)
-      if (!res || !res.ok) {
-        this.log(`[mail] pull failed (${res ? res.status : 'network'})`)
-        continue
-      }
-      const { envelopes } = (await res.json()) as { envelopes?: Envelope[] }
-      if (!Array.isArray(envelopes) || envelopes.length === 0) continue
-      const consumed: string[] = []
-      for (const env of envelopes) {
-        try {
-          const o = open1to1(env, this.deps.identity.encryptionPrivHex)
-          opened.push(o)
-          consumed.push(env.id)
-          this.deps.onMail(o, env)
-        } catch {
-          // Not openable by us (token collision/corruption) — leave it; the
-          // courier TTL collects it. Never ack what we cannot open.
+    // Every mailbox base where mail can legitimately land (the rendezvous +
+    // the node we are connected to), × each owned token (home + cur + prev).
+    for (const base of this.bases()) {
+      for (const token of this.watchedTokens()) {
+        const res = await this.fetcher()(`${base}/api/mail/${token}`).catch(() => null)
+        if (!res || !res.ok) {
+          this.log(`[mail] pull failed (${base.replace(/^https?:\/\//, '')} ${res ? res.status : 'network'})`)
+          continue
         }
-      }
-      if (consumed.length > 0) {
-        const epoch = token === curToken ? this.epoch.cur : (token === prevToken ? this.epoch.prev : undefined)
-        await this.fetcher()(`${base}/api/mail/${token}/ack`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(ackBody(this.deps.identity, token, consumed, epoch)),
-        }).catch(() => { /* mail stays until TTL; a later pull re-consumes */ })
+        const { envelopes } = (await res.json()) as { envelopes?: Envelope[] }
+        if (!Array.isArray(envelopes) || envelopes.length === 0) continue
+        const consumed: string[] = []
+        for (const env of envelopes) {
+          try {
+            const o = open1to1(env, this.deps.identity.encryptionPrivHex)
+            opened.push(o)
+            consumed.push(env.id)
+            this.deps.onMail(o, env)
+          } catch {
+            // Not openable by us (token collision/corruption) — leave it; the
+            // courier TTL collects it. Never ack what we cannot open.
+          }
+        }
+        if (consumed.length > 0) {
+          const epoch = token === curToken ? this.epoch.cur : (token === prevToken ? this.epoch.prev : undefined)
+          await this.fetcher()(`${base}/api/mail/${token}/ack`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(ackBody(this.deps.identity, token, consumed, epoch)),
+          }).catch(() => { /* mail stays until TTL; a later pull re-consumes */ })
+        }
       }
     }
     return opened

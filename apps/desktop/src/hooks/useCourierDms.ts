@@ -24,6 +24,20 @@ function mailBase(): string {
   return (getCentralApiUrl() || getApiBaseUrl()).replace(/\/+$/, '')
 }
 
+/**
+ * Mailboxes besides the primary this client must drain: the node we are
+ * CONNECTED to, when the primary is the rendezvous courier. A peer who
+ * learned our node from a signed beacon drops envelopes into THAT node's
+ * mailbox (ARCHITECTURE-P2P §10d) — a receiver that drains only the
+ * rendezvous never sees mail addressed to its own node's box.
+ */
+function extraMailBases(): string[] {
+  const node = getApiBaseUrl().replace(/\/+$/, '')
+  const primary = mailBase()
+  if (!node || node === primary) return []
+  return [node]
+}
+
 export interface CourierDeps {
   webSocketFactory?: (url: string) => MailSocket
   fetchImpl?: typeof fetch
@@ -177,6 +191,7 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
     })
     const client = new MailClient({
       apiBase: mailBase(),
+      extraBases: extraMailBases(),
       identity,
       webSocketFactory: depsRef.current.webSocketFactory,
       fetchImpl: depsRef.current.fetchImpl,

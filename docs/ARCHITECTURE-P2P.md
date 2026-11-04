@@ -244,6 +244,21 @@ courier until something unrelated pulled. The watch socket is built by
 `wsUrlForBase` (`utils/api.ts`) so a relative API base (browser dev, riding the
 Vite proxy) resolves to the page origin instead of the invalid `ws:///api/mail/ws`.
 
+**The receiver drains every legitimate mailbox (2026-11-04).** The sender
+chooses the box — a peer who learned our node from a signed beacon drops the
+envelope into THAT node's mailbox, one who never learned a node uses the
+rendezvous. A receiver that drained only its primary (the rendezvous courier)
+therefore never saw mail addressed to its own node's box — the whole sealed
+DM round trip was dead in a two-instance run (`e2e/courier-two-instance.spec.ts`,
+unmasked and green). `MailClient` accepts `extraBases` (bounded to 4,
+deduped): `useCourierDms` always passes the node the client is connected to
+when it differs from the mail base; each distinct base gets a watch socket
+(known page couriers poll instead) and is drained (with ack) on every pull.
+One server piece was required for browser contexts: `serve.ts`'s fast-path
+`/api/health` now answers with CORS headers — without them a cross-origin
+client's health probe is unreadable, courier mode is never detected, and no
+beacon is ever broadcast.
+
 ### The release feed (2026-10-24)
 
 `release.json` is served by the Cloudflare Pages project

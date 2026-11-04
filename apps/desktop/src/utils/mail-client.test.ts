@@ -29,7 +29,7 @@ function okJson(obj: unknown): Response {
   return new Response(JSON.stringify(obj), { status: 200, headers: { 'Content-Type': 'application/json' } })
 }
 
-function client(deps: Partial<Record<'fetchImpl' | 'onMail' | 'now', unknown>> = {}) {
+function client(deps: Partial<Record<'fetchImpl' | 'onMail' | 'now' | 'apiBase' | 'extraBases', unknown>> = {}) {
   const sockets: FakeSocket[] = []
   const c = new MailClient({
     apiBase: 'http://courier.test',
@@ -288,6 +288,66 @@ describe('MailClient (blind courier)', () => {
     expect(ackPayload.ids).toEqual([sessionEnv.id])
     expect(ackPayload.epoch).toBe(curEpoch)
     expect(ackPayload.pubkey).toBe(bob.publicKeyHex)
+  })
+})
+
+describe('MailClient multi-base mailboxes (receiver drains every legitimate box)', () => {
+  // A sender chooses the recipient's mailbox: the peer's own node (learned
+  // from a signed beacon) or the rendezvous when it never learned a node.
+  // A receiver connected to a node must therefore drain BOTH its node's
+  // boxes and the rendezvous — draining only the primary once dropped every
+  // envelope a peer addressed to our node's mailbox.
+
+  function multiFetch(byUrl: (url: string) => Response | 'ack') {
+    const seen: string[] = []
+    const fetchImpl = makeFetch(async (url, init) => {
+      seen.push(`${new URL(url).origin}${new URL(url).pathname}`)
+      const r = byUrl(String(url))
+      if (r === 'ack') return okJson({ ok: true })
+      return r
+    })
+    return { seen, fetchImpl }
+  }
+
+  it('pull drains the node box AND the rendezvous box, acking on both', async () => {
+    const { seal1to1 } = await import('@orbit/protocol')
+    const nodeEnv = seal1to1('mail to my node box', 'mail', alice, bob)
+    const { seen, fetchImpl } = multiFetch((url) =>
+      url.startsWith('http://node:8790/') && url.endsWith(`/api/mail/${BOB_TOKEN}`)
+        ? okJson({ envelopes: [nodeEnv] })
+        : okJson({ envelopes: [] }),
+    )
+    const { c } = client({ apiBase: 'https://gmatch.pages.dev', extraBases: ['http://node:8790'], fetchImpl })
+    await c.pull()
+    expect(seen.filter((u) => u === `http://node:8790/api/mail/${BOB_TOKEN}`)).toHaveLength(1)
+    expect(seen.filter((u) => u === `https://gmatch.pages.dev/api/mail/${BOB_TOKEN}`)).toHaveLength(1)
+    expect(seen.find((u) => u === `http://node:8790/api/mail/${BOB_TOKEN}/ack`)).toBeTruthy()
+  })
+
+  it('an extra base equal to the primary (normalized) is not pulled twice', async () => {
+    const { seen, fetchImpl } = multiFetch(() => okJson({ envelopes: [] }))
+    const { c } = client({ apiBase: 'http://node:8790', extraBases: ['http://node:8790/'], fetchImpl })
+    await c.pull()
+    expect(seen.filter((u) => u === `http://node:8790/api/mail/${BOB_TOKEN}`)).toHaveLength(1)
+  })
+
+  it('watch opens one socket per distinct non-courier base; the page courier polls', async () => {
+    const { c, sockets } = client({ apiBase: 'https://gmatch.pages.dev', extraBases: ['http://node:8790'], fetchImpl: makeFetch(async () => okJson({ envelopes: [] })) })
+    c.start()
+    // pages.dev is a known site courier (poll); node:8790 is not — it gets
+    // exactly one watch socket.
+    expect(sockets).toHaveLength(1)
+    sockets[0].emitOpen()
+    const watchFrame = JSON.parse(sockets[0].sent[0])
+    void watchFrame
+  })
+
+  it('stop() closes every watch socket', async () => {
+    const { c, sockets } = client({ apiBase: 'http://node:8790', extraBases: ['http://other:8790'], fetchImpl: makeFetch(async () => okJson({ envelopes: [] })) })
+    c.start()
+    expect(sockets).toHaveLength(2)
+    c.stop()
+    expect(sockets.every((s) => s.closed)).toBe(true)
   })
 })
 

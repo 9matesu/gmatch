@@ -267,6 +267,12 @@ Bun.serve({
     ) {
       if (url.pathname === '/api/health') {
         const status = dbReady ? 200 : dbInitError ? 500 : 503
+        // CORS on the fast path: the browser (browser dev / a web-page peer
+        // pointing at a remote node) runs the useP2P health probe from
+        // ANOTHER origin, and without these headers the response is
+        // undecipherable — a cross-origin client then never learns the node
+        // is a courier, skips the beacon lane and shows no presence.
+        const origin = req.headers.get('Origin') || '*'
         return Response.json({
           status: dbReady ? 'ok' : dbInitError ? 'error' : 'starting',
           db_ready: dbReady,
@@ -274,7 +280,7 @@ Bun.serve({
           timestamp: new Date().toISOString(),
           mode: siteServices ? 'courier' : 'legacy',
           services: siteServices ? Array.from(siteServices) : ['all'],
-        }, { status })
+        }, { status, headers: { 'Access-Control-Allow-Origin': origin, Vary: 'Origin' } })
       }
       if (!dbReady) {
         return Response.json({ error: 'API is starting. Try again shortly.' }, { status: 503 })
