@@ -334,17 +334,31 @@ export async function clearDeadLoopbackApiBase(): Promise<boolean> {
  * Loopback is handled by clearDeadLoopbackApiBase; the courier by
  * purgeCourierApiState (it answers /api/health but is never a data base).
  */
-export async function clearUnreachableApiBase(timeoutMs = 2500): Promise<string | null> {
+export async function clearUnreachableApiBase(timeoutMs = 2500, attempts = 3): Promise<string | null> {
   try {
     if (typeof localStorage === 'undefined') return null
     const manual = localStorage.getItem('gmatch.api.url')?.trim()
     if (!manual || !/^https?:\/\//i.test(manual)) return null
     if (isLoopbackApiUrl(manual) || isCourierApiUrl(manual)) return null
     const base = manual.replace(/\/+$/, '')
-    try {
-      const res = await fetch(`${base}/api/health`, { signal: AbortSignal.timeout(timeoutMs) })
-      if (res.ok) return null // a node answers: the pointer is legitimate
-    } catch { /* unreachable: drop it below */ }
+    for (let i = 0; i < Math.max(1, attempts); i++) {
+      let answered: Response | null = null
+      try {
+        answered = await fetch(`${base}/api/health`, { signal: AbortSignal.timeout(timeoutMs) })
+      } catch {
+        answered = null // aborted/timed out: an inconclusive probe, retry
+      }
+      if (answered) {
+        if (answered.ok) return null // a node answers: the pointer is legitimate
+        // Woken gateway (502/503/504): the HOST answered and the node is
+        // starting — a transient state, not a dead pointer. Wiping here
+        // silently rewires the app to another world (SPEC §12: the pointer
+        // is resolved, never assumed — and never dropped on a guess).
+        if (answered.status === 502 || answered.status === 503 || answered.status === 504) return null
+        break // answered and still not a node: drop below
+      }
+      if (i < attempts - 1) await new Promise((resolve) => setTimeout(resolve, 200))
+    }
     localStorage.removeItem('gmatch.api.url')
     localStorage.removeItem(SERVER_MARKER)
     try {
