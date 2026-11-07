@@ -476,6 +476,38 @@ type SwarmMessage =
 - **Response Cycle:** Any peer holding the object slices the binary buffer and sends sequential `SWARM_CHUNK` frames (4 MiB = 820 frames at legacy size).
 - **Reassembly:** The requesting peer tracks received chunk indices in memory. Once all chunks are present, it assembles the final `Blob`, verifies the SHA-256 digest against `objectId`, and commits it to local IndexedDB.
 
+### The node's WS relay carries the WHOLE client-to-client wire (2026-11-07)
+
+The node's relay allowlist (`apps/api/src/ws-bus.ts`) is the boundary between
+"the relay moves peer traffic" and "the relay invents server events" (audit
+A2). It used to list only `SWARM_WANT`, `SWARM_HAVE`, `SWARM_CHUNK` and the
+announce shapes — so the relay DROPPED `SWARM_KEY`, `SWARM_CHALLENGE`,
+`SWARM_RECEIPT`, `SWARM_OP` and `SWARM_OP_ACK`.
+
+That silently broke the relay path for exactly the traffic it exists for:
+
+- a swarm-v1 transfer over the relay could never decrypt a chunk (the sealed
+  DEK never arrived), so the "guaranteed fallback" moved nothing but
+  ciphertext the receiver could not read;
+- durable-replication receipts and signed social operations could not cross
+  the node either.
+
+The allowlist now carries every client-to-client frame, each with a shape
+check (bounded strings, an object payload), while still refusing anything
+that looks like a server-published event. The relay never opens a payload: the
+`SWARM_KEY` body is sealed to the FETCHER's ephemeral offer key, a receipt is
+a signature, and an operation carries its own author signature — the
+receiver's authorizer decides, the relay only moves bytes.
+
+**Assembly is honest about missing bytes.** A transfer is complete only when
+it declared a size AND every index arrived (`req.total > 0 &&
+chunks.size === req.total`). The bare size comparison used to fire on the
+FIRST frame — even one that failed its AEAD check — and assembled an EMPTY
+blob, which the durable store then rejected with a misleading "Invalid local
+object". A chunk that never authenticated now fails the fetch with the
+truth (`failed authenticated decryption`) instead of an empty object or a
+timeout, and nothing is ever persisted from a partial transfer.
+
 ### swarm-v1: chunk transfers are sealed end to end (2026-10-22)
 
 The media path is the one place the node used to see bytes it forwarded.

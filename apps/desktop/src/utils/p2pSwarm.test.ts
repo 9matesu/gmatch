@@ -220,6 +220,88 @@ describe('p2pSwarm (WebRTC Object Swarm Transfer)', () => {
     vi.unstubAllGlobals()
   })
 
+  it('fails honestly (never persisting an empty blob) when the relay drops the transfer key', async () => {
+    // The exact shape of a broken relay: SWARM_KEY never arrives, so every
+    // chunk fails its AEAD check. The fetch must NOT assemble an empty
+    // object (0 chunks === total 0) and hand it to the durable store.
+    const text = 'f'.repeat(40 * 1024)
+    const blob = new Blob([text], { type: 'image/jpeg' })
+    const store = new Map([['keyless', blob]])
+    const seeder = createSwarmSession({
+      send: (m) => {
+        // A relay that drops the sealed DEK (it used to be missing from the
+        // node's client-to-client allowlist).
+        if (m.type === 'SWARM_KEY') return
+        void handleSwarmMessage(m)
+      },
+      localStore: store,
+    })
+    setSwarmTransport((m) => { void seeder.handleMessage(m) })
+    vi.stubGlobal('window', { gmatch: { vaultPutBytes: vi.fn().mockResolvedValue({ ok: true }) } })
+
+    await expect(requestSwarmObject('keyless', 3000)).rejects.toThrow(
+      /failed authenticated decryption|assembled no bytes|timed out/i,
+    )
+    expect(hasLocalObject('keyless')).toBe(false)
+    setSwarmTransport(null)
+    vi.unstubAllGlobals()
+  })
+
+  it('completes a swarm-v1 transfer when the relay forwards the transfer key', async () => {
+    const text = 'g'.repeat(40 * 1024)
+    const blob = new Blob([text], { type: 'image/jpeg' })
+    const frames: SwarmMessage[] = []
+    const seeder = createSwarmSession({
+      send: (m) => { frames.push(m); void handleSwarmMessage(m) },
+      localStore: new Map([['keyed', blob]]),
+    })
+    setSwarmTransport((m) => { void seeder.handleMessage(m) })
+    vi.stubGlobal('window', { gmatch: { vaultPutBytes: vi.fn().mockResolvedValue({ ok: true }) } })
+
+    const received = await requestSwarmObject('keyed', 5000)
+    expect(received.size).toBe(blob.size)
+    expect(frames.some((f) => f.type === 'SWARM_KEY')).toBe(true)
+    expect(frames.some((f) => f.type === 'SWARM_CHUNK')).toBe(true)
+    setSwarmTransport(null)
+    vi.unstubAllGlobals()
+  })
+
+  it('ignores an unauthenticated chunk that lies about the transfer size', async () => {
+    // A hostile peer that saw the WANT knows the victim's transferId. It can
+    // inject a chunk that fails its AEAD check and claims a bogus `total`.
+    // The claimed size must NOT become the transfer's size: otherwise the
+    // legitimate seeder's chunks look inconsistent and the fetch dies.
+    const text = 'h'.repeat(40 * 1024)
+    const blob = new Blob([text], { type: 'image/jpeg' })
+    const seeder = createSwarmSession({
+      send: (m) => { void handleSwarmMessage(m) },
+      localStore: new Map([['poison', blob]]),
+    })
+    const nonce = Buffer.alloc(24, 7).toString('base64')
+    setSwarmTransport((m) => {
+      if (m.type === 'SWARM_WANT') {
+        void handleSwarmMessage({
+          type: 'SWARM_CHUNK',
+          id: 'poison',
+          index: 0,
+          total: 9999,
+          mimeType: 'image/jpeg',
+          enc: 'swarm-v1',
+          transferId: m.transferId,
+          nonce,
+          dataBase64: Buffer.alloc(64, 3).toString('base64'),
+        })
+      }
+      void seeder.handleMessage(m)
+    })
+    vi.stubGlobal('window', { gmatch: { vaultPutBytes: vi.fn().mockResolvedValue({ ok: true }) } })
+
+    const received = await requestSwarmObject('poison', 5000)
+    expect(received.size).toBe(blob.size)
+    setSwarmTransport(null)
+    vi.unstubAllGlobals()
+  })
+
   it('does not serve zero-byte or over-limit local objects (offered or not)', async () => {
     const send = vi.fn()
     setSwarmTransport(send)

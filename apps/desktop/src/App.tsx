@@ -1426,6 +1426,15 @@ export default function Home() {
   // Own profile: load the player's posts explicitly so they always appear on
   // the own profile even when they fall out of the general 50-row feed
   // snapshot. A peer's profile uses the selectedProfileUser branch above.
+  //
+  // The fallback reads the CURRENT feed through a ref, never through the
+  // `feedPosts` dependency: `feedPosts` already contains `myProfileVisible`,
+  // which is derived from this very state. Depending on it made this effect
+  // feed its own output back into the memo, and React tore the whole tree
+  // down with "Maximum update depth exceeded" — the feed froze on
+  // "Loading media..." forever. The ref breaks that cycle: one render lag is
+  // irrelevant for a fallback, and the authoritative answer comes from the
+  // author_id query below.
   useEffect(() => {
     if (!identity || selectedProfileUser) {
       setMyProfilePosts([])
@@ -1433,7 +1442,7 @@ export default function Home() {
     }
 
     let cancelled = false
-    const fallbackPosts = feedPosts.filter((post) => post.author_id === identity.orbitId)
+    const fallbackPosts = feedPostsRef.current.filter((post) => post.author_id === identity.orbitId)
     setMyProfilePosts(fallbackPosts)
 
     orbitFetch(`/api/posts?author_id=${encodeURIComponent(identity.orbitId)}&limit=200&sort=latest`, {}, identity)
@@ -1447,7 +1456,7 @@ export default function Home() {
       .catch(() => { })
 
     return () => { cancelled = true }
-  }, [identity, selectedProfileUser, feedPosts])
+  }, [identity, selectedProfileUser])
 
   const loadServerFeed = useCallback((): Promise<FeedPost[]> => {
     if (!identity) return Promise.resolve([])

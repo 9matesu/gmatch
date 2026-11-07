@@ -200,6 +200,22 @@ text overlays kept for caption hunts, §6).
   strict UTF-8, ≤4KB, exactly one http(s)/`gmcache://`/`/api/objects/` URL) and
   recovered idempotently as they are read — bytes are kept, nothing is deleted or
   re-imported, and the row stops being served as media.
+- **Media rehydration: put the real bytes back (2026-11-07).** A descriptor row
+  keeps the post; the bytes live in the CLIENT's stores. When those stores are
+  lost, the feed honestly shows "No preview" for hundreds of posts that used to
+  have images. `apps/api/src/rehydrate-media.ts` (+ `rehydrate-media-cli.ts`) is
+  the one place that decides whether a candidate byte run IS the bytes a row
+  used to point at — and it only ever accepts an EXACT match:
+  - **64-hex `content_hash`** = `sha256(bytes)` (current scheme);
+  - **40-hex `content_hash`** = `sha256(bytes).slice(0, 40)` (the old
+    "fake btih" era: the magnet's btih was the first 20 bytes of a SHA-256).
+  Sources: the desktop's media vault, the encrypted imgcache LRU, a node's blob
+  store, another node over a signed GET, and the desktop profile's Chromium
+  IndexedDB external blob store (a Blink structured clone whose inline `Blob`
+  is read exactly — `B` marker + LEB128 length). Recovered bytes are written
+  into the node's blob store, so `GET /api/objects/:id` serves a picture
+  instead of a `{"type":"p2p"}` descriptor. Nothing is matched by caption,
+  size, date or "looks like the same picture".
 
 ### 6b. Feed/market queries (user spec: player picks, no hardcodes)
 
@@ -414,6 +430,20 @@ offline earnings). Each +5% click power. Persist across prestige.
   one it holds or has in flight, ≤3 at a time, each with its own timeout. A failure
   stays *wanted* for the next advertisement — an advertisement is not a mandate to
   download a library.
+- **The relay carries the whole client-to-client wire (2026-11-07):** the node's
+  `SWARM_FRAME` allowlist now includes `SWARM_KEY` (the per-transfer DEK sealed
+  to the fetcher's ephemeral offer key), `SWARM_CHALLENGE`, `SWARM_RECEIPT`,
+  `SWARM_OP` and `SWARM_OP_ACK` — each with a shape check, while anything that
+  looks like a server event is still dropped (audit A2). Without `SWARM_KEY` the
+  guaranteed relay fallback could never decrypt a chunk, so a peer that cannot
+  punch a direct WebRTC hole received nothing but unreadable ciphertext. The
+  relay never opens a payload; the receiver's authorizer decides.
+- **A transfer that cannot complete says so (2026-11-07):** assembly finishes
+  only when the transfer declared a size AND every chunk index arrived. A chunk
+  that fails its AEAD check is dropped and counted; once every index of the
+  transfer has been seen and one never authenticated, the fetch fails with
+  `failed authenticated decryption` instead of assembling an empty blob. No
+  partial transfer is ever persisted.
 - **Descriptor vs bytes:** `data` is media, nothing else. An announcement's link is
   stored as `source_url`; publishing or receiving one never overwrites bytes already
   held. Legacy rows that wrote the URL into `data` are recovered idempotently on read

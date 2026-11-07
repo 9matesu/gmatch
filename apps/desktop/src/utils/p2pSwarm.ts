@@ -608,16 +608,62 @@ function handleEncryptedChunkFrame(msg: SwarmChunkFrame, req: PendingFetch): boo
   }
   if (!plaintext) {
     req.offer!.badFrames += 1
+    // Remember WHICH index failed. The declared size is NOT taken from this
+    // frame: an unauthenticated peer must never be able to poison the
+    // transfer's shape (a bogus `total` would make the legitimate seeder's
+    // chunks look inconsistent and abort the fetch).
+    if (Number.isSafeInteger(msg.index) && msg.index >= 0 && msg.index < MAX_CHUNKS) {
+      // Only count an index as missing when it is not already stored: a
+      // hostile peer may inject garbage for an index the seeder already
+      // delivered, and the two must not be counted twice.
+      if (!req.chunks.has(msg.index)) req.badIndices.add(msg.index)
+    }
+    // The seeder sends exactly `total` chunks and `total` is only known from
+    // an AUTHENTICATED frame. Once every index of the transfer has been seen
+    // and one of them never authenticated, the seeder is done and this
+    // transfer can never complete: fail now with an honest error instead of
+    // waiting out the whole timeout.
+    if (req.total > 0 && req.badIndices.size > 0 && req.chunks.size + req.badIndices.size >= req.total) {
+      failFetch(
+        msg.id,
+        req,
+        new Error(`Swarm chunk for ${msg.id} failed authenticated decryption`),
+      )
+      return true
+    }
+    // A chunk that fails every candidate key is dropped, never accepted. When
+    // NOTHING has authenticated yet, the seeder's SWARM_KEY may still be in
+    // flight on another transport — so give it a short grace and then fail
+    // with an honest error instead of hanging until the whole timeout.
+    if (req.chunks.size === 0 && !req.badFrameTimer) {
+      req.badFrameTimer = setTimeout(() => {
+        req.badFrameTimer = undefined
+        if (pendingFetches.get(msg.id) !== req) return
+        if (req.chunks.size > 0) return
+        failFetch(
+          msg.id,
+          req,
+          new Error(`Swarm chunk for ${msg.id} failed authenticated decryption`),
+        )
+      }, SWARM_KEY_GRACE_MS)
+    }
     if (req.offer!.badFrames > MAX_TRANSFER_KEYS * Math.max(1, msg.total || 1) + 8) {
       failFetch(msg.id, req, new Error('Swarm transfer failed authenticated-chunk checks'))
     }
     return true
+  }
+  if (req.badFrameTimer) {
+    clearTimeout(req.badFrameTimer)
+    req.badFrameTimer = undefined
   }
   try {
     validateChunkEnvelope(msg, req.total, req.mimeType)
     // Duplicate re-delivery (relay/transport replay) is an idempotent
     // no-op, never a fetch failure: we already hold that index.
     if (req.chunks.has(msg.index)) return true
+    // This index DID authenticate, so it is not missing after all (a hostile
+    // peer may have injected garbage for it first).
+    req.badIndices.delete(msg.index)
     const isLast = msg.index === msg.total - 1
     if (!plaintext.byteLength || plaintext.byteLength > SWARM_CHUNK_PAYLOAD ||
         (!isLast && plaintext.byteLength !== SWARM_CHUNK_PAYLOAD) ||
@@ -973,6 +1019,9 @@ export function __resetReceiptStateForTests(): void {
   receiptIdentity = null
 }
 
+/** Grace period for a seeder's SWARM_KEY to arrive on another transport. */
+const SWARM_KEY_GRACE_MS = 3000
+
 interface PendingFetch {
   resolve: (blob: Blob) => void
   reject: (err: Error) => void
@@ -985,6 +1034,10 @@ interface PendingFetch {
   onProgress?: (received: number, total: number) => void
   /** swarm-v1: this fetch's ephemeral offer. Absent = no offer was possible. */
   offer?: TransferOffer
+  /** Chunk indices that arrived but never authenticated. */
+  badIndices: Set<number>
+  /** Grace timer: fires when no chunk has authenticated yet (see the AEAD path). */
+  badFrameTimer?: ReturnType<typeof setTimeout>
 }
 const pendingFetches = new Map<string, PendingFetch>()
 
@@ -1112,10 +1165,22 @@ function noteDurableFetchComplete(id: string): void {
 
 async function finishFetch(id: string, req: PendingFetch): Promise<void> {
   clearTimeout(req.timer)
-    const parts: Uint8Array[] = []
+  if (req.badFrameTimer) {
+    clearTimeout(req.badFrameTimer)
+    req.badFrameTimer = undefined
+  }
+  const parts: Uint8Array[] = []
   for (let i = 0; i < req.total; i++) {
     const chunk = req.chunks.get(i)
     if (chunk) parts.push(chunk)
+  }
+  // An assembly with no bytes is never a valid object. It happens when the
+  // transfer's chunks were all dropped (e.g. the seeder's SWARM_KEY never
+  // arrived, so every chunk failed its AEAD check) — report THAT honestly
+  // instead of handing an empty blob to the durable store.
+  if (parts.length === 0) {
+    failFetch(id, req, new Error(`Swarm object ${id} assembled no bytes`))
+    return
   }
   // Verify content hash (when the object advertises one) BEFORE registering:
   // a chunk stream from an arbitrary peer is untrusted transport, and a
@@ -1154,6 +1219,10 @@ async function finishFetch(id: string, req: PendingFetch): Promise<void> {
 
 function failFetch(id: string, req: PendingFetch, error: Error): void {
   clearTimeout(req.timer)
+  if (req.badFrameTimer) {
+    clearTimeout(req.badFrameTimer)
+    req.badFrameTimer = undefined
+  }
   if (pendingFetches.get(id) !== req) return
   pendingFetches.delete(id)
   req.reject(error)
@@ -1254,9 +1323,26 @@ export async function handleSwarmMessage(msg: SwarmMessage): Promise<boolean> {
     } catch {
       /* progress listener must never break assembly */
     }
-    if (req.chunks.size === req.total) void finishFetch(msg.id, req).catch((error) => {
-      failFetch(msg.id, req, error instanceof Error ? error : new Error('Swarm assembly failed'))
-    })
+    // Assembly is complete only when the transfer declared a size AND every
+    // index arrived. `req.total` starts at 0, so the bare size comparison
+    // fired on the FIRST frame — even one that failed its AEAD check — and
+    // assembled an empty blob.
+    if (req.total > 0 && req.chunks.size === req.total) {
+      void finishFetch(msg.id, req).catch((error) => {
+        failFetch(msg.id, req, error instanceof Error ? error : new Error('Swarm assembly failed'))
+      })
+      return true
+    }
+    // The seeder sends exactly `total` chunks. Once every index has been seen
+    // and one of them never authenticated, the seeder is done and this
+    // transfer can never complete: fail with an honest error now.
+    if (req.badIndices.size > 0 && req.total > 0 && req.chunks.size + req.badIndices.size >= req.total) {
+      failFetch(
+        msg.id,
+        req,
+        new Error(`Swarm chunk for ${msg.id} failed authenticated decryption`),
+      )
+    }
     return true
   }
   if (msg.type === 'SWARM_HAVE') {
@@ -1338,6 +1424,11 @@ function fetchVerifiedPeerObject(id: string, timeoutMs: number, opts: SwarmFetch
   }
   return new Promise<Blob>((resolve, reject) => {
     const timer = setTimeout(() => {
+      const pending = pendingFetches.get(id)
+      if (pending?.badFrameTimer) {
+        clearTimeout(pending.badFrameTimer)
+        pending.badFrameTimer = undefined
+      }
       pendingFetches.delete(id)
       // Nobody answered: keep the id on the want list so the next SWARM_HAVE
       // from a peer that holds it can serve us without a fresh request.
@@ -1356,7 +1447,7 @@ function fetchVerifiedPeerObject(id: string, timeoutMs: number, opts: SwarmFetch
         reject(err instanceof Error ? err : new Error('swarm transfer offer unavailable'))
         return
       }
-      pendingFetches.set(id, { resolve, reject, timer, chunks: new Map(), receivedBytes: 0, total: 0, mimeType: '', expectedHash, onProgress: opts.onProgress, offer })
+      pendingFetches.set(id, { resolve, reject, timer, chunks: new Map(), receivedBytes: 0, total: 0, mimeType: '', expectedHash, onProgress: opts.onProgress, offer, badIndices: new Set() })
       try {
         swarmSend!({
           type: 'SWARM_WANT',
@@ -1381,6 +1472,10 @@ export function cancelSwarmObject(id: string): boolean {
   const req = pendingFetches.get(id)
   if (!req) return false
   clearTimeout(req.timer)
+  if (req.badFrameTimer) {
+    clearTimeout(req.badFrameTimer)
+    req.badFrameTimer = undefined
+  }
   pendingFetches.delete(id)
   req.reject(new Error('swarm fetch cancelled'))
   return true

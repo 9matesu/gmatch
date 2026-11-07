@@ -218,13 +218,50 @@ export function handleIncoming(conn: WsConn, data: string): void {
   // the socket PROVED at auth, so a receiver can tell a real sender from a
   // forged `user.id` in the payload.
   if (msg.type === 'SWARM_FRAME' && msg.swarm && typeof msg.swarm === 'object') {
-    const inner = msg.swarm as { type?: unknown; dataBase64?: unknown }
+    const inner = msg.swarm as {
+      type?: unknown
+      dataBase64?: unknown
+      transferId?: unknown
+      wrapped?: unknown
+      id?: unknown
+      challenge?: unknown
+      receipt?: unknown
+      operation?: unknown
+      operationId?: unknown
+      actorId?: unknown
+    }
+    const bounded = (v: unknown, max: number): v is string => typeof v === 'string' && v.length > 0 && v.length <= max
     const relayable =
       inner.type === 'SWARM_WANT' ||
       inner.type === 'SWARM_HAVE' ||
       (inner.type === 'SWARM_CHUNK' &&
         typeof inner.dataBase64 === 'string' &&
         inner.dataBase64.length <= 128 * 1024) ||
+      // swarm-v1 transfer key: the per-transfer DEK, sealed to the FETCHER's
+      // ephemeral offer key. The relay cannot open it (it holds no private
+      // key), so forwarding it leaks nothing — but WITHOUT this frame the
+      // relay path could never decrypt a chunk, which silently broke the
+      // "guaranteed fallback" for every peer that cannot punch a direct
+      // WebRTC hole.
+      (inner.type === 'SWARM_KEY' &&
+        bounded(inner.transferId, 128) &&
+        bounded(inner.wrapped, 1024)) ||
+      // Durable-replication evidence: the seeder's challenge and the
+      // fetcher's signed receipt (challenge-bound, read-back verified).
+      (inner.type === 'SWARM_CHALLENGE' &&
+        bounded(inner.id, 256) &&
+        bounded(inner.challenge, 1024)) ||
+      (inner.type === 'SWARM_RECEIPT' &&
+        bounded(inner.id, 256) &&
+        !!inner.receipt &&
+        typeof inner.receipt === 'object') ||
+      // Signed social operations and their acks: the operation carries its
+      // own signature, and the receiver's authorizer decides (the relay
+      // never reads or rewrites it).
+      (inner.type === 'SWARM_OP' && !!inner.operation && typeof inner.operation === 'object') ||
+      (inner.type === 'SWARM_OP_ACK' &&
+        bounded(inner.operationId, 256) &&
+        bounded(inner.actorId, 256)) ||
       // Announce shapes: an object's metadata + its provider link, never bytes.
       inner.type === 'IMAGE_ANNOUNCE' ||
       inner.type === 'MESSAGE' ||

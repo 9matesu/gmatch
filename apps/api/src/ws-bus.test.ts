@@ -191,6 +191,57 @@ describe('handleIncoming: authenticated dispatch', () => {
     expect(peer.sent).toHaveLength(2)
   })
 
+  it('relays the swarm-v1 transfer key and the replication evidence', () => {
+    // Without SWARM_KEY the relay path could never decrypt a chunk, so the
+    // "guaranteed fallback" for peers that cannot punch a direct WebRTC hole
+    // silently moved nothing but ciphertext the receiver could not read.
+    const sender = authedConn('s')
+    const peer = authedConn('p')
+
+    handleIncoming(sender, JSON.stringify({
+      type: 'SWARM_FRAME',
+      swarm: { type: 'SWARM_KEY', id: 'obj-1', transferId: 'a1b2c3d4', wrapped: 'Zm9v' },
+    }))
+    expect(peer.sent).toHaveLength(1)
+
+    handleIncoming(sender, JSON.stringify({
+      type: 'SWARM_FRAME',
+      swarm: { type: 'SWARM_CHALLENGE', id: 'obj-1', challenge: 'chal-1' },
+    }))
+    handleIncoming(sender, JSON.stringify({
+      type: 'SWARM_FRAME',
+      swarm: { type: 'SWARM_RECEIPT', id: 'obj-1', receipt: { challenge: 'chal-1', signature: 'aa' } },
+    }))
+    expect(peer.sent).toHaveLength(3)
+  })
+
+  it('relays signed social operations and their acks', () => {
+    const sender = authedConn('s')
+    const peer = authedConn('p')
+
+    handleIncoming(sender, JSON.stringify({
+      type: 'SWARM_FRAME',
+      swarm: { type: 'SWARM_OP', operation: { operationId: 'op-1', actorId: 'a', signature: 'aa' } },
+    }))
+    handleIncoming(sender, JSON.stringify({
+      type: 'SWARM_FRAME',
+      swarm: { type: 'SWARM_OP_ACK', operationId: 'op-1', actorId: 'a' },
+    }))
+    expect(peer.sent).toHaveLength(2)
+  })
+
+  it('drops malformed swarm frames fail-closed (new types included)', () => {
+    const sender = authedConn('s')
+    const peer = authedConn('p')
+    handleIncoming(sender, JSON.stringify({ type: 'SWARM_FRAME', swarm: { type: 'SWARM_KEY', id: 'x' } }))
+    handleIncoming(sender, JSON.stringify({ type: 'SWARM_FRAME', swarm: { type: 'SWARM_KEY', id: 'x', transferId: 't', wrapped: 'z'.repeat(2000) } }))
+    handleIncoming(sender, JSON.stringify({ type: 'SWARM_FRAME', swarm: { type: 'SWARM_RECEIPT', id: 'x' } }))
+    handleIncoming(sender, JSON.stringify({ type: 'SWARM_FRAME', swarm: { type: 'SWARM_OP', operation: 'nope' } }))
+    handleIncoming(sender, JSON.stringify({ type: 'SWARM_FRAME', swarm: { type: 'SWARM_OP_ACK', operationId: 'op' } }))
+    handleIncoming(sender, JSON.stringify({ type: 'SWARM_FRAME', swarm: { type: 'SWARM_CHALLENGE', id: 'x' } }))
+    expect(peer.sent).toHaveLength(0)
+  })
+
   it('drops malformed SWARM_FRAME shapes fail-closed', () => {
     const sender = authedConn('s')
     const peer = authedConn('p')

@@ -4,8 +4,8 @@ const ALGORITHM = 'aes-256-gcm'
 const IV_LENGTH = 12
 const TAG_LENGTH = 16
 
-function getKey(): Buffer {
-  const hex = process.env.STORAGE_ENCRYPTION_KEY
+function getKey(explicit?: string | null): Buffer {
+  const hex = explicit ?? process.env.STORAGE_ENCRYPTION_KEY
   if (!hex || hex === '00'.repeat(32)) {
     throw new Error('STORAGE_ENCRYPTION_KEY must be set to a non-zero 64-character hex string (32 bytes)')
   }
@@ -15,8 +15,17 @@ function getKey(): Buffer {
   return Buffer.from(hex, 'hex')
 }
 
-export function encryptBlob(plaintext: Uint8Array): Uint8Array {
-  const key = getKey()
+/**
+ * `explicitKeyHex` overrides the environment key.
+ *
+ * The recovery tooling reads stores encrypted with a DIFFERENT key than the
+ * one it writes with (the desktop's media vault and picture LRU are keyed by
+ * the install's storage.key; the node's blob store by its own). Same envelope,
+ * same algorithm — only the key differs — so the key is a parameter here
+ * instead of a second copy of the AEAD code.
+ */
+export function encryptBlob(plaintext: Uint8Array, explicitKeyHex?: string | null): Uint8Array {
+  const key = getKey(explicitKeyHex)
   const iv = randomBytes(IV_LENGTH)
   const cipher = createCipheriv(ALGORITHM, key, iv)
   const encrypted = Buffer.concat([cipher.update(Buffer.from(plaintext)), cipher.final()])
@@ -24,8 +33,8 @@ export function encryptBlob(plaintext: Uint8Array): Uint8Array {
   return Buffer.concat([iv, authTag, encrypted])
 }
 
-export function decryptBlob(data: Uint8Array): Uint8Array {
-  const key = getKey()
+export function decryptBlob(data: Uint8Array, explicitKeyHex?: string | null): Uint8Array {
+  const key = getKey(explicitKeyHex)
   const iv = data.slice(0, IV_LENGTH)
   const authTag = data.slice(IV_LENGTH, IV_LENGTH + TAG_LENGTH)
   const ciphertext = data.slice(IV_LENGTH + TAG_LENGTH)
