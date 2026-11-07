@@ -595,6 +595,18 @@ ADR-002 (`docs/ADR-002-servers.md`) é canônico; resumo de operação:
   nome/descrição/hint no diretório (metadados assinados; conteúdo
   NUNCA sai do seu PC). Heartbeat de 15 min mantém o listing vivo (24h sem ping
   = some da lista).
+- **Endereço**: o NÓ sabe como é alcançado (bind 0.0.0.0, porta própria) e
+  responde isso em `GET /api/servers/node` → `lanUrls` (IPv4 não-interno,
+  sem link-local). O shell empacotado lê a mesma lista pela ponte Electron; um
+  build de navegador não tem ponte, então usa a do nó. O hint publicado é o
+  endereço LAN que um amigo consegue discar (`pickShareableHint`: 10/8,
+  172.16/12 e 192.168/16 primeiro; loopback e link-local nunca).
+- **Build de navegador**: o heartbeat REPETE um registro já existente
+  (`gmatch.server.register`) e nunca inventa um — publicar esta máquina no
+  diretório público é ato explícito (Servers → "+ Add server"), não efeito
+  colateral de abrir o app. Um browser apontado para o nó de OUTRA máquina
+  (`gmatch_server_url` do proxy de dev) é cliente lá, e não publica o
+  endereço daqui.
 - **Entrar**: lista única de servidores → clicar a linha (a linha do servidor
   atual é inerte) → `serverSet({mode:'client'})` + relaunch. Colar um código de
   nó é o passo "Join with code" do mesmo "+ Add server" (erro de código inválido

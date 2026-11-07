@@ -48,3 +48,11 @@ Sem mudanca de protocolo; a lista continua sendo a mesma federacao.
 - **Entrar num mundo pesa** (`ServersView.tsx`): enquanto `connectingId` estiver ativo, a lista escurece atras de um veu com o tile do mundo-alvo, o nome e a espera dita em texto (`Entering <world>…`). Nada e inventado — o veu existe somente durante a conexao real.
 - O teste de privacidade (`ServersView.mask.test.ts`) continua valendo: nem endereco nem `owner_name` chegam ao JSX.
 
+## Endereco do no + build de navegador (2026-11-07)
+
+- **O no sabe o proprio endereco.** Ele escuta em `0.0.0.0` e e dono da porta, entao `GET /api/servers/node` responde `lanUrls` (IPv4 nao-interno, sem link-local). O shell empacotado ja tinha a mesma lista pela ponte Electron (`server-mode.cjs#lanUrls`); um build de navegador nao tem ponte, entao usa a do no.
+- **Hint publicado = endereco discavel.** `pickShareableHint` (`src/utils/serverAddress.ts`) prefere a LAN de casa (10/8, 192.168/16), depois 172.16/12 (que costuma ser adaptador virtual), e nunca publica loopback nem link-local.
+- **Build de navegador REPETE, nao inventa.** O heartbeat (`useServerHeartbeat`) le modo e enderecos do no e so republica um registro que ja existe (`gmatch.server.register`). Publicar esta maquina no diretorio publico e ato explicito (Servers -> Add server -> Host a server): um build que se auto-declarasse colocaria toda maquina de dev online. Um browser apontado para o no de OUTRA maquina (cookie `gmatch_server_url` do proxy de dev) e cliente la — e nao publica o endereco daqui.
+- **A migracao de boot nao mata mais um listing vivo.** Um registro so se aposenta quando o endereco e um que ninguem mais consegue discar (loopback, courier). Antes, qualquer mencao a porta 8790 (a porta de todo no padrao) apagava o claim — e o listing morria no boot seguinte.
+- **Linha chamada "gmatch" com endereco real aparece.** O nome padrao do no escondia a propria maquina de todo mundo; so a linha legada, sem endereco proprio, continua fora da lista.
+

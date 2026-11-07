@@ -1,6 +1,7 @@
 // T3: public server directory (register/list/unregister/heartbeat).
 import { describe, it, expect, beforeAll } from 'vitest'
 import app from '../index'
+import { nodeLanUrls } from './servers'
 import { createTestIdentity, signRequestHeaders, createMockEnv } from '../test-utils'
 
 const owner = createTestIdentity()
@@ -262,6 +263,22 @@ describe('Server node API', () => {
   const member = createTestIdentity()
   let env: Awaited<ReturnType<typeof createMockEnv>>
 
+  it('reports this machine addresses on the port the node owns', () => {
+    const prev = process.env.PORT
+    process.env.PORT = '8791'
+    try {
+      const urls = nodeLanUrls()
+      for (const u of urls) {
+        expect(u).toMatch(/^http:\/\/\d+\.\d+\.\d+\.\d+:8791$/)
+        // loopback and link-local are not dialable from another machine
+        expect(u).not.toMatch(/127\.|169\.254\./)
+      }
+    } finally {
+      if (prev === undefined) delete process.env.PORT
+      else process.env.PORT = prev
+    }
+  })
+
   beforeAll(async () => {
     env = await createMockEnv()
     await app.request('/api/users', { headers: headers(host, 'GET', '/api/users') }, env)
@@ -276,6 +293,13 @@ describe('Server node API', () => {
     expect(body.name).toBe('gmatch')
     expect(body.isAdmin).toBe(true)
     expect(body.mode).toBe('host')
+    // The node reports how it is reached, so a browser build (no Electron
+    // bridge) can publish a dialable address for this machine.
+    expect(Array.isArray(body.lanUrls)).toBe(true)
+    for (const url of body.lanUrls as string[]) {
+      expect(url).toMatch(/^http:\/\/\d+\.\d+\.\d+\.\d+:\d+$/)
+      expect(url).not.toMatch(/^http:\/\/(127\.|169\.254\.)/)
+    }
   })
 
   it('host admin can rename the node and dashboard reflects it', async () => {

@@ -1,10 +1,40 @@
 import { Hono } from 'hono'
+import { networkInterfaces } from 'node:os'
 import { bytesToHex } from '../hexio'
 import { sha256 } from '@noble/hashes/sha256'
 import { orbitAuth } from '../middleware/auth'
 import { adminAuth } from '../middleware/admin'
 import { logAdminAction } from '../admin-audit'
 import type { D1Turso } from '../db'
+
+/**
+ * The addresses THIS node answers on, from the LAN.
+ *
+ * The packaged shell reports the same list through the Electron bridge
+ * (electron/server-mode.cjs#lanUrls). A browser build has no bridge, and the
+ * dev server PROXIES to this node — so without the node answering, the
+ * renderer cannot work out how a friend would dial this machine, and the node
+ * silently drops out of the public directory after its listing goes stale.
+ *
+ * The node listens on 0.0.0.0 and owns the port (serve.ts reads PORT), so it
+ * knows. Loopback and link-local addresses are skipped: neither is dialable
+ * from another machine.
+ */
+export function nodeLanUrls(): string[] {
+  const port = parseInt(process.env.PORT || '8080', 10)
+  const out: string[] = []
+  for (const addrs of Object.values(networkInterfaces())) {
+    for (const a of addrs || []) {
+      const family = a.family as unknown
+      if (family !== 'IPv4' && family !== 4) continue
+      if (a.internal) continue
+      if (a.address.startsWith('169.254.')) continue // link-local: not dialable
+      const url = `http://${a.address}:${port}`
+      if (!out.includes(url)) out.push(url)
+    }
+  }
+  return out
+}
 
 /**
  * Public SERVER DIRECTORY (plan T3) — lives ONLY on the central node.
@@ -211,6 +241,10 @@ servers.get('/node', orbitAuth, async (c) => {
     // Every app now runs its own node (host-only since 1.6.8), so the shell can
     // show the Admin door: the PIN verify inside the panel is the real boundary.
     mode: 'host' as const,
+    // How a friend dials THIS machine. The packaged shell gets the same list
+    // from its Electron bridge; a browser build has no bridge, so the node
+    // answers for itself here.
+    lanUrls: nodeLanUrls(),
   })
 })
 

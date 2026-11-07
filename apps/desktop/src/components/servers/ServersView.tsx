@@ -14,6 +14,7 @@ import { getCentralApiUrl, setCentralApiUrl } from '../../utils/central'
 import { rememberKnownNodeHint } from '../../utils/peerNodes'
 import { orbitFetch, getApiBaseUrl, isCourierApiUrl, LOCAL_NODE_BASE } from '../../utils/api'
 import { normalizeServerUrl, isCurrentServerUrl } from '../../utils/serverUrl'
+import { pickShareableHint } from '../../utils/serverAddress'
 import { joinServer } from '../../utils/join-server'
 import { switchClientWorld } from '../../utils/server-switch'
 import { rememberPendingHost } from '../../utils/server-host-pending'
@@ -73,6 +74,10 @@ export interface ServerNode {
   directoryId?: string | null
   tags?: string[]
   isAdmin: boolean
+  /** How this node is reached from the LAN (the node's own report). */
+  lanUrls?: string[]
+  /** Host-only since 1.6.8: every node hosts a world. */
+  mode?: string
 }
 
 type Toast = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void
@@ -393,8 +398,11 @@ export function ServersView({
 
   useEffect(() => {
     try {
+      // The legacy built-in row ("gmatch", no address of its own) is not a
+      // destination. A REAL listing keeps its address — even on port 8790,
+      // which is the port every default node runs on.
       const cached = readDirectoryCache().filter(
-        (s) => s.name.trim().toLowerCase() !== 'gmatch' && !s.endpoint_hint?.includes('8790') && s.id !== 'central-node'
+        (s) => s.id !== 'central-node' && !(s.name.trim().toLowerCase() === 'gmatch' && !s.endpoint_hint?.trim())
       )
       writeDirectoryCache(cached)
       if (localStorage.getItem(DIRECTORY_ID_KEY) === 'central-node') localStorage.removeItem(DIRECTORY_ID_KEY)
@@ -402,7 +410,12 @@ export function ServersView({
       if (regRaw) {
         try {
           const parsed = JSON.parse(regRaw)
-          if (parsed.name?.trim().toLowerCase() === 'gmatch' || parsed.endpoint_hint?.includes('8790')) {
+          // Only an address nobody else can dial retires the claim: the old
+          // auto-registration pointed at THIS machine's loopback sidecar (or
+          // at the courier), so no friend could ever join it. A LAN address
+          // is joinable and stays — otherwise the listing would silently die
+          // on the next boot.
+          if (isLocalHint(parsed.endpoint_hint) || isCourierApiUrl(parsed.endpoint_hint)) {
             localStorage.removeItem(REG_KEY)
           }
         } catch { /* ignore */ }
@@ -510,7 +523,11 @@ export function ServersView({
     const q = query.trim().toLowerCase()
     return servers.filter((s) => {
       if (s.id === 'central-node' || s.id === 'central-p2p' || s.id === 'central-local') return false
-      if (s.name.trim().toLowerCase() === 'gmatch') return false
+      // The legacy built-in "gmatch" row carried no address of its own. A REAL
+      // listing named "gmatch" (the default node name) has one and stays
+      // visible — hiding it by name alone would make this machine unfindable
+      // for every other player.
+      if (s.name.trim().toLowerCase() === 'gmatch' && !s.endpoint_hint?.trim()) return false
       // A blind courier is infrastructure, never a destination: a stale
       // directory mirror of it is never a row.
       if (isCourierApiUrl(s.endpoint_hint)) return false
@@ -670,13 +687,28 @@ export function ServersView({
       const st = await window.gmatch?.serverState?.().catch(() => null)
       let claimedBefore = false
       try { claimedBefore = Boolean(localStorage.getItem(REG_KEY)) } catch { /* session-only */ }
-      // One server per install: this machine already hosts its own node.
-      if (claimedBefore && st?.mode === 'host') {
+      // One server per install: this machine already hosts its own node. A
+      // browser build has no bridge to ask, but the node it talks to IS this
+      // machine's — so the same guard applies there.
+      if (claimedBefore && (st?.mode === 'host' || !st)) {
         toast(`This computer already hosts “${serverName || 'a server'}”. Rename it on the left instead.`, 'warning')
         return
       }
       const canHost = Boolean(window.gmatch?.serverSet && st?.packaged)
-      const hintFinal = hint.trim() || (canHost ? st?.lanUrls?.[0] ?? '' : '')
+      // The addresses this node answers on. The bridge knows them; without it
+      // the NODE knows them (it binds 0.0.0.0 and owns the port) and says so
+      // on GET /api/servers/node.
+      let lanUrls = st?.lanUrls ?? []
+      if (!lanUrls.length) {
+        try {
+          const n = await orbitFetch('/api/servers/node', { method: 'GET' }, identity)
+          if (n.ok) {
+            const nj = (await n.json()) as ServerNode
+            lanUrls = nj.lanUrls ?? []
+          }
+        } catch { /* node without the route */ }
+      }
+      const hintFinal = hint.trim() || pickShareableHint(lanUrls)
       if (canHost) {
         // Claim marker first: even if every request below dies, the heartbeat
         // will replay the registration once the host is reachable again.
@@ -702,9 +734,16 @@ export function ServersView({
         await refresh()
         return
       }
-      // Browser/dev build without the desktop bridge: directory-only listing;
-      // hosting your own node needs the packaged app.
+      // Browser/dev build without the desktop bridge: the node on this machine
+      // IS the world — list it so other players can find and join it.
       if (!central && !getApiBaseUrl()) { toast('No node to list this server on. Hosting runs in the desktop app.', 'warning'); return }
+      // Claim marker first: even if the request below dies, the heartbeat
+      // replays this registration once the directory answers again.
+      try {
+        localStorage.setItem(REG_KEY, JSON.stringify({
+          name: trimmed, description: desc, endpoint_hint: hintFinal, password_required: needsPassword, private: isPrivate,
+        }))
+      } catch { /* session-only */ }
       const listed = await registerDirectory(trimmed, desc, hintFinal, needsPassword, isPrivate)
       if (listed) {
         toast('Server registered. Signed-in users can see it in the directory.', 'success')
@@ -1240,7 +1279,7 @@ export function ServersView({
         </label>
       </div>
       {(() => {
-        const preview = buildNodeCode(hint.trim() || hostState?.lanUrls?.[0] || '', name.trim())
+        const preview = buildNodeCode(hint.trim() || pickShareableHint(hostState?.lanUrls ?? node?.lanUrls ?? []), name.trim())
         return preview ? (
           <div data-testid="create-handle-preview" className="flex items-center gap-2 text-xs font-mono text-retro-muted">
             <span className="truncate max-w-[240px]">{preview.slice(0, 28)}…</span>
