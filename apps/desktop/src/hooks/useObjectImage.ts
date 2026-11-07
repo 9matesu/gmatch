@@ -108,6 +108,10 @@ export function isRequestableObjectId(raw: string | null | undefined): boolean {
   const id = normalizeCardId(raw.trim())
   if (!id) return false
   if (isMagnetUri(id)) return false
+  // A `urn:sha256:…` descriptor has no separators, so the terminator test below
+  // accepts it — reject it explicitly like the magnet above. Firing
+  // /api/objects/urn:sha256:… is always a doomed request.
+  if (/^urn:/i.test(id)) return false
   // No path separators or terminators: a single path segment, nothing that can
   // split the URL. Catches magnets, urns, absolute URLs and file paths at once.
   return !/[/\\?#\s]/.test(id)

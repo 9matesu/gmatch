@@ -115,3 +115,81 @@ describe('useObjectImage eviction (signed media vanish)', () => {
     pinned.unmount()
   })
 })
+
+describe('useObjectImage resolveObject edge cases (Fase 4)', () => {
+  const identity = { orbitId: 'me', publicKeyHex: 'p', privateKeyHex: 'k' }
+
+  beforeEach(async () => {
+    const { __resetObjectImageCacheForTests } = await import('./useObjectImage')
+    __resetObjectImageCacheForTests()
+    ;(URL as unknown as { createObjectURL: unknown }).createObjectURL = vi.fn(() => 'blob:test-url')
+    ;(URL as unknown as { revokeObjectURL: unknown }).revokeObjectURL = vi.fn()
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.restoreAllMocks()
+  })
+
+  it('magnet/urn descriptor never touches the network', async () => {
+    const { useObjectImage } = await import('./useObjectImage')
+    const { orbitFetch } = await import('../utils/api')
+    vi.mocked(orbitFetch).mockClear()
+
+    const h = renderHook(() => useObjectImage('magnet:?xt=urn:btih:abc123def456', identity))
+    await waitFor(() => expect(h.result.current.failed).toBe(true))
+
+    expect(orbitFetch).not.toHaveBeenCalled()
+    h.unmount()
+  })
+
+  it('urn:sha256 descriptor never touches the network', async () => {
+    const { useObjectImage } = await import('./useObjectImage')
+    const { orbitFetch } = await import('../utils/api')
+    vi.mocked(orbitFetch).mockClear()
+
+    const h = renderHook(() => useObjectImage('urn:sha256:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab', identity))
+    await waitFor(() => expect(h.result.current.failed).toBe(true))
+
+    expect(orbitFetch).not.toHaveBeenCalled()
+    h.unmount()
+  })
+
+  it('retries a cold-dyno 503 until a 200 arrives', async () => {
+    const { useObjectImage } = await import('./useObjectImage')
+    const { orbitFetch } = await import('../utils/api')
+    const calls: number[] = []
+    vi.mocked(orbitFetch).mockImplementation(async () => {
+      calls.push(calls.length)
+      if (calls.length === 1) return { ok: false, status: 503 } as Response
+      return {
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'Content-Type': 'image/png' }),
+        blob: async () => new Blob(['recovered'], { type: 'image/png' }),
+      } as Response
+    })
+
+    const h = renderHook(() => useObjectImage('cold-dyno-card', identity))
+    await waitFor(() => expect(h.result.current.url).toMatch(/^blob:/))
+    expect(h.result.current.failed).toBe(false)
+    expect(calls).toHaveLength(2)
+    h.unmount()
+  })
+
+  it('404 without swarm bytes fails honestly without poisoning the cache', async () => {
+    const { useObjectImage } = await import('./useObjectImage')
+    const { orbitFetch } = await import('../utils/api')
+    vi.mocked(orbitFetch).mockResolvedValue({ ok: false, status: 404 } as Response)
+
+    const h = renderHook(() => useObjectImage('dead-card', identity))
+    await waitFor(() => expect(h.result.current.failed).toBe(true))
+    // The miss was probed on the wire before giving up.
+    expect(vi.mocked(orbitFetch)).toHaveBeenCalledWith(
+      '/api/objects/dead-card',
+      { method: 'GET' },
+      identity,
+    )
+    h.unmount()
+  })
+})

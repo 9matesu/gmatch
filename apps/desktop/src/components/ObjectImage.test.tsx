@@ -103,4 +103,32 @@ describe('ObjectImage placeholder (T-W3)', () => {
     expect(screen.queryByText('No preview')).toBeNull()
     expect(container.firstChild).toBeNull()
   })
+
+  it('says "No preview" (never an endless "Loading media...") for a descriptor with no id', () => {
+    rec.cardId = null
+    // A magnet is a descriptor, not an id: there is nothing to request, so
+    // the tile must state the terminal truth instead of spinning forever.
+    const { container } = render(
+      <ObjectImage contentUrl="magnet:?xt=urn:btih:abc123def456" identity={identity} />
+    )
+    expect(screen.getByText('No preview')).toBeInTheDocument()
+    expect(screen.queryByText('Loading media...')).toBeNull()
+    expect(rec.cardId).toBeNull()
+    expect(container.querySelector('img')).toBeNull()
+  })
+
+  it('addresses the node local copy by the id inside a urn:sha256 descriptor', () => {
+    const uuid = 'e66d0889-8c2a-4bd3-84d5-a7a29273db0f'
+    rec.cardId = null
+    render(<ObjectImage contentUrl={`urn:sha256:${uuid}`} identity={identity} />)
+    // The urn carries the canonical object id; the raw urn is not requestable.
+    expect(rec.cardId).toBe(uuid)
+  })
+
+  it('addresses a sha256-hex urn by its hex object id', () => {
+    const hex = 'a'.repeat(64)
+    rec.cardId = null
+    render(<ObjectImage contentUrl={`urn:sha256:${hex}`} identity={identity} />)
+    expect(rec.cardId).toBe(hex)
+  })
 })

@@ -62,12 +62,21 @@ const OBJECT_PATH = '/api/objects/'
 // /api/objects/<id> for <img>, but that request carries no auth headers and
 // 401s for anything not public. The signed fetch path must own it instead.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+// A `urn:sha256:<…>` descriptor carries the canonical object id INSIDE it:
+// that id is what the node stores the bytes under, so the signed fetch
+// addresses the node's local copy (the direct path maps the same way in
+// utils/media.ts). The raw urn is NOT an id — useObjectImage rejects it.
+const URN_UUID_RE = /^urn:sha256:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i
+const URN_HEX_RE = /^urn:sha256:([0-9a-f]{64})/i
 
 function extractObjectId(contentUrl: string | null | undefined, objectId: string | null | undefined): string | null {
   if (!contentUrl) return objectId || null
   const idx = contentUrl.indexOf(OBJECT_PATH)
   if (idx >= 0) return contentUrl.slice(idx + OBJECT_PATH.length).split(/[?#]/)[0] || null
-  if (UUID_RE.test(contentUrl.trim())) return contentUrl.trim()
+  const trimmed = contentUrl.trim()
+  if (UUID_RE.test(trimmed)) return trimmed
+  const urn = URN_UUID_RE.exec(trimmed) || URN_HEX_RE.exec(trimmed)
+  if (urn) return urn[1]
   return objectId || null
 }
 
@@ -138,6 +147,10 @@ export function ObjectImage({
 }: ObjectImageProps) {
   const signed = needsSignedFetch(contentUrl, objectId)
   const effObjectId = extractObjectId(contentUrl, objectId)
+  // A descriptor with no id at all (a bare `magnet:`) has NOTHING to request:
+  // the hook can never resolve it, so the tile must say "No preview" instead
+  // of spinning on "Loading media..." forever. The post stays visible.
+  const unresolvable = signed && !effObjectId
 
   // Defer the authenticated fetch for signed images until the element is near
   // the viewport. Direct URLs rely on the browser's native `loading="lazy"`.
@@ -239,8 +252,8 @@ export function ObjectImage({
   }, [src, hasError, signed, img.failed, unavailableTimeoutMs, onMediaUnavailable, onLoadingChange])
 
   if (!src) {
-    if (hideUnavailable && (signed ? img.failed : hasError)) return null
-    const waiting = signed && !img.failed
+    if (hideUnavailable && (signed ? img.failed || unresolvable : hasError)) return null
+    const waiting = signed && !img.failed && !unresolvable
     const seeding = signed && img.awaitingSeeder
     return (
       <div

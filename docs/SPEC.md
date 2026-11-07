@@ -58,6 +58,24 @@ trades — two separate economies, no bridge between them.
 - A row is never dropped for missing bytes (1.6.8): the tile shows "No preview"
   while the post keeps its author, caption and counts. Hiding the row would
   erase a real post just because this device does not hold its media.
+- A descriptor is never an object id (2026-11-06): the media ladder (encrypted
+  vault → local swarm store → signed `GET /api/objects/:id` → swarm peers)
+  requests an id only when it is a single path segment. `magnet:?…` and
+  `urn:sha256:…` are DESCRIPTORS — the raw form fails locally, with no
+  request at all, so a doomed call can never 404, fire `orbit-object-404` or
+  poison the media LRU. The id INSIDE a descriptor stays addressable:
+  `urn:sha256:<uuid>` and `urn:sha256:<sha256-hex>` resolve to that canonical
+  object id (the node's local copy). A descriptor with no id at all (a bare
+  `magnet:`) has nothing to request, so the tile says "No preview" instead of
+  spinning on "Loading media..." forever.
+- Legacy nodes still hold the bytes 1.4.0 uploaded (2026-11-06): the old
+  media path wrote file bytes into `Objects.data`, so `GET /api/objects/:id`
+  streamed a peer's image straight from the node. Measured on the retired
+  `gmatch.fly.dev`: of the 200 latest posts, 188 answer with a `p2p`
+  descriptor and only 12 still hold bytes (all legacy `video/mp4`, dated
+  22–25 Sep and 25 Oct 2026). Posts published after the P2P alignment carry a
+  descriptor only, so "a peer's image" now means "a peer who still holds the
+  bytes must be online" — by design (§10d), not a regression.
 - Excluded from the merge (documented, not silently dropped): `apps/discord`
   bridge, the old hosted infrastructure, Rust `image-processor` (unused).
 
