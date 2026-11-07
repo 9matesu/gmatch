@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { broadcastPresence, fetchPresenceRosterFrom, PRESENCE_TOKEN } from './courierPresence'
 import { generateIdentity, type OrbitIdentity } from '@orbit/crypto'
+import { _resetNodeAddress } from '../utils/serverAddress'
 
 /**
  * A peer that lives on ANOTHER node: the beacon says which node, and the
@@ -20,6 +21,7 @@ describe('courierPresence across nodes', () => {
       removeItem: (k: string) => void store.delete(k),
       clear: () => store.clear(),
     } as Storage)
+    _resetNodeAddress()
   })
 
   afterEach(() => {
@@ -40,8 +42,31 @@ describe('courierPresence across nodes', () => {
     expect(beacon.nodeUrl).toBe('http://node.test:8790')
   })
 
-  it('reports the node each peer lives on', async () => {
-    localStorage.setItem('gmatch.api.url', 'http://node.test:8790')
+  it('names the node DIALABLY: a loopback base is useless to another machine', async () => {
+    // The packaged app talks to its own node over 127.0.0.1. A peer reading
+    // that address would dial ITS OWN loopback, so the beacon has to name the
+    // address the node really answers on.
+    localStorage.setItem('gmatch.api.url', 'http://127.0.0.1:8790')
+    let captured: any = null
+    const fetchMock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.includes('/api/servers/node')) {
+        return new Response(JSON.stringify({ lanUrls: ['http://172.28.48.1:8790', 'http://192.168.5.2:8790'] }), { status: 200 })
+      }
+      if (!init?.body) {
+        // the node's public key probe — no seal available, signed path stands
+        return new Response(JSON.stringify({ sealed_available: false }), { status: 200 })
+      }
+      captured = JSON.parse(String(init.body)).env
+      return new Response(JSON.stringify({ ok: true }), { status: 200 })
+    })
+
+    expect(await broadcastPresence(bob, { displayName: 'Bob' }, fetchMock as unknown as typeof globalThis.fetch)).toBe(true)
+
+    const beacon = JSON.parse(decodeURIComponent(escape(atob(captured.sealed))))
+    expect(beacon.nodeUrl).toBe('http://192.168.5.2:8790')
+  })
+
+  it('reports the node each peer lives on', async () => {    localStorage.setItem('gmatch.api.url', 'http://node.test:8790')
     let captured: any = null
     const putFetch = vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
       captured = JSON.parse(init?.body as string).env

@@ -402,6 +402,15 @@ offline earnings). Each +5% click power. Persist across prestige.
   URL the peer is connected to, and a sealed envelope addressed to that peer is dropped
   into THAT node's mailbox (the node still cannot open it). The client learns the other
   nodes from the directory it reads on the node it is on (SPEC §12).
+- **The node URL is DIALABLE (2026-11-07).** A beacon used to name the API base, which
+  is `127.0.0.1` in the packaged app (a peer would read that as its OWN loopback) and
+  empty in a browser build (the dev proxy carries no address). `resolveNodeAddress`
+  (`src/utils/serverAddress.ts`) asks the node for the addresses it answers on
+  (`GET /api/servers/node` → `lanUrls`) and signs the LAN one into the beacon; a
+  non-loopback base (a client joined to a friend's node) is already the answer. The
+  client drains that SAME box: `useCourierDms` adds the node's address as a mailbox
+  base when the API base hides it, so an envelope addressed to our node is read instead
+  of waiting for its TTL.
 - **Presence & Discovery:** Ephemeral signed beacons (`PresenceBeacon`) broadcast to public
   presence token `sha256Hex('orbit-global-presence-v1')`. Client compiles and verifies in-memory
   roster with 60s TTL and 120s drop threshold. Zero presence state stored on server.

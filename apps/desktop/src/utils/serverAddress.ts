@@ -1,4 +1,4 @@
-import { getApiBaseUrl, isLoopbackApiUrl } from './api'
+import { getApiBaseUrl, isLoopbackApiUrl, orbitFetch, type OrbitIdentityLike } from './api'
 
 /**
  * Addresses a friend can dial, and whose node they belong to.
@@ -8,13 +8,16 @@ import { getApiBaseUrl, isLoopbackApiUrl } from './api'
  * Electron bridge (electron/server-mode.cjs#lanUrls); a browser build has no
  * bridge, so the node answers for itself on GET /api/servers/node (`lanUrls`).
  *
- * Two questions live here because both the heartbeat and the Servers screen
- * need the same honest answers:
+ * Three questions live here because the heartbeat, the Servers screen and the
+ * presence beacon all need the same honest answers:
  *
  *   - pickShareableHint: which address do we publish?
  *   - ownsLocalNode: is the node we are talking to OURS? A browser pointed at
  *     a friend's node is a CLIENT there and must never publish this machine's
  *     address as if it hosted a world.
+ *   - resolveNodeAddress: which address does ANOTHER machine dial to reach
+ *     the node we are on? That is the node our presence beacon names and the
+ *     node whose mailbox we must drain.
  */
 
 /**
@@ -127,4 +130,68 @@ export function ownsLocalNode(lanUrls: string[] = []): boolean {
 
   // Nothing points anywhere: the dev proxy falls back to the local dev node.
   return true
+}
+
+/**
+ * The cached node address. The node's addresses do not change minute to
+ * minute, and the answer is needed by the beacon (every 60s) and by the
+ * mailbox list, so it is fetched once and reused for a while. The cache is
+ * keyed by the API base, so switching to another node does not serve the old
+ * address.
+ */
+const NODE_ADDRESS_TTL_MS = 10 * 60 * 1000
+let nodeAddressCache: { base: string; url: string; at: number } | null = null
+
+/** test seam */
+export function _resetNodeAddress(): void {
+  nodeAddressCache = null
+}
+
+/**
+ * The address ANOTHER machine dials to reach the node we are connected to.
+ *
+ * This is the address our signed presence beacon names, and the box a peer
+ * drops our sealed envelopes into — so it has to be DIALABLE from the
+ * outside. Two common bases are not:
+ *
+ *   - `http://127.0.0.1:8790` — the packaged app's own node. A peer on
+ *     another machine would read that as ITS OWN loopback.
+ *   - `''` — a browser build riding the dev proxy: no address at all.
+ *
+ * Sources, in order:
+ *   1. an absolute, non-loopback API base: that IS the node we are on (a
+ *      client joined to a friend's node) and it is already dialable;
+ *   2. the node's own report (`GET /api/servers/node` -> `lanUrls`) — how a
+ *      loopback or relative base gets a real LAN address.
+ *
+ * Returns null when nothing dialable is known: a beacon without a node URL
+ * is still a valid beacon (it just cannot be routed across nodes).
+ */
+export async function resolveNodeAddress(
+  identity: OrbitIdentityLike | null,
+  fetchImpl: typeof globalThis.fetch = globalThis.fetch,
+): Promise<string | null> {
+  const base = getApiBaseUrl().trim()
+  if (base && !isLoopbackApiUrl(base)) {
+    try {
+      const u = new URL(base)
+      if (u.protocol === 'http:' || u.protocol === 'https:') return `${u.protocol}//${u.host}`
+    } catch { /* not a URL; fall through to the node's report */ }
+  }
+  if (nodeAddressCache && nodeAddressCache.base === base && Date.now() - nodeAddressCache.at < NODE_ADDRESS_TTL_MS) {
+    return nodeAddressCache.url || null
+  }
+  let url = ''
+  try {
+    const res = await orbitFetch('/api/servers/node', { method: 'GET' }, identity, fetchImpl)
+    if (res.ok) {
+      const j = (await res.json()) as { lanUrls?: string[] }
+      url = pickShareableHint(j?.lanUrls ?? [])
+    }
+  } catch {
+    // The node is unreachable (or has no such route): the beacon simply
+    // carries no address. Never a guess.
+  }
+  nodeAddressCache = { base, url, at: Date.now() }
+  return url || null
 }

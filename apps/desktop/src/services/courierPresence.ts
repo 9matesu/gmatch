@@ -4,6 +4,7 @@ import { sha256Hex } from '@orbit/protocol'
 import { type User, generateFallbackName } from '@orbit/shared'
 import { getApiBaseUrl } from '../utils/api'
 import { normalizeNodeUrl } from '../utils/peerNodes'
+import { resolveNodeAddress } from '../utils/serverAddress'
 
 /**
  * Well-known 64-hex delivery token on the blind courier dedicated to
@@ -57,15 +58,20 @@ export async function broadcastPresence(
   fetchImpl: typeof globalThis.fetch = globalThis.fetch,
 ): Promise<boolean> {
   const now = Date.now()
+  // Where we live: the node we are connected to — its box is where a peer
+  // drops the envelopes addressed to us. It has to be an address ANOTHER
+  // machine can dial: the packaged app's own API base is `127.0.0.1` (a peer
+  // would read that as its own loopback) and a browser build rides the dev
+  // proxy with no address at all. The node reports the addresses it answers
+  // on, so both cases resolve to a real one.
+  const nodeUrl = await resolveNodeAddress(identity, fetchImpl)
   const rawBeacon: Omit<PresenceBeacon, 'sig'> = {
     orbitId: identity.orbitId,
     displayName: profile.displayName || 'Player',
     pfpUrl: profile.pfpUrl || null,
     publicKeyHex: identity.publicKeyHex,
     encryptionPubHex: identity.encryptionPubHex || '',
-    // Where we live: the node we are connected to. It is the mailbox that
-    // holds a sealed envelope addressed to us.
-    ...(normalizeNodeUrl(getApiBaseUrl()) ? { nodeUrl: normalizeNodeUrl(getApiBaseUrl())! } : {}),
+    ...(nodeUrl ? { nodeUrl } : {}),
     timestamp: now,
   }
 

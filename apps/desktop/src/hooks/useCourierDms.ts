@@ -14,6 +14,7 @@ import { logger } from '../utils/logger'
 import { handleInboundSignal } from '../utils/courierSignaling'
 import { ownDisplayName } from '../utils/displayName'
 import { activeTypists, pruneTypingState } from '../utils/dmTyping'
+import { resolveNodeAddress } from '../utils/serverAddress'
 
 /**
  * Where sealed mail is relayed. The Cloudflare courier is the default
@@ -36,6 +37,18 @@ function extraMailBases(): string[] {
   const primary = mailBase()
   if (!node || node === primary) return []
   return [node]
+}
+
+/**
+ * True when the node this client talks to is NOT among the drained boxes.
+ *
+ * A browser build rides the dev proxy: the API base is RELATIVE, so the node
+ * behind it never shows up as a mailbox base. The node's own dialable
+ * address has to be added instead — otherwise a peer that learned our node
+ * from the signed beacon drops envelopes into a box nobody reads.
+ */
+function nodeBoxMissing(): boolean {
+  return !getApiBaseUrl().replace(/\/+$/, '')
 }
 
 export interface CourierDeps {
@@ -237,6 +250,19 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
       roomsRef.current = null
       storeRef.current = null
     }
+  }, [identity, mode])
+
+  // The node's own box, when the dev proxy hid it. The address is the SAME
+  // one our signed presence beacon names, so a peer on another node drops
+  // envelopes exactly where we now read them.
+  useEffect(() => {
+    if (!identity || mode !== 'courier' || !nodeBoxMissing()) return
+    let cancelled = false
+    void resolveNodeAddress(identity, depsRef.current.fetchImpl).then((addr) => {
+      if (cancelled || !addr) return
+      clientRef.current?.addBases([addr])
+    })
+    return () => { cancelled = true }
   }, [identity, mode])
 
   // The sender is always the local user, so the name is read from the shared

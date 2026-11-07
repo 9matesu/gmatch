@@ -133,6 +133,26 @@ describe('MailClient (blind courier)', () => {
     expect(ackJson.pubkey).toBe(bob.publicKeyHex)
   })
 
+  it('a mailbox learned late is drained and watched too', async () => {
+    // The node this client is connected to can be learned AFTER start (a
+    // browser build rides the dev proxy and only then learns the node's real
+    // address). A peer that learned our node from the signed beacon drops
+    // envelopes exactly there.
+    const calls: string[] = []
+    const fetchImpl = makeFetch(async (url) => {
+      calls.push(url)
+      return okJson({ envelopes: [] })
+    })
+    const { c, sockets } = client({ fetchImpl })
+    c.start()
+    expect(sockets).toHaveLength(1)
+    c.addBases(['http://node.test:8790'])
+    // a watch socket for the new box
+    expect(sockets).toHaveLength(2)
+    await c.pull()
+    expect(calls.some((u) => u.startsWith('http://node.test:8790/api/mail/'))).toBe(true)
+  })
+
   it('envelopes I cannot open are never acked (no DoS by acking foreign ids)', async () => {
     const eve = generateIdentity()
     const other = generateIdentity()

@@ -8,14 +8,16 @@ import { seal1to1 } from '@orbit/protocol'
 import { useCourierDms } from './useCourierDms'
 import { encodeDmBody } from '../utils/mail-dm'
 import { _resetMailModeCache } from '../utils/mail-mode'
+import { _resetNodeAddress } from '../utils/serverAddress'
 import type { MailSocket } from '../utils/mail-client'
 
 // Pin the API base to a remote host: the real loopback/dev base is now a
 // known-courier fast path (no wire probe), which would make the "legacy
 // inbox" scenario unreachable in these tests.
+const apiBase = vi.hoisted(() => ({ url: 'http://node.test' }))
 vi.mock('../utils/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../utils/api')>()
-  return { ...actual, getApiBaseUrl: () => 'http://node.test' }
+  return { ...actual, getApiBaseUrl: () => apiBase.url }
 })
 
 const alice = generateIdentity()
@@ -65,7 +67,9 @@ const wrapper = ({ children }: { children: ReactNode }) => createElement('div', 
 
 beforeEach(() => {
   _resetMailModeCache()
+  _resetNodeAddress()
   localStorage.clear()
+  apiBase.url = 'http://node.test'
 })
 
 describe('useCourierDms', () => {
@@ -100,6 +104,40 @@ describe('useCourierDms', () => {
     const t = result.current.threadFor(bob.orbitId) || []
     expect(t.some((m) => m.text === 'sealed hello' && m.own && m.status === 'sent')).toBe(true)
     expect(JSON.stringify(box.value)).not.toContain('sealed hello')
+  })
+
+  it('a browser build drains its node own box (the dev proxy hides it)', async () => {
+    // The API base is RELATIVE here: the node this client talks to rides the
+    // dev proxy, so it never shows up as a mailbox base. A peer that learned
+    // our node from the signed beacon drops envelopes exactly there, so the
+    // node's real address has to be watched and drained.
+    apiBase.url = ''
+    const seen: string[] = []
+    const watched: string[] = []
+    const f = vi.fn(async (input: any, init?: any) => {
+      const url = String(input)
+      seen.push(url)
+      if (url.includes('/api/servers/node')) {
+        return new Response(JSON.stringify({ lanUrls: ['http://192.168.5.2:8790'] }), { status: 200 })
+      }
+      if (!init?.body) {
+        return new Response(JSON.stringify({ sealed_available: false }), { status: 200 })
+      }
+      return new Response(JSON.stringify({ envelopes: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }) as unknown as typeof fetch
+
+    const { result } = renderHook(
+      () => useCourierDms(alice, {
+        fetchImpl: f,
+        webSocketFactory: (url: string) => { watched.push(url); return new FakeSocket() },
+      }),
+      { wrapper },
+    )
+    await waitFor(() => {
+      expect(watched.some((u) => u.includes('192.168.5.2:8790'))).toBe(true)
+    }, { timeout: 5000 })
+    await result.current.pull()
+    expect(seen.some((u) => u.startsWith('http://192.168.5.2:8790/api/mail/'))).toBe(true)
   })
 
   it('unknown peer -> failed LOUD (held locally, not silently lost)', async () => {

@@ -121,6 +121,29 @@ export class MailClient {
     return out
   }
 
+  /**
+   * Add mailboxes to drain, after the client was built.
+   *
+   * The node this client is connected to can be learned late: a browser build
+   * rides the dev proxy with a RELATIVE base, so the node's own box is not in
+   * the list until the node answers for itself (`/api/servers/node`). Without
+   * it, a peer that learned our node from the signed beacon drops envelopes
+   * into a box nobody reads.
+   */
+  addBases(bases: string[]): void {
+    const before = this.bases()
+    const merged = [...(this.deps.extraBases ?? [])]
+    for (const base of bases) {
+      const clean = String(base || '').replace(/\/+$/, '')
+      if (clean && !merged.includes(clean)) merged.push(clean)
+    }
+    this.deps.extraBases = merged
+    // A base learned after start() still needs its watch socket.
+    for (const base of this.bases()) {
+      if (!before.includes(base)) this.connect(base)
+    }
+  }
+
   /** All delivery tokens watched and pulled this session (home + cur + prev session tokens). */
   watchedTokens(): string[] {
     return watchedTokens(this.token, this.epoch, this.deps.identity.publicKeyHex)

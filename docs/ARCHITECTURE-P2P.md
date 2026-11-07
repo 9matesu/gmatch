@@ -305,6 +305,16 @@ more. A peer that lives on a DIFFERENT node is still reachable, because:
   A relay that rewrites the address breaks the signature, so the beacon is
   dropped instead of being redirected. A beacon from a client that does not
   know the field still verifies against the old payload.
+- that URL is **dialable** (2026-11-07). The API base is not: the packaged
+  app talks to its own node over `127.0.0.1` (a peer would read that as its
+  OWN loopback) and a browser build rides the dev proxy with no address at
+  all. `resolveNodeAddress` (`utils/serverAddress.ts`) asks the node for the
+  addresses it answers on (`GET /api/servers/node` → `lanUrls`) and signs the
+  LAN one into the beacon; a non-loopback base — a client joined to a
+  friend's node — is already the answer. The client then drains that SAME
+  box: `useCourierDms` adds the node's address as a mailbox base when the API
+  base hides it, so an envelope addressed to our node is READ instead of
+  waiting out its TTL on a box nobody polls.
 - the presence token is a well-known public constant, so a client can read the
   presence mailbox of any node it knows (ours, plus the nodes the directory
   lists). That is how a peer on another node enters the roster.
