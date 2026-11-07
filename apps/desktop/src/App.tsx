@@ -1250,6 +1250,9 @@ export default function Home() {
   // The upload response is the truth (the bytes are already durable locally);
   // waiting for the next feed read is what made a successful post look lost.
   const [optimisticPosts, setOptimisticPosts] = useState<FeedPost[]>([])
+  // Own posts on the player's own profile: fetched explicitly (author_id
+  // query) because the general feed snapshot (50 rows) may not carry them.
+  const [myProfilePosts, setMyProfilePosts] = useState<FeedPost[]>([])
   /**
    * A permalink (`#/feed?post=`) or notification target can name a post that
    * the 50-row snapshot does not carry (old, unranked, archived out of the
@@ -1373,8 +1376,15 @@ export default function Home() {
         };
       });
 
-    return [...optimisticVisible, ...pinnedVisible, ...peerVisible, ...serverVisible, ...repostedPosts, ...localPublicPosts];
-  }, [items, profilePics, identity, myProfile, repostedPosts, archivedPostIds, deletedPostIds, serverPosts, normalizeFeedPost, users, optimisticPosts, pinnedPosts, peerFeedPosts]);
+    // Own profile posts fetched explicitly (author_id query): dedupe against
+    // the server snapshot so a post that is both in the general feed and the
+    // user's own post list appears once.
+    const myProfileVisible = myProfilePosts.filter(
+      (p) => !deletedPostIds.has(p.id) && !seenServerIds.has(p.id),
+    );
+
+    return [...optimisticVisible, ...pinnedVisible, ...peerVisible, ...serverVisible, ...repostedPosts, ...localPublicPosts, ...myProfileVisible];
+  }, [items, profilePics, identity, myProfile, repostedPosts, archivedPostIds, deletedPostIds, serverPosts, normalizeFeedPost, users, optimisticPosts, pinnedPosts, peerFeedPosts, myProfilePosts]);
 
   const feedPostsRef = useRef<FeedPost[]>(feedPosts)
   useEffect(() => { feedPostsRef.current = feedPosts }, [feedPosts])
@@ -1412,6 +1422,32 @@ export default function Home() {
 
     return () => { cancelled = true }
   }, [selectedProfileUser, identity, feedPosts])
+
+  // Own profile: load the player's posts explicitly so they always appear on
+  // the own profile even when they fall out of the general 50-row feed
+  // snapshot. A peer's profile uses the selectedProfileUser branch above.
+  useEffect(() => {
+    if (!identity || selectedProfileUser) {
+      setMyProfilePosts([])
+      return
+    }
+
+    let cancelled = false
+    const fallbackPosts = feedPosts.filter((post) => post.author_id === identity.orbitId)
+    setMyProfilePosts(fallbackPosts)
+
+    orbitFetch(`/api/posts?author_id=${encodeURIComponent(identity.orbitId)}&limit=200&sort=latest`, {}, identity)
+      .then(async (res) => {
+        if (!res.ok || cancelled) return
+        const data = await res.json().catch(() => null)
+        if (!cancelled && Array.isArray(data?.posts)) {
+          setMyProfilePosts(data.posts as FeedPost[])
+        }
+      })
+      .catch(() => { })
+
+    return () => { cancelled = true }
+  }, [identity, selectedProfileUser, feedPosts])
 
   const loadServerFeed = useCallback((): Promise<FeedPost[]> => {
     if (!identity) return Promise.resolve([])
