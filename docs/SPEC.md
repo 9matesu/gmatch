@@ -447,6 +447,18 @@ offline earnings). Each +5% click power. Persist across prestige.
   guaranteed relay fallback could never decrypt a chunk, so a peer that cannot
   punch a direct WebRTC hole received nothing but unreadable ciphertext. The
   relay never opens a payload; the receiver's authorizer decides.
+- **One swarm contract, both ends (2026-11-08):** the frame shapes, the bounds
+  and the relay allowlist live in `packages/protocol/src/swarm-frame.ts` — the
+  package both sides already import. The node's allowlist IS that predicate
+  (`isRelayableSwarmFrame`), and the client NARROWS what arrives
+  (`parseSwarmEnvelope`) instead of casting it. Every inbound pipe (relay
+  socket, local-tab channel, direct mesh) goes through one route
+  (`routeInboundFrame`) and one announcement handler, so the two ends cannot
+  disagree about what a frame is. A field of the wrong type is dropped; a
+  frame that does not fit its declared shape never reaches a handler. When a
+  frame came through the relay, the socket PROVED the sender (`relayedBy`): an
+  announcement whose self-described user id disagrees is dropped, exactly as
+  the object path already did (`resolveClaimedOwner`).
 - **A transfer that cannot complete says so (2026-11-07):** assembly finishes
   only when the transfer declared a size AND every chunk index arrived. A chunk
   that fails its AEAD check is dropped and counted; once every index of the

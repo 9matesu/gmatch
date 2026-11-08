@@ -14,33 +14,20 @@ import {
   encryptSwarmChunk,
   openSwarmKey,
   sealSwarmKey,
+  SWARM_CHUNK_PAYLOAD,
+  SWARM_CHUNK_SIZE,
+  SWARM_MAX_CHUNKS,
+  SWARM_MAX_CHUNK_BASE64,
+  SWARM_MAX_FRAME_BYTES,
+  SWARM_MAX_OBJECT_BYTES,
   type ReplicationReceipt,
+  type SwarmMessage,
 } from '@orbit/protocol'
 
-export type SwarmMessage =
-  | { type: 'SWARM_HAVE'; ids: string[]; from?: string }
-  | { type: 'SWARM_WANT'; id: string; transferId?: string; offerPub?: string; from?: string }
-  | { type: 'SWARM_KEY'; id: string; transferId: string; wrapped: string; from?: string }
-  | {
-      type: 'SWARM_CHUNK'
-      id: string
-      index: number
-      total: number
-      mimeType: string
-      /** Legacy plaintext payload (v0). Only accepted when legacy ingest is enabled. */
-      dataBase64: string
-      /** 'swarm-v1': the wire payload is DEK-encrypted, see swarmTransfer below. */
-      enc?: 'swarm-v1'
-      transferId?: string
-      nonce?: string
-      from?: string
-    }
-  | { type: 'SWARM_CHALLENGE'; id: string; challenge: string }
-  | { type: 'SWARM_RECEIPT'; id: string; receipt: unknown }
-  /** A signed social operation travelling between peers (L4 transport). */
-  | { type: 'SWARM_OP'; operation: unknown }
-  /** Peer reports it durably appended that operation (L4.3). */
-  | { type: 'SWARM_OP_ACK'; operationId: string; actorId: string }
+// The wire contract (the frame shapes and their bounds) lives in
+// @orbit/protocol: the node's relay allowlist and this engine read the SAME
+// rules, so the two ends cannot disagree about what a frame is.
+export type { SwarmMessage } from '@orbit/protocol'
 
 /**
  * RAM cache of swarm bytes.
@@ -139,19 +126,6 @@ export function __resetLocalObjectCacheForTests(): void {
   localObjectBytes = 0
 }
 
-const CHUNK_SIZE = 5 * 1024 // Keep base64 JSON chunk frames below relay splitting.
-const MAX_OBJECT_BYTES = 64 * 1024 * 1024
-const MAX_CHUNKS = Math.ceil(MAX_OBJECT_BYTES / CHUNK_SIZE)
-// Keep the JSON envelope under the relay's 30 KB frame-splitting threshold.
-const MAX_SWARM_FRAME_BYTES = 8 * 1024
-const MAX_CHUNK_BASE64_LENGTH = Math.floor((MAX_SWARM_FRAME_BYTES - 512) / 4) * 4
-/**
- * Plaintext bytes per encrypted wire chunk (swarm-v1). The AEAD adds a 16-byte
- * tag and a 24-byte nonce field to the frame; 4 KiB keeps the base64 envelope
- * inside the relay split threshold (4096 -> 4112 bytes -> 5484 base64 chars).
- */
-const SWARM_CHUNK_PAYLOAD = 4 * 1024
-
 /**
  * Base64 for chunk frames.
  *
@@ -183,7 +157,7 @@ function isSha256Hex(value: string): boolean {
 }
 
 function isBoundedChunkFrame(message: SwarmMessage): boolean {
-  return message.type !== 'SWARM_CHUNK' || new TextEncoder().encode(JSON.stringify(message)).byteLength <= MAX_SWARM_FRAME_BYTES
+  return message.type !== 'SWARM_CHUNK' || new TextEncoder().encode(JSON.stringify(message)).byteLength <= SWARM_MAX_FRAME_BYTES
 }
 
 /** Broadcast by useP2P whenever a peer transitions to online (swarm or
@@ -317,7 +291,7 @@ export async function hydrateLocalObjects(maxBytes = RAM_LIMIT_BYTES): Promise<n
 }
 
 export function registerLocalObject(id: string, blob: Blob, meta: LocalObjectMeta = {}): void {
-  if (!id || id.length > 256 || !blob || blob.size === 0 || blob.size > MAX_OBJECT_BYTES) return
+  if (!id || id.length > 256 || !blob || blob.size === 0 || blob.size > SWARM_MAX_OBJECT_BYTES) return
   rememberLocalObject(id, blob)
   // We hold it now, so it stops being "wanted".
   wantedObjects.delete(id)
@@ -329,7 +303,7 @@ export function registerLocalObject(id: string, blob: Blob, meta: LocalObjectMet
 
 /** Register and confirm persistence before reporting an object as received. */
 export async function persistLocalObject(id: string, blob: Blob, meta: LocalObjectMeta = {}): Promise<void> {
-  if (!id || !blob || blob.size < 1 || blob.size > MAX_OBJECT_BYTES) throw new Error('Invalid local object')
+  if (!id || !blob || blob.size < 1 || blob.size > SWARM_MAX_OBJECT_BYTES) throw new Error('Invalid local object')
   const previous = localObjects.get(id)
   rememberLocalObject(id, blob)
   wantedObjects.delete(id)
@@ -516,10 +490,10 @@ function validateChunkEnvelope(
   reqTotal: number,
   reqMime: string,
 ): void {
-  if (!Number.isSafeInteger(msg.total) || msg.total < 1 || msg.total > MAX_CHUNKS ||
+  if (!Number.isSafeInteger(msg.total) || msg.total < 1 || msg.total > SWARM_MAX_CHUNKS ||
       !Number.isSafeInteger(msg.index) || msg.index < 0 || msg.index >= msg.total ||
       typeof msg.mimeType !== 'string' || msg.mimeType.length > 128 ||
-      typeof msg.dataBase64 !== 'string' || msg.dataBase64.length > MAX_CHUNK_BASE64_LENGTH ||
+      typeof msg.dataBase64 !== 'string' || msg.dataBase64.length > SWARM_MAX_CHUNK_BASE64 ||
       !isBoundedChunkFrame(msg) ||
       (reqTotal !== 0 && reqTotal !== msg.total) ||
       (reqMime !== '' && reqMime !== msg.mimeType)) {
@@ -537,7 +511,7 @@ async function serveOfferedObject(
   senderOrbitId: string,
 ): Promise<void> {
   const buffer = await blob.arrayBuffer()
-  if (buffer.byteLength === 0 || buffer.byteLength > MAX_OBJECT_BYTES) return
+  if (buffer.byteLength === 0 || buffer.byteLength > SWARM_MAX_OBJECT_BYTES) return
   const dek = createSwarmDek()
   const wrapped = sealSwarmKey(dek, offerPubHex)
   send({
@@ -612,7 +586,7 @@ function handleEncryptedChunkFrame(msg: SwarmChunkFrame, req: PendingFetch): boo
     // frame: an unauthenticated peer must never be able to poison the
     // transfer's shape (a bogus `total` would make the legitimate seeder's
     // chunks look inconsistent and abort the fetch).
-    if (Number.isSafeInteger(msg.index) && msg.index >= 0 && msg.index < MAX_CHUNKS) {
+    if (Number.isSafeInteger(msg.index) && msg.index >= 0 && msg.index < SWARM_MAX_CHUNKS) {
       // Only count an index as missing when it is not already stored: a
       // hostile peer may inject garbage for an index the seeder already
       // delivered, and the two must not be counted twice.
@@ -667,7 +641,7 @@ function handleEncryptedChunkFrame(msg: SwarmChunkFrame, req: PendingFetch): boo
     const isLast = msg.index === msg.total - 1
     if (!plaintext.byteLength || plaintext.byteLength > SWARM_CHUNK_PAYLOAD ||
         (!isLast && plaintext.byteLength !== SWARM_CHUNK_PAYLOAD) ||
-        req.receivedBytes + plaintext.byteLength > MAX_OBJECT_BYTES) {
+        req.receivedBytes + plaintext.byteLength > SWARM_MAX_OBJECT_BYTES) {
       throw new Error('Invalid swarm chunk length')
     }
     req.chunks.set(msg.index, plaintext)
@@ -1252,11 +1226,11 @@ export async function handleSwarmMessage(msg: SwarmMessage): Promise<boolean> {
     if (!legacyPlaintextServing) return true
     try {
       const buffer = await blob.arrayBuffer()
-      if (buffer.byteLength === 0 || buffer.byteLength > MAX_OBJECT_BYTES) return true
-      const totalChunks = Math.ceil(buffer.byteLength / CHUNK_SIZE) || 1
+      if (buffer.byteLength === 0 || buffer.byteLength > SWARM_MAX_OBJECT_BYTES) return true
+      const totalChunks = Math.ceil(buffer.byteLength / SWARM_CHUNK_SIZE) || 1
       const mimeType = blob.type || 'application/octet-stream'
       for (let i = 0; i < totalChunks; i++) {
-        const slice = new Uint8Array(buffer.slice(i * CHUNK_SIZE, Math.min((i + 1) * CHUNK_SIZE, buffer.byteLength)))
+        const slice = new Uint8Array(buffer.slice(i * SWARM_CHUNK_SIZE, Math.min((i + 1) * SWARM_CHUNK_SIZE, buffer.byteLength)))
         const frame: SwarmMessage = { type: 'SWARM_CHUNK', id: msg.id, index: i, total: totalChunks, mimeType, dataBase64: bytesToBase64(slice) }
         if (!isBoundedChunkFrame(frame)) return true
         swarmSend(frame)
@@ -1287,10 +1261,10 @@ export async function handleSwarmMessage(msg: SwarmMessage): Promise<boolean> {
       // cannot authenticate would put unverified media into the vault.
       if (!legacyPlaintextServing) return true
       try {
-        if (!Number.isSafeInteger(msg.total) || msg.total < 1 || msg.total > MAX_CHUNKS ||
+        if (!Number.isSafeInteger(msg.total) || msg.total < 1 || msg.total > SWARM_MAX_CHUNKS ||
             !Number.isSafeInteger(msg.index) || msg.index < 0 || msg.index >= msg.total ||
             typeof msg.mimeType !== 'string' || msg.mimeType.length > 128 ||
-            typeof msg.dataBase64 !== 'string' || msg.dataBase64.length > MAX_CHUNK_BASE64_LENGTH || !isBoundedChunkFrame(msg) ||
+            typeof msg.dataBase64 !== 'string' || msg.dataBase64.length > SWARM_MAX_CHUNK_BASE64 || !isBoundedChunkFrame(msg) ||
             (req.total !== 0 && req.total !== msg.total) ||
             (req.mimeType !== '' && req.mimeType !== msg.mimeType)) {
           throw new Error('Invalid swarm chunk metadata')
@@ -1305,8 +1279,8 @@ export async function handleSwarmMessage(msg: SwarmMessage): Promise<boolean> {
         // no-op, never a fetch failure: we already hold that index.
         if (req.chunks.has(msg.index)) return true
         const isLast = msg.index === msg.total - 1
-        if (!bytes.byteLength || bytes.byteLength > CHUNK_SIZE || (!isLast && bytes.byteLength !== CHUNK_SIZE) ||
-            req.receivedBytes + bytes.byteLength > MAX_OBJECT_BYTES) {
+        if (!bytes.byteLength || bytes.byteLength > SWARM_CHUNK_SIZE || (!isLast && bytes.byteLength !== SWARM_CHUNK_SIZE) ||
+            req.receivedBytes + bytes.byteLength > SWARM_MAX_OBJECT_BYTES) {
           throw new Error('Invalid swarm chunk length')
         }
         req.chunks.set(msg.index, bytes)
@@ -1603,7 +1577,7 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
       const isLast = msg.index === msg.total - 1
       if (!plaintext.byteLength || plaintext.byteLength > SWARM_CHUNK_PAYLOAD ||
           (!isLast && plaintext.byteLength !== SWARM_CHUNK_PAYLOAD) ||
-          req.receivedBytes + plaintext.byteLength > MAX_OBJECT_BYTES) {
+          req.receivedBytes + plaintext.byteLength > SWARM_MAX_OBJECT_BYTES) {
         throw new Error('Invalid swarm chunk length')
       }
       req.chunks.set(msg.index, plaintext)
@@ -1635,15 +1609,15 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
         return
       }
       if (!options.legacyPlaintext) return
-      if (blob.size === 0 || blob.size > MAX_OBJECT_BYTES) return
+      if (blob.size === 0 || blob.size > SWARM_MAX_OBJECT_BYTES) return
       const buffer = await blob.arrayBuffer()
       const totalBytes = buffer.byteLength
-      const totalChunks = Math.ceil(totalBytes / CHUNK_SIZE) || 1
+      const totalChunks = Math.ceil(totalBytes / SWARM_CHUNK_SIZE) || 1
       const mimeType = blob.type || 'application/octet-stream'
 
       for (let i = 0; i < totalChunks; i++) {
-        const start = i * CHUNK_SIZE
-        const end = Math.min(start + CHUNK_SIZE, totalBytes)
+        const start = i * SWARM_CHUNK_SIZE
+        const end = Math.min(start + SWARM_CHUNK_SIZE, totalBytes)
         const slice = new Uint8Array(buffer.slice(start, end))
 
         // Convert slice to base64 (block-wise: see bytesToBase64).
@@ -1684,10 +1658,10 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
         if (!options.legacyPlaintext) return
         let bytes: Uint8Array
         try {
-          if (!Number.isSafeInteger(msg.total) || msg.total < 1 || msg.total > MAX_CHUNKS ||
+          if (!Number.isSafeInteger(msg.total) || msg.total < 1 || msg.total > SWARM_MAX_CHUNKS ||
               !Number.isSafeInteger(msg.index) || msg.index < 0 || msg.index >= msg.total ||
               typeof msg.mimeType !== 'string' || msg.mimeType.length > 128 ||
-              typeof msg.dataBase64 !== 'string' || msg.dataBase64.length > MAX_CHUNK_BASE64_LENGTH || !isBoundedChunkFrame(msg) ||
+              typeof msg.dataBase64 !== 'string' || msg.dataBase64.length > SWARM_MAX_CHUNK_BASE64 || !isBoundedChunkFrame(msg) ||
               (req.total !== 0 && req.total !== msg.total) ||
               (req.mimeType !== '' && req.mimeType !== msg.mimeType)) {
             throw new Error('Invalid swarm chunk metadata')
@@ -1696,8 +1670,8 @@ export function createSwarmSession(options: SwarmSessionOptions): SwarmSession {
           // Duplicate re-delivery: idempotent no-op (see module handler note).
           if (req.chunks.has(msg.index)) return
           const last = msg.index === msg.total - 1
-          if (!bytes.byteLength || bytes.byteLength > CHUNK_SIZE || (!last && bytes.byteLength !== CHUNK_SIZE) ||
-              req.receivedBytes + bytes.byteLength > MAX_OBJECT_BYTES) {
+          if (!bytes.byteLength || bytes.byteLength > SWARM_CHUNK_SIZE || (!last && bytes.byteLength !== SWARM_CHUNK_SIZE) ||
+              req.receivedBytes + bytes.byteLength > SWARM_MAX_OBJECT_BYTES) {
             throw new Error('Invalid swarm chunk length')
           }
         } catch (error) {

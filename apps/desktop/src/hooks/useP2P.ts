@@ -1,13 +1,14 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { OrbitIdentity } from '@orbit/crypto';
 import { User, OrbitObject } from '@orbit/shared';
+import { parseBareSwarmAnnounce, parseSwarmEnvelope, type SwarmAnnounce, type SwarmMessage } from '@orbit/protocol';
 import { saveObject, getObject } from '../utils/storage';
 import { getApiBaseUrl, getApiWebSocketUrl, isCourierHost, orbitFetch, subscribeApiBase } from '../utils/api';
 import { mergeRoster } from '../utils/peerRoster';
 import { presenceBucket } from '../utils/compare';
 import { CHAT_WIPE_SECONDS } from '@orbit/shared';
 import { logger } from '../utils/logger';
-import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, hydrateDurableReplications, announcePeerOnline, PEER_ONLINE_EVENT, announceHeldObjects, setSwarmReceiptIdentity, setSwarmOperationHandler, setSwarmOperationAckHandler, sendSwarmFrame, type SwarmMessage } from '../utils/p2pSwarm';
+import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, hydrateDurableReplications, announcePeerOnline, PEER_ONLINE_EVENT, announceHeldObjects, setSwarmReceiptIdentity, setSwarmOperationHandler, setSwarmOperationAckHandler, sendSwarmFrame } from '../utils/p2pSwarm';
 import { broadcastPresence, fetchPresenceRosterFrom } from '../services/courierPresence';
 import { knownNodes, rememberKnownNode, rememberPeerNode } from '../utils/peerNodes';
 import { broadcastMeshFrame, onMeshMessage, connectToPeerMesh, setMeshIceFailureHandler, MESH_BACKPRESSURE_HIGH_BYTES } from '../utils/courierSignaling';
@@ -73,46 +74,37 @@ export interface ChatMessage {
   reactions?: Record<string, string[]>;
 }
 
-export interface P2PSwarmMessage {
-  type: 'PRESENCE' | 'MESSAGE' | 'IMAGE_ANNOUNCE' | 'CHAT' | 'STORY_ANNOUNCE';
-  user: User;
-  payload?: OrbitObject;
-  chatMessage?: ChatMessage;
-  channel?: string;
-  timestamp: number;
-  /**
-   * Sender stamped by the relay socket (it owns the auth ticket), when the
-   * frame arrived through the WS relay. `user.id` alone is client-supplied and
-   * must never be treated as proof of who sent an object.
-   */
-  relayedBy?: string;
-}
-
 /**
- * Route one inbound P2P frame.
+ * Route one inbound peer frame.
  *
- * The relay wraps every client-to-client frame in the `SWARM_FRAME` envelope
- * (a bare `type` key could shadow a server-published event, audit A2), so both
- * the swarm byte protocol and the announce shapes arrive wrapped. Swarm shapes
- * go to the byte protocol; everything else is an announcement and carries the
- * relay's proven `relayedBy` when one was stamped.
+ * Every pipe — the relay socket, the local-tab channel and the direct mesh —
+ * ends here, so there is ONE place that knows what a peer frame is:
+ *
+ *   - the relay wraps every client-to-client frame in `SWARM_FRAME` (a bare
+ *     `type` key could shadow a server-published event, audit A2);
+ *   - the mesh and the local channel carry announcements bare.
+ *
+ * The frames are NARROWED by the shared contract (@orbit/protocol): a field
+ * of the wrong type is dropped, and a frame that does not fit its declared
+ * shape never reaches a handler.
  */
 function routeInboundFrame(
   raw: unknown,
   onSwarm: (msg: SwarmMessage) => void,
-  onAnnounce: (msg: P2PSwarmMessage) => void,
+  onAnnounce: (msg: SwarmAnnounce) => void,
 ): boolean {
-  if (!raw || typeof raw !== 'object') return false
-  const frame = raw as { type?: unknown; swarm?: unknown; relayedBy?: unknown }
-  if (frame.type !== 'SWARM_FRAME' || !frame.swarm || typeof frame.swarm !== 'object') return false
-  const inner = frame.swarm as { type?: unknown }
-  if (typeof inner.type === 'string' && inner.type.startsWith('SWARM_')) {
-    onSwarm(inner as SwarmMessage)
+  const envelope = parseSwarmEnvelope(raw)
+  if (envelope) {
+    if (envelope.kind === 'swarm') onSwarm(envelope.frame)
+    else onAnnounce(envelope.announce)
     return true
   }
-  const announce = frame.swarm as P2PSwarmMessage
-  onAnnounce(typeof frame.relayedBy === 'string' && frame.relayedBy ? { ...announce, relayedBy: frame.relayedBy } : announce)
-  return true
+  const announce = parseBareSwarmAnnounce(raw)
+  if (announce) {
+    onAnnounce(announce)
+    return true
+  }
+  return false
 }
 
 function arePeersStructurallyEqual(a: User[], b: User[]): boolean {
@@ -138,7 +130,7 @@ function arePeersStructurallyEqual(a: User[], b: User[]): boolean {
 
 // Module-level so it can be referenced from the WebSocket effect without
 // ordering issues and keeps a stable identity (not memoized in the hook).
-function transmitOverWebSocket(socket: WebSocket | null, queue: P2PSwarmMessage[], msg: P2PSwarmMessage) {
+function transmitOverWebSocket(socket: WebSocket | null, queue: SwarmAnnounce[], msg: SwarmAnnounce) {
   if (!socket || socket.readyState !== WebSocket.OPEN) {
     logger.log('[ORBIT Network Swarm] WebSocket not open yet. Queuing message for delivery on connect...');
     queue.push(msg);
@@ -327,9 +319,7 @@ export function useP2P(identity: OrbitIdentity | null) {
     const unsubMesh = onMeshMessage((data: string) => {
       try {
         const parsed = JSON.parse(data);
-        if (!routeInboundFrame(parsed, (m) => { void handleSwarmMessage(m); }, processSwarmMessage)) {
-          processSwarmMessage(parsed as P2PSwarmMessage);
-        }
+        routeInboundFrame(parsed, (m) => { void handleSwarmMessage(m); }, processSwarmMessage);
       } catch {}
     });
     // Local-first seeding: reload persisted bytes into RAM so this client
@@ -456,24 +446,40 @@ export function useP2P(identity: OrbitIdentity | null) {
 
     updatePeersList();
 
-    const processSwarmMessage = (data: P2PSwarmMessage) => {
+    /**
+     * Apply one peer announcement.
+     *
+     * Every pipe ends here (the relay socket, the local-tab channel and the
+     * direct mesh), so there is ONE announcement handler. The frames arrive
+     * NARROWED (see routeInboundFrame): a peer cannot hand this function a
+     * chat line without text or an object without an id.
+     *
+     * A local tab's own announcement is the SAME identity, so it is not a
+     * peer: it does not enter the roster and it is not stored again (the
+     * bytes are already local) — but the other tab still lists the item.
+     */
+    const processSwarmMessage = (data: SwarmAnnounce) => {
       const currentSelf = selfUserRef.current;
-      if (!data || !data.user || data.user.id === currentSelf.id) return;
+      const isSelf = data.user.id === currentSelf.id;
 
-      logger.log('[ORBIT Network Swarm] Discovered remote peer:', data.user.display_name || data.user.id, 'Type:', data.type);
+      if (!isSelf) {
+        logger.log('[ORBIT Network Swarm] Discovered remote peer:', data.user.display_name || data.user.id, 'Type:', data.type);
 
-      const prevSeen = peerMapRef.current.get(data.user.id);
-      peerMapRef.current.set(data.user.id, {
-        ...data.user,
-        online: true,
-        last_seen: new Date().toISOString(),
-      });
-      updatePeersList();
-      // Offline seeder coming back: wake failed P2P tiles so they retry.
-      if (!prevSeen || !prevSeen.online) announcePeerOnline(data.user.id);
+        const prevSeen = peerMapRef.current.get(data.user.id);
+        peerMapRef.current.set(data.user.id, {
+          ...data.user,
+          online: true,
+          last_seen: new Date().toISOString(),
+        });
+        updatePeersList();
+        // Offline seeder coming back: wake failed P2P tiles so they retry.
+        if (!prevSeen || !prevSeen.online) announcePeerOnline(data.user.id);
+      }
 
       if (data.type === 'PRESENCE') {
-        logger.log('[ORBIT Network Swarm] Remote peer online presence confirmed:', data.user.display_name || data.user.id);
+        // A presence beacon says nothing else; the roster heartbeat is
+        // periodic and authoritative.
+        if (!isSelf) logger.log('[ORBIT Network Swarm] Remote peer online presence confirmed:', data.user.display_name || data.user.id);
       } else if (data.type === 'STORY_ANNOUNCE') {
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('orbit-story-announce'))
@@ -481,22 +487,22 @@ export function useP2P(identity: OrbitIdentity | null) {
       } else if (data.type === 'CHAT' && data.chatMessage) {
         const chan = data.chatMessage.channel || data.channel || 'global_lobby';
         const msgWithChan: ChatMessage = { ...data.chatMessage, channel: chan };
-        logger.log('[ORBIT Chat] Cross-tab chat message:', msgWithChan.text.slice(0, 30));
+        logger.log('[ORBIT Chat] Swarm chat message:', msgWithChan.text.slice(0, 30));
         setChatMessages(prev => {
           if (prev.some(m => m.id === msgWithChan.id)) return prev;
           return [...prev, msgWithChan];
         });
       } else if ((data.type === 'IMAGE_ANNOUNCE' || data.type === 'MESSAGE') && data.payload) {
         const newItem = data.payload;
-        logger.log('[ORBIT Network Swarm] Received IMAGE_ANNOUNCE payload from remote peer:', data.user.display_name || data.user.id, 'Item ID:', newItem.id, 'DataURL Length:', newItem.content_url?.length || 0);
+        logger.log('[ORBIT Network Swarm] Received IMAGE_ANNOUNCE payload from peer:', data.user.display_name || data.user.id, 'Item ID:', newItem.id, 'DataURL Length:', newItem.content_url?.length || 0);
 
         // An announcement DESCRIBES an object; it never carries its bytes. The
         // provider link is stored as `source_url` — separate from `data` — and
         // the claimed owner is only accepted when the envelope's sender proves
         // it (a relayed claim stays unverified instead of impersonating).
-        const claim = resolveClaimedOwner((newItem as any).owner_id, data.relayedBy || data.user?.id)
+        const claim = resolveClaimedOwner(newItem.owner_id, data.relayedBy || data.user.id)
 
-        if (newItem.content_url) {
+        if (newItem.content_url && !isSelf) {
           const sourceUrl = newItem.content_url
           void (async () => {
             try {
@@ -514,24 +520,24 @@ export function useP2P(identity: OrbitIdentity | null) {
                 name: newItem.id,
                 mime_type: newItem.mime_type || 'image/jpeg',
                 size_bytes: newItem.size_bytes || 0,
-                owner_id: claim.owner_id || (data.user?.id ?? ''),
+                owner_id: claim.owner_id || data.user.id,
                 owner_verified: claim.owner_verified,
                 sender_pubkey: newItem.sender_pubkey || '',
                 sender_enc_pubkey: newItem.sender_enc_pubkey || '',
                 created_at: newItem.created_at || new Date().toISOString(),
                 data: new ArrayBuffer(0),
                 source_url: sourceUrl,
-                is_public: mediaFlag((newItem as any).is_public),
-                is_story: mediaFlag((newItem as any).is_story),
-                is_chat: mediaFlag((newItem as any).is_chat),
-                is_avatar: mediaFlag((newItem as any).is_avatar),
-                caption: (newItem as any).caption || (newItem as any).post_caption || '',
-                tags: (newItem as any).tags || [],
-                author_name: (newItem as any).author_name || (newItem as any).sender_name || '',
-                location: (newItem as any).location || '',
-                comments: (newItem as any).comments || [],
-                likes_count: (newItem as any).likes_count || (newItem as any).like_count || 0,
-                comment_count: (newItem as any).comment_count || 0,
+                is_public: mediaFlag(newItem.is_public),
+                is_story: mediaFlag(newItem.is_story),
+                is_chat: mediaFlag(newItem.is_chat),
+                is_avatar: mediaFlag(newItem.is_avatar),
+                caption: newItem.caption || newItem.post_caption || '',
+                tags: newItem.tags || [],
+                author_name: newItem.author_name || newItem.sender_name || '',
+                location: newItem.location || '',
+                comments: newItem.comments || [],
+                likes_count: newItem.likes_count || newItem.like_count || 0,
+                comment_count: newItem.comment_count || 0,
               })
             } catch {
               /* storage unavailable (tests/SSR/quota) */
@@ -543,7 +549,11 @@ export function useP2P(identity: OrbitIdentity | null) {
           if (prev.some((item) => item.id === newItem.id)) return prev;
           const updated = [{ ...newItem, owner_verified: claim.owner_verified }, ...prev];
           try {
-            const safeItems = updated.slice(0, 50);
+            // The mirror is a localStorage string: a huge provider link would
+            // blow the quota for the whole gallery.
+            const safeItems = updated.slice(0, 50).map(i => (
+              i.content_url && i.content_url.length > 100000 ? { ...i, content_url: '' } : i
+            ));
             localStorage.setItem('orbit_p2p_gallery', JSON.stringify(safeItems));
           } catch (e) {
             logger.warn('[ORBIT P2P] LocalStorage save quota limit:', e);
@@ -685,9 +695,6 @@ export function useP2P(identity: OrbitIdentity | null) {
               });
               return;
             }
-
-            const data: P2PSwarmMessage = rawData;
-            processSwarmMessage(data);
           } catch {
             // Ignore non-JSON frames
           }
@@ -719,7 +726,7 @@ export function useP2P(identity: OrbitIdentity | null) {
       // timers anyway, and hidden tabs should not contribute swarm noise.
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       const currentSelf = selfUserRef.current;
-      const msg: P2PSwarmMessage = {
+      const msg: SwarmAnnounce = {
         type: 'PRESENCE',
         user: currentSelf,
         timestamp: Date.now(),
@@ -861,59 +868,11 @@ export function useP2P(identity: OrbitIdentity | null) {
       document.addEventListener('visibilitychange', onVisible)
     }
 
-    // 5. Handle incoming local tab P2P swarm events
-    channel.onmessage = (event: MessageEvent<P2PSwarmMessage & { swarm?: SwarmMessage; type: string }>) => {
-      const raw = event.data as unknown as { swarm?: SwarmMessage; type?: string };
-      if (raw && raw.swarm && typeof raw.swarm === 'object') {
-        void handleSwarmMessage(raw.swarm);
-        return;
-      }
-      const data = event.data as P2PSwarmMessage;
-      if (!data || !data.user) return;
-
-      const prevLocal = peerMapRef.current.get(data.user.id);
-      peerMapRef.current.set(data.user.id, {
-        ...data.user,
-        online: true,
-        last_seen: new Date().toISOString(),
-      });
-      updatePeersList();
-      if (!prevLocal || !prevLocal.online) announcePeerOnline(data.user.id);
-
-      if (data.type === 'PRESENCE') {
-        // Do not echo every tab's presence back into BroadcastChannel and the
-        // websocket. The server heartbeat is periodic and authoritative.
-      } else if (data.type === 'CHAT' && data.chatMessage) {
-        const chan = data.chatMessage.channel || data.channel || 'global_lobby';
-        const msgWithChan: ChatMessage = { ...data.chatMessage, channel: chan };
-        setChatMessages(prev => {
-          if (prev.some(m => m.id === msgWithChan.id)) return prev;
-          return [...prev, msgWithChan];
-        });
-      } else if (data.type === 'STORY_ANNOUNCE') {
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('orbit-story-announce'))
-        }
-      } else if ((data.type === 'IMAGE_ANNOUNCE' || data.type === 'MESSAGE') && data.payload) {
-        const newItem = data.payload;
-        logger.log('[ORBIT Local Swarm] Received local tab swarm event:', data.type, 'from:', data.user.display_name || data.user.id, 'item:', newItem.id);
-        setP2pItems((prev) => {
-          if (prev.some((item) => item.id === newItem.id)) return prev;
-          const updated = [newItem, ...prev];
-          try {
-            const safeItems = updated.slice(0, 50).map(i => {
-              if (i.content_url && i.content_url.length > 100000) {
-                return { ...i, content_url: '' };
-              }
-              return i;
-            });
-            localStorage.setItem('orbit_p2p_gallery', JSON.stringify(safeItems));
-          } catch (e) {
-            logger.warn('[ORBIT P2P] LocalStorage save quota limit:', e);
-          }
-          return updated;
-        });
-      }
+    // 5. Handle incoming local tab P2P swarm events. The local channel
+    // carries the same frames as the relay (wrapped swarm frames) and bare
+    // announcements, so it goes through the SAME route.
+    channel.onmessage = (event: MessageEvent<unknown>) => {
+      routeInboundFrame(event.data, (m) => { void handleSwarmMessage(m); }, processSwarmMessage);
     };
 
     return () => {
@@ -974,7 +933,7 @@ export function useP2P(identity: OrbitIdentity | null) {
     }
   }, [loadLobbyHistory])
 
-  const queuedMessagesRef = useRef<P2PSwarmMessage[]>([]);
+  const queuedMessagesRef = useRef<SwarmAnnounce[]>([]);
 
   const sendP2PItem = useCallback(
     (item: OrbitObject) => {
@@ -1034,7 +993,7 @@ export function useP2P(identity: OrbitIdentity | null) {
 
       const selfUser = selfUserRef.current;
 
-      const msg: P2PSwarmMessage = {
+      const msg: SwarmAnnounce = {
         type: 'IMAGE_ANNOUNCE',
         user: selfUser,
         payload: item,
@@ -1077,7 +1036,7 @@ export function useP2P(identity: OrbitIdentity | null) {
       timestamp: Date.now(),
       channel,
     };
-    const msg: P2PSwarmMessage = {
+    const msg: SwarmAnnounce = {
       type: 'CHAT',
       user: selfUser,
       chatMessage: chatMsg,

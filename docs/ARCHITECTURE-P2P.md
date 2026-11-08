@@ -509,6 +509,42 @@ that looks like a server-published event. The relay never opens a payload: the
 a signature, and an operation carries its own author signature — the
 receiver's authorizer decides, the relay only moves bytes.
 
+### One swarm contract, both ends (2026-11-08)
+
+The allowlist above was a hand-written list inside `apps/api/src/ws-bus.ts`,
+while the frame shapes lived in the desktop's `p2pSwarm.ts` and the desktop
+cast whatever arrived to `SwarmMessage` (`inner as SwarmMessage`,
+`frame.swarm as P2PSwarmMessage`). The two ends could therefore disagree:
+the relay carried a shape the client then dropped, and the client accepted a
+shape the relay had never allowed.
+
+- **The contract lives in `packages/protocol/src/swarm-frame.ts`** — the
+  package both sides already import. It holds the byte-protocol frames
+  (`SwarmMessage`), the announcement envelopes (`SwarmAnnounce`), the bounds
+  (`SWARM_CHUNK_SIZE`, `SWARM_CHUNK_PAYLOAD`, `SWARM_MAX_OBJECT_BYTES`,
+  `SWARM_MAX_CHUNKS`, `SWARM_MAX_CHUNK_BASE64`), the relay allowlist
+  (`isRelayableSwarmFrame`) and the narrowing (`parseSwarmFrame`,
+  `parseSwarmEnvelope`, `parseBareSwarmAnnounce`, `parseSwarmAnnounce`).
+- **The node's allowlist IS the shared predicate.** `ws-bus.ts` calls
+  `isRelayableSwarmFrame`; it no longer re-implements the list. The rule is
+  one rule: bounded strings, an object payload, a chunk whose index belongs
+  to its total, and nothing that looks like a server event.
+- **The client narrows instead of casting.** Every inbound pipe — the relay
+  socket, the local-tab channel and the direct mesh — goes through ONE route
+  (`routeInboundFrame` in `useP2P.ts`), so there is one place that knows what
+  a peer frame is. A field of the wrong type is DROPPED; a frame that does
+  not fit its declared shape never reaches a handler.
+- **One announcement handler, not two.** The local-tab channel used to carry
+  its own copy of the announce logic (a weaker one: it never stored the
+  object). Both pipes now use the same handler.
+- **The relay's proof wins over the self-description.** When a frame came
+  through the relay, the socket PROVED the sender (`relayedBy`). An
+  announcement whose self-described user id disagrees is dropped — the same
+  rule the object path already applied (`resolveClaimedOwner`).
+- **The chunk count bound follows the smallest payload.** `SWARM_MAX_CHUNKS`
+  is counted against the 4 KiB sealed chunk, so an object at the 64 MiB size
+  limit fits in BOTH encodings (the legacy 5 KiB chunk needs fewer chunks).
+
 **Assembly is honest about missing bytes.** A transfer is complete only when
 it declared a size AND every index arrived (`req.total > 0 &&
 chunks.size === req.total`). The bare size comparison used to fire on the

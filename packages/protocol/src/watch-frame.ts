@@ -11,10 +11,7 @@
 // The room STATE (Party, PartyMember, QueueEntry, ChatEntry) lives in
 // watchparty.ts; the SHAPES that travel on the wire live here.
 
-/** Narrow an untrusted value to a plain record (no arrays, no null). */
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value)
-}
+import { isRecord } from './record'
 
 function strField(src: Record<string, unknown>, key: string): string | undefined {
   const v = src[key]

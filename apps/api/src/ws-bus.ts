@@ -58,7 +58,7 @@ import {
   applyWatch, joinWatch, watchPong, applyChat, deleteChat, leaveWatch,
   kickWatch, banWatch, muteWatch, transferHost, settingsWatch, queueOps, watchReady, touchRooms, leaveAll, disbandWatch,
 } from './watchparty'
-import { parseWatchFrame, isRecord, type WatchFrame } from '@orbit/protocol'
+import { isRelayableSwarmFrame, parseWatchFrame, isRecord, type WatchFrame } from '@orbit/protocol'
 
 export function handleIncoming(conn: WsConn, data: string): void {
   let parsed: unknown = null
@@ -243,46 +243,11 @@ export function handleIncoming(conn: WsConn, data: string): void {
   // the socket PROVED at auth, so a receiver can tell a real sender from a
   // forged `user.id` in the payload.
   if (msg.type === 'SWARM_FRAME' && isRecord(msg.swarm)) {
-    const inner = msg.swarm
-    const bounded = (v: unknown, max: number): v is string => typeof v === 'string' && v.length > 0 && v.length <= max
-    const relayable =
-      inner.type === 'SWARM_WANT' ||
-      inner.type === 'SWARM_HAVE' ||
-      (inner.type === 'SWARM_CHUNK' &&
-        typeof inner.dataBase64 === 'string' &&
-        inner.dataBase64.length <= 128 * 1024) ||
-      // swarm-v1 transfer key: the per-transfer DEK, sealed to the FETCHER's
-      // ephemeral offer key. The relay cannot open it (it holds no private
-      // key), so forwarding it leaks nothing — but WITHOUT this frame the
-      // relay path could never decrypt a chunk, which silently broke the
-      // "guaranteed fallback" for every peer that cannot punch a direct
-      // WebRTC hole.
-      (inner.type === 'SWARM_KEY' &&
-        bounded(inner.transferId, 128) &&
-        bounded(inner.wrapped, 1024)) ||
-      // Durable-replication evidence: the seeder's challenge and the
-      // fetcher's signed receipt (challenge-bound, read-back verified).
-      (inner.type === 'SWARM_CHALLENGE' &&
-        bounded(inner.id, 256) &&
-        bounded(inner.challenge, 1024)) ||
-      (inner.type === 'SWARM_RECEIPT' &&
-        bounded(inner.id, 256) &&
-        !!inner.receipt &&
-        typeof inner.receipt === 'object') ||
-      // Signed social operations and their acks: the operation carries its
-      // own signature, and the receiver's authorizer decides (the relay
-      // never reads or rewrites it).
-      (inner.type === 'SWARM_OP' && !!inner.operation && typeof inner.operation === 'object') ||
-      (inner.type === 'SWARM_OP_ACK' &&
-        bounded(inner.operationId, 256) &&
-        bounded(inner.actorId, 256)) ||
-      // Announce shapes: an object's metadata + its provider link, never bytes.
-      inner.type === 'IMAGE_ANNOUNCE' ||
-      inner.type === 'MESSAGE' ||
-      inner.type === 'STORY_ANNOUNCE' ||
-      inner.type === 'CHAT' ||
-      inner.type === 'PRESENCE'
-    if (!relayable) return
+    // ONE allowlist, shared with the client: the node decides which frames it
+    // carries, and the client decides which frames it accepts, from the same
+    // rules (@orbit/protocol). Before this the node re-implemented the list
+    // by hand, so the two ends could disagree about what a frame is.
+    if (!isRelayableSwarmFrame(msg.swarm)) return
     // Bound the RELAYED frame. The relay fans the same payload out to every
     // authed socket in the room, so an unbounded frame is an amplification
     // vector (one sender, N copies). The client used to "solve" this by
