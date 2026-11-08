@@ -247,26 +247,15 @@ function getQueryNegatives() {
 // 400px for localhost content-volume parity — small stills/gifs stay).
 const FLOOR_PX = 400
 
-// Blocklist matching. MUST stay byte-for-byte equivalent to
-// apps/desktop/src/game/tagFilter.ts (hitsAtTokenStart): the renderer and the
-// main process enforce the same hard line and a disagreement between them is
-// a safety hole, not a cosmetic bug. See tagFilter.ts for why a raw substring
-// test is wrong and why allowing a term to be a token PREFIX keeps every real
-// compound blocked.
-function normalizeTagText(raw) {
-  return String(raw).toLowerCase().replace(/[\s-]+/g, '_')
-}
-
-function hitsAtTokenStart(tag, term) {
-  if (!tag || !term) return false
-  let from = 0
-  for (;;) {
-    const i = tag.indexOf(term, from)
-    if (i === -1) return false
-    if (i === 0 || tag.charCodeAt(i - 1) === 95) return true // '_'
-    from = i + 1
-  }
-}
+// Blocklist matching. The RULE is canonical in
+// packages/shared/src/blocklist.ts; this file carries the CommonJS mirror
+// (apps/desktop/electron/blocklistRule.cjs) because main.cjs cannot import
+// TypeScript. The two are pinned against each other by a parity test: the
+// renderer and the main process enforce the same hard line and a
+// disagreement between them is a safety hole, not a cosmetic bug. See
+// blocklistRule.cjs for why a raw substring test is wrong and why allowing a
+// term to be a token PREFIX keeps every real compound blocked.
+const { normalizeTagText, hitsAtTokenStart } = require('./blocklistRule.cjs')
 
 function isQueryBlocked(query) {
   const q = normalizeTagText(query)

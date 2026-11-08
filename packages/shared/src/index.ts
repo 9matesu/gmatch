@@ -1,6 +1,7 @@
-import blocklistData from '../../../shared/blocklist.json'
+import { DEFAULT_BLOCKLIST, tagHitsAnyTerm } from './blocklist';
 
 export * from './social-vectors';
+export * from './blocklist';
 
 export type OrbitId = string;
 
@@ -9,6 +10,13 @@ export type LikeDecision = 'like' | 'reject' | 'pass';
 export const MAX_TAGS = 5;
 export const MAX_TAG_LENGTH = 20;
 
+/**
+ * The blocklist terms this process enforces.
+ *
+ * The desktop sidecar points the API at the player's edited copy
+ * (`BLOCKLIST_PATH`, written only through Settings → Blocklist); the repo
+ * file is the factory default.
+ */
 function resolveInitialBlocklist(): string[] {
   if (typeof process !== 'undefined' && process.env?.BLOCKLIST_PATH) {
     try {
@@ -21,19 +29,21 @@ function resolveInitialBlocklist(): string[] {
       /* fallback */
     }
   }
-  return Array.isArray(blocklistData.blocklist) ? [...blocklistData.blocklist] : []
+  return [...DEFAULT_BLOCKLIST]
 }
 
-export let TAG_BLACKLIST: string[] = resolveInitialBlocklist()
+const ACTIVE_BLOCKLIST: readonly string[] = resolveInitialBlocklist()
 
-export function setTagBlacklist(list: string[]): void {
-  TAG_BLACKLIST = [...list]
-}
-
+/**
+ * Is this tag on the hard line?
+ *
+ * The token-boundary rule (SPEC §8): a term matches when it starts a token,
+ * and may be a PREFIX of that token — so 'lolicon' and 'teenager' are
+ * blocked while 'fifteen' and 'grape' are not. See ./blocklist.ts.
+ */
 export function isBlacklistedTag(tag: string): boolean {
   if (!tag) return false;
-  const clean = tag.trim().toLowerCase().replace(/^#/, '').replace(/[^a-z0-9_-]/g, '');
-  return TAG_BLACKLIST.some(b => clean.includes(b));
+  return tagHitsAnyTerm(tag, ACTIVE_BLOCKLIST);
 }
 
 /**
@@ -51,20 +61,6 @@ export function isDefaultPeerName(name?: string | null): boolean {
   if (!name || !name.trim()) return true;
   const n = name.trim();
   return /^user[-_].*/i.test(n) || n.toLowerCase() === 'user' || n.toLowerCase() === 'unknown user' || n.toLowerCase() === 'anonymous';
-}
-
-export function checkBlacklistedTags(raw: (string | null | undefined)[]): { hasBlacklisted: boolean; blockedTags: string[] } {
-  const blocked: string[] = [];
-  for (const entry of raw) {
-    if (!entry) continue;
-    const parts = entry.split(',').map(p => p.trim().toLowerCase().replace(/^#/, '').replace(/[^a-z0-9_-]/g, '')).filter(Boolean);
-    for (const part of parts) {
-      if (isBlacklistedTag(part) && !blocked.includes(part)) {
-        blocked.push(part);
-      }
-    }
-  }
-  return { hasBlacklisted: blocked.length > 0, blockedTags: blocked };
 }
 
 /**

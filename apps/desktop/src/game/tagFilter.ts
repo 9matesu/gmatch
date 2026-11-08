@@ -1,4 +1,10 @@
-import blocklistData from '../../../../shared/blocklist.json'
+import {
+  DEFAULT_BLOCKLIST,
+  DEFAULT_BLOCKLIST_DATA as SHARED_BLOCKLIST_DATA,
+  DEFAULT_NOISE_TAGS,
+  DEFAULT_SUGGESTED_EXCLUDES,
+  tagHitsAnyTerm,
+} from '@orbit/shared'
 import type { BlocklistData } from '../types/gmatch-bridge'
 
 /**
@@ -6,16 +12,17 @@ import type { BlocklistData } from '../types/gmatch-bridge'
  * bestiality, necrophilia, non-consent). A tag is rejected if a blocklist
  * term appears in it ALIGNED TO A TOKEN BOUNDARY (underscore-joined words;
  * a term may still be a prefix of its token, so 'lolicon' stays blocked while
- * 'fifteen' no longer trips 'teen'). Single source of truth:
- * shared/blocklist.json (also required by electron/main.cjs, which cannot
- * import TS). Everything legal-but-polarising lives in SUGGESTED_EXCLUDES
- * and is blocked only when the player adds it to their own exclude list.
+ * 'fifteen' no longer trips 'teen'). The RULE lives in @orbit/shared
+ * (one canonical implementation); the TERMS live in shared/blocklist.json
+ * (also required by electron/main.cjs, which cannot import TS).
+ * Everything legal-but-polarising lives in SUGGESTED_EXCLUDES and is blocked
+ * only when the player adds it to their own exclude list.
  */
-export const DEFAULT_BLOCKLIST_DATA: BlocklistData = blocklistData as BlocklistData
+export const DEFAULT_BLOCKLIST_DATA: BlocklistData = SHARED_BLOCKLIST_DATA as BlocklistData
 
-export let BLOCKLIST: readonly string[] = [...blocklistData.blocklist]
-export let NOISE_TAGS: readonly string[] = [...blocklistData.noise]
-export let SUGGESTED_EXCLUDES: readonly string[] = [...(blocklistData.suggested ?? [])]
+export let BLOCKLIST: readonly string[] = [...DEFAULT_BLOCKLIST]
+export let NOISE_TAGS: readonly string[] = [...DEFAULT_NOISE_TAGS]
+export let SUGGESTED_EXCLUDES: readonly string[] = [...DEFAULT_SUGGESTED_EXCLUDES]
 
 let NOISE = new Set(NOISE_TAGS.map((t) => t.toLowerCase()))
 
@@ -23,7 +30,7 @@ const STORAGE_KEY = 'gmatch_custom_blocklist'
 
 export function getActiveBlocklistData(): BlocklistData {
   return {
-    ...blocklistData,
+    ...SHARED_BLOCKLIST_DATA,
     blocklist: [...BLOCKLIST],
     suggested: [...SUGGESTED_EXCLUDES],
     noise: [...NOISE_TAGS],
@@ -55,7 +62,7 @@ export function loadSavedBlocklist(): BlocklistData {
         if (parsed && typeof parsed === 'object') {
           updateActiveBlocklist(parsed)
           return {
-            ...blocklistData,
+            ...SHARED_BLOCKLIST_DATA,
             ...parsed,
           }
         }
@@ -64,7 +71,7 @@ export function loadSavedBlocklist(): BlocklistData {
   } catch {
     /* fallback to default */
   }
-  return { ...blocklistData } as BlocklistData
+  return { ...SHARED_BLOCKLIST_DATA } as BlocklistData
 }
 
 export async function syncBlocklistFromBridge(): Promise<BlocklistData> {
@@ -115,7 +122,7 @@ export async function resetBlocklist(): Promise<BlocklistData> {
   } catch {
     /* ignore */
   }
-  let defaultData: BlocklistData = { ...blocklistData } as BlocklistData
+  let defaultData: BlocklistData = { ...SHARED_BLOCKLIST_DATA } as BlocklistData
   if (typeof window !== 'undefined' && window.gmatch?.blocklistReset) {
     try {
       const res = await window.gmatch.blocklistReset()
@@ -129,7 +136,7 @@ export async function resetBlocklist(): Promise<BlocklistData> {
 }
 
 export function __resetBlocklist(): void {
-  updateActiveBlocklist(blocklistData as BlocklistData)
+  updateActiveBlocklist(SHARED_BLOCKLIST_DATA as BlocklistData)
 }
 
 // Initial bootstrap from localStorage if present
@@ -168,44 +175,7 @@ export function __resetUserExcludes(): void {
 }
 
 function matchesAny(term: string, list: readonly string[]): boolean {
-  const t = normalizeTagText(term)
-  if (!t) return false
-  return list.some((bad) => hitsAtTokenStart(t, normalizeTagText(bad)))
-}
-
-/**
- * Booru tag vocabularies are underscore-joined words, so `_` (plus spaces and
- * hyphens, which sources use interchangeably) is the only real token boundary.
- */
-export function normalizeTagText(raw: string): string {
-  return String(raw).toLowerCase().replace(/[\s-]+/g, '_')
-}
-
-/**
- * True when `term` occurs in `tag` STARTING ON A TOKEN BOUNDARY.
- *
- * The old rule was a raw substring test, which is wrong in both directions.
- * It let 'grape' (rape), 'fifteen' (teen) and 'scrape' through as blocked —
- * 20 of 28 sampled legal tags were being dropped for merely containing the
- * letters of a banned word, which quietly starves the feed.
- *
- * Requiring token alignment fixes those. Crucially a term may still be a
- * PREFIX of its token, so every real compound stays blocked: 'lolicon',
- * 'shota'/'shotacon', 'teenager', 'childhood_friends', 'necrophilia' and
- * 'zoo_philia' are all caught. What stops matching is only a mid-token hit,
- * which is exactly the accidental case. No safety term loses its coverage
- * except compounds where the banned word is a SUFFIX ('grandchild'); tag
- * vocabularies put the head noun first, so this is not a real gap.
- */
-export function hitsAtTokenStart(tag: string, term: string): boolean {
-  if (!tag || !term) return false
-  let from = 0
-  for (;;) {
-    const i = tag.indexOf(term, from)
-    if (i === -1) return false
-    if (i === 0 || tag.charCodeAt(i - 1) === 95 /* '_' */) return true
-    from = i + 1
-  }
+  return tagHitsAnyTerm(term, list)
 }
 
 export function isTagBlocked(tag: string): boolean {

@@ -315,9 +315,15 @@ prefix matching is what keeps the real compounds blocked; removing those two
 would leak `zoophilia`/`baby`-prefixed terms, so they are a policy decision, not
 a code one.
 
-`electron/main.cjs` implements the identical `hitsAtTokenStart` rule. The
-renderer and the main process enforce the same hard line, so the two
-implementations must not drift; a parity check lives in the tagFilter suite.
+The rule is ONE implementation: `packages/shared/src/blocklist.ts`
+(`normalizeTagText` + `hitsAtTokenStart`) — the renderer, the API and the
+protocol all import it, and `isBlacklistedTag` (the shared gate behind
+`normalizeTags` / `parseTags`) uses the same token-boundary rule. The
+Electron main process cannot import TypeScript, so it carries the CommonJS
+mirror `apps/desktop/electron/blocklistRule.cjs`; the renderer and the main
+process enforce the same hard line, so the two must not drift — a parity
+test (`apps/desktop/src/game/blocklistParity.test.ts`) pins them against the
+same fixtures.
 
 Player excludes (setup screen + Config tab, 100 max, persisted) extend this
 list at runtime: queries, post tags, and market discovery all respect them,
@@ -330,8 +336,9 @@ explicit/adult. The list lives in `shared/blocklist.json` (single source of
 truth; also imported by electron/main.cjs and required by src/game/tagFilter.ts)
 and additionally blocks: AI-generated (`ai_generated`), furry/anthro/feral/
 scalie, monochrome/greyscale/sketch/comic media, low-quality markers, and
-count-tag noise (`1girl`, `solo`, `2boys`, ...). Unit tests in
-src/game/tagFilter.ts — it is the most important tested module in the repo.
+count-tag noise (`1girl`, `solo`, `2boys`, ...). The rule is pinned by
+`packages/shared/src/blocklist.test.ts` and `src/game/tagFilter.test.ts` — the
+hard line is the most important tested code in the repo.
 
 ## 9. Prestige — Brainmelt
 

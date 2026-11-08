@@ -12,9 +12,11 @@ large changes; `docs/DESKTOP.md` covers the exe's runtime internals.
 > tags verbatim and never hard-blocks them. No telemetry, no uploads; images are
 > fetched read-only from public booru APIs.
 >
-> Blocklist single source of truth is `shared/blocklist.json`; the renderer rule
-> (`apps/desktop/src/game/tagFilter.ts`) and the identical `hitsAtTokenStart` in
-> `apps/desktop/electron/main.cjs` must not drift — a parity test guards it.
+> Blocklist single source of truth is `shared/blocklist.json`; the rule is one
+> implementation (`packages/shared/src/blocklist.ts` — `normalizeTagText` +
+> `hitsAtTokenStart`), with a CommonJS mirror for the main process
+> (`apps/desktop/electron/blocklistRule.cjs`) pinned against it by a parity
+> test (`apps/desktop/src/game/blocklistParity.test.ts`).
 
 ## Layout (npm workspaces — there is no root `src/`)
 
