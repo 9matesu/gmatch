@@ -26,7 +26,7 @@ describe('GMatchFeed cold-start nudge', () => {
         myProfileTags={['cars']}
       />,
     )
-    expect(screen.getByText(/Empty in here\?/)).toBeInTheDocument()
+    expect(screen.getByText(/No posts yet\./)).toBeInTheDocument()
     expect(screen.getByLabelText('Follow Alice')).toBeInTheDocument()
     fireEvent.click(screen.getByLabelText('Follow Bob'))
     expect(onFollow).toHaveBeenCalledWith('u2')
@@ -41,6 +41,6 @@ describe('GMatchFeed cold-start nudge', () => {
         users={[]}
       />,
     )
-    expect(screen.queryByText(/Empty in here\?/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/No posts yet\./)).not.toBeInTheDocument()
   })
 })

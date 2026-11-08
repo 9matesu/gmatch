@@ -71,7 +71,7 @@ trades — two separate economies, no bridge between them.
 - Legacy nodes still hold the bytes 1.4.0 uploaded (2026-11-06): the old
   media path wrote file bytes into `Objects.data`, so `GET /api/objects/:id`
   streamed a peer's image straight from the node. Measured on the retired
-  `gmatch.fly.dev`: of the 200 latest posts, 188 answer with a `p2p`
+  hosted deployment: of the 200 latest posts, 188 answer with a `p2p`
   descriptor and only 12 still hold bytes (all legacy `video/mp4`, dated
   22–25 Sep and 25 Oct 2026). Posts published after the P2P alignment carry a
   descriptor only, so "a peer's image" now means "a peer who still holds the
@@ -391,10 +391,10 @@ offline earnings). Each +5% click power. Persist across prestige.
 
 ## 10d. P2P Swarm & Blind Courier Presence (ARCHITECTURE-P2P.md)
 
-- **The courier is the node each client is connected to** (since 2026-10-24 there
-  is no hosted full node: every packaged app runs its own node, and the public
-  rendezvous is a blind Cloudflare directory/mail relay that is never a data
-  base). A node is strictly a blind, zero-knowledge forwarder for its clients: it
+- **The courier is the node each client is connected to** (since 2026-11-07 there
+  is no hosted service of any kind: every packaged app runs its own node, and
+  that node is the directory, the mail relay and the swarm rendezvous). A node is
+  strictly a blind, zero-knowledge forwarder for its clients: it
   holds no profiles, presence, posts or media, only sealed envelopes and relayed
   swarm frames. All legacy central routes (`/api/users/online`, `/api/posts`,
   `/api/objects`, `/api/signal/*`) intentionally 404.
@@ -501,8 +501,8 @@ offline earnings). Each +5% click power. Persist across prestige.
   - **host** (default since 2026-10-21): spawns the bundled server on
     `:8790` (world data lives in `userData/orbit.sqlite` + `userData/blobs`);
     the Server tab lists this machine's LAN URLs (`http://<ip>:8790`) to share
-    with friends. There is no hosted world to dial (Cloudflare only encodes a
-    directory/mail rendezvous), so a packaged build with no stored mode starts
+    with friends. There is no hosted world to dial (nothing hosted is in the
+    loop since 2026-11-07), so a packaged build with no stored mode starts
     its own node.
   - **client** (opt-in in Settings → Server): talks to someone else's node —
     a friend's machine or any `http(s)://host[:port]` the user was given
@@ -543,7 +543,8 @@ offline earnings). Each +5% click power. Persist across prestige.
   `site/build-release.mjs`); tagging `v*` fires
   `.github/workflows/release.yml` (lint+typecheck+test gate → GitHub Release
   asset). The page is served by Cloudflare Pages at `https://gmatch.pages.dev`
-  from `site/` (binaries are never part of that artifact). Unsigned exe →
+  from `site/` — a static page, no function and no database (binaries are
+  never part of that artifact). Unsigned exe →
   SmartScreen "More info → Run anyway".
 - Portable self-updater (`electron/updater.cjs` + `updater-core.cjs`,
   packaged builds only): daily + manual check of the site `release.json`,
@@ -561,28 +562,32 @@ offline earnings). Each +5% click power. Persist across prestige.
   hidden. A 503 from the release host is the free-tier dyno waking up — an
   error to retry, not a missing release.
 
-### 12b. No hosted data node — Cloudflare is a meeting point, not a world
+### 12b. No hosted service — the own node is the world (gmatch 2.0)
 
-**Decision (2026-10-24): there is no hosted full node.** The end state is
-**direct peer-to-peer**: no third-party host stores posts, media, comments,
-likes, profiles or presence.
+**Decision (2026-11-07): there is no hosted service of any kind.** The end
+state is **direct peer-to-peer**: no third-party host stores posts, media,
+comments, likes, profiles, presence — and no third-party host holds a mailbox
+or a directory row either.
 
 - A packaged install starts its **own** full node (local Bun sidecar). That is
   the default world and the only one the app assumes.
-- `https://gmatch.pages.dev` is the **release page and a blind courier** in one
-  Cloudflare Pages project (`site/functions/api/[[path]].ts`): a public node
-  directory plus a sealed-mail relay, with the only state in D1 (mailbox rows
-  with a TTL and public metadata). Every stateful route answers 404. It
-  advertises `sealed_available:false`, so clients never seal to it.
+- `https://gmatch.pages.dev` is a **static release page** only: the download
+  page, the legal pages and `release.json`. The hosted courier function and its
+  D1 database were removed (the D1 was emptied, then deleted). `/api/*` on
+  that origin returns the page, never courier JSON, and a client that still
+  points there fails loudly instead of talking to a stale rendezvous.
 - There is **no built-in world row** in Servers: joining is a node code from a
   friend or a row published in the directory. A hub/directory is never a
   destination.
 - What remains shared is a **rendezvous**: the directory (who exists and where)
   and sealed mail (signalling, DMs, presence beacons). Both are replaceable;
-  the app keeps working with `gmatch.central.url = none`.
-- The Cloudflare courier has no WebSocket (a Pages isolate cannot notify a
-  socket held by another isolate), so `MailClient` polls its boxes every 20 s
-  when that origin is the mail base.
+  the app keeps working with `gmatch.central.url = none` — which is the
+  **default** since gmatch 2.0 (`apps/desktop/src/utils/central.ts`). A shared
+  hub is opt-in: set `gmatch.central.url` / `VITE_CENTRAL_URL` to a node you
+  run.
+- A pointer to the retired hosted rendezvous (`*.gmatch.pages.dev`) is dropped
+  instead of dialed (`isRetiredCourier` in `central.ts`), so an old install
+  cannot keep talking to a service that no longer exists.
 
 Consequences that are already implemented:
 - The updater asks **one** public feed (`gmatch.pages.dev/release.json`) and the
@@ -625,8 +630,8 @@ ADR-002 (`docs/ADR-002-servers.md`) é canônico; resumo de operação:
 - **Lista**: um nó que hospeda um mundo é um servidor, inclusive o que roda nesta
   máquina — uma linha por endereço (`dedupeServers`), nunca por nome. Não há
   mundo embutido: o app lista o próprio nó, os nós do diretório e os que você
-  adicionou por código. O diretório do Cloudflare (metadados + mail selado) é
-  infraestrutura e não aparece como destino. Grupos locais são rótulo só deste
+  adicionou por código. O diretório (metadados + mail selado) é infraestrutura
+  e não aparece como destino. Grupos locais são rótulo só deste
   dispositivo (rodapé → diálogo), nunca um destino. Nada é assumido online: sem
   resposta do probe, a linha aparece offline e o join falha com aviso, sem
   inventar conexão.
@@ -638,8 +643,9 @@ ADR-002 (`docs/ADR-002-servers.md`) é canônico; resumo de operação:
   mecanismo honesto de handoff v1. Tabelas de segurança/transporte do nó
   (SystemMeta, Sessions, ServerDirectory…) são excluídas por design.
 - **Central** (`VITE_CENTRAL_URL` / Settings→Server): diretório + mail selado,
-  nada mais; o padrão é o courier do Cloudflare (`gmatch.pages.dev`) e um nó
-  próprio pode substituí-lo (`none` desliga). O diretório nunca lê conteúdo de
+  nada mais; desde gmatch 2.0 o padrão é `none` — o próprio nó é o diretório e
+  o relay, e nada hospedado participa (`none` desliga; um hub próprio pode
+  substituir). O diretório nunca lê conteúdo de
   nenhum servidor federado.
 
 ## 14. Chat (`#/messages`) — reconstruction

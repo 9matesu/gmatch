@@ -1,6 +1,6 @@
 # Terms of Use
 
-_Binding text (EN)_: **2026-09-11.2** · updated: 2026-09-09
+_Binding text (EN)_: **2026-11-07.1** · updated: 2026-11-07
 Jurisdiction: Brazil (LGPD); GDPR applies additionally where applicable
 
 ## 1. Eligibility and age
@@ -25,7 +25,7 @@ gMatch is self-hostable software for an adult social network with gameplay (card
 
 The app runs in two modes with different trust models:
 
-- **Official site / courier:** the public server works only as a blind postman. It forwards encrypted envelopes it CANNOT open and never sees content, conversation identities, presence or the social graph.
+- **Your own node (the default):** you run the node your client talks to, so you are the operator of the service you use. The node relays encrypted envelopes it CANNOT open and never sees conversation identities, presence or the social graph. This project hosts no node and no service of any kind; the download page stores nothing.
 
 - **Full-node (your own or a third-party server):** you connect to a complete server that YOU (or whoever hosts it) administer. In this mode the server operator can read legacy private messages and post data as described in the Privacy Policy. Note what the SOFTWARE does and does not offer: the admin suite moderates reported cases, public content and in-game chat. It contains no bulk private-message browsing. A host with database access can always do more than its software exposes. Connecting to a third-party full-node is your choice and creates a trust relationship with that host.
 
@@ -43,7 +43,7 @@ You declare you have the right to publish what you send (including model release
 
 ## 7. Termination
 
-You may leave at any time: delete the app and the account disappears from your side; in courier mode un-consumed envelopes expire by TTL and vanish. We cannot "delete you from a server" that is not ours, nor purge data we never had.
+You may leave at any time: delete the app and the account disappears from your side; on a node you run, un-consumed envelopes expire by TTL and vanish. We cannot "delete you from a server" that is not ours, nor purge data we never had.
 
 ## 8. Limitation of liability
 

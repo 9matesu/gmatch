@@ -77,6 +77,18 @@ export interface GroupInfo {
 
 type OpenTarget = 'group' | 'lobby' | 'queue' | 'peer' | 'room' | null;
 
+// Stable empty defaults. A literal `= []` in the destructuring mints a NEW
+// array on every render, which silently defeats every memo that depends on
+// it (the search memo never hit because of exactly this).
+const NO_MESSAGES: ChatMessage[] = [];
+const NO_PEERS: PeerInfo[] = [];
+const NO_THREADS: ThreadItem[] = [];
+const NO_GROUPS: GroupInfo[] = [];
+const NO_ROOMS: RoomInfo[] = [];
+const NO_USERS: User[] = [];
+const NO_PROFILE_PICS: Record<string, string> = {};
+const NO_GROUP_MESSAGES: Record<string, ChatMessage[]> = {};
+
 export interface RoomInfo {
   id: string;
   name: string;
@@ -89,17 +101,17 @@ export interface RoomInfo {
 
 export function GMatchDMs({
   identity,
-  chatMessages = [],
-  pmMessages = [],
+  chatMessages = NO_MESSAGES,
+  pmMessages = NO_MESSAGES,
   activePmPeer,
-  peers = [],
-  threads = [],
-  profilePics = {},
+  peers = NO_PEERS,
+  threads = NO_THREADS,
+  profilePics = NO_PROFILE_PICS,
   myDisplayName = 'You',
-  groups = [],
-  groupMessages = {},
+  groups = NO_GROUPS,
+  groupMessages = NO_GROUP_MESSAGES,
   showRooms = false,
-  rooms = [],
+  rooms = NO_ROOMS,
   activeRoomId = null,
   onSelectRoom,
   onCreateRoom,
@@ -139,7 +151,7 @@ export function GMatchDMs({
   activeGroupId,
   onOpenImage,
   onLoadHistory,
-  users = [],
+  users = NO_USERS,
 }: {
   identity: OrbitIdentity | null;
   chatMessages?: ChatMessage[];
@@ -488,28 +500,39 @@ export function GMatchDMs({
   for (const p of peers) {
     peerMap.set(p.orbitId, p);
   }
+  // The roster is read from a module-level directory, so it has no reactive
+  // identity of its own. A ref keeps `displayNameFor` STABLE across renders
+  // (a new function identity every render made every memo that depends on it
+  // miss forever) while still seeing the freshest names.
+  const peerMapRef = useRef(peerMap);
+  peerMapRef.current = peerMap;
 
-  const displayNameFor = (id: string, fallback?: string | null) =>
-    chatDisplayName({ id, payloadName: fallback, roster: peerMap, selfId: identity?.orbitId, selfName: myDisplayName });
+  const displayNameFor = useCallback(
+    (id: string, fallback?: string | null) =>
+      chatDisplayName({ id, payloadName: fallback, roster: peerMapRef.current, selfId: identity?.orbitId, selfName: myDisplayName }),
+    [identity?.orbitId, myDisplayName],
+  );
 
-  const threadMap = new Map<string, ThreadItem>();
-  for (const t of threads) {
-    if (t.peer_id && t.peer_id !== identity?.orbitId && t.peer_id !== 'global_lobby' && t.peer_id !== 'card_queue') {
-      threadMap.set(t.peer_id, t);
+  const activeThreads = useMemo(() => {
+    const threadMap = new Map<string, ThreadItem>();
+    for (const t of threads) {
+      if (t.peer_id && t.peer_id !== identity?.orbitId && t.peer_id !== 'global_lobby' && t.peer_id !== 'card_queue') {
+        threadMap.set(t.peer_id, t);
+      }
     }
-  }
 
-  if (activePmPeer && activePmPeer.orbitId !== identity?.orbitId && activePmPeer.orbitId !== 'global_lobby' && activePmPeer.orbitId !== 'card_queue' && !threadMap.has(activePmPeer.orbitId)) {
-    threadMap.set(activePmPeer.orbitId, {
-      peer_id: activePmPeer.orbitId,
-      peer_name: activePmPeer.name || nameFor(activePmPeer.orbitId) || UNKNOWN_NAME,
-      last_body: 'New conversation',
-      last_sender_id: identity?.orbitId,
-      last_created_at: new Date().toISOString(),
-    });
-  }
+    if (activePmPeer && activePmPeer.orbitId !== identity?.orbitId && activePmPeer.orbitId !== 'global_lobby' && activePmPeer.orbitId !== 'card_queue' && !threadMap.has(activePmPeer.orbitId)) {
+      threadMap.set(activePmPeer.orbitId, {
+        peer_id: activePmPeer.orbitId,
+        peer_name: activePmPeer.name || nameFor(activePmPeer.orbitId) || UNKNOWN_NAME,
+        last_body: 'New conversation',
+        last_sender_id: identity?.orbitId,
+        last_created_at: new Date().toISOString(),
+      });
+    }
 
-  const activeThreads = Array.from(threadMap.values());
+    return Array.from(threadMap.values());
+  }, [threads, identity?.orbitId, activePmPeer?.orbitId, activePmPeer?.name]);
 
   const isSearching = searchQuery.trim().length > 0;
   /**
@@ -607,8 +630,18 @@ export function GMatchDMs({
   const messageRows = useMemo(() => groupMessagesByDay(displayedMessages), [displayedMessages]);
 
 
-  const findMessage = (id?: string): ChatMessage | undefined =>
-    id ? displayedMessages.find((m) => m.id === id) : undefined;
+  // Reply/edit/delete look a message up by id. A linear scan per lookup made
+  // the open conversation O(n²); one index makes it O(1).
+  const messageIndex = useMemo(() => {
+    const m = new Map<string, ChatMessage>();
+    for (const msg of displayedMessages) m.set(msg.id, msg);
+    return m;
+  }, [displayedMessages]);
+
+  const findMessage = useCallback(
+    (id?: string): ChatMessage | undefined => (id ? messageIndex.get(id) : undefined),
+    [messageIndex],
+  );
 
   const copyMessage = (text: string) => {
     if (navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
@@ -1196,7 +1229,7 @@ export function GMatchDMs({
                 <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-2 text-retro-muted my-auto select-none">
                   <MessageSquare className="w-6 h-6" />
                   <p className="text-xs text-retro-body">{headerTitle}</p>
-                  <p className="text-xs text-retro-muted">Send a message to start chatting</p>
+                  <p className="text-xs text-retro-muted">No messages yet.</p>
                   {isLobbyGroup && (
                     <p className="text-[10px] text-retro-muted flex items-center gap-1"><Clock3 className="w-3 h-3" /> Clears every 12 hours</p>
                   )}
@@ -1605,7 +1638,7 @@ export function GMatchDMs({
             <MessageSquare className="w-6 h-6 text-retro-muted" />
             <div className="space-y-1">
               <h3 className="text-sm font-medium text-retro-body">Messages</h3>
-              <p className="text-xs text-retro-muted max-w-xs">Select a conversation to start chatting.</p>
+              <p className="text-xs text-retro-muted max-w-xs">Select a conversation.</p>
             </div>
           </div>
         )}

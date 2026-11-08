@@ -67,7 +67,7 @@ function RoomThumbnail({
   return (
     <div className="relative w-full h-full bg-gradient-to-br from-retro-panel to-surface-canvas flex flex-col items-center justify-center overflow-hidden border-b border-border-subtle group-hover:border-retro-fg/20 transition-colors">
       <div className="absolute inset-0 bg-radial from-retro-accent/5 to-transparent opacity-60" />
-      <div className="p-3 rounded-2xl bg-surface-raised/80 border border-border-glass shadow-lg group-hover:scale-110 group-hover:border-retro-fg/30 transition-all duration-200">
+      <div className="p-3 rounded-xl bg-surface-raised/80 border border-border-glass shadow-lg group-hover:scale-110 group-hover:border-retro-fg/30 transition-all duration-150">
         <Film className="w-6 h-6 text-retro-muted group-hover:text-retro-fg transition-colors" />
       </div>
       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
@@ -185,7 +185,7 @@ export function WatchPartyRoomList({
           you left was simply gone from the UI. */}
       {recents.length > 0 && (
         <div className="mb-5">
-          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-retro-muted mb-2">
+          <h3 className="text-[10px] font-semibold uppercase tracking-wider text-retro-muted mb-2">
             Recently watched
           </h3>
           <div className="flex flex-wrap gap-2">
@@ -212,15 +212,15 @@ export function WatchPartyRoomList({
           type="button"
           onClick={onNewParty}
           aria-label="Create a new room"
-          className="group relative flex flex-col aspect-video sm:aspect-auto sm:min-h-[220px] rounded-xl border border-dashed border-border-glass hover:border-retro-fg bg-surface-canvas/40 hover:bg-glass-w8 p-5 items-center justify-center text-center transition-all duration-200 cursor-pointer active:scale-[0.98] shadow-sm"
+          className="group relative flex flex-col aspect-video sm:aspect-auto sm:min-h-[220px] rounded-xl border border-dashed border-border-glass hover:border-retro-fg bg-surface-canvas/40 hover:bg-glass-w8 p-5 items-center justify-center text-center transition-all duration-150 cursor-pointer active:scale-[0.98] shadow-sm"
         >
-          <div className="w-12 h-12 rounded-full border border-border-glass bg-surface-raised flex items-center justify-center text-retro-muted group-hover:text-retro-fg group-hover:border-retro-fg/50 group-hover:scale-110 transition-all duration-200 mb-3 shadow-md">
+          <div className="w-12 h-12 rounded-full border border-border-glass bg-surface-raised flex items-center justify-center text-retro-muted group-hover:text-retro-fg group-hover:border-retro-fg/50 group-hover:scale-110 transition-all duration-150 mb-3 shadow-md">
             <Plus className="w-6 h-6 stroke-[2.5]" />
           </div>
           <span className="text-xs font-bold text-retro-fg group-hover:text-white transition-colors">
             Create Room
           </span>
-          <span className="text-[11px] text-retro-muted mt-1">
+          <span className="text-xs text-retro-muted mt-1">
             Start a new watch party
           </span>
         </button>
@@ -232,7 +232,7 @@ export function WatchPartyRoomList({
             type="button"
             onClick={() => void joinPartyById(identity, r.id)}
             aria-label={`Join room ${r.name}`}
-            className="group relative flex flex-col rounded-xl border border-border-glass hover:border-retro-fg/60 bg-surface-canvas/60 hover:bg-surface-raised/80 overflow-hidden text-left transition-all duration-200 cursor-pointer active:scale-[0.98] shadow-md hover:shadow-xl"
+            className="group relative flex flex-col rounded-xl border border-border-glass hover:border-retro-fg/60 bg-surface-canvas/60 hover:bg-surface-raised/80 overflow-hidden text-left transition-all duration-150 cursor-pointer active:scale-[0.98] shadow-md hover:shadow-xl"
           >
             {/* 16:9 Thumbnail Area */}
             <div className="relative aspect-video w-full overflow-hidden bg-black">
@@ -245,7 +245,7 @@ export function WatchPartyRoomList({
               </div>
 
               {/* Hover Play Button Overlay */}
-              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-black/40 backdrop-blur-[2px] z-10">
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150 bg-black/40 backdrop-blur-[2px] z-10">
                 <div className="p-3 rounded-full bg-white text-black shadow-lg transform group-hover:scale-110 transition-transform">
                   <Play className="w-4 h-4 fill-black text-black ml-0.5" />
                 </div>
@@ -258,7 +258,7 @@ export function WatchPartyRoomList({
                 <h4 className="text-xs font-bold text-retro-fg truncate group-hover:text-white transition-colors">
                   {r.name}
                 </h4>
-                <p className="text-[11px] text-retro-muted truncate font-sans">
+                <p className="text-xs text-retro-muted truncate font-sans">
                   {r.mediaName || 'No media playing'}
                 </p>
               </div>
@@ -268,7 +268,7 @@ export function WatchPartyRoomList({
                   <span className={`w-1.5 h-1.5 rounded-full ${r.members > 0 ? 'bg-emerald-400 animate-pulse' : 'bg-retro-muted/40'}`} />
                   {r.members > 0 ? 'Active' : 'Persistent'}
                 </span>
-                <span className="font-mono text-[9px] uppercase tracking-wider text-retro-muted/60">
+                <span className="font-mono text-[10px] uppercase tracking-wider text-retro-muted/60">
                   {r.id.slice(0, 8)}
                 </span>
               </div>

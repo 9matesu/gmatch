@@ -330,7 +330,7 @@ export function MediaPickerModal({
                           </span>
                         )}
                         {raw.startsWith('vault://') && !httpUrlMap[raw] && !unresolvable && (
-                          <span className="absolute inset-x-0 bottom-0 py-0.5 text-center text-[9px] bg-black/50 text-white/80">…</span>
+                          <span className="absolute inset-x-0 bottom-0 py-0.5 text-center text-[10px] bg-black/60 text-white/80">…</span>
                         )}
                       </button>
                     );

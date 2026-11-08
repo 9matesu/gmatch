@@ -83,13 +83,13 @@ describe('GMatchStories segment bar (T-W3)', () => {
     localStorage.setItem('orbit_seen_stories', JSON.stringify(['s2']))
     renderStories([story({ id: 's1' }), story({ id: 's2' })])
     fireEvent.click(screen.getByAltText('Story Gal'))
-    expect(screen.getByTestId('seg-track-1').className).toContain('bg-white/25')
+    expect(screen.getByTestId('seg-track-1').className).toContain('bg-glass-w12')
   })
 
   it('treats a server-reported viewed=1 as already seen (cross-device)', () => {
     renderStories([story({ id: 's1' }), story({ id: 's2', viewed: 1 })])
     fireEvent.click(screen.getByAltText('Story Gal'))
-    expect(screen.getByTestId('seg-track-1').className).toContain('bg-white/25')
+    expect(screen.getByTestId('seg-track-1').className).toContain('bg-glass-w12')
   })
 });
 

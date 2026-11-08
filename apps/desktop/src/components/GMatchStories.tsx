@@ -468,7 +468,7 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
                   <div
                     key={s.id || sIdx}
                     data-testid={`seg-track-${sIdx}`}
-                    className={`flex-1 h-1 rounded-full overflow-hidden backdrop-blur-xs ${wasSeen ? 'bg-white/25' : 'bg-white/40'}`}
+                    className={`flex-1 h-1 rounded-full overflow-hidden backdrop-blur-xs ${wasSeen ? 'bg-glass-w12' : 'bg-glass-w20'}`}
                   >
                     <div
                       data-testid={`seg-fill-${sIdx}`}

@@ -131,10 +131,10 @@ export function NotificationCenter(props: NotificationCenterProps) {
           )}
         </span>
         <span aria-live="polite" className="min-w-0 flex-1 hidden sm:block leading-tight">
-          <span className="block text-[9px] font-bold uppercase tracking-wider text-retro-muted">
+          <span className="block text-[10px] font-bold uppercase tracking-wider text-retro-muted">
             Notifications
           </span>
-          <span className="block truncate text-[11px] text-retro-fg/80">{preview}</span>
+          <span className="block truncate text-xs text-retro-fg/80">{preview}</span>
         </span>
       </button>
 
@@ -152,7 +152,7 @@ export function NotificationCenter(props: NotificationCenterProps) {
                 <span className="text-[10px] font-bold uppercase tracking-wide text-retro-muted">
                   Recent{overflowCount > 0 && <span className="font-normal"> · +{overflowCount} more</span>}
                 </span>
-                <button type="button" onClick={clearAll} className="text-[11px] text-retro-muted hover:text-retro-fg cursor-pointer">
+                <button type="button" onClick={clearAll} className="text-xs text-retro-muted hover:text-retro-fg cursor-pointer">
                   Clear
                 </button>
               </div>
@@ -160,7 +160,7 @@ export function NotificationCenter(props: NotificationCenterProps) {
                 {[...messages].reverse().map((m) => (
                   <li key={m.id} className="flex items-start gap-2 px-3 py-2">
                     <IconFor type={m.type} />
-                    <span className="flex-1 min-w-0 text-[11px] text-retro-fg break-words">{m.text}</span>
+                    <span className="flex-1 min-w-0 text-xs text-retro-fg break-words">{m.text}</span>
                     <button
                       type="button"
                       onClick={() => dismiss(m.id)}

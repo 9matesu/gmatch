@@ -253,7 +253,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
           {followingIds.length === 0 && groups.length === 0 && (
             <div className="py-8 text-center space-y-1.5">
               <p className="text-xs font-semibold text-retro-fg">Nothing to send to yet</p>
-              <p className="text-[11px] text-retro-muted">
+              <p className="text-xs text-retro-muted">
                 Follow friends or join a group first, or copy the link below.
               </p>
             </div>

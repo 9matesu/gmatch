@@ -89,7 +89,7 @@ describe('api base without a hosted fallback', () => {
   it('retries a failed probe and keeps the pointer when a later attempt answers', async () => {
     // The boot probe races the page load: a reload mid-probe aborts the fetch
     // and must not count as "the node is dead".
-    localStorage.setItem('gmatch.api.url', 'https://gmatch.fly.dev')
+    localStorage.setItem('gmatch.api.url', 'https://peer-node.example.test')
     const fetchMock = vi.fn()
       .mockRejectedValueOnce(new Error('aborted'))
       .mockResolvedValueOnce({ ok: true })
@@ -97,7 +97,7 @@ describe('api base without a hosted fallback', () => {
 
     expect(await clearUnreachableApiBase(50)).toBeNull()
     expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(localStorage.getItem('gmatch.api.url')).toBe('https://gmatch.fly.dev')
+    expect(localStorage.getItem('gmatch.api.url')).toBe('https://peer-node.example.test')
   })
 
   it('drops the pointer when the host answers but is not a node (404)', async () => {

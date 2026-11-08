@@ -39,12 +39,12 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
       role="dialog"
       aria-modal="true"
       aria-label={`What's New in version ${CURRENT_CHANGELOG_VERSION}`}
-      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 sm:p-6 animate-fade-in"
+      className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 sm:p-6 animate-orbit-fade-in"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div className="relative w-full max-w-lg max-h-[85vh] flex flex-col rounded-2xl border border-border-glass bg-surface-canvas/95 backdrop-blur-xl shadow-2xl overflow-hidden text-left">
+      <div className="relative w-full max-w-lg max-h-[85vh] flex flex-col rounded-xl border border-border-glass bg-surface-canvas/95 backdrop-blur-xl shadow-2xl overflow-hidden text-left">
         <div className="flex items-center justify-between p-5 border-b border-border-glass/60 bg-surface-raised/40">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-bold text-retro-fg">What&apos;s New</h3>

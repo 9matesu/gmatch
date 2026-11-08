@@ -133,7 +133,10 @@ grep -rn "Welcome to\|successfully\|seamless\|effortless\|unleash\|cutting-edge\
 grep -rn "metro-rule" src
 # Exemption (2026-09-11 audit): CommentsModal quick-reaction buttons insert emoji
 # into the user's comment BODY (content, not chrome); their chrome is lucide.
-grep -rn "❤️\|⚡\|★\|✕" src --include=*.tsx | grep -v test | grep -v CommentsModal
+# Same for the DM reaction palette (GMatchDMs): the glyph IS the reaction
+# payload stored on the message, so it is content — the buttons around it are
+# lucide.
+grep -rn "❤️\|⚡\|★\|✕" src --include=*.tsx | grep -v test | grep -v CommentsModal | grep -v GMatchDMs
 grep -rn "animate-fade-in\|animate-slide-up\|animate-slide-down" src --include=*.tsx | grep -v orbit
 grep -nE "^\s*--color-(surface-raised|surface-elevated|surface-interactive|retro-panel):\s*#" src/globals.css
 grep -n "text-sm" src/components/feed/GMatchFeed.tsx src/components/feed/PostComments.tsx

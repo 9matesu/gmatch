@@ -1,6 +1,6 @@
 # Community Rules
 
-_Binding text (EN)_: **2026-09-11.2** · updated: 2026-09-09
+_Binding text (EN)_: **2026-11-07.1** · updated: 2026-11-07
 Jurisdiction: Enforced technically client-side and by full-node hosts
 
 ## 1. Age and consent
@@ -25,4 +25,4 @@ The internal economy (g$) has no real value, is not convertible and not tradable
 
 ## 6. Enforcement
 
-In official courier mode NOBODY moderates: we do not read what you receive. Your tools are silent blocking, key disclosure (see the Abuse document) and the client-side technical filter. On full-nodes each host applies these rules on its own.
+In the peer-to-peer model there is NO central publisher to moderate: we read nothing, because we hold nothing. Your tools are silent blocking, key disclosure (see the Abuse document) and the client-side technical filter. On a node run by somebody else, that host applies these rules on its own.

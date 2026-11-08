@@ -69,16 +69,76 @@ function useReducedMotion(): boolean {
   return reduce
 }
 
+/**
+ * The powerups dock is its own component on purpose.
+ *
+ * It is the only part of the panel that needs the points counter, and points
+ * change EVERY SECOND (passive income). Subscribing to them here instead of
+ * in GoonPanel keeps the media stage from re-rendering on every tick: the
+ * dock's four small buttons re-render, the image does not.
+ */
+function CapsDock() {
+  const points = useGame((s) => s.points)
+  const caps = useGame((s) => s.caps)
+  const popCap = useGame((s) => s.popCap)
+  const now = Date.now()
+
+  return (
+    <div
+      className="flex flex-none items-center gap-2 overflow-x-auto rounded-xl border border-border-glass bg-glass-w8 p-1.5 backdrop-blur-md styled-scrollbar"
+      role="group"
+      aria-label="Powerups dock"
+    >
+      {CAP_ORDER.map((id, idx) => {
+        const def = CAPS[id]
+        const st = capStacks(caps, id, now)
+        const isLive = st.count > 0
+        return (
+          <button
+            key={id}
+            type="button"
+            className={`group relative flex flex-1 min-w-[125px] cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-all duration-150 enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${isLive
+              ? 'border-rose-500/50 bg-rose-500/10 shadow-[0_0_12px_rgba(244,63,94,0.15)] hover:border-rose-500/70 hover:bg-rose-500/15'
+              : 'border-border-glass bg-retro-bg/60 hover:border-border-strong hover:bg-glass-w5'
+              }`}
+            disabled={points < def.cost}
+            onClick={() => popCap(id)}
+            title={`${def.name}. ${capEffectLabel(id)}. ${formatNum(def.cost)} pts. Press [${idx + 1}]`}
+          >
+            <kbd className={`${MONO} inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border border-white/15 bg-black/60 text-[10px] font-bold text-white/60 group-hover:text-white transition-colors`}>
+              {idx + 1}
+            </kbd>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-1">
+                <span className={`${DISPLAY} truncate text-xs font-bold leading-tight text-white group-hover:text-retro-accent transition-colors`}>
+                  {def.name}
+                </span>
+                {st.count > 0 && (
+                  <span className={`${MONO} text-[10px] font-black text-rose-400`}>
+                    x{st.count}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center justify-between gap-1 text-[10px] text-retro-muted leading-tight">
+                <span className="truncate">{capEffectLabel(id)}</span>
+                <span className={`${MONO} shrink-0 font-semibold text-retro-body`}>{formatNum(def.cost)}</span>
+              </div>
+            </div>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNode }) {
   const current = useGame((s) => s.current)
   const feedOffline = useGame((s) => s.feedOffline)
   const feedEmptyFresh = useGame((s) => s.feedEmptyFresh)
   const fetching = useGame((s) => s.fetching)
-  const points = useGame((s) => s.points)
   const foeHp = useGame((s) => s.foeHp)
   const foeMaxHp = useGame((s) => s.foeMaxHp)
   const defeated = useGame((s) => s.defeated)
-  const caps = useGame((s) => s.caps)
   const viewMode = useGame((s) => s.viewMode)
   const grid = useGame((s) => s.grid)
   const heatStreak = useGame((s) => s.heatStreak)
@@ -102,7 +162,6 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
   const canGridBack = useGame((s) => s.gridPast.length > 0)
   const queue = useGame((s) => s.queue)
   const past = useGame((s) => s.past)
-  const popCap = useGame((s) => s.popCap)
   const imageReady = useGame((s) => s.imageReady)
   const setImageReady = useGame((s) => s.setImageReady)
 
@@ -122,8 +181,6 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
   const floatId = useRef(0)
   const stageRef = useRef<HTMLElement | null>(null)
   const reduceMotion = useReducedMotion()
-
-  const now = Date.now()
 
   const onImageError = useCallback(() => {
     if (current?.preview && shownUrl !== current.preview) {
@@ -408,7 +465,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
             <button
               key={mode}
               type="button"
-              className={`${MONO} cursor-pointer border-0 bg-transparent px-2 py-0.5 text-[11px] font-bold ${viewMode === mode ||
+              className={`${MONO} cursor-pointer border-0 bg-transparent px-2 py-0.5 text-xs font-bold ${viewMode === mode ||
                 (mode === '3x3' && viewMode === 'grid')
                 ? 'bg-retro-accent text-retro-accent-text'
                 : 'bg-transparent text-retro-muted hover:text-retro-fg'
@@ -857,50 +914,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
       </div>
 
       {/* Thumb-sized compact bottom dock with [1] [2] [3] [4] keyboard triggers */}
-      <div
-        className="flex flex-none items-center gap-2 overflow-x-auto rounded-xl border border-border-glass bg-glass-w8 p-1.5 backdrop-blur-md styled-scrollbar"
-        role="group"
-        aria-label="Powerups dock"
-      >
-        {CAP_ORDER.map((id, idx) => {
-          const def = CAPS[id]
-          const st = capStacks(caps, id, now)
-          const isLive = st.count > 0
-          return (
-            <button
-              key={id}
-              type="button"
-              className={`group relative flex flex-1 min-w-[125px] cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-all duration-150 enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${isLive
-                ? 'border-rose-500/50 bg-rose-500/10 shadow-[0_0_12px_rgba(244,63,94,0.15)] hover:border-rose-500/70 hover:bg-rose-500/15'
-                : 'border-border-glass bg-retro-bg/60 hover:border-border-strong hover:bg-glass-w5'
-                }`}
-              disabled={points < def.cost}
-              onClick={() => popCap(id)}
-              title={`${def.name}. ${capEffectLabel(id)}. ${formatNum(def.cost)} pts. Press [${idx + 1}]`}
-            >
-              <kbd className={`${MONO} inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border border-white/15 bg-black/60 text-[10px] font-bold text-white/60 group-hover:text-white transition-colors`}>
-                {idx + 1}
-              </kbd>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-1">
-                  <span className={`${DISPLAY} truncate text-xs font-bold leading-tight text-white group-hover:text-retro-accent transition-colors`}>
-                    {def.name}
-                  </span>
-                  {st.count > 0 && (
-                    <span className={`${MONO} text-[10px] font-black text-rose-400`}>
-                      x{st.count}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center justify-between gap-1 text-[10px] text-retro-muted leading-tight">
-                  <span className="truncate">{capEffectLabel(id)}</span>
-                  <span className={`${MONO} shrink-0 font-semibold text-retro-body`}>{formatNum(def.cost)}</span>
-                </div>
-              </div>
-            </button>
-          )
-        })}
-      </div>
+      <CapsDock />
     </section>
   )
 }

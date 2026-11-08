@@ -458,14 +458,23 @@ export function GMatchFeed({
     // user's own like action outranks it, and only until the post moves.
     // Retirement happens out here: a state updater must stay pure, and
     // StrictMode invokes updaters twice.
+    //
+    // Both maps are REBUILT from the current list, never appended to: a post
+    // that scrolls away leaves nothing behind, so a long session cannot grow
+    // an unbounded map of ids the feed no longer shows.
+    const live = new Set(posts.map((p) => p.id));
     for (const [id, g] of Array.from(governedLikeCounts.current)) {
+      if (!live.has(id)) {
+        governedLikeCounts.current.delete(id); // post is gone from the feed
+        continue;
+      }
       const postCount = initialCounts[id];
       if (postCount === undefined) continue; // not in the list right now
       if (postCount === g.override || postCount !== g.postAt) {
         governedLikeCounts.current.delete(id); // post agrees, or has moved on
       }
     }
-    for (const p of posts) postedLikeCounts.current.set(p.id, p.like_count ?? 0);
+    postedLikeCounts.current = new Map(posts.map((p) => [p.id, p.like_count ?? 0]));
     const counts: Record<string, number> = { ...initialCounts };
     for (const [id, g] of governedLikeCounts.current) counts[id] = g.override;
     setLikeCounts(counts);
@@ -520,54 +529,65 @@ export function GMatchFeed({
     }
   }, [posts]);
 
+  // Background publish work, counted in ONE pass (the label used to filter
+  // the whole list twice on every render).
+  const syncCounts = useMemo(() => {
+    let pending = 0;
+    let local = 0;
+    for (const p of posts) {
+      if (p.sync_state === 'pending') pending++;
+      else if (p.sync_state === 'local') local++;
+    }
+    return { pending, local };
+  }, [posts]);
+
   // Algorithmic Sorting. Latest is strictly chronological; Trending is a
   // deterministic engagement + tag-affinity score with recency decay, matching
   // the server's scoring intent (see /api/posts).
-    const displayPosts = useMemo(() => {
-    const active = posts.filter((p) => {
+    // The timeline is filtered once and sorted once. The two sorts are separate
+  // memos so the minute tick behind relative timestamps only re-ranks the
+  // "for you" order — the "latest" order does not depend on the clock at all.
+  const visiblePosts = useMemo(
+    () => posts.filter((p) => {
       if (p.is_archived) return false;
       if (!p.is_sponsored && !p.url && (!p.media || p.media.length === 0)) return false;
       // Media that cannot be fetched right now keeps the post on screen (its
       // tile shows the placeholder). Hiding the whole post here is what made a
       // user's own old uploads disappear when no seeder held the bytes.
       return true;
-    });
+    }),
+    [posts],
+  );
 
-    if (feedSort === 'latest') {
-      return [...active].sort(
-        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
-    }
+  // The timestamp is parsed ONCE per post, not inside every comparator call.
+  const latestPosts = useMemo(() => {
+    const stamped = visiblePosts.map((p) => ({ p, t: Date.parse(p.created_at) || 0 }));
+    stamped.sort((a, b) => b.t - a.t);
+    return stamped.map((s) => s.p);
+  }, [visiblePosts]);
 
-    return [...active].sort((a, b) => {
-      const ageHoursA = Math.max(1, (now - new Date(a.created_at).getTime()) / (1000 * 60 * 60));
-      const ageHoursB = Math.max(1, (now - new Date(b.created_at).getTime()) / (1000 * 60 * 60));
-
-      const likesA = likeCounts[a.id] ?? a.like_count ?? 0;
-      const likesB = likeCounts[b.id] ?? b.like_count ?? 0;
-      const commentsA = (commentsMap[a.id]?.length || a.comment_count || 0);
-      const commentsB = (commentsMap[b.id]?.length || b.comment_count || 0);
-
-      let tagScoreA = 0;
-      let tagScoreB = 0;
-      if (a.tags) {
-        a.tags.forEach((t) => { tagScoreA += tagAffinities[t.toLowerCase()] || 0; });
+  const rankedPosts = useMemo(() => {
+    const stamped = visiblePosts.map((p) => ({ p, t: Date.parse(p.created_at) || 0 }));
+    const score = (s: { p: FeedPost; t: number }): number => {
+      const ageHours = Math.max(1, (now - s.t) / (1000 * 60 * 60));
+      const likes = likeCounts[s.p.id] ?? s.p.like_count ?? 0;
+      const comments = commentsMap[s.p.id]?.length || s.p.comment_count || 0;
+      let tagScore = 0;
+      if (s.p.tags) {
+        s.p.tags.forEach((t) => { tagScore += tagAffinities[t.toLowerCase()] || 0; });
       }
-      if (b.tags) {
-        b.tags.forEach((t) => { tagScoreB += tagAffinities[t.toLowerCase()] || 0; });
-      }
-
-      const scoreA = (likesA * 2 + commentsA * 3 + tagScoreA * 4) / Math.pow(ageHoursA, 0.6);
-      const scoreB = (likesB * 2 + commentsB * 3 + tagScoreB * 4) / Math.pow(ageHoursB, 0.6);
+      return (likes * 2 + comments * 3 + tagScore * 4) / Math.pow(ageHours, 0.6);
+    };
+    stamped.sort((a, b) => {
+      const scoreA = score(a);
+      const scoreB = score(b);
       if (scoreA !== scoreB) return scoreB - scoreA;
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      return b.t - a.t;
     });
-  }, [posts, likeCounts, commentsMap, tagAffinities, now, feedSort, users, identity?.orbitId]);
+    return stamped.map((s) => s.p);
+  }, [visiblePosts, likeCounts, commentsMap, tagAffinities, now]);
 
-  // A post whose bytes are not on this device still exists: the tile carries
-  // its own honest "No preview" state, so the timeline keeps the author,
-  // caption and counts instead of silently dropping the row.
-  const visiblePosts = displayPosts;
+  const displayPosts = feedSort === 'latest' ? latestPosts : rankedPosts;
 
   const followSuggestions = useMemo(
     () => displayPosts.length === 0
@@ -590,17 +610,17 @@ export function GMatchFeed({
       case 'offline':
         return {
           title: 'This node hosts no feed.',
-          body: 'It relays messages only. Your own uploads and posts received from peers still appear here.',
+          body: 'Your uploads and posts received from peers still appear here.',
         };
       case 'error':
         return {
           title: 'Could not read the feed.',
-          body: 'Nothing was lost — retry, or keep reading what is already local.',
+          body: 'Retry, or keep reading what is already local.',
         };
       default:
         return {
-          title: 'Empty in here? Start posting and get things moving.',
-          body: 'One upload, three tags. Posts are what grow followers.',
+          title: 'No posts yet.',
+          body: 'Upload a post, or join a node that has some.',
         };
     }
   }, [feedStatus]);
@@ -903,7 +923,7 @@ export function GMatchFeed({
                 fill={true}
               />
             </span>
-            <span className="min-w-0 flex-1 truncate text-sm text-retro-muted">
+            <span className="min-w-0 flex-1 truncate text-xs text-retro-muted">
               Share something…
             </span>
             <span className="flex shrink-0 items-center gap-1 rounded-full bg-retro-accent px-3 py-1.5 text-xs font-bold text-retro-accent-text transition-transform group-active:scale-95">
@@ -921,31 +941,26 @@ export function GMatchFeed({
       {/* ONE quiet sync label (replaces the per-post chips): reflects real
           background publish work — active uploads / posts saved locally only.
           Non-blocking, no layout shift beyond this single row. */}
-      {(() => {
-        const pending = posts.filter((p) => p.sync_state === 'pending').length;
-        const localOnly = posts.filter((p) => p.sync_state === 'local').length;
-        if (!pending && !localOnly) return null;
-        return (
-          <div
-            role="status"
-            className="w-full py-1 px-3 flex items-center gap-1.5 text-[10px] font-mono text-retro-muted border-b border-border-glass bg-glass-w4 select-none"
-          >
-            {pending > 0 ? (
-              <>
-                <Loader2 className="w-3 h-3 animate-spin shrink-0" aria-hidden="true" />
-                <span>Syncing {pending} post{pending === 1 ? '' : 's'} to the network…</span>
-              </>
-            ) : (
-              <>
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400/90 shrink-0" aria-hidden="true" />
-                <span>
-                  {localOnly} post{localOnly === 1 ? '' : 's'} saved on this device — they upload when the network is back.
-                </span>
-              </>
-            )}
-          </div>
-        );
-      })()}
+      {syncCounts.pending > 0 || syncCounts.local > 0 ? (
+        <div
+          role="status"
+          className="w-full py-1 px-3 flex items-center gap-1.5 text-[10px] font-mono text-retro-muted border-b border-border-glass bg-glass-w4 select-none"
+        >
+          {syncCounts.pending > 0 ? (
+            <>
+              <Loader2 className="w-3 h-3 animate-spin shrink-0" aria-hidden="true" />
+              <span>Syncing {syncCounts.pending} post{syncCounts.pending === 1 ? '' : 's'} to the network…</span>
+            </>
+          ) : (
+            <>
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400/90 shrink-0" aria-hidden="true" />
+              <span>
+                {syncCounts.local} post{syncCounts.local === 1 ? '' : 's'} saved on this device — they upload when the network is back.
+              </span>
+            </>
+          )}
+        </div>
+      ) : null}
 
 
       {/* Discreet grey loading label when stories/content are loading */}

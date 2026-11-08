@@ -1,11 +1,11 @@
 # Adult Content & Records (18 U.S.C. §2257-adjacent)
 
-_Binding text (EN)_: **2026-09-11.2** · updated: 2026-09-09
+_Binding text (EN)_: **2026-11-07.1** · updated: 2026-11-07
 Jurisdiction: US (for publishers of explicit content under US jurisdiction); analogous local laws
 
 ## 1. Who is the "publisher"
 
-In the courier/P2P model there is NO central publisher: whoever submits is the publisher of their content and the custodian of their records. Publishing sexually explicit content in the US triggers 18 U.S.C. §2257 record-keeping duties; analogous laws may apply elsewhere.
+In the peer-to-peer model there is NO central publisher: whoever submits is the publisher of their content and the custodian of their records. Publishing sexually explicit content in the US triggers 18 U.S.C. §2257 record-keeping duties; analogous laws may apply elsewhere.
 
 ## 2. Where records live
 

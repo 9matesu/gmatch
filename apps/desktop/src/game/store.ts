@@ -1407,7 +1407,12 @@ export const useGame = create<GameState>((set, get) => ({
   tick: (dtMs = 1000) => {
     const s = get()
     const now = Date.now()
-    const caps = activeCaps(s.caps, now)
+    // `activeCaps` allocates a NEW array every call, so storing it as-is gave
+    // every subscriber of `s.caps` a fresh reference once per second and
+    // re-rendered the whole panel on every tick. Keep the old array when
+    // nothing expired: the contents are identical, so the identity should be.
+    const live = activeCaps(s.caps, now)
+    const caps = live.length === s.caps.length ? s.caps : live
     const input: EconomyInput = { ...econ(s), caps }
     const gps = passiveGps(input, now)
     const auto = capAutoClicksPerSec(caps, now)

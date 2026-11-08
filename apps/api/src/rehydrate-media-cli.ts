@@ -23,7 +23,7 @@
  *
  *   bun run src/rehydrate-media-cli.ts \
  *     --db I:/goongrid/apps/api/orbit.sqlite \
- *     --remote https://gmatch.fly.dev \
+ *     --remote http://192.168.1.10:8790 \
  *     --vault "C:/Users/<you>/AppData/Roaming/@gmatch/desktop/media-vault" \
  *     --vault-key "C:/Users/<you>/AppData/Roaming/@gmatch/desktop/storage.key" \
  *     --imgcache "C:/Users/<you>/AppData/Roaming/@gmatch/desktop/imgcache" \

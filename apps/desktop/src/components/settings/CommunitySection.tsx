@@ -37,7 +37,7 @@ export function CommunitySection({ toast }: { toast?: (message: string, type?: '
         Report a problem, ask for help, or find other people on the server.
       </p>
       <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-        <code className="flex-1 min-w-0 truncate rounded-md border border-border-glass bg-surface-raised px-2 py-1.5 text-[11px] text-retro-body">
+        <code className="flex-1 min-w-0 truncate rounded-md border border-border-glass bg-surface-raised px-2 py-1.5 text-xs text-retro-body">
           {url}
         </code>
         <div className="flex items-center gap-2">

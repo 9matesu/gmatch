@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { getCentralApiUrl, setCentralApiUrl, hasCentral, COURIER_ORIGIN } from './central'
+import { getCentralApiUrl, setCentralApiUrl, hasCentral } from './central'
 
 beforeEach(() => {
   const store = new Map<string, string>()
@@ -17,21 +17,28 @@ afterEach(() => {
 })
 
 describe('central utils', () => {
-  it('defaults to the Cloudflare courier (directory + mail rendezvous)', () => {
-    expect(getCentralApiUrl()).toBe(COURIER_ORIGIN)
-    expect(COURIER_ORIGIN).toBe('https://gmatch.pages.dev')
-    expect(hasCentral()).toBe(true)
+  it('defaults to NO hosted hub (gmatch 2.0: the own node is the directory)', () => {
+    expect(getCentralApiUrl()).toBe('')
+    expect(hasCentral()).toBe(false)
   })
 
   it('respects setCentralApiUrl and localStorage', () => {
     setCentralApiUrl('http://custom-node:9000')
     expect(getCentralApiUrl()).toBe('http://custom-node:9000')
     setCentralApiUrl('')
-    expect(getCentralApiUrl()).toBe(COURIER_ORIGIN)
+    expect(getCentralApiUrl()).toBe('')
   })
 
   it('handles "none" central keyword', () => {
     setCentralApiUrl('none')
+    expect(getCentralApiUrl()).toBe('')
+    expect(hasCentral()).toBe(false)
+  })
+
+  it('ignores a pointer to the retired hosted rendezvous', () => {
+    // gmatch 2.0 emptied its D1 and removed the function. A stale pointer is
+    // dead state, never a dial target.
+    setCentralApiUrl('https://gmatch.pages.dev')
     expect(getCentralApiUrl()).toBe('')
     expect(hasCentral()).toBe(false)
   })

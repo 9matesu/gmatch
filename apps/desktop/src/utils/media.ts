@@ -18,7 +18,7 @@ export function resolveMediaUrl(url?: string | null): string {
   if (/^(file|about|javascript|chrome|chrome-extension|moz-extension|safari-web-extension):/i.test(trimmed)) {
     return '';
   }
-  // Content-addressed media from imported posts (fly.dev bridge): urn:sha256:<uuid><padding>.
+  // Content-addressed media from imported posts: urn:sha256:<uuid><padding>.
   // Resolve to /api/objects/<uuid> so the server streams the local P2P copy.
   const urnMatch = trimmed.match(/^urn:sha256:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
   if (urnMatch) {

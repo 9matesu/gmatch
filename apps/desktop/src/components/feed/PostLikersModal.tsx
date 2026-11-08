@@ -98,7 +98,7 @@ export function PostLikersModal({
       aria-label="Post likes"
     >
       <div
-        className="bg-surface-raised w-full max-w-sm rounded-t-3xl sm:rounded-2xl border border-border-glass shadow-2xl overflow-hidden flex flex-col max-h-[80vh] sm:max-h-[500px] animate-orbit-slide-up"
+        className="bg-surface-raised w-full max-w-sm rounded-t-xl sm:rounded-xl border border-border-glass shadow-2xl overflow-hidden flex flex-col max-h-[80vh] sm:max-h-[500px] animate-orbit-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -192,7 +192,7 @@ export function PostLikersModal({
                       </span>
                     </div>
                   </div>
-                  <span className="text-[11px] font-medium text-retro-muted group-hover:text-retro-fg shrink-0 transition-colors px-2 py-1 rounded bg-glass-w06">
+                  <span className="text-xs font-medium text-retro-muted group-hover:text-retro-fg shrink-0 transition-colors px-2 py-1 rounded bg-glass-w06">
                     View
                   </span>
                 </div>

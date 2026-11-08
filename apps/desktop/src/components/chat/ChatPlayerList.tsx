@@ -226,7 +226,7 @@ export function ChatPlayerList({
             Players
           </h2>
         </div>
-        <div className="flex items-center gap-1.5 text-[11px] font-mono shrink-0">
+        <div className="flex items-center gap-1.5 text-xs font-mono shrink-0">
           <span className="flex items-center gap-1 text-retro-online font-medium">
             <span className="w-2 h-2 rounded-full bg-retro-online inline-block" />
             {displayOnlineCount}

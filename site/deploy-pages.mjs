@@ -1,14 +1,15 @@
-// Deploy the release page AND the blind courier to Cloudflare Pages
-// (project `gmatch`, https://gmatch.pages.dev).
+// Deploy the release page to Cloudflare Pages (project `gmatch`,
+// https://gmatch.pages.dev).
 //
 // Public files ship from site/: index.html, release.json, img/ (favicon +
-// screenshots), legal/ and functions/ (the courier: /api/health, /api/identity,
-// /api/servers directory, /api/mail relay). The 100 MB exe never ships.
+// screenshots) and legal/. The 100 MB exe never ships.
 //
-// Staging happens INSIDE the repo (.pages-stage) on purpose: wrangler bundles
-// functions/api/[[path]].ts with esbuild, and the file imports @noble/* from
-// the workspace's node_modules. A temp dir outside the workspace cannot
-// resolve those. The stage is removed afterwards.
+// gmatch 2.0: this is a STATIC PAGE and nothing else. The blind courier
+// function and its D1 binding were removed — no hosted service holds a
+// mailbox, a directory row or any other app state for an install. A node is
+// where a client lives; peers meet there.
+//
+// Staging happens INSIDE the repo (.pages-stage) and is removed afterwards.
 //
 //   node deploy-pages.mjs            # production (branch main)
 //   node deploy-pages.mjs --preview  # preview alias, production untouched
@@ -23,9 +24,6 @@ const here = import.meta.dirname
 const stage = join(here, '..', '.pages-stage')
 const preview = process.argv.includes('--preview')
 
-// The courier's D1 database (site/schema.sql). Override for a fork.
-const D1_ID = process.env.GMATCH_D1_ID || '3773d27c-23cc-4fe4-bcc6-8bf17cb70009'
-
 rmSync(stage, { recursive: true, force: true })
 mkdirSync(stage, { recursive: true })
 try {
@@ -33,7 +31,6 @@ try {
   cpSync(join(here, 'release.json'), join(stage, 'release.json'))
   cpSync(join(here, 'img'), join(stage, 'img'), { recursive: true })
   cpSync(join(here, 'legal'), join(stage, 'legal'), { recursive: true })
-  cpSync(join(here, 'functions'), join(stage, 'functions'), { recursive: true })
 
   writeFileSync(
     join(stage, 'wrangler.toml'),
@@ -41,11 +38,6 @@ try {
       'name = "gmatch"',
       'compatibility_date = "2026-10-24"',
       'pages_build_output_dir = "."',
-      '',
-      '[[d1_databases]]',
-      'binding = "DB"',
-      'database_name = "gmatch-courier"',
-      `database_id = "${D1_ID}"`,
       '',
     ].join('\n'),
   )

@@ -444,7 +444,18 @@ export function ServersView({
 
   const saveCentral = () => {
     const raw = setupUrl.trim()
-    if (!raw) { setSetupError('Enter your central node address.'); return }
+    // Empty means "no shared hub": the own node is the directory. That is the
+    // gmatch 2.0 default — nothing hosted holds a row or a mailbox for this
+    // install unless the user asks for a shared rendezvous point.
+    if (!raw) {
+      setCentralApiUrl('')
+      setCentral('')
+      setSetupError('')
+      setSetupUrl('')
+      toast('Directory disabled — this node is the directory.', 'info')
+      void refresh()
+      return
+    }
     const normalized = normalizeServerUrl(raw) || normalizeServerUrl(`http://${raw}`)
     if (!normalized) {
       setSetupError('That does not look like an http(s) address (e.g. https://central.example).')
@@ -1417,8 +1428,8 @@ export function ServersView({
                     </button>
                   </div>
                   <p className="text-[10px] text-retro-muted">
-                    Optional: a node that publishes a server directory for others. Empty means your own node
-                    is the directory.
+                    Empty means your own node is the directory. Set one only if
+                    you want a shared rendezvous point.
                   </p>
                   <div className="flex items-center gap-1.5">
                     <input
@@ -1802,7 +1813,7 @@ export function ServersView({
                   className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-retro-bg/80 backdrop-blur-sm"
                 >
                   <span
-                    className="flex h-16 w-16 items-center justify-center rounded-2xl border text-2xl font-bold text-white/90 shadow-xl animate-orbit-pop"
+                    className="flex h-16 w-16 items-center justify-center rounded-xl border text-2xl font-bold text-white/90 shadow-xl animate-orbit-pop"
                     style={worldTileStyle(key)}
                   >
                     {worldGlyph(worldName)}

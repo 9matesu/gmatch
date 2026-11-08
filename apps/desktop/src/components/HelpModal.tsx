@@ -267,7 +267,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
               <Users className="w-4 h-4 shrink-0 text-retro-fg" />
               <span className="flex-1 min-w-0">
                 <span className="block text-xs font-bold text-retro-fg">Community &amp; support</span>
-                <span className="block text-[11px] text-retro-muted truncate">Ask for help or report an issue on the community server</span>
+                <span className="block text-xs text-retro-muted truncate">Ask for help or report an issue on the community server</span>
               </span>
               <ArrowUpRight className="w-4 h-4 shrink-0 text-retro-muted" />
             </button>

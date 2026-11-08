@@ -360,7 +360,7 @@ export function WatchPartySlot({
               to diagnose from the UI. The real element state is right here. */}
           {diag && (
             <span
-              className="text-[9px] font-mono text-retro-muted/70 tabular-nums"
+              className="text-[10px] font-mono text-retro-muted/70 tabular-nums"
               data-testid="watch-media-diag"
               title="readyState / networkState — 0 = nothing requested, 1 = loading, 4 = enough data"
             >
@@ -368,7 +368,7 @@ export function WatchPartySlot({
             </span>
           )}
           {media.failed && !diag && (
-            <span className="text-[9px] font-mono text-retro-muted/70">{videoSrc?.slice(0, 60)}</span>
+            <span className="text-[10px] font-mono text-retro-muted/70">{videoSrc?.slice(0, 60)}</span>
           )}
         </div>
       )}
@@ -382,7 +382,7 @@ export function WatchPartySlot({
           transfer.status === 'failed' ||
           transfer.status === 'cancelled') && (
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-1.5 bg-black/70 px-4 text-center">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-retro-fg">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-retro-fg">
               {transfer.status === 'receiving'
                 ? 'Receiving from the sharer…'
                 : transfer.status === 'failed'

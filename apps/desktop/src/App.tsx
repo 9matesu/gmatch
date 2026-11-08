@@ -5609,7 +5609,7 @@ export default function Home() {
       </div>
 
        {adminModalOpen && (
-         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-2 sm:p-6" role="dialog" aria-modal="true" aria-label="Admin control panel" onMouseDown={(e) => { if (e.target === e.currentTarget) setAdminModalOpen(false) }}>
+         <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 p-2 sm:p-6" role="dialog" aria-modal="true" aria-label="Admin control panel" onMouseDown={(e) => { if (e.target === e.currentTarget) setAdminModalOpen(false) }}>
            <div className="relative flex h-[92vh] w-full max-w-[1500px] min-h-0 flex-col overflow-hidden rounded-xl border border-border-glass bg-retro-bg shadow-2xl">
              <button type="button" aria-label="Close admin control panel" onClick={() => setAdminModalOpen(false)} className="absolute right-3 top-3 z-20 rounded-md border border-border-glass bg-surface-raised px-2 py-1 text-xs text-retro-muted hover:text-retro-fg cursor-pointer">Close</button>
              <div className="min-h-0 flex-1 overflow-y-auto"><AdminApp identity={identity} /></div>

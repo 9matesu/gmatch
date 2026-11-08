@@ -41,19 +41,19 @@
 |---|---|
 | (a) User-disk forensics | F1/F2/F3/F8 → runtime-only: images in RAM only, `no-store`, keys and threads in DPAPI, local `storage.key` |
 | (b) User-level malware | DPAPI does not help (same session), mitigated by: key export only via explicit modal + `will-prevent-unload` warning; honest limit stated in the ToS |
-| (c) Server operator | Blind courier + envelope signature + public token + random TURN + ICE hygiene + SITE gate: the official host does NOT see content, conversation identity, presence, or the graph. Full-node: the HOST IS the server, and `e2e-disclaimer` says so |
+| (c) Server operator | Blind node relay + envelope signature + public token + random TURN + ICE hygiene + SITE gate: a node you run does NOT see content, conversation identity, presence, or the graph. A node somebody else runs: the HOST IS the server, and `e2e-disclaimer` says so |
 | (d) Network MITM | TLS on the API + payloads already E2EE; replay protected by nonce/signature; CSP without arbitrary origins (F7 fixed) |
 | (e) Admin abuse | PIN hashed + lockout + no default (F4); wave 2 adds identity binding + 12h grant TTL (F22); content unseal only via victim key-disclosure (implemented: report-scoped cases) |
 
 ## Per-mode model (F5, recorded decision)
 
-- **Official SITE (`SITE_SERVICES=mail,turn`)**: pure courier. The server is stateless for content (no table ever written; see `site-blindness.test.ts`), keeps opaque envelopes for ≤7d and does not know who connects.
+- **A node in SITE_SERVICES mode (`SITE_SERVICES=mail,turn`)**: pure relay. The server is stateless for content (no table ever written; see `site-blindness.test.ts`), keeps opaque envelopes until they expire and does not know who connects. gmatch 2.0 hosts no such node: every install runs its own.
 - **Self-hosted full-node**: LAN/community convenience: the HOST'S ADMINS see PMs/blobs with their own key, like any historical central server. It is not "their server"; it is yours. ToS + disclaimer make this explicit.
 
 ## Limitations / out of reach
 
 - No forward secrecy (static X25519 per account), ratchet/prekeys remain future 1.x hardening.
-- No onion-routing, residual traffic×time correlation on any courier (mitigated client-side with padding/jitter; not eliminable).
+- No onion-routing, residual traffic×time correlation on any relay (mitigated client-side with padding/jitter; not eliminable).
 - The audit is static: it does not replace third-party dynamic pentesting or human counsel review for the legal side.
 
 ## Runtime-only checklist (how to verify today)
@@ -111,12 +111,12 @@ phase" becomes implemented reality). Full ledger in `docs/ADMIN-SUITE.md`.
 
 ## What we did NOT solve (honest)
 
-- **TCP-layer IP**: the network edge (fly.io; Cloudflare once the official
-  node is proxied) still sees client IPs, code cannot fix that. What the code
+- **TCP-layer IP**: the network edge and whichever node a peer connects to
+  still see client IPs; code cannot fix that. What the code
   guarantees: the application layer never stores, echoes, logs or renders an
-  IP (F25/B3/B4; `scripts/security-greps.sh` is the gate). Pending ops step:
-  front the official node behind a reverse proxy (CF Proxied).
-- **Traffic×time correlation** on the courier remains possible (padding/jitter
+  IP (F25/B3/B4; `scripts/security-greps.sh` is the gate). Since gmatch 2.0 this project hosts
+  no node at all, so there is no project-operated edge in the path.
+- **Traffic×time correlation** on a node relay remains possible (padding/jitter
   only; without onion-routing it cannot reach zero, round 1 already said so).
 - **Video metadata** (mp4/webm) is not stripped (pure-JS parser limit; upgrade
   path: ffmpeg-sidecar if ever demanded).

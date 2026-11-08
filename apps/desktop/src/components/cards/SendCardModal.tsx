@@ -56,7 +56,7 @@ export function SendCardModal({
     <div
       role="dialog"
       aria-label={`Gift a Card to ${recipientName}`}
-      className="fixed inset-0 z-[var(--z-system)] flex items-center justify-center bg-black/80 p-4 select-none font-sans"
+      className="fixed inset-0 z-[var(--z-system)] flex items-center justify-center bg-black/70 p-4 select-none font-sans"
     >
       <div
         className="relative max-w-lg w-full bg-retro-panel rounded-xl border border-border-glass shadow-2xl overflow-hidden p-5 flex flex-col gap-4 text-retro-fg"

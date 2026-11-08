@@ -199,19 +199,14 @@ function FeedSettingsTab({
       </div>
 
       <div className="p-4 bg-glass-w5 border border-border-glass rounded-lg space-y-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h4 className="text-xs font-medium text-retro-fg">Content Blocklist (blocklist.json)</h4>
-          <p className="text-xs text-retro-muted">
-            Configure hard blocked terms, suggested exclude categories, and noise filter tags.
-          </p>
-        </div>
+        <h4 className="text-xs font-medium text-retro-fg">Content blocklist</h4>
         {onNavigateTab && (
           <button
             type="button"
             onClick={() => onNavigateTab('blocklist')}
             className="px-3.5 py-2 bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text rounded-lg text-xs font-semibold cursor-pointer shrink-0 active:scale-[0.98] transition-colors"
           >
-            Configure blocklist.json
+            Configure
           </button>
         )}
       </div>
@@ -462,7 +457,7 @@ export function GMatchSettingsModal({
                       onChange={(e) => updateSettings('panelOpacity', Number(e.target.value) / 100)}
                       className="w-full accent-retro-accent cursor-pointer"
                     />
-                    <p className="text-[10px] text-retro-body">Makes panels and cards more see-through. Text keeps its backing.</p>
+                    <p className="text-[10px] text-retro-body">Panel and card transparency. Text keeps its backing.</p>
                   </div>
 
                   {/* Glass blur */}
@@ -481,14 +476,14 @@ export function GMatchSettingsModal({
                       onChange={(e) => updateSettings('glassBlur', Number(e.target.value) / 100)}
                       className="w-full accent-retro-accent cursor-pointer"
                     />
-                    <p className="text-[10px] text-retro-body">Backdrop frost strength. Lower is faster on weak GPUs; 0% disables it entirely.</p>
+                    <p className="text-[10px] text-retro-body">Backdrop blur strength. 0% disables it.</p>
                   </div>
 
                   {/* Animated chrome (perf gate) */}
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <div className="text-xs font-medium text-retro-fg">Animated chrome</div>
-                      <div className="text-xs text-retro-body">Moving shine on accent buttons/headings. Off is faster; enable for the sparkle.</div>
+                      <div className="text-xs text-retro-body">Shine on accent buttons and headings. Off is faster.</div>
                     </div>
                     <Switch label="Animated chrome" checked={settings.animatedChrome} onChange={() => updateSettings('animatedChrome', !settings.animatedChrome)} />
                   </div>
@@ -771,8 +766,8 @@ export function GMatchSettingsModal({
                     <div>
                       <h4 className="text-xs font-medium text-retro-fg">Local media vault</h4>
                       <p className="text-xs text-retro-body">
-                        Store kept gallery images and cards on this computer (3 GB cap, oldest unkept goes first).
-                        Off = memory only, nothing is written to disk.
+                        Keeps gallery images and cards on this computer (3 GB cap, oldest unkept goes first).
+                        Off = memory only.
                       </p>
                     </div>
                     <Switch

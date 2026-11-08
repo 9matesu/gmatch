@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased — gmatch 2.0: no hosted service; the own node is the world
+
+- **Nothing hosted is contacted.** The client defaults to `central = none`
+  (`apps/desktop/src/utils/central.ts`): the node you are connected to is the
+  directory, the sealed-mail relay and the swarm rendezvous. A shared hub is
+  opt-in (`gmatch.central.url` / `VITE_CENTRAL_URL`) and points at a node you
+  run. A pointer to the retired `*.gmatch.pages.dev` rendezvous is dropped
+  instead of dialed, so an old install cannot keep talking to a service that no
+  longer exists.
+- **The hosted courier is gone.** The Cloudflare Pages function and its D1
+  (`Mail` + `ServerDirectory` rows) were removed; the D1 was emptied and then
+  deleted. `gmatch.pages.dev` is a static release page again: no function, no
+  database, no mailbox, no listing. `/api/*` on that origin returns the page,
+  never courier JSON.
+- **All local data was wiped.** Local node DB + blob store, the Electron
+  `userData` tree, browser storage, the e2e scratch directory and the scratch
+  identity were cleared. The app now starts from an empty world — which is the
+  honest starting point for a system with no hosted data node.
+- **The legal corpus says what is true.** Terms, privacy, community, abuse,
+  records and the E2E disclaimer now name the node you run (or the node you
+  joined) as the controller, instead of an official hosted courier. Version
+  `2026-11-07.1`; every account re-accepts once.
+- **The site stops claiming a directory.** `site/index.html` and the legal
+  pages describe the gmatch 2.0 topology: a download page that stores nothing,
+  and a client that talks to its own node.
+
 ## 1.6.7 - local media is found again; missing media stops spinning
 
 - **The vault answers by object id, not just by the old URL.** The media vault

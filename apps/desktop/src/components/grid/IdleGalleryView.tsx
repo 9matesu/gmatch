@@ -822,7 +822,7 @@ export default function IdleGalleryView({
             </button>
           </div>
           {batchNotice && (
-            <div className="px-4 pb-1 text-[11px] text-amber-300" role="status">
+            <div className="px-4 pb-1 text-xs text-amber-300" role="status">
               {batchNotice}
             </div>
           )}
@@ -830,7 +830,7 @@ export default function IdleGalleryView({
       )}
 
       {batchNotice && selectedIds.size === 0 && (
-        <div className="px-4 pt-1 text-[11px] text-amber-300" role="status">
+        <div className="px-4 pt-1 text-xs text-amber-300" role="status">
           {batchNotice}
         </div>
       )}

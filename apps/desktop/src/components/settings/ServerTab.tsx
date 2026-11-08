@@ -149,7 +149,7 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
       <div className="glass-card p-4 space-y-3">
         <div className="space-y-0.5 min-w-0">
           <h4 className="text-xs font-medium text-retro-fg">Performance</h4>
-          <p className="text-[11px] text-retro-muted">
+          <p className="text-xs text-retro-muted">
             Nothing to migrate: there is no hosted account storage. Posts, media and keys live on this device and on the
             worlds you join.
           </p>

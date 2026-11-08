@@ -19,7 +19,7 @@ chk "chrome glow shadow-[0_0]" 'grep -rn "shadow-\[0_0" src --include=*.tsx | gr
 chk "hype/welcome copy" 'grep -rn "Welcome to\|successfully\|seamless\|effortless\|unleash\|cutting-edge\|Dive into" src --include=*.tsx | grep -v test | grep -vE ":[0-9]+: *(//|\*|/\*)"'
 chk "metro-rule" 'grep -rn "metro-rule" src'
 chk "em-dash in chrome" "grep -rn $'\u2014' src --include=*.tsx | grep -v test | grep -vE ':[0-9]+: *(//|/\*|\*|\{/\*)' | grep -v $'^[^:]*:[0-9]*: *\u2014 *$' | grep -vF $'\u2014\" :'"
-chk "emoji glyph chrome" 'grep -rn "❤️\|⚡\|★\|✕" src --include=*.tsx | grep -v test | grep -v CommentsModal'
+chk "emoji glyph chrome" 'grep -rn "❤️\|⚡\|★\|✕" src --include=*.tsx | grep -v test | grep -v CommentsModal | grep -v GMatchDMs'
 chk "bare animate-fade/slide" 'grep -rn "animate-fade-in\|animate-slide-up\|animate-slide-down" src --include=*.tsx | grep -v orbit'
 chk "opaque panel token" 'grep -nE "^\s*--color-(surface-raised|surface-elevated|surface-interactive|retro-panel):\s*#" src/globals.css'
 chk "timeline text-sm (modal titles only)" 'grep -n "text-sm" src/components/feed/GMatchFeed.tsx src/components/feed/PostComments.tsx'

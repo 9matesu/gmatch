@@ -8,12 +8,12 @@
 ## 1. System Overview
 
 Since 2026-10-24 there is **no central data deployment**: every packaged copy of
-the app runs **its own node** (host mode is the default). What remains shared is
-a blind rendezvous at `https://gmatch.pages.dev` — a Cloudflare Pages Function
-that serves a signed public-node directory and a sealed-mail relay (D1), with
-no content tables, no accounts, no presence and no TURN. It is not a node and
-never a data base. The old hosted courier and full node are retired and no
-longer appear in the code.
+the app runs **its own node** (host mode is the default). Since 2026-11-07 there
+is no hosted rendezvous either — the hosted courier function and its D1 were
+removed, and the release page is static. The rendezvous is **the node each
+client is connected to**: it serves a signed public-node directory and a
+sealed-mail relay, with no content tables, no accounts and no presence. It is
+not a world, never a data base.
 
 A node is still a *blind, stateless courier* for its own clients: it holds no
 user profiles, no presence, no posts, no feeds and no media objects. It only
@@ -48,7 +48,7 @@ node's mailbox — the node still cannot open it.
    - The courier only handles sealed binary envelopes (`Envelope v2`) addressed by 64-hex BLAKE3 delivery tokens.
    - The courier learns nothing about the sender's identity, the message body, or the routing kind.
    - Deliberately returns `404 Not Found` for legacy central endpoints: `/api/users/online`, `/api/posts`, `/api/objects`, and `/api/signal/*`.
-   - The Cloudflare courier (`gmatch.pages.dev`) offers the HTTP mailbox only — a Pages isolate cannot hold another isolate's socket — so `MailClient` polls that origin every 20 s instead of opening `/api/mail/ws`.
+   - A node whose WebSocket is unavailable (a relay behind a proxy that drops upgrades) offers the HTTP mailbox only, so `MailClient` polls that origin every 20 s instead of opening `/api/mail/ws`.
 
 2. **Ephemeral Presence Discovery:**
    - Peers discover each other by broadcasting signed presence beacons to a shared public presence mailbox token (`sha256Hex('orbit-global-presence-v1')`).

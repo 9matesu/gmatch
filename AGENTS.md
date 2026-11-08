@@ -51,7 +51,7 @@ Root commands fan out with `--workspaces --if-present`.
   social feed carries peer uploads over the swarm, never from a booru. Any
   fetch failure must fall back to offline SVG placeholders (SPEC §6), never
   crash or fabricate.
-- `npm run dev` boots a local Bun sidecar and talks to it only (`vite.config.ts`); there is no remote dev mode. The Cloudflare Pages project (`site/functions/`) is a **blind courier** (directory + sealed mail only) and 404s every stateful route — the local sidecar (or a self-hosted full node) is required for feed/DMs. Sealed mail defaults to that courier so peers on different worlds still reach each other; the courier has no WebSocket, so `MailClient` polls it.
+- `npm run dev` boots a local Bun sidecar and talks to it only (`vite.config.ts`); there is no remote dev mode. Since gmatch 2.0 there is **no hosted service at all**: the site is a static release page, and the node you are connected to is the directory + sealed-mail relay. A shared hub is opt-in via `gmatch.central.url` (default `none`); a pointer to the retired `*.gmatch.pages.dev` courier is dropped, never dialed.
 - Two separate economies, never bridged (SPEC §2): idle `pts` live only in the localStorage save (`gmatch.save.v1`); server `g$` is the authoritative `EconomyService` ledger.
 - Single 18+ gate is the shell's `AgeGateModal` (mirrored into the idle store); don't add a second one.
 

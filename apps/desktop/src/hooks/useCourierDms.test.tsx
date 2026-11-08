@@ -120,6 +120,9 @@ describe('useCourierDms', () => {
       if (url.includes('/api/servers/node')) {
         return new Response(JSON.stringify({ lanUrls: ['http://192.168.5.2:8790'] }), { status: 200 })
       }
+      // The legacy inbox is gone: a current node 404s /api/pm, which is what
+      // puts a relative (browser-dev) base in courier mode.
+      if (url.endsWith('/api/pm')) return new Response('{}', { status: 404 })
       if (!init?.body) {
         return new Response(JSON.stringify({ sealed_available: false }), { status: 200 })
       }

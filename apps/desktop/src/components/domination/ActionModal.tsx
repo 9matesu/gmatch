@@ -191,7 +191,7 @@ export function ActionModal({
                 } bg-surface-interactive`}
               >
                 <FolderOpen className="w-3.5 h-3.5 text-retro-muted shrink-0" />
-                <span className="text-[11px] text-retro-fg truncate">
+                <span className="text-xs text-retro-fg truncate">
                   {inlineName
                     ? `Inline: ${inlineName}`
                     : url

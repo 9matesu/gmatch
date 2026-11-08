@@ -52,21 +52,21 @@ th, td { border: 1px solid #27272a; padding: 6px 12px; text-align: left; font-we
 <p><a href="../index.html#terms">← back to the main page</a></p>
 <p><em>Generated from the canonical in-app source. Do not edit here.</em></p>
 <h1>Privacy Policy (LGPD/GDPR)</h1>
-<p>_Binding text (EN)_: <strong>2026-09-11.2</strong> · updated: 2026-09-09</p>
+<p>_Binding text (EN)_: <strong>2026-11-07.1</strong> · updated: 2026-11-07</p>
 <p>Jurisdiction: LGPD (Lei 13.709/2018); GDPR for EU users</p>
 <h2>1. Who is the controller</h2>
-<p>For the OFFICIAL SITE (blind courier + TURN): the maintainers of the official site, contactable through the in-app abuse channel (Settings → Help). For FULL-NODES: the administrator of that server is the controller of the data it holds; the software only implements what the host runs.</p>
+<p>This project runs NO data service: the download page is static and stores nothing, and no node is hosted by the maintainers. The controller is therefore whoever runs the node you are connected to. By default that is YOU (the app runs your own node): you are the controller of your own data. If you join a node somebody else runs, that operator is the controller of what its node holds, reachable through its own abuse channel; the software only implements what the host runs.</p>
 <h2>2. Legal bases</h2>
 <p>Contract performance (delivering the service you asked for) + legitimate interest (security/anti-abuse) + consent (accepting the Terms and enabling optional features such as uploads).</p>
 <h2>3. What we do NOT collect (minimisation statement)</h2>
 <ul>
-<li>No content: the official courier receives only sealed envelopes (XChaCha20-Poly1305) and the delivery address = BLAKE3 hash of your public key. It cannot know who sent, what, or when you read.</li>
+<li>No content: the node you are connected to receives only sealed envelopes (XChaCha20-Poly1305) and the delivery address = BLAKE3 hash of your public key. It cannot know who sent, what, or when you read. This project holds no key and no envelope at all.</li>
 </ul>
 <ul>
-<li>No presence: site mode exposes nothing about who is online, the social graph, profiles or posts.</li>
+<li>No presence at the project: nothing here knows who is online. Your node sees the clients connected to it, because it has to relay for them.</li>
 </ul>
 <ul>
-<li>No IP: TURN credential requests use an ephemeral random identity per session; server logs record redacted IPs (last octet removed); the rate limiter keys buckets on a salted one-way hash, never the address itself; the app never displays a raw server address (masked as 203.0.•••.•••).</li>
+<li>No IP at the project: there is no project service to see one. The node you are connected to sees your IP address, as any network peer does; server logs record redacted IPs (last octet removed); the rate limiter keys buckets on a salted one-way hash, never the address itself; the app never displays a raw server address (masked as 203.0.•••.•••).</li>
 </ul>
 <ul>
 <li>No telemetry: the application makes zero analytics, crash-report or beacon requests to third parties.</li>
@@ -79,7 +79,7 @@ th, td { border: 1px solid #27272a; padding: 6px 12px; text-align: left; font-we
 </ul>
 <h2>4. What IS processed, and by whom</h2>
 <ul>
-<li><strong>Official site:</strong> delivery address (hash), envelope size, timestamps, TTL/per-box caps (anti-flood). Purpose: routing. Retention: up to 7 days (expiry) or immediately after a signed ack.</li>
+<li><strong>Your node (or the node you joined):</strong> delivery address (hash), envelope size, timestamps, TTL/per-box caps (anti-flood). Purpose: routing. Retention: until expiry or immediately after a signed ack.</li>
 </ul>
 <ul>
 <li><strong>Your machine:</strong> the full identity, keys, threads, rooms, settings, game save. It never leaves to the site.</li>
@@ -88,11 +88,11 @@ th, td { border: 1px solid #27272a; padding: 6px 12px; text-align: left; font-we
 <li><strong>Full-node (if you use one):</strong> it stores posts, profiles, legacy DMs (encrypted with the SERVER key, so the host can read them), economies and admin logs. Check your host's policy.</li>
 </ul>
 <h2>5. Data subject rights (art. 18 LGPD / arts. 15-22 GDPR)</h2>
-<p>Confirmation, access, rectification, portability, deletion and consent withdrawal are exercised LOCALLY: export your identity in the app (portability) and delete it (deletion on your device); in courier mode envelopes expire by themselves. For the official site, since data is only hashes and sealed bytes, it cannot be linked to you, and deletion is baked into the architecture. For full-nodes, contact the host administrator.</p>
+<p>Confirmation, access, rectification, portability, deletion and consent withdrawal are exercised LOCALLY: export your identity in the app (portability) and delete it (deletion on your device); on a node you run, envelopes expire by themselves. This project holds nothing, so there is nothing for us to hand over or erase. For a node run by somebody else, contact that operator.</p>
 <h2>6. Security</h2>
 <p>Ed25519 signatures on every mutation with anti-replay nonces; ECIES (X25519 + XChaCha20-Poly1305 + BLAKE3 KDF); short-lived HMAC TURN credentials; shape-only validation without content reads; strict CSP; ICE candidate sanitisation against IP leaks (mDNS/relay). The full audit is published at legal/security.html on the official site.</p>
 <h2>7. International transfers and subprocessors</h2>
-<p>The official site may be hosted on cloud outside Brazil; the only data processed there are opaque envelopes and hashes, without any decryption key. Self-hosted TURN is optional; we never use third-party clouds for content.</p>
+<p>The download page may be hosted on cloud outside Brazil; it stores nothing and sets no cookie. The node you connect to may be anywhere, including another country: the only data it holds about you is what routing needs (delivery address, envelope size, timestamps). Self-hosted TURN is optional; we never use third-party clouds for content.</p>
 <h2>8. Minors</h2>
 <p>The service is for adults (18+). We do not intentionally collect minors' data; there is no age verification.</p>
 <h2>9. Changes</h2>
