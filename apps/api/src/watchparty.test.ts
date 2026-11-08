@@ -26,46 +26,21 @@ beforeEach(() => {
   conns.clear()
 })
 
-describe('parseWatchFrame (the watch contract)', () => {
-  it('rejects anything that is not a plain object', () => {
-    expect(parseWatchFrame(null)).toBeNull()
-    expect(parseWatchFrame(undefined)).toBeNull()
-    expect(parseWatchFrame('watch.join')).toBeNull()
-    expect(parseWatchFrame(42)).toBeNull()
-    expect(parseWatchFrame([{ party: 'p' }])).toBeNull()
-  })
-
-  it('copies only the known fields', () => {
-    const frame = parseWatchFrame({ type: 'watch', party: 'p1', action: 'play', position: 4, evil: 'x' })
-    expect(frame).not.toBeNull()
-    expect(frame!.party).toBe('p1')
-    expect(frame!.action).toBe('play')
-    expect(frame!.position).toBe(4)
-    expect('evil' in frame!).toBe(false)
-  })
-
-  it('drops a field whose type is wrong instead of coercing it', () => {
-    // The old handlers did Number(msg.position) / String(msg.party), so a
-    // client could send "7" for a number and "0" for a party id. The frame is
-    // now narrowed: a wrong type is simply not there.
-    const frame = parseWatchFrame({ party: 'p1', position: '7', on: 'yes', size: 'big' })
-    expect(frame!.position).toBeUndefined()
-    expect(frame!.on).toBeUndefined()
-    expect(frame!.size).toBeUndefined()
-    expect(frame!.party).toBe('p1')
-  })
-
-  it('keeps a relay descriptor only when it carries both halves', () => {
-    const full = parseWatchFrame({ relay: { upstream: 'https://x/y', referer: 'https://x/' } })
-    expect(full!.relay).toEqual({ upstream: 'https://x/y', referer: 'https://x/' })
-    expect(parseWatchFrame({ relay: { upstream: 'https://x/y' } })!.relay).toBeUndefined()
-    expect(parseWatchFrame({ relay: 'nope' })!.relay).toBeUndefined()
-  })
-
+// The frame contract itself is tested where it lives:
+// packages/protocol/src/watch-frame.test.ts. What matters HERE is that the
+// node's handlers consume the narrowed frame: a field of the wrong type is
+// dropped, so a transport frame with a string position is refused.
+describe('the node consumes the narrowed frame', () => {
   it('a frame with a non-numeric position is refused by the transport handler', () => {
     const p = makeParty('u0')
     const frame = parseWatchFrame({ party: p.id, action: 'play', position: '7' })
     expect(applyWatch('u0', frame!)).toBeNull()
+  })
+
+  it('a frame with a numeric position is applied', () => {
+    const p = makeParty('u0')
+    const frame = parseWatchFrame({ party: p.id, action: 'play', position: 7 })
+    expect(applyWatch('u0', frame!)).not.toBeNull()
   })
 })
 

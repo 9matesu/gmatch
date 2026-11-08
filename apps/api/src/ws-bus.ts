@@ -57,13 +57,8 @@ export function validateTicket(ticket: string): string | null {
 import {
   applyWatch, joinWatch, watchPong, applyChat, deleteChat, leaveWatch,
   kickWatch, banWatch, muteWatch, transferHost, settingsWatch, queueOps, watchReady, touchRooms, leaveAll, disbandWatch,
-  parseWatchFrame, type WatchFrame,
 } from './watchparty'
-
-/** Narrow an untrusted JSON value to a plain record. */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value)
-}
+import { parseWatchFrame, isRecord, type WatchFrame } from '@orbit/protocol'
 
 export function handleIncoming(conn: WsConn, data: string): void {
   let parsed: unknown = null

@@ -79,7 +79,9 @@ describe('watchPartyStore', () => {
     handleWatchMessage({ type: 'watch.sync', party: 'ghost', frame: { action: 'pause', position: 99 } })
     expect(watchPartyStore.getSnapshot().parties.find((p) => p.id === 'p1')!.frame?.position).toBe(5)
     handleWatchMessage({ type: 'watch.roster', party: 'p1', members: [{ id: 'u2', name: 'Bob' }] })
-    expect(watchPartyStore.getSnapshot().parties.find((p) => p.id === 'p1')!.members).toEqual([{ id: 'u2', name: 'Bob' }])
+    // The roster is NORMALIZED by the shared contract: a member without a
+    // mute flag is not muted.
+    expect(watchPartyStore.getSnapshot().parties.find((p) => p.id === 'p1')!.members).toEqual([{ id: 'u2', name: 'Bob', muted: false }])
   })
 
   it('watch.chat appends text (clamped) to the right party only', () => {

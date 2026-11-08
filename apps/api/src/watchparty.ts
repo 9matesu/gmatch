@@ -1,181 +1,36 @@
 // Watch rooms: in-memory state + WS frame handling. Rooms are ephemeral by
 // design (a cold node drops them; clients see 404 and say so honestly), so
 // there is deliberately no migration here.
+//
+// The wire contract (the inbound frame, the outbound payloads and the shapes
+// that travel) lives in watch-frame.ts. This file owns the ROOM.
 import { randomUUID } from 'node:crypto'
+import {
+  isRecord,
+  type ChatEntry,
+  type PartyFrame,
+  type PartyMember,
+  type QueueEntry,
+  type WatchFrame,
+  type WatchPayload,
+  type WatchQueue,
+  type WatchRoster,
+  type WatchSettings,
+  type WatchSnapshot,
+  type WatchSync,
+} from '@orbit/protocol'
 
-/**
- * The watch-party client frame.
- *
- * Every watch control frame is the same envelope: a party id, an optional
- * idempotency key and a handful of typed fields. The frames arrive as
- * untrusted JSON over the WebSocket, so they are NARROWED by
- * `parseWatchFrame` — never cast. A field of the wrong type is DROPPED, not
- * coerced, and unknown keys never reach a handler.
- */
-export interface WatchFrame {
-  type?: string
-  party?: string
-  /** Idempotency key: a repeated command returns the current state instead
-   *  of applying twice. */
-  cmdId?: string
-  /** Display name (join) or the queue entry's title (add). */
-  name?: string
-  /** Private-room invite token (join only). */
-  invite?: string
-  /** Transport action: 'play' | 'pause'. */
-  action?: string
-  position?: number
-  rate?: number
-  /** Chat message body. */
-  text?: string
-  /** Chat message id (delete). */
-  msgId?: string
-  /** The member a host action applies to (kick/ban/mute/transfer host). */
-  target?: string
-  /** Mute on/off. */
-  on?: boolean
-  isPrivate?: boolean
-  lockVideo?: boolean
-  sharedControl?: boolean
-  requireApproval?: boolean
-  /** Queue operation: add | remove | move | play | next | prev | approve | flag | unflag. */
-  op?: string
-  /** Media URL (queue add). */
-  url?: string
-  /** Queue entry id, or the new entry's id. */
-  id?: string
-  /** SHA-256 of the shared bytes (queue add / readiness). */
-  hash?: string
-  /** Byte size of the shared media. */
-  size?: number
-  /** The id an entry is moved BEFORE (queue move). */
-  before?: string
-  /** Provider label for the queue entry. */
-  provider?: string
-  /** Poster still for the queue entry. */
-  thumb?: string
-  /** True for consent-shared local files. */
-  local?: boolean
-  /** Upstream relay descriptor for a stored media object. The referer is
-   *  required: the upstream fetch sends it, so a descriptor without one is
-   *  dropped rather than half-applied. */
-  relay?: { upstream: string; referer: string }
-}
-
-function strField(src: Record<string, unknown>, key: string): string | undefined {
-  const v = src[key]
-  return typeof v === 'string' ? v : undefined
-}
-
-/**
- * Narrow an untrusted JSON value into a WatchFrame.
- *
- * Returns null when the value is not a plain object. Every field is copied
- * only when it already has the right type — the frame never coerces a
- * string into a number or a number into a string, so a handler can trust
- * the types it reads.
- */
-export function parseWatchFrame(raw: unknown): WatchFrame | null {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
-  const src = raw as Record<string, unknown>
-  const frame: WatchFrame = {}
-
-  const type = strField(src, 'type'); if (type !== undefined) frame.type = type
-  const party = strField(src, 'party'); if (party !== undefined) frame.party = party
-  const cmdId = strField(src, 'cmdId'); if (cmdId !== undefined) frame.cmdId = cmdId
-  const name = strField(src, 'name'); if (name !== undefined) frame.name = name
-  const invite = strField(src, 'invite'); if (invite !== undefined) frame.invite = invite
-  const action = strField(src, 'action'); if (action !== undefined) frame.action = action
-  const text = strField(src, 'text'); if (text !== undefined) frame.text = text
-  const msgId = strField(src, 'msgId'); if (msgId !== undefined) frame.msgId = msgId
-  const target = strField(src, 'target'); if (target !== undefined) frame.target = target
-  const op = strField(src, 'op'); if (op !== undefined) frame.op = op
-  const url = strField(src, 'url'); if (url !== undefined) frame.url = url
-  const id = strField(src, 'id'); if (id !== undefined) frame.id = id
-  const hash = strField(src, 'hash'); if (hash !== undefined) frame.hash = hash
-  const before = strField(src, 'before'); if (before !== undefined) frame.before = before
-  const provider = strField(src, 'provider'); if (provider !== undefined) frame.provider = provider
-  const thumb = strField(src, 'thumb'); if (thumb !== undefined) frame.thumb = thumb
-
-  const position = src.position
-  if (typeof position === 'number' && Number.isFinite(position)) frame.position = position
-  const rate = src.rate
-  if (typeof rate === 'number' && Number.isFinite(rate)) frame.rate = rate
-  const size = src.size
-  if (typeof size === 'number' && Number.isFinite(size)) frame.size = size
-
-  const on = src.on
-  if (typeof on === 'boolean') frame.on = on
-  const isPrivate = src.isPrivate
-  if (typeof isPrivate === 'boolean') frame.isPrivate = isPrivate
-  const lockVideo = src.lockVideo
-  if (typeof lockVideo === 'boolean') frame.lockVideo = lockVideo
-  const sharedControl = src.sharedControl
-  if (typeof sharedControl === 'boolean') frame.sharedControl = sharedControl
-  const requireApproval = src.requireApproval
-  if (typeof requireApproval === 'boolean') frame.requireApproval = requireApproval
-  const local = src.local
-  if (typeof local === 'boolean') frame.local = local
-
-  const relay = src.relay
-  if (relay && typeof relay === 'object' && !Array.isArray(relay)) {
-    const r = relay as Record<string, unknown>
-    const upstream = strField(r, 'upstream')
-    const referer = strField(r, 'referer')
-    if (upstream !== undefined && referer !== undefined) frame.relay = { upstream, referer }
-  }
-
-  return frame
-}
-
-export interface PartyFrame {
-  url: string
-  action: 'play' | 'pause'
-  position: number
-  rate: number
-  updatedAt: number
-  /** Monotonic server revision. Clients apply only newer frames/snapshots. */
-  rev: number
-  /** Display name of the member who last moved the transport. */
-  by?: string
-}
-
-export interface PartyMember {
-  name: string
-  muted: boolean
-}
-
-export interface QueueEntry {
-  id: string
-  name: string
-  url: string
-  relay?: { upstream: string; referer: string }
-  /** SHA-256 of the bytes, when the entry is a consent-shared local file. */
-  hash?: string
-  /** Byte size, when known (local files, stored objects). */
-  size?: number
-  /** True for consent-shared local files (bytes live on the swarm, not the server). */
-  local?: boolean
-  /** Poster still for a shared local video: a register-only object URL the
-   *  room resolves peer-to-peer (same swarm path as the media itself). */
-  thumb?: string
-  /** Provider label from source resolution (x, redgifs, pmvhaven, booru, page…). */
-  provider?: string
-  /**
-   * Queue state. Absent/queued = playable now; proposed = a participant's
-   * suggestion awaiting host approval; unavailable = flagged (broken source)
-   * and skipped by next/prev. Never auto-plays while proposed.
-   */
-  status?: 'queued' | 'proposed' | 'unavailable'
-}
-
-export interface ChatEntry {
-  id: string
-  from: string
-  name: string
-  text: string
-  at: number
-}
+// Re-exported so the existing importers keep one import site.
+export {
+  parseWatchFrame,
+  isRecord,
+  type WatchFrame,
+  type WatchPayload,
+  type PartyFrame,
+  type PartyMember,
+  type QueueEntry,
+  type ChatEntry,
+} from '@orbit/protocol'
 
 export interface Party {
   id: string
@@ -326,44 +181,77 @@ function serverNow(): number {
   return Date.now() / 1000
 }
 
+/**
+ * The persisted room snapshot.
+ *
+ * This is the file on disk that a restart reads back. It is NOT trusted: it
+ * can be truncated, hand-edited, or written by an older build. Every field is
+ * therefore narrowed, never coerced — a string where a number belongs is
+ * DROPPED (and the default used), not silently converted.
+ */
+interface PersistedParty {
+  id: string
+  name: string
+  mediaUrl: string
+  mediaName: string
+  hostId: string
+  isPrivate: boolean
+  lockVideo: boolean
+  sharedControl: boolean
+  requireApproval: boolean
+  relay?: { upstream: string; referer: string }
+  frame: PartyFrame
+  frameRev: number
+  queueRev: number
+  settingsRev: number
+  queue: QueueEntry[]
+  current: string
+  chat: ChatEntry[]
+  createdAt: number
+}
+
 /** Coerce anything frame-shaped into a valid PartyFrame (see restoreParties). */
-function sanitizeFrame(raw: any, fallbackUrl: string): PartyFrame {
-  const position = Number(raw?.position)
-  const updatedAt = Number(raw?.updatedAt)
-  const rate = Number(raw?.rate)
-  const rev = Number(raw?.rev)
+function sanitizeFrame(raw: unknown, fallbackUrl: string): PartyFrame {
+  const src = isRecord(raw) ? raw : {}
+  const position = typeof src.position === 'number' && Number.isFinite(src.position) && src.position >= 0 ? src.position : 0
+  const updatedAt = typeof src.updatedAt === 'number' && Number.isFinite(src.updatedAt) ? src.updatedAt : serverNow()
+  const rev = typeof src.rev === 'number' && Number.isFinite(src.rev) && src.rev >= 0 ? Math.floor(src.rev) : 1
   return {
-    url: typeof raw?.url === 'string' && raw.url ? raw.url : fallbackUrl,
-    action: raw?.action === 'play' ? 'play' : 'pause',
-    position: Number.isFinite(position) && position >= 0 ? position : 0,
-    rate: Number.isFinite(rate) && rate === 1 ? 1 : 1,
-    updatedAt: Number.isFinite(updatedAt) ? updatedAt : serverNow(),
-    rev: Number.isFinite(rev) && rev >= 0 ? Math.floor(rev) : 1,
-    by: typeof raw?.by === 'string' ? raw.by : undefined,
+    url: typeof src.url === 'string' && src.url ? src.url : fallbackUrl,
+    action: src.action === 'play' ? 'play' : 'pause',
+    position,
+    // Party speed is locked at 1x; a stored rate of anything else is a
+    // corrupt row, not a speed the room can honour.
+    rate: 1,
+    updatedAt,
+    rev,
+    by: typeof src.by === 'string' ? src.by : undefined,
   }
 }
 
-function sanitizeRev(raw: any): number {
-  const rev = Number(raw)
-  return Number.isFinite(rev) && rev >= 0 ? Math.floor(rev) : 0
+function sanitizeRev(raw: unknown): number {
+  return typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : 0
 }
 
 /** Coerce anything queue-entry-shaped into a valid QueueEntry, or null. */
-function sanitizeQueueEntry(raw: any): QueueEntry | null {
-  if (!raw || typeof raw !== 'object') return null
+function sanitizeQueueEntry(raw: unknown): QueueEntry | null {
+  if (!isRecord(raw)) return null
   const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim().slice(0, 8) : ''
   const url = typeof raw.url === 'string' ? raw.url : ''
   if (!id || !url) return null
   const hash = typeof raw.hash === 'string' && /^[0-9a-f]{64}$/i.test(raw.hash.trim()) ? raw.hash.trim().toLowerCase() : undefined
-  const size = Number(raw.size)
+  const size = typeof raw.size === 'number' && Number.isFinite(raw.size) && raw.size > 0 ? Math.floor(raw.size) : undefined
   const status = raw.status === 'proposed' || raw.status === 'unavailable' ? raw.status : undefined
+  const relay = isRecord(raw.relay) && typeof raw.relay.upstream === 'string' && typeof raw.relay.referer === 'string'
+    ? { upstream: raw.relay.upstream, referer: raw.relay.referer }
+    : undefined
   const entry: QueueEntry = {
     id,
     name: (typeof raw.name === 'string' ? raw.name : '').slice(0, 60) || 'Untitled',
     url,
-    relay: raw.relay && typeof raw.relay.upstream === 'string' ? raw.relay : undefined,
+    relay,
     hash,
-    size: Number.isFinite(size) && size > 0 ? Math.floor(size) : undefined,
+    size,
     local: raw.local === true ? true : undefined,
     // A poster is a swarm object URL, never a local path: peers fetch the
     // still over the same P2P path as the video. Anything else is dropped.
@@ -372,6 +260,19 @@ function sanitizeQueueEntry(raw: any): QueueEntry | null {
     provider: typeof raw.provider === 'string' && raw.provider.trim() ? raw.provider.trim().slice(0, 24) : undefined,
   }
   return entry
+}
+
+/** Coerce anything chat-entry-shaped into a valid ChatEntry, or null. */
+function sanitizeChatEntry(raw: unknown): ChatEntry | null {
+  if (!isRecord(raw)) return null
+  if (typeof raw.text !== 'string') return null
+  return {
+    id: typeof raw.id === 'string' ? raw.id : '',
+    from: typeof raw.from === 'string' ? raw.from : '',
+    name: typeof raw.name === 'string' ? raw.name : '',
+    text: raw.text.slice(0, 80),
+    at: typeof raw.at === 'number' && Number.isFinite(raw.at) ? raw.at : 0,
+  }
 }
 
 /** Poster URLs must be swarm object routes or plain http(s) — never file/vault paths. */
@@ -441,7 +342,7 @@ function gcTick(): void {
   }
 }
 
-function rosterPayload(party: Party): any {
+function rosterPayload(party: Party): WatchRoster {
   return {
     type: 'watch.roster',
     party: party.id,
@@ -451,11 +352,11 @@ function rosterPayload(party: Party): any {
 }
 
 /** Full room snapshot for joiners (position + chat + queue recovery). */
-function snapshotPayload(party: Party): any {
+function snapshotPayload(party: Party): WatchSnapshot {
   return { ...rosterPayload(party), frame: party.frame, chat: party.chat, queue: party.queue, current: party.current, queueRev: party.queueRev, settingsRev: party.settingsRev, ready: readyPayload(party), sharedControl: party.sharedControl, requireApproval: party.requireApproval, lockVideo: party.lockVideo, isPrivate: party.isPrivate }
 }
 
-function pushSystem(party: Party, text: string): any {
+function pushSystem(party: Party, text: string): WatchPayload {
   return { type: 'watch.system', party: party.id, text }
 }
 
@@ -487,8 +388,14 @@ export function controlsParty(party: Party, userId: string): boolean {
   return party.sharedControl && !party.lockVideo && party.members.has(userId)
 }
 
+/** A room + the payload(s) to broadcast into it. */
+export interface WatchBroadcast {
+  room: string
+  payload: WatchPayload | WatchPayload[]
+}
+
 /** Validate + apply one client control frame. Returns null to drop it. */
-export function applyWatch(userId: string, msg: WatchFrame): { room: string; payload: any } | null {
+export function applyWatch(userId: string, msg: WatchFrame): { room: string; payload: WatchPayload } | null {
   const party = parties.get(msg.party ?? '')
   const member = party?.members.get(userId)
   if (!party || !member) return null
@@ -533,7 +440,7 @@ export function applyWatch(userId: string, msg: WatchFrame): { room: string; pay
 }
 
 /** Handle watch.join: add member, return the snapshot payload for the room. */
-export function joinWatch(userId: string, displayName: string, msg: WatchFrame): { room: string; payload: any; snapshot: any; broadcastPayload: any } | null {
+export function joinWatch(userId: string, displayName: string, msg: WatchFrame): { room: string; payload: WatchPayload[]; snapshot: WatchSnapshot; broadcastPayload: WatchPayload[] } | null {
   const party = parties.get(msg.party ?? '')
   if (!party || party.bans.has(userId)) return null
   // Private rooms require membership or a current invite token. The token is
@@ -566,15 +473,15 @@ export function joinWatch(userId: string, displayName: string, msg: WatchFrame):
 }
 
 /** Explicit watch.leave (tab close uses leaveAll via the socket close hook). */
-export function leaveWatch(userId: string, msg: WatchFrame): { room: string; payload: any } | null {
+export function leaveWatch(userId: string, msg: WatchFrame): { room: string; payload: WatchPayload[] } | null {
   const party = parties.get(msg.party ?? '')
   if (!party || !party.members.has(userId)) return null
   return removeMember(party, userId, false)
 }
 
 /** Socket-close path: remove the user from every watch room they joined. */
-export function leaveAll(userId: string): Array<{ room: string; payload: any }> {
-  const out: Array<{ room: string; payload: any }> = []
+export function leaveAll(userId: string): Array<{ room: string; payload: WatchPayload[] }> {
+  const out: Array<{ room: string; payload: WatchPayload[] }> = []
   if (!userId) return out
   for (const party of [...parties.values()]) {
     if (party.members.has(userId)) {
@@ -585,7 +492,7 @@ export function leaveAll(userId: string): Array<{ room: string; payload: any }> 
   return out
 }
 
-function removeMember(party: Party, userId: string, forceClose: boolean): { room: string; payload: any } | null {
+function removeMember(party: Party, userId: string, forceClose: boolean): { room: string; payload: WatchPayload[] } | null {
   void forceClose
   const who = party.members.get(userId)?.name || userId.slice(0, 8)
   party.members.delete(userId)
@@ -616,12 +523,12 @@ function removeMember(party: Party, userId: string, forceClose: boolean): { room
     // open for HOST_SEAT_GRACE_MS; joinWatch/controlsParty reconcile it later.
     party.hostLeftAt = Date.now()
   }
-  const payloads: any[] = [pushSystem(party, `${who} left`), rosterPayload(party)]
+  const payloads: WatchPayload[] = [pushSystem(party, `${who} left`), rosterPayload(party)]
   return { room, payload: payloads }
 }
 
 /** Party chat: members only, 80 chars, 1 msg/2s per user. Text only. */
-export function applyChat(userId: string, displayName: string, msg: WatchFrame): { room: string; payload: any } | null {
+export function applyChat(userId: string, displayName: string, msg: WatchFrame): { room: string; payload: WatchPayload } | null {
   const party = parties.get(msg.party ?? '')
   const member = party?.members.get(userId)
   if (!party || !member || member.muted) return null
@@ -646,7 +553,7 @@ export function applyChat(userId: string, displayName: string, msg: WatchFrame):
   }
 }
 
-export function deleteChat(userId: string, msg: WatchFrame): { room: string; payload: any } | null {
+export function deleteChat(userId: string, msg: WatchFrame): { room: string; payload: WatchPayload } | null {
   const party = parties.get(msg.party ?? '')
   if (!party || !party.members.has(userId)) return null
   const idx = party.chat.findIndex((m) => m.id === (msg.msgId ?? ''))
@@ -658,7 +565,7 @@ export function deleteChat(userId: string, msg: WatchFrame): { room: string; pay
 
 /** Send a direct frame to one user's live sockets (kick notice). Returns the
  * set of matched userIds for testability; ws-bus passes conns access. */
-export function kickWatch(userId: string, msg: WatchFrame): { room: string; payload: any; kicked?: string } | null {
+export function kickWatch(userId: string, msg: WatchFrame): { room: string; payload: WatchPayload[]; kicked?: string } | null {
   const party = parties.get(msg.party ?? '')
   if (!party || party.hostId !== userId) return null
   const target = msg.target ?? ''
@@ -666,7 +573,7 @@ export function kickWatch(userId: string, msg: WatchFrame): { room: string; payl
   const who = party.members.get(target)?.name || target.slice(0, 8)
   party.members.delete(target)
   const room = partyRoom(party.id)
-  const payloads: any[] = [pushSystem(party, `${who} was removed`), rosterPayload(party)]
+  const payloads: WatchPayload[] = [pushSystem(party, `${who} was removed`), rosterPayload(party)]
   // Do NOT drop the room when a kick empties it. Leaving deliberately keeps the
   // room (removeMember), and "the room must persist" cannot depend on HOW the
   // last member left — a kick used to destroy the room, its queue and its chat
@@ -677,7 +584,7 @@ export function kickWatch(userId: string, msg: WatchFrame): { room: string; payl
   return { room, payload: payloads, kicked: target }
 }
 
-export function banWatch(userId: string, msg: WatchFrame): { room: string; payload: any; kicked?: string } | null {
+export function banWatch(userId: string, msg: WatchFrame): { room: string; payload: WatchPayload[]; kicked?: string } | null {
   const party = parties.get(msg.party ?? '')
   if (!party || party.hostId !== userId) return null
   const target = msg.target ?? ''
@@ -686,7 +593,7 @@ export function banWatch(userId: string, msg: WatchFrame): { room: string; paylo
   return kickWatch(userId, msg)
 }
 
-export function muteWatch(userId: string, msg: WatchFrame): { room: string; payload: any } | null {
+export function muteWatch(userId: string, msg: WatchFrame): { room: string; payload: WatchPayload } | null {
   const party = parties.get(msg.party ?? '')
   if (!party || party.hostId !== userId) return null
   const member = party.members.get(msg.target ?? '')
@@ -696,7 +603,7 @@ export function muteWatch(userId: string, msg: WatchFrame): { room: string; payl
   return { room: partyRoom(party.id), payload: { type: 'watch.settings', party: party.id, muted } }
 }
 
-export function transferHost(userId: string, msg: WatchFrame): { room: string; payload: any } | null {
+export function transferHost(userId: string, msg: WatchFrame): { room: string; payload: WatchPayload } | null {
   const party = parties.get(msg.party ?? '')
   if (!party || party.hostId !== userId) return null
   const target = msg.target ?? ''
@@ -746,14 +653,14 @@ export function redeemInvite(userId: string, partyId: string, invite: unknown): 
   return true
 }
 
-export function settingsWatch(userId: string, msg: WatchFrame): { room: string; payload: any } | null {
+export function settingsWatch(userId: string, msg: WatchFrame): { room: string; payload: WatchPayload } | null {
   const party = parties.get(msg.party ?? '')
   if (!party || party.hostId !== userId) return null
   const cmdId = normalizeCmdId(msg.cmdId)
   if (cmdId && claimCmd(party, cmdId)) {
     return { room: partyRoom(party.id), payload: currentSettingsPayload(party) }
   }
-  const payload: any = { type: 'watch.settings', party: party.id }
+  const payload: WatchSettings = { type: 'watch.settings', party: party.id }
   if (typeof msg.name === 'string' && msg.name.trim()) {
     party.name = msg.name.trim().slice(0, 40)
     payload.name = party.name
@@ -780,13 +687,13 @@ export function settingsWatch(userId: string, msg: WatchFrame): { room: string; 
   return { room: partyRoom(party.id), payload }
 }
 
-function currentSettingsPayload(party: Party): any {
+function currentSettingsPayload(party: Party): WatchSettings {
   return { type: 'watch.settings', party: party.id, name: party.name, isPrivate: party.isPrivate, lockVideo: party.lockVideo, sharedControl: party.sharedControl, requireApproval: party.requireApproval, settingsRev: party.settingsRev }
 }
 
 /** Queue ops (entries are already resolved media; resolution lives in the
  * route layer). 'add' never touches the playing frame; 'next' swaps it. */
-export function queueOps(userId: string, msg: WatchFrame): { room: string; payload: any } | null {
+export function queueOps(userId: string, msg: WatchFrame): { room: string; payload: WatchPayload } | null {
   const party = parties.get(msg.party ?? '')
   const member = party?.members.get(userId)
   if (!party || !member) return null
@@ -884,7 +791,7 @@ export function queueOps(userId: string, msg: WatchFrame): { room: string; paylo
   }
 }
 
-function currentQueuePayload(party: Party): any {
+function currentQueuePayload(party: Party): WatchQueue {
   return {
     type: 'watch.queue',
     party: party.id,
@@ -910,7 +817,7 @@ function readyPayload(party: Party): Record<string, string[]> {
  * machine). Idempotent: repeated signals change nothing. Returns the queue
  * payload so the room sees readiness converge.
  */
-export function watchReady(userId: string, msg: WatchFrame): { room: string; payload: any } | null {
+export function watchReady(userId: string, msg: WatchFrame): { room: string; payload: WatchPayload } | null {
   const party = parties.get(msg.party ?? '')
   if (!party || !party.members.has(userId)) return null
   const entry = party.queue.find((q) => q.id === (msg.id ?? ''))
@@ -1033,37 +940,80 @@ export function restoreParties(json: string): number {
   if (!Array.isArray(rows)) return 0
   let n = 0
   for (const raw of rows) {
-    const s = raw as any
-    if (!s || typeof s.id !== 'string' || typeof s.mediaUrl !== 'string' || !s.frame) continue
+    const s = parsePersistedParty(raw)
+    if (!s) continue
     if (parties.has(s.id)) continue
-    const p = createParty(String(s.name || 'Party'), s.mediaUrl, s.mediaUrl, s.relay, String(s.hostId || ''), s.id, Number(s.createdAt) || 0)
+    const p = createParty(s.name, s.mediaUrl, s.mediaUrl, s.relay, s.hostId, s.id, s.createdAt)
     if (p.hostId) p.members.delete(p.hostId) // roster re-forms via watch.join
-    p.mediaName = String(s.mediaName || '')
-    p.isPrivate = Boolean(s.isPrivate)
-    p.lockVideo = Boolean(s.lockVideo)
-    p.sharedControl = Boolean((s as any).sharedControl)
-    p.requireApproval = Boolean((s as any).requireApproval)
+    p.mediaName = s.mediaName
+    p.isPrivate = s.isPrivate
+    p.lockVideo = s.lockVideo
+    p.sharedControl = s.sharedControl
+    p.requireApproval = s.requireApproval
     // Sanitize, don't adopt wholesale. A stored frame with a missing/garbage
     // position or updatedAt used to be handed straight to every client, where
     // computeTargetPosition turned it into NaN and — because every comparison
     // against NaN is false — the whole reconciler for that slot stopped
     // seeking, pausing and advancing, with the scrubber frozen at 0:00.
-    p.frame = sanitizeFrame(s.frame, s.mediaUrl)
-    p.frameRev = sanitizeRev((s as any).frameRev ?? p.frame.rev)
+    p.frame = s.frame
+    p.frameRev = s.frameRev
     p.frame.rev = p.frameRev
-    p.queueRev = sanitizeRev((s as any).queueRev)
-    p.settingsRev = sanitizeRev((s as any).settingsRev)
+    p.queueRev = s.queueRev
+    p.settingsRev = s.settingsRev
     // Sanitize, don't adopt wholesale: queue entries ride the same persisted
     // file as the frame, and a corrupt entry used to 404 every client.
-    if (Array.isArray(s.queue)) p.queue = s.queue.map(sanitizeQueueEntry).filter((q: QueueEntry | null): q is QueueEntry => Boolean(q))
-    if (typeof s.current === 'string') p.current = s.current
-    if (Array.isArray(s.chat)) p.chat = s.chat.filter((m: any) => m && typeof m.text === 'string').slice(-80)
+    p.queue = s.queue
+    if (s.current) p.current = s.current
+    p.chat = s.chat
     // dropParty clears queue-entry capabilities; restore must re-mint ALL
     // of them, not just the current media, or queued private objects 404.
     for (const entry of p.queue) addPartyMedia(p, entry.url)
     n++
   }
   return n
+}
+
+/**
+ * Narrow one persisted room row.
+ *
+ * Returns null when the row is not a room at all (no id, no media url, no
+ * frame). Everything else is field-by-field narrowed: a wrong-typed value is
+ * dropped in favour of the default, never coerced into it.
+ */
+function parsePersistedParty(raw: unknown): PersistedParty | null {
+  if (!isRecord(raw)) return null
+  const id = typeof raw.id === 'string' ? raw.id : ''
+  const mediaUrl = typeof raw.mediaUrl === 'string' ? raw.mediaUrl : ''
+  if (!id || !mediaUrl || !raw.frame) return null
+  const relay = isRecord(raw.relay) && typeof raw.relay.upstream === 'string' && typeof raw.relay.referer === 'string'
+    ? { upstream: raw.relay.upstream, referer: raw.relay.referer }
+    : undefined
+  const frame = sanitizeFrame(raw.frame, mediaUrl)
+  const frameRev = sanitizeRev(raw.frameRev ?? frame.rev)
+  return {
+    id,
+    name: typeof raw.name === 'string' && raw.name ? raw.name : 'Party',
+    mediaUrl,
+    mediaName: typeof raw.mediaName === 'string' ? raw.mediaName : '',
+    hostId: typeof raw.hostId === 'string' ? raw.hostId : '',
+    isPrivate: raw.isPrivate === true,
+    lockVideo: raw.lockVideo === true,
+    sharedControl: raw.sharedControl === true,
+    requireApproval: raw.requireApproval === true,
+    relay,
+    frame,
+    frameRev,
+    queueRev: sanitizeRev(raw.queueRev),
+    settingsRev: sanitizeRev(raw.settingsRev),
+    queue: Array.isArray(raw.queue)
+      ? raw.queue.map(sanitizeQueueEntry).filter((q: QueueEntry | null): q is QueueEntry => Boolean(q))
+      : [],
+    current: typeof raw.current === 'string' ? raw.current : '',
+    chat: Array.isArray(raw.chat)
+      ? raw.chat.map(sanitizeChatEntry).filter((m: ChatEntry | null): m is ChatEntry => Boolean(m)).slice(-80)
+      : [],
+    createdAt: typeof raw.createdAt === 'number' && Number.isFinite(raw.createdAt) ? raw.createdAt : 0,
+  }
 }
 
 export function watchPong(t0: unknown): { type: string; t0: number; t1: number } {

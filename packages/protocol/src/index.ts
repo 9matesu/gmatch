@@ -5,3 +5,4 @@ export * from './social-operation';
 export * from './replication-receipt';
 export * from './content-manifest';
 export * from './swarm-chunk';
+export * from './watch-frame';

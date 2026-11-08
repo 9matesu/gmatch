@@ -479,6 +479,14 @@ offline earnings). Each +5% click power. Persist across prestige.
   operation, a duplicate follow is refused, and following yourself is
   refused. The node's follower counts remain the node's bookkeeping; the
   operation is the graph that travels.
+- **The Followers table is the ONLY follower count** (2026-11-08). The
+  denormalized `Users.followers_count` / `Users.following_count` columns are
+  gone (migration 058): every follow bumped them, every cascade delete and
+  account wipe left them stale, and NO public read path used them — the
+  profile, the roster, `/me` and the follow endpoints all derive
+  `COUNT(*) FROM Followers`. The admin panel was the one reader and the one
+  writer, so an admin could set a follower count that no user would ever
+  see. The count is now derived everywhere and is not adjustable.
 - **Reports are operations, and there is no admin in a mesh.** A report about
   peer-replicated content is a signed `report.create` operation, so it
   reaches the AUTHOR of that content through the mesh. The author is the one
@@ -525,6 +533,36 @@ above the PIN guard and that nothing else escaped.
 path; the old sequential `batch()` is gone. A request marked accepted without
 the friendship it implies (or a round without its entries) is worse than a
 failed write, so every batch is one transaction.
+
+## 10g. Watch rooms — one contract, both ends (2026-11-08)
+
+The watch-party wire format was implicit: the node's handlers took `msg: any`
+and coerced whatever arrived (`Number(msg.position)`, `String(msg.party)`,
+`Boolean(msg.on)`), while the client took `msg: any` and coerced every
+payload field back (`String(q.url)`, `Number(q.size)`). A malformed frame
+therefore became a room with a blank name and a queue of empty entries, and
+neither side could say what the other actually sent.
+
+- **The contract lives in `packages/protocol/src/watch-frame.ts`** — the
+  shared package both sides already import. It holds the inbound frame
+  (`WatchFrame` + `parseWatchFrame`), the outbound payloads (`WatchPayload`,
+  a closed union) and the shapes that travel (`PartyFrame`, `QueueEntry`,
+  `ChatEntry`).
+- **Both directions are NARROWED, never coerced.** A field of the wrong type
+  is DROPPED; unknown keys never reach a handler. `parseWatchServerFrame`
+  covers everything the node sends (the room payloads plus `watch.nack`,
+  `watch.kicked`, `watch.gone` and `watch.pong`).
+- **The persisted room snapshot is narrowed too.** The file on disk is not
+  trusted: `restoreParties` drops a corrupt frame, queue entry or chat line
+  instead of coercing it, and a stored `rate` other than 1 is a corrupt row
+  (party speed is locked at 1x).
+- **An absent `rev` means UNVERSIONED**, not revision 0. The client applies
+  an unversioned frame (there is nothing to compare it to); revision 0 would
+  read as stale and silently freeze the room.
+
+The node's own room state (`Party`, `PartyMember`) stays in
+`apps/api/src/watchparty.ts` — the contract is what travels, the room is
+what it lives in.
 
 ## 11. Save
 
