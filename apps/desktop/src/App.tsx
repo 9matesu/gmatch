@@ -23,7 +23,6 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import type { SettingsOpenTarget } from './components/settings/GMatchSettingsModal';
 import { userFacingError } from './utils/userError';
 import { ImageViewer } from "./components/ImageViewer";
-import { PasskeyManager } from "./components/PasskeyManager";
 import { IdleOverlay } from "./components/IdleOverlay";
 import { useP2P } from "./hooks/useP2P";
 import { usePeerFeedPosts } from './hooks/usePeerFeedPosts'
@@ -53,6 +52,9 @@ import { OnboardingFlow } from "./firstRun/OnboardingFlow";
 import { isOnboardingComplete, readOnboardingState } from "./firstRun/onboardingState";
 import { DEFAULT_FEED_SORT, isFeedSort, type FeedSort } from "./components/feed/feedSort";
 import { GMatchFeed, type FeedPost } from "./components/feed/GMatchFeed";
+import { AnnouncementBanner } from "./components/feed/AnnouncementBanner";
+import { findUserById } from "./utils/userLookup";
+import { resolveObjectRefId } from "./utils/objectRef";
 import { reconcilePublishedPost } from "./utils/feedPublish";
 import { mergeRecentPushes, rememberPushed, type PushedEntry } from "./utils/feedMerge";
 import { PEER_ONLINE_EVENT } from "./utils/p2pSwarm";
@@ -455,7 +457,6 @@ export default function Home() {
       return raw ? JSON.parse(raw) : []
     } catch { return [] }
   })
-  const [showMaxGoonerModal, setShowMaxGoonerModal] = useState(false)
   const syncedTagsRef = useRef<string[] | null>(null)
   const previousCountRef = useRef<number>(0)
   const mainScrollRef = useRef<HTMLDivElement>(null)
@@ -673,10 +674,13 @@ export default function Home() {
   const resolveWallpaperUrl = useCallback((url: string): Promise<string> => {
     if (!url) return Promise.resolve('')
     if (url.startsWith('data:') || url.startsWith('blob:')) return Promise.resolve(url)
-    // `urn:sha256:<uuid>` descriptors (imported posts) are not URLs — map to
-    // the node's object route so the signed fetch below can address them.
-    const urnMatch = url.match(/^urn:sha256:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i)
-    const objectUrl = urnMatch ? `/api/objects/${urnMatch[1]}` : url
+    // A `urn:sha256:<…>` descriptor is not a URL — the canonical object id
+    // lives INSIDE it, so address the node's object route with it. This used
+    // to carry its own UUID-only regex, so a 64-hex sha256 descriptor fell
+    // through and fired `orbitFetch('urn:sha256:…')` — a doomed request
+    // against a string that is not a path. utils/objectRef.ts owns the rule.
+    const urnId = resolveObjectRefId(url)
+    const objectUrl = urnId && /^urn:/i.test(url) ? `/api/objects/${urnId}` : url
     const localPromise = localHeldMediaUrl(url)
     if (/\.(mp4|webm|ogv|mov)(\?|$)/i.test(url.split('?')[0]) || url.includes('/rg-media')) {
       // Videos: a locally held copy (vault loopback URL is Range-capable, a
@@ -946,7 +950,7 @@ export default function Home() {
   }
 
   const [showHelpModal, setShowHelpModal] = useState(false);
-  const [showPointsHelpModal, setShowPointsHelpModal] = useState(false);  const [showFlashModal, setShowFlashModal] = useState(false);
+  const [showFlashModal, setShowFlashModal] = useState(false);
   const [showChangelogModal, setShowChangelogModal] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     try {
@@ -968,8 +972,7 @@ export default function Home() {
     window.addEventListener('gmatch-open-changelog', onOpen);
     return () => window.removeEventListener('gmatch-open-changelog', onOpen);
   }, []);
-  const [,setAnnouncements] = useState<{ id: string; message: string; created_at: string; created_by_name: string | null }[]>([])
-  const [showPasskeys,] = useState(false);
+  const [announcements, setAnnouncements] = useState<{ id: string; message: string; created_at: string; created_by_name: string | null }[]>([])
   // Host mode at the SHELL level (ServersView keeps its own copy): the Admin
   // entry shows only when this machine hosts the node or the node says this
   // identity administers it. The PIN verify inside the panel is the boundary.
@@ -1117,7 +1120,6 @@ export default function Home() {
     }
   };
 
-  const [showRecommendations, setShowRecommendations] = useState(false);
   const lastSavedProfileRef = useRef<{ displayName: string; tags: string[] } | null>(null)
   const [lobbyLightboxUrl, setLobbyLightboxUrl] = useState<string | null>(null)
   const [selectedProfileUser, setSelectedProfileUser] = useState<User | null>(null)
@@ -1128,7 +1130,7 @@ export default function Home() {
   // Open the Instagram-style profile popup for a user id (resolved from the
   // online roster when possible, otherwise a minimal fallback object).
   const openProfileById = useCallback((id: string) => {
-    const target = users.find((u) => u.id === id || (u as any).orbitId === id)
+    const target = findUserById(users, id)
     if (target) setSelectedProfileUser(target)
   }, [users])
 
@@ -1305,7 +1307,7 @@ export default function Home() {
         // another user's directory name or avatar.
         const unverified = (obj as any).owner_verified === false;
         const authorUser = !isSelf && !unverified && obj.owner_id
-          ? users.find((u) => u.id === obj.owner_id || (u as any).orbitId === obj.owner_id)
+          ? findUserById(users, obj.owner_id)
           : null;
         const authorName = isSelf
           ? (myProfile.displayName || 'You')
@@ -1365,7 +1367,7 @@ export default function Home() {
       .filter((p) => !deletedPostIds.has(p.id) && !knownIds.has(p.id))
       .map((p) => {
         const isSelf = p.author_id === identity?.orbitId;
-        const author = users.find((u) => u.id === p.author_id || (u as any).orbitId === p.author_id);
+        const author = findUserById(users, p.author_id);
         if (!isSelf && !author) return p;
         return {
           ...p,
@@ -1711,7 +1713,7 @@ export default function Home() {
     // No `(u as any).orbitId` check here: OrbitId is a string alias and nothing
     // ever sets a separate `.orbitId` property, so it could only ever match the
     // wrong row.
-    const target = users.find((u) => u.id === userId)
+    const target = findUserById(users, userId)
     setFollowersModalState({
       isOpen: true,
       initialTab: tab,
@@ -2363,7 +2365,7 @@ export default function Home() {
     const peerId = item.target.conversationId
     if (!peerId) return
     stampDmSeen(peerId)
-    const known = users.find((u) => u.id === peerId || (u as { orbitId?: string }).orbitId === peerId)
+    const known = findUserById(users, peerId)
     setPmPeer(toChatPeer(known) || toChatPeer({ orbitId: peerId, name: item.actorName || generateFallbackName(peerId) }))
     handleSetMainView('messages')
   }, [courier.rooms, openRoomChat, stampDmSeen, users, toast])
@@ -3398,7 +3400,7 @@ export default function Home() {
             // here reads as NaN/0 in the top bar and the Store — and, worse,
             // "now created" is itself an unstable field. Carry the last known
             // balance/score forward instead of inventing them.
-            const prior = users.find((u) => u.id === identity.orbitId);
+            const prior = findUserById(users, identity.orbitId);
             mergedMap.set(identity.orbitId, {
               id: identity.orbitId,
               publicKey: identity.publicKeyHex,
@@ -4022,6 +4024,9 @@ export default function Home() {
       .catch(() => { })
   }, [identity])
 
+  /** The node serves the NEWEST active announcement only. */
+  const announcement = announcements[0] ?? null;
+
   // Identity-scoped caches drop their contents when the identity changes: a
   // snapshot read for account A must never render under account B, and any
   // request still on the wire is superseded.
@@ -4411,7 +4416,7 @@ export default function Home() {
         content_url: img.content_url,
         display_name: img.owner_id === identity?.orbitId
           ? (myProfile.displayName || 'You')
-          : (users.find((u) => u.id === img.owner_id)?.display_name?.trim() || 'Unknown User'),
+          : (findUserById(users, img.owner_id)?.display_name?.trim() || 'Unknown User'),
         expires_at: img.expires_at,
       } as OrbitObject)
     }
@@ -4419,7 +4424,7 @@ export default function Home() {
   }, [items, stories, lobby.images, users, identity?.orbitId, myProfile.displayName])
 
   const myUser = useMemo(() => {
-    return users.find(u => u.id === identity?.orbitId)
+    return findUserById(users, identity?.orbitId)
   }, [users, identity?.orbitId])
 
   // Buy-me-a-coffee gate: accumulate in-match playtime locally + read the
@@ -4680,12 +4685,6 @@ export default function Home() {
                     <IdleOverlay items={items} identity={identity} onExit={() => { }} />
                   )}
 
-                  {mainView !== 'game' && showPasskeys && (
-                    <div className="max-w-md">
-                      <PasskeyManager identity={identity} />
-                    </div>
-                  )}
-
                   {mainView !== 'game' && transferProgress && (
                     <div className="bg-retro-panel border border-retro-warning p-3 text-center text-xs text-retro-warning flex items-center justify-center gap-2">
                       <span className="w-2 h-2 bg-retro-warning flex-shrink-0" />
@@ -4704,6 +4703,8 @@ export default function Home() {
                       )}
                       <div className={isVisionJammed ? "blur-md select-none pointer-events-none transition-all duration-300" : ""}>
                         <div className="w-full max-w-6xl mx-auto px-3 sm:px-4 pt-3 sm:pt-4 flex flex-col gap-4 pb-[calc(var(--island-clearance)+1.25rem)]">
+                          <AnnouncementBanner announcement={announcement} />
+
                           {/* ── Feed ── */}
                           <section className="module module-primary module-glass overflow-visible order-1">
                             {collapsedModules.feed && (
@@ -4741,7 +4742,7 @@ export default function Home() {
                                 onFollowSuggestion={(id) => { void toggleFollowUser(id); }}
                                 myProfileTags={myProfile.tags}
                                 onSelectUser={(uId) => {
-                                  const target = users.find((u) => u.id === uId);
+                                  const target = findUserById(users, uId);
                                   if (target) {
                                     setSelectedProfileUser(target);
                                     return;
@@ -4760,7 +4761,7 @@ export default function Home() {
                                 }}
                                 users={users}
                                 onStartPm={(user) => {
-                                  const target = users.find((u) => u.id === user.id || (u as any).orbitId === user.id);
+                                  const target = findUserById(users, user.id);
                                   setPmPeer(toChatPeer(target) || toChatPeer(user));
                                   handleSetMainView('messages');
                                 }}
@@ -4786,7 +4787,7 @@ export default function Home() {
                                 onDeletePostApi={deletePostOnServer}
                                 onOpenNetwork={(userId) => openUserNetwork(userId)}
                                 onUserContext={(e, userId, displayName) => {
-                                  const u = users.find((x) => x.id === userId)
+                                  const u = findUserById(users, userId)
                                   openContextMenu('user', u || { id: userId, display_name: displayName })(e)
                                 }}
                                 onArchivePost={async (id) => {
@@ -4876,7 +4877,7 @@ export default function Home() {
                       onPersistSave={persistSave}
                       onPersistComment={persistComment}
                       onSelectUser={(uId) => {
-                        const target = users.find((u) => u.id === uId || (u as any).orbitId === uId);
+                        const target = findUserById(users, uId);
                         if (target) setSelectedProfileUser(target);
                       }}
                       onOpenNetwork={(userId) => openUserNetwork(userId)}
@@ -4923,7 +4924,7 @@ export default function Home() {
                           identity={identity as never}
                           toast={toast}
                           onSelectUser={(u) => {
-                            const full = users.find((existing) => existing.id === u.id || (existing as any).orbitId === u.id)
+                            const full = findUserById(users, u.id)
                             setSelectedProfileUser(full || u)
                           }}
                           profilePics={profilePics}
@@ -4949,7 +4950,7 @@ export default function Home() {
                           // No `|| 'User'` fallback: a placeholder name is not a
                           // name, and resolveDisplayName treats it as such and
                           // falls through to the real sources.
-                          peers={users.map((u) => ({ orbitId: u.id || (u as { orbitId?: string }).orbitId || '', name: u.display_name }))}
+                          peers={users.map((u) => ({ orbitId: u.id, name: u.display_name }))}
                           users={users}
                           threads={pmThreads}
                           profilePics={profilePics}
@@ -4972,7 +4973,7 @@ export default function Home() {
                           onSendPm={(peerId, text, replyToId, attachment) => { void sendPm(peerId, text, replyToId, attachment) }}
                           onSelectPeer={(p) => {
                             if (p) {
-                              const found = users.find((u) => u.id === p.orbitId || (u as { orbitId?: string }).orbitId === p.orbitId)
+                              const found = findUserById(users, p.orbitId)
                               setPmPeer(toChatPeer(found) || toChatPeer({ orbitId: p.orbitId, name: p.name }))
                               if (p.orbitId !== 'global_lobby' && p.orbitId !== 'card_queue') loadPmMessages(p.orbitId)
                             } else {
@@ -5019,7 +5020,7 @@ export default function Home() {
                           onAddGroupMembers={addGroupMembers}
                           onSelectGroup={setActiveGroupId}
                           onOpenProfile={(userId, userObj) => {
-                            const t = users.find((u) => u.id === userId || (u as { orbitId?: string }).orbitId === userId)
+                            const t = findUserById(users, userId)
                             // Prefer the FRESHER sighting. The chat hub builds
                             // userObj from a 30s dashboard poll, while the roster
                             // entry's last_seen only moves when the roster poll
@@ -5030,7 +5031,7 @@ export default function Home() {
                           }}
                           onOpenImage={(msg) => setViewerMessage(msg)}
                           onUserContext={(e, peerId, name) => {
-                            const u = users.find((x) => x.id === peerId || (x as { orbitId?: string }).orbitId === peerId)
+                            const u = findUserById(users, peerId)
                             openContextMenu('user', u || { id: peerId, display_name: name })(e)
                           }}
                           onDeleteThread={deleteThread}
@@ -5200,7 +5201,7 @@ export default function Home() {
                           ? { id: 'global_lobby', name: 'Lobby Lounge (Everyone)' }
                           : { id: 'card_queue', name: 'Card Game Queue' }))
                       } else {
-                        const found = users.find((u) => u.id === row.id || (u as { orbitId?: string }).orbitId === row.id)
+                        const found = findUserById(users, row.id)
                         setPmPeer(toChatPeer(found) || toChatPeer({ id: row.id, name: row.name }))
                         loadPmMessages(row.id)
                       }
@@ -5302,7 +5303,7 @@ export default function Home() {
                       setSendCardTarget({ id: userId, name: target?.display_name || nameFor(userId) || UNKNOWN_NAME });
                     }}
                     onStartPm={selectedProfileUser.id === identity?.orbitId ? undefined : (u) => {
-                      const targetUser = users.find((usr) => usr.id === u.id) || u;
+                      const targetUser = findUserById(users, u.id) ?? u;
                       setPmPeer(toChatPeer(targetUser));
                       handleSetMainView('messages');
                     }}
@@ -5420,8 +5421,6 @@ export default function Home() {
                 handleFullConfigRestore={handleFullConfigRestore}
                 showHelpModal={showHelpModal}
                 setShowHelpModal={setShowHelpModal}
-                showPointsHelpModal={showPointsHelpModal}
-                setShowPointsHelpModal={setShowPointsHelpModal}
                 showFlashModal={showFlashModal}
                 setShowFlashModal={setShowFlashModal}
                 showSettingsModal={showSettingsModal}
@@ -5433,10 +5432,6 @@ export default function Home() {
                 setCreatePostInitialData={setCreatePostInitialData}
                 showStoryModal={showStoryModal}
                 setShowStoryModal={setShowStoryModal}
-                showMaxGoonerModal={showMaxGoonerModal}
-                setShowMaxGoonerModal={setShowMaxGoonerModal}
-                showRecommendations={showRecommendations}
-                setShowRecommendations={setShowRecommendations}
                 followersModalState={followersModalState}
                 setFollowersModalState={setFollowersModalState}
                 showCoffee={showCoffee}

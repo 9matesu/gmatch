@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { isMediaVideo, resolveMediaUrl } from '../utils/media'
+import { resolveObjectRefId } from '../utils/objectRef'
 import { useObjectImage } from '../hooks/useObjectImage'
 import { NativeVideoPlayer } from './media/NativeVideoPlayer'
 import { useVaultUrl, useVaultHttpUrls } from '../services/vault'
@@ -62,21 +63,19 @@ const OBJECT_PATH = '/api/objects/'
 // /api/objects/<id> for <img>, but that request carries no auth headers and
 // 401s for anything not public. The signed fetch path must own it instead.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-// A `urn:sha256:<…>` descriptor carries the canonical object id INSIDE it:
-// that id is what the node stores the bytes under, so the signed fetch
-// addresses the node's local copy (the direct path maps the same way in
-// utils/media.ts). The raw urn is NOT an id — useObjectImage rejects it.
-const URN_UUID_RE = /^urn:sha256:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i
-const URN_HEX_RE = /^urn:sha256:([0-9a-f]{64})/i
 
 function extractObjectId(contentUrl: string | null | undefined, objectId: string | null | undefined): string | null {
   if (!contentUrl) return objectId || null
-  const idx = contentUrl.indexOf(OBJECT_PATH)
+  // A `urn:sha256:<…>` descriptor carries the canonical object id INSIDE it:
+  // that id is what the node stores the bytes under, so the signed fetch
+  // addresses the node's local copy. The raw urn is NOT an id — useObjectImage
+  // rejects it. ONE parser owns that rule (utils/objectRef.ts).
+  const idx = contentUrl.indexOf(OBJECT_PATH);
   if (idx >= 0) return contentUrl.slice(idx + OBJECT_PATH.length).split(/[?#]/)[0] || null
   const trimmed = contentUrl.trim()
   if (UUID_RE.test(trimmed)) return trimmed
-  const urn = URN_UUID_RE.exec(trimmed) || URN_HEX_RE.exec(trimmed)
-  if (urn) return urn[1]
+  const urnId = resolveObjectRefId(trimmed);
+  if (urnId) return urnId
   return objectId || null
 }
 

@@ -13,6 +13,18 @@ export interface WsConn {
 }
 
 const TICKET_TTL_MS = 2 * 60 * 1000
+
+/**
+ * The largest client-to-client frame the relay will fan out.
+ *
+ * The relay copies one payload to every authed socket in the room, so the
+ * frame size multiplies by the roster. 512 KB is far above a real
+ * announcement (an object descriptor with a caption and tags is ~1 KB) and
+ * far below a media blob, which never travels this path — bytes ride the
+ * swarm chunk frames.
+ */
+export const MAX_RELAY_FRAME_BYTES = 512 * 1024
+
 const tickets = new Map<string, { userId: string; expiresAt: number }>()
 export const conns = new Set<WsConn>()
 
@@ -269,6 +281,14 @@ export function handleIncoming(conn: WsConn, data: string): void {
       inner.type === 'CHAT' ||
       inner.type === 'PRESENCE'
     if (!relayable) return
+    // Bound the RELAYED frame. The relay fans the same payload out to every
+    // authed socket in the room, so an unbounded frame is an amplification
+    // vector (one sender, N copies). The client used to "solve" this by
+    // splitting big announcements into top-level SWARM_CHUNK frames — which
+    // this relay refuses (audit A2 drops any top-level frame with a `type`
+    // key), so a >30 KB announcement was silently LOST rather than split.
+    // The frame now travels whole and the bound is enforced here.
+    if (data.length > MAX_RELAY_FRAME_BYTES) return
     const relayed = conn.userId
       ? JSON.stringify({ type: 'SWARM_FRAME', swarm: msg.swarm, relayedBy: conn.userId })
       : data

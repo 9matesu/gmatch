@@ -28,6 +28,7 @@ function VaultUsage() {
 import { useGame, MAX_USER_EXCLUDES } from '../../game/store';
 import { FeedTuneStep } from '../../firstRun/FeedTuneStep';
 import { DeleteAccountSection } from './DeleteAccountSection';
+import { PasskeyManager } from '../PasskeyManager';
 import { UpdateSection } from './UpdateSection';
 import { CommunitySection } from './CommunitySection';
 import { BlocklistSection } from './BlocklistSection';
@@ -637,6 +638,60 @@ export function GMatchSettingsModal({
                   </div>
                 </div>
 
+                {/* Media & Notifications
+                    These four toggles used to live ONLY inside the "Maximum
+                    Gooner Hardcore" modal, which was unreachable (its App
+                    state was a constant `false`). Three of them are live
+                    settings the app reads; the only way to change them was a
+                    modal nobody could open. They live here now. */}
+                <div className="p-4 bg-glass-w5 border border-border-glass rounded-lg space-y-3">
+                  <h4 className="text-xs font-medium text-retro-fg">Media & notifications</h4>
+
+                  <div className="space-y-3 divide-y divide-border-glass">
+                    {([
+                      {
+                        label: 'Sound effects',
+                        desc: 'Clicks, purchases and unlocks play a sound',
+                        key: 'soundEffects' as const,
+                      },
+                      {
+                        label: 'Auto-open images',
+                        desc: 'Open the lightbox when a peer sends media',
+                        key: 'autoOpenImages' as const,
+                      },
+                      {
+                        label: 'Idle mode',
+                        desc: 'Pause the feed when the window has been inactive',
+                        key: 'idleEnabled' as const,
+                      },
+                      {
+                        label: 'Allow remote wallpaper',
+                        desc: 'Let a peer set this device’s background',
+                        key: 'allowRemoteWallpaper' as const,
+                      },
+                    ]).map((item) => {
+                      const isOn = Boolean(settings[item.key]);
+                      return (
+                        <div key={item.key} className="pt-3 first:pt-0 flex items-center justify-between gap-4">
+                          <div>
+                            <div className="text-xs font-medium text-retro-fg">{item.label}</div>
+                            <div className="text-xs text-retro-body">{item.desc}</div>
+                          </div>
+
+                          <Switch
+                            label={item.label}
+                            checked={isOn}
+                            onChange={() => {
+                              playPress(isOn ? 600 : 900);
+                              updateSettings(item.key, !isOn);
+                            }}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 {/* Wallpaper & Background Section */}
                 <div className="p-4 bg-glass-w5 border border-border-glass rounded-lg space-y-3">
                   <button
@@ -909,6 +964,14 @@ export function GMatchSettingsModal({
                     </button>
                   </div>
                 </div>
+
+                {/* Vault security — the passkey binds this device's key to a
+                    hardware authenticator. The component existed but was
+                    unreachable (its App.tsx branch was a constant `false`),
+                    so the feature was dead code with a live server route. */}
+                {identity && (
+                  <PasskeyManager identity={identity} />
+                )}
 
                 <DeleteAccountSection
                   identity={identity}

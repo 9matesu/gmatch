@@ -152,28 +152,18 @@ function transmitOverWebSocket(socket: WebSocket | null, queue: P2PSwarmMessage[
   // a bare `type` key is refused by the node (a forged `feed`/`user_banned`
   // frame must never shadow a server-published event), which is also why peer
   // announcements used to vanish unless a direct WebRTC channel existed.
+  //
+  // The frame is sent WHOLE. This used to be split into top-level
+  // `{type:'SWARM_CHUNK'}` frames above 30 KB, justified by a "relay frame
+  // splitting threshold" that does not exist: the relay does no splitting, and
+  // its audit-A2 rule drops every top-level frame with a string `type`. So the
+  // chunker sent frames the relay refused — a >30 KB announcement was not
+  // split, it was LOST. The relay now enforces a real size bound
+  // (apps/api/src/ws-bus.ts, MAX_RELAY_FRAME_BYTES) and the producer bounds
+  // what it announces.
   const fullPayloadStr = JSON.stringify({ type: 'SWARM_FRAME', swarm: msg });
-  const CHUNK_SIZE = 30000;
-  if (fullPayloadStr.length > CHUNK_SIZE) {
-    const totalChunks = Math.ceil(fullPayloadStr.length / CHUNK_SIZE);
-    const transferId = `tr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    logger.log(`[ORBIT Network Swarm] Transmitting payload (${(fullPayloadStr.length / 1024).toFixed(1)} KB) in ${totalChunks} chunks (Transfer ID: ${transferId})...`);
-    for (let idx = 0; idx < totalChunks; idx++) {
-      const chunkData = fullPayloadStr.substring(idx * CHUNK_SIZE, (idx + 1) * CHUNK_SIZE);
-      const chunkMsg = {
-        type: 'SWARM_CHUNK',
-        transferId,
-        index: idx,
-        total: totalChunks,
-        chunk: chunkData,
-        senderId: msg.user.id,
-      };
-      socket.send(JSON.stringify(chunkMsg));
-    }
-  } else {
-    logger.log('[ORBIT Network Swarm] Transmitting event over WebSocket network to remote peers for item:', msg.payload?.id || msg.type);
-    socket.send(fullPayloadStr);
-  }
+  logger.log('[ORBIT Network Swarm] Transmitting event over WebSocket network to remote peers for item:', msg.payload?.id || msg.type);
+  socket.send(fullPayloadStr);
 }
 
 export function useP2P(identity: OrbitIdentity | null) {
@@ -226,7 +216,6 @@ export function useP2P(identity: OrbitIdentity | null) {
   useEffect(() => subscribeApiBase(() => setBaseGen((g) => g + 1)), []);
   const wsRef = useRef<WebSocket | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
-  const chunkBuffersRef = useRef<Map<string, { total: number; chunks: Map<number, string>; startedAt: number }>>(new Map());
   const sendHeartbeatRef = useRef<() => void>(() => {});
   const historyLoadedRef = useRef(false);
 
@@ -681,42 +670,6 @@ export function useP2P(identity: OrbitIdentity | null) {
               return;
             }
 
-            if (rawData.type === 'SWARM_CHUNK') {
-              const { transferId, index, total, chunk, senderId } = rawData;
-              const currentSelf = selfUserRef.current;
-              if (senderId === currentSelf.id) return;
-
-              // TTL sweep: clean transfers older than 2 minutes
-              const now = Date.now()
-              for (const [tid, buf] of chunkBuffersRef.current) {
-                if (now - buf.startedAt > 120_000) {
-                  chunkBuffersRef.current.delete(tid)
-                }
-              }
-
-              logger.log(`[ORBIT Network Swarm] Received chunk ${index + 1}/${total} for transfer ${transferId}`);
-              if (!chunkBuffersRef.current.has(transferId)) {
-                chunkBuffersRef.current.set(transferId, { total, chunks: new Map(), startedAt: now });
-              }
-              const buf = chunkBuffersRef.current.get(transferId)!;
-              buf.chunks.set(index, chunk);
-
-              if (buf.chunks.size === total) {
-                let fullStr = '';
-                for (let i = 0; i < total; i++) {
-                  fullStr += buf.chunks.get(i) || '';
-                }
-                chunkBuffersRef.current.delete(transferId);
-                logger.log(`[ORBIT Network Swarm] Reassembled transfer ${transferId} (${(fullStr.length / 1024).toFixed(1)} KB)`);
-                const parsed = JSON.parse(fullStr);
-                if (!routeInboundFrame(parsed, (m) => { void handleSwarmMessage(m); }, processSwarmMessage)) {
-                  // Legacy peer: an announcement sent unwrapped.
-                  processSwarmMessage(parsed as P2PSwarmMessage);
-                }
-              }
-              return;
-            }
-
             if (rawData.type === 'lobby-chat' && rawData.action === 'new' && rawData.message && rawData.message.id) {
               const m = rawData.message as { id: string; sender_id: string; sender_name: string | null; body: string; created_at: string; channel?: string };
               const chan = m.channel || rawData.channel || 'global_lobby';
@@ -1100,7 +1053,8 @@ export function useP2P(identity: OrbitIdentity | null) {
         }
       } catch {}
 
-      // Broadcast over network WebSocket to remote swarm peers with chunking/queuing
+      // Broadcast over network WebSocket to remote swarm peers (the relay
+      // enforces its own frame bound; see apps/api/src/ws-bus.ts)
       transmitOverWebSocket(wsRef.current, queuedMessagesRef.current, msg);
       broadcastMeshFrame(JSON.stringify(msg));
     },

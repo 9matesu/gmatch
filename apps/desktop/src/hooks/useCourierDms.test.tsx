@@ -43,13 +43,24 @@ class FakeSocket implements MailSocket {
   close() { /* noop */ }
 }
 
-function mockFetch(box: { value: unknown[] }, acks: unknown[] = [], pmStatus = 404) {
+/**
+ * A courier mock that models the REAL box layout.
+ *
+ * Each delivery token is its OWN mailbox: an envelope addressed to token X
+ * lives only in X's box. The previous mock served every token's box from one
+ * array, so a client that pulls home+cur+prev in parallel saw the same
+ * envelope in all of them and acked it more than once.
+ */
+function mockFetch(box: { value: any[] }, acks: unknown[] = [], pmStatus = 404) {
   return vi.fn(async (input: any, init?: any) => {
     const url = String(input)
     if (url.endsWith('/api/pm')) return new Response('{}', { status: pmStatus })
     if (url.endsWith('/ack')) {
-      acks.push(JSON.parse(String(init.body)))
-      box.value = [] // drain like the real courier
+      const body = JSON.parse(String(init.body))
+      acks.push(body)
+      // The courier drains exactly what was acked.
+      const acked = new Set<string>(body.ids || [])
+      box.value = box.value.filter((e: any) => !acked.has(e.id))
       return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
     if (init?.method === 'PUT') {
@@ -57,7 +68,9 @@ function mockFetch(box: { value: unknown[] }, acks: unknown[] = [], pmStatus = 4
       return new Response(JSON.stringify({ ok: true }), { status: 202, headers: { 'Content-Type': 'application/json' } })
     }
     if (url.includes('/api/mail/')) {
-      return new Response(JSON.stringify({ envelopes: box.value }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      const token = url.split('/api/mail/')[1]?.split('?')[0] ?? ''
+      const envelopes = box.value.filter((e: any) => e.to === token)
+      return new Response(JSON.stringify({ envelopes }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
     return new Response('{}', { status: 404 })
   }) as unknown as typeof fetch

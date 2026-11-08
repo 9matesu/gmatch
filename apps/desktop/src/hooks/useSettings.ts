@@ -17,9 +17,6 @@ export interface AppSettings {
   soundEffects: boolean
   watchPartyEnabled: boolean
   autoRefresh: boolean
-  advancedMode: boolean
-  maximumGooner: boolean
-  maximumGooning: boolean
   allowRemoteWallpaper: boolean
   wallpaperUrl: string
   wallpaperPreset: string
@@ -28,7 +25,6 @@ export interface AppSettings {
   wallpaperSlideshowInterval: number
   wallpaperMime: string
   autoOpenImages: boolean
-  autoForwardAll: boolean
   sidebarVisible: boolean
   headerVisible: boolean
   idleTimeout: number
@@ -79,9 +75,6 @@ const DEFAULTS: AppSettings = {
   soundEffects: true,
   watchPartyEnabled: true,
   autoRefresh: true,
-  advancedMode: false,
-  maximumGooner: false,
-  maximumGooning: false,
   allowRemoteWallpaper: true,
   wallpaperUrl: '',
   wallpaperPreset: 'default',
@@ -90,7 +83,6 @@ const DEFAULTS: AppSettings = {
   wallpaperSlideshowInterval: 8000,
   wallpaperMime: '',
   autoOpenImages: false,
-  autoForwardAll: false,
   sidebarVisible: false,
   headerVisible: false,
   idleTimeout: 5,

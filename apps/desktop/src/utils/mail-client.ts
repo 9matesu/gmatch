@@ -323,37 +323,48 @@ export class MailClient {
 
     // Every mailbox base where mail can legitimately land (the rendezvous +
     // the node we are connected to), × each owned token (home + cur + prev).
+    //
+    // The boxes are pulled CONCURRENTLY. This used to be a nested serial
+    // loop: with 4 bases × 3 tokens that is 12 GETs and up to 12 ACK POSTs,
+    // one round-trip at a time — a burst of notices cost O(N × 24) serial
+    // RTTs before the first message appeared. The per-token epoch mapping
+    // and the "never ack what we cannot open" rule are preserved exactly;
+    // only the waiting is parallel.
+    const jobs: Array<Promise<void>> = []
     for (const base of this.bases()) {
       for (const token of this.watchedTokens()) {
-        const res = await this.fetcher()(`${base}/api/mail/${token}`).catch(() => null)
-        if (!res || !res.ok) {
-          this.log(`[mail] pull failed (${base.replace(/^https?:\/\//, '')} ${res ? res.status : 'network'})`)
-          continue
-        }
-        const { envelopes } = (await res.json()) as { envelopes?: Envelope[] }
-        if (!Array.isArray(envelopes) || envelopes.length === 0) continue
-        const consumed: string[] = []
-        for (const env of envelopes) {
-          try {
-            const o = open1to1(env, this.deps.identity.encryptionPrivHex)
-            opened.push(o)
-            consumed.push(env.id)
-            this.deps.onMail(o, env)
-          } catch {
-            // Not openable by us (token collision/corruption) — leave it; the
-            // courier TTL collects it. Never ack what we cannot open.
+        jobs.push((async () => {
+          const res = await this.fetcher()(`${base}/api/mail/${token}`).catch(() => null)
+          if (!res || !res.ok) {
+            this.log(`[mail] pull failed (${base.replace(/^https?:\/\//, '')} ${res ? res.status : 'network'})`)
+            return
           }
-        }
-        if (consumed.length > 0) {
-          const epoch = token === curToken ? this.epoch.cur : (token === prevToken ? this.epoch.prev : undefined)
-          await this.fetcher()(`${base}/api/mail/${token}/ack`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(ackBody(this.deps.identity, token, consumed, epoch)),
-          }).catch(() => { /* mail stays until TTL; a later pull re-consumes */ })
-        }
+          const { envelopes } = (await res.json()) as { envelopes?: Envelope[] }
+          if (!Array.isArray(envelopes) || envelopes.length === 0) return
+          const consumed: string[] = []
+          for (const env of envelopes) {
+            try {
+              const o = open1to1(env, this.deps.identity.encryptionPrivHex)
+              opened.push(o)
+              consumed.push(env.id)
+              this.deps.onMail(o, env)
+            } catch {
+              // Not openable by us (token collision/corruption) — leave it; the
+              // courier TTL collects it. Never ack what we cannot open.
+            }
+          }
+          if (consumed.length > 0) {
+            const epoch = token === curToken ? this.epoch.cur : (token === prevToken ? this.epoch.prev : undefined)
+            await this.fetcher()(`${base}/api/mail/${token}/ack`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(ackBody(this.deps.identity, token, consumed, epoch)),
+            }).catch(() => { /* mail stays until TTL; a later pull re-consumes */ })
+          }
+        })())
       }
     }
+    await Promise.all(jobs)
     return opened
   }
 }

@@ -6,6 +6,7 @@ import { getLocalObject, requestSwarmObject, PEER_ONLINE_EVENT } from '../utils/
 import { vaultProbe } from '../services/vault'
 import { resolveVideoMime, sniffFileHead } from '../utils/media'
 import { isMagnetUri } from '../utils/magnet'
+import { normalizeObjectId, isRequestableObjectId } from '../utils/objectRef'
 
 /**
  * Video detection for bytes in hand: trusts a concrete blob/stored MIME, but
@@ -83,38 +84,18 @@ function pinKey(cardId: string, source: string): string {
   return `${source}::${normalizeCardId(cardId)}`
 }
 
-export function normalizeCardId(cardId: string): string {
-  if (!cardId) return cardId
-  if (cardId.startsWith('/api/objects/')) return cardId.slice('/api/objects/'.length).split(/[?#]/)[0]
-  return cardId
-}
-
 /**
  * Can this value be used as an object id in a request path?
  *
- * `Objects.id` is always a UUID or a short opaque token (`p2p-obj-…`,
- * `story-preload-1`, …). A `magnet:?…` or `urn:sha256:…` descriptor is what the
- * API *returns* for an object, never something you can ask for — and feeding
- * one back as an id is silent data loss: the literal `?` in `magnet:?xt=…`
- * terminates the path, so the browser requests `/api/objects/magnet:` and the
- * node 404s on the truncated id. That 404 then also fired `orbit-object-404`
- * (which tried to delete the story row) and cached a permanent failure that
- * evicted a real entry from the 24-slot LRU.
- *
- * Rejecting is the honest answer rather than encoding: these are not ids.
+ * The rule lives in `utils/objectRef.ts` (ONE parser for every media
+ * reference in the app). This stays as a re-export because the hook's public
+ * surface is used by several components and tests.
  */
-export function isRequestableObjectId(raw: string | null | undefined): boolean {
-  if (!raw) return false
-  const id = normalizeCardId(raw.trim())
-  if (!id) return false
-  if (isMagnetUri(id)) return false
-  // A `urn:sha256:…` descriptor has no separators, so the terminator test below
-  // accepts it — reject it explicitly like the magnet above. Firing
-  // /api/objects/urn:sha256:… is always a doomed request.
-  if (/^urn:/i.test(id)) return false
-  // No path separators or terminators: a single path segment, nothing that can
-  // split the URL. Catches magnets, urns, absolute URLs and file paths at once.
-  return !/[/\\?#\s]/.test(id)
+export { isRequestableObjectId };
+
+/** Strip the `/api/objects/` mount so the bare id remains. */
+export function normalizeCardId(cardId: string): string {
+  return normalizeObjectId(cardId);
 }
 
 function cacheGet(rawCardId: string, source: string): ImageState | null {

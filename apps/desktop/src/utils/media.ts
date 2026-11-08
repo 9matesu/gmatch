@@ -3,6 +3,7 @@
 import { getApiBaseUrl } from './api';
 import { logger } from './logger';
 import { mediaUrlToCachedFile } from './cacheMedia';
+import { resolveObjectRefId } from './objectRef';
 
 /**
  * Resolves any relative media endpoint (/api/objects/..., /api/lobby/images/...)
@@ -18,19 +19,14 @@ export function resolveMediaUrl(url?: string | null): string {
   if (/^(file|about|javascript|chrome|chrome-extension|moz-extension|safari-web-extension):/i.test(trimmed)) {
     return '';
   }
-  // Content-addressed media from imported posts: urn:sha256:<uuid><padding>.
-  // Resolve to /api/objects/<uuid> so the server streams the local P2P copy.
-  const urnMatch = trimmed.match(/^urn:sha256:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
-  if (urnMatch) {
+  // Content-addressed media from imported posts: `urn:sha256:<uuid>` and
+  // `urn:sha256:<sha256-hex>`. The id lives INSIDE the descriptor, so it
+  // resolves to /api/objects/<id> and the server streams the local P2P copy.
+  // The parse lives in utils/objectRef.ts — ONE rule for every media ref.
+  const urnId = resolveObjectRefId(trimmed);
+  if (urnId && /^urn:/i.test(trimmed)) {
     const base = getApiBaseUrl().replace(/\/+$/, '');
-    return base ? `${base}/api/objects/${urnMatch[1]}` : `/api/objects/${urnMatch[1]}`;
-  }
-  // The same archive also carries sha256-hex object ids (no dashes) in the URN.
-  // Those ids ARE the canonical object ids, so stream them the same way.
-  const urnHex = trimmed.match(/^urn:sha256:([0-9a-f]{64})/i);
-  if (urnHex) {
-    const base = getApiBaseUrl().replace(/\/+$/, '');
-    return base ? `${base}/api/objects/${urnHex[1]}` : `/api/objects/${urnHex[1]}`;
+    return base ? `${base}/api/objects/${urnId}` : `/api/objects/${urnId}`;
   }
   // magnet: links cannot be rendered directly; no doomed request.
   if (/^magnet:/i.test(trimmed)) {
