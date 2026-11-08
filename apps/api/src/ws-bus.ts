@@ -57,20 +57,26 @@ export function validateTicket(ticket: string): string | null {
 import {
   applyWatch, joinWatch, watchPong, applyChat, deleteChat, leaveWatch,
   kickWatch, banWatch, muteWatch, transferHost, settingsWatch, queueOps, watchReady, touchRooms, leaveAll, disbandWatch,
+  parseWatchFrame, type WatchFrame,
 } from './watchparty'
 
+/** Narrow an untrusted JSON value to a plain record. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value)
+}
+
 export function handleIncoming(conn: WsConn, data: string): void {
-  let msg: any
+  let parsed: unknown = null
   try {
-    msg = JSON.parse(data)
+    parsed = JSON.parse(data)
   } catch {
-    msg = null
+    parsed = null
   }
 
   // Anonymous connections may only present an auth ticket. Everything else is
   // dropped until a valid one-time ticket is proven (see ws.ts grace timer).
-  if (msg && msg.type === 'auth') {
-    const userId = typeof msg.ticket === 'string' ? validateTicket(msg.ticket) : null
+  if (isRecord(parsed) && parsed.type === 'auth') {
+    const userId = typeof parsed.ticket === 'string' ? validateTicket(parsed.ticket) : null
     if (userId) {
       conn.userId = userId
       conn.authed = true
@@ -86,12 +92,14 @@ export function handleIncoming(conn: WsConn, data: string): void {
   // Unauthenticated connections are not relayed into any room.
   if (!conn.authed) return
 
-  if (!msg || typeof msg !== 'object') {
+  if (!isRecord(parsed)) {
     for (const c of conns) {
       if (c !== conn && c.authed && c.rooms.has('global')) c.send(data)
     }
     return
   }
+
+  const msg = parsed
 
   if (msg.type === 'subscribe') {
     // Audit A1: room membership is minted server-side (watch.join, auth).
@@ -108,13 +116,23 @@ export function handleIncoming(conn: WsConn, data: string): void {
   // Watch Room frames. join subscribes the socket to the party room; control
   // frames are re-stamped with the SERVER clock and relayed to the room so
   // every peer advances from the same instant.
-  if (msg.type === 'watch.ping') {
+  //
+  // The frame is NARROWED first: parseWatchFrame copies only the known
+  // fields, with the type each field must have. A handler never sees a raw
+  // JSON value, so a string can never be read as a number and an unknown key
+  // can never reach a handler.
+  const frameType = typeof msg.type === 'string' ? msg.type : ''
+  const isWatchFrame = frameType === 'watch' || frameType.startsWith('watch.')
+  const watch: WatchFrame | null = isWatchFrame ? parseWatchFrame(msg) : null
+  if (isWatchFrame && !watch) return
+
+  if (frameType === 'watch.ping') {
     touchRooms(conn.userId || '')
     conn.send(JSON.stringify(watchPong(msg.t0)))
     return
   }
-  if (msg.type === 'watch.join') {
-    const res = joinWatch(conn.userId || '', (msg.name || '').slice(0, 40), msg)
+  if (frameType === 'watch.join' && watch) {
+    const res = joinWatch(conn.userId || '', (watch.name ?? '').slice(0, 40), watch)
     if (res) {
       conn.rooms.add(res.room)
       // Send full state snapshot ONLY to the joiner socket
@@ -124,15 +142,15 @@ export function handleIncoming(conn: WsConn, data: string): void {
       if (othersPayload && (!Array.isArray(othersPayload) || othersPayload.length > 0)) {
         broadcastToRoomExcept(res.room, conn, othersPayload)
       }
-    } else if (typeof msg.party === 'string') {
+    } else if (typeof watch.party === 'string') {
       // Room died (GC/eviction pre-persistence, or a creator wipe): say so
       // once, on the requester's socket, so no ghost room loops 404s.
-      conn.send(JSON.stringify({ type: 'watch.gone', party: msg.party }))
+      conn.send(JSON.stringify({ type: 'watch.gone', party: watch.party }))
     }
     return
   }
-  if (msg.type === 'watch') {
-    const res = applyWatch(conn.userId || '', msg)
+  if (frameType === 'watch' && watch) {
+    const res = applyWatch(conn.userId || '', watch)
     if (res) {
       broadcastToRoom(res.room, res.payload)
       return
@@ -142,68 +160,68 @@ export function handleIncoming(conn: WsConn, data: string): void {
     // throttle. The client showed "playing" and the user pressed pause and
     // nothing happened, with zero evidence anywhere. Tell the sender, so the
     // UI can be optimistic and a dropped command is explainable.
-    conn.send(JSON.stringify({ type: 'watch.nack', party: msg.party, action: msg.action }))
+    conn.send(JSON.stringify({ type: 'watch.nack', party: watch.party, action: watch.action }))
     return
   }
-  if (msg.type === 'watch.chat') {
-    const res = applyChat(conn.userId || '', msg.name, msg)
+  if (frameType === 'watch.chat' && watch) {
+    const res = applyChat(conn.userId || '', watch.name ?? '', watch)
     if (res) broadcastToRoom(res.room, res.payload)
     return
   }
-  if (msg.type === 'watch.chat.del') {
-    const res = deleteChat(conn.userId || '', msg)
+  if (frameType === 'watch.chat.del' && watch) {
+    const res = deleteChat(conn.userId || '', watch)
     if (res) broadcastToRoom(res.room, res.payload)
     return
   }
-  if (msg.type === 'watch.leave') {
-    const res = leaveWatch(conn.userId || '', msg)
+  if (frameType === 'watch.leave' && watch) {
+    const res = leaveWatch(conn.userId || '', watch)
     if (res) {
       conn.rooms.delete(res.room)
       broadcastToRoom(res.room, res.payload)
     }
     return
   }
-  if (msg.type === 'watch.kick' || msg.type === 'watch.ban') {
-    const res = msg.type === 'watch.kick' ? kickWatch(conn.userId || '', msg) : banWatch(conn.userId || '', msg)
+  if ((frameType === 'watch.kick' || frameType === 'watch.ban') && watch) {
+    const res = frameType === 'watch.kick' ? kickWatch(conn.userId || '', watch) : banWatch(conn.userId || '', watch)
     if (res) {
       broadcastToRoom(res.room, res.payload)
       // Tell the target directly + evict its room membership.
       for (const c of conns) {
         if (c.userId === res.kicked) {
           c.rooms.delete(res.room)
-          c.send(JSON.stringify({ type: 'watch.kicked', party: msg.party }))
+          c.send(JSON.stringify({ type: 'watch.kicked', party: watch.party }))
         }
       }
     }
     return
   }
-  if (msg.type === 'watch.mute') {
-    const res = muteWatch(conn.userId || '', msg)
+  if (frameType === 'watch.mute' && watch) {
+    const res = muteWatch(conn.userId || '', watch)
     if (res) broadcastToRoom(res.room, res.payload)
     return
   }
-  if (msg.type === 'watch.host') {
-    const res = transferHost(conn.userId || '', msg)
+  if (frameType === 'watch.host' && watch) {
+    const res = transferHost(conn.userId || '', watch)
     if (res) broadcastToRoom(res.room, res.payload)
     return
   }
-  if (msg.type === 'watch.settings') {
-    const res = settingsWatch(conn.userId || '', msg)
+  if (frameType === 'watch.settings' && watch) {
+    const res = settingsWatch(conn.userId || '', watch)
     if (res) broadcastToRoom(res.room, res.payload)
     return
   }
-  if (msg.type === 'watch.queue') {
-    const res = queueOps(conn.userId || '', msg)
+  if (frameType === 'watch.queue' && watch) {
+    const res = queueOps(conn.userId || '', watch)
     if (res) broadcastToRoom(res.room, res.payload)
     return
   }
-  if (msg.type === 'watch.ready') {
-    const res = watchReady(conn.userId || '', msg)
+  if (frameType === 'watch.ready' && watch) {
+    const res = watchReady(conn.userId || '', watch)
     if (res) broadcastToRoom(res.room, res.payload)
     return
   }
-  if (msg.type === 'watch.disband') {
-    const res = disbandWatch(conn.userId || '', msg)
+  if (frameType === 'watch.disband' && watch) {
+    const res = disbandWatch(conn.userId || '', watch)
     if (res) {
       // Everyone in the room (host included) gets gone + leaves the room.
       for (const c of conns) {
@@ -229,19 +247,8 @@ export function handleIncoming(conn: WsConn, data: string): void {
   // SWARM_FRAME envelope, and the relay stamps `relayedBy` with the identity
   // the socket PROVED at auth, so a receiver can tell a real sender from a
   // forged `user.id` in the payload.
-  if (msg.type === 'SWARM_FRAME' && msg.swarm && typeof msg.swarm === 'object') {
-    const inner = msg.swarm as {
-      type?: unknown
-      dataBase64?: unknown
-      transferId?: unknown
-      wrapped?: unknown
-      id?: unknown
-      challenge?: unknown
-      receipt?: unknown
-      operation?: unknown
-      operationId?: unknown
-      actorId?: unknown
-    }
+  if (msg.type === 'SWARM_FRAME' && isRecord(msg.swarm)) {
+    const inner = msg.swarm
     const bounded = (v: unknown, max: number): v is string => typeof v === 'string' && v.length > 0 && v.length <= max
     const relayable =
       inner.type === 'SWARM_WANT' ||

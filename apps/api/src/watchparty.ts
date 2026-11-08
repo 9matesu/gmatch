@@ -3,6 +3,131 @@
 // there is deliberately no migration here.
 import { randomUUID } from 'node:crypto'
 
+/**
+ * The watch-party client frame.
+ *
+ * Every watch control frame is the same envelope: a party id, an optional
+ * idempotency key and a handful of typed fields. The frames arrive as
+ * untrusted JSON over the WebSocket, so they are NARROWED by
+ * `parseWatchFrame` — never cast. A field of the wrong type is DROPPED, not
+ * coerced, and unknown keys never reach a handler.
+ */
+export interface WatchFrame {
+  type?: string
+  party?: string
+  /** Idempotency key: a repeated command returns the current state instead
+   *  of applying twice. */
+  cmdId?: string
+  /** Display name (join) or the queue entry's title (add). */
+  name?: string
+  /** Private-room invite token (join only). */
+  invite?: string
+  /** Transport action: 'play' | 'pause'. */
+  action?: string
+  position?: number
+  rate?: number
+  /** Chat message body. */
+  text?: string
+  /** Chat message id (delete). */
+  msgId?: string
+  /** The member a host action applies to (kick/ban/mute/transfer host). */
+  target?: string
+  /** Mute on/off. */
+  on?: boolean
+  isPrivate?: boolean
+  lockVideo?: boolean
+  sharedControl?: boolean
+  requireApproval?: boolean
+  /** Queue operation: add | remove | move | play | next | prev | approve | flag | unflag. */
+  op?: string
+  /** Media URL (queue add). */
+  url?: string
+  /** Queue entry id, or the new entry's id. */
+  id?: string
+  /** SHA-256 of the shared bytes (queue add / readiness). */
+  hash?: string
+  /** Byte size of the shared media. */
+  size?: number
+  /** The id an entry is moved BEFORE (queue move). */
+  before?: string
+  /** Provider label for the queue entry. */
+  provider?: string
+  /** Poster still for the queue entry. */
+  thumb?: string
+  /** True for consent-shared local files. */
+  local?: boolean
+  /** Upstream relay descriptor for a stored media object. The referer is
+   *  required: the upstream fetch sends it, so a descriptor without one is
+   *  dropped rather than half-applied. */
+  relay?: { upstream: string; referer: string }
+}
+
+function strField(src: Record<string, unknown>, key: string): string | undefined {
+  const v = src[key]
+  return typeof v === 'string' ? v : undefined
+}
+
+/**
+ * Narrow an untrusted JSON value into a WatchFrame.
+ *
+ * Returns null when the value is not a plain object. Every field is copied
+ * only when it already has the right type — the frame never coerces a
+ * string into a number or a number into a string, so a handler can trust
+ * the types it reads.
+ */
+export function parseWatchFrame(raw: unknown): WatchFrame | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const src = raw as Record<string, unknown>
+  const frame: WatchFrame = {}
+
+  const type = strField(src, 'type'); if (type !== undefined) frame.type = type
+  const party = strField(src, 'party'); if (party !== undefined) frame.party = party
+  const cmdId = strField(src, 'cmdId'); if (cmdId !== undefined) frame.cmdId = cmdId
+  const name = strField(src, 'name'); if (name !== undefined) frame.name = name
+  const invite = strField(src, 'invite'); if (invite !== undefined) frame.invite = invite
+  const action = strField(src, 'action'); if (action !== undefined) frame.action = action
+  const text = strField(src, 'text'); if (text !== undefined) frame.text = text
+  const msgId = strField(src, 'msgId'); if (msgId !== undefined) frame.msgId = msgId
+  const target = strField(src, 'target'); if (target !== undefined) frame.target = target
+  const op = strField(src, 'op'); if (op !== undefined) frame.op = op
+  const url = strField(src, 'url'); if (url !== undefined) frame.url = url
+  const id = strField(src, 'id'); if (id !== undefined) frame.id = id
+  const hash = strField(src, 'hash'); if (hash !== undefined) frame.hash = hash
+  const before = strField(src, 'before'); if (before !== undefined) frame.before = before
+  const provider = strField(src, 'provider'); if (provider !== undefined) frame.provider = provider
+  const thumb = strField(src, 'thumb'); if (thumb !== undefined) frame.thumb = thumb
+
+  const position = src.position
+  if (typeof position === 'number' && Number.isFinite(position)) frame.position = position
+  const rate = src.rate
+  if (typeof rate === 'number' && Number.isFinite(rate)) frame.rate = rate
+  const size = src.size
+  if (typeof size === 'number' && Number.isFinite(size)) frame.size = size
+
+  const on = src.on
+  if (typeof on === 'boolean') frame.on = on
+  const isPrivate = src.isPrivate
+  if (typeof isPrivate === 'boolean') frame.isPrivate = isPrivate
+  const lockVideo = src.lockVideo
+  if (typeof lockVideo === 'boolean') frame.lockVideo = lockVideo
+  const sharedControl = src.sharedControl
+  if (typeof sharedControl === 'boolean') frame.sharedControl = sharedControl
+  const requireApproval = src.requireApproval
+  if (typeof requireApproval === 'boolean') frame.requireApproval = requireApproval
+  const local = src.local
+  if (typeof local === 'boolean') frame.local = local
+
+  const relay = src.relay
+  if (relay && typeof relay === 'object' && !Array.isArray(relay)) {
+    const r = relay as Record<string, unknown>
+    const upstream = strField(r, 'upstream')
+    const referer = strField(r, 'referer')
+    if (upstream !== undefined && referer !== undefined) frame.relay = { upstream, referer }
+  }
+
+  return frame
+}
+
 export interface PartyFrame {
   url: string
   action: 'play' | 'pause'
@@ -250,7 +375,7 @@ function sanitizeQueueEntry(raw: any): QueueEntry | null {
 }
 
 /** Poster URLs must be swarm object routes or plain http(s) — never file/vault paths. */
-function sanitizeThumb(raw: any): string | undefined {
+function sanitizeThumb(raw: unknown): string | undefined {
   if (typeof raw !== 'string') return undefined
   const url = raw.trim().slice(0, 512)
   if (!url) return undefined
@@ -273,7 +398,7 @@ function pruneCmds(party: Party): void {
     party.recentCmds.delete(oldest.value)
   }
 }
-function normalizeCmdId(raw: any): string | null {
+function normalizeCmdId(raw: unknown): string | null {
   const s = typeof raw === 'string' ? raw.trim() : ''
   if (!s || s.length > 64) return null
   return s
@@ -363,9 +488,8 @@ export function controlsParty(party: Party, userId: string): boolean {
 }
 
 /** Validate + apply one client control frame. Returns null to drop it. */
-export function applyWatch(userId: string, msg: any): { room: string; payload: any } | null {
-  if (!msg || typeof msg !== 'object') return null
-  const party = parties.get(String(msg.party || ''))
+export function applyWatch(userId: string, msg: WatchFrame): { room: string; payload: any } | null {
+  const party = parties.get(msg.party ?? '')
   const member = party?.members.get(userId)
   if (!party || !member) return null
   // Transport is holder-only (host, or members when sharedControl is on).
@@ -379,11 +503,11 @@ export function applyWatch(userId: string, msg: any): { room: string; payload: a
   // their pending frames are not refused while the socket is down.
   if (!controlsParty(party, userId)) return null
   if (msg.action !== 'play' && msg.action !== 'pause') return null
-  const position = Number(msg.position)
-  if (!Number.isFinite(position) || position < 0) return null
+  const position = msg.position
+  if (position === undefined || !Number.isFinite(position) || position < 0) return null
   // V1 lock: party speed is always 1x. A rate != 1 frame is a desync bug or
   // a modified client; drop it.
-  if (msg.rate !== undefined && Number(msg.rate) !== 1) return null
+  if (msg.rate !== undefined && msg.rate !== 1) return null
   const cmdId = normalizeCmdId(msg.cmdId)
   if (cmdId && claimCmd(party, cmdId)) {
     // Idempotent retry: return the authoritative frame without moving it.
@@ -409,13 +533,13 @@ export function applyWatch(userId: string, msg: any): { room: string; payload: a
 }
 
 /** Handle watch.join: add member, return the snapshot payload for the room. */
-export function joinWatch(userId: string, displayName: string, msg: any): { room: string; payload: any; snapshot: any; broadcastPayload: any } | null {
-  const party = parties.get(String(msg?.party || ''))
+export function joinWatch(userId: string, displayName: string, msg: WatchFrame): { room: string; payload: any; snapshot: any; broadcastPayload: any } | null {
+  const party = parties.get(msg.party ?? '')
   if (!party || party.bans.has(userId)) return null
   // Private rooms require membership or a current invite token. The token is
   // compared only here and never logged, persisted, or broadcast.
   if (party.isPrivate && !party.members.has(userId)) {
-    const invite = typeof msg?.invite === 'string' ? msg.invite : ''
+    const invite = msg.invite ?? ''
     if (!party.inviteToken || invite !== party.inviteToken) return null
     party.members.set(userId, { name: String(displayName || '').slice(0, 40), muted: false })
   } else {
@@ -442,8 +566,8 @@ export function joinWatch(userId: string, displayName: string, msg: any): { room
 }
 
 /** Explicit watch.leave (tab close uses leaveAll via the socket close hook). */
-export function leaveWatch(userId: string, msg: any): { room: string; payload: any } | null {
-  const party = parties.get(String(msg?.party || ''))
+export function leaveWatch(userId: string, msg: WatchFrame): { room: string; payload: any } | null {
+  const party = parties.get(msg.party ?? '')
   if (!party || !party.members.has(userId)) return null
   return removeMember(party, userId, false)
 }
@@ -497,12 +621,11 @@ function removeMember(party: Party, userId: string, forceClose: boolean): { room
 }
 
 /** Party chat: members only, 80 chars, 1 msg/2s per user. Text only. */
-export function applyChat(userId: string, displayName: string, msg: any): { room: string; payload: any } | null {
-  if (!msg || typeof msg !== 'object') return null
-  const party = parties.get(String(msg.party || ''))
+export function applyChat(userId: string, displayName: string, msg: WatchFrame): { room: string; payload: any } | null {
+  const party = parties.get(msg.party ?? '')
   const member = party?.members.get(userId)
   if (!party || !member || member.muted) return null
-  const text = typeof msg.text === 'string' ? msg.text.trim().slice(0, 80) : ''
+  const text = (msg.text ?? '').trim().slice(0, 80)
   if (!text) return null
   const now = Date.now()
   if (now - (party.lastChat.get(userId) || 0) < 2000) return null
@@ -523,22 +646,22 @@ export function applyChat(userId: string, displayName: string, msg: any): { room
   }
 }
 
-export function deleteChat(userId: string, msg: any): { room: string; payload: any } | null {
-  const party = parties.get(String(msg?.party || ''))
+export function deleteChat(userId: string, msg: WatchFrame): { room: string; payload: any } | null {
+  const party = parties.get(msg.party ?? '')
   if (!party || !party.members.has(userId)) return null
-  const idx = party.chat.findIndex((m) => m.id === String(msg?.msgId || ''))
+  const idx = party.chat.findIndex((m) => m.id === (msg.msgId ?? ''))
   if (idx < 0) return null
   if (userId !== party.hostId && userId !== party.chat[idx].from) return null
   party.chat.splice(idx, 1)
-  return { room: partyRoom(party.id), payload: { type: 'watch.chat_del', party: party.id, msgId: String(msg.msgId) } }
+  return { room: partyRoom(party.id), payload: { type: 'watch.chat_del', party: party.id, msgId: msg.msgId ?? '' } }
 }
 
 /** Send a direct frame to one user's live sockets (kick notice). Returns the
  * set of matched userIds for testability; ws-bus passes conns access. */
-export function kickWatch(userId: string, msg: any): { room: string; payload: any; kicked?: string } | null {
-  const party = parties.get(String(msg?.party || ''))
+export function kickWatch(userId: string, msg: WatchFrame): { room: string; payload: any; kicked?: string } | null {
+  const party = parties.get(msg.party ?? '')
   if (!party || party.hostId !== userId) return null
-  const target = String(msg?.target || '')
+  const target = msg.target ?? ''
   if (!target || target === userId || !party.members.has(target)) return null
   const who = party.members.get(target)?.name || target.slice(0, 8)
   party.members.delete(target)
@@ -554,29 +677,29 @@ export function kickWatch(userId: string, msg: any): { room: string; payload: an
   return { room, payload: payloads, kicked: target }
 }
 
-export function banWatch(userId: string, msg: any): { room: string; payload: any; kicked?: string } | null {
-  const party = parties.get(String(msg?.party || ''))
+export function banWatch(userId: string, msg: WatchFrame): { room: string; payload: any; kicked?: string } | null {
+  const party = parties.get(msg.party ?? '')
   if (!party || party.hostId !== userId) return null
-  const target = String(msg?.target || '')
+  const target = msg.target ?? ''
   if (!target || target === userId) return null
   party.bans.add(target)
   return kickWatch(userId, msg)
 }
 
-export function muteWatch(userId: string, msg: any): { room: string; payload: any } | null {
-  const party = parties.get(String(msg?.party || ''))
+export function muteWatch(userId: string, msg: WatchFrame): { room: string; payload: any } | null {
+  const party = parties.get(msg.party ?? '')
   if (!party || party.hostId !== userId) return null
-  const member = party.members.get(String(msg?.target || ''))
+  const member = party.members.get(msg.target ?? '')
   if (!member) return null
-  member.muted = Boolean(msg.on)
-  const muted: Record<string, boolean> = { [String(msg.target)]: member.muted }
+  member.muted = msg.on === true
+  const muted: Record<string, boolean> = { [msg.target ?? '']: member.muted }
   return { room: partyRoom(party.id), payload: { type: 'watch.settings', party: party.id, muted } }
 }
 
-export function transferHost(userId: string, msg: any): { room: string; payload: any } | null {
-  const party = parties.get(String(msg?.party || ''))
+export function transferHost(userId: string, msg: WatchFrame): { room: string; payload: any } | null {
+  const party = parties.get(msg.party ?? '')
   if (!party || party.hostId !== userId) return null
-  const target = String(msg?.target || '')
+  const target = msg.target ?? ''
   if (!party.members.has(target)) return null
   party.hostId = target
   return { room: partyRoom(party.id), payload: rosterPayload(party) }
@@ -584,8 +707,8 @@ export function transferHost(userId: string, msg: any): { room: string; payload:
 
 /** Host closes the room for everyone: drop it and tell each member socket
  * watch.gone (their client removes the room + shows the notice). */
-export function disbandWatch(userId: string, msg: any): { room: string; partyId: string } | null {
-  const party = parties.get(String(msg?.party || ''))
+export function disbandWatch(userId: string, msg: WatchFrame): { room: string; partyId: string } | null {
+  const party = parties.get(msg.party ?? '')
   if (!party || party.hostId !== userId) return null
   const room = partyRoom(party.id)
   const partyId = party.id
@@ -623,8 +746,8 @@ export function redeemInvite(userId: string, partyId: string, invite: unknown): 
   return true
 }
 
-export function settingsWatch(userId: string, msg: any): { room: string; payload: any } | null {
-  const party = parties.get(String(msg?.party || ''))
+export function settingsWatch(userId: string, msg: WatchFrame): { room: string; payload: any } | null {
+  const party = parties.get(msg.party ?? '')
   if (!party || party.hostId !== userId) return null
   const cmdId = normalizeCmdId(msg.cmdId)
   if (cmdId && claimCmd(party, cmdId)) {
@@ -663,8 +786,8 @@ function currentSettingsPayload(party: Party): any {
 
 /** Queue ops (entries are already resolved media; resolution lives in the
  * route layer). 'add' never touches the playing frame; 'next' swaps it. */
-export function queueOps(userId: string, msg: any): { room: string; payload: any } | null {
-  const party = parties.get(String(msg?.party || ''))
+export function queueOps(userId: string, msg: WatchFrame): { room: string; payload: any } | null {
+  const party = parties.get(msg.party ?? '')
   const member = party?.members.get(userId)
   if (!party || !member) return null
   if (party.lockVideo && party.hostId !== userId) return null
@@ -672,24 +795,24 @@ export function queueOps(userId: string, msg: any): { room: string; payload: any
   if (cmdId && claimCmd(party, cmdId)) {
     return { room: partyRoom(party.id), payload: currentQueuePayload(party) }
   }
-  const op = String(msg.op || '')
+  const op = msg.op ?? ''
   let mutated = true
   if (op === 'add') {
-    const url = typeof msg.url === 'string' ? msg.url : ''
+    const url = msg.url ?? ''
     if (!url) return null
-    const entryId = (typeof msg.id === 'string' && msg.id.trim()) ? msg.id.trim().slice(0, 8) : randomUUID().slice(0, 8)
-    const hash = typeof msg.hash === 'string' && /^[0-9a-f]{64}$/i.test(msg.hash.trim()) ? msg.hash.trim().toLowerCase() : undefined
-    const size = Number(msg.size)
+    const entryId = (msg.id?.trim()) ? msg.id.trim().slice(0, 8) : randomUUID().slice(0, 8)
+    const hash = msg.hash && /^[0-9a-f]{64}$/i.test(msg.hash.trim()) ? msg.hash.trim().toLowerCase() : undefined
+    const size = msg.size
     const entry: QueueEntry = {
       id: entryId,
-      name: (typeof msg.name === 'string' ? msg.name : '').slice(0, 60) || 'Untitled',
+      name: (msg.name ?? '').slice(0, 60) || 'Untitled',
       url,
-      relay: msg.relay && typeof msg.relay.upstream === 'string' ? msg.relay : undefined,
+      relay: msg.relay,
       hash,
-      size: Number.isFinite(size) && size > 0 ? Math.floor(size) : undefined,
+      size: size !== undefined && size > 0 ? Math.floor(size) : undefined,
       local: msg.local === true ? true : undefined,
       thumb: sanitizeThumb(msg.thumb),
-      provider: typeof msg.provider === 'string' && msg.provider.trim() ? msg.provider.trim().slice(0, 24) : undefined,
+      provider: msg.provider?.trim() ? msg.provider.trim().slice(0, 24) : undefined,
     }
     // No silent duplicates: the same file queued twice is one entry. Identity
     // is the verified hash when present, else the relay upstream, else the
@@ -707,12 +830,12 @@ export function queueOps(userId: string, msg: any): { room: string; payload: any
     }
   } else if (op === 'remove') {
     if (!controlsParty(party, userId)) return null
-    party.queue = party.queue.filter((q) => q.id !== String(msg.id || ''))
+    party.queue = party.queue.filter((q) => q.id !== (msg.id ?? ''))
   } else if (op === 'move') {
     if (!controlsParty(party, userId)) return null
-    const from = party.queue.findIndex((q) => q.id === String(msg.id || ''))
+    const from = party.queue.findIndex((q) => q.id === (msg.id ?? ''))
     if (from < 0) return null
-    const beforeRaw = String(msg.before || '')
+    const beforeRaw = msg.before ?? ''
     const entry = party.queue.splice(from, 1)[0]
     if (!beforeRaw) {
       party.queue.push(entry)
@@ -723,7 +846,7 @@ export function queueOps(userId: string, msg: any): { room: string; payload: any
     }
   } else if (op === 'play') {
     if (!controlsParty(party, userId)) return null
-    const entry = party.queue.find((q) => q.id === String(msg.id || ''))
+    const entry = party.queue.find((q) => q.id === (msg.id ?? ''))
     if (!entry || entry.status === 'unavailable') mutated = false
     else {
       // A host pressing play on a proposal approves it implicitly.
@@ -741,12 +864,12 @@ export function queueOps(userId: string, msg: any): { room: string; payload: any
     if (!stepQueue(party, userId, member.name, -1)) mutated = false
   } else if (op === 'approve') {
     if (party.hostId !== userId) return null
-    const entry = party.queue.find((q) => q.id === String(msg.id || ''))
+    const entry = party.queue.find((q) => q.id === (msg.id ?? ''))
     if (!entry || entry.status !== 'proposed') return null
     delete entry.status
   } else if (op === 'flag' || op === 'unflag') {
     if (!controlsParty(party, userId)) return null
-    const entry = party.queue.find((q) => q.id === String(msg.id || ''))
+    const entry = party.queue.find((q) => q.id === (msg.id ?? ''))
     if (!entry) return null
     if (op === 'flag') entry.status = 'unavailable'
     else if (entry.status === 'unavailable') delete entry.status
@@ -787,12 +910,12 @@ function readyPayload(party: Party): Record<string, string[]> {
  * machine). Idempotent: repeated signals change nothing. Returns the queue
  * payload so the room sees readiness converge.
  */
-export function watchReady(userId: string, msg: any): { room: string; payload: any } | null {
-  const party = parties.get(String(msg?.party || ''))
+export function watchReady(userId: string, msg: WatchFrame): { room: string; payload: any } | null {
+  const party = parties.get(msg.party ?? '')
   if (!party || !party.members.has(userId)) return null
-  const entry = party.queue.find((q) => q.id === String(msg?.id || ''))
+  const entry = party.queue.find((q) => q.id === (msg.id ?? ''))
   if (!entry) return null
-  const hash = typeof msg?.hash === 'string' ? msg.hash.trim().toLowerCase() : ''
+  const hash = msg.hash ? msg.hash.trim().toLowerCase() : ''
   // When the entry carries a hash, the signal must name it: readiness for a
   // different file must not count toward this entry.
   if (entry.hash && hash !== entry.hash) return null

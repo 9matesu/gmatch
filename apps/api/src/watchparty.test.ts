@@ -4,7 +4,7 @@ import {
   deleteChat, kickWatch, banWatch, muteWatch, transferHost, settingsWatch,
   queueOps, setPartyMedia, __resetParties, partyRoom, MAX_QUEUE, isPartyMediaObject,
   serializeParties, restoreParties, liveMediaObjectIds, HOST_SEAT_GRACE_MS, controlsParty, type Party,
-  mintInvite, revokeInvite, redeemInvite, watchReady,
+  mintInvite, revokeInvite, redeemInvite, watchReady, parseWatchFrame,
 } from './watchparty'
 import { handleIncoming, conns, createWsTicket, type WsConn } from './ws-bus'
 
@@ -24,6 +24,49 @@ function authed(conn: WsConn & { sent: string[] }, userId: string) {
 beforeEach(() => {
   __resetParties()
   conns.clear()
+})
+
+describe('parseWatchFrame (the watch contract)', () => {
+  it('rejects anything that is not a plain object', () => {
+    expect(parseWatchFrame(null)).toBeNull()
+    expect(parseWatchFrame(undefined)).toBeNull()
+    expect(parseWatchFrame('watch.join')).toBeNull()
+    expect(parseWatchFrame(42)).toBeNull()
+    expect(parseWatchFrame([{ party: 'p' }])).toBeNull()
+  })
+
+  it('copies only the known fields', () => {
+    const frame = parseWatchFrame({ type: 'watch', party: 'p1', action: 'play', position: 4, evil: 'x' })
+    expect(frame).not.toBeNull()
+    expect(frame!.party).toBe('p1')
+    expect(frame!.action).toBe('play')
+    expect(frame!.position).toBe(4)
+    expect('evil' in frame!).toBe(false)
+  })
+
+  it('drops a field whose type is wrong instead of coercing it', () => {
+    // The old handlers did Number(msg.position) / String(msg.party), so a
+    // client could send "7" for a number and "0" for a party id. The frame is
+    // now narrowed: a wrong type is simply not there.
+    const frame = parseWatchFrame({ party: 'p1', position: '7', on: 'yes', size: 'big' })
+    expect(frame!.position).toBeUndefined()
+    expect(frame!.on).toBeUndefined()
+    expect(frame!.size).toBeUndefined()
+    expect(frame!.party).toBe('p1')
+  })
+
+  it('keeps a relay descriptor only when it carries both halves', () => {
+    const full = parseWatchFrame({ relay: { upstream: 'https://x/y', referer: 'https://x/' } })
+    expect(full!.relay).toEqual({ upstream: 'https://x/y', referer: 'https://x/' })
+    expect(parseWatchFrame({ relay: { upstream: 'https://x/y' } })!.relay).toBeUndefined()
+    expect(parseWatchFrame({ relay: 'nope' })!.relay).toBeUndefined()
+  })
+
+  it('a frame with a non-numeric position is refused by the transport handler', () => {
+    const p = makeParty('u0')
+    const frame = parseWatchFrame({ party: p.id, action: 'play', position: '7' })
+    expect(applyWatch('u0', frame!)).toBeNull()
+  })
 })
 
 function makeParty(creator = 'u1'): Party {
