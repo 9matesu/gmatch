@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { parseTags, type User, type OrbitObject } from '@orbit/shared';
-import { X, Copy, Check, Star, Ban, Send, Grid, MessageCircle, Play, Swords, Flag } from 'lucide-react';
+import { X, Copy, Check, Star, Ban, Send, Grid, MessageCircle, Play, Swords, Flag, Bell } from 'lucide-react';
 import { playPress } from '../utils/sounds';
 import { resolveMediaUrl } from '../utils/media';
 import { ObjectImage } from './ObjectImage';
@@ -33,6 +33,9 @@ interface UserProfileModalProps {
   onInviteToGame?: (userId: string) => void;
   onOpenFollowers?: (tab: 'followers' | 'following') => void;
   onReportUser?: (userId: string, name: string) => void;
+  /** Raise the caller's own attention flag (the node floats them to the top
+   *  of the roster for 30s). Only offered on your OWN profile. */
+  onPingAttention?: () => void;
   followingIds?: string[];
   /**
    * Roster for presence cross-checking. Typed with the presence fields
@@ -70,6 +73,7 @@ export function UserProfileModal({
   onInviteToGame,
   onOpenFollowers,
   onReportUser,
+  onPingAttention,
   followingIds = [],
   users = [],
   shareGroups = [],
@@ -426,6 +430,18 @@ export function UserProfileModal({
                 >
                   <Swords className="w-3.5 h-3.5 stroke-[1.75]" />
                   <span>Invite to Game</span>
+                </button>
+              )}
+
+              {onPingAttention && (
+                <button
+                  type="button"
+                  onClick={onPingAttention}
+                  title="Float your profile to the top of the roster for 30 seconds"
+                  className="py-2 px-3 bg-glass-w12 hover:bg-glass-w20 border border-border-glass text-retro-fg font-semibold text-xs rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <Bell className="w-3.5 h-3.5 stroke-[1.75]" />
+                  <span>Ping</span>
                 </button>
               )}
             </div>

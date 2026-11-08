@@ -63,15 +63,15 @@ describe('snapshotDb / restoreDb', () => {
     expect((res.rows[0] as any).decision).toBe('yes')
   })
 
-  it('restores blobs of columns added later via ALTER (schema drift)', async () => {
+  it('restores a non-default column value across a snapshot (schema drift)', async () => {
     const src = await makeClient()
-    await src.execute("INSERT INTO Users (id, public_key, maximum_gooner) VALUES ('u9', 'pub9', 4)")
+    await src.execute("INSERT INTO Users (id, public_key, score) VALUES ('u9', 'pub9', 4)")
     await snapshotDb(src, snapshotPath)
 
     const dst = await makeClient()
     await restoreDb(dst, snapshotPath)
-    const res = await dst.execute("SELECT maximum_gooner FROM Users WHERE id = 'u9'")
-    expect((res.rows[0] as any).maximum_gooner).toBe(4)
+    const res = await dst.execute("SELECT score FROM Users WHERE id = 'u9'")
+    expect((res.rows[0] as any).score).toBe(4)
   })
 
   it('restores profile data from an older snapshot schema with fewer columns', async () => {

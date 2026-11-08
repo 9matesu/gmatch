@@ -182,7 +182,6 @@ export interface User {
   gacha_downloads_received?: number;
   gacha_items_collected?: number;
   score?: number;
-  maximum_gooner?: boolean;
   /** PC Domination: user has opted in to remote control features */
   pc_domination_enabled?: boolean;
   /** PC Domination: JSON settings object for fine-grained consent */
@@ -336,7 +335,7 @@ export interface StoreItem {
   id: string;
   name: string;
   desc: string;
-  category: 'perk' | 'badge' | 'title' | 'pack' | 'hack';
+  category: 'perk' | 'badge' | 'title' | 'hack';
   cost: number;
   icon: string;
   badge?: string;
@@ -359,9 +358,6 @@ export const STORE_ITEMS: StoreItem[] = [
   { id: 'item-hack-mobile', name: 'Screen Lock', desc: 'Locks their screen behind a takeover image for one minute. Only lands while they are online.', category: 'hack', cost: 4500, icon: 'Flame', badge: 'LOCK', consumable: true },
   { id: 'item-hack-deny', name: 'Vision Jam', desc: 'Blurs their feed images for five minutes. Only lands while they are online.', category: 'hack', cost: 800, icon: 'EyeOff', badge: 'JAM', consumable: true },
   { id: 'item-flash-drop', name: 'Flash Drop Broadcast', desc: 'Instantly broadcasts your chosen photo to everyone online for 5 seconds. Liking one counts as a normal like.', category: 'hack', cost: 1000, icon: 'Zap', badge: 'ABILITY', consumable: true },
-  { id: 'item-lootbox-celebrity', name: 'Celebrity Stars Mystery Box', desc: 'Opens a celebrity-tier luxury lootbox containing rare pop-culture, idol, and celebrity cards.', category: 'pack', cost: 350, icon: 'Sparkles', badge: 'CELEB', consumable: true },
-  { id: 'item-pack-rare', name: 'Holo Rare Vault Pack', desc: 'Opens a 3-card pack guaranteed to contain Rare or Epic holographic cards with high trade valuation.', category: 'pack', cost: 250, icon: 'Sparkles', badge: 'HOLO', consumable: true },
-  { id: 'item-pack-cyber', name: 'Cyber Mythic Lootbox', desc: 'Opens a 5-card luxury lootbox with guaranteed Epic and Legendary tier duel cards.', category: 'pack', cost: 500, icon: 'Box', badge: 'MYTHIC', consumable: true },
 ];
 
 /** One-time flash broadcast shown to every online user for ~5 seconds. */
@@ -436,7 +432,6 @@ export interface BabecockInvite {
 
 export * from './lobby';
 export * from './card-valuation';
-export * from './booru';
 export * from './gossip';
 export * from './watchSource';
 

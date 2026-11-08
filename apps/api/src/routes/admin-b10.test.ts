@@ -92,12 +92,14 @@ describe('Admin B10 suite — result override, ban+wipe', () => {
       expect(body.result).toBe('winner_a')
 
       // The match should now be archived with the override result.
-      const archive = await app.request(`/api/admin/matches/archive/${matchId}`, {
-        headers: auth(admin, 'GET', `/api/admin/matches/archive/${matchId}`),
+      const archive = await app.request('/api/admin/matches/archive', {
+        headers: auth(admin, 'GET', '/api/admin/matches/archive'),
       }, env)
       expect(archive.status).toBe(200)
       const aBody: any = await archive.json()
-      expect(aBody.result).toBe('winner_a')
+      const row = aBody.matches.find((m: any) => m.id === matchId)
+      expect(row).toBeTruthy()
+      expect(row.result).toBe('winner_a')
     })
   })
 

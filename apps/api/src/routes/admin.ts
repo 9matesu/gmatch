@@ -5,16 +5,13 @@ import { adminAuth, ADMIN_GRANT_KEY } from '../middleware/admin'
 import type { D1Turso } from '../db'
 import type { LocalBlobStore } from '../blob'
 import { purgeObjectLikes } from '../game'
-import { STALE_PLAYER_MS, recordLeagueRank, resolveMatch, ensureBotReady, promoteLobbyImagesToPosts, advanceLobbyWithOptions, resolveCardUrl } from '../lobby'
+import { STALE_PLAYER_MS, recordLeagueRank, resolveMatch, promoteLobbyImagesToPosts, advanceLobby, resolveCardUrl } from '../lobby'
 import { deleteUserCascade, wipeUserContent } from './users'
 import { runPeriodicMaintenance } from '../cleanup'
 import { broadcastToRoom } from '../ws-bus'
 import { parseTags, clampCashoutRateBps, type GameMatch } from '@orbit/shared'
 import { logAdminAction } from '../admin-audit'
 import { decryptText, createSignedObjectToken } from '../crypto'
-import { getBotConfig, saveBotConfig, testBotApi, refreshBotImageCache, getBotProfiles, saveBotProfile, deleteBotProfile, generateBotPicture } from '../bot-image-api'
-import { validateProviderUrl } from '../bots/provider-pool'
-import { listLootboxes, getLootbox, normalizeTags, normalizeDrawConfig, stateTransition, isValidState, type LootboxState } from '../lootboxes/service'
 import { EconomyService } from '../economy'
 import { getCashoutRateBps } from '../cards'
 import { resolveReport, ReportError } from '../reports'
@@ -202,25 +199,6 @@ admin.get('/cards', async (c) => {
   return c.json(rows.results || [])
 })
 
-admin.get('/cards/:id', async (c) => {
-  const id = c.req.param('id')
-  const card = await c.env.DB.prepare(`
-    SELECT c.*, co.owner_id, u.display_name AS owner_name, o.mime_type,
-           o.caption, o.content_url
-    FROM Cards c
-    LEFT JOIN CardOwnership co ON co.card_id = c.id
-    LEFT JOIN Users u ON u.id = co.owner_id
-    LEFT JOIN Objects o ON o.id = c.media_object_id
-    WHERE c.id = ?
-  `).bind(id).first<any>()
-  if (!card) return c.json({ error: 'Card not found' }, 404)
-  const history = await c.env.DB.prepare(`
-    SELECT id, event, from_user, to_user, meta, created_at
-    FROM CardHistory WHERE card_id = ? ORDER BY created_at DESC LIMIT 200
-  `).bind(id).all()
-  return c.json({ card, history: history.results || [] })
-})
-
 admin.patch('/cards/:id/moderation', async (c) => {
   const adminId = c.get('orbitId')
   const id = c.req.param('id')
@@ -373,24 +351,6 @@ admin.post('/babecock/:id/close', async (c) => {
 //  one-time media→card migration stays available from git history if ever
 //  needed again. Canonical-card minting runs live on upload.)
 
-// Live active lobby players & online users status
-admin.get('/live', async (c) => {
-  const cutoff = new Date(Date.now() - STALE_PLAYER_MS).toISOString()
-  const onlineUsers = await c.env.DB.prepare(`
-    SELECT u.id, u.display_name, u.pfp_url, u.last_seen, u.tags, u.objects_sent_count, lp.status as lobby_status, lp.joined_at
-    FROM Users u
-    LEFT JOIN LobbyPlayers lp ON u.id = lp.user_id
-    WHERE datetime(u.last_seen) > datetime(?)
-    ORDER BY u.last_seen DESC
-  `).bind(cutoff).all()
-
-  const mapped = (onlineUsers.results || []).map((u: any) => ({
-    ...u,
-    tags: parseTags(u.tags),
-  }))
-
-  return c.json(mapped)
-})
 
 // Moderation dashboard: aggregate platform stats + recent activity
 admin.get('/dashboard', async (c) => {
@@ -580,91 +540,6 @@ admin.post('/matches/:id/result', async (c) => {
   return c.json({ success: true, match_id: id, result })
 })
 
-// Manually pair up queued players into a fresh 1v1 match (admin override).
-// If only 1 player is queued or selected, automatically pairs them with an AI bot!
-admin.post('/matches/force', async (c) => {
-  let userA: string | null = null
-  let userB: string | null = null
-  try {
-    const body = await c.req.json()
-    userA = body?.user_a ? String(body.user_a).trim() : null
-    userB = body?.user_b ? String(body.user_b).trim() : null
-  } catch { }
-
-  const now = Date.now()
-  const onlineCutoff = new Date(now - STALE_PLAYER_MS).toISOString()
-
-  let a = userA
-  let b = userB
-
-  if (!a && !b) {
-    const queued = await c.env.DB.prepare(`
-      SELECT lp.user_id
-      FROM LobbyPlayers lp
-      LEFT JOIN Users u ON u.id = lp.user_id
-      WHERE lp.status = 'waiting'
-        AND (lp.auto_queue IS NULL OR lp.auto_queue = 1)
-        AND u.last_seen IS NOT NULL
-        AND datetime(u.last_seen) >= datetime(?)
-      ORDER BY lp.joined_at ASC
-      LIMIT 2
-    `).bind(onlineCutoff).all<{ user_id: string }>()
-
-    const results = queued.results || []
-    if (results.length >= 2) {
-      a = results[0].user_id
-      b = results[1].user_id
-    } else if (results.length === 1) {
-      a = results[0].user_id
-    } else {
-      const online = await c.env.DB.prepare(`
-        SELECT id FROM Users WHERE last_seen IS NOT NULL AND datetime(last_seen) >= datetime(?) ORDER BY last_seen DESC LIMIT 1
-      `).bind(onlineCutoff).first<{ id: string }>()
-      if (online) a = online.id
-    }
-  }
-
-  if (!a) {
-    return c.json({ error: 'No active or queued player found to match' }, 404)
-  }
-
-  if (!b || a === b) {
-    const profiles = await getBotProfiles(c.env.DB).catch(() => [])
-    const available = profiles.filter((p) => p.enabled)
-    const bot = available.length > 0
-      ? available[Math.floor(Math.random() * available.length)]
-      : null
-    if (!bot) {
-      return c.json({ error: 'No bot profiles configured' }, 409)
-    }
-    await ensureBotReady(c.env.DB, { id: bot.id, name: bot.name, tags: bot.tags, col: bot.color || '', pfp_url: bot.pfp_url })
-    b = bot.id
-  }
-
-  // Guard: don't double-match players already locked in a duel.
-  const already = await c.env.DB.prepare(`
-    SELECT 1 FROM GameMatches
-    WHERE status IN ('lobby', 'playing') AND (user_a IN (?, ?) OR user_b IN (?, ?))
-    LIMIT 1
-  `).bind(a, b, a, b).first()
-  if (already) return c.json({ error: 'One of these players is already in an active match' }, 409)
-
-  const id = crypto.randomUUID()
-  const deadline = now + 10 * 1000
-  await c.env.DB.batch([
-    c.env.DB.prepare(`
-      INSERT INTO GameMatches (id, user_a, user_b, status, phase, round_seq, max_rounds,
-        score_a, score_b, played_cards_a, played_cards_b, rounds_history, phase_deadline, phase_version)
-      VALUES (?, ?, ?, 'lobby', 'lobby', 1, 5, 0, 0, '[]', '[]', '[]', ?, 1)
-    `).bind(id, a, b, deadline),
-    c.env.DB.prepare("UPDATE LobbyPlayers SET status = 'in_match', waiting_since = NULL WHERE user_id IN (?, ?)").bind(a, b),
-  ])
-
-  broadcastToRoom('lobby', { type: 'lobby', action: 'updated' })
-  await logAdminAction(c.env.DB, c.get('orbitId'), 'force_match', { id, type: 'match' }, `${a} vs ${b}`)
-
-  return c.json({ success: true, match_id: id, user_a: a, user_b: b })
-})
 
 // Force matchup all online human players — pairs them up without bots.
 admin.post('/matches/force-all', async (c) => {
@@ -737,8 +612,8 @@ admin.post('/matches/force-all', async (c) => {
     }
   }
 
-  // 6. Run pairing with skipBots=true
-  await advanceLobbyWithOptions(c.env.DB, now, true)
+  // 6. Run pairing
+  await advanceLobby(c.env.DB, now)
 
   // 7. Get created matches
   const newMatches = await c.env.DB.prepare(`
@@ -845,40 +720,6 @@ admin.get('/matches/archive', async (c) => {
     total: Number(countRow?.n || 0),
     limit,
     offset,
-  })
-})
-
-// Full single-archived-match report detail (round history with cards).
-admin.get('/matches/archive/:id', async (c) => {
-  const id = c.req.param('id') || ''
-  const m = await c.env.DB
-    .prepare('SELECT * FROM MatchArchive WHERE id = ?')
-    .bind(id)
-    .first<any>()
-  if (!m) return c.json({ error: 'Archived match not found' }, 404)
-  let history: any[] = []
-  try { history = m.rounds_history ? JSON.parse(m.rounds_history) : [] } catch { }
-  const resolvedHistory = await Promise.all(history.map(async (h: any) => ({
-    ...h,
-    card_a_url: await resolveCardUrl(c.env.DB, h.card_a),
-    card_b_url: await resolveCardUrl(c.env.DB, h.card_b),
-  })))
-  return c.json({
-    id: m.id,
-    user_a: m.user_a,
-    user_b: m.user_b,
-    user_a_name: m.user_a_name,
-    user_a_pfp: m.user_a_pfp,
-    user_b_name: m.user_b_name,
-    user_b_pfp: m.user_b_pfp,
-    score_a: Number(m.score_a || 0),
-    score_b: Number(m.score_b || 0),
-    result: m.result,
-    matched: Number(m.matched || 0),
-    perfect: Number(m.perfect || 0),
-    rounds_history: resolvedHistory,
-    created_at: m.created_at,
-    ended_at: m.ended_at,
   })
 })
 
@@ -1016,7 +857,7 @@ admin.delete('/posts/:id', async (c) => {
   const post = await c.env.DB.prepare('SELECT owner_id, mime_type FROM Objects WHERE id = ? AND is_public = 1').bind(id).first<{ owner_id: string; mime_type: string }>()
   if (!post) return c.json({ error: 'Public post not found' }, 404)
   if (post.mime_type !== 'text/url' && c.env.BUCKET) await c.env.BUCKET.delete(`objects/${id}`).catch(() => {})
-  await c.env.DB.batch([
+  await c.env.DB.atomicBatch([
     c.env.DB.prepare('DELETE FROM CommentLikes WHERE comment_id IN (SELECT id FROM Comments WHERE object_id = ?)').bind(id),
     c.env.DB.prepare('DELETE FROM Comments WHERE object_id = ?').bind(id),
     c.env.DB.prepare('DELETE FROM Saves WHERE object_id = ?').bind(id),
@@ -1027,123 +868,10 @@ admin.delete('/posts/:id', async (c) => {
   return c.json({ ok: true, deleted: id })
 })
 
-// Sent pictures stream (objects)
-admin.get('/objects', async (c) => {
-  const { q, limit, offset, param } = pagedQuery(c, 100, 500)
-  const owner = param('owner')
-  const type = param('type')
-  const sort = param('sort') || 'created_at'
-  const order = param('order').toLowerCase() === 'asc' ? 'ASC' : 'DESC'
-
-  // Denunciation protocol: the object browser is for PUBLIC surfaces only.
-  // Private objects (DM attachments, drafts) are never enumerable by admins.
-  const where: string[] = ['o.is_public = 1']
-  const params: unknown[] = []
-  if (q) {
-    where.push(`(o.caption LIKE ? OR o.id LIKE ? OR u.display_name LIKE ?)`)
-    const like = `%${q}%`
-    params.push(like, like, like)
-  }
-  if (owner) {
-    where.push('o.owner_id = ?')
-    params.push(owner)
-  }
-  if (type === 'story') where.push('o.is_story = 1')
-  if (type === 'card') where.push('COALESCE(o.is_story, 0) = 0')
-
-  const sortMap: Record<string, string> = {
-    created_at: 'o.created_at',
-    likes: 'COALESCE(lc.n, 0)',
-    favorites: 'COALESCE(fc.n, 0)',
-    recipients: 'COALESCE(rc.n, 0)',
-    size: 'o.size_bytes',
-  }
-  const orderCol = sortMap[sort] || 'o.created_at'
-
-  const whereSql = where.length > 0 ? ` WHERE ${where.join(' AND ')}` : ''
-  const total = await c.env.DB.prepare(`
-    SELECT COUNT(*) AS n FROM Objects o
-    LEFT JOIN Users u ON o.owner_id = u.id
-    ${whereSql}
-  `).bind(...params).first<{ n: number }>()
-
-  const { results } = await c.env.DB.prepare(`
-    SELECT o.id, o.owner_id, o.mime_type, o.size_bytes, o.is_story, o.created_at, o.caption,
-           u.display_name as owner_name, u.public_key as owner_public_key,
-           COALESCE(rc.n, 0) as recipients_count,
-           COALESCE(lc.n, 0) as likes_count,
-           COALESCE(fc.n, 0) as favorites_count
-    FROM Objects o
-    LEFT JOIN Users u ON o.owner_id = u.id
-    LEFT JOIN (SELECT object_id, COUNT(*) as n FROM Recipients GROUP BY object_id) rc ON rc.object_id = o.id
-    LEFT JOIN (SELECT object_id, COUNT(*) as n FROM Likes GROUP BY object_id) lc ON lc.object_id = o.id
-    LEFT JOIN (SELECT object_id, COUNT(*) as n FROM Favorites GROUP BY object_id) fc ON fc.object_id = o.id
-    ${whereSql}
-    ORDER BY ${orderCol} ${order}
-    LIMIT ? OFFSET ?
-  `).bind(...params, limit, offset).all()
-
-  const out = (results || []).map((o: any) => ({
-    ...o,
-    content_url: `/api/objects/${o.id}`,
-  }))
-
-  c.header('X-Total-Count', String(total?.n || 0))
-  return c.json(out)
-})
 
 // (GET /users/:id/objects removed — denunciation protocol: no bulk
 // sweep of a user's assets. Case evidence is the only door.)
 
-admin.post('/objects/:id/delete', async (c) => {
-  const adminId = c.get('orbitId')
-  const id = c.req.param('id')
-  const obj = await c.env.DB.prepare('SELECT owner_id, mime_type FROM Objects WHERE id = ? AND is_public = 1').bind(id).first<{ owner_id: string; mime_type: string }>()
-  if (!obj) return c.json({ error: 'Object not found' }, 404)
-
-  if (obj.mime_type !== 'text/url' && c.env.BUCKET) {
-    try {
-      await c.env.BUCKET.delete(`objects/${id}`)
-    } catch (err) {
-      console.error(`[admin] Failed to delete blob for object ${id}:`, err)
-    }
-  }
-
-  await c.env.DB.prepare('DELETE FROM Favorites WHERE object_id = ?').bind(id).run()
-  await c.env.DB.prepare('DELETE FROM Recipients WHERE object_id = ?').bind(id).run()
-  await purgeObjectLikes(c.env.DB, id)
-  await c.env.DB.prepare('UPDATE TierMatches SET card_a = NULL WHERE card_a = ?').bind(id).run()
-  await c.env.DB.prepare('UPDATE TierMatches SET card_b = NULL WHERE card_b = ?').bind(id).run()
-  await c.env.DB.prepare('DELETE FROM Objects WHERE id = ?').bind(id).run()
-  await logAdminAction(c.env.DB, adminId, 'delete_object', { id, type: 'object' })
-
-  return c.json({ success: true, deleted: id })
-})
-
-// Redact a submitted object: wipe the blob, thumbnail refs and caption while
-// keeping the row (recipients/history stay intact so the poster can be traced).
-admin.post('/objects/:id/redact', async (c) => {
-  const adminId = c.get('orbitId')
-  const id = c.req.param('id')
-  const obj = await c.env.DB.prepare('SELECT mime_type FROM Objects WHERE id = ? AND is_public = 1').bind(id).first<{ mime_type: string }>()
-  if (!obj) return c.json({ error: 'Object not found' }, 404)
-
-  if (obj.mime_type !== 'text/url' && c.env.BUCKET) {
-    try {
-      await c.env.BUCKET.delete(`objects/${id}`)
-    } catch (err) {
-      console.error(`[admin] Failed to delete redacted blob for object ${id}:`, err)
-    }
-  }
-
-  await c.env.DB
-    .prepare("UPDATE Objects SET content_url = NULL, caption = 'REDACTED BY ADMIN', mime_type = 'text/redacted', size_bytes = 0 WHERE id = ?")
-    .bind(id)
-    .run()
-  await logAdminAction(c.env.DB, adminId, 'redact_object', { id, type: 'object' })
-
-  return c.json({ success: true, redacted: id })
-})
 
 // ─── Unified content reports queue (ContentReports) ───────────────────────
 // Every report (post, story, lobby image, comment, PM, chat, card, user)
@@ -1762,16 +1490,12 @@ admin.post('/users/:id/adjust', async (c) => {
     finalReputation = Number(user.score_total || 0)
   }
 
-  await c.env.DB.prepare(`
-    UPDATE Users
-    SET score = ?, score_total = ?, likes_received = ?, followers_count = ?, is_moderator = ?, is_admin = ?
-    WHERE id = ?
-  `).bind(newScore, finalReputation, newLikes, newFollowers, newModerator, newAdmin, userId).run()
-
-  await logAdminAction(c.env.DB, orbitId, 'adjust_user', { id: userId, type: 'user' }, `score=${newScore} reputation=${finalReputation} likes=${newLikes} followers=${newFollowers} mod=${newModerator}`)
-
-  // Wallet (g$) adjustments go through the authoritative economy so they are
-  // ledgered and audited, never written directly.
+  // The wallet (g$) is the FALLIBLE half of this adjustment: a debit can be
+  // refused for insufficient funds. It runs FIRST, so a refusal cannot leave
+  // a half-applied adjustment behind. This used to update the Users row
+  // (score, reputation, likes, followers, moderator, admin) and THEN debit
+  // the wallet — so a 409 "Insufficient wallet funds" was a lie: the score
+  // and the admin flag had already been committed.
   let balance: number | null = null
   if (gcoinsDelta !== undefined && gcoinsDelta !== 0) {
     const economy = new EconomyService(c.env.DB)
@@ -1789,6 +1513,17 @@ admin.post('/users/:id/adjust', async (c) => {
       }
     }
     balance = await economy.getBalance(userId)
+  }
+
+  await c.env.DB.prepare(`
+    UPDATE Users
+    SET score = ?, score_total = ?, likes_received = ?, followers_count = ?, is_moderator = ?, is_admin = ?
+    WHERE id = ?
+  `).bind(newScore, finalReputation, newLikes, newFollowers, newModerator, newAdmin, userId).run()
+
+  await logAdminAction(c.env.DB, orbitId, 'adjust_user', { id: userId, type: 'user' }, `score=${newScore} reputation=${finalReputation} likes=${newLikes} followers=${newFollowers} mod=${newModerator}`)
+
+  if (balance !== null) {
     await logAdminAction(c.env.DB, orbitId, 'adjust_wallet', { id: userId, type: 'user' }, `gcoins_delta=${gcoinsDelta} balance=${balance}`)
   }
 
@@ -1811,7 +1546,7 @@ admin.post('/users/:id/adjust', async (c) => {
 admin.post('/database/clean-posts', async (c) => {
   const orbitId = c.get('orbitId')
 
-  await c.env.DB.batch([
+  await c.env.DB.atomicBatch([
     c.env.DB.prepare('DELETE FROM CommentLikes'),
     c.env.DB.prepare('DELETE FROM Comments'),
     c.env.DB.prepare('DELETE FROM PostLikes'),
@@ -1911,7 +1646,15 @@ admin.patch('/announcements/:id/toggle', async (c) => {
   const current = (await c.env.DB.prepare('SELECT is_active FROM Announcements WHERE id = ?').bind(id).first()) as { is_active: number } | null
   if (!current) return c.json({ error: 'Announcement not found' }, 404)
 
-  const nextStatus = current.is_active ? 0 : 1
+  // Honour the requested state when the client sends one; otherwise flip.
+  // The panel sends the state it wants (`!ann.is_active`), and used to have
+  // it ignored — the route only ever flipped, so the two disagreed about
+  // what "toggle" meant.
+  const body = await c.req.json().catch(() => ({} as unknown))
+  const requested = (body as { is_active?: unknown })?.is_active
+  const nextStatus = typeof requested === 'boolean'
+    ? (requested ? 1 : 0)
+    : (current.is_active ? 0 : 1)
   if (nextStatus === 1) {
     await c.env.DB.prepare('UPDATE Announcements SET is_active = 0').run()
   }
@@ -1995,39 +1738,6 @@ admin.put('/settings/discord-invite', async (c) => {
   return c.json({ success: true, url })
 })
 
-admin.get('/settings/store-prices', async (c) => {
-  const row = await c.env.DB.prepare("SELECT value FROM SystemMeta WHERE key = 'store_prices'").bind().first() as { value: string } | null
-  let prices: Record<string, number> = {}
-  if (row?.value) {
-    try {
-      prices = JSON.parse(row.value)
-    } catch { }
-  }
-  return c.json({ prices })
-})
-
-admin.put('/settings/store-prices', async (c) => {
-  const adminId = c.get('orbitId')
-  const prices: Record<string, number> = {}
-  try {
-    const body = await c.req.json()
-    if (body?.prices && typeof body.prices === 'object') {
-      for (const [k, v] of Object.entries(body.prices)) {
-        const num = Number(v)
-        if (!isNaN(num) && num >= 0) {
-          prices[k] = Math.floor(num)
-        }
-      }
-    }
-  } catch { }
-
-  const serialized = JSON.stringify(prices)
-  await c.env.DB.prepare("INSERT INTO SystemMeta (key, value) VALUES ('store_prices', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
-    .bind(serialized).run()
-  await logAdminAction(c.env.DB, adminId, 'set_store_prices', null, serialized)
-
-  return c.json({ success: true, prices })
-})
 
 // Economy cashout rate (inflation). Controls how many g$ a card is worth when
 // cashed out. Stored in basis points and clamped server-side to legal bounds.
@@ -2051,360 +1761,6 @@ admin.put('/settings/economy', async (c) => {
   return c.json({ success: true, cashoutRateBps: rateBps })
 })
 
-// ─── Lootbox management: admins create + individually release lootboxes ───
-
-admin.get('/settings/lootboxes', async (c) => {
-  const lootboxes = await listLootboxes(c.env.DB)
-  return c.json({ lootboxes })
-})
-
-admin.post('/settings/lootboxes', async (c) => {
-  const adminId = c.get('orbitId')
-  let body: any = {}
-  try { body = await c.req.json() } catch {}
-  const name = String(body?.name || '').trim()
-  if (!name) return c.json({ error: 'name is required' }, 400)
-  const id = body?.id && typeof body.id === 'string' && body.id.trim() ? body.id.trim() : crypto.randomUUID()
-  const cost = Math.max(0, Math.floor(Number(body?.cost) || 0))
-  const cardCount = Math.min(Math.max(1, Math.floor(Number(body?.card_count) || 3)), 20)
-  const rarityTheme = String(body?.rarity_theme || 'rare')
-  const icon = body?.icon ? String(body.icon) : 'Sparkles'
-  const badge = body?.badge ? String(body.badge) : null
-  const desc = body?.desc ? String(body.desc).slice(0, 500) : null
-  const tags = normalizeTags(body?.tags)
-  const drawConfig = normalizeDrawConfig(body?.draw_config)
-  const state: LootboxState = isValidState(body?.state) ? body.state : (body?.released ? 'released' : 'draft')
-  const released = state === 'released' ? 1 : 0
-  const nowIso = new Date().toISOString()
-
-  await c.env.DB
-    .prepare('INSERT INTO Lootboxes (id, name, desc, cost, card_count, rarity_theme, icon, badge, released, state, tags, draw_config, version, released_at, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)')
-    .bind(id, name, desc, cost, cardCount, rarityTheme, icon, badge, released, state, JSON.stringify(tags), JSON.stringify(drawConfig), state === 'released' ? nowIso : null, adminId)
-    .run()
-  await logAdminAction(c.env.DB, adminId, 'create_lootbox', { id, type: 'lootbox' }, `${name} (state=${state})`)
-
-  return c.json({ success: true, id, state, tags })
-})
-
-admin.patch('/settings/lootboxes/:id', async (c) => {
-  const adminId = c.get('orbitId')
-  const id = c.req.param('id')
-  let body: any = {}
-  try { body = await c.req.json() } catch {}
-  const existing = await getLootbox(c.env.DB, id)
-  if (!existing) return c.json({ error: 'Lootbox not found' }, 404)
-
-  const name = body?.name !== undefined ? String(body.name).trim() || existing.name : existing.name
-  const desc = body?.desc !== undefined ? (body.desc ? String(body.desc).slice(0, 500) : null) : existing.desc
-  const cost = body?.cost !== undefined ? Math.max(0, Math.floor(Number(body.cost))) : existing.cost
-  const cardCount = body?.card_count !== undefined ? Math.min(Math.max(1, Math.floor(Number(body.card_count))), 20) : existing.card_count
-  const rarityTheme = body?.rarity_theme !== undefined ? String(body.rarity_theme) : existing.rarity_theme
-  const icon = body?.icon !== undefined ? String(body.icon) : existing.icon
-  const badge = body?.badge !== undefined ? (body.badge ? String(body.badge) : null) : existing.badge
-  const tags = body?.tags !== undefined ? normalizeTags(body.tags) : existing.tags
-  const drawConfig = body?.draw_config !== undefined ? normalizeDrawConfig(body.draw_config) : existing.draw_config
-
-  // Explicit `state` wins, else the legacy `released` boolean maps to a state.
-  let nextState: LootboxState = existing.state
-  if (isValidState(body?.state)) nextState = body.state
-  else if (typeof body?.released === 'boolean') nextState = body.released ? 'released' : 'draft'
-
-  if (existing.state === 'archived' && nextState !== 'archived') {
-    return c.json({ error: 'Archived lootboxes are immutable' }, 409)
-  }
-
-  const transition = stateTransition(existing.state, nextState)
-  const released = transition ? transition.released : (nextState === 'released' ? 1 : 0)
-  const releasedAt = transition ? transition.released_at : existing.released_at
-  const archivedAt = transition ? transition.archived_at : existing.archived_at
-  const version = transition && nextState === 'released' ? existing.version + 1 : existing.version
-
-  await c.env.DB
-    .prepare('UPDATE Lootboxes SET name = ?, desc = ?, cost = ?, card_count = ?, rarity_theme = ?, icon = ?, badge = ?, released = ?, state = ?, tags = ?, draw_config = ?, version = ?, released_at = ?, archived_at = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-    .bind(name, desc, cost, cardCount, rarityTheme, icon, badge, released, nextState, JSON.stringify(tags), JSON.stringify(drawConfig), version, releasedAt, archivedAt, adminId, id)
-    .run()
-  await logAdminAction(c.env.DB, adminId, 'update_lootbox', { id, type: 'lootbox' }, `state=${nextState}`)
-
-  return c.json({ success: true, state: nextState, tags, version })
-})
-
-admin.delete('/settings/lootboxes/:id', async (c) => {
-  const adminId = c.get('orbitId')
-  const id = c.req.param('id')
-  const existing = await getLootbox(c.env.DB, id)
-  if (!existing) return c.json({ error: 'Lootbox not found' }, 404)
-  // Archive instead of hard-delete so already-purchased inventory stays openable.
-  await c.env.DB
-    .prepare("UPDATE Lootboxes SET state = 'archived', released = 0, archived_at = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-    .bind(new Date().toISOString(), adminId, id)
-    .run()
-  await logAdminAction(c.env.DB, adminId, 'archive_lootbox', { id, type: 'lootbox' })
-  return c.json({ success: true })
-})
-
-// ─── Bot & Image API Configuration & Connection Diagnostics ───
-
-admin.get('/bot-config', async (c) => {
-  const config = await getBotConfig(c.env.DB)
-  return c.json(config)
-})
-
-admin.put('/bot-config', async (c) => {
-  const adminId = c.get('orbitId')
-  let body: any = {}
-  try {
-    body = await c.req.json()
-  } catch { }
-
-  const configUpdates: any = {}
-  if (Array.isArray(body.providers)) {
-    const providers = body.providers.map((p: any, idx: number) => ({
-      id: p.id || `prov_${idx + 1}`,
-      name: p.name || `API Provider ${idx + 1}`,
-      providerType: p.providerType || 'generic',
-      url: (p.url || '').trim(),
-      apiKey: (p.apiKey || '').trim(),
-      userId: (p.userId || '').trim(),
-      customHeaders: p.customHeaders || {},
-      tags: Array.isArray(p.tags)
-        ? p.tags
-        : typeof p.tags === 'string'
-          ? p.tags.split(/[\n,]+/).map((t: string) => t.trim()).filter(Boolean)
-          : [],
-      enabled: p.enabled !== false,
-      weight: typeof p.weight === 'number' ? p.weight : 10,
-    }))
-
-    // Reject providers that point at localhost / private / metadata endpoints.
-    for (const provider of providers) {
-      if (!provider.url) continue
-      const check = validateProviderUrl(provider.url)
-      if (!check.ok) {
-        return c.json({ error: `Provider "${provider.name}": ${check.error}` }, 400)
-      }
-    }
-
-    configUpdates.providers = providers
-  }
-  if (typeof body.apiUrl === 'string') configUpdates.apiUrl = body.apiUrl.trim()
-  if (typeof body.apiKey === 'string') configUpdates.apiKey = body.apiKey.trim()
-  if (typeof body.userId === 'string') configUpdates.userId = body.userId.trim()
-  if (Array.isArray(body.tags)) configUpdates.tags = body.tags
-  else if (typeof body.tags === 'string') configUpdates.tags = body.tags.split(/[\n,]+/).map((t: string) => t.trim()).filter(Boolean)
-  if (Array.isArray(body.names)) configUpdates.names = body.names
-  else if (typeof body.names === 'string') configUpdates.names = body.names.split(/[\n,]+/).map((n: string) => n.trim()).filter(Boolean)
-  if (typeof body.enabled === 'boolean') configUpdates.enabled = body.enabled
-
-  // Activation/fallback/model settings the admin panel sends must survive the
-  // round trip (previously accepted by the UI but discarded by this route).
-  const ALLOWED_RULES = new Set(['immediate', 'fallback', 'manual_only', 'disabled'])
-  if (typeof body.activationRule === 'string') {
-    const rule = String(body.activationRule).trim()
-    if (!ALLOWED_RULES.has(rule)) {
-      return c.json({ error: 'Invalid activationRule' }, 400)
-    }
-    configUpdates.activationRule = rule
-  }
-  if (body.fallbackSeconds !== undefined) {
-    const seconds = Number(body.fallbackSeconds)
-    if (!Number.isFinite(seconds)) {
-      return c.json({ error: 'fallbackSeconds must be a number' }, 400)
-    }
-    configUpdates.fallbackSeconds = Math.max(0, Math.floor(seconds))
-  }
-  if (Array.isArray(body.models)) {
-    configUpdates.models = body.models.map((m: any) => String(m).trim()).filter(Boolean)
-  } else if (typeof body.models === 'string') {
-    configUpdates.models = body.models.split(/[\n,]+/).map((m: string) => m.trim()).filter(Boolean)
-  }
-
-  await saveBotConfig(c.env.DB, configUpdates)
-  await logAdminAction(c.env.DB, adminId, 'update_bot_config', null, JSON.stringify({
-    providersCount: configUpdates.providers?.length,
-    enabled: configUpdates.enabled,
-  }))
-
-  const updated = await getBotConfig(c.env.DB)
-  return c.json({ success: true, config: updated })
-})
-
-admin.post('/bot-config/test', async (c) => {
-  let body: any = {}
-  try {
-    body = await c.req.json()
-  } catch { }
-
-  const current = await getBotConfig(c.env.DB)
-  const provider = body.provider || body
-  const apiUrl = (typeof provider.url === 'string' && provider.url.trim())
-    ? provider.url.trim()
-    : (typeof body.apiUrl === 'string' && body.apiUrl.trim())
-      ? body.apiUrl.trim()
-      : (current.providers[0]?.url || current.apiUrl || 'https://api.waifu.im/search')
-
-  const apiKey = provider.apiKey !== undefined
-    ? String(provider.apiKey).trim()
-    : body.apiKey !== undefined
-      ? String(body.apiKey).trim()
-      : (current.providers[0]?.apiKey || current.apiKey || '')
-
-  const userId = provider.userId !== undefined
-    ? String(provider.userId).trim()
-    : body.userId !== undefined
-      ? String(body.userId).trim()
-      : (current.providers[0]?.userId || current.userId || '')
-
-  const providerType = provider.providerType || body.providerType
-
-  const tags = Array.isArray(provider.tags)
-    ? provider.tags
-    : typeof provider.tags === 'string'
-      ? provider.tags.split(/[\n,]+/).map((t: string) => t.trim()).filter(Boolean)
-      : Array.isArray(body.tags)
-        ? body.tags
-        : typeof body.tags === 'string'
-          ? body.tags.split(/[\n,]+/).map((t: string) => t.trim()).filter(Boolean)
-          : (current.providers[0]?.tags || current.tags || [])
-
-  const testResult = await testBotApi(
-    {
-      url: apiUrl,
-      apiKey,
-      userId,
-      providerType,
-      tags,
-    },
-    apiKey,
-    tags,
-    userId,
-    providerType
-  )
-
-  return c.json(testResult)
-})
-
-admin.post('/bot-config/sync-images', async (c) => {
-  let body: any = {}
-  try { body = await c.req.json() } catch { }
-  const playerTags = Array.isArray(body.tags) ? body.tags : undefined
-  const cached = await refreshBotImageCache(c.env.DB, 20, playerTags)
-  await logAdminAction(c.env.DB, c.get('orbitId'), 'bot_sync_images', { type: 'bot_config' }, `cached=${cached.length}`)
-  return c.json({ success: true, cachedCount: cached.length, samples: cached.slice(0, 5).map(c => c.url) })
-})
-
-// ─── Persistent Bot Duelist Profiles ───
-// Each bot is an independently editable identity (name, tags, picture) backed
-// by the Bots table. Pictures are resolved from the bot's own tags against the
-// configured booru providers, or set manually. Every write also syncs the bot's
-// Users row so its name/tags/picture are visible in the roster and matches.
-
-function sanitizeBotTags(raw: unknown): string[] {
-  if (Array.isArray(raw)) {
-    return raw.map((t) => String(t).trim().replace(/^#/, '').toLowerCase()).filter(Boolean)
-  }
-  if (typeof raw === 'string') {
-    return raw.split(/[\n,]+/).map((t) => t.trim().replace(/^#/, '').toLowerCase()).filter(Boolean)
-  }
-  return []
-}
-
-admin.get('/bots', async (c) => {
-  const bots = await getBotProfiles(c.env.DB)
-  return c.json({ bots })
-})
-
-admin.post('/bots', async (c) => {
-  const adminId = c.get('orbitId')
-  let body: any = {}
-  try { body = await c.req.json() } catch { }
-
-  const name = typeof body.name === 'string' ? body.name.trim().slice(0, 32) : ''
-  if (!name) return c.json({ error: 'name is required' }, 400)
-
-  const tags = sanitizeBotTags(body.tags)
-  const rawId = typeof body.id === 'string' && body.id.trim()
-    ? body.id.trim().toLowerCase().replace(/[^a-z0-9_]/g, '').replace(/^bot_/, '')
-    : crypto.randomUUID()
-  const id = `bot_${rawId}`
-
-  const saved = await saveBotProfile(c.env.DB, {
-    id,
-    name,
-    tags,
-    color: typeof body.color === 'string' && body.color.trim() ? body.color.trim() : null,
-    enabled: body.enabled !== false,
-  })
-  await ensureBotReady(c.env.DB, { id: saved.id, name: saved.name, tags: saved.tags, col: saved.color || '', pfp_url: saved.pfp_url })
-  await logAdminAction(c.env.DB, adminId, 'create_bot', { id: saved.id }, JSON.stringify({ name, tags }))
-  return c.json({ success: true, bot: saved }, 201)
-})
-
-admin.put('/bots/:id', async (c) => {
-  const adminId = c.get('orbitId')
-  const id = c.req.param('id') || ''
-  const existing = await c.env.DB.prepare('SELECT id FROM Bots WHERE id = ?').bind(id).first()
-  if (!existing) return c.json({ error: 'Bot not found' }, 404)
-
-  let body: any = {}
-  try { body = await c.req.json() } catch { }
-
-  const updates: any = {}
-  if (typeof body.name === 'string' && body.name.trim()) updates.name = body.name.trim().slice(0, 32)
-  if (body.tags !== undefined) updates.tags = sanitizeBotTags(body.tags)
-  if (body.color !== undefined) updates.color = typeof body.color === 'string' && body.color.trim() ? body.color.trim() : null
-  if (body.enabled !== undefined) updates.enabled = Boolean(body.enabled)
-  if (body.pfp_url !== undefined) updates.pfp_url = typeof body.pfp_url === 'string' && body.pfp_url.trim() ? body.pfp_url.trim() : null
-
-  const saved = await saveBotProfile(c.env.DB, { id, ...updates })
-  await ensureBotReady(c.env.DB, { id: saved.id, name: saved.name, tags: saved.tags, col: saved.color || '', pfp_url: saved.pfp_url })
-
-  // A disabled bot must not sit in the queue — purge it from LobbyPlayers so
-  // it never appears as an eternally-waiting entry (and can't be paired).
-  if (updates.enabled === false) {
-    await c.env.DB.prepare("DELETE FROM LobbyPlayers WHERE user_id = ?").bind(id).run().catch(() => {})
-  }
-
-  await logAdminAction(c.env.DB, adminId, 'update_bot', { id }, JSON.stringify(updates))
-  return c.json({ success: true, bot: saved })
-})
-
-admin.delete('/bots/:id', async (c) => {
-  const adminId = c.get('orbitId')
-  const id = c.req.param('id') || ''
-  const existing = await c.env.DB.prepare('SELECT id, enabled FROM Bots WHERE id = ?').bind(id).first<{ id: string; enabled: number }>()
-  if (!existing) return c.json({ error: 'Bot not found' }, 404)
-
-  // Keep the arcade duelist pool from ever emptying entirely. Only an enabled
-  // bot that is the sole remaining enabled one is protected — deleting a
-  // disabled bot never reduces the active pool.
-  if (Number(existing.enabled ?? 0) === 1) {
-    const countRow = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM Bots WHERE enabled = 1').first<{ n: number }>()
-    if (Number(countRow?.n ?? 0) <= 1) {
-      return c.json({ error: 'Cannot delete the last enabled bot' }, 409)
-    }
-  }
-
-  const removed = await deleteBotProfile(c.env.DB, id)
-  if (!removed) return c.json({ error: 'Bot not found' }, 404)
-  await logAdminAction(c.env.DB, adminId, 'delete_bot', { id }, null)
-  return c.json({ success: true })
-})
-
-// Regenerate a bot's picture from its tags (or persist an admin-supplied URL).
-admin.post('/bots/:id/picture', async (c) => {
-  const adminId = c.get('orbitId')
-  const id = c.req.param('id') || ''
-  let body: any = {}
-  try { body = await c.req.json() } catch { }
-  const customUrl = typeof body.customUrl === 'string' && body.customUrl.trim() ? body.customUrl.trim() : ''
-
-  const result = await generateBotPicture(c.env.DB, id, customUrl || undefined)
-  if (!result.ok) return c.json({ error: result.error }, 400)
-
-  await ensureBotReady(c.env.DB, { id: result.bot.id, name: result.bot.name, tags: result.bot.tags, col: result.bot.color || '', pfp_url: result.bot.pfp_url })
-  await logAdminAction(c.env.DB, adminId, 'refresh_bot_picture', { id }, JSON.stringify({ url: result.bot.pfp_url }))
-  return c.json({ success: true, bot: result.bot })
-})
 
 // Trigger explicit maintenance sweep & vacuum
 admin.post('/cleanup', async (c) => {
@@ -2613,33 +1969,6 @@ admin.delete('/chat/messages/:channel/:id', async (c) => {
 
   await logAdminAction(c.env.DB, adminId, 'delete_chat_message', { id, type: channel })
   return c.json({ ok: true })
-})
-
-admin.delete('/chat/:id', async (c) => {
-  const adminId = c.get('orbitId')
-  const id = c.req.param('id')
-  await c.env.DB.prepare('DELETE FROM LobbyChat WHERE id = ?').bind(id).run()
-  broadcastToRoom('lobby', { type: 'lobby-chat', action: 'delete', message_id: id })
-  broadcastToRoom('global', { type: 'lobby-chat', action: 'delete', message_id: id })
-  await logAdminAction(c.env.DB, adminId, 'delete_chat_message', { id, type: 'chat_message' })
-  return c.json({ ok: true })
-})
-
-admin.post('/chat/:id/ban', async (c) => {
-  const adminId = c.get('orbitId')
-  const id = c.req.param('id')
-  const msg = await c.env.DB.prepare('SELECT sender_id FROM LobbyChat WHERE id = ?').bind(id).first<{ sender_id: string }>()
-  if (!msg) return c.json({ error: 'Message not found' }, 404)
-
-  const banId = crypto.randomUUID()
-  await c.env.DB.batch([
-    c.env.DB.prepare('INSERT OR REPLACE INTO Bans (id, user_id, reason, banned_by) VALUES (?, ?, ?, ?)').bind(banId, msg.sender_id, 'Inappropriate chat message', adminId),
-    c.env.DB.prepare('DELETE FROM LobbyChat WHERE sender_id = ?').bind(msg.sender_id),
-  ])
-  await deleteUserCascade(c.env.DB, msg.sender_id, { BUCKET: c.env.BUCKET })
-  broadcastToRoom('lobby', { type: 'user_banned', user_id: msg.sender_id })
-  await logAdminAction(c.env.DB, adminId, 'ban_user_chat', { id: msg.sender_id, type: 'user' }, 'Banned via chat moderation')
-  return c.json({ ok: true, banned_user_id: msg.sender_id })
 })
 
 // Public announcements endpoint for active announcement ticker

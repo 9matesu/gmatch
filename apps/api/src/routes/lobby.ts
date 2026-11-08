@@ -11,6 +11,7 @@ import { addPoints } from '../game'
 import { reportContent as serviceReportContent, ReportError } from '../reports'
 import { SPECIAL_MAX_TIER, SPECIAL_TIER_POINTS, SPECIAL_FINAL_POINTS, MIN_GAME_CARDS, matchEconomy } from '@orbit/shared'
 import { EconomyService } from '../economy'
+import { findDisplayName } from '../common/userLookup'
 
 type Bindings = {
   DB: D1Turso
@@ -154,8 +155,8 @@ lobby.get('/special', orbitAuth, async (c) => {
   await expireIdleSpecialMatches(c.env.DB)
   const decorate = async (match: any) => {
     const opponentId = match.user_a === userId ? match.user_b : match.user_a
-    const opponent = await c.env.DB.prepare('SELECT display_name FROM Users WHERE id = ?').bind(opponentId).first<{ display_name: string | null }>()
-    return { ...match, opponent_id: opponentId, opponent_name: opponent?.display_name?.trim() || 'Unknown User' }
+    const opponentName = (await findDisplayName(c.env.DB, opponentId))?.trim() || 'Unknown User'
+    return { ...match, opponent_id: opponentId, opponent_name: opponentName }
   }
   const active = await c.env.DB.prepare("SELECT * FROM TierMatches WHERE status = 'active' AND (user_a = ? OR user_b = ?) ORDER BY updated_at DESC")
     .bind(userId, userId).all<any>()
@@ -425,14 +426,14 @@ lobby.post('/match/:matchId/chat', orbitAuth, async (c) => {
     peerId = tm.user_a === orbitId ? tm.user_b : tm.user_a
   }
 
-  const user = await c.env.DB.prepare('SELECT display_name FROM Users WHERE id = ?').bind(orbitId).first<{ display_name: string | null }>()
+  const senderName = (await findDisplayName(c.env.DB, orbitId))?.trim() || 'Unknown User'
   const id = crypto.randomUUID()
   const createdAt = new Date().toISOString()
   const message = {
     id,
     match_id: matchId,
     sender_id: orbitId,
-    sender_name: user?.display_name?.trim() || 'Unknown User',
+    sender_name: senderName,
     body: text,
     created_at: createdAt,
   }
@@ -728,10 +729,10 @@ lobby.post('/chat', orbitAuth, async (c) => {
   if (!text) return c.json({ error: 'Message cannot be empty' }, 400)
 
   const channel = typeof body.channel === 'string' && body.channel ? body.channel : 'global_lobby'
-  const user = await c.env.DB.prepare('SELECT display_name FROM Users WHERE id = ?').bind(orbitId).first<{ display_name: string | null }>()
+  const senderName = (await findDisplayName(c.env.DB, orbitId))?.trim() || 'Unknown User'
   const id = typeof body.id === 'string' && body.id.length <= 64 ? body.id : crypto.randomUUID()
   const createdAt = new Date().toISOString()
-  const message = { id, sender_id: orbitId, sender_name: user?.display_name?.trim() || 'Unknown User', body: text, created_at: createdAt, channel }
+  const message = { id, sender_id: orbitId, sender_name: senderName, body: text, created_at: createdAt, channel }
   
   try {
     await c.env.DB.prepare(

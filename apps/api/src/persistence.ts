@@ -94,8 +94,6 @@ export async function restoreDb(db: Client, path: string): Promise<boolean> {
 
     await db.execute('DETACH DATABASE snap')
     attached = false
-    if (copied > 0) {
-    }
     return true
   } catch  {
     if (attached) {

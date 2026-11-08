@@ -33,7 +33,6 @@ CREATE TABLE IF NOT EXISTS Users (
   objects_sent_count INTEGER DEFAULT 0,
   gacha_downloads_received INTEGER DEFAULT 0,
   gacha_items_collected INTEGER DEFAULT 0,
-  maximum_gooner INTEGER DEFAULT 0,
   pc_domination_enabled INTEGER DEFAULT 0,
   pc_domination_settings TEXT DEFAULT '{}',
   is_admin INTEGER DEFAULT 0,

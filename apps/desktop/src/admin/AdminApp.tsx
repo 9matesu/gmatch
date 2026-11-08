@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 
 import { orbitFetch, getApiBaseUrl } from "../utils/api";
+import { adminApi } from "../utils/adminApi";
 import { useToast } from "../components/Toast";
 import { describePinFailure } from "./pinFailure";
 import { useConfirm } from "../components/ConfirmDialog";
@@ -219,12 +220,16 @@ export default function AdminPageClient({ identity: appIdentity }: { identity?: 
   const handleAction = useCallback(async (action: string, ...args: unknown[]) => {
     if (!identity || !pinVerified) return;
     try {
+      // ONE admin HTTP layer: every action goes through `adminApi`, which
+      // throws on a non-2xx response. The direct `orbitFetch` calls this
+      // replaces IGNORED the response status — a 403 or a 500 still toasted
+      // "<action> completed", so a failed moderation action reported success.
       switch (action) {
         case "forceEnd":
-          await orbitFetch(`/api/admin/matches/${args[0]}/end`, { method: "POST" }, identity);
+          await adminApi.forceEndMatch(identity, String(args[0]));
           break;
         case "cancel":
-          await orbitFetch(`/api/admin/matches/${args[0]}`, { method: "DELETE" }, identity);
+          await adminApi.cancelMatch(identity, String(args[0]));
           break;
         case "override": {
           const result = await confirm({
@@ -234,117 +239,96 @@ export default function AdminPageClient({ identity: appIdentity }: { identity?: 
             tone: "danger",
           });
           if (result) {
-            await orbitFetch(`/api/admin/matches/${args[0]}/result`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ result: args[1] }),
-            }, identity);
+            await adminApi.overrideMatchResult(identity, String(args[0]), String(args[1]));
           }
           break;
         }
         case "forceMatchup":
-          await orbitFetch("/api/admin/matches/force-all", { method: "POST" }, identity);
+          await adminApi.forceMatchup(identity);
           break;
         case "runCleanup":
-          await orbitFetch("/api/admin/cleanup", { method: "POST" }, identity);
+          await adminApi.triggerCleanup(identity);
           break;
         case "endTier":
-          await orbitFetch(`/api/admin/special-matches/${args[0]}/end`, { method: "POST" }, identity);
+          await adminApi.endTierMatch(identity, String(args[0]));
           break;
         case "closeRoom":
-          await orbitFetch(`/api/admin/rooms/${args[0]}/close`, { method: "POST" }, identity);
+          await adminApi.closeRoom(identity, String(args[0]));
           break;
         case "closeBabecock":
-          await orbitFetch(`/api/admin/babecock/${args[0]}/close`, { method: "POST" }, identity);
-          break;
-        case "viewArchive":
-          // Navigate to archive detail
+          await adminApi.closeBabecock(identity, String(args[0]));
           break;
         case "banUser":
           if (await confirm({ title: `Ban user ${args[0]}?`, description: "Ban this user and wipe/moderate their active content.", confirmLabel: "Ban User", tone: "danger" })) {
-            await orbitFetch(`/api/admin/users/${args[0]}/ban`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ reason: args[1] || "Admin inline moderation", wipe: true, scope: "all" }),
-            }, identity);
+            await adminApi.banUser(identity, String(args[0]), String(args[1] || "Admin inline moderation"), true, "all");
           }
           break;
         case "togglePostVisibility":
           {
             const post = args[0] as { id: string; hidden_at: string | null };
-            await orbitFetch(`/api/admin/posts/${post.id}/visibility`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ hidden: !post.hidden_at }),
-            }, identity);
+            await adminApi.togglePostVisibility(identity, post.id, !post.hidden_at);
           }
           break;
         case "deletePost":
           if (await confirm({ title: "Delete post?", description: "Permanently delete this public post.", confirmLabel: "Delete", tone: "danger" })) {
-            await orbitFetch(`/api/admin/posts/${args[0]}`, { method: "DELETE" }, identity);
+            await adminApi.deletePost(identity, String(args[0]));
           }
           break;
         case "deleteLobbyImage":
           if (await confirm({ title: "Delete lobby image?", description: "Removes the row and blob permanently.", confirmLabel: "Delete", tone: "danger" })) {
-            await orbitFetch(`/api/admin/lobby-images/${args[0]}`, { method: "DELETE" }, identity);
+            await adminApi.deleteLobbyImage(identity, String(args[0]));
           }
           break;
         case "unban":
-          await orbitFetch(`/api/admin/users/${args[0]}/unban`, { method: "POST" }, identity);
+          await adminApi.unbanUser(identity, String(args[0]));
           break;
         case "moderator":
-          await orbitFetch(`/api/admin/users/${args[0]}/moderator`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ is_moderator: args[1] }),
-          }, identity);
+          await adminApi.toggleModerator(identity, String(args[0]), Boolean(args[1]));
           break;
         case "admin":
-          await orbitFetch(`/api/admin/users/${args[0]}/adjust`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ is_admin: args[1] }),
-          }, identity);
+          await adminApi.adjustUser(identity, String(args[0]), { is_admin: args[1] });
           break;
         case "deleteUser":
-          if (await confirm({ title: `Delete user?`, description: "Permanently deletes the account and all content.", confirmLabel: "Delete", tone: "danger" })) {
-            await orbitFetch(`/api/admin/users/${args[0]}/delete`, { method: "POST" }, identity);
+          if (await confirm({ title: "Delete user?", description: "Permanently deletes the account and all content.", confirmLabel: "Delete", tone: "danger" })) {
+            await adminApi.deleteUser(identity, String(args[0]));
           }
           break;
         case "hideComment":
-          await orbitFetch(`/api/admin/lobby-comments/${args[0]}/hide`, { method: "POST" }, identity);
+          await adminApi.hideLobbyComment(identity, String(args[0]));
           break;
         case "unhideComment":
-          await orbitFetch(`/api/admin/lobby-comments/${args[0]}/unhide`, { method: "POST" }, identity);
+          await adminApi.unhideLobbyComment(identity, String(args[0]));
           break;
         case "deleteComment":
           if (await confirm({ title: "Delete comment?", description: "Permanently delete this comment.", confirmLabel: "Delete", tone: "danger" })) {
-            await orbitFetch(`/api/admin/lobby-comments/${args[0]}`, { method: "DELETE" }, identity);
+            await adminApi.deleteLobbyComment(identity, String(args[0]));
           }
           break;
         case "deleteChat":
           if (await confirm({ title: "Delete chat message?", description: "Permanently delete this message.", confirmLabel: "Delete", tone: "danger" })) {
-            await orbitFetch(`/api/admin/chat/messages/${args[0]}/${args[1]}`, { method: "DELETE" }, identity);
+            await adminApi.deleteChatMessage(identity, String(args[0]), String(args[1]));
           }
           break;
         case "moderateCard":
-          await orbitFetch(`/api/admin/cards/${args[0]}/moderation`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ moderation_state: args[1] }),
-          }, identity);
+          await adminApi.moderateCard(identity, String(args[0]), args[1] as "active" | "hidden" | "banned");
           break;
         case "toggleAnnouncement":
-          await orbitFetch(`/api/admin/announcements/${args[0]}/toggle`, { method: "PATCH" }, identity);
+          await adminApi.toggleAnnouncement(identity, String(args[0]), Boolean(args[1]));
           break;
         case "deleteAnnouncement":
           if (await confirm({ title: "Delete announcement?", description: "Permanently delete this announcement.", confirmLabel: "Delete", tone: "danger" })) {
-            await orbitFetch(`/api/admin/announcements/${args[0]}`, { method: "DELETE" }, identity);
+            await adminApi.deleteAnnouncement(identity, String(args[0]));
           }
           break;
         case "refresh":
           loadDashboardData();
           break;
+        default:
+          // An unknown action is a client bug, not a server error: say so
+          // instead of reporting success for something that never ran.
+          logger.error(`Unknown admin action: ${action}`);
+          toast(`Unknown action: ${action}`, "error");
+          return;
       }
       toast(`${action} completed`, "success");
     } catch (err) {

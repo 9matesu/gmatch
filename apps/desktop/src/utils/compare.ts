@@ -38,7 +38,6 @@ const USER_ECONOMY_FIELDS = [
   'followers_count',
   'following_count',
   'is_private',
-  'maximum_gooner',
 ] as const satisfies readonly (keyof User)[];
 
 /**

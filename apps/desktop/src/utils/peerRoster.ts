@@ -47,7 +47,6 @@ export function mergeRoster(
       display_name: u.display_name || known.display_name,
       pfp_url: u.pfp_url ?? known.pfp_url,
       score: u.score ?? known.score,
-      maximum_gooner: u.maximum_gooner ?? known.maximum_gooner,
       tags: u.tags && u.tags.length > 0 ? u.tags : known.tags,
       online: true,
       last_seen: sighting,

@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import app from '../index'
 import { createTestIdentity, signRequestHeaders, createMockEnv } from '../test-utils'
-import { saveBotConfig } from '../bot-image-api'
 
 const alice = createTestIdentity()
 const bob = createTestIdentity()
@@ -49,7 +48,6 @@ describe('Slideshows API', () => {
 
   beforeAll(async () => {
     env = await createMockEnv()
-    await saveBotConfig(env.DB, { enabled: false })
     await registerUser(env, alice)
     await registerUser(env, bob)
     cardId = await createCardObject(env, alice)
@@ -93,44 +91,29 @@ describe('Slideshows API', () => {
     expect(bobGet.status).toBe(404)
   })
 
-  it('creates an api slideshow and returns an items array (empty when providers disabled)', async () => {
-    const body = JSON.stringify({ title: 'Tag feed', source: 'api', tags: ['scenery'] })
+  it('rejects sources outside the supported set', async () => {
+    // The server fetches no media itself: a slideshow is a playlist of the
+    // caller's own cards/posts. Anything else (including the retired 'api'
+    // tag feed) is refused.
+    for (const source of ['api', 'nope']) {
+      const body = JSON.stringify({ source, items: [{ object_id: cardId }] })
+      const res = await app.request('/api/slideshows', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders(alice, 'POST', '/api/slideshows', body) },
+        body,
+      }, env)
+      expect(res.status).toBe(400)
+    }
+  })
+
+  it('requires at least one item', async () => {
+    const body = JSON.stringify({ source: 'cards', items: [] })
     const res = await app.request('/api/slideshows', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders(alice, 'POST', '/api/slideshows', body) },
       body,
     }, env)
-    expect(res.status).toBe(200)
-    const json: any = await res.json()
-    expect(json.slideshow.source).toBe('api')
-    expect(json.slideshow.tags).toContain('scenery')
-
-    const itemsRes = await app.request(`/api/slideshows/${json.slideshow.id}/items`, {
-      headers: authHeaders(alice, 'GET', `/api/slideshows/${json.slideshow.id}/items`),
-    }, env)
-    expect(itemsRes.status).toBe(200)
-    expect(Array.isArray((await itemsRes.json()).items)).toBe(true)
-  })
-
-  it('stores tags verbatim and still rejects invalid sources', async () => {
-    // Client-side filtering only: the server accepts any tags (blocking
-    // happens in the desktop client via shared/blocklist.json).
-    const anyTags = JSON.stringify({ source: 'api', tags: ['loli'] })
-    const res = await app.request('/api/slideshows', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders(alice, 'POST', '/api/slideshows', anyTags) },
-      body: anyTags,
-    }, env)
-    expect(res.status).toBe(200)
-    expect((await res.json()).slideshow.tags).toContain('loli')
-
-    const badSource = JSON.stringify({ source: 'nope', items: [{ object_id: cardId }] })
-    const res2 = await app.request('/api/slideshows', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders(alice, 'POST', '/api/slideshows', badSource) },
-      body: badSource,
-    }, env)
-    expect(res2.status).toBe(400)
+    expect(res.status).toBe(400)
   })
 
   it('deletes a slideshow owned by the caller', async () => {

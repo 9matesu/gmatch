@@ -14,20 +14,18 @@ import {
   X,
   Film,
   Image as ImageIcon,
-  Tag,
 } from 'lucide-react';
 
 interface SlideshowSummary {
   id: string;
   title: string | null;
-  source: 'cards' | 'posts' | 'both' | 'api';
-  tags: string[];
+  source: 'cards' | 'posts' | 'both';
   interval_ms: number;
   item_count: number;
   created_at: string;
 }
 
-type Source = 'cards' | 'posts' | 'both' | 'api';
+type Source = 'cards' | 'posts' | 'both';
 
 interface Candidate {
   id: string;
@@ -54,7 +52,6 @@ export function SlideshowManager({
   const [saving, setSaving] = useState(false);
   const [title, setTitle] = useState('');
   const [source, setSource] = useState<Source>('cards');
-  const [tags, setTags] = useState('');
   const [intervalMs, setIntervalMs] = useState(5000);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [playing, setPlaying] = useState<{ items: ResolvedItem[]; intervalMs: number } | null>(null);
@@ -105,15 +102,11 @@ export function SlideshowManager({
       source,
       interval_ms: intervalMs,
     };
-    if (source === 'api') {
-      body.tags = tags.split(/[\n,]+/).map((t) => t.trim()).filter(Boolean);
-    } else {
-      if (selected.size === 0) {
-        toast?.('Select at least one item', 'warning');
-        return;
-      }
-      body.items = Array.from(selected).map((object_id) => ({ object_id }));
+    if (selected.size === 0) {
+      toast?.('Select at least one item', 'warning');
+      return;
     }
+    body.items = Array.from(selected).map((object_id) => ({ object_id }));
     setSaving(true);
     try {
       const res = await orbitFetch('/api/slideshows', {
@@ -125,7 +118,6 @@ export function SlideshowManager({
         playPress(880);
         toast?.('Slideshow created', 'success');
         setTitle('');
-        setTags('');
         setSelected(new Set());
         setCreating(false);
         load();
@@ -171,7 +163,6 @@ export function SlideshowManager({
     cards: 'Cards',
     posts: 'Posts',
     both: 'Cards + Posts',
-    api: 'API Tags',
   };
 
   return (
@@ -223,45 +214,32 @@ export function SlideshowManager({
             ))}
           </div>
 
-          {source === 'api' ? (
-            <div className="flex items-center gap-2 bg-surface-interactive border border-border-glass rounded-lg px-3 py-2">
-              <Tag className="w-3.5 h-3.5 text-retro-muted" />
-              <input
-                type="text"
-                value={tags}
-                onChange={(e) => setTags(e.target.value)}
-                placeholder="Comma-separated tags (e.g. scenery, cyberpunk)"
-                className="flex-1 bg-transparent text-xs text-retro-fg placeholder:text-retro-muted outline-none"
-              />
+          <div>
+            <p className="text-xs text-retro-muted mb-2">
+              {selected.size} selected · {candidates.length} available
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-56 overflow-y-auto styled-scrollbar">
+              {candidates.map((c) => {
+                const isSelected = selected.has(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => toggleSelect(c.id)}
+                    className={`flex items-center gap-2 px-2 py-2 rounded-lg border text-left cursor-pointer transition-colors ${
+                      isSelected ? 'bg-surface-interactive border-retro-accent text-retro-fg' : 'bg-surface-interactive/40 border-border-glass text-retro-muted hover:text-retro-body border-transparent'
+                    }`}
+                  >
+                    {c.kind === 'post' ? <ImageIcon className="w-3.5 h-3.5 shrink-0" /> : <Film className="w-3.5 h-3.5 shrink-0" />}
+                    <span className="text-xs truncate">{c.label}</span>
+                  </button>
+                );
+              })}
+              {candidates.length === 0 && (
+                <p className="col-span-full text-xs text-retro-muted">No {sourceLabel[source]} available to select.</p>
+              )}
             </div>
-          ) : (
-            <div>
-              <p className="text-xs text-retro-muted mb-2">
-                {selected.size} selected · {candidates.length} available
-              </p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-56 overflow-y-auto styled-scrollbar">
-                {candidates.map((c) => {
-                  const isSelected = selected.has(c.id);
-                  return (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => toggleSelect(c.id)}
-                      className={`flex items-center gap-2 px-2 py-2 rounded-lg border text-left cursor-pointer transition-colors ${
-                        isSelected ? 'bg-surface-interactive border-retro-accent text-retro-fg' : 'bg-surface-interactive/40 border-border-glass text-retro-muted hover:text-retro-body'
-                      }`}
-                    >
-                      {c.kind === 'post' ? <ImageIcon className="w-3.5 h-3.5 shrink-0" /> : <Film className="w-3.5 h-3.5 shrink-0" />}
-                      <span className="text-xs truncate">{c.label}</span>
-                    </button>
-                  );
-                })}
-                {candidates.length === 0 && (
-                  <p className="col-span-full text-xs text-retro-muted">No {sourceLabel[source]} available to select.</p>
-                )}
-              </div>
-            </div>
-          )}
+          </div>
 
           <div className="flex items-center gap-3">
             <label className="text-xs text-retro-muted flex items-center gap-2">
@@ -293,14 +271,14 @@ export function SlideshowManager({
         {loading ? (
           <p className="text-xs text-retro-muted">Loading…</p>
         ) : list.length === 0 ? (
-          <p className="text-xs text-retro-muted">No slideshows yet. Create one from your gallery cards, posts, or API tags.</p>
+          <p className="text-xs text-retro-muted">No slideshows yet. Create one from your gallery cards or posts.</p>
         ) : (
           list.map((s) => (
             <div key={s.id} className="flex items-center justify-between gap-2 bg-surface-interactive/40 border border-border-glass rounded-lg px-3 py-2">
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-retro-fg truncate">{s.title || 'Untitled slideshow'}</p>
                 <p className="text-xs text-retro-muted">
-                  {sourceLabel[s.source]} · {s.source === 'api' ? (s.tags.join(', ') || 'default tags') : `${s.item_count} item${s.item_count === 1 ? '' : 's'}`}
+                  {sourceLabel[s.source]} · {s.item_count} item{s.item_count === 1 ? '' : 's'}
                 </p>
               </div>
               <div className="flex items-center gap-1 shrink-0">

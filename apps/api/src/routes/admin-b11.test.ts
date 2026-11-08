@@ -112,23 +112,4 @@ describe('Admin B11 suite — filters, sort, pagination', () => {
     })
   })
 
-  describe('objects endpoint', () => {
-    it('filters by owner', async () => {
-      const { body, total } = await get(`/api/admin/objects?owner=${userA.orbitId}`)
-      expect(total).toBe(3)
-      expect(body.every((o: any) => o.owner_id === userA.orbitId)).toBe(true)
-    })
-
-    it('searches by caption', async () => {
-      const { body, total } = await get(`/api/admin/objects?owner=${userA.orbitId}&q=card`)
-      expect(total).toBe(3)
-      expect(body.every((o: any) => o.owner_id === userA.orbitId)).toBe(true)
-    })
-
-    it('paginates and reports total', async () => {
-      const { body, total } = await get(`/api/admin/objects?owner=${userA.orbitId}&limit=2&offset=0`)
-      expect(total).toBe(3)
-      expect(body.length).toBe(2)
-    })
-  })
 })

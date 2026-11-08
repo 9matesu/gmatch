@@ -358,7 +358,7 @@ export function GalleryView({
               {Array.from({ length: 10 }).map((_, i) => <CardSkeleton key={i} />)}
             </div>
           ) : filteredItems.length === 0 ? (
-            <EmptyState title="No cards found" description="Upload images, battle in the duel arena, or open lootboxes to expand your deck!" />
+            <EmptyState title="No cards found" description="Forge a card from an image, or win one in the duel arena." />
           ) : (
             <>
               <div

@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
 import app from '../index'
 import { advanceLobby } from '../lobby'
-import { saveBotProfile } from '../bot-image-api'
 import { createTestIdentity, signRequestHeaders, createMockEnv } from '../test-utils'
 import type { TestIdentity } from '../test-utils'
 
@@ -94,15 +93,6 @@ describe('1v1 Match Hopper & Queue Lifecycle', () => {
     await register(playerA)
     await register(playerB)
     await register(playerC)
-
-    // Seed an enabled admin-managed duelist so bot fallback / Quick Match have
-    // a real opponent (bots now come only from the Bots table).
-    await saveBotProfile(env.DB, {
-      id: 'bot_queue_test',
-      name: 'Queue Test Bot',
-      tags: ['1girl', 'solo'],
-      enabled: true,
-    })
   })
 
   beforeEach(async () => {
@@ -110,7 +100,6 @@ describe('1v1 Match Hopper & Queue Lifecycle', () => {
     await env.DB.prepare('DELETE FROM LobbyPlayers').run()
     await env.DB.prepare('DELETE FROM Recipients').run()
     await env.DB.prepare('DELETE FROM Objects').run()
-    await env.DB.prepare("DELETE FROM SystemMeta WHERE key = 'bot_enabled'").run()
   })
 
   it('allows joining and leaving the lobby queue', async () => {
@@ -363,9 +352,7 @@ describe('1v1 Match Hopper & Queue Lifecycle', () => {
       .run()
   }
 
-  it('does NOT pair a lone queued player with a bot even after the wait elapses (bots removed from queue matching)', async () => {
-    // Bots would be enabled, but queue fallback pairing is removed.
-    await env.DB.prepare("INSERT INTO SystemMeta (key, value) VALUES ('bot_enabled', '1')").run()
+  it('keeps a lone queued player waiting for a human even after the wait elapses', async () => {
     await joinOneLonerAndAge(playerC)
     await advanceLobby(env.DB, Date.now())
 
@@ -379,10 +366,7 @@ describe('1v1 Match Hopper & Queue Lifecycle', () => {
     expect(lp.status).toBe('waiting')
   })
 
-  it('does NOT pair a lone queued player with a bot when bots are disabled — they keep waiting for a human', async () => {
-    // Disable the bot matchmaking switch in SystemMeta.
-    await env.DB.prepare("INSERT INTO SystemMeta (key, value) VALUES ('bot_enabled', '0')").run()
-
+  it('matches the waiting loner with the next human who joins', async () => {
     await joinOneLonerAndAge(playerC)
     await advanceLobby(env.DB, Date.now())
 
@@ -396,7 +380,7 @@ describe('1v1 Match Hopper & Queue Lifecycle', () => {
     const lp = await lobbyPlayer(playerC)
     expect(lp.status).toBe('waiting')
 
-    // Ticking forward again still does nothing while bots stay disabled.
+    // Ticking forward again still does nothing while nobody else is queued.
     await env.DB.prepare("UPDATE LobbyPlayers SET waiting_since = ? WHERE user_id = ?")
       .bind(new Date(Date.now() - 60_000).toISOString(), playerC.orbitId)
       .run()
@@ -408,8 +392,8 @@ describe('1v1 Match Hopper & Queue Lifecycle', () => {
     const lp2 = await lobbyPlayer(playerC)
     expect(lp2.status).toBe('waiting')
 
-    // Now a second human joins — regular human/human pairing must still work
-    // even while bots are disabled. The loner is matched with the newcomer.
+    // Now a second human joins — human/human pairing must still work.
+    // The loner is matched with the newcomer.
     for (let i = 0; i < 5; i++) await uploadCard(playerA)
     await app.request('/api/lobby/join', {
       method: 'POST',
@@ -425,8 +409,6 @@ describe('1v1 Match Hopper & Queue Lifecycle', () => {
     const opponents = new Set([matchRow3.user_a, matchRow3.user_b])
     expect(opponents.has(playerC.orbitId)).toBe(true)
     expect(opponents.has(playerA.orbitId)).toBe(true)
-    // No bot involved.
-    expect([...opponents].every((id) => !id.startsWith('bot_'))).toBe(true)
   })
 
   it('Quick Match bot path is DELETED (no bots for players, directive 2026-09-12)', async () => {

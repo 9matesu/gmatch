@@ -1709,6 +1709,32 @@ export default function Home() {
     }
   }, [identity, followingIds])
 
+  // ─── Attention ping ───
+  // The node keeps a 30-second "attention" flag on the CALLER: while it is
+  // set, the directory floats that player to the top of the roster. It is a
+  // self-ping ("I am here, look at me"), not a message to somebody else —
+  // there is no route that pings another player.
+  const pingAttention = useCallback(async () => {
+    if (!identity) return
+    try {
+      const res = await orbitFetch('/api/users/attention', { method: 'POST' }, identity)
+      const data: any = await res.json().catch(() => null)
+      if (res.ok) {
+        invalidateCache('/api/users')
+        void loadUsersRef.current?.()
+        toast('Pinged — you are at the top of the roster for 30s', 'success')
+        return
+      }
+      if (res.status === 429) {
+        toast(`Ping cooldown — ${Number(data?.cooldown_remaining || 0)}s left`, 'warning')
+        return
+      }
+      toast(data?.error || 'Could not ping', 'error')
+    } catch {
+      toast('Could not ping — the node is unreachable', 'error')
+    }
+  }, [identity, toast])
+
   const openUserNetwork = useCallback((userId: string, tab: 'followers' | 'following' = 'followers') => {
     // No `(u as any).orbitId` check here: OrbitId is a string alias and nothing
     // ever sets a separate `.orbitId` property, so it could only ever match the
@@ -5322,6 +5348,7 @@ export default function Home() {
                     onToggleFollow={selectedProfileUser.id === identity?.orbitId ? undefined : toggleFollowUser}
                     onBlockUser={selectedProfileUser.id === identity?.orbitId ? undefined : blockUser}
                     onReportUser={selectedProfileUser.id === identity?.orbitId ? undefined : (id, name) => openReportModal(id, name)}
+                    onPingAttention={selectedProfileUser.id === identity?.orbitId ? () => { void pingAttention() } : undefined}
                     onOpenFollowers={(tab) => setFollowersModalState({ isOpen: true, initialTab: tab, targetUserId: selectedProfileUser.id, targetName: selectedProfileUser.display_name || null })}
                     onCopyId={(id) => {
                       navigator.clipboard.writeText(id)

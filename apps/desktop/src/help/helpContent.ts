@@ -123,9 +123,8 @@ export const HELP_TOPICS: HelpTopic[] = [
       {
         heading: 'Where cards come from',
         bullets: [
-          'The 5 free starter cards.',
-          'Forge your own from a URL, up to 5 tags. The card shows VALUE TBD until it has been voted on enough to have a score.',
-          'Lootboxes in the Store, and the Community Market where players list and buy each other cards.',
+          'Forge your own from an image, up to 5 tags. The card shows VALUE TBD until it has been voted on enough to have a score.',
+          'The Community Market, where players list and buy each other cards.',
           'Gifts, which permanently transfer a card to you.',
         ],
       },

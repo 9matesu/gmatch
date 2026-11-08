@@ -7,8 +7,8 @@ pictures to earn **pts**, buy **tags** (parsed live from booru sources) that
 generate passive income and reshape your idle feed, buy images into your
 **Gallery**, pop **GoonCaps**, climb the **Pornification** ladder, and
 **Brainmelt** (prestige). Idle pts are a local-only currency (the save file);
-the server g$ ledger (`EconomyService`) backs duels, lootboxes, hacks and
-trades — two separate economies, no bridge between them.
+the server g$ ledger (`EconomyService`) backs duels, hacks and trades — two
+separate economies, no bridge between them.
 
 ## 0. Architecture (merge plan D1–D9)
 
@@ -103,8 +103,8 @@ trades — two separate economies, no bridge between them.
   Legacy saves migrate `gp`/`gc`/`totalEarnedGP`/`totalEarnedGc` →
   `points`/`totalEarned` (same value, renamed).
 - **g$** — the server ledger currency (`EconomyService` is authoritative):
-  duel stakes, lootboxes, hacks, trades, store purchases. Idle no longer
-  feeds it; you earn g$ through the shell's social/game loops only.
+  duel stakes, hacks, trades, store purchases. Idle no longer feeds it; you
+  earn g$ through the shell's social/game loops only.
 - **XP** — drives Pornification tier (never resets within a run).
 - **Corruption shards** — prestige currency, persists through Brainmelt.
 
@@ -485,6 +485,46 @@ offline earnings). Each +5% click power. Persist across prestige.
   who can act on it, and the report shows up in their notification centre
   ("X reported your post"). Node-hosted content keeps the node's moderation
   queue — the node that hosts the content moderates it.
+
+## 10f. Card & store economy — what actually exists (2026-11-08)
+
+Three subsystems were cut because they could never be used, not because they
+were hard to build. Every surface that mentioned them was removed with them.
+
+- **No lootboxes / packs.** The server's pack catalogue was unsellable: a
+  purchase granted inventory nobody could open, and the store copy said
+  "Buying retired". The `Lootboxes` table, its two migrations, the service,
+  the admin routes and the `'pack'` store category are gone.
+- **The store catalogue is exactly `STORE_ITEMS` from `@orbit/shared`** —
+  Screen Lock, Vision Jam, Flash Drop Broadcast. The node used to overlay
+  prices from `SystemMeta.store_prices`; that override is removed, so the
+  shared list is the single source of truth and the client and server can
+  never disagree about what a thing costs.
+- **No bot opponents.** The bot provider cluster (`bot-image-api.ts`,
+  `bots/`, `starter-deck.ts`, the shared booru client) fed a match system
+  whose only entry point was an admin force-match route. The whole cluster is
+  deleted, and a quick match now pairs humans or waits.
+- **No starter cards.** A new account owns no cards. Cards come from the
+  client forge (`POST /api/cards`) and the Community Market; the Help copy
+  says exactly that.
+- **The slideshow `'api'` source is gone.** A slideshow is a playlist of the
+  caller's own cards/posts; the server fetches no media itself.
+- **Attention ping.** `POST /api/users/attention` sets the CALLER's own
+  30-second attention flag, which floats that player to the top of the
+  roster. It is a self-ping ("I am here"), offered on your own profile only;
+  there is no route that pings another player.
+
+**Admin parity is enforced both ways** (`apps/desktop/src/admin/adminEndpointParity.test.ts`):
+every admin request the client makes must exist on the server with the SAME
+verb, and every admin route on the server must have a caller in the product
+— otherwise it is deleted. `POST /api/admin/verify-pin` is the sole
+public-by-design exception, and the gate proves structurally that it sits
+above the PIN guard and that nothing else escaped.
+
+**Writes are transactional.** `atomicBatch` is the only multi-statement write
+path; the old sequential `batch()` is gone. A request marked accepted without
+the friendship it implies (or a round without its entries) is worse than a
+failed write, so every batch is one transaction.
 
 ## 11. Save
 

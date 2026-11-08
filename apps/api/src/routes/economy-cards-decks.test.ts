@@ -234,7 +234,7 @@ describe('store purchase uses the g$ wallet', () => {
   })
 
   it('requires an Idempotency-Key', async () => {
-    const body = JSON.stringify({ item_id: 'item-pack-rare' })
+    const body = JSON.stringify({ item_id: 'item-hack-deny' })
     const res = await app.request('/api/users/store/purchase', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders(user, 'POST', '/api/users/store/purchase', body) },
@@ -244,7 +244,7 @@ describe('store purchase uses the g$ wallet', () => {
   })
 
   it('rejects purchase with an empty wallet', async () => {
-    const body = JSON.stringify({ item_id: 'item-pack-rare', idempotency_key: 'store-purchase-01' })
+    const body = JSON.stringify({ item_id: 'item-flash-drop', idempotency_key: 'store-purchase-01' })
     const res = await app.request('/api/users/store/purchase', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders(user, 'POST', '/api/users/store/purchase', body) },
@@ -257,7 +257,7 @@ describe('store purchase uses the g$ wallet', () => {
     const economy = new EconomyService(env.DB)
     await economy.credit(user.orbitId, 1000, { idempotencyKey: 'seed-store-funds', kind: 'grant' })
 
-    const body = JSON.stringify({ item_id: 'item-pack-rare', idempotency_key: 'store-purchase-02' })
+    const body = JSON.stringify({ item_id: 'item-flash-drop', idempotency_key: 'store-purchase-02' })
     const res = await app.request('/api/users/store/purchase', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders(user, 'POST', '/api/users/store/purchase', body) },
@@ -265,9 +265,9 @@ describe('store purchase uses the g$ wallet', () => {
     }, env)
     expect(res.status).toBe(200)
     const data: any = await res.json()
-    expect(data.balance).toBe(750)
+    expect(data.balance).toBe(0)
 
-    const inv = await env.DB.prepare('SELECT quantity FROM UserInventory WHERE user_id = ? AND item_id = ?').bind(user.orbitId, 'item-pack-rare').first<{ quantity: number }>()
+    const inv = await env.DB.prepare('SELECT quantity FROM UserInventory WHERE user_id = ? AND item_id = ?').bind(user.orbitId, 'item-flash-drop').first<{ quantity: number }>()
     expect(Number(inv?.quantity || 0)).toBe(1)
 
     // Replay: no double-charge, no double-grant.
@@ -280,8 +280,8 @@ describe('store purchase uses the g$ wallet', () => {
     const replayData: any = await replay.json()
     expect(replayData.replayed).toBe(true)
 
-    await expect(economy.getBalance(user.orbitId)).resolves.toBe(750)
-    const invAfter = await env.DB.prepare('SELECT quantity FROM UserInventory WHERE user_id = ? AND item_id = ?').bind(user.orbitId, 'item-pack-rare').first<{ quantity: number }>()
+    await expect(economy.getBalance(user.orbitId)).resolves.toBe(0)
+    const invAfter = await env.DB.prepare('SELECT quantity FROM UserInventory WHERE user_id = ? AND item_id = ?').bind(user.orbitId, 'item-flash-drop').first<{ quantity: number }>()
     expect(Number(invAfter?.quantity || 0)).toBe(1)
   })
 
@@ -372,17 +372,4 @@ describe('authorization gates', () => {
     expect(res.status).toBe(403)
   })
 
-  it('PUT /api/starter-deck/settings rejects non-admins', async () => {
-    const env = await createMockEnv()
-    const user = createTestIdentity()
-    await app.request('/api/users', { headers: authHeaders(user, 'GET', '/api/users') }, env)
-
-    const body = JSON.stringify({ provider_id: 'x', tags: 'y' })
-    const res = await app.request('/api/starter-deck/settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...authHeaders(user, 'PUT', '/api/starter-deck/settings', body) },
-      body,
-    }, env)
-    expect(res.status).toBe(403)
-  })
 })

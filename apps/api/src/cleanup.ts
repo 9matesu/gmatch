@@ -390,7 +390,7 @@ export async function maybeResetDailyScores(db: D1Turso, now: number = Date.now(
   // also swallowed the failure while the marker still moved.
   // (db.batch is a real transaction on D1/Turso; the embedded dev shim runs
   // statements sequentially, which is a weaker but still not-worse guarantee.)
-  await db.batch([
+  await db.atomicBatch([
     db.prepare('UPDATE Users SET score = 0'),
     db.prepare(
       "INSERT INTO SystemMeta (key, value) VALUES ('last_score_reset_at', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",

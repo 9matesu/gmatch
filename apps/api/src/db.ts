@@ -7,9 +7,18 @@ export interface D1Result {
 }
 
 export interface D1PreparedStatement {
+  /** The SQL text, so an atomic batch can take prepared statements directly. */
+  sql: string
+  /** The bound arguments, sanitized the same way the run path does. */
+  args: any[]
   run(): Promise<D1Result>
   first<T = any>(): Promise<T | null>
   all<T = any>(): Promise<{ results: T[] }>
+}
+
+/** A statement that can also be bound. */
+export interface D1Statement extends D1PreparedStatement {
+  bind(...args: any[]): D1PreparedStatement
 }
 
 // One statement in an atomic batch. `args` are sanitized the same way as the
@@ -69,52 +78,41 @@ export class D1Turso {
     }
   }
 
-  prepare(sql: string): {
-    bind(...args: any[]): D1PreparedStatement
-    run(): Promise<D1Result>
-    first<T = any>(): Promise<T | null>
-    all<T = any>(): Promise<{ results: T[] }>
-  } {
+  prepare(sql: string): D1Statement {
     const exec = async (args?: any[]) => {
       const cleanArgs = sanitizeArgs(args)
       const result = await this.exec(sql, cleanArgs)
       return { success: true, meta: { changes: result?.rowsAffected ?? 0 } }
     }
 
-    const getFirst = async <T>(args?: any[]): Promise<T | null> => {
+    const getFirst = async <T>(args?: any[]) => {
       const cleanArgs = sanitizeArgs(args)
       const result = await this.exec(sql, cleanArgs)
       return (result.rows[0] as T) || null
     }
 
-    const getAll = async <T>(args?: any[]): Promise<{ results: T[] }> => {
+    const getAll = async <T>(args?: any[]) => {
       const cleanArgs = sanitizeArgs(args)
       const result = await this.exec(sql, cleanArgs)
       return { results: (result?.rows || []) as T[] }
     }
 
+    const statement = (args: any[]): D1PreparedStatement => ({
+      sql,
+      args: sanitizeArgs(args),
+      run: () => exec(args),
+      first: <T>() => getFirst<T>(args),
+      all: <T>() => getAll<T>(args),
+    })
+
     return {
-      bind(...args: any[]): D1PreparedStatement {
-        return {
-          run: () => exec(args),
-          first: <T>() => getFirst<T>(args),
-          all: <T>() => getAll<T>(args),
-        }
-      },
+      sql,
+      args: [],
+      bind: (...args: any[]) => statement(args),
       run: () => exec(),
       first: <T>() => getFirst<T>(),
       all: <T>() => getAll<T>(),
     }
-  }
-
-  async batch(stmts: Array<{ run: () => Promise<D1Result> }>): Promise<D1Result[]> {
-    // The embedded libsql engine is stateful (single in-memory client), but
-    // running statements sequentially keeps batch semantics exact and simple.
-    const results: D1Result[] = []
-    for (const stmt of stmts) {
-      results.push(await stmt.run())
-    }
-    return results
   }
 
   // Atomic batch: executes all statements in a single write transaction on the
@@ -126,13 +124,19 @@ export class D1Turso {
   // gives genuine atomicity in the single-process event loop. Errors surface as
   // SqlError with the libsql base code preserved so callers can detect unique
   // constraint (idempotency) conflicts.
-  async atomicBatch(stmts: AtomicStatement[]): Promise<AtomicResult[]> {
+  //
+  // This is the ONLY multi-statement write path: a half-applied write (a
+  // round without its entries, a request marked accepted without the
+  // friendship) is worse than a failed one, so every batch is a transaction.
+  async atomicBatch(stmts: Array<AtomicStatement | D1PreparedStatement>): Promise<AtomicResult[]> {
     await ensureSchema(this.db)
+    const normalized = stmts.map((s) => (
+      Array.isArray((s as D1PreparedStatement).args)
+        ? { sql: (s as D1PreparedStatement).sql, args: (s as D1PreparedStatement).args }
+        : { sql: (s as AtomicStatement).sql, args: sanitizeArgs((s as AtomicStatement).args) }
+    ))
     try {
-      const results = await this.db.batch(
-        stmts.map((s) => ({ sql: s.sql, args: sanitizeArgs(s.args) })),
-        'write',
-      )
+      const results = await this.db.batch(normalized, 'write')
       return results.map((r) => ({
         rows: (r?.rows ?? []) as Record<string, unknown>[],
         rowsAffected: Number(r?.rowsAffected ?? 0),

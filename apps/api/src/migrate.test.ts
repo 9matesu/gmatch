@@ -92,10 +92,6 @@ describe('gMatch Phase 1 migrations', () => {
     expect(await indexExists(client, 'idx_slideshows_owner')).toBe(true)
     expect(await indexExists(client, 'idx_slideshow_items_slide')).toBe(true)
 
-    // Lootboxes (migration 026)
-    expect(await tableExists(client, 'Lootboxes')).toBe(true)
-    expect(await indexExists(client, 'idx_lootboxes_released')).toBe(true)
-
     // Chat groups + DM replies (migration 027)
     expect(await tableExists(client, 'ChatGroups')).toBe(true)
     expect(await tableExists(client, 'ChatGroupMembers')).toBe(true)
@@ -118,12 +114,6 @@ describe('gMatch Phase 1 migrations', () => {
     // Group message attachments (migration 032)
     expect(await columnExists(client, 'GroupMessages', 'attachment_id')).toBe(true)
     expect(await indexExists(client, 'idx_group_messages_attachment')).toBe(true)
-
-    // Lootbox configuration v2 (migration 033)
-    for (const col of ['state', 'tags', 'draw_config', 'version', 'released_at', 'archived_at', 'created_by', 'updated_by']) {
-      expect(await columnExists(client, 'Lootboxes', col)).toBe(true)
-    }
-    expect(await indexExists(client, 'idx_lootboxes_state')).toBe(true)
 
     // Card rarity normalization (migration 034)
 

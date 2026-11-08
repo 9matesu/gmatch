@@ -42,7 +42,7 @@ const CONTENT_TABLES = [
   'PrivateMessages', 'PmReadReceipts',
   'Comments', 'CommentLikes',
   'Decks', 'DeckCards', 'Cards', 'CardOwnership', 'CardHistory', 'MarketListings',
-  'StoreUnlocks', 'UserInventory', 'BabecockRounds', 'BabecockEntries', 'BabecockInvites', 'Lootboxes',
+  'StoreUnlocks', 'UserInventory', 'BabecockRounds', 'BabecockEntries', 'BabecockInvites',
   'Slideshows', 'SlideshowItems',
   'Wallets', 'LedgerTransactions', 'EconomicOperations',
   'Notifications', 'Playtime', 'Saves', 'DominationActions', 'HackDebuffs', 'DonationAcknowledgement',

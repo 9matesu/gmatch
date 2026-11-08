@@ -1,16 +1,15 @@
 import { Hono } from 'hono'
 import { orbitAuth } from '../middleware/auth'
-import type { D1Turso, AtomicStatement } from '../db'
+import type { D1Turso, AtomicStatement, D1PreparedStatement } from '../db'
 import type { LocalBlobStore } from '../blob'
-import { normalizeTagShape, STORE_ITEMS, computeCardRarity, generateFallbackName, isDefaultPeerName } from '@orbit/shared'
-import { parseLootboxTags, normalizeDrawConfig } from '../lootboxes/service'
+import { normalizeTagShape, STORE_ITEMS, generateFallbackName, isDefaultPeerName } from '@orbit/shared'
 import { recomputeUserCounters } from '../game'
 import { maybeResetDailyScores } from '../cleanup'
 import { broadcastToRoom } from '../ws-bus'
 import { reportContent, ReportError } from '../reports'
-import { EconomyService, buildDebitStatements, type BalanceOpResult } from '../economy'
+import { EconomyService, buildDebitStatements, findRecordedOperation, type BalanceOpResult } from '../economy'
 import { stripImageMetadata } from '../metadata-strip'
-import { mintCardStatements } from '../cards'
+import { findDisplayName } from '../common/userLookup'
 import crypto from 'crypto'
 
 type Bindings = {
@@ -106,11 +105,6 @@ users.get('/:id/pfp', async (c) => {
   }
 })
 
-users.get('/:id/avatar', async (c) => {
-  const userId = c.req.param('id')
-  return c.redirect(`/api/users/${userId}/pfp`, 307)
-})
-
 users.use('*', orbitAuth)
 
 users.get('/me', async (c) => {
@@ -148,7 +142,6 @@ users.get('/me', async (c) => {
     balance: Number(user.balance || 0),
     is_admin: Boolean(user.is_admin),
     is_moderator: Boolean(user.is_moderator || user.is_admin),
-    maximum_gooner: Boolean(user.maximum_gooner),
     is_private: Boolean(user.is_private),
     matches_won: Number(user.matches_won ?? 0),
     matches_lost: Number(user.matches_lost ?? 0),
@@ -167,29 +160,53 @@ users.get('/', async (c) => {
   await maybeResetDailyScores(c.env.DB, Date.now()).catch(() => {})
 
   let results: any[] = []
+  // ONE column list for the directory. The primary query and its degraded
+  // fallback used to carry two hand-copied SELECT lists, and the fallback had
+  // already drifted once (it dropped pfp_url, matches_won/lost, balance,
+  // gacha_items_collected, likes_given/received and matches_total — which
+  // silently emptied the Card Duel board, zeroed every W/L, blanked every
+  // avatar and showed "0 likes" for the whole roster). Sharing the list
+  // makes that drift IMPOSSIBLE: the only difference between the two queries
+  // is the Objects aggregation, which is the fragile part on older schemas.
+  const DIRECTORY_COLUMNS = `
+      u.id, u.public_key, u.encryption_pub_key, u.display_name, u.tags, u.pfp_url, u.last_seen, u.attention_at,
+      COALESCE(u.objects_sent_count, 0) as objects_sent_count,
+      COALESCE(u.gacha_items_collected, 0) as gacha_items_collected,
+      COALESCE(u.is_admin, 0) as is_admin,
+      COALESCE(u.is_moderator, 0) as is_moderator,
+      COALESCE(u.likes_given, 0) as likes_given,
+      COALESCE(u.likes_received, 0) as likes_received,
+      COALESCE(u.matches_total, 0) as matches_total,
+      COALESCE(u.score, 0) as score,
+      COALESCE(u.score_total, 0) as score_total,
+      COALESCE(u.bio, '') as bio,
+      COALESCE(u.website, '') as website,
+      (SELECT COUNT(*) FROM Followers fc WHERE fc.followee_id = u.id AND fc.accepted = 1) as followers_count,
+      (SELECT COUNT(*) FROM Followers gc WHERE gc.follower_id = u.id AND gc.accepted = 1) as following_count,
+      COALESCE(u.posts_count, 0) as posts_count,
+      COALESCE(u.is_private, 0) as is_private,
+      %DOWNLOADS% as gacha_downloads_received,
+      COALESCE(lr.wins, 0) as matches_won,
+      COALESCE(lr.losses, 0) as matches_lost,
+      COALESCE(w.balance, 0) as balance`
+
+  // The WHERE/ORDER BY/LIMIT tail is identical for both queries.
+  const directoryTail = (): { sql: string; params: any[] } => {
+    const params: any[] = []
+    let sql = ' WHERE u.hidden_at IS NULL'
+    if (cursor) {
+      sql += ' AND u.id > ?'
+      params.push(cursor)
+    }
+    sql += ' ORDER BY u.id ASC LIMIT ?'
+    params.push(limit)
+    return { sql, params }
+  }
+
   try {
-    let queryStr = `
-      SELECT u.id, u.public_key, u.encryption_pub_key, u.display_name, u.tags, u.pfp_url, u.last_seen, u.attention_at,
-             COALESCE(u.objects_sent_count, 0) as objects_sent_count,
-             COALESCE(u.gacha_items_collected, 0) as gacha_items_collected,
-             COALESCE(u.maximum_gooner, 0) as maximum_gooner,
-             COALESCE(u.is_admin, 0) as is_admin,
-             COALESCE(u.is_moderator, 0) as is_moderator,
-             COALESCE(u.likes_given, 0) as likes_given,
-             COALESCE(u.likes_received, 0) as likes_received,
-             COALESCE(u.matches_total, 0) as matches_total,
-             COALESCE(u.score, 0) as score,
-             COALESCE(u.score_total, 0) as score_total,
-             COALESCE(u.bio, '') as bio,
-             COALESCE(u.website, '') as website,
-             (SELECT COUNT(*) FROM Followers fc WHERE fc.followee_id = u.id AND fc.accepted = 1) as followers_count,
-             (SELECT COUNT(*) FROM Followers gc WHERE gc.follower_id = u.id AND gc.accepted = 1) as following_count,
-             COALESCE(u.posts_count, 0) as posts_count,
-             COALESCE(u.is_private, 0) as is_private,
-             COALESCE(g.sum_downloads, 0) as gacha_downloads_received,
-             COALESCE(lr.wins, 0) as matches_won,
-             COALESCE(lr.losses, 0) as matches_lost,
-             COALESCE(w.balance, 0) as balance
+    const tail = directoryTail()
+    const queryStr = `
+      SELECT ${DIRECTORY_COLUMNS.replace('%DOWNLOADS%', 'COALESCE(g.sum_downloads, 0)')}
       FROM Users u
       LEFT JOIN (
         SELECT owner_id, SUM(COALESCE(gacha_downloads_count, 0)) as sum_downloads
@@ -198,65 +215,21 @@ users.get('/', async (c) => {
       ) g ON g.owner_id = u.id
       LEFT JOIN LeagueRank lr ON lr.user_id = u.id
       LEFT JOIN Wallets w ON w.user_id = u.id
-    `
-    const params: any[] = []
-    if (cursor) {
-      queryStr += ' WHERE u.hidden_at IS NULL AND u.id > ?'
-      params.push(cursor)
-    } else {
-      queryStr += ' WHERE u.hidden_at IS NULL'
-    }
-    queryStr += ' ORDER BY u.id ASC LIMIT ?'
-    params.push(limit)
-
-    const res = await c.env.DB.prepare(queryStr).bind(...params).all()
+    ${tail.sql}`
+    const res = await c.env.DB.prepare(queryStr).bind(...tail.params).all()
     results = res.results || []
   } catch (primaryErr) {
-    // The fallback must be COLUMN-IDENTICAL to the primary query. It used to
-    // omit pfp_url, matches_won/lost, balance, gacha_items_collected,
-    // likes_given/received and matches_total, and the mapper then read them as
-    // undefined -> 0. That silently emptied the Card Duel board, zeroed every
-    // W/L, blanked every avatar and showed "0 likes" for the whole roster —
-    // with no log line to explain it. Only the Objects aggregation (g) is
-    // dropped: that is the fragile part on older schemas.
+    // The fallback drops ONLY the Objects aggregation (the fragile part on
+    // older schemas). Every other column is the shared list above.
     console.error('[users] directory query failed, using degraded fallback:', primaryErr)
-    let queryStr = `
-      SELECT u.id, u.public_key, u.encryption_pub_key, u.display_name, u.tags, u.pfp_url, u.last_seen, u.attention_at,
-             COALESCE(u.objects_sent_count, 0) as objects_sent_count,
-             COALESCE(u.gacha_items_collected, 0) as gacha_items_collected,
-             COALESCE(u.maximum_gooner, 0) as maximum_gooner,
-             COALESCE(u.is_admin, 0) as is_admin,
-             COALESCE(u.is_moderator, 0) as is_moderator,
-             COALESCE(u.likes_given, 0) as likes_given,
-             COALESCE(u.likes_received, 0) as likes_received,
-             COALESCE(u.matches_total, 0) as matches_total,
-             COALESCE(u.score, 0) as score,
-             COALESCE(u.score_total, 0) as score_total,
-             COALESCE(u.bio, '') as bio,
-             COALESCE(u.website, '') as website,
-             (SELECT COUNT(*) FROM Followers fc WHERE fc.followee_id = u.id AND fc.accepted = 1) as followers_count,
-             (SELECT COUNT(*) FROM Followers gc WHERE gc.follower_id = u.id AND gc.accepted = 1) as following_count,
-             COALESCE(u.posts_count, 0) as posts_count,
-             COALESCE(u.is_private, 0) as is_private,
-             0 as gacha_downloads_received,
-             COALESCE(lr.wins, 0) as matches_won,
-             COALESCE(lr.losses, 0) as matches_lost,
-             COALESCE(w.balance, 0) as balance
+    const tail = directoryTail()
+    const queryStr = `
+      SELECT ${DIRECTORY_COLUMNS.replace('%DOWNLOADS%', '0')}
       FROM Users u
       LEFT JOIN LeagueRank lr ON lr.user_id = u.id
       LEFT JOIN Wallets w ON w.user_id = u.id
-    `
-    const params: any[] = []
-    if (cursor) {
-      queryStr += ' WHERE u.hidden_at IS NULL AND u.id > ?'
-      params.push(cursor)
-    } else {
-      queryStr += ' WHERE u.hidden_at IS NULL'
-    }
-    queryStr += ' ORDER BY u.id ASC LIMIT ?'
-    params.push(limit)
-
-    const res = await c.env.DB.prepare(queryStr).bind(...params).all()
+    ${tail.sql}`
+    const res = await c.env.DB.prepare(queryStr).bind(...tail.params).all()
     results = res.results || []
   }
 
@@ -305,7 +278,6 @@ users.get('/', async (c) => {
       daily_score: score,
       reputation: Number(u.score_total ?? 0),
       balance: u.id === orbitId ? Number(u.balance ?? 0) : undefined,
-      maximum_gooner: u.maximum_gooner ? true : false,
       bio: u.bio || undefined,
       website: u.website || undefined,
       followers_count: Number(u.followers_count ?? 0),
@@ -385,7 +357,7 @@ users.get('/online', async (c) => {
   try {
     const res = await c.env.DB.prepare(
       `SELECT id, public_key, encryption_pub_key, display_name, tags, pfp_url,
-              last_seen, score, maximum_gooner
+              last_seen, score
        FROM Users
        WHERE hidden_at IS NULL AND last_seen >= ? AND id != ?
        ORDER BY last_seen DESC LIMIT 100`,
@@ -407,7 +379,6 @@ users.get('/online', async (c) => {
       pfp_url: u.pfp_url || undefined,
       last_seen: u.last_seen || undefined,
       score: u.score ?? 0,
-      maximum_gooner: u.maximum_gooner ?? 0,
       online: true,
     }
   })
@@ -517,8 +488,7 @@ users.on(['PATCH', 'PUT'], '/profile', async (c) => {
   // Every authenticated account must have a real profile name. The auth
   // middleware may create a temporary row before onboarding completes, but no
   // profile update may leave that row nameless.
-  const existing = await c.env.DB.prepare('SELECT display_name FROM Users WHERE id = ?')
-    .bind(orbitId).first<{ display_name: string | null }>()
+  const existingName = await findDisplayName(c.env.DB, orbitId)
 
   let cleanBio: string | undefined
   if (body.bio !== undefined) {
@@ -563,7 +533,7 @@ users.on(['PATCH', 'PUT'], '/profile', async (c) => {
   // save must work even on an auth-provisioned row with no display_name
   // yet - the old blanket 400 permanently locked such accounts out of
   // ever fixing their profile (pfp 400 report, fix/resilience wave).
-  if (cleanName !== undefined && !cleanName && !existing?.display_name?.trim()) {
+  if (cleanName !== undefined && !cleanName && !existingName?.trim()) {
     return c.json({ error: 'Display name is required' }, 400)
   }
   let cleanTags: string[] | undefined
@@ -725,8 +695,7 @@ users.post('/:id/follow', async (c) => {
     broadcastToRoom('global', { type: 'follow', action: 'new', follower_id: followerId, followee_id: followeeId })
 
     try {
-      const follower = await db.prepare('SELECT display_name FROM Users WHERE id = ?').bind(followerId).first<{ display_name: string | null }>()
-      const name = follower?.display_name?.trim() || 'Someone'
+      const name = (await findDisplayName(db, followerId))?.trim() || 'Someone'
       const { createNotification } = await import('../notifications')
       const { broadcastToUser } = await import('../ws-bus')
       const notif = await createNotification(db, followeeId, 'follow', `${name} started following you`, null, { follower_id: followerId })
@@ -820,7 +789,7 @@ export async function deleteUserCascade(
   // Objects/likes/PMs/chats/cards/decks/groups/notifications (bucket blobs too).
   const affectedUsers = await wipeUserContent(db, userId, opts)
 
-  const stmts: Array<{ run: () => Promise<any> }> = []
+  const stmts: D1PreparedStatement[] = []
   const del = (sql: string, ...args: unknown[]) => {
     stmts.push(db.prepare(sql).bind(...args as never[]))
   }
@@ -863,7 +832,7 @@ export async function deleteUserCascade(
   del(`UPDATE ReportedImages SET reporter_id = 'deleted' WHERE reporter_id = ?`, userId)
   del('DELETE FROM Users WHERE id = ?', userId)
 
-  await db.batch(stmts)
+  await db.atomicBatch(stmts)
 
   return affectedUsers.filter(uid => uid !== userId)
 }
@@ -914,7 +883,7 @@ export async function wipeUserContent(
     await Promise.all(deletePromises)
   }
 
-  const stmts: Array<{ run: () => Promise<any> }> = []
+  const stmts: D1PreparedStatement[] = []
   stmts.push(db.prepare('DELETE FROM Recipients WHERE recipient_id = ?').bind(userId))
   if (objectIds.length > 0) {
     stmts.push(db.prepare(`DELETE FROM Recipients WHERE object_id IN (${objectIds.map(() => '?').join(',')})`).bind(...objectIds))
@@ -959,12 +928,12 @@ export async function wipeUserContent(
   stmts.push(db.prepare('DELETE FROM MatchInvites WHERE inviter_id = ? OR invitee_id = ?').bind(userId, userId))
   stmts.push(db.prepare('DELETE FROM LobbyPlayers WHERE user_id = ?').bind(userId))
   stmts.push(db.prepare(
-    `UPDATE Users SET objects_sent_count = 0, gacha_items_collected = 0, maximum_gooner = 0,
+    `UPDATE Users SET objects_sent_count = 0, gacha_items_collected = 0,
        likes_given = 0, likes_received = 0, matches_total = 0, score = 0, score_total = 0, pfp_url = NULL
      WHERE id = ?`
   ).bind(userId))
 
-  await db.batch(stmts)
+  await db.atomicBatch(stmts)
 
   return affectedUsers.filter(uid => uid !== userId)
 }
@@ -980,16 +949,6 @@ users.delete('/account', async (c) => {
   }
 
   return c.json({ ok: true })
-})
-
-users.post('/maximum-gooner', async (c) => {
-  const orbitId = c.get('orbitId')
-  const body = await c.req.json()
-  const enabled = body?.enabled === true ? 1 : 0
-  try {
-    await c.env.DB.prepare('UPDATE Users SET maximum_gooner = ? WHERE id = ?').bind(enabled, orbitId).run()
-  } catch {}
-  return c.json({ ok: true, maximum_gooner: enabled === 1 })
 })
 
 users.post('/:id/block', async (c) => {
@@ -1061,42 +1020,13 @@ async function findActiveHack(db: D1Turso, attackerId: string, targetId: string)
   ).bind(attackerId, targetId, Date.now()).first<ServerHackDebuff>() ?? null
 }
 
-async function getDynamicItemPrices(db: any): Promise<Record<string, number>> {
-  try {
-    const row = await db.prepare("SELECT value FROM SystemMeta WHERE key = 'store_prices'").bind().first() as { value: string } | null
-    if (row?.value) {
-      return JSON.parse(row.value)
-    }
-  } catch {}
-  return {}
-}
-
-// Get all store items with single-source-of-truth prices applied from SystemMeta.
-// Pack/lootbox items are NOT taken from the static list — they come from the
-// admin-managed Lootboxes table, filtered to released rows only.
+// The store catalogue. Prices come from the shared STORE_ITEMS list — the
+// same list the shop renders — so the server can never quote a price the
+// client does not show. (There used to be a SystemMeta `store_prices`
+// override, but only a dead admin route could write it, so the override was
+// always empty while the code pretended it was a feature.)
 users.get('/store/items', async (c) => {
-  const overrides = await getDynamicItemPrices(c.env.DB)
-  const nonPack = STORE_ITEMS
-    .filter((it) => it.category !== 'pack')
-    .map((it) => ({
-      ...it,
-      cost: typeof overrides[it.id] === 'number' ? overrides[it.id] : it.cost,
-    }))
-  const rows = await c.env.DB
-    .prepare('SELECT id, name, desc, cost, icon, badge, tags FROM Lootboxes WHERE released = 1 ORDER BY created_at ASC')
-    .all<{ id: string; name: string; desc: string | null; cost: number; icon: string | null; badge: string | null; tags: string | null }>()
-  const packs = (rows.results || []).map((lb) => ({
-    id: lb.id,
-    name: lb.name,
-    desc: lb.desc || '',
-    category: 'pack' as const,
-    cost: Number(lb.cost || 0),
-    icon: lb.icon || 'Sparkles',
-    badge: lb.badge || undefined,
-    tags: parseLootboxTags(lb.tags),
-    consumable: true,
-  }))
-  return c.json({ items: [...nonPack, ...packs] })
+  return c.json({ items: STORE_ITEMS })
 })
 
 // Purchase a store item with g$ from the authoritative economy wallet. The
@@ -1117,32 +1047,13 @@ users.post('/store/purchase', async (c) => {
   } catch {}
   if (!idemKey) idemKey = c.req.header('Idempotency-Key') || c.req.header('X-Idempotency-Key') || ''
 
-  let baseItem: any = STORE_ITEMS.find((i) => i.id === itemId)
-  if (!baseItem) {
-    const lb = await c.env.DB
-      .prepare('SELECT id, name, desc, cost, icon, badge FROM Lootboxes WHERE id = ? AND released = 1')
-      .bind(itemId)
-      .first<{ id: string; name: string; desc: string | null; cost: number; icon: string | null; badge: string | null }>()
-    if (lb) {
-      baseItem = {
-        id: lb.id,
-        name: lb.name,
-        desc: lb.desc || '',
-        category: 'pack',
-        cost: Number(lb.cost || 0),
-        icon: lb.icon || 'Sparkles',
-        badge: lb.badge || undefined,
-        consumable: true,
-      }
-    }
-  }
+  const baseItem = STORE_ITEMS.find((i) => i.id === itemId)
   if (!baseItem) return c.json({ error: 'Unknown store item' }, 400)
   if (idemKey.length < 8 || idemKey.length > 128) {
     return c.json({ error: 'Idempotency-Key header required (8-128 chars)' }, 400)
   }
 
-  const overrides = await getDynamicItemPrices(c.env.DB)
-  const cost = typeof overrides[baseItem.id] === 'number' ? overrides[baseItem.id] : baseItem.cost
+  const cost = baseItem.cost
 
   const db = c.env.DB
   const economy = new EconomyService(db)
@@ -1153,10 +1064,7 @@ users.post('/store/purchase', async (c) => {
 
   // Idempotent replay: return the recorded purchase without re-charging or
   // re-granting, and refuse keys reused with different parameters.
-  const existing = await db
-    .prepare('SELECT user_id, fingerprint, result FROM EconomicOperations WHERE idempotency_key = ?')
-    .bind(idemKey)
-    .first<{ user_id: string; fingerprint: string | null; result: string | null }>()
+  const existing = await findRecordedOperation(db, idemKey)
   if (existing) {
     if (existing.user_id !== orbitId || (existing.fingerprint && existing.fingerprint !== fingerprint)) {
       return c.json({ error: 'Idempotency key reused with different parameters' }, 409)
@@ -1196,9 +1104,9 @@ if (baseItem.id === 'item-flash-drop') {
     if (targetConsent.allowHacks !== true) {
       return c.json({ error: 'That player has not allowed hacks on their account' }, 403)
     }
-    const me = await db.prepare('SELECT display_name FROM Users WHERE id = ?').bind(orbitId).first<{ display_name: string | null }>()
+    const me = await findDisplayName(db, orbitId)
     const targetName = target?.display_name?.trim() || 'Unknown User'
-    const attackerName = me?.display_name?.trim() || 'Unknown User'
+    const attackerName = me?.trim() || 'Unknown User'
 
     let durationMs = 5 * 60 * 1000
     let hackType: 'deny' | 'mobile_virus' = 'deny'
@@ -1344,175 +1252,10 @@ users.get('/hacks/spy-feed/:targetId', async (c) => {
     intercepted: [],
   })
 })
-// The set of store items this user has already unlocked (used to restore the
-// "UNLOCKED" state across sessions and devices).
-users.get('/store/unlocks', async (c) => {
-  const orbitId = c.get('orbitId')
-  const rows = await c.env.DB.prepare('SELECT item_id FROM StoreUnlocks WHERE user_id = ?').bind(orbitId).all<{ item_id: string }>()
-  return c.json((rows.results || []).map((r) => r.item_id))
-})
-
 // Owned consumables (e.g. Flash Drop) with stack counts, so the web client can
 // restore the Inventory tab across sessions and devices.
 users.get('/store/inventory', async (c) => {
   const orbitId = c.get('orbitId')
   const rows = await c.env.DB.prepare('SELECT item_id, quantity FROM UserInventory WHERE user_id = ? AND quantity > 0').bind(orbitId).all<{ item_id: string; quantity: number }>()
   return c.json((rows.results || []).map((r) => ({ item_id: r.item_id, quantity: Number(r.quantity || 0) })))
-})
-
-const PACK_THEMES = [
-  { title: 'Cyber Valkyrie', col1: '#ec4899', col2: '#8b5cf6', rarity: 'EPIC', score: 150 },
-  { title: 'Neon Phantom', col1: '#06b6d4', col2: '#3b82f6', rarity: 'RARE', score: 80 },
-  { title: 'Solar Empress', col1: '#f59e0b', col2: '#ef4444', rarity: 'LEGENDARY', score: 300 },
-  { title: 'Astral Nomad', col1: '#10b981', col2: '#06b6d4', rarity: 'COMMON', score: 20 },
-  { title: 'Void Weaver', col1: '#8b5cf6', col2: '#1e1b4b', rarity: 'MYTHIC', score: 500 },
-  { title: 'Prism Blossom', col1: '#f43f5e', col2: '#fb7185', rarity: 'RARE', score: 90 },
-  { title: 'Quantum Overlord', col1: '#6366f1', col2: '#a855f7', rarity: 'LEGENDARY', score: 350 },
-]
-
-type PackTheme = (typeof PACK_THEMES)[number]
-
-function themesForRarityTheme(rarityTheme: string): PackTheme[] {
-  const labels: Record<string, string[]> = {
-    common: ['COMMON', 'RARE'],
-    rare: ['RARE', 'EPIC'],
-    legendary: ['LEGENDARY', 'MYTHIC'],
-    mythic: ['MYTHIC', 'LEGENDARY'],
-  }
-  const wanted = labels[rarityTheme]
-  if (!wanted) return PACK_THEMES
-  const filtered = PACK_THEMES.filter((t) => wanted.includes(t.rarity))
-  return filtered.length > 0 ? filtered : PACK_THEMES
-}
-
-function pickPackTheme(rarityTheme: string, drawConfig: Record<string, unknown>): PackTheme {
-  // Optional draw_config.rarity_weights (e.g. { EPIC: 30, RARE: 70 }) takes
-  // precedence; otherwise the box's rarity_theme filters the pool.
-  const weights = (drawConfig && typeof drawConfig.rarity_weights === 'object' ? drawConfig.rarity_weights : {}) as Record<string, unknown>
-  const pool = PACK_THEMES.map((theme) => {
-    const w = Number(weights[theme.rarity])
-    return { theme, weight: Number.isFinite(w) && w >= 0 ? w : 0 }
-  })
-  const total = pool.reduce((sum, p) => sum + p.weight, 0)
-  if (total > 0) {
-    let roll = Math.random() * total
-    for (const p of pool) {
-      roll -= p.weight
-      if (roll < 0) return p.theme
-    }
-    return pool[pool.length - 1].theme
-  }
-  const filtered = themesForRarityTheme(rarityTheme)
-  return filtered[Math.floor(Math.random() * filtered.length)]
-}
-
-users.post('/store/open-pack', async (c) => {
-  const orbitId = c.get('orbitId')
-  const db = c.env.DB
-  let itemId = ''
-  let idemKey = ''
-  try {
-    const body = await c.req.json()
-    itemId = String(body?.item_id || body?.itemId || '').trim()
-    idemKey = String(body?.idempotency_key || '').trim()
-  } catch {}
-  if (!idemKey) idemKey = c.req.header('Idempotency-Key') || c.req.header('X-Idempotency-Key') || ''
-
-  // Packs open against the admin-managed Lootboxes table — only released boxes
-  // can be opened, and the minted card count comes from the box definition.
-  const pack = await db
-    .prepare('SELECT id, card_count, rarity_theme, draw_config FROM Lootboxes WHERE id = ? AND released = 1')
-    .bind(itemId)
-    .first<{ id: string; card_count: number; rarity_theme: string | null; draw_config: string | null }>()
-  if (!pack) return c.json({ error: 'Invalid pack item' }, 400)
-  if (idemKey.length < 8 || idemKey.length > 128) {
-    return c.json({ error: 'Idempotency-Key header required (8-128 chars)' }, 400)
-  }
-
-  const fingerprint = `open_pack|${orbitId}|${itemId}`
-
-  // Idempotent replay: return the previously minted cards without consuming
-  // another pack, and refuse keys reused with different parameters.
-  const existing = await db
-    .prepare('SELECT user_id, fingerprint, result FROM EconomicOperations WHERE idempotency_key = ?')
-    .bind(idemKey)
-    .first<{ user_id: string; fingerprint: string | null; result: string | null }>()
-  if (existing) {
-    if (existing.user_id !== orbitId || (existing.fingerprint && existing.fingerprint !== fingerprint)) {
-      return c.json({ error: 'Idempotency key reused with different parameters' }, 409)
-    }
-    if (existing.result) return c.json(JSON.parse(existing.result))
-    return c.json({ error: 'Operation already in progress' }, 409)
-  }
-
-  const cardCount = Math.max(1, Math.min(20, Number(pack.card_count || 3)))
-  const nowIso = new Date().toISOString()
-  const drawConfig = normalizeDrawConfig(pack.draw_config)
-  const rarityTheme = pack.rarity_theme || 'rare'
-
-  // Build the atomic batch: inventory decrement is the gate; the minted cards
-  // and the idempotency record only apply when the decrement succeeds.
-  const openedCards: Array<{ id: string; title: string; rarity: string; score: number; content_url: string }> = []
-  const statements: AtomicStatement[] = [
-    { sql: 'UPDATE UserInventory SET quantity = quantity - 1 WHERE user_id = ? AND item_id = ? AND quantity > 0 RETURNING quantity', args: [orbitId, itemId] },
-  ]
-
-  for (let i = 0; i < cardCount; i++) {
-    const theme = pickPackTheme(rarityTheme, drawConfig)
-    const cardId = crypto.randomUUID()
-    const objectId = crypto.randomUUID()
-    const canonicalRarity = computeCardRarity(theme.score).rarity
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="560" viewBox="0 0 400 560">
-<defs>
-  <linearGradient id="g${i}" x1="0%" y1="0%" x2="100%" y2="100%">
-    <stop offset="0%" stop-color="${theme.col1}"/>
-    <stop offset="100%" stop-color="${theme.col2}"/>
-  </linearGradient>
-</defs>
-<rect width="400" height="560" rx="24" fill="#09090b"/>
-<rect x="12" y="12" width="376" height="536" rx="16" fill="url(#g${i})" fill-opacity="0.18" stroke="url(#g${i})" stroke-width="2.5"/>
-<circle cx="200" cy="230" r="95" fill="url(#g${i})" fill-opacity="0.85"/>
-<text x="200" y="242" font-family="sans-serif" font-size="46" font-weight="900" fill="#ffffff" text-anchor="middle">✦</text>
-<text x="200" y="400" font-family="sans-serif" font-size="22" font-weight="bold" fill="#ffffff" text-anchor="middle">${theme.title}</text>
-<text x="200" y="430" font-family="sans-serif" font-size="13" font-weight="800" fill="${theme.col1}" text-anchor="middle">${theme.rarity} EDITION</text>
-<text x="200" y="470" font-family="monospace" font-size="11" font-weight="600" fill="#71717a" text-anchor="middle">COLLECTOR #${cardId.slice(0, 6).toUpperCase()}</text>
-</svg>`
-    const dataUrl = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`
-
-    statements.push(...mintCardStatements({
-      ownerId: orbitId,
-      cardId,
-      objectId,
-      spec: { name: theme.title, rarity: canonicalRarity, contentUrl: dataUrl, mimeType: 'image/svg+xml', sizeBytes: 1024, value: theme.score },
-      historyId: crypto.randomUUID(),
-      nowIso,
-      source: 'pack',
-    }))
-
-    openedCards.push({ id: cardId, title: theme.title, rarity: theme.rarity, score: theme.score, content_url: dataUrl })
-  }
-
-  const resultPayload = { ok: true, cards: openedCards }
-  const operationId = crypto.randomUUID()
-  statements.push({
-    sql: 'INSERT INTO EconomicOperations (id, idempotency_key, user_id, kind, fingerprint, payload, result) SELECT ?, ?, ?, ?, ?, ?, ? WHERE changes() = 1',
-    args: [operationId, idemKey, orbitId, 'open_pack', fingerprint, JSON.stringify({ itemId, cardCount }), JSON.stringify(resultPayload)],
-  })
-
-  let res
-  try {
-    res = await db.atomicBatch(statements)
-  } catch (err: any) {
-    if (err?.code?.includes('CONSTRAINT')) {
-      const recorded = await db.prepare('SELECT result FROM EconomicOperations WHERE idempotency_key = ?').bind(idemKey).first<{ result: string | null }>()
-      if (recorded?.result) return c.json(JSON.parse(recorded.result))
-    }
-    throw err
-  }
-
-  if ((res[0].rows?.length ?? 0) === 0) {
-    return c.json({ error: 'You do not own this pack' }, 400)
-  }
-
-  return c.json(resultPayload)
 })

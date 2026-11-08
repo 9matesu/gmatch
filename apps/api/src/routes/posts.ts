@@ -6,6 +6,7 @@ import { purgeObjectLikes } from '../game'
 import { reportContent, ReportError } from '../reports'
 import { promoteLobbyImageToPost } from '../lobby'
 import { generateFallbackName } from '@orbit/shared'
+import { findDisplayName } from '../common/userLookup'
 
 type Bindings = {
   DB: D1Turso
@@ -320,8 +321,7 @@ posts.post('/:id/like', async (c) => {
     try {
       const postOwner = obj.owner_id
       if (postOwner && postOwner !== orbitId) {
-        const liker = await db.prepare('SELECT display_name FROM Users WHERE id = ?').bind(orbitId).first<{ display_name: string | null }>()
-        const name = liker?.display_name?.trim() || 'Someone'
+        const name = (await findDisplayName(db, orbitId))?.trim() || 'Someone'
         const { createNotification } = await import('../notifications')
         const { broadcastToUser } = await import('../ws-bus')
         const notif = await createNotification(db, postOwner, 'like', `${name} liked your post`, null, { post_id: id, liker_id: orbitId, actor_id: orbitId, actor_name: name })
@@ -470,8 +470,7 @@ posts.post('/:id/comments', async (c) => {
   await db.prepare('UPDATE Objects SET comment_count = comment_count + 1 WHERE id = ?').bind(id).run()
 
   try {
-    const commenter = await db.prepare('SELECT display_name FROM Users WHERE id = ?').bind(orbitId).first<{ display_name: string | null }>()
-    const name = commenter?.display_name?.trim() || 'Someone'
+    const name = (await findDisplayName(db, orbitId))?.trim() || 'Someone'
     const { createNotification, findMentionedUserIds } = await import('../notifications')
     const { broadcastToUser } = await import('../ws-bus')
 
@@ -564,8 +563,7 @@ posts.post('/:id/comments/:commentId/like', async (c) => {
       // Only the first like notifies; INSERT OR IGNORE above already makes the
       // counter idempotent, and the event key makes the row idempotent too.
       if (comment.author_id && comment.author_id !== orbitId) {
-        const liker = await db.prepare('SELECT display_name FROM Users WHERE id = ?').bind(orbitId).first<{ display_name: string | null }>()
-        const name = liker?.display_name?.trim() || 'Someone'
+        const name = (await findDisplayName(db, orbitId))?.trim() || 'Someone'
         const { createNotification } = await import('../notifications')
         const { broadcastToUser } = await import('../ws-bus')
         const notif = await createNotification(db, comment.author_id, 'comment_like', `${name} liked your comment`, null, {

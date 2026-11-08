@@ -11,6 +11,7 @@ import { bytesToHex } from '@noble/hashes/utils'
 import { proxyAndStoreExternal } from '../proxy'
 import { isPartyMediaObject } from '../watchparty'
 import { stripImageMetadata } from '../metadata-strip'
+import { findDisplayName } from '../common/userLookup'
 
 type Bindings = {
   DB: D1Turso
@@ -406,8 +407,7 @@ objects.post('/', orbitAuth, async (c) => {
         await c.env.DB.prepare('INSERT OR IGNORE INTO Recipients (object_id, recipient_id) VALUES (?, ?)').bind(objectId, id).run().catch(() => { })
       }
       try {
-        const sender = await c.env.DB.prepare('SELECT display_name FROM Users WHERE id = ?').bind(orbitId).first<{ display_name: string | null }>()
-        const name = sender?.display_name?.trim() || 'Someone'
+        const name = (await findDisplayName(c.env.DB, orbitId))?.trim() || 'Someone'
         const { createNotification } = await import('../notifications')
         const { broadcastToUser } = await import('../ws-bus')
         for (const recipientId of ids) {

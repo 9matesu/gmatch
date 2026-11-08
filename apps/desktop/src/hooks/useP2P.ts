@@ -123,7 +123,6 @@ function arePeersStructurallyEqual(a: User[], b: User[]): boolean {
       a[i].display_name !== b[i].display_name ||
       a[i].online !== b[i].online ||
       a[i].score !== b[i].score ||
-      a[i].maximum_gooner !== b[i].maximum_gooner ||
       JSON.stringify(a[i].tags || []) !== JSON.stringify(b[i].tags || [])
     ) {
       return false;
