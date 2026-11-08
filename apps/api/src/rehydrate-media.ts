@@ -40,7 +40,7 @@
  */
 
 import { createHash } from 'node:crypto'
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { signMessage } from '@orbit/crypto'
 import { LocalBlobStore } from './blob'
@@ -642,11 +642,4 @@ export async function selectArchiveRows(
   return out
 }
 
-/** True when the path exists and is readable (used for cheap local checks). */
-export function pathExists(p: string): boolean {
-  try {
-    return existsSync(p)
-  } catch {
-    return false
-  }
-}
+

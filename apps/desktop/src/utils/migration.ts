@@ -119,8 +119,4 @@ export async function runMigrations(): Promise<void> {
   await migrateIndexedDB();
 }
 
-export function getStorageKey(key: string): string {
-  return `${STORAGE_PREFIX_NEW}-${key}`;
-}
-
 export { STORAGE_PREFIX_NEW as STORAGE_PREFIX };

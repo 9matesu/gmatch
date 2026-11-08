@@ -30,9 +30,6 @@ export const CHAT_WIPE_SECONDS = 12 * 60 * 60;
 export const STORY_TTL_SECONDS = 7 * 60 * 60;
 export const PICTURE_TTL_SECONDS = 7 * 60 * 60;
 
-export const OFFLINE_DELETION_SECONDS = 3 * 24 * 60 * 60;
-export const OFFLINE_WARNING_SECONDS = 2 * 24 * 60 * 60;
-
 // Special match ladder: a mutual like climbs a level, the third (final) mutual
 // like pays out big and ends the match. Any non-mutual decision ends it.
 export const SPECIAL_MAX_TIER = 3;
@@ -186,13 +183,6 @@ export interface ChatMessage {
   created_at: string;
 }
 
-export interface ChatEvent {
-  type: 'chat';
-  action: 'new';
-  match_id: string;
-  message: ChatMessage;
-}
-
 export interface LobbyPlayer {
   user_id: OrbitId;
   status: LobbyPlayerStatus;
@@ -274,11 +264,9 @@ export interface SpecialMatchesResponse {
 // ---------------------------------------------------------------------------
 
 export const ROOM_START_SECONDS = 45;
-export const ROOM_MAX_PLAYERS = 4;
 export const ROOM_MIN_PLAYERS = 2;
 export const ROOM_MAX_ROUNDS = 6;
 export const LEAGUE_CHAMPION_POINTS = 50;
-export const LEAGUE_MATCH_POINTS = 5;
 
 export type RoomStatus = 'open' | 'countdown' | 'live' | 'ended';
 export type RoomPhase = 'waiting' | 'countdown' | 'pick' | 'reveal' | 'decide' | 'result' | 'ended';

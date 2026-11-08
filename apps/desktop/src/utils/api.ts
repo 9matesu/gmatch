@@ -209,13 +209,6 @@ export function getApiWebSocketUrl(path = '/api/ws'): string {
   return wsUrlForBase(base, path)
 }
 
-export function setApiBaseUrl(url: string): void {
-  try {
-    if (url.trim()) localStorage.setItem('gmatch.api.url', url.trim())
-    else localStorage.removeItem('gmatch.api.url')
-  } catch { /* session-only */ }
-}
-
 /** True for a loopback API base (packaged host-mode sidecar address). */
 export function isLoopbackApiUrl(url: string | null | undefined): boolean {
   if (!url) return false
@@ -225,26 +218,6 @@ export function isLoopbackApiUrl(url: string | null | undefined): boolean {
   } catch {
     return /127\.0\.0\.1|localhost/.test(url)
   }
-}
-
-/**
- * Packaged-exe install fix: a stale `gmatch.api.url=http://127.0.0.1:8790`
- * (left by an old host-mode install or server-join debug) makes a fresh
- * client-default install hammer a dead sidecar forever — the "loops pinging
- * 127.0.0.1" report. Call once on boot when the main process says we are a
- * packaged client: the stale key is dropped so API_BASE falls through to
- * the central node. Returns true when a stale key was cleared.
- */
-export function clearStaleLoopbackApiBase(): boolean {
-  try {
-    if (typeof localStorage === 'undefined') return false
-    const manual = localStorage.getItem('gmatch.api.url')
-    if (manual?.trim() && isLoopbackApiUrl(manual.trim())) {
-      localStorage.removeItem('gmatch.api.url')
-      return true
-    }
-  } catch { /* private mode */ }
-  return false
 }
 
 /** Cookie the dev proxy reads to route /api (vite.config.ts `resolveDevApiTarget`). */
@@ -679,82 +652,6 @@ export async function orbitFetch(
 
 }
 
-export interface UploadWithProgressResult {
-  ok: boolean
-  status: number
-  /** Parsed `{ id }` from a successful response body or existing duplicate. */
-  id: string | null
-  error?: string
-}
-
-/**
- * XHR-based POST of a FormData body that reports upload progress. Auth signing
- * matches orbitFetch (fresh nonce/timestamp per request). `fetch` can't expose
- * upload progress, so match-card uploads use this to drive a progress bar.
- */
-export function uploadWithProgress(
-  endpoint: string,
-  formData: FormData,
-  identity: { orbitId: string; publicKeyHex: string; privateKeyHex: string; encryptionPubHex?: string },
-  onProgress?: (pct: number) => void
-): Promise<UploadWithProgressResult> {
-  return new Promise((resolve) => {
-    const url = resolveEndpoint(endpoint)
-    const pathname = getPathname(url)
-    const send = (attempt: number) => {
-      const headers = signRequestHeaders('POST', pathname, '', identity)
-
-      const xhr = new XMLHttpRequest()
-      xhr.open('POST', url)
-
-      headers.forEach((value, key) => {
-        if (key.toLowerCase() === 'content-type') return
-        xhr.setRequestHeader(key, value)
-      })
-
-      xhr.upload.onprogress = (e) => {
-        if (!onProgress) return
-        if (!e.lengthComputable) return
-        const pct = Math.round((e.loaded / e.total) * 100)
-        onProgress(Math.min(100, Math.max(0, pct)))
-      }
-
-      xhr.onerror = () => {
-        if (attempt === 0) {
-          send(1)
-        } else {
-          resolve({ ok: false, status: 0, id: null, error: 'Network error during upload' })
-        }
-      }
-      xhr.onabort = () => resolve({ ok: false, status: 0, id: null, error: 'Upload aborted' })
-      xhr.onload = () => {
-        let body: any = null
-        try {
-          body = JSON.parse(xhr.responseText)
-        } catch {}
-
-        if (xhr.status >= 200 && xhr.status < 300) {
-          onProgress?.(100)
-          const id = body && typeof body.id === 'string' ? body.id : null
-          resolve({ ok: true, status: xhr.status, id })
-        } else if (xhr.status === 401 && attempt === 0) {
-          // Re-sign with a fresh timestamp and retry once. The X-Orbit
-          // ticket window may have expired between the user opening the
-          // dialog and the upload actually starting (max 5 min on the
-          // server now, but still worth a one-shot retry).
-          send(1)
-        } else {
-          const id = (body && typeof body.existing_id === 'string') ? body.existing_id : ((body && typeof body.id === 'string') ? body.id : null)
-          const errorMsg = body?.error || `Upload failed (${xhr.status})`
-          resolve({ ok: false, status: xhr.status, id, error: errorMsg })
-        }
-      }
-
-      xhr.send(formData)
-    }
-    send(0)
-  })
-}
 
 // Genuine network failures return an honest 503 so callers surface an offline
 // state instead of locally fabricated mock data (which made the app appear to

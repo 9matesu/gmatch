@@ -12,8 +12,6 @@ import {
 import type { AppSettings } from '../../hooks/useSettings';
 import { playPress } from '../../utils/sounds';
 
-export const WALLPAPER_PRESETS: { id: string; name: string; url: string }[] = [];
-
 interface ThemeDrawerProps {
   isOpen: boolean;
   onClose: () => void;

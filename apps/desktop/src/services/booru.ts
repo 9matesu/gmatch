@@ -406,11 +406,6 @@ function rememberCounted(
 // (probe/page-explicit) draws are never recorded.
 const PAGE_MEMORY_DEPTH = 20
 const recentPages = new Map<string, number[]>()
-/** Test hook: clear page memory (also run by __resetFeedState). */
-export function __resetPageMemoryForTests(): void {
-  recentPages.clear()
-}
-
 function recordPage(key: string, page: number): void {
   recentPages.set(key, [...(recentPages.get(key) ?? []), page].slice(-PAGE_MEMORY_DEPTH))
 }

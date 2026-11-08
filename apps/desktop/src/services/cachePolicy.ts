@@ -21,14 +21,6 @@
 
 /** Feed memo TTL. Mirrors FEED_TTL_MS in electron/imageCache.cjs. */
 export const FEED_CACHE_TTL_MS = 10 * 60 * 1000
-/** Feed memo slot count. Mirrors FEED_MAX_QUERIES in electron/imageCache.cjs
- *  (was documented as 100 here; the implementation has always been 40). */
-export const FEED_CACHE_MAX_QUERIES = 40
-
-/** Single-file guard — a "picture" bigger than this is never cached.
- *  Mirrors the per-file cap in electron/imageCache.cjs. */
-export const IMAGE_MAX_BYTES = 25 * 1024 * 1024
-
 /** Total media budget. Mirrors MAX_DEFAULT in electron/diskImageCache.cjs.
  *  There is no live per-FILE count: the disk cache is byte-bounded only. */
 export const IMAGE_CACHE_MAX_BYTES = 500 * 1024 * 1024

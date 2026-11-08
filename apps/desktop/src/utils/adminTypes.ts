@@ -456,24 +456,4 @@ export interface FilterConfig {
   defaultValue?: unknown;
 }
 
-export interface AdminApiError {
-  error: string;
-  status: number;
-}
-
-export type OptimisticUpdate<T> = {
-  type: 'create' | 'update' | 'delete';
-  entity: string;
-  id: string;
-  previousData?: T;
-  newData?: T;
-  timestamp: number;
-};
-
-export interface WebSocketMessage {
-  type: 'stats_update' | 'match_update' | 'report_update' | 'user_update' | 'chat_message';
-  payload: unknown;
-  timestamp: number;
-}
-
 export type { Announcement, OrbitIdentity };

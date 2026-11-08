@@ -86,11 +86,6 @@ function backendRevision(backend: object): number {
   return backendRevisions.get(backend) ?? 0
 }
 
-/** Revision the cached read is valid for (diagnostics/tests). */
-export function currentOperationLogRevision(): number {
-  return externalRevision
-}
-
 /** Fired after a durable write so projections/UI can refresh. */
 export const OPERATION_LOG_CHANGED_EVENT = 'gmatch:operation-log-changed'
 

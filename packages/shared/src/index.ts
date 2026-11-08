@@ -213,16 +213,6 @@ export interface Relationship {
   last_match_at?: string;
 }
 
-export interface RelationshipResponse {
-  relationships: Relationship[];
-  stats: {
-    likes_given: number;
-    likes_received: number;
-    matches_total: number;
-    score: number;
-  };
-}
-
 export const TIER_RARITY = [
   '',
   'Acquaintance',
@@ -288,26 +278,6 @@ export interface Friend {
   encryption_pub_key?: string;
 }
 
-export interface FriendRequest {
-  id: string;
-  sender_id: OrbitId;
-  receiver_id?: OrbitId;
-  status: 'pending' | 'accepted' | 'rejected';
-  created_at: string;
-  sender_name?: string;
-}
-
-export interface UploadResponse {
-  id: string;
-  size: number;
-  type?: string;
-  recipients?: number;
-}
-
-export interface ApiError {
-  error: string;
-}
-
 export interface Announcement {
   id: string;
   message: string;
@@ -315,16 +285,6 @@ export interface Announcement {
   created_at: string;
   created_by_name?: string | null;
   is_active?: number;
-}
-
-export interface Recommendation {
-  id: string;
-  user_id: string;
-  category: 'Feature' | 'UI' | 'Idea' | 'Bug';
-  content: string;
-  status: 'pending' | 'reviewed' | 'resolved';
-  created_at: string;
-  user_name?: string | null;
 }
 
 export interface StoreItem {
@@ -397,11 +357,6 @@ export interface BabecockRound {
   my_entry?: string | null;
 }
 
-export interface BabecockPlacement {
-  entry_id: string;
-  grid_position: number;
-}
-
 /**
  * Babecock invite: a host pings a specific user to draw their attention to the
  * currently-open round. The round is still globally joinable — the invite is
@@ -430,15 +385,3 @@ export * from './lobby';
 export * from './card-valuation';
 export * from './gossip';
 export * from './watchSource';
-
-/** PC Domination action log entry */
-export interface DominationAction {
-  id: string;
-  dominator_id: string;
-  victim_id: string;
-  action: 'wallpaper' | 'game_bg' | 'popup_video' | 'message' | 'text_overlay' | 'blur' | 'camera';
-  payload?: Record<string, any>;
-  status: 'sent' | 'executed' | 'failed' | 'denied';
-  created_at: string;
-  executed_at?: string;
-}

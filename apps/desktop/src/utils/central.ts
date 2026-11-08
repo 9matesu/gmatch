@@ -12,8 +12,6 @@
  * set it here (Settings -> Servers -> Directory) or with
  * `VITE_CENTRAL_URL` at build time. `none`/`off`/`0` disables it.
  */
-export const COURIER_ORIGIN = 'https://gmatch.pages.dev'
-
 const DEFAULT_CENTRAL_URL = ''
 const NO_CENTRAL = ['none', 'off', '0']
 
@@ -61,9 +59,4 @@ export function setCentralApiUrl(url: string): void {
 
 export function hasCentral(): boolean {
   return !!getCentralApiUrl()
-}
-
-/** The Cloudflare courier origin (mail rendezvous + directory). */
-export function getCourierBase(): string {
-  return COURIER_ORIGIN
 }

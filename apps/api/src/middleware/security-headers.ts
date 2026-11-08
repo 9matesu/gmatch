@@ -61,23 +61,4 @@ export function connectSrcFromEnv(env: Record<string, string | undefined> = proc
   return parts.join(' ')
 }
 
-/**
- * Mask PII before it lands in console/server logs. Currently redacts
- * x-forwarded-for / x-real-ip (per the privacy audit request); pass any
- * header through `redactHeader` so future PII-bearing headers stay private.
- */
-export function redactIp(ip: string | undefined | null): string {
-  if (!ip) return 'unknown'
-  // Keep first /24 wall-breaking last octet for forensics without leaking
-  // the full client address. IPv6 keeps its /64 prefix.
-  if (ip.includes(':')) {
-    return ip.split(':').slice(0, 4).join(':') + '::X'
-  }
-  const parts = ip.split('.')
-  if (parts.length === 4) return `${parts[0]}.${parts[1]}.${parts[2]}.X`
-  return 'unknown'
-}
 
-export function clientIpForLog(c: Context): string {
-  return redactIp(c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || c.req.header('x-real-ip'))
-}

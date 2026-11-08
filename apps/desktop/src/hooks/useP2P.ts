@@ -12,7 +12,7 @@ import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, hydrateDura
 import { broadcastPresence, fetchPresenceRosterFrom } from '../services/courierPresence';
 import { knownNodes, rememberKnownNode, rememberPeerNode } from '../utils/peerNodes';
 import { broadcastMeshFrame, onMeshMessage, connectToPeerMesh, setMeshIceFailureHandler, MESH_BACKPRESSURE_HIGH_BYTES } from '../utils/courierSignaling';
-import { createTransportRegistry, type PeerTransportPhase } from '../utils/transportState';
+import { createTransportRegistry } from '../utils/transportState';
 import { resolveDisplayName } from '../utils/displayName';
 import { parseApiTimestamp } from '../utils/timeAgo';
 import { mediaFlag, resolveClaimedOwner, descriptorUrlFromBytes } from '../utils/objectDescriptor';
@@ -32,15 +32,6 @@ const TRANSPORT_TICK_MS = 4000;
  * relay session alive while direct attempts retry with backoff.
  */
 const swarmTransportRegistry = createTransportRegistry();
-
-/** UI probe: one entry per known peer's transport phase. */
-export function getSwarmTransportPhases(): Array<{ id: string; phase: PeerTransportPhase; lastFailure?: string }> {
-  return [...swarmTransportRegistry.snapshot().entries()].map(([id, entry]) => ({
-    id,
-    phase: entry.phase,
-    lastFailure: entry.lastFailure,
-  }));
-}
 
 /** Human label for the peer list: what path is this peer's traffic really
  *  taking? Null = nothing worth showing yet (idle/connecting). */

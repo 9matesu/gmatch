@@ -98,11 +98,3 @@ export function getIce(id: string, wantSender: boolean): unknown[] {
     .map((i) => i.candidate)
 }
 
-/** Test helper: drop all offers and stop the TTL sweeper. */
-export function resetSignalStore() {
-  offers.clear()
-  if (sweepTimer) {
-    clearInterval(sweepTimer)
-    sweepTimer = null
-  }
-}

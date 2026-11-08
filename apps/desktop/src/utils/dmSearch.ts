@@ -35,12 +35,6 @@ export interface DmSearchHit {
   ts: number
 }
 
-export interface DmSearchResult {
-  hits: DmSearchHit[]
-  /** True when the archive was larger than the index budget. */
-  truncated: boolean
-}
-
 /** Flatten threads into one bounded, newest-first index. */
 export function buildDmSearchIndex<M extends SearchableMessage>(
   threads: Record<string, readonly M[] | undefined>,

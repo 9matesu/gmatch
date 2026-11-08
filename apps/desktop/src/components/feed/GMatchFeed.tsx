@@ -121,12 +121,6 @@ export interface FeedPost {
   cta_label?: string;
 }
 
-export const PRESET_CHAT_GROUPS = [
-  { id: 'group_general', name: 'General Lounge', icon: 'general', desc: 'Main public community' },
-  { id: 'group_arcade', name: 'Arcade Duelists', icon: 'arcade', desc: 'Card game matchmaking' },
-  { id: 'group_anime', name: 'Anime Syndicate', icon: 'anime', desc: 'Art & Booru showcase' },
-];
-
 const AD_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   discord: MessageCircle,
   coffee: Coffee,

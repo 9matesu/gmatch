@@ -5,12 +5,6 @@ export type LinkToken = {
 
 const URL_PATTERN = /(https?:\/\/[^\s<>"']+|www\.[^\s<>"']+|tg:\/\/[^\s<>"']+)/gi
 const TRAILING_PUNCTUATION = /[.,;:!?)\]}]+$/
-const MEDIA_EXT = /\.(jpe?g|png|gif|webp|avif|mp4|webm|mov|ogg|m4v)(\?.*)?$/i
-
-/** True if a normalized URL points directly at an image/video asset. */
-export function isMediaUrl(url: string): boolean {
-  return MEDIA_EXT.test(url.split('?')[0])
-}
 
 /** Normalize a matched URL token: trim trailing punctuation and ensure a scheme. */
 function normalizeUrl(raw: string): { display: string; href: string } | null {

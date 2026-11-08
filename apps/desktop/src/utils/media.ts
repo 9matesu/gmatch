@@ -308,16 +308,6 @@ export async function resolveTwitterMediaAll(url: string): Promise<string[] | nu
 }
 
 /**
- * Resolves a Twitter/X URL to a single playable direct video MP4 URL or image URL.
- * @deprecated Prefer resolveTwitterMediaAll — returns only the first item.
- */
-export async function resolveTwitterMedia(url: string): Promise<string | null> {
-  const all = await resolveTwitterMediaAll(url);
-  return all?.[0] ?? null;
-}
-
-
-/**
  * Computes a SHA-256 hex digest of a Blob/File's bytes. Used as a content
  * fingerprint so the server can dedup byte-identical re-uploads by the same
  * owner. Runs on the SubtleCrypto Web API available in browsers + workers.

@@ -111,10 +111,6 @@ export function playPress(_freq?: number) {
   playAtonalClick(0.12, 0.022);
 }
 
-export function playBeep() {
-  playPress();
-}
-
 /** Short rimshot click (atonal noise crack, lower volume, no tonal oscillator) */
 export function playRimshot() {
   playAtonalClick(0.15, 0.032);
@@ -156,8 +152,6 @@ export function playChime() {
     osc.stop(start + 0.26);
   });
 }
-
-export const playNotification = playChime;
 
 /** Uplifting like ding */
 export function playLike() {
@@ -250,27 +244,6 @@ export function playTierUp() {
     osc.start(start);
     osc.stop(start + 0.32);
   });
-}
-
-/** Round start gong */
-export function playRoundStart() {
-  const audio = ensureCtx();
-  if (!audio) return;
-  const now = audio.currentTime;
-
-  const osc = audio.createOscillator();
-  const gain = audio.createGain();
-
-  osc.type = 'square';
-  osc.frequency.setValueAtTime(440, now);
-  osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);
-
-  gain.gain.setValueAtTime(0.3, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
-
-  osc.connect(gain).connect(audio.destination);
-  osc.start(now);
-  osc.stop(now + 0.22);
 }
 
 /** Clock tick */

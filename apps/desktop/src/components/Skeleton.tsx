@@ -20,16 +20,6 @@ export function CardSkeleton() {
   );
 }
 
-export function IdentityCardSkeleton() {
-  return (
-    <div className="bg-retro-panel p-6 border border-border-glass">
-      <Skeleton className="h-3 w-32 mb-2" />
-      <Skeleton className="h-5 w-64 mb-4" />
-      <Skeleton className="h-10 w-36" />
-    </div>
-  );
-}
-
 export function PageSkeleton() {
   return (
     <main id="main-content" role="status" aria-label="Loading page" className="flex-grow flex items-center justify-center">

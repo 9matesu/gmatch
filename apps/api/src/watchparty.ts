@@ -17,7 +17,6 @@ import {
   type WatchRoster,
   type WatchSettings,
   type WatchSnapshot,
-  type WatchSync,
 } from '@orbit/protocol'
 
 // Re-exported so the existing importers keep one import site.
@@ -386,12 +385,6 @@ export function controlsParty(party: Party, userId: string): boolean {
   reconcileHost(party)
   if (Boolean(party.hostId) && party.hostId === userId) return true
   return party.sharedControl && !party.lockVideo && party.members.has(userId)
-}
-
-/** A room + the payload(s) to broadcast into it. */
-export interface WatchBroadcast {
-  room: string
-  payload: WatchPayload | WatchPayload[]
 }
 
 /** Validate + apply one client control frame. Returns null to drop it. */

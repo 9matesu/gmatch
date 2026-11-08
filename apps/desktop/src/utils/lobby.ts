@@ -109,17 +109,3 @@ export function resolveDisplayName(id: string, sources: NameResolutionSources = 
   return generateFallbackName(id)
 }
 
-export interface TagResolutionSources {
-  users?: User[] | null
-  players?: LobbyState['players'] | null
-}
-
-/** Tags come from the users directory when available; fall back to the lobby roster. */
-export function resolveTags(id: string, sources: TagResolutionSources = {}): string[] | null {
-  const { users, players } = sources
-  const fromUsers = users?.find((u) => u.id === id)?.tags
-  if (fromUsers && fromUsers.length > 0) return fromUsers
-  const fromPlayers = players?.find((p) => p.user_id === id)?.tags
-  if (fromPlayers) return Array.isArray(fromPlayers) ? fromPlayers : [fromPlayers]
-  return null
-}

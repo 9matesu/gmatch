@@ -114,27 +114,6 @@ export function unwatchMailSocket(ws: any): void {
   watcherAdapters.delete(ws)
 }
 
-export function watchToken(token: string, conn: Watcher): () => void {
-  if (!TOKEN_RE.test(token)) return () => {}
-  let set = watchers.get(token)
-  if (!set) {
-    set = new Set()
-    watchers.set(token, set)
-  }
-  set.add(conn)
-  return () => {
-    set!.delete(conn)
-    if (set!.size === 0) watchers.delete(token)
-  }
-}
-
-export function unwatchAll(conn: Watcher): void {
-  for (const [token, set] of watchers) {
-    set.delete(conn)
-    if (set.size === 0) watchers.delete(token)
-  }
-}
-
 function notify(token: string, env: MailEnvelope): void {
   const set = watchers.get(token)
   if (!set) return

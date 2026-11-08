@@ -877,7 +877,6 @@ export function setSwarmReceiptIdentity(identity: SwarmReceiptIdentity | null): 
  * is allowed to claim durable custody in a receipt.
  */
 async function confirmDurableHold(id: string): Promise<boolean> {
-  if (typeof __durableReadBackForTests === 'function') return __durableReadBackForTests(id)
   try {
     const blob = await readDurableObject(id)
     if (!blob || !isSha256Hex(id)) return false
@@ -979,12 +978,6 @@ export function sendSwarmFrame(msg: SwarmMessage): boolean {
   } catch {
     return false
   }
-}
-
-/** Test seam for the durable read-back (node tests have no vault). */
-let __durableReadBackForTests: ((id: string) => Promise<boolean>) | null = null
-export function __setDurableReadBackForTests(fn: ((id: string) => Promise<boolean>) | null): void {
-  __durableReadBackForTests = fn
 }
 
 /** Test seam: wipe challenge/receipt state (durable bytes untouched). */

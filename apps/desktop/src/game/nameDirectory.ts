@@ -125,11 +125,6 @@ export function nameRoster(): Map<string, NameRosterEntry> {
   return out
 }
 
-/** Every known name, for diagnostics and tests. */
-export function allNames(): Record<string, string> {
-  return Object.fromEntries(names)
-}
-
 export function __resetNameDirectoryForTests(): void {
   names = new Map()
 }

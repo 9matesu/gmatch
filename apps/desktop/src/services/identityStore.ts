@@ -116,10 +116,6 @@ export function getCurrentIdentity(): OrbitIdentity | null {
   return state.identity;
 }
 
-export function isIdentityLoaded(): boolean {
-  return state.isLoaded;
-}
-
 let loadPromise: Promise<void> | null = null;
 
 /**

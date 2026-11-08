@@ -17,8 +17,6 @@
 import { signRequestHeaders } from './api'
 import type { OrbitIdentityLike } from './api'
 
-export type NodeCapability = 'stateful'
-
 const cache = new Map<string, boolean>()
 const inflight = new Map<string, Promise<boolean>>()
 

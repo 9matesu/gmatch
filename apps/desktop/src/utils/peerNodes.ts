@@ -105,15 +105,6 @@ export function rememberKnownNodeHint(hint: string | null | undefined): void {
   rememberKnownNode(/^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`)
 }
 
-/** Forget a peer (it went away): the map is a hint, not a ledger. */
-export function forgetPeerNode(orbitId: string): void {
-  if (!orbitId) return
-  const map = readJson<Record<string, string>>(PEER_NODES_KEY)
-  if (!map || !(orbitId in map)) return
-  delete map[orbitId]
-  writeJson(PEER_NODES_KEY, map)
-}
-
 /** test seam */
 export function _resetPeerNodes(): void {
   try {

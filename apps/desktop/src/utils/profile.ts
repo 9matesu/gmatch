@@ -6,8 +6,6 @@ import type { OrbitIdentity } from '@orbit/crypto';
 export { MAX_TAGS, MAX_TAG_LENGTH };
 
 export const MAX_DISPLAY_NAME_LENGTH = 50;
-export const MAX_BIO_LENGTH = 150;
-export const MAX_WEBSITE_LENGTH = 200;
 
 /** The single shape the web client persists via /api/users/profile. */
 export interface ProfilePatch {

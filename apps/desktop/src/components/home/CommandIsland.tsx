@@ -30,8 +30,6 @@ import { formatCount } from '../../ui/format';
 import type { ViewMode } from '../../game/types';
 export type MainViewType = 'feed' | 'games' | 'create' | 'messages' | 'profile' | 'game' | 'gallery' | 'store' | 'pc_domination' | 'grid' | 'rooms' | 'servers' | 'watch';
 
-export type GamesNavTab = 'duel' | 'cards' | 'babecock' | 'ranks' | 'idle';
-
 export interface ActiveHackSession {
   itemId: string;
   itemName: string;

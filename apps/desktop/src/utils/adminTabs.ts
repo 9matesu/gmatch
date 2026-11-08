@@ -5,7 +5,7 @@ import {
   Globe,
   Settings,
 } from "lucide-react";
-import type { TabConfig, TabId, TabSection, AdminState } from "./adminTypes";
+import type { TabConfig, TabId, AdminState } from "./adminTypes";
 
 export const TAB_REGISTRY: TabConfig[] = [
   {
@@ -58,27 +58,13 @@ export const TAB_REGISTRY: TabConfig[] = [
   },
 ];
 
-export const TAB_SECTIONS: TabSection[] = [
-  "Operations",
-  "System",
-];
-
 export function getTabConfig(tabId: TabId): TabConfig | undefined {
   return TAB_REGISTRY.find(t => t.id === tabId);
-}
-
-export function getTabsBySection(section: TabSection): TabConfig[] {
-  return TAB_REGISTRY.filter(t => t.section === section);
 }
 
 export function getTabBadge(tabId: TabId, state: AdminState): string | null {
   const tab = getTabConfig(tabId);
   return tab?.badge?.(state) || null;
-}
-
-export function getTabRoute(tabId: TabId): string | undefined {
-  const tab = getTabConfig(tabId);
-  return tab?.route;
 }
 
 export const LEGACY_TAB_MAP: Record<string, TabId> = {

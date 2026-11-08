@@ -26,12 +26,6 @@ interface CreateCardModalProps {
   initialFile?: File | null;
 }
 
-export interface CardPrefill {
-  url: string;
-  tags: string[];
-  name: string;
-}
-
 export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0, initialMedia = null, initialFile = null }: CreateCardModalProps) {
   const [file, setFile] = useState<File | null>(initialFile);
   const [url, setUrl] = useState('');

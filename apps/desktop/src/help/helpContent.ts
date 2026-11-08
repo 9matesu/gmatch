@@ -324,4 +324,3 @@ export const HELP_TOPICS: HelpTopic[] = [
   },
 ]
 
-export const HELP_TOPIC_IDS = HELP_TOPICS.map((t) => t.id)
