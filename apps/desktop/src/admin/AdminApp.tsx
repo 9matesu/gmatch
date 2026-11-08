@@ -294,7 +294,7 @@ export default function AdminPageClient({ identity: appIdentity }: { identity?: 
           break;
         case "moderator":
           await orbitFetch(`/api/admin/users/${args[0]}/moderator`, {
-            method: "PUT",
+            method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ is_moderator: args[1] }),
           }, identity);

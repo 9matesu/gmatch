@@ -265,7 +265,7 @@ export const adminApi = {
 
   toggleModerator: (identity: OrbitIdentity, userId: string, isModerator: boolean) =>
     fetchJson<{ success: boolean }>(`${ADMIN_BASE}/users/${userId}/moderator`, identity, {
-      method: "PUT",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ is_moderator: isModerator }),
     }),

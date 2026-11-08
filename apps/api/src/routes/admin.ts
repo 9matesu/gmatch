@@ -136,55 +136,21 @@ admin.post('/verify-pin', async (c) => {
   return c.json({ success: true })
 })
 
-// Protect all moderation endpoints with adminAuth
-admin.use('/dashboard', adminAuth)
-admin.use('/content-reports', adminAuth)
-admin.use('/content-reports/*', adminAuth)
-admin.use('/cases', adminAuth)
-admin.use('/cases/*', adminAuth)
-admin.use('/users/*', adminAuth)
-admin.use('/users', adminAuth)
-admin.use('/announcements/*', adminAuth)
-admin.use('/announcements', adminAuth)
-admin.use('/recommendations/*', adminAuth)
-admin.use('/recommendations', adminAuth)
-admin.use('/live', adminAuth)
-admin.use('/matches/*', adminAuth)
-admin.use('/matches', adminAuth)
-admin.use('/special-matches/*', adminAuth)
-admin.use('/special-matches', adminAuth)
-admin.use('/lobby-images/*', adminAuth)
-admin.use('/lobby-images', adminAuth)
-admin.use('/posts/*', adminAuth)
-admin.use('/posts', adminAuth)
-admin.use('/settings/*', adminAuth)
-admin.use('/objects/*', adminAuth)
-admin.use('/objects', adminAuth)
-admin.use('/cleanup', adminAuth)
-// Admin Panel v2 — new moderation surfaces (D2-D6): lobby
-// comments, private messages, admin audit log, daily stats.
-admin.use('/lobby-comments', adminAuth)
-admin.use('/lobby-comments/*', adminAuth)
-admin.use('/audit-log', adminAuth)
-admin.use('/audit-log/*', adminAuth)
-admin.use('/daily-stats', adminAuth)
-admin.use('/bot-config', adminAuth)
-admin.use('/bot-config/*', adminAuth)
-admin.use('/bots', adminAuth)
-admin.use('/bots/*', adminAuth)
-admin.use('/cards/*', adminAuth)
-admin.use('/cards', adminAuth)
-admin.use('/economy/*', adminAuth)
-admin.use('/decks/*', adminAuth)
-admin.use('/decks', adminAuth)
-admin.use('/marketplace/*', adminAuth)
-admin.use('/marketplace', adminAuth)
-admin.use('/rooms/*', adminAuth)
-admin.use('/rooms', adminAuth)
-admin.use('/babecock/*', adminAuth)
-admin.use('/babecock', adminAuth)
-admin.use('/chat', adminAuth)
-admin.use('/chat/*', adminAuth)
+// Protect EVERY admin endpoint with adminAuth.
+//
+// This used to be a hand-maintained list of 46 path prefixes, which meant
+// authorization was opt-in: a new route shipped UNPROTECTED unless someone
+// remembered to add it. Three destructive routes did exactly that —
+// `/purge-e2e`, `/database/clean-posts` and `/database/migrate-lobby-to-posts`
+// — and `orbitAuth` auto-registers any Ed25519 identity, so any client that
+// could mint a keypair could wipe the node.
+//
+// One wildcard makes authorization a property of the MOUNT POINT instead of a
+// list that has to be edited per route: a new admin route is admin-gated by
+// construction. `/verify-pin` is registered ABOVE this line (it is what
+// GRANTS the admin flag), so it stays reachable — and it is the only
+// exception.
+admin.use('*', adminAuth)
 
 /** Shared paged-query parsing for the list endpoints: trimmed search,
  * clamped limit/offset. Keeps every /api/admin list honest about ranges. */
