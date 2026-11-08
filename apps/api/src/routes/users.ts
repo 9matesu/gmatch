@@ -390,9 +390,9 @@ users.get('/online', async (c) => {
 // returns only public fields.
 users.get('/:id', async (c) => {
   const id = c.req.param('id')
-  // Counts are COUNTed from the Followers table, not the Users columns: the
-  // denormalized followers_count/following_count drift after cascade deletes
-  // and admin edits (and the columns stay there purely as the bump target).
+  // Counts are COUNTed from the Followers table. There is no Users column to
+  // drift: the denormalized followers_count/following_count pair was dropped
+  // (migration 058) because nothing read it.
   const row = await c.env.DB.prepare(
     `SELECT u.id, u.public_key, u.encryption_pub_key, u.display_name, u.bio, u.website,
             u.tags, u.pfp_url, u.last_seen, u.score, u.posts_count, u.likes_received,
@@ -656,16 +656,13 @@ users.on(['PATCH', 'PUT'], '/profile', async (c) => {
 })
 
 // ─── Instagram-style asymmetric follows (Followers table) ───
-
-async function bumpFollowCounts(db: D1Turso, followerId: string, followeeId: string, delta: number) {
-  if (delta > 0) {
-    await db.prepare('UPDATE Users SET followers_count = COALESCE(followers_count, 0) + 1 WHERE id = ?').bind(followeeId).run().catch(() => {})
-    await db.prepare('UPDATE Users SET following_count = COALESCE(following_count, 0) + 1 WHERE id = ?').bind(followerId).run().catch(() => {})
-  } else {
-    await db.prepare('UPDATE Users SET followers_count = MAX(COALESCE(followers_count, 0) - 1, 0) WHERE id = ?').bind(followeeId).run().catch(() => {})
-    await db.prepare('UPDATE Users SET following_count = MAX(COALESCE(following_count, 0) - 1, 0) WHERE id = ?').bind(followerId).run().catch(() => {})
-  }
-}
+//
+// The Followers TABLE is the only source of truth. There used to be
+// denormalized Users.followers_count / Users.following_count columns that
+// every follow/unfollow bumped; they drifted after every cascade delete and
+// every admin edit, and NO public read path used them — so the admin panel
+// was editing a number the product ignored. The columns are gone; every
+// count is a COUNT(*) over Followers.
 
 /** Table-derived follow counts, same definition the profile read paths use. */
 async function followCounts(db: D1Turso, userId: string): Promise<{ followers_count: number; following_count: number }> {
@@ -691,7 +688,6 @@ users.post('/:id/follow', async (c) => {
 
   const res = await db.prepare('INSERT OR IGNORE INTO Followers (follower_id, followee_id, accepted) VALUES (?, ?, 1)').bind(followerId, followeeId).run()
   if (Number(res.meta?.changes || 0) > 0) {
-    await bumpFollowCounts(db, followerId, followeeId, 1)
     broadcastToRoom('global', { type: 'follow', action: 'new', follower_id: followerId, followee_id: followeeId })
 
     try {
@@ -720,7 +716,6 @@ users.delete('/:id/follow', async (c) => {
 
   const res = await db.prepare('DELETE FROM Followers WHERE follower_id = ? AND followee_id = ?').bind(followerId, followeeId).run()
   if (Number(res.meta?.changes || 0) > 0) {
-    await bumpFollowCounts(db, followerId, followeeId, -1)
     broadcastToRoom('global', { type: 'follow', action: 'removed', follower_id: followerId, followee_id: followeeId })
   }
   return c.json({

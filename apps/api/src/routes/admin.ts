@@ -1171,7 +1171,7 @@ admin.get('/users', async (c) => {
            COALESCE(lr.wins, 0) as matches_won,
            COALESCE(lr.losses, 0) as matches_lost,
            COALESCE(w.balance, 0) as balance,
-           COALESCE(u.followers_count, 0) as followers_count,
+           (SELECT COUNT(*) FROM Followers fc WHERE fc.followee_id = u.id AND fc.accepted = 1) as followers_count,
            lp.status as lobby_status,
            CASE WHEN b.id IS NOT NULL THEN 1 ELSE 0 END as is_banned,
            b.reason as ban_reason, b.created_at as ban_created_at,
@@ -1435,17 +1435,19 @@ admin.post('/purge-e2e', async (c) => {
 //                                    score_total via MAX for back-compat
 //   - reputation / add_reputation -> persistent reputation (Users.score_total)
 //   - gcoins / add_gcoins         -> g$ wallet via EconomyService (ledgered)
-//   - likes_received, followers_count, is_moderator, is_admin (unchanged)
+//   - likes_received, is_moderator, is_admin (unchanged)
+//
+// Follower counts are NOT adjustable: they are a COUNT(*) over the Followers
+// table, so a number typed into an admin form could never be true. Editing
+// the old denormalized column changed a value no read path used.
 admin.post('/users/:id/adjust', async (c) => {
   const orbitId = c.get('orbitId')
   const userId = c.req.param('id')
 
   let scoreDelta: number | undefined
   let likesDelta: number | undefined
-  let followersDelta: number | undefined
   let setScore: number | undefined
   let setLikes: number | undefined
-  let setFollowers: number | undefined
   let setModerator: boolean | undefined
   let setAdmin: boolean | undefined
   let setReputation: number | undefined
@@ -1456,10 +1458,8 @@ admin.post('/users/:id/adjust', async (c) => {
     const body = await c.req.json()
     if (typeof body?.score === 'number') setScore = body.score
     if (typeof body?.likes_received === 'number') setLikes = body.likes_received
-    if (typeof body?.followers_count === 'number') setFollowers = body.followers_count
     if (typeof body?.add_score === 'number') scoreDelta = body.add_score
     if (typeof body?.add_likes === 'number') likesDelta = body.add_likes
-    if (typeof body?.add_followers === 'number') followersDelta = body.add_followers
     if (typeof body?.is_moderator === 'boolean') setModerator = body.is_moderator
     if (typeof body?.is_admin === 'boolean' && userId !== orbitId) setAdmin = body.is_admin
     if (typeof body?.reputation === 'number') setReputation = body.reputation
@@ -1475,7 +1475,6 @@ admin.post('/users/:id/adjust', async (c) => {
     ? setReputation
     : (Number(user.score_total || 0) + (reputationDelta || 0))
   const newLikes = setLikes !== undefined ? setLikes : (Number(user.likes_received || 0) + (likesDelta || 0))
-  const newFollowers = setFollowers !== undefined ? setFollowers : (Number(user.followers_count || 0) + (followersDelta || 0))
   const newModerator = setModerator !== undefined ? (setModerator ? 1 : 0) : Number(user.is_moderator || 0)
   const newAdmin = setAdmin !== undefined ? (setAdmin ? 1 : 0) : Number(user.is_admin || 0)
 
@@ -1517,11 +1516,11 @@ admin.post('/users/:id/adjust', async (c) => {
 
   await c.env.DB.prepare(`
     UPDATE Users
-    SET score = ?, score_total = ?, likes_received = ?, followers_count = ?, is_moderator = ?, is_admin = ?
+    SET score = ?, score_total = ?, likes_received = ?, is_moderator = ?, is_admin = ?
     WHERE id = ?
-  `).bind(newScore, finalReputation, newLikes, newFollowers, newModerator, newAdmin, userId).run()
+  `).bind(newScore, finalReputation, newLikes, newModerator, newAdmin, userId).run()
 
-  await logAdminAction(c.env.DB, orbitId, 'adjust_user', { id: userId, type: 'user' }, `score=${newScore} reputation=${finalReputation} likes=${newLikes} followers=${newFollowers} mod=${newModerator}`)
+  await logAdminAction(c.env.DB, orbitId, 'adjust_user', { id: userId, type: 'user' }, `score=${newScore} reputation=${finalReputation} likes=${newLikes} mod=${newModerator}`)
 
   if (balance !== null) {
     await logAdminAction(c.env.DB, orbitId, 'adjust_wallet', { id: userId, type: 'user' }, `gcoins_delta=${gcoinsDelta} balance=${balance}`)
@@ -1534,7 +1533,6 @@ admin.post('/users/:id/adjust', async (c) => {
       score: newScore,
       reputation: finalReputation,
       likes_received: newLikes,
-      followers_count: newFollowers,
       is_moderator: Boolean(newModerator),
       is_admin: Boolean(newAdmin),
       balance,

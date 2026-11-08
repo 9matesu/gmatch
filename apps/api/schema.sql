@@ -49,8 +49,6 @@ CREATE TABLE IF NOT EXISTS Users (
   is_private INTEGER NOT NULL DEFAULT 0,
   bio TEXT,
   website TEXT,
-  followers_count INTEGER NOT NULL DEFAULT 0,
-  following_count INTEGER NOT NULL DEFAULT 0,
   posts_count INTEGER NOT NULL DEFAULT 0,
   is_moderator INTEGER NOT NULL DEFAULT 0,
   hidden_at DATETIME
@@ -760,7 +758,6 @@ CREATE INDEX IF NOT EXISTS idx_objects_public_feed ON Objects(is_public, created
 CREATE INDEX IF NOT EXISTS idx_objects_trending ON Objects(is_public, like_count, comment_count, created_at);
 CREATE INDEX IF NOT EXISTS idx_objects_shared_from ON Objects(shared_from);
 CREATE INDEX IF NOT EXISTS idx_users_is_private ON Users(is_private);
-CREATE INDEX IF NOT EXISTS idx_users_followers_count ON Users(followers_count);
 CREATE INDEX IF NOT EXISTS idx_users_is_moderator ON Users(is_moderator);
 CREATE INDEX IF NOT EXISTS idx_objects_is_sensitive ON Objects(is_sensitive);
 

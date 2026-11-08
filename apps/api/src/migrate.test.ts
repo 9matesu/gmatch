@@ -31,11 +31,11 @@ async function userVersion(client: Awaited<ReturnType<typeof createClient>>): Pr
 }
 
 describe('gMatch Phase 1 migrations', () => {
-  it('migrates a fresh in-memory DB to user_version 57 with all new tables/columns', async () => {
+  it('migrates a fresh in-memory DB to user_version 58 with all new tables/columns', async () => {
     const client = createClient({ url: ':memory:' })
     await migrate(client)
 
-    expect(await userVersion(client)).toBe(57)
+    expect(await userVersion(client)).toBe(58)
 
     // Gossip relay envelopes (migration 055, plan G1)
     expect(await tableExists(client, 'GossipEnvelopes')).toBe(true)
@@ -66,12 +66,16 @@ describe('gMatch Phase 1 migrations', () => {
     expect(await indexExists(client, 'idx_comment_likes_comment')).toBe(true)
     expect(await indexExists(client, 'idx_saves_user')).toBe(true)
 
-    // Profile extras (migration 017)
-    for (const col of ['is_private', 'bio', 'website', 'followers_count', 'following_count', 'posts_count']) {
+    // Profile extras (migration 017). The follower counters it added were
+    // dropped again by 058 — the Followers table is the only source of truth.
+    for (const col of ['is_private', 'bio', 'website', 'posts_count']) {
       expect(await columnExists(client, 'Users', col)).toBe(true)
     }
+    for (const col of ['followers_count', 'following_count']) {
+      expect(await columnExists(client, 'Users', col)).toBe(false)
+    }
     expect(await indexExists(client, 'idx_users_is_private')).toBe(true)
-    expect(await indexExists(client, 'idx_users_followers_count')).toBe(true)
+    expect(await indexExists(client, 'idx_users_followers_count')).toBe(false)
 
     // Post likes + post_tags (migration 018)
     expect(await tableExists(client, 'PostLikes')).toBe(true)
@@ -336,7 +340,7 @@ describe('gMatch Phase 1 migrations', () => {
     const client = createClient({ url: ':memory:' })
     await migrate(client)
     const versionAfterFirst = await userVersion(client)
-    expect(versionAfterFirst).toBe(57)
+    expect(versionAfterFirst).toBe(58)
     expect(await columnExists(client, 'ServerDirectory', 'tags')).toBe(true)
 
     // Running migrate() again is a no-op
@@ -365,15 +369,15 @@ describe('gMatch Phase 1 migrations', () => {
     // deferred until migration 053 has added the column.
     await migrate(client)
 
-    expect(await userVersion(client)).toBe(57)
+    expect(await userVersion(client)).toBe(58)
     expect(await columnExists(client, 'Objects', 'is_avatar')).toBe(true)
     expect(await indexExists(client, 'idx_objects_is_avatar')).toBe(true)
   })
 
-  it('upgrades a pre-gMatch snapshot (user_version 13) by applying 014-057', async () => {
+  it('upgrades a pre-gMatch snapshot (user_version 13) by applying 014-058', async () => {
     const client = createClient({ url: ':memory:' })
     await migrate(client)
-    expect(await userVersion(client)).toBe(57)
+    expect(await userVersion(client)).toBe(58)
 
     // Tear down gMatch additions so we're effectively at pre-014 state.
     await client.execute('DROP TABLE IF EXISTS Saves')
@@ -396,10 +400,10 @@ describe('gMatch Phase 1 migrations', () => {
     // Pretend we're still on the pre-gMatch migration version.
     await client.execute('PRAGMA user_version = 13')
 
-    // Re-run migrate — it should detect user_version=13 and apply 014-057 in order
+    // Re-run migrate — it should detect user_version=13 and apply 014-058 in order
     await migrate(client)
 
-    expect(await userVersion(client)).toBe(57)
+    expect(await userVersion(client)).toBe(58)
     expect(await tableExists(client, 'Followers')).toBe(true)
     expect(await tableExists(client, 'Comments')).toBe(true)
     expect(await tableExists(client, 'CommentLikes')).toBe(true)

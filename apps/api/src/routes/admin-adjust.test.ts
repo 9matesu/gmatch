@@ -90,4 +90,29 @@ describe('admin user adjustment (metric-specific)', () => {
     expect(typeof row.score).toBe('number')
     expect(row.followers_count).toBe(0)
   })
+
+  it('cannot fabricate a follower count — the number is a COUNT(*) over Followers', async () => {
+    // The admin panel used to EDIT Users.followers_count, a column no public
+    // read path used. A typed-in number could never be true, so the field is
+    // gone and the list derives the count from the Followers table.
+    await env.DB.prepare('INSERT INTO Followers (follower_id, followee_id, accepted) VALUES (?, ?, 1)')
+      .bind('someone-else', target.orbitId).run()
+
+    const listRes = await app.request('/api/admin/users', { headers: authHeaders(admin, 'GET', '/api/admin/users') }, env)
+    const list: any = await listRes.json()
+    const row = list.find((u: any) => u.id === target.orbitId)
+    expect(row.followers_count).toBe(1)
+
+    const body = JSON.stringify({ followers_count: 999, add_followers: 500 })
+    const res = await app.request(`/api/admin/users/${target.orbitId}/adjust`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders(admin, 'POST', `/api/admin/users/${target.orbitId}/adjust`, body) },
+      body,
+    }, env)
+    expect(res.status).toBe(200)
+
+    const afterRes = await app.request('/api/admin/users', { headers: authHeaders(admin, 'GET', '/api/admin/users') }, env)
+    const after: any = await afterRes.json()
+    expect(after.find((u: any) => u.id === target.orbitId).followers_count).toBe(1)
+  })
 })

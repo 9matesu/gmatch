@@ -60,7 +60,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
   const [showTagsModal, setShowTagsModal] = useState<{ user: AdminUser } | null>(null);
   const [tagsInput, setTagsInput] = useState("");
   const [showBalanceModal, setShowBalanceModal] = useState<{ user: AdminUser } | null>(null);
-  const [balanceData, setBalanceData] = useState({ score: 0, likes: 0, followers: 0, gcoins: 0 });
+  const [balanceData, setBalanceData] = useState({ score: 0, likes: 0, gcoins: 0 });
   const [detailUser, setDetailUser] = useState<AdminUser | null>(null);
 
   // Cards & Marketplace State
@@ -257,7 +257,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
         break;
       case "balance":
         setShowBalanceModal({ user });
-        setBalanceData({ score: user.score || 0, likes: user.likes_received || 0, followers: user.followers_count || 0, gcoins: user.balance || 0 });
+        setBalanceData({ score: user.score || 0, likes: user.likes_received || 0, gcoins: user.balance || 0 });
         break;
       case "tags":
         setShowTagsModal({ user });
@@ -300,7 +300,6 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
       await adminApi.adjustUser(identity, showBalanceModal.user.id, {
         score: balanceData.score,
         likes_received: balanceData.likes,
-        followers_count: balanceData.followers,
         balance: balanceData.gcoins,
       });
       setShowBalanceModal(null);
@@ -798,7 +797,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
           onClose={() => setShowBalanceModal(null)}
           onConfirm={handleSaveBalance}
           title={`Adjust Balances: ${showBalanceModal.user.display_name || showBalanceModal.user.id}`}
-          description="Manually override user gameplay score, likes, followers, and currency."
+          description="Manually override user gameplay score, likes, and currency."
           confirmLabel="Save Balances"
           variant="primary"
         >
@@ -827,15 +826,6 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                 type="number"
                 value={balanceData.likes}
                 onChange={e => setBalanceData(p => ({ ...p, likes: Number(e.target.value) || 0 }))}
-                className="w-full bg-surface-canvas border border-border-glass rounded px-3 py-1.5 text-xs text-retro-fg font-mono outline-none"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-bold text-retro-muted uppercase block">Followers</label>
-              <input
-                type="number"
-                value={balanceData.followers}
-                onChange={e => setBalanceData(p => ({ ...p, followers: Number(e.target.value) || 0 }))}
                 className="w-full bg-surface-canvas border border-border-glass rounded px-3 py-1.5 text-xs text-retro-fg font-mono outline-none"
               />
             </div>

@@ -2,10 +2,12 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import app from '../index'
 import { createMockEnv, createTestIdentity, signRequestHeaders } from '../test-utils'
 
-// Follow counts are DERIVED from the Followers table — the denormalized
-// Users.followers_count/following_count columns drift (cascade deletes, admin
-// edits) and made the profile counters disagree with the follower lists.
-describe('profile follow counts are derived', () => {
+// Follow counts are DERIVED from the Followers table. There used to be
+// denormalized Users.followers_count / Users.following_count columns that
+// every follow/unfollow bumped; they drifted after cascade deletes and
+// admin edits, and the admin panel edited a number no read path used. The
+// columns are gone — the table is the only source of truth.
+describe('profile follow counts are derived from the Followers table', () => {
   let env: any
   let alice: any
   let bob: any
@@ -17,8 +19,8 @@ describe('profile follow counts are derived', () => {
     bob = createTestIdentity()
     carol = createTestIdentity()
     for (const u of [alice, bob, carol]) {
-      await env.DB.prepare(`INSERT INTO Users (id, public_key, display_name, followers_count, following_count, last_seen) VALUES (?, ?, ?, 99, 99, datetime('now'))`)
-        .bind(u.orbitId, u.publicKeyHex, u.orbitId.slice(8, 13), new Date().toISOString()).run()
+      await env.DB.prepare(`INSERT INTO Users (id, public_key, display_name, last_seen) VALUES (?, ?, ?, datetime('now'))`)
+        .bind(u.orbitId, u.publicKeyHex, u.orbitId.slice(8, 13)).run()
     }
     // Ground truth: bob + carol follow alice; alice follows nobody. A pending
     // (accepted=0) follow must NOT count.
@@ -31,7 +33,14 @@ describe('profile follow counts are derived', () => {
     return app.fetch(new Request(`http://localhost${path}`, { headers: signRequestHeaders(who, 'GET', path) }), env)
   }
 
-  it('GET /api/users/:id returns table-derived counts, not the stale columns', async () => {
+  it('the denormalized counter columns do not exist', async () => {
+    const cols = await env.DB.prepare('PRAGMA table_info(Users)').all<{ name: string }>()
+    const names = cols.results.map((c) => c.name)
+    expect(names).not.toContain('followers_count')
+    expect(names).not.toContain('following_count')
+  })
+
+  it('GET /api/users/:id returns table-derived counts', async () => {
     const body = (await (await get(`/api/users/${alice.orbitId}`, bob)).json()) as any
     expect(body.user.followers_count).toBe(2)
     expect(body.user.following_count).toBe(0)

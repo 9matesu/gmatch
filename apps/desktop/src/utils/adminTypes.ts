@@ -21,8 +21,8 @@ export interface AdminUser {
   gacha_downloads_received?: number;
   score?: number;
   balance?: number;
+  /** Derived from the Followers table (the admin list never reads a counter column). */
   followers_count?: number;
-  following_count?: number;
   is_admin?: boolean | number;
   is_moderator?: boolean | number;
   is_banned?: boolean | number;
