@@ -266,6 +266,36 @@ describe('p2pSwarm (WebRTC Object Swarm Transfer)', () => {
     vi.unstubAllGlobals()
   })
 
+  it('a session fetch survives a hostile pre-key chunk (one shared engine)', async () => {
+    // The module path drops a chunk that fails its AEAD check and lets the
+    // real seeder's stream complete. The old session twin rejected the fetch
+    // on the FIRST such chunk — the drift this suite pins shut: both paths
+    // run the same engine now, so a session fetcher must tolerate it too.
+    const text = 'k'.repeat(9 * 1024)
+    const blob = new Blob([text], { type: 'image/png' })
+    const seeder = createSwarmSession({
+      send: (m) => { void fetcher.handleMessage(m) },
+      localStore: new Map([['session-hostile', blob]]),
+    })
+    const fetcher = createSwarmSession({
+      send: (m) => {
+        if (m.type !== 'SWARM_WANT') return
+        // A hostile peer that saw the WANT injects a chunk that fails its
+        // AEAD check before the real seeder answers.
+        void fetcher.handleMessage({
+          type: 'SWARM_CHUNK', id: 'session-hostile', index: 0, total: 9999,
+          mimeType: 'image/png', enc: 'swarm-v1', transferId: m.transferId,
+          nonce: Buffer.alloc(24, 7).toString('base64'),
+          dataBase64: Buffer.alloc(64, 3).toString('base64'),
+        })
+        void seeder.handleMessage(m)
+      },
+    })
+
+    const received = await fetcher.requestObject('session-hostile', 5000)
+    expect(received.size).toBe(blob.size)
+  })
+
   it('ignores an unauthenticated chunk that lies about the transfer size', async () => {
     // A hostile peer that saw the WANT knows the victim's transferId. It can
     // inject a chunk that fails its AEAD check and claims a bogus `total`.
