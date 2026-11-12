@@ -186,10 +186,22 @@ export function signalLocalReady(partyId: string, entryId: string, hash?: string
 /**
  * Ids whose bytes this client verified (own forged files, or swarm transfers
  * that passed the expected-hash check). Only these may claim readiness.
+ * Bounded ring (plan B1): one id per verified transfer used to live forever;
+ * past the cap the oldest id is forgotten, which at worst asks an ancient
+ * room entry to re-verify before claiming readiness again.
  */
+const VERIFIED_IDS_CAP = 256
 const verifiedIds = new Set<string>()
 export function markVerified(...ids: Array<string | undefined>): void {
-  for (const id of ids) if (id) verifiedIds.add(id)
+  for (const id of ids) {
+    if (!id) continue
+    verifiedIds.add(id)
+    while (verifiedIds.size > VERIFIED_IDS_CAP) {
+      const oldest = verifiedIds.values().next().value
+      if (oldest === undefined) break
+      verifiedIds.delete(oldest)
+    }
+  }
 }
 export function isVerified(...ids: Array<string | undefined>): boolean {
   return ids.some((id) => id !== undefined && verifiedIds.has(id as string))

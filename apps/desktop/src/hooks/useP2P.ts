@@ -119,6 +119,23 @@ function arePeersStructurallyEqual(a: User[], b: User[]): boolean {
   return true;
 }
 
+/** The same 24h window the storage hydration uses: entries unseen for longer
+ *  are ghosts and are dropped (plan B1). Pure so it is unit-testable. */
+export function pruneStalePeers(map: Map<string, User>, now = Date.now()): number {
+  const cutoff = now - 24 * 60 * 60 * 1000;
+  let dropped = 0;
+  for (const [id, p] of map) {
+    const t = p.last_seen ? new Date(p.last_seen).getTime() : 0;
+    // A peer with no timestamp at all cannot be aged; keep it (hydration
+    // already drops timestamp-less ancient ghosts at boot).
+    if (t > 0 && t < cutoff) {
+      map.delete(id);
+      dropped++;
+    }
+  }
+  return dropped;
+}
+
 // Module-level so it can be referenced from the WebSocket effect without
 // ordering issues and keeps a stable identity (not memoized in the hook).
 function transmitOverWebSocket(socket: WebSocket | null, queue: SwarmAnnounce[], msg: SwarmAnnounce) {
@@ -436,6 +453,12 @@ export function useP2P(identity: OrbitIdentity | null) {
     };
 
     updatePeersList();
+
+    // Periodic ghost sweep (plan B1): the map used to grow for the whole
+    // session. Hourly is plenty — entries die at 24h unseen.
+    const pruneTimer = setInterval(() => {
+      if (pruneStalePeers(peerMapRef.current) > 0) updatePeersList();
+    }, 60 * 60 * 1000);
 
     /**
      * Apply one peer announcement.
@@ -871,6 +894,7 @@ export function useP2P(identity: OrbitIdentity | null) {
       clearInterval(interval);
       clearInterval(rosterInterval);
       clearInterval(transportInterval);
+      clearInterval(pruneTimer);
       setMeshIceFailureHandler(null);
       if (typeof document !== 'undefined') {
         document.removeEventListener('visibilitychange', onVisible)

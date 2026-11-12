@@ -691,6 +691,25 @@ unbounded `Map`, so every object the app had ever seen stayed resident: the
 (disk) or IndexedDB, so an eviction costs one re-read — and boot hydration
 (`hydrateLocalObjects`) fills to the same budget instead of 256MB.
 
+### The remaining bounded stores (2026-11-12)
+
+The same plan bounded the last four session-lifetime collections:
+
+- `game/presenceStore.ts` — an ingest now drops records not re-sighted for 24h
+  (the same window the P2P peer map's hydration uses). Every id ever seen used
+  to live in the roster Map forever.
+- `utils/mediaData.ts` — `localObjectUrlCache` (legacy IndexedDB object blob
+  URLs) is an LRU capped at 512; a hit refreshes recency and eviction revokes
+  the URL, freeing the Blob. The gallery rebuild re-mints every row it still
+  holds, so a live row is never evicted; nothing durable is affected (the bytes
+  stay in IndexedDB).
+- `hooks/watchLocalShare.ts` — `verifiedIds` is a bounded ring (256); past the
+  cap the oldest verified transfer id is forgotten, which at worst asks an
+  ancient room entry to re-verify before claiming readiness again.
+- `hooks/useP2P.ts` — the in-memory peer map is swept hourly by
+  `pruneStalePeers` (entries unseen >24h are ghosts); storage hydration already
+  applied the same window at boot.
+
 ---
 
 ## 5. Honest Boundaries & Fallback Behavior
