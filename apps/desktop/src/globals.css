@@ -816,6 +816,42 @@
   padding: 1px;
 }
 
+/* Border beam: a light streak that runs around the frame's edge. Painted on
+   a ::before ring (same mask-composite trick as .edge-lit) so the beam only
+   covers the border, never the media inside. */
+.border-beam::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  pointer-events: none;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--beam-angle, 0deg),
+    transparent 0deg,
+    transparent 300deg,
+    rgba(255, 255, 255, 0.85) 342deg,
+    transparent 360deg
+  );
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: beam-orbit 4s linear infinite;
+}
+
+@property --beam-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes beam-orbit {
+  to { --beam-angle: 360deg; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .border-beam::after { animation: none; }
+}
+
 /* Grain overlay: REMOVED (CDP perf sweep 2026-09-10). A fixed full-viewport
    layer with mix-blend-mode: soft-light forced a blend-readback on every
    composited frame — attribution showed it owned the entire RecalcStyle cost

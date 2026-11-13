@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
 import { useGame } from '../game/store'
 import { gridSizeForMode, isGridMode } from '../game/store'
-import { CAPS, capEffectLabel, capStacks } from '../game/caps'
 import { HEAT_WINDOW_MS, heatMultiplier } from '../game/economy'
 import type { CapId, ViewMode } from '../game/types'
 import { playPress } from '../utils/sounds'
@@ -13,7 +12,6 @@ import { formatNum } from './format'
 import {
   BTN,
   BTN_SMALL,
-  DISPLAY,
   FLOAT_GC,
   FLOAT_GC_CRIT,
   GOON_IMAGE,
@@ -67,68 +65,6 @@ function useReducedMotion(): boolean {
     return () => mq.removeEventListener('change', on)
   }, [])
   return reduce
-}
-
-/**
- * The powerups dock is its own component on purpose.
- *
- * It is the only part of the panel that needs the points counter, and points
- * change EVERY SECOND (passive income). Subscribing to them here instead of
- * in GoonPanel keeps the media stage from re-rendering on every tick: the
- * dock's four small buttons re-render, the image does not.
- */
-function CapsDock() {
-  const points = useGame((s) => s.points)
-  const caps = useGame((s) => s.caps)
-  const popCap = useGame((s) => s.popCap)
-  const now = Date.now()
-
-  return (
-    <div
-      className="flex flex-none items-center gap-2 overflow-x-auto rounded-xl border border-border-glass bg-glass-w8 p-1.5 backdrop-blur-md styled-scrollbar"
-      role="group"
-      aria-label="Powerups dock"
-    >
-      {CAP_ORDER.map((id, idx) => {
-        const def = CAPS[id]
-        const st = capStacks(caps, id, now)
-        const isLive = st.count > 0
-        return (
-          <button
-            key={id}
-            type="button"
-            className={`group relative flex flex-1 min-w-[125px] cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-all duration-150 enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${isLive
-              ? 'border-rose-500/50 bg-rose-500/10 shadow-[0_0_12px_rgba(244,63,94,0.15)] hover:border-rose-500/70 hover:bg-rose-500/15'
-              : 'border-border-glass bg-retro-bg/60 hover:border-border-strong hover:bg-glass-w5'
-              }`}
-            disabled={points < def.cost}
-            onClick={() => popCap(id)}
-            title={`${def.name}. ${capEffectLabel(id)}. ${formatNum(def.cost)} pts. Press [${idx + 1}]`}
-          >
-            <kbd className={`${MONO} inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border border-white/15 bg-black/60 text-[10px] font-bold text-white/60 group-hover:text-white transition-colors`}>
-              {idx + 1}
-            </kbd>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-1">
-                <span className={`${DISPLAY} truncate text-xs font-bold leading-tight text-white group-hover:text-retro-accent transition-colors`}>
-                  {def.name}
-                </span>
-                {st.count > 0 && (
-                  <span className={`${MONO} text-[10px] font-black text-rose-400`}>
-                    x{st.count}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center justify-between gap-1 text-[10px] text-retro-muted leading-tight">
-                <span className="truncate">{capEffectLabel(id)}</span>
-                <span className={`${MONO} shrink-0 font-semibold text-retro-body`}>{formatNum(def.cost)}</span>
-              </div>
-            </div>
-          </button>
-        )
-      })}
-    </div>
-  )
 }
 
 export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNode }) {
@@ -446,6 +382,31 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
     </div>
   )
 
+  // KO popup: a brief screen pop the moment a foe is drained — mobile-game
+  // feedback, honoring prefers-reduced-motion.
+  const [koPop, setKoPop] = useState(false)
+  const prevDefeated = useRef(defeated)
+  useEffect(() => {
+    if (defeated <= prevDefeated.current) {
+      prevDefeated.current = defeated
+      return
+    }
+    prevDefeated.current = defeated
+    if (reduceMotion) return
+    setKoPop(true)
+    const t = window.setTimeout(() => setKoPop(false), 900)
+    return () => window.clearTimeout(t)
+  }, [defeated, reduceMotion])
+
+  const koPopEl = koPop && (
+    <div className="pointer-events-none absolute inset-0 z-[11] flex items-center justify-center">
+      <div className="animate-orbit-pop flex items-center gap-2 rounded-2xl border border-white/20 bg-black/85 px-8 py-3 font-mono text-3xl font-black tracking-widest text-white shadow-[0_0_50px_rgba(244,63,94,0.5)]">
+        <Skull className="h-7 w-7 text-rose-400" weight="fill" />
+        KO
+      </div>
+    </div>
+  )
+
   return (
     <section
       ref={stageRef as React.RefObject<HTMLElement>}
@@ -498,6 +459,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           aria-label={`${viewMode} goon grid`}
         >
           {critFlashEl}
+          {koPopEl}
           {grid.map((cell, i) => {
             const motion =
               (cell.post.kind === 'video' || isVideoUrl(cell.post.url)) &&
@@ -654,7 +616,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
         <div
           // No `key` here on purpose ÔÇö see the grid tile above. This div holds
           // the <img>/<video>, and a per-click key remounted them.
-          className={`${STAGE_FRAME} relative min-h-0 flex-1 ${imageReady ? 'cursor-pointer active:cursor-grabbing' : 'cursor-progress'} max-[1100px]:min-h-[320px]`}
+          className={`${STAGE_FRAME} border-beam relative min-h-0 flex-1 ${imageReady ? 'cursor-pointer active:cursor-grabbing' : 'cursor-progress'} max-[1100px]:min-h-[320px]`}
           onClick={handleClick}
           onAuxClick={handleAuxClick}
           role="button"
@@ -668,6 +630,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           }}
         >
           {critFlashEl}
+          {koPopEl}
           {/* Shake on its own keyed-free overlay, and the progressive damage
               wash. Both sit above the media and below the controls. */}
           {shakeCell === null && shakeKey > 0 && (
@@ -807,7 +770,6 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               className={`${MONO} inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border border-rose-500/40 bg-rose-500/10 px-2.5 py-1 text-xs font-bold text-rose-300 hover:bg-rose-500/20 transition-colors`}
             >
               <Gift size={14} weight="bold" className="text-rose-400" />
-              Drops
               <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-black text-white">
                 {pendingDrops.length}
               </span>
@@ -909,12 +871,10 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           title="Lifetime KOs. Each foe hits harder"
         >
           <Skull size={13} weight="bold" className="text-rose-400" />
-          KOs: {formatNum(defeated)}
+          {formatNum(defeated)}
         </span>
       </div>
 
-      {/* Thumb-sized compact bottom dock with [1] [2] [3] [4] keyboard triggers */}
-      <CapsDock />
     </section>
   )
 }
