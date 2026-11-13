@@ -1637,7 +1637,7 @@ export function GMatchDMs({
           <div className="flex-1 flex flex-col items-center justify-center text-center p-8 space-y-3">
             <MessageSquare className="w-6 h-6 text-retro-muted" />
             <div className="space-y-1">
-              <h3 className="text-sm font-medium text-retro-body">Messages</h3>
+              <h3 className="text-base font-black uppercase tracking-tight text-retro-fg">Messages</h3>
               <p className="text-xs text-retro-muted max-w-xs">Select a conversation.</p>
             </div>
           </div>
