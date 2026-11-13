@@ -1083,7 +1083,7 @@ export function GMatchDMs({
                 </div>
 
                 <div className="min-w-0">
-                  <h3 className="text-xs font-medium text-retro-fg truncate">{headerTitle}</h3>
+                  <h3 className="text-sm font-black uppercase tracking-tight text-retro-fg truncate">{headerTitle}</h3>
                   {peerTyping && openTarget === 'peer' ? (
                     <span className="text-[10px] text-retro-accent block" role="status" aria-live="polite">
                       typing…
@@ -1226,9 +1226,9 @@ export function GMatchDMs({
                >
                <div ref={messageStreamRef} className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-3 styled-scrollbar select-text bg-transparent">
                               {displayedMessages.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-2 text-retro-muted my-auto select-none">
-                  <MessageSquare className="w-6 h-6" />
-                  <p className="text-xs text-retro-body">{headerTitle}</p>
+                <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3 text-retro-muted my-auto select-none">
+                  <MessageSquare className="w-6 h-6 text-retro-faint" />
+                  <p className="text-base font-black uppercase tracking-tight text-retro-fg">{headerTitle}</p>
                   <p className="text-xs text-retro-muted">No messages yet.</p>
                   {isLobbyGroup && (
                     <p className="text-[10px] text-retro-muted flex items-center gap-1"><Clock3 className="w-3 h-3" /> Clears every 12 hours</p>
@@ -1634,10 +1634,10 @@ export function GMatchDMs({
             </form>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-8 space-y-3">
-            <MessageSquare className="w-6 h-6 text-retro-muted" />
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-8 space-y-4">
+            <MessageSquare className="w-6 h-6 text-retro-faint" />
             <div className="space-y-1">
-              <h3 className="text-base font-black uppercase tracking-tight text-retro-fg">Messages</h3>
+              <h2 className="text-2xl font-black uppercase tracking-tighter text-retro-fg">Messages</h2>
               <p className="text-xs text-retro-muted max-w-xs">Select a conversation.</p>
             </div>
           </div>

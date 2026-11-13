@@ -225,6 +225,29 @@ function useVaultPinProgress(): Record<string, number> {
  *  downloads for the same bytes. */
 const retryingKeepsakes = new Set<string>()
 
+/** Boot repair runs once per session: every keep that is not yet verified
+ *  'persisted' goes through the authorized persist pipeline, so the vault
+ *  ends up holding ALL the media the app knows about — offline data, not
+ *  best-effort. The vault bridge dedupes by content hash, so a re-run after
+ *  an eviction re-fetches only what is actually missing. */
+let bootRepairRan = false
+async function repairKeepsakeVault(gallery: GalleryImage[]): Promise<void> {
+  if (bootRepairRan) return
+  bootRepairRan = true
+  const missing = gallery.filter((g) => g.url && g.saveState !== 'persisted' && !retryingKeepsakes.has(g.id))
+  // Bounded pool of 3: the pipeline is already per-URL guarded; this keeps the
+  // boot repair from storming a host with every keep at once.
+  const queue = [...missing]
+  const worker = async () => {
+    for (;;) {
+      const img = queue.shift()
+      if (!img) return
+      await retryKeepsake(img).catch(() => { /* a failed repair stays 'failed' honestly */ })
+    }
+  }
+  await Promise.all([worker(), worker(), worker()])
+}
+
 /** Re-run the authorized persist pipeline for one keep; store the outcome.
  *  A failed retry never discards an identity the record already carries. */
 async function retryKeepsake(img: GalleryImage): Promise<void> {
@@ -344,6 +367,14 @@ export default function IdleGalleryView({
   const [slideshowItems, setSlideshowItems] = useState<ResolvedItem[]>([])
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const pinProgress = useVaultPinProgress()
+
+  // Boot repair: sweep every keep that is not yet verified into the vault once
+  // per session, so the offline data IS there when the network is not.
+  const galleryRef = useRef(gallery)
+  galleryRef.current = gallery
+  useEffect(() => {
+    void repairKeepsakeVault(galleryRef.current)
+  }, [])
 
   useEffect(() => {
     if (!openMenuId) return
