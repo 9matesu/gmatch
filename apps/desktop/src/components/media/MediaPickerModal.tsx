@@ -38,14 +38,17 @@ function Preview({ url, isVideo }: { url: string; isVideo: boolean }) {
   return <img src={url} alt="Selected media preview" className="max-h-56 w-auto max-w-full rounded-lg object-contain bg-black" />;
 }
 
-export function MediaPickerModal({
+export function MediaPickerPanel({
   options,
   onPick,
   onClose,
+  compact = false,
 }: {
   options: MediaPickerOptions;
   onPick: (sel: MediaSelection) => void;
   onClose: () => void;
+  /** Bubble mode: tighter paddings, no dialog chrome. */
+  compact?: boolean;
 }) {
   const accept = options.accept ?? ['image'];
   const sources = options.sources ?? ['browse', 'upload', 'url'];
@@ -59,6 +62,11 @@ export function MediaPickerModal({
   const [dragOver, setDragOver] = useState(false);
   const [busyKeepId, setBusyKeepId] = useState<string | null>(null);
   const [selectedKeepId, setSelectedKeepId] = useState<string | null>(null);
+  // Browse pane renders a bounded window and grows on demand: mounting every
+  // keepsake tile (each a vault-fetched <img>/<video>) at once is what made
+  // the gallery lag with a few hundred keeps.
+  const PAGE = 24;
+  const [visibleCount, setVisibleCount] = useState(PAGE);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Object URL for the current upload preview; revoked on replace/close —
   // EXCEPT after a confirm, when ownership transfers to the caller.
@@ -204,6 +212,7 @@ export function MediaPickerModal({
     .filter((g) =>
       tagFilter.trim() ? g.tags.some((t) => t.toLowerCase().includes(tagFilter.trim().toLowerCase())) : true,
     );
+  const shownGallery = filteredGallery.slice(0, visibleCount);
 
   const confirm = () => {
     if (!pending) return;
@@ -232,58 +241,53 @@ export function MediaPickerModal({
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 select-none font-sans"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+      aria-label={options.title ?? 'Pick media'}
+      className={`bg-surface-raised border border-border-glass rounded-xl w-full max-w-xl max-h-[80vh] flex flex-col shadow-2xl overflow-hidden text-retro-fg ${compact ? 'max-h-[70vh] text-xs' : ''}`}
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={options.title ?? 'Pick media'}
-        className="bg-surface-raised border border-border-glass rounded-xl w-full max-w-xl max-h-[80vh] flex flex-col shadow-2xl overflow-hidden text-retro-fg"
-      >
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border-glass">
-          <h2 className="text-sm font-bold">{options.title ?? 'Pick media'}</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close media picker"
-            className="p-1 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w8 cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+      <div className={`flex items-center justify-between ${compact ? 'px-3 py-2' : 'px-4 py-2.5'} border-b border-border-glass`}>
+        <h2 className="text-sm font-bold">{options.title ?? 'Pick media'}</h2>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close media picker"
+          className="p-1 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w8 cursor-pointer"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
 
-        <div className="flex items-center gap-1.5 px-4 py-2 border-b border-border-glass">
-          {sources.includes('browse') && tabBtn('browse', 'Your media', FolderOpen)}
-          {sources.includes('upload') && tabBtn('upload', 'Upload', UploadCloud)}
-          {sources.includes('url') && tabBtn('url', 'Paste URL', LinkIcon)}
-        </div>
+      <div className={`flex items-center gap-1.5 ${compact ? 'px-3 py-1.5' : 'px-4 py-2'} border-b border-border-glass`}>
+        {sources.includes('browse') && tabBtn('browse', 'Your media', FolderOpen)}
+        {sources.includes('upload') && tabBtn('upload', 'Upload', UploadCloud)}
+        {sources.includes('url') && tabBtn('url', 'Paste URL', LinkIcon)}
+      </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 styled-scrollbar">
-          {error && (
-            <p className="text-xs font-bold text-retro-error" role="alert">
-              {error}
+      <div className={`flex-1 overflow-y-auto ${compact ? 'p-3' : 'p-4'} space-y-3 styled-scrollbar`}>
+        {error && (
+          <p className="text-xs font-bold text-retro-error" role="alert">
+            {error}
+          </p>
+        )}
+
+        {pane === 'browse' && (
+          browseGallery.length === 0 ? (
+            <p className="text-xs text-retro-muted py-6 text-center">
+              Your gallery is empty — upload a file or paste a URL instead.
             </p>
-          )}
-
-          {pane === 'browse' && (
-            browseGallery.length === 0 ? (
-              <p className="text-xs text-retro-muted py-6 text-center">
-                Your gallery is empty — upload a file or paste a URL instead.
-              </p>
-            ) : (
-              <>
-                <input
-                  type="text"
-                  value={tagFilter}
-                  onChange={(e) => setTagFilter(e.target.value)}
-                  placeholder="Filter by tag…"
-                  className="w-full px-3 py-1.5 rounded-lg bg-glass-w8 border border-border-glass text-xs text-retro-fg placeholder:text-retro-muted focus:outline-none focus:border-retro-accent"
-                />
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                  {filteredGallery.map((g: GalleryImage) => {
+          ) : (
+            <>
+              <input
+                type="text"
+                value={tagFilter}
+                onChange={(e) => {
+                  setTagFilter(e.target.value);
+                  setVisibleCount(PAGE);
+                }}
+                placeholder="Filter by tag…"
+                className="w-full px-3 py-1.5 rounded-lg bg-glass-w8 border border-border-glass text-xs text-retro-fg placeholder:text-retro-muted focus:outline-none focus:border-retro-accent"
+              />
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                {shownGallery.map((g: GalleryImage) => {
                     const video = g.kind === 'video';
                     const selected = selectedKeepId === g.id && pending?.kind === 'file' && pending.source === 'browse';
                     const src = tileUrl(g);
@@ -336,6 +340,15 @@ export function MediaPickerModal({
                     );
                   })}
                 </div>
+                {filteredGallery.length > shownGallery.length && (
+                  <button
+                    type="button"
+                    onClick={() => setVisibleCount((c) => c + PAGE)}
+                    className="w-full py-2 rounded-lg bg-glass-w8 border border-border-glass text-xs font-bold text-retro-muted hover:text-retro-fg hover:bg-glass-w12 transition-colors cursor-pointer"
+                  >
+                    Load more ({filteredGallery.length - shownGallery.length} left)
+                  </button>
+                )}
                 {filteredGallery.length === 0 && (
                   <p className="text-xs text-retro-muted text-center">No keepsakes match that tag.</p>
                 )}
@@ -430,7 +443,34 @@ export function MediaPickerModal({
               </div>
             </div>
           )}
-        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The modal wrapper: fixed overlay + dialog semantics around the SAME panel
+ * the navbar bubble renders inline. All picker behaviour lives in
+ * MediaPickerPanel — this adds only the backdrop and the close-on-backdrop.
+ */
+export function MediaPickerModal({
+  options,
+  onPick,
+  onClose,
+}: {
+  options: MediaPickerOptions;
+  onPick: (sel: MediaSelection) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 select-none font-sans"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div role="dialog" aria-modal="true" className="contents">
+        <MediaPickerPanel options={options} onPick={onPick} onClose={onClose} />
       </div>
     </div>
   );

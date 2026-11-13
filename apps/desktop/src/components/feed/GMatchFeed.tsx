@@ -899,36 +899,6 @@ export function GMatchFeed({
         }
       />
 
-      {/* One-click composer: the feed opens with the door to writing on it.
-          It is the first thing on the page, so posting never needs a trip to
-          the dock or a scroll. */}
-      {onOpenPostCreator && identity && (
-        <div className="w-full px-2 pt-2 sm:px-4">
-          <button
-            type="button"
-            onClick={() => { playPress(900); onOpenPostCreator(); }}
-            aria-label="Create a post"
-            className="group flex w-full items-center gap-3 rounded-xl border border-border-glass bg-glass-w4 px-3 py-2.5 text-left transition-colors hover:bg-glass-w8 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-retro-accent cursor-pointer"
-          >
-            <span className="h-8 w-8 shrink-0 overflow-hidden rounded-full border border-border-glass bg-retro-panel">
-              <Avatar
-                id={identity.orbitId}
-                size={32}
-                imageUrl={profilePics[identity.orbitId]}
-                fill={true}
-              />
-            </span>
-            <span className="min-w-0 flex-1 truncate text-xs text-retro-muted">
-              Share something…
-            </span>
-            <span className="flex shrink-0 items-center gap-1 rounded-full bg-retro-accent px-3 py-1.5 text-xs font-bold text-retro-accent-text transition-transform group-active:scale-95">
-              <PlusSquare className="h-3.5 w-3.5" />
-              Post
-            </span>
-          </button>
-        </div>
-      )}
-
       {/* Selective status pills: only empty/conflict states, never a
           healthy timeline (see FeedStatusPills). */}
       <FeedStatusPills postCount={displayPosts.length} />

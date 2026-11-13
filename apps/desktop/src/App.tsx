@@ -3607,6 +3607,18 @@ export default function Home() {
           <ErrorBoundary>
             <div className="app-glass relative z-10 w-full h-full min-h-0 bg-transparent text-retro-fg shadow-2xl flex flex-col overflow-hidden">
               <NativeHeaderBar
+                onCreatePost={() => { setChatOpen(false); setShowCreatePostModal(true); }}
+                onPickMedia={(sel) => {
+                  // The bubble picker hands the selection straight to the
+                  // post creator, pre-attached — one hover, one pick, done.
+                  setCreatePostInitialData(
+                    sel.kind === 'file'
+                      ? { mediaList: [{ id: 'pick_' + Date.now(), file: sel.file, previewUrl: sel.previewUrl }] }
+                      : { mediaList: [{ id: 'pick_' + Date.now(), previewUrl: sel.url, isExternalUrl: /^https?:\/\//i.test(sel.url) }] },
+                  );
+                  setChatOpen(false);
+                  setShowCreatePostModal(true);
+                }}
                 notifications={{
                   notifications: lobby.notifications,
                   invites: lobby.invites,

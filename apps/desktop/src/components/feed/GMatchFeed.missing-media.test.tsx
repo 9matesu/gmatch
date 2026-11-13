@@ -56,7 +56,9 @@ describe('GMatchFeed missing media', () => {
     fireEvent.click(screen.getByRole('button', { name: 'missing media' }));
 
     // The tile reports the miss; the row (author, caption, counts) stays.
-    expect(screen.getByText('My own post without local bytes')).toBeInTheDocument();
+    // Clicking the media also opens the comments side sheet, which repeats
+    // the caption beside the timeline — the tile keeps its own copy too.
+    expect(screen.getAllByText('My own post without local bytes').length).toBeGreaterThan(0);
     expect(
       screen.queryByText(/hidden — media not on this device/),
     ).not.toBeInTheDocument();
