@@ -13,8 +13,9 @@
      Settings -> Panel Opacity silently stops reaching it (see docs/DESIGN.md). */
   --color-surface-canvas: #09090b;
 
-  /* Panel opacity (Settings -> Panel Opacity): 1 = solid, 0.35 = most transparent. */
-  --panel-alpha: 0.75;
+  /* Panel opacity (Settings -> Panel Opacity): 1 = solid, 0.35 = most transparent.
+     Default leans transparent: the wallpaper is the hero, panels are chrome. */
+  --panel-alpha: 0.62;
 
   /* Panel family - one slate, one opacity, under every name (used with backdrop-filter). */
   --color-glass: rgba(18, 18, 21, var(--panel-alpha));

@@ -242,7 +242,7 @@ export function MediaPickerPanel({
   return (
     <div
       aria-label={options.title ?? 'Pick media'}
-      className={`bg-surface-raised border border-border-glass rounded-xl w-full max-w-xl max-h-[80vh] flex flex-col shadow-2xl overflow-hidden text-retro-fg ${compact ? 'max-h-[70vh] text-xs' : ''}`}
+      className={`bg-surface-raised border border-border-glass rounded-xl w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl overflow-hidden text-retro-fg ${compact ? 'max-h-[70vh] text-xs' : ''}`}
     >
       <div className={`flex items-center justify-between ${compact ? 'px-3 py-2' : 'px-4 py-2.5'} border-b border-border-glass`}>
         <h2 className="text-base font-black tracking-tight">{options.title ?? 'Pick media'}</h2>

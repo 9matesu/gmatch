@@ -481,7 +481,7 @@ function extForMime(mime: string): string {
       className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 pb-[calc(0.75rem+var(--island-clearance))] sm:p-4 sm:pb-[calc(1rem+var(--island-clearance))] font-sans select-none animate-orbit-fade-in"
     >
       <div
-        className="w-full max-w-3xl bg-retro-panel border border-border-glass rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[calc(100dvh-var(--island-clearance)-2rem)] text-retro-fg animate-orbit-pop"
+        className="w-full max-w-2xl bg-retro-panel border border-border-glass rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[calc(100dvh-var(--island-clearance)-2rem)] text-retro-fg animate-orbit-pop"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
