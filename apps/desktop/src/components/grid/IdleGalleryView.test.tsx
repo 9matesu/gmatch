@@ -110,13 +110,13 @@ describe('IdleGalleryView', () => {
 
     render(<IdleGalleryView />)
 
-    const videoFilterBtn = screen.getByRole('button', { name: /^Filter: video$/i })
+    const videoFilterBtn = screen.getByRole('tab', { name: /^Videos$/i })
     await userEvent.click(videoFilterBtn)
 
     const videoItems = screen.getAllByRole('button', { name: /^View /i })
     expect(videoItems.length).toBe(1)
 
-    const imageFilterBtn = screen.getByRole('button', { name: /^Filter: image$/i })
+    const imageFilterBtn = screen.getByRole('tab', { name: /^Images$/i })
     await userEvent.click(imageFilterBtn)
 
     const imageItems = screen.getAllByRole('button', { name: /^View /i })
@@ -155,16 +155,16 @@ describe('IdleGalleryView', () => {
     await userEvent.click(selectAllBtn)
 
     // Batch bar shows 18 selected (page 1 has 18 items)
-    expect(screen.getByText(/18 images selected/i)).toBeInTheDocument()
+    expect(screen.getByText(/18 selected/i)).toBeInTheDocument()
 
     // Press Escape to clear
     fireEvent.keyDown(window, { key: 'Escape' })
-    expect(screen.queryByText(/18 images selected/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/18 selected/i)).not.toBeInTheDocument()
 
     // Select single item via checkbox
     const selectCheckbox = screen.getAllByLabelText(/Select image/i)[0]
     await userEvent.click(selectCheckbox)
-    expect(screen.getByText(/1 images selected/i)).toBeInTheDocument()
+    expect(screen.getByText(/^1 selected/i)).toBeInTheDocument()
 
     // Batch delete
     const deleteBtn = screen.getByRole('button', { name: /^Delete$/i })
@@ -380,13 +380,13 @@ describe('IdleGalleryView', () => {
 
     render(<IdleGalleryView />)
     await userEvent.click(screen.getByRole('button', { name: /Select all on page/i }))
-    await userEvent.click(screen.getByRole('button', { name: /Download Selected/i }))
+    await userEvent.click(screen.getByRole('button', { name: /^Download$/i }))
     await waitFor(() => expect(vi.mocked(releaseLocalUrl)).toHaveBeenCalledTimes(2))
 
     // Source refuses: the URL is still released, so nothing is leaked.
     fetchMock.mockImplementation(async () => ({ ok: false }))
     vi.mocked(releaseLocalUrl).mockClear()
-    await userEvent.click(screen.getByRole('button', { name: /Download Selected/i }))
+    await userEvent.click(screen.getByRole('button', { name: /^Download$/i }))
     await waitFor(() => expect(vi.mocked(releaseLocalUrl)).toHaveBeenCalledTimes(2))
     vi.unstubAllGlobals()
   })
