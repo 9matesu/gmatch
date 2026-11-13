@@ -97,7 +97,9 @@ describe('inline post expansion', () => {
     fireEvent.click(second);
     const composers = screen.getAllByPlaceholderText('Add a comment...');
     expect(composers).toHaveLength(1);
-    expect(articleOf('p2')!.contains(composers[0])).toBe(true);
+    // The thread lives in the side sheet ("ao lado"), not inside the article.
+    expect(articleOf('p2')!.contains(composers[0])).toBe(false);
+    expect(composers[0].closest('aside')).not.toBeNull();
   });
 
   it('comments work inline: composer posts through the existing handler', async () => {
@@ -113,7 +115,9 @@ describe('inline post expansion', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Post' }));
     // Third argument is the reply target: `null` for a top-level comment.
     expect(onPersistComment).toHaveBeenCalledWith('p1', 'nice', null);
-    await waitFor(() => expect(screen.getByText('nice')).toBeInTheDocument());
+    // The comment shows twice: in the side sheet AND as the card's
+    // latest-comment preview line ("View all N comments").
+    await waitFor(() => expect(screen.getAllByText('nice').length).toBeGreaterThan(0));
   });
 
   it('replying sends the parent comment id and nests the reply', async () => {
@@ -140,7 +144,7 @@ describe('inline post expansion', () => {
     fireEvent.change(screen.getByPlaceholderText('Reply to Bob…'), { target: { value: 'agreed' } });
     fireEvent.click(screen.getByRole('button', { name: 'Reply' }));
     expect(onPersistComment).toHaveBeenCalledWith('p1', 'agreed', 'c1');
-    await waitFor(() => expect(screen.getByText('agreed')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('agreed').length).toBeGreaterThan(0));
   });
 
   it('deep link #/feed?post= expands the target inline', async () => {

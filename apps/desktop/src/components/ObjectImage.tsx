@@ -26,6 +26,8 @@ export interface ObjectImageProps {
   alt?: string
   className?: string
   videoClassName?: string
+  /** Hug the media's own aspect ratio — no letterbox bars (see NativeVideoPlayer). */
+  natural?: boolean
   loading?: 'lazy' | 'eager'
   fetchPriority?: 'high' | 'low' | 'auto'
   muted?: boolean
@@ -126,6 +128,7 @@ export function ObjectImage({
   alt = '',
   className = '',
   videoClassName = '',
+  natural = false,
   loading = 'lazy',
   fetchPriority = 'auto',
   muted = true,
@@ -297,6 +300,7 @@ export function ObjectImage({
           src={src}
           className={videoClassName || className}
           videoClassName={videoClassName}
+          natural={natural}
           muted={muted}
           autoPlay={autoPlay}
           loop={loop}

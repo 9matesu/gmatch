@@ -30,6 +30,10 @@ export interface NativeVideoPlayerProps {
   alwaysShowControls?: boolean;
   className?: string;
   videoClassName?: string;
+  /** Hug the video's own aspect ratio (no letterbox): the container is exactly
+   *  as tall as the media, so no black bars ever show. Default false — grid
+   *  tiles that size the container themselves keep the h-full behavior. */
+  natural?: boolean;
   style?: React.CSSProperties;
   onExpand?: () => void;
   onDoubleTapLike?: () => void;
@@ -73,6 +77,7 @@ export function NativeVideoPlayer({
   alwaysShowControls = false,
   className = '',
   videoClassName = '',
+  natural = false,
   style,
   onExpand,
   onDoubleTapLike,
@@ -464,7 +469,7 @@ export function NativeVideoPlayer({
       onMouseLeave={handleMouseLeave}
       data-media-url={resolvedSrc}
       className={`relative select-none outline-none group bg-black overflow-hidden flex items-center justify-center ${
-        isFullscreen ? 'w-screen h-screen' : 'w-full h-full'
+        isFullscreen ? 'w-screen h-screen' : natural ? 'w-full' : 'w-full h-full'
       } ${className}`}
       style={style}
     >
@@ -477,7 +482,7 @@ export function NativeVideoPlayer({
         muted={isMuted}
         playsInline={playsInline}
         preload={inView ? preload : 'none'}
-        className={`w-full h-full object-contain pointer-events-auto cursor-pointer ${videoClassName}`}
+        className={`${natural ? 'w-full h-auto' : 'w-full h-full'} object-contain pointer-events-auto cursor-pointer ${videoClassName}`}
         onClick={handleVideoCanvasClick}
         onTimeUpdate={() => {
           if (!isScrubbing && videoRef.current) {

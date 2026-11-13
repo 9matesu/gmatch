@@ -38,6 +38,7 @@ import type { OrbitIdentity } from '@orbit/crypto';
 import type { OrbitObject as StoryItem } from '@orbit/shared';
 import { GMatchStories } from '../GMatchStories';
 import { PostComments } from './PostComments';
+import { SideSheet } from '../../ui/kit';
 import { LiveCameraModal } from '../camera/LiveCameraModal';
 import { ObjectImage } from '../ObjectImage';
 import { Avatar } from '../Avatar';
@@ -983,7 +984,7 @@ export function GMatchFeed({
       {/* Feed Content Column (Posts) */}
       <div className="w-full max-w-[1400px] mx-auto flex flex-col px-2 sm:px-4 py-2 space-y-3">
         {/* Feed Posts List with Sharp Square Images */}
-                  <div className={`mt-3 ${feedCols === '1' ? 'space-y-3' : 'grid grid-cols-1 sm:grid-cols-2 gap-3' + (feedCols === '3' ? ' lg:grid-cols-3' : feedCols === '4' ? ' lg:grid-cols-3 xl:grid-cols-4' : feedCols === '5' ? ' lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5' : '')}`}>
+                  <div className={`mt-3 gap-3 ${feedCols === '1' ? 'columns-1' : feedCols === '3' ? 'columns-1 sm:columns-2 lg:columns-3' : feedCols === '4' ? 'columns-1 sm:columns-2 lg:columns-3 xl:columns-4' : feedCols === '5' ? 'columns-1 sm:columns-2 lg:columns-3 xl:columns-4 2xl:columns-5' : 'columns-1 sm:columns-2 lg:columns-3'}`}>
            {visiblePosts.map((post, _idx) => {
             const isLiked = !!likedPosts[post.id];
             const isSaved = !!savedPosts[post.id];
@@ -1018,7 +1019,7 @@ export function GMatchFeed({
             return post.is_sponsored ? (
               <article
                 key={post.id}
-                className={`bg-retro-panel border border-border-glass rounded-lg overflow-hidden flex flex-col shadow-xs ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
+                className={`bg-retro-panel border border-border-glass rounded-lg overflow-hidden flex flex-col shadow-xs mb-3 break-inside-avoid ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
               >
                 {/* Sponsored Banner */}
                 <div className="bg-retro-bg px-4 py-2 flex items-center gap-2 text-xs text-retro-muted border-b border-border-glass">
@@ -1069,7 +1070,7 @@ export function GMatchFeed({
                 key={post.id}
                 data-post-id={post.id}
                 onContextMenu={(e) => { e.preventDefault(); setOptionsPost(post) }}
-                className={`relative bg-retro-panel border border-border-glass rounded-lg overflow-hidden flex flex-col shadow-xs ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
+                className={`relative bg-retro-panel border border-border-glass rounded-lg overflow-hidden flex flex-col shadow-xs mb-3 break-inside-avoid ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
               >
                 {/* Repost attribution: a quiet line, not a filled band, so the
                     post reads as one media-first tile, Instagram-style. */}
@@ -1151,6 +1152,7 @@ export function GMatchFeed({
                               />
                             ) : isVid ? (
                               <NativeVideoPlayer
+                                natural
                                 src={url}
                                 videoClassName="w-full max-h-[min(680px,80vh)] group-data-[expanded=true]/post:max-h-[85vh] object-contain rounded-none"
                                 controls={true}
@@ -1176,7 +1178,8 @@ export function GMatchFeed({
                         // with zero fetch while server/swarm catch up.
                         isVideo ? (
                           <NativeVideoPlayer
-                            src={post.localPreviewUrl}
+                                natural
+                                src={post.localPreviewUrl}
                             videoClassName="w-full max-h-[min(680px,80vh)] group-data-[expanded=true]/post:max-h-[85vh] object-contain rounded-none"
                             controls={true}
                             alwaysShowControls={true}
@@ -1213,7 +1216,8 @@ export function GMatchFeed({
                         />
                       ) : isVideo ? (
                         <NativeVideoPlayer
-                          src={post.url}
+                                natural
+                                src={post.url}
                           videoClassName="w-full max-h-[min(680px,80vh)] group-data-[expanded=true]/post:max-h-[85vh] object-contain rounded-none"
                           controls={true}
                           alwaysShowControls={true}
@@ -1447,23 +1451,7 @@ export function GMatchFeed({
                     {likedByLabel || `${currentLikes.toLocaleString()} ${currentLikes === 1 ? 'like' : 'likes'}`}
                   </button>
 
-                  {expanded ? (
-                    <div className="motion-safe:animate-orbit-fade-in">
-                      <PostComments
-                        key={post.id}
-                        post={post}
-                        comments={postComments}
-                        commentsLoading={commentsLoadingId === post.id}
-                        authorAvatar={authorAvatarUrl}
-                        onAuthorClick={() => handleAvatarClick(post.author_id)}
-                        onCommentAuthorClick={(authorId) => handleAvatarClick(authorId)}
-                        onAddComment={handleAddComment}
-                        onToggleCommentLike={handleToggleCommentLike}
-                        onReportComment={onReportComment}
-                        focusCommentId={focusCommentId}
-                      />
-                    </div>
-                  ) : (
+                  {(
                   <>
                   {/* Caption & Tags */}
                   {post.caption && (
@@ -1648,6 +1636,39 @@ export function GMatchFeed({
         document.body,
       )}
 
+      {/* ─── Comments side sheet: comments open "ao lado", never pushing the
+              timeline down. The fetch is keyed on expandedPostId (above), so
+              opening the sheet is all it takes for the thread to load. ─── */}
+      {(() => {
+        const expandedPost = expandedPostId ? visiblePosts.find((p) => p.id === expandedPostId) : null;
+        if (!expandedPost) return null;
+        const sheetComments = mergeCommentRows(
+          commentsMap[expandedPost.id] || [],
+          peerComments.get(expandedPost.id) || [],
+        );
+        return (
+          <SideSheet
+            open
+            onClose={() => setExpandedPostId(null)}
+            title={`Comments · ${expandedPost.author_name}`}
+          >
+            <PostComments
+              key={expandedPost.id}
+              post={expandedPost}
+              comments={sheetComments}
+              commentsLoading={commentsLoadingId === expandedPost.id}
+              authorAvatar={profilePics[expandedPost.author_id]}
+              onAuthorClick={() => handleAvatarClick(expandedPost.author_id)}
+              onCommentAuthorClick={(authorId) => handleAvatarClick(authorId)}
+              onAddComment={handleAddComment}
+              onToggleCommentLike={handleToggleCommentLike}
+              onReportComment={onReportComment}
+              focusCommentId={focusCommentId}
+            />
+          </SideSheet>
+        );
+      })()}
+
       {/* ─── MODAL 5b: Likers Modal ─── */}
       {likersModalPostId && (
         <PostLikersModal
@@ -1724,3 +1745,5 @@ export function GMatchFeed({
     </div>
   );
 }
+
+

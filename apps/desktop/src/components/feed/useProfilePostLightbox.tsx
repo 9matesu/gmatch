@@ -6,6 +6,7 @@ import { createLikeGovernor, type LikeGovernor } from '../../utils/likeReconcile
 import { playPress, playMsgReceive } from '../../utils/sounds';
 import { orbitFetch, postShareUrl } from '../../utils/api';
 import { ProfileExpandedPost } from './ProfileExpandedPost';
+import { SideSheet } from '../../ui/kit';
 import { SharePostModal } from './SharePostModal';
 import { PostOptionsModal } from './PostOptionsModal';
 import { PostLikersModal } from './PostLikersModal';
@@ -269,13 +270,21 @@ export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
 
   const userNames = Object.fromEntries(users.map((u) => [u.id, u.display_name || '']));
 
-  // Inline expansion, rendered by the consumer directly under its grid —
-  // the card lives in the page flow, not in a dialog. Share/options/likers
-  // stay true overlays and render wherever the consumer mounts `modals`.
+  // The open post renders in a SideSheet ("ao lado", never pushing the grid
+  // down). Share/options/likers stay true overlays and render wherever the
+  // consumer mounts `modals`. zIndexClass lifts the sheet above a host
+  // overlay (e.g. UserProfileModal at z-system).
   const expandedNode = activePost ? (
-    <ProfileExpandedPost
-      post={activePost}
+    <SideSheet
+      open
       onClose={closePost}
+      title={activePost.author_name || 'Post'}
+      width="w-[480px] max-w-[94vw]"
+      zIndexClass={zIndexClass}
+    >
+      <ProfileExpandedPost
+        post={activePost}
+        onClose={closePost}
       identity={identity}
       profilePics={profilePics}
       isLiked={!!liked[activePost.id]}
@@ -306,7 +315,8 @@ export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
             }
           : undefined
       }
-    />
+      />
+    </SideSheet>
   ) : null;
 
   const modals = (

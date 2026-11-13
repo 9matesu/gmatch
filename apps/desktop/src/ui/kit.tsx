@@ -190,6 +190,60 @@ export function Modal({
   )
 }
 
+// ─── SideSheet ──────────────────────────────────────────────────────────────
+
+/**
+ * Right-anchored side panel ("abrir ao lado"): the page stays visible and
+ * usable while the sheet carries a detail view — feed comments, a profile
+ * post, anything that used to expand inline and push content down.
+ * Escape or backdrop click closes; the sheet slides in.
+ */
+export function SideSheet({
+  open,
+  onClose,
+  title,
+  children,
+  width = 'w-[420px] max-w-[92vw]',
+  zIndexClass = 'z-[var(--z-modal)]',
+}: {
+  open: boolean
+  onClose: () => void
+  title: ReactNode
+  children: ReactNode
+  width?: string
+  /** Stacking override when the sheet is hosted inside a higher-z overlay. */
+  zIndexClass?: string
+}) {
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+
+  if (!open) return null
+  return (
+    <div className={`fixed inset-0 ${zIndexClass} flex justify-end pointer-events-none`} onClick={onClose}>
+      <aside
+        role="complementary"
+        aria-label={typeof title === 'string' ? title : undefined}
+        onClick={(e) => e.stopPropagation()}
+        className={`pointer-events-auto ${width} h-full bg-[var(--color-glass)] backdrop-blur-xl border-l border-border-glass shadow-2xl flex flex-col animate-orbit-slide-left`}
+      >
+        <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border-glass shrink-0">
+          <h2 className="text-xs font-semibold text-retro-fg truncate">{title}</h2>
+          <Button variant="ghost" size="sm" aria-label="Close" onClick={onClose} className="px-1.5">
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+        <div className="flex-1 overflow-y-auto styled-scrollbar p-4 space-y-3">{children}</div>
+      </aside>
+    </div>
+  )
+}
+
 // ─── Tabs ───────────────────────────────────────────────────────────────────
 
 export function Tabs<T extends string>({
