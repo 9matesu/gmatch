@@ -10,7 +10,7 @@
  * (pills). Colors: fg/muted + one accent + one danger + the frozen game set
  * (HP/rarity/crit, in ui/styles.ts).
  */
-import { useEffect, type ButtonHTMLAttributes, type ReactNode } from 'react'
+import { useEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 
 // ─── Button ─────────────────────────────────────────────────────────────────
@@ -95,46 +95,91 @@ export function CardHeader({
 
 // ─── Modal ──────────────────────────────────────────────────────────────────
 
+/**
+ * THE modal shell. Renders conditionally (parent does `{show && <Modal/>}`).
+ * Focus-trapped (Tab cycles, focus restored on close), Escape closes, and the
+ * backdrop click dismisses ONLY with `dismissable` — typed input is never lost
+ * to a stray click. Sits at the --z-modal layer with island clearance.
+ */
 export function Modal({
-  open,
-  onClose,
   title,
+  onClose,
   children,
-  width = 'max-w-lg',
+  maxWidth = 'max-w-sm',
+  dismissable = false,
 }: {
-  open: boolean
-  onClose: () => void
   title: ReactNode
+  onClose: () => void
   children: ReactNode
-  width?: string
+  maxWidth?: string
+  /** Backdrop click dismisses. Defaults to false so typed input is never
+   *  lost by a stray click — close explicitly via the X button or Escape. */
+  dismissable?: boolean
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
-    if (!open) return
+    const prevActive = document.activeElement as HTMLElement | null
+    const el = dialogRef.current
+    if (el) {
+      const focusable = el.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      )
+      if (focusable.length > 0) {
+        focusable[0].focus()
+      }
+    }
+
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onClose()
+      } else if (e.key === 'Tab' && el) {
+        const focusable = Array.from(
+          el.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+          )
+        )
+        if (focusable.length === 0) return
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault()
+          last.focus()
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault()
+          first.focus()
+        }
+      }
     }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose])
-  if (!open) return null
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      prevActive?.focus()
+    }
+  }, [onClose])
+
   return (
     <div
-      className="fixed inset-0 bg-black/60 flex items-center justify-center p-4"
-      onClick={onClose}
+      className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4 pb-[calc(1rem+var(--island-clearance))] bg-black/60 animate-orbit-fade-in"
+      onClick={dismissable ? onClose : undefined}
     >
-      <Card
-        tone="raised"
-        className={`w-full ${width} max-h-[90vh] overflow-y-auto p-4 space-y-3`}
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={typeof title === 'string' ? title : undefined}
         onClick={(e) => e.stopPropagation()}
+        className={`w-full ${maxWidth} glass-panel shadow-xl animate-orbit-pop`}
       >
-        <div className="flex items-center justify-between gap-2 pb-2 border-b border-border-glass">
-          <div className="text-xs font-semibold text-retro-fg">{title}</div>
-          <Button variant="ghost" size="sm" aria-label="Close" onClick={onClose} className="px-1.5">
+        <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border-glass">
+          <div className="text-xs font-semibold text-retro-fg truncate">{title}</div>
+          <Button variant="ghost" size="sm" aria-label="Close dialog" onClick={onClose} className="px-1.5">
             <X className="w-4 h-4" />
           </Button>
         </div>
-        {children}
-      </Card>
+        <div className="p-4">{children}</div>
+      </div>
     </div>
   )
 }

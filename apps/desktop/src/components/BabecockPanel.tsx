@@ -524,7 +524,7 @@ export function BabecockPanel({
     <div className="space-y-4 font-sans select-none">
       {/* Tutorial overlay */}
       {showTutorial && (
-        <Modal open onClose={closeTutorial} title="How the round works">
+        <Modal onClose={closeTutorial} title="How the round works">
           <ol className="text-xs text-retro-muted space-y-2 leading-relaxed list-decimal list-inside">
             <li>A host starts the round with an <strong className="text-retro-fg">OP picture</strong>.</li>
             <li>Other players join with their own challenger pictures before the 3-minute timer expires.</li>
@@ -831,11 +831,12 @@ export function BabecockPanel({
       </Card>
 
       {/* Modal: Start or Join Round */}
-      <Modal
-        open={!!modal}
-        onClose={() => setModal(null)}
-        title={modal === 'start' ? 'Post the OP picture' : 'Join with your picture'}
-      >
+      {modal && (
+        <Modal
+          title={modal === 'start' ? 'Post the OP picture' : 'Join with your picture'}
+          onClose={() => setModal(null)}
+          maxWidth="max-w-lg"
+        >
         <Tabs
           tabs={[{ id: 'upload' as const, label: 'Upload' }, { id: 'url' as const, label: 'URL' }, { id: 'camera' as const, label: 'Camera' }]}
           value={mode}
@@ -916,7 +917,8 @@ export function BabecockPanel({
             {submitting ? 'Submitting…' : modal === 'start' ? 'Start round' : 'Join round'}
           </Button>
         </div>
-      </Modal>
+        </Modal>
+      )}
 
       {/* Expanded Gallery Round Lightbox */}
       {expandedRound && (

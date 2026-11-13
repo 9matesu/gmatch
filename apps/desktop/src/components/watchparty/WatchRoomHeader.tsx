@@ -6,7 +6,7 @@
 import { useState } from 'react'
 import { Crown, Settings, Share, X } from 'lucide-react'
 import { BTN, BTN_PRIMARY, MUTED } from '../../ui/styles'
-import { Modal } from '../Modal'
+import { Modal } from '../../ui/kit'
 import { Switch } from '../../ui/Switch'
 import { kickParty, banParty, muteParty, transferParty, setPartySettings, leaveParty, disbandParty, mintPartyInvite, revokePartyInvite, type PartyRuntime } from '../../hooks/watchPartyStore'
 
@@ -179,3 +179,4 @@ export function WatchRoomHeader({ party, identity, profilePics: _profilePics }: 
     </>
   )
 }
+

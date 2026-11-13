@@ -23,7 +23,7 @@ import { readLabels, writeLabels, type LocalMeshLabel } from './meshLabels'
 import { decodeNodeMask } from '../../utils/nodeMask'
 import { buildNodeCode } from '../../utils/nodeShare'
 import { PromptDialog } from '../PromptDialog'
-import { Modal } from '../Modal'
+import { Modal } from '../../ui/kit'
 import { AddWorldDialog } from './AddWorldDialog'
 import { GroupsDialog } from './GroupsDialog'
 import { WorldRow, WorldMenuItem, formatDomain, formatRelativeTime } from './WorldRow'
@@ -1998,3 +1998,4 @@ export function ServersView({
     </div>
   )
 }
+

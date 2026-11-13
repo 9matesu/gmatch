@@ -5,7 +5,7 @@
 
 import { useState } from 'react'
 import { classifyStaticUrl } from '@orbit/shared'
-import { Modal } from '../Modal'
+import { Modal } from '../../ui/kit'
 import { WatchLocalFile } from './WatchLocalFile'
 import { BTN_PRIMARY } from '../../ui/styles'
 import { createParty, expandPlaylist, loadPartyVideo, loadPartyVideos, type PartyRuntime } from '../../hooks/watchPartyStore'
@@ -272,3 +272,4 @@ export function WatchPartyUrlModal({
     </Modal>
   )
 }
+

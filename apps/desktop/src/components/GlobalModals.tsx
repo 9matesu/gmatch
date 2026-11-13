@@ -3,7 +3,6 @@
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { User, OrbitObject, ActiveHackDebuff } from '@orbit/shared';
 import type { AppSettings } from '../hooks/useSettings';
-import { Modal } from './Modal';
 import { toChatPeer, type ChatPeer } from './chat/chatPeer';
 import { IdentityModal } from './IdentityModal';
 import { HelpModal } from './HelpModal';
@@ -281,3 +280,4 @@ export function GlobalModals(props: GlobalModalsProps) {
     </>
   );
 }
+

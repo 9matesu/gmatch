@@ -7,7 +7,7 @@
 // in AddWorldDialog; this is the secondary management flow for labels alone.
 import { useEffect, useState } from 'react'
 import { createLabel, isOwnLabel, type LocalMeshLabel } from './meshLabels'
-import { Modal } from '../Modal'
+import { Modal } from '../../ui/kit'
 
 export function GroupsDialog({
   open,
@@ -99,3 +99,4 @@ export function GroupsDialog({
     </Modal>
   )
 }
+

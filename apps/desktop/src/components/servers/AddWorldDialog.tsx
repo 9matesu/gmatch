@@ -12,7 +12,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ArrowLeft } from 'lucide-react';
-import { Modal } from '../Modal';
+import { Modal } from '../../ui/kit';
 
 export function AddWorldDialog({
   open,
@@ -148,3 +148,4 @@ export function AddWorldDialog({
     </Modal>
   )
 }
+
