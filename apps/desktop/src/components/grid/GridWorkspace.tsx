@@ -103,7 +103,7 @@ export default function GridWorkspace({
       <div className="relative flex h-full min-h-0 items-center justify-center overflow-hidden bg-surface-canvas p-4 sm:p-8">
         <div className="glass-card flex max-h-full w-full max-w-2xl flex-col rounded-xl p-6 sm:p-8 space-y-5 overflow-y-auto styled-scrollbar">
           <div className="shrink-0 text-center">
-            <h2 className="text-xl font-bold tracking-tight text-retro-fg">Pick your pleasure</h2>
+            <h2 className="text-2xl font-black tracking-tighter uppercase text-retro-fg">Pick your pleasure</h2>
             <p className="text-sm text-retro-muted mt-1.5">
               Tap {4} pills to tune your feed. Nothing is fetched before that.
             </p>
