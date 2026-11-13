@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
-import { Lock, Globe, ShieldCheck, RefreshCw, Pencil, Check, X, Search, Share2, ArrowLeft, Plus, Trash2, Loader2 } from 'lucide-react'
+import { Lock, Globe, ShieldCheck, RefreshCw, Pencil, Check, X, Search, Share2, ArrowLeft, Plus, Trash2, Loader2, Copy } from 'lucide-react'
 import { generateIdentity } from '@orbit/crypto'
 import { getCentralApiUrl, setCentralApiUrl } from '../../utils/central'
 import { rememberKnownNodeHint } from '../../utils/peerNodes'
@@ -158,12 +158,17 @@ export function ServersView({
   onSelectUser,
   profilePics = {},
   onServerJoined,
+  p2pPeers = [],
 }: {
   identity: Parameters<typeof orbitFetch>[2] | null
   toast: Toast
   onSelectUser?: (user: User) => void
   profilePics?: Record<string, string>
   onServerJoined?: (server: DirectoryServer) => void
+  /** Live P2P roster (signed presence beacons). Peers on OTHER nodes never
+   *  appear in this node's dashboard, so without this the hub shows "nobody
+   *  online" while the swarm is actually alive. */
+  p2pPeers?: User[]
 }) {
   const [central, setCentral] = useState(() => getCentralApiUrl())
   const [servers, setServers] = useState<DirectoryServer[]>([])
@@ -1146,10 +1151,16 @@ export function ServersView({
   }
 
   const allUsers = dash?.users || []
-  const onlineUsers = useMemo(() => allUsers.filter((u) => u.online), [allUsers])
+  const onlineUsers = useMemo(() => {
+    const roster = allUsers.filter((u) => u.online)
+    // P2P peers (other nodes) join the roster: deduped by id, dashboard rows win.
+    const seen = new Set(roster.map((u) => u.id))
+    const swarm = p2pPeers.filter((p) => p.online !== false && p.id !== identity?.orbitId && !seen.has(p.id))
+    return [...roster, ...swarm]
+  }, [allUsers, p2pPeers, identity?.orbitId])
   const offlineUsers = useMemo(() => allUsers.filter((u) => !u.online), [allUsers])
 
-  const handleUserClick = (u: DashboardUser) => {
+  const handleUserClick = (u: DashboardUser | User) => {
     if (!onSelectUser) return
     playPress(700)
     onSelectUser({
@@ -1555,6 +1566,29 @@ export function ServersView({
                     <p className="text-xs text-retro-muted mt-1">
                       {dash ? `${dash.members_total} members · ${dash.posts_24h} posts/24h` : (serverDescription || 'Connected')}
                     </p>
+                    {/* The one line that says WHERE this world lives and that
+                        it is actually reachable — copied with one click. */}
+                    {(() => {
+                      const addr = serverMode === 'client'
+                        ? hostState?.url || ''
+                        : (hostState?.lanUrls?.[0] || hostState?.url || '')
+                      if (!addr) return null
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void navigator.clipboard?.writeText(addr)
+                            toast('Address copied — send it to a friend', 'success')
+                          }}
+                          title="Copy address"
+                          className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-mono text-retro-muted hover:text-retro-fg transition-colors cursor-pointer"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-retro-online shrink-0" aria-hidden />
+                          <span className="truncate max-w-[280px]">{addr}</span>
+                          <Copy className="w-3 h-3 shrink-0" aria-hidden />
+                        </button>
+                      )
+                    })()}
                   </div>
                 </div>
 

@@ -166,12 +166,56 @@ async function persistToVault(id: string, blob: Blob, meta: LocalObjectMeta = {}
     /* arrayBuffer unavailable */
   }
   if (!buf || buf.byteLength === 0) return false
+  // The vault is content-addressed: it only accepts a sha256 hex key
+  // (HASH_RE in electron/vault.cjs). Callers may pass a UUID object id,
+  // so hash the bytes HERE — a uuid key was silently rejected with
+  // bad-hash, which is how an own post lost BOTH its bytes row and its
+  // metadata row on the packaged app.
+  let hash = ''
+  try {
+    const digest = await crypto.subtle.digest('SHA-256', buf)
+    hash = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('')
+  } catch {
+    hash = ''
+  }
   // Renderer side: ArrayBuffer crosses IPC cleanly; the main process
   // re-verifies the sha256 before filing it under `id`.
-  if (typeof window !== 'undefined' && window.gmatch?.vaultPutBytes) {
+  if (typeof window !== 'undefined' && window.gmatch?.vaultPutBytes && hash) {
     try {
-      const result = await window.gmatch.vaultPutBytes(id, blob.type || 'application/octet-stream', buf)
-      if (result?.ok) return true
+      const result = await window.gmatch.vaultPutBytes(hash, blob.type || 'application/octet-stream', buf)
+      if (result?.ok) {
+        // The vault holds BYTES only. Without a metadata row the post is
+        // invisible after a restart: the gallery rebuild (getAllObjects)
+        // never sees it, so an own public post vanished "even for me".
+        // Store the row with the vault link as its provider url — the data
+        // field carries exactly that URL text, which is the established
+        // descriptor-row shape that recoverDescriptorRow repairs on read,
+        // so feed AND gallery render from the vault stream with no new
+        // render logic.
+        const vaultUrl = `vault://f/${result.ref || hash}`
+        try {
+          const { saveObject } = await import('./storage')
+          await saveObject({
+            id,
+            name: id,
+            mime_type: blob.type || 'application/octet-stream',
+            size_bytes: buf.byteLength,
+            owner_id: meta.ownerId || '',
+            sender_pubkey: '',
+            sender_enc_pubkey: '',
+            created_at: new Date().toISOString(),
+            data: new TextEncoder().encode(vaultUrl).buffer as ArrayBuffer,
+            source_url: vaultUrl,
+            is_public: typeof meta.isPublic === 'boolean' ? (meta.isPublic ? 1 : 0) : null,
+            is_story: typeof meta.isStory === 'boolean' ? (meta.isStory ? 1 : 0) : null,
+            is_chat: typeof meta.isChat === 'boolean' ? (meta.isChat ? 1 : 0) : null,
+            is_avatar: typeof meta.isAvatar === 'boolean' ? (meta.isAvatar ? 1 : 0) : null,
+          } as Parameters<typeof saveObject>[0])
+        } catch {
+          /* metadata row is best-effort; the bytes are already durable */
+        }
+        return true
+      }
       return false
     } catch {
       return false

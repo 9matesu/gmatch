@@ -20,13 +20,42 @@ import {
 
 // Only deleteObject is observed: the durable store itself is not under test
 // here, and getLocalObject must still answer honestly (null) when offline.
-const storageMock = vi.hoisted(() => ({ deleteObject: vi.fn().mockResolvedValue(undefined) }))
+const storageMock = vi.hoisted(() => ({
+  deleteObject: vi.fn().mockResolvedValue(undefined),
+  saveObject: vi.fn().mockResolvedValue(undefined),
+}))
 vi.mock('./storage', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./storage')>()),
   deleteObject: storageMock.deleteObject,
+  saveObject: storageMock.saveObject,
 }))
 
 describe('p2pSwarm (WebRTC Object Swarm Transfer)', () => {
+  it('persistToVault: a uuid-keyed object still lands (bytes via its sha256) and writes the metadata row', async () => {
+    // Regression: vaultPutBytes only accepts a sha256 hex key, so a forge
+    // registered under a UUID was rejected (bad-hash) and the packaged app
+    // lost BOTH the bytes row and the metadata row — the post vanished
+    // "even for me" after a restart.
+    storageMock.saveObject.mockClear()
+    const put = vi.fn().mockResolvedValue({ ok: true, ref: 'a'.repeat(64) })
+    vi.stubGlobal('window', { gmatch: { vaultPutBytes: put } })
+    const blob = new Blob(['persist-me'], { type: 'image/jpeg' })
+    registerLocalObject('not-a-hash-uuid', blob, { ownerId: 'me', isPublic: true })
+    await vi.waitFor(() => {
+      expect(put).toHaveBeenCalledTimes(1)
+      expect(put.mock.calls[0][0]).toMatch(/^[0-9a-f]{64}$/) // sha256 key, not the uuid
+      expect(storageMock.saveObject).toHaveBeenCalledTimes(1)
+      const row = storageMock.saveObject.mock.calls[0][0]
+      expect(row.id).toBe('not-a-hash-uuid')
+      expect(row.source_url).toBe('vault://f/' + 'a'.repeat(64))
+      expect(row.is_public).toBe(1)
+      expect(row.owner_id).toBe('me')
+      expect(new Uint8Array(row.data).length).toBeGreaterThan(0) // descriptor link, not bytes
+    })
+    vi.unstubAllGlobals()
+    __resetLocalObjectCacheForTests()
+  })
+
   it('registers and retrieves local objects for swarm seeding', async () => {
     const blob = new Blob(['sample-card-media-data'], { type: 'image/png' })
     registerLocalObject('obj-card-1', blob)

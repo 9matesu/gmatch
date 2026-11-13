@@ -3872,6 +3872,7 @@ export default function Home() {
                         <ServersView
                           identity={identity as never}
                           toast={toast}
+                          p2pPeers={peers}
                           onSelectUser={(u) => {
                             const full = findUserById(users, u.id)
                             setSelectedProfileUser(full || u)
