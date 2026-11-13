@@ -1,6 +1,6 @@
 'use client'
 
-import { X } from 'lucide-react'
+import { Modal, Button } from '../ui/kit'
 
 export interface ChangelogModalProps {
   isOpen: boolean
@@ -35,51 +35,30 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
   if (!isOpen) return null
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={`What's New in version ${CURRENT_CHANGELOG_VERSION}`}
-      className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 sm:p-6 animate-orbit-fade-in"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
+    <Modal
+      title={
+        <span className="flex items-center gap-2">
+          What&apos;s New
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-retro-accent/20 text-retro-accent border border-retro-accent/30">
+            v{CURRENT_CHANGELOG_VERSION}
+          </span>
+        </span>
+      }
+      onClose={onClose}
+      dismissable
+      maxWidth="max-w-lg"
     >
-      <div className="relative w-full max-w-lg max-h-[85vh] flex flex-col rounded-xl border border-border-glass bg-surface-canvas/95 backdrop-blur-xl shadow-2xl overflow-hidden text-left">
-        <div className="flex items-center justify-between p-5 border-b border-border-glass/60 bg-surface-raised/40">
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm font-bold text-retro-fg">What&apos;s New</h3>
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-retro-accent/20 text-retro-accent border border-retro-accent/30">
-              v{CURRENT_CHANGELOG_VERSION}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close changelog"
-            className="p-1.5 rounded-lg border border-border-glass hover:text-retro-fg/40 text-retro-muted hover:text-white transition-colors cursor-pointer bg-surface-raised/50"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+      <ul className="space-y-3 list-disc pl-4 marker:text-retro-muted text-xs leading-relaxed text-retro-body max-h-[60vh] overflow-y-auto styled-scrollbar">
+        {CHANGES.map((change) => (
+          <li key={change}>{change}</li>
+        ))}
+      </ul>
 
-        <div className="flex-1 overflow-y-auto p-5 styled-scrollbar text-xs leading-relaxed text-retro-body">
-          <ul className="space-y-3 list-disc pl-4 marker:text-retro-muted">
-            {CHANGES.map((change) => (
-              <li key={change}>{change}</li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="p-4 border-t border-border-glass/60 bg-surface-raised/40 flex justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-5 py-2 rounded-lg bg-retro-accent hover:bg-retro-accent-hover text-black font-semibold text-xs transition-all shadow-md active:scale-95 cursor-pointer"
-          >
-            Got it
-          </button>
-        </div>
+      <div className="pt-3 border-t border-border-glass flex justify-end">
+        <Button variant="primary" onClick={onClose}>
+          Got it
+        </Button>
       </div>
-    </div>
+    </Modal>
   )
 }

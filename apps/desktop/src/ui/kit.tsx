@@ -10,7 +10,7 @@
  * (pills). Colors: fg/muted + one accent + one danger + the frozen game set
  * (HP/rarity/crit, in ui/styles.ts).
  */
-import { useEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 
 // ─── Button ─────────────────────────────────────────────────────────────────
@@ -107,6 +107,7 @@ export function Modal({
   children,
   maxWidth = 'max-w-sm',
   dismissable = false,
+  initialFocusRef,
 }: {
   title: ReactNode
   onClose: () => void
@@ -115,8 +116,12 @@ export function Modal({
   /** Backdrop click dismisses. Defaults to false so typed input is never
    *  lost by a stray click — close explicitly via the X button or Escape. */
   dismissable?: boolean
+  /** Element to focus on open (e.g. a form input). Defaults to the first
+   *  focusable in the dialog. */
+  initialFocusRef?: React.RefObject<HTMLElement | null>
 }) {
   const dialogRef = useRef<HTMLDivElement>(null)
+  const titleId = useId()
 
   useEffect(() => {
     const prevActive = document.activeElement as HTMLElement | null
@@ -125,9 +130,8 @@ export function Modal({
       const focusable = el.querySelectorAll<HTMLElement>(
         'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
       )
-      if (focusable.length > 0) {
-        focusable[0].focus()
-      }
+      const target = initialFocusRef?.current ?? focusable[0]
+      target?.focus()
     }
 
     const onKey = (e: KeyboardEvent) => {
@@ -157,7 +161,7 @@ export function Modal({
       window.removeEventListener('keydown', onKey)
       prevActive?.focus()
     }
-  }, [onClose])
+  }, [onClose, initialFocusRef])
 
   return (
     <div
@@ -168,17 +172,19 @@ export function Modal({
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-label={typeof title === 'string' ? title : undefined}
+        aria-labelledby={titleId}
         onClick={(e) => e.stopPropagation()}
         className={`w-full ${maxWidth} glass-panel shadow-xl animate-orbit-pop`}
       >
         <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border-glass">
-          <div className="text-xs font-semibold text-retro-fg truncate">{title}</div>
+          <h2 id={titleId} className="text-xs font-semibold text-retro-fg truncate">
+            {title}
+          </h2>
           <Button variant="ghost" size="sm" aria-label="Close dialog" onClick={onClose} className="px-1.5">
             <X className="w-4 h-4" />
           </Button>
         </div>
-        <div className="p-4">{children}</div>
+        <div className="p-4 space-y-3">{children}</div>
       </div>
     </div>
   )

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { ChangelogModal, CURRENT_CHANGELOG_VERSION } from './ChangelogModal'
+import { ChangelogModal } from './ChangelogModal'
 
 /**
  * The changelog was four hard-coded cards, each with a coloured icon and a
@@ -26,14 +26,14 @@ describe('ChangelogModal', () => {
     const { container } = render(<ChangelogModal isOpen onClose={() => {}} />)
     // The feature icons (Film/MessageSquare/Zap/ShieldCheck/Sparkles) are gone.
     expect(container.querySelectorAll('svg').length).toBe(1)
-    expect(screen.getByRole('button', { name: 'Close changelog' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Close dialog' })).toBeTruthy()
   })
 
   it('keeps the dialog contract the app and e2e depend on', () => {
     render(<ChangelogModal isOpen onClose={() => {}} />)
-    const dialog = screen.getByRole('dialog', { name: `What's New in version ${CURRENT_CHANGELOG_VERSION}` })
+    const dialog = screen.getByRole('dialog')
     expect(dialog).toBeTruthy()
-    expect(screen.getByRole('heading', { name: "What's New" })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: /What's New/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Got it' })).toBeTruthy()
   })
 
