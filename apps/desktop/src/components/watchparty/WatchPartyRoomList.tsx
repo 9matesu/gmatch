@@ -65,8 +65,7 @@ function RoomThumbnail({
   }
 
   return (
-    <div className="relative w-full h-full bg-gradient-to-br from-retro-panel to-surface-canvas flex flex-col items-center justify-center overflow-hidden border-b border-border-subtle group-hover:border-retro-fg/20 transition-colors">
-      <div className="absolute inset-0 bg-radial from-retro-accent/5 to-transparent opacity-60" />
+    <div className="relative w-full h-full bg-surface-canvas flex flex-col items-center justify-center overflow-hidden border-b border-border-subtle group-hover:border-retro-fg/20 transition-colors">
       <div className="p-3 rounded-xl bg-surface-raised/80 border border-border-glass shadow-lg group-hover:scale-110 group-hover:border-retro-fg/30 transition-all duration-150">
         <Film className="w-6 h-6 text-retro-muted group-hover:text-retro-fg transition-colors" />
       </div>

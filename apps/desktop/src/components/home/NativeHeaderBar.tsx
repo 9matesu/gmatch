@@ -84,7 +84,7 @@ export function NativeHeaderBar({
 
   return (
     <header
-      className="w-full h-9 flex items-center justify-between px-3 select-none z-[var(--z-dropdown)] bg-transparent text-xs"
+      className="relative w-full h-9 flex items-center justify-between px-3 select-none z-[var(--z-dropdown)] bg-transparent text-xs"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
       {/* Left: Navigators & Branding */}
@@ -124,68 +124,70 @@ export function NativeHeaderBar({
         <span className="text-[13px] font-bold tracking-wide text-retro-fg select-none ml-1">gMatch</span>
       </div>
 
-      {/* Center: the unified notification centre (badge, list, invites, toasts) */}
-      <NotificationCenter
-        {...(notifications ?? {
-          onMarkAllRead: () => {},
-          onMarkRead: () => {},
-          onOpenTarget: () => {},
-          onOpenLocalTarget: () => {},
-          onMarkLocalRead: () => {},
-        })}
-      />
+      {/* Center: THE Post button — one focal point, dead-center of the screen.
+          Bigger than the bar chrome; everything else flanks it. */}
+      {onCreatePost && (
+        <div
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          onMouseEnter={openPickerSoon}
+          onMouseLeave={closePickerSoon}
+          onKeyDown={(e) => { if (e.key === 'Escape') setPickerOpen(false); }}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              playPress(900);
+              if (hoverTimer.current) { window.clearTimeout(hoverTimer.current); hoverTimer.current = null; }
+              setPickerOpen(false);
+              onCreatePost();
+            }}
+            aria-label="Create a post"
+            title="Create a post — hover for the media picker"
+            aria-haspopup={onPickMedia ? 'dialog' : undefined}
+            aria-expanded={onPickMedia ? pickerOpen : undefined}
+            className="flex items-center gap-1.5 rounded-md bg-white px-3.5 h-7 text-xs font-bold uppercase tracking-wider text-black hover:bg-white/85 transition-colors cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" weight="bold" />
+            Post
+          </button>
+          {/* The picker pops FROM the button: an animated glass bubble
+              anchored under the navbar, not a centered modal. */}
+          {pickerOpen && onPickMedia && (
+            <div
+              role="dialog"
+              aria-label="Pick post media"
+              className="absolute right-0 top-[calc(100%+8px)] z-[var(--z-modal)] w-[340px] animate-orbit-pop origin-top-right"
+              onMouseEnter={() => { if (leaveTimer.current) { window.clearTimeout(leaveTimer.current); leaveTimer.current = null; } }}
+              onMouseLeave={closePickerSoon}
+            >
+              <MediaPickerPanel
+                compact
+                options={{ accept: ['image', 'video'], sources: ['browse', 'upload', 'url'], title: 'Pick post media' }}
+                onPick={(sel) => { setPickerOpen(false); onPickMedia(sel); }}
+                onClose={() => setPickerOpen(false)}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
-      {/* Right: create post + mute + window controls (frameless: buttons
+      {/* Right: notifications + mute + window controls (frameless: buttons
           render only when the preload bridge exposes them. Browser/dev =
           no bridge) */}
       <div
         className="flex items-center gap-2 text-retro-muted"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
-        {onCreatePost && (
-          <div
-            className="relative"
-            onMouseEnter={openPickerSoon}
-            onMouseLeave={closePickerSoon}
-            onKeyDown={(e) => { if (e.key === 'Escape') setPickerOpen(false); }}
-          >
-            <button
-              type="button"
-              onClick={() => {
-                playPress(900);
-                if (hoverTimer.current) { window.clearTimeout(hoverTimer.current); hoverTimer.current = null; }
-                setPickerOpen(false);
-                onCreatePost();
-              }}
-              aria-label="Create a post"
-              title="Create a post — hover for the media picker"
-              aria-haspopup={onPickMedia ? 'dialog' : undefined}
-              aria-expanded={onPickMedia ? pickerOpen : undefined}
-              className="flex items-center gap-1 rounded-md bg-white px-2.5 min-h-[24px] text-[11px] font-bold text-black hover:bg-white/85 transition-colors cursor-pointer"
-            >
-              <Plus className="w-3 h-3" weight="bold" />
-              Post
-            </button>
-            {/* The picker pops FROM the button: an animated glass bubble
-                anchored under the navbar, not a centered modal. */}
-            {pickerOpen && onPickMedia && (
-              <div
-                role="dialog"
-                aria-label="Pick post media"
-                className="absolute right-0 top-[calc(100%+8px)] z-[var(--z-modal)] w-[340px] animate-orbit-pop origin-top-right"
-                onMouseEnter={() => { if (leaveTimer.current) { window.clearTimeout(leaveTimer.current); leaveTimer.current = null; } }}
-                onMouseLeave={closePickerSoon}
-              >
-                <MediaPickerPanel
-                  compact
-                  options={{ accept: ['image', 'video'], sources: ['browse', 'upload', 'url'], title: 'Pick post media' }}
-                  onPick={(sel) => { setPickerOpen(false); onPickMedia(sel); }}
-                  onClose={() => setPickerOpen(false)}
-                />
-              </div>
-            )}
-          </div>
-        )}
+        <NotificationCenter
+          {...(notifications ?? {
+            onMarkAllRead: () => {},
+            onMarkRead: () => {},
+            onOpenTarget: () => {},
+            onOpenLocalTarget: () => {},
+            onMarkLocalRead: () => {},
+          })}
+        />
 
         <button
           type="button"

@@ -494,7 +494,7 @@ function extForMime(mime: string): string {
             <X className="w-5 h-5" />
           </button>
 
-          <span className="font-semibold text-xs text-retro-fg">
+          <span className="font-black uppercase tracking-tight text-base text-retro-fg">
             {mode === 'story' ? 'Create Story' : 'Create Post'} {mediaList.length > 0 ? `(${mediaList.length} media)` : ''}
           </span>
 

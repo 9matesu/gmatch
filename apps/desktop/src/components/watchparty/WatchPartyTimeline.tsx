@@ -251,7 +251,7 @@ export function WatchPartyTimeline({
         </div>
 
         <div
-          className="absolute left-0 top-1/2 -translate-y-1/2 h-1 group-hover/scrub:h-1.5 rounded-full bg-gradient-to-r from-retro-accent to-white pointer-events-none transition-all duration-150"
+          className="absolute left-0 top-1/2 -translate-y-1/2 h-1 group-hover/scrub:h-1.5 rounded-full bg-white pointer-events-none transition-all duration-150"
           style={{ width: `${progressPct}%` }}
         />
 

@@ -173,7 +173,7 @@ export function CardTile({
           {frameType !== 'chrome' && (
             <span className={`text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded-md border font-mono backdrop-blur-xs ${
               frameType === 'holo'
-                ? 'bg-gradient-to-r from-pink-500/80 via-purple-500/80 to-cyan-500/80 text-white border-pink-400/60'
+                ? 'bg-purple-950/90 text-purple-200 border-purple-400/60'
                 : frameType === 'carbon'
                 ? 'bg-retro-bg/90 text-retro-fg border-border-glass'
                 : frameType === 'neon'

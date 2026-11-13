@@ -1232,7 +1232,7 @@ export function GMatchFeed({
                                 onKeyDown={(e) => e.key === 'Enter' && handleAvatarClick(post.author_id)}
                                 title={authorHasStory ? 'Watch story' : 'View profile'}
                                 aria-label={authorHasStory ? `Watch story of ${post.author_name}` : `View profile of ${post.author_name}`}
-                                className={`relative w-8 h-8 rounded-full p-[1.5px] flex-shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${authorHasStory ? 'bg-gradient-to-tr from-zinc-300 to-zinc-600' : 'bg-glass-w12 border border-border-glass'}`}
+                                className={`relative w-8 h-8 rounded-full p-[1.5px] flex-shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${authorHasStory ? 'bg-white' : 'bg-glass-w12 border border-border-glass'}`}
                               >
                                 <div className="relative w-full h-full rounded-full bg-retro-panel overflow-hidden flex items-center justify-center text-xs font-semibold text-retro-fg">
                                   <Avatar id={post.author_id} size={32} imageUrl={profilePics[post.author_id] || post.author_avatar} fill={true} />
@@ -1493,10 +1493,10 @@ export function GMatchFeed({
           })}
 
           {displayPosts.length === 0 && (
-            <div className="solid-panel border border-border-glass rounded-lg p-8 text-center space-y-4 shadow-xs my-4 max-w-md mx-auto">
+            <div className="border border-border-glass rounded-lg p-10 text-center space-y-5 my-4 max-w-md mx-auto">
               <div>
-                <h4 className="text-xs font-semibold text-retro-fg">{emptyCopy.title}</h4>
-                <p className="text-xs text-retro-muted mt-1 leading-relaxed">
+                <h2 className="text-2xl font-black tracking-tighter uppercase text-retro-fg">{emptyCopy.title}</h2>
+                <p className="text-xs text-retro-muted mt-2 leading-relaxed">
                   {emptyCopy.body}
                 </p>
               </div>

@@ -176,8 +176,8 @@ export function Modal({
         onClick={(e) => e.stopPropagation()}
         className={`w-full ${maxWidth} glass-panel shadow-xl animate-orbit-pop`}
       >
-        <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border-glass">
-          <h2 id={titleId} className="text-xs font-semibold text-retro-fg truncate">
+        <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-border-glass">
+          <h2 id={titleId} className="text-base font-black tracking-tight uppercase text-retro-fg truncate">
             {title}
           </h2>
           <Button variant="ghost" size="sm" aria-label="Close dialog" onClick={onClose} className="px-1.5">
@@ -232,8 +232,8 @@ export function SideSheet({
         onClick={(e) => e.stopPropagation()}
         className={`pointer-events-auto ${width} h-full bg-[var(--color-glass)] backdrop-blur-xl border-l border-border-glass shadow-2xl flex flex-col animate-orbit-slide-left`}
       >
-        <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border-glass shrink-0">
-          <h2 className="text-xs font-semibold text-retro-fg truncate">{title}</h2>
+        <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-border-glass shrink-0">
+          <h2 className="text-base font-black tracking-tight uppercase text-retro-fg truncate">{title}</h2>
           <Button variant="ghost" size="sm" aria-label="Close" onClick={onClose} className="px-1.5">
             <X className="w-4 h-4" />
           </Button>
