@@ -181,7 +181,7 @@ export function WorldRow({
       <div className="flex shrink-0 items-center gap-2">
         {/* Fixed slot so the ⋯ column lines up down the list, whether or not a
             row has a figure the server actually reported. */}
-        <span className={`hidden sm:inline-block w-16 text-right text-[10px] ${MONO} text-retro-muted`}>
+        <span className={`hidden sm:inline-block w-28 text-right text-[10px] ${MONO} text-retro-muted`}>
           {state.counts ?? ''}
         </span>
 

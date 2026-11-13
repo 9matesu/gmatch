@@ -141,11 +141,11 @@ function rowCounts(
     const total = typeof dash.members_total === 'number'
       ? dash.members_total
       : (Array.isArray(dash.users) ? dash.users.length : 0)
-    return `${online} / ${total}`
+    return `${online} online · ${total} members`
   }
 
   if (typeof s.online_count === 'number' && typeof s.user_count === 'number') {
-    return `${s.online_count} / ${s.user_count}`
+    return `${s.online_count} online · ${s.user_count} members`
   }
   if (typeof s.online_count === 'number') return `${s.online_count} online`
   if (typeof s.user_count === 'number') return `${s.user_count} members`
@@ -562,12 +562,34 @@ export function ServersView({
     const matches = (s: DirectoryServer) =>
       !q || `${s.name} ${s.description ?? ''}`.toLowerCase().includes(q)
     const listed = dedupeServers([...visibleServers])
+    // Every address that belongs to THIS machine (loopback + the node's own
+    // LAN URLs). A directory row pointing at one of them is the same node the
+    // synthetic own-row already represents — one machine, ONE row, never two.
+    // The connected base only counts as "this machine" when we are hosting it;
+    // a client connected to a friend's node must not swallow that friend's row.
+    const selfHosts = new Set(['localhost', '127.0.0.1', '::1', '[::1]'])
+    const lanUrls = [...(hostState?.lanUrls ?? []), ...(node?.lanUrls ?? [])]
+    // Host mode with no measured LAN list: the bridge's own URL is still this
+    // machine. Never the committed base — a client joined to a friend's node
+    // must not swallow that friend's row.
+    if (!lanUrls.length && hostState?.mode === 'host' && hostState.url) lanUrls.push(hostState.url)
+    for (const u of lanUrls) {
+      if (!u) continue
+      try { selfHosts.add(new URL(u).hostname.toLowerCase()) } catch { /* not a URL */ }
+    }
+    const hostOf = (hint?: string): string => {
+      if (!hint) return ''
+      try { return new URL(hint.includes('://') ? hint : `http://${hint}`).hostname.toLowerCase() } catch { return '' }
+    }
+    const deduped = ownServer
+      ? listed.filter((s) => !selfHosts.has(hostOf(s.endpoint_hint)))
+      : listed
     // The node on this machine IS a server even when the directory does not
     // list it. Its own directory record wins when there is one (that is the
     // name it registered under); the synthetic row is only the fallback.
     const ownListed = !!ownServer && matches(ownServer)
-      && !listed.some((s) => serverKey(s) === serverKey(ownServer))
-    const rows = ownListed ? [...listed, ownServer!] : listed
+      && !deduped.some((s) => serverKey(s) === serverKey(ownServer))
+    const rows = ownListed ? [...deduped, ownServer!] : deduped
     return rows.sort((a, b) => {
       // The connected world first, then by measured population.
       const rank = (s: DirectoryServer) => (isCurrent(s) ? 0 : 1)
@@ -576,7 +598,7 @@ export function ServersView({
       if (ac !== bc) return ac - bc
       return (b.online_count ?? -1) - (a.online_count ?? -1) || a.name.localeCompare(b.name)
     })
-  }, [ownServer, visibleServers, query, apiBaseTick])
+  }, [ownServer, visibleServers, query, apiBaseTick, hostState, node, nodeUrl])
 
   const currentServerTitle = useMemo(() => {
     const apiBase = getEffectiveServerUrl()
@@ -1868,8 +1890,10 @@ export function ServersView({
               </div>
             )}
 
-            {/* ONE list: every server this client knows, the current one first. */}
-            <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar px-4 py-2">
+            {/* ONE list: every server this client knows, the current one first.
+                A near-solid backing: a world list is data you read, not glass
+                you see the wallpaper through. */}
+            <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar px-4 py-2 bg-retro-bg/85 backdrop-blur-md">
               {/* A failed directory request never erases servers we already know. */}
               {dirError && serverRows.length > 0 && (
                 <div role="status" className="mb-2 flex items-center gap-2 px-3 py-2 rounded-lg border border-border-glass bg-glass-w5 text-[10px] text-retro-muted">

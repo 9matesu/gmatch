@@ -145,7 +145,7 @@ describe('ServersView', () => {
     const activeRow = active.closest('li')!
     expect(within(activeRow).getByText('Current')).toBeInTheDocument()
     expect(activeRow).toHaveAttribute('aria-current', 'true')
-    expect(within(activeRow).getByText('1 / 4')).toBeInTheDocument()
+    expect(within(activeRow).getByText('1 online · 4 members')).toBeInTheDocument()
 
     // clicking the active row must not reconnect...
     fireEvent.click(active)
@@ -593,9 +593,12 @@ describe('ServersView', () => {
       ] })
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    // the node on this machine + the listing that carries this machine's
-    // address: two rows, and the listing is NOT hidden by its name
-    await waitFor(() => expect(screen.getAllByRole('listitem').length).toBe(2))
+    // The node on this machine + a directory listing that carries THIS
+    // machine's own LAN address are ONE node: one row (the duplicate the
+    // directory merge used to show is gone), and the row is not hidden by
+    // its name — this machine stays findable.
+    await waitFor(() => expect(screen.getAllByRole('listitem').length).toBe(1))
+    expect(screen.getByText('gmatch')).toBeInTheDocument()
   })
 
   it('a claim with a LAN address survives the boot migration; a loopback claim does not', async () => {
