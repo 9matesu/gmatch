@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import { CommandIsland } from './CommandIsland'
 
 // The sidebar/footer chrome was replaced by the island; these tests pin that
@@ -140,5 +140,38 @@ describe('CommandIsland styling & layout compliance', () => {
     expect(serversButton).toBeInTheDocument();
     const icon = serversButton.querySelector('svg');
     expect(icon?.className.baseVal || icon?.getAttribute('class') || '').not.toContain('text-retro-online');
+  });
+});
+
+describe('CommandIsland post button (footer, centered, one picker flow)', () => {
+  it('carries no balance counter: the g$ ledger lives in the Vault, not the chrome', () => {
+    render(<CommandIsland mainView="feed" setMainView={vi.fn()} />);
+    expect(screen.queryByLabelText(/Balance:/)).toBeNull();
+  });
+
+  it('clicking Post toggles the SAME media-picker bubble hover shows (one flow, no second modal)', () => {
+    vi.useFakeTimers();
+    const onPickMedia = vi.fn();
+    render(<CommandIsland mainView="feed" setMainView={vi.fn()} onOpenCreatePost={vi.fn()} onPickMedia={onPickMedia} />);
+
+    // Click toggles the bubble — the same dialog hover opens.
+    fireEvent.click(screen.getByLabelText('Create a post'));
+    expect(screen.getByRole('dialog', { name: 'Pick post media' })).toBeInTheDocument();
+
+    // A second click closes it again.
+    fireEvent.click(screen.getByLabelText('Create a post'));
+    expect(screen.queryByRole('dialog', { name: 'Pick post media' })).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it('hover pops the bubble after the intent delay and a pick is handed over', () => {
+    vi.useFakeTimers();
+    const onPickMedia = vi.fn();
+    render(<CommandIsland mainView="feed" setMainView={vi.fn()} onOpenCreatePost={vi.fn()} onPickMedia={onPickMedia} />);
+
+    fireEvent.mouseEnter(screen.getByLabelText('Create a post').parentElement!);
+    act(() => { vi.advanceTimersByTime(250); });
+    expect(screen.getByRole('dialog', { name: 'Pick post media' })).toBeInTheDocument();
+    vi.useRealTimers();
   });
 });

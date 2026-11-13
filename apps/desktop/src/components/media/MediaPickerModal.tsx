@@ -171,6 +171,17 @@ export function MediaPickerPanel({
     try {
       fresh = await resolveFreshLocalUrl(img);
       if (!fresh) {
+        // The tile already renders these bytes through the SAME local pipeline
+        // (vault loopback / IndexedDB blob). What you can see you can post: a
+        // display URL that is local IS the local copy — never a provider
+        // hotlink, so the fallback stays honest.
+        const display = tileUrl(img);
+        const isLocalDisplay =
+          /^(blob:|data:)/i.test(display) ||
+          /^https?:\/\/(127\.0\.0\.1|localhost)([:/]|$)/i.test(display);
+        if (isLocalDisplay) fresh = display;
+      }
+      if (!fresh) {
         setError('No local copy of this keepsake on this device yet — open it in the Gallery first so the bytes are fetched.');
         return;
       }

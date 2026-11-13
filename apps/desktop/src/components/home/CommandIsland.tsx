@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   House,
   SquaresFour,
@@ -26,7 +26,8 @@ import { playPress } from '../../utils/sounds';
 import { useCommunityInvite, openCommunityInvite } from '../../services/community';
 import { resolveMediaUrl } from '../../utils/media';
 import { CountBadge } from './CountBadge';
-import { formatCount } from '../../ui/format';
+import { MediaPickerPanel } from '../media/MediaPickerModal';
+import type { MediaSelection } from '../media/picker';
 import type { ViewMode } from '../../game/types';
 export type MainViewType = 'feed' | 'games' | 'create' | 'messages' | 'profile' | 'game' | 'gallery' | 'store' | 'pc_domination' | 'grid' | 'rooms' | 'servers' | 'watch';
 
@@ -53,7 +54,6 @@ function readSatelliteOpen(): boolean {
 export interface CommandIslandProps {
   mainView: MainViewType;
   setMainView: (view: MainViewType) => void;
-  balance?: number;
   wsConnected?: boolean;
   unreadMessagesCount?: number;
   /** Live players in queue + in match (Arena badge). Hidden at 0. */
@@ -68,6 +68,9 @@ export interface CommandIslandProps {
   displayName?: string;
   profilePic?: string;
   onOpenCreatePost?: () => void;
+  /** A media pick from the hover bubble goes straight into the post creator
+   *  pre-attached. Omitted → the bubble is not offered (tests / embeds). */
+  onPickMedia?: (sel: MediaSelection) => void;
   onOpenSettings?: () => void;
   /** Open the Help & documentation modal. */
   onOpenHelp?: () => void;
@@ -92,7 +95,6 @@ export interface CommandIslandProps {
 export function CommandIsland({
   mainView,
   setMainView,
-  balance = 0,
   wsConnected: _wsConnected = false,
   unreadMessagesCount = 0,
   gamesOnlineCount = 0,
@@ -102,6 +104,7 @@ export function CommandIsland({
   displayName = 'You',
   profilePic,
   onOpenCreatePost,
+  onPickMedia,
   onOpenSettings,
   onOpenHelp,
   settingsOpen = false,
@@ -119,7 +122,30 @@ export function CommandIsland({
   onGridSizeChange: _onGridSizeChange,
 }: CommandIslandProps) {
   const [satelliteOpen, setSatelliteOpen] = useState<boolean>(readSatelliteOpen);
+  const [postPickerOpen, setPostPickerOpen] = useState(false);
+  const hoverTimer = useRef<number | null>(null);
+  const leaveTimer = useRef<number | null>(null);
   const communityUrl = useCommunityInvite();
+
+  // Hover-intent open / grace close — the SAME bubble a click toggles, so
+  // hover and click are one flow, never two different modals.
+  const openPickerSoon = () => {
+    if (!onPickMedia) return;
+    if (leaveTimer.current) { window.clearTimeout(leaveTimer.current); leaveTimer.current = null; }
+    if (hoverTimer.current) window.clearTimeout(hoverTimer.current);
+    hoverTimer.current = window.setTimeout(() => setPostPickerOpen(true), 180);
+  };
+  const closePickerSoon = () => {
+    if (hoverTimer.current) { window.clearTimeout(hoverTimer.current); hoverTimer.current = null; }
+    if (leaveTimer.current) window.clearTimeout(leaveTimer.current);
+    leaveTimer.current = window.setTimeout(() => setPostPickerOpen(false), 260);
+  };
+  const togglePicker = () => {
+    playPress(900);
+    if (hoverTimer.current) { window.clearTimeout(hoverTimer.current); hoverTimer.current = null; }
+    if (leaveTimer.current) { window.clearTimeout(leaveTimer.current); leaveTimer.current = null; }
+    setPostPickerOpen((v) => !v);
+  };
 
   const toggleSatellite = () => {
     playPress(760);
@@ -180,26 +206,9 @@ export function CommandIsland({
     },
   ];
 
-  // Contextual action depending on current view
+  // Contextual action depending on current view. Post lives permanently at
+  // the island's center now; only Forge stays contextual.
   const renderContextualAction = () => {
-    if (mainView === 'feed') {
-      return (
-        <button
-          type="button"
-          onClick={() => {
-            playPress(920);
-            onOpenCreatePost?.();
-          }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-retro-accent text-retro-accent-text hover:bg-retro-accent-hover active:scale-95 transition-all text-xs font-semibold"
-          title="Create Post"
-          aria-label="Create Post"
-        >
-          <Plus className="w-3.5 h-3.5" weight="bold" />
-          <span className="hidden sm:inline">Post</span>
-        </button>
-      );
-    }
-
     if (mainView === 'gallery') {
       return (
         <button
@@ -237,20 +246,9 @@ export function CommandIsland({
         aria-label="Command Island"
         className={`command-island fixed bottom-5 left-1/2 -translate-x-1/2 z-[var(--z-dropdown)] flex max-w-[calc(100vw-1.5rem)] items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full select-none transition-all duration-300 overflow-hidden flex-nowrap ${recessed ? 'island-recessed' : ''}`}
       >
-        {/* Left Telemetry: $G Balance */}
-        <div
-          aria-label={`Balance: ${formatCount(balance)} dollars`}
-          className="flex items-center px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full bg-glass-w5 border border-border-glass text-xs font-mono tabular-nums text-retro-body shrink-0"
-        >
-          <span className="font-semibold text-retro-fg tracking-tight">
-            ${formatCount(balance)}
-          </span>
-        </div>
-
-        <div className="h-4 w-[1px] bg-glass-w10 mx-0.5 shrink-0" />
-
-        {/* Center Primary Nav Tabs */}
-        <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
+        {/* Left zone: primary nav tabs — flex-1 so the Post button sits
+            exactly at the island's center when the satellite is collapsed. */}
+        <div className="flex items-center gap-0.5 sm:gap-1 flex-1 justify-end min-w-0">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = item.active;
@@ -278,6 +276,41 @@ export function CommandIsland({
               </button>
             );
           })}
+        </div>
+
+        <div className="h-4 w-[1px] bg-glass-w10 mx-0.5 shrink-0" />
+
+        {/* Center: THE Post button — one focal point, dead-center of the
+            island. Hover OR click open the SAME media-picker bubble (never
+            two different modals); a pick flows into the composer
+            pre-attached. The balance counter is gone: the g$ ledger lives in
+            the Vault, not in the chrome. */}
+        {onOpenCreatePost && (
+          <div
+            className="relative shrink-0"
+            onMouseEnter={openPickerSoon}
+            onMouseLeave={closePickerSoon}
+            onKeyDown={(e) => { if (e.key === 'Escape') setPostPickerOpen(false); }}
+          >
+            <button
+              type="button"
+              onClick={togglePicker}
+              aria-label="Create a post"
+              aria-haspopup={onPickMedia ? 'dialog' : undefined}
+              aria-expanded={onPickMedia ? postPickerOpen : undefined}
+              title="Create a post — hover or click for the media picker"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-retro-accent text-retro-accent-text hover:bg-retro-accent-hover active:scale-95 transition-all text-xs font-bold uppercase tracking-wide"
+            >
+              <Plus className="w-3.5 h-3.5" weight="bold" />
+              <span className="hidden sm:inline">Post</span>
+            </button>
+          </div>
+        )}
+
+        <div className="h-4 w-[1px] bg-glass-w10 mx-0.5 shrink-0" />
+
+        {/* Right zone: chat, profile, contextual action, extra tools. */}
+        <div className="flex items-center gap-0.5 sm:gap-1 flex-1 justify-start min-w-0">
 
           {/* The notification bell lives in the header now (single entry point);
               the footer island no longer duplicates it. */}
@@ -334,7 +367,6 @@ export function CommandIsland({
             </div>
             <span className="text-xs font-medium hidden md:inline">Profile</span>
           </button>
-        </div>
 
         {/* Contextual Capsule */}
         {renderContextualAction() && (
@@ -539,6 +571,27 @@ export function CommandIsland({
                 </button>
               </>
             )}
+          </div>
+        )}
+        </div>
+
+        {/* The picker bubble renders OUTSIDE the pill (the island clips
+            overflow), fixed above the island's center — the same spot as the
+            Post button it belongs to. */}
+        {postPickerOpen && onPickMedia && (
+          <div
+            role="dialog"
+            aria-label="Pick post media"
+            className="fixed bottom-[calc(1.25rem+60px)] left-1/2 -translate-x-1/2 z-[var(--z-modal)] w-[340px] max-w-[calc(100vw-1.5rem)] animate-orbit-pop origin-bottom"
+            onMouseEnter={() => { if (leaveTimer.current) { window.clearTimeout(leaveTimer.current); leaveTimer.current = null; } }}
+            onMouseLeave={closePickerSoon}
+          >
+            <MediaPickerPanel
+              compact
+              options={{ accept: ['image', 'video'], sources: ['browse', 'upload', 'url'], title: 'Pick post media' }}
+              onPick={(sel) => { setPostPickerOpen(false); onPickMedia(sel); }}
+              onClose={() => setPostPickerOpen(false)}
+            />
           </div>
         )}
       </nav>
