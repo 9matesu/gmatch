@@ -11,11 +11,12 @@ import { DropZone } from './DropZone'
 import { CameraCapture } from './CameraCapture'
 import { forgeMediaLocally } from '../services/mediaForge'
 import {
-  Flame, Camera, UploadCloud, Link as LinkIcon, Clock,
-  Sparkles, Check, X, Grid, Move,   Mail,
+  Flame, Link as LinkIcon, Clock,
+  Sparkles, Check, X, Move,   Mail,
   ChevronDown, ChevronRight,  Layers, ZoomIn, Share2, ImagePlus
 } from 'lucide-react'
 import { logger } from '../utils/logger'
+import { Button, Card, CardHeader, Modal, Tabs, Title } from '../ui/kit'
 
 /**
  * Lays out n entries in a near-square grid that always fills every cell.
@@ -523,132 +524,87 @@ export function BabecockPanel({
     <div className="space-y-4 font-sans select-none">
       {/* Tutorial overlay */}
       {showTutorial && (
-        <div className="fixed inset-0 z-[var(--z-lightbox)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-surface-raised border border-border-glass rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-orange-100 border border-orange-200 flex items-center justify-center text-orange-600">
-                <Flame className="w-4 h-4" />
-              </div>
-              <h2 className="text-sm font-black text-retro-fg uppercase tracking-wider">Babecock</h2>
-            </div>
-            <ol className="text-xs text-retro-muted space-y-2 leading-relaxed list-decimal list-inside">
-              <li>A host starts the round with an <strong className="text-retro-fg">OP picture</strong>.</li>
-              <li>Other players join with their own challenger pictures before the 3-minute timer expires.</li>
-              <li>Organize cards into an interconnected <strong className="text-retro-fg">collage grid</strong> with the OP picture in the center.</li>
-              <li>Finished rounds appear in the <strong className="text-retro-fg">Babecock Gallery</strong> for 1 hour.</li>
-            </ol>
-            <button
-              type="button"
-              onClick={closeTutorial}
-              className="w-full py-2.5 bg-black text-white font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-surface-elevated transition-colors cursor-pointer shadow-xs"
-            >
-              Got it, let&apos;s go!
-            </button>
-          </div>
-        </div>
+        <Modal open onClose={closeTutorial} title="How the round works">
+          <ol className="text-xs text-retro-muted space-y-2 leading-relaxed list-decimal list-inside">
+            <li>A host starts the round with an <strong className="text-retro-fg">OP picture</strong>.</li>
+            <li>Other players join with their own challenger pictures before the 3-minute timer expires.</li>
+            <li>Organize cards into a <strong className="text-retro-fg">collage grid</strong> with the OP picture in the center.</li>
+            <li>Finished rounds appear in the <strong className="text-retro-fg">gallery</strong> for 1 hour.</li>
+          </ol>
+          <Button variant="primary" className="w-full" onClick={closeTutorial}>
+            Got it
+          </Button>
+        </Modal>
       )}
 
       {/* Invites Banner */}
       {invites.length > 0 && (
-        <div className="solid-panel rounded-xl p-3.5 space-y-2 backdrop-blur-md">
-          <div className="text-xs font-semibold text-retro-fg flex items-center gap-1.5">
-            <Mail className="w-3.5 h-3.5 text-retro-muted" />
-            <span>Babecock Invitations ({invites.length})</span>
-          </div>
+        <Card className="p-3.5 space-y-2">
+          <Title>Invites ({invites.length})</Title>
           <div className="space-y-1.5">
             {invites.map((inv) => (
-              <div key={inv.id} className="flex items-center justify-between gap-2 p-2.5 bg-retro-bg/60 border border-border-glass rounded-md text-xs shadow-xs">
-                <span className="text-retro-fg">
-                  <strong className="text-retro-fg font-medium">{inv.host_name || 'Someone'}</strong> invited you to their round!
+              <div key={inv.id} className="flex items-center justify-between gap-2 p-2.5 bg-glass-w5 border border-border-glass rounded-lg text-xs">
+                <span className="text-retro-fg truncate">
+                  <strong className="font-medium">{inv.host_name || 'Someone'}</strong> invited you to their round
                 </span>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    type="button"
+                  <Button
+                    variant="primary"
+                    size="sm"
                     onClick={() => {
                       void dismissInvite(inv.id)
                       openModal('join')
                     }}
-                    className="px-3 py-1 bg-white text-retro-bg hover:bg-retro-fg font-semibold text-xs rounded-md transition-all duration-150 active:scale-[0.96] shadow-xs cursor-pointer"
                   >
                     Join
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => dismissInvite(inv.id)}
-                    aria-label="Dismiss invite"
-                    className="p-1 min-w-[28px] min-h-[28px] flex items-center justify-center text-retro-muted hover:text-retro-fg rounded-md cursor-pointer transition-colors"
-                  >
+                  </Button>
+                  <Button variant="ghost" size="sm" aria-label="Dismiss invite" onClick={() => dismissInvite(inv.id)} className="px-1.5">
                     <X className="w-3.5 h-3.5" />
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Live Round Section */}
-      <div className="solid-panel rounded-xl overflow-hidden shadow-xs backdrop-blur-md">
-        <div className="flex items-center justify-between px-4 py-3 bg-glass-w8 backdrop-blur-md border-b border-border-glass">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-md bg-glass-w12 border border-border-glass flex items-center justify-center text-amber-400">
-              <Flame className="w-4 h-4" />
-            </div>
-            <div>
-              <h2 className="text-xs font-semibold text-retro-fg">Live Babecock</h2>
-              <p className="text-[10px] text-retro-muted font-sans">
-                {round
-                  ? `Hosted by ${round.host_name || 'Anonymous'}. ${round.entries.length} entr${round.entries.length === 1 ? 'y' : 'ies'}`
-                  : 'No round running right now'}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {round && (
-              <span className={`px-2.5 py-1 text-xs font-mono font-semibold rounded-md border flex items-center gap-1 ${secsLeft > 0 ? 'bg-red-500/10 text-red-400 border-red-500/30' : 'text-retro-muted border-border-glass'
-                }`}>
-                <Clock className="w-3.5 h-3.5" />
-                <span>{secsLeft > 0 ? fmt(secsLeft) : 'CLOSED'}</span>
-              </span>
-            )}
-            {round && round.entries.length > 1 && (
-              <div className="flex bg-retro-bg p-0.5 rounded-md border border-border-glass text-[10px] font-medium" role="radiogroup" aria-label="Layout view">
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={viewLayout === 'collage'}
-                  onClick={() => setViewLayout('collage')}
-                  className={`px-2 py-0.5 rounded cursor-pointer transition-all duration-150 active:scale-[0.96] ${viewLayout === 'collage' ? 'bg-glass-w12 text-retro-fg shadow-xs font-semibold' : 'text-retro-muted hover:text-retro-fg'}`}
-                  title="Collage Grid"
-                >
-                  <Grid className="w-3 h-3 inline mr-1" />
-                  Collage
-                </button>
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={viewLayout === 'strip'}
-                  onClick={() => setViewLayout('strip')}
-                  className={`px-2 py-0.5 rounded cursor-pointer transition-all duration-150 active:scale-[0.96] ${viewLayout === 'strip' ? 'bg-glass-w12 text-retro-fg shadow-xs font-semibold' : 'text-retro-muted hover:text-retro-fg'}`}
-                  title="Strip View"
-                >
-                  <Layers className="w-3 h-3 inline mr-1" />
-                  Strip
-                </button>
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={() => setLiveOpen((v) => !v)}
-              aria-label={liveOpen ? "Collapse live round" : "Expand live round"}
-              aria-expanded={liveOpen}
-              className="p-1 min-w-[28px] min-h-[28px] flex items-center justify-center text-retro-muted hover:text-retro-fg rounded-md cursor-pointer transition-colors"
-            >
-              {liveOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-            </button>
-          </div>
-        </div>
+      <Card className="overflow-hidden">
+        <CardHeader
+          icon={<Flame className="w-4 h-4" />}
+          title="Live round"
+          caption={round
+            ? `Hosted by ${round.host_name || 'Anonymous'} · ${round.entries.length} entr${round.entries.length === 1 ? 'y' : 'ies'}`
+            : 'No round running right now'}
+          right={
+            <>
+              {round && (
+                <span className={`px-2.5 py-1 text-xs font-mono font-semibold rounded-md border flex items-center gap-1 ${secsLeft > 0 ? 'bg-red-500/10 text-red-400 border-red-500/30' : 'text-retro-muted border-border-glass'
+                  }`}>
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>{secsLeft > 0 ? fmt(secsLeft) : 'CLOSED'}</span>
+                </span>
+              )}
+              {round && round.entries.length > 1 && (
+                <Tabs
+                  tabs={[{ id: 'collage' as const, label: 'Collage' }, { id: 'strip' as const, label: 'Strip' }]}
+                  value={viewLayout}
+                  onChange={(v) => setViewLayout(v)}
+                />
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label={liveOpen ? "Collapse live round" : "Expand live round"}
+                aria-expanded={liveOpen}
+                onClick={() => setLiveOpen((v) => !v)}
+                className="px-1.5"
+              >
+                {liveOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              </Button>
+            </>
+          }
+        />
 
         {liveOpen && (
           <div className="p-4 space-y-4">
@@ -660,16 +616,12 @@ export function BabecockPanel({
                   <Flame className="w-6 h-6 text-orange-500" />
                 </div>
                 <p className="text-xs text-retro-muted max-w-sm mx-auto leading-relaxed">
-                  No Babecock round is currently live. Start one by posting the OP image and inviting challengers!
+                  No round is live. Start one by posting the OP image and inviting challengers.
                 </p>
-                <button
-                  type="button"
-                  onClick={() => openModal('start')}
-                  className="px-4 py-2 bg-black hover:bg-surface-elevated text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer shadow-xs inline-flex items-center gap-1.5"
-                >
+                <Button variant="primary" onClick={() => openModal('start')} className="mx-auto">
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>Start a Round</span>
-                </button>
+                  <span>Start a round</span>
+                </Button>
               </div>
             ) : (
               <div className="space-y-4">
@@ -758,46 +710,33 @@ export function BabecockPanel({
                 {/* Round Actions & Controls */}
                 <div className="flex items-center gap-2 flex-wrap pt-1">
                   {amHost && secsLeft > 0 && (
-                    <button
-                      type="button"
-                      onClick={addMoreImages}
-                      disabled={addingImages}
-                      className="px-3 py-2 text-xs font-bold text-retro-body border border-border-glass hover:bg-glass-w10 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-40"
-                    >
+                    <Button onClick={addMoreImages} disabled={addingImages}>
                       <ImagePlus className="w-3.5 h-3.5" />
-                      <span>{addingImages ? 'Adding...' : 'Add images'}</span>
-                    </button>
+                      <span>{addingImages ? 'Adding…' : 'Add images'}</span>
+                    </Button>
                   )}
                   {round.my_entry ? (
-                    <span className="px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-1.5">
+                    <span className="px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-1.5">
                       <Check className="w-3.5 h-3.5" />
                       <span>You are in the round</span>
                     </span>
                   ) : secsLeft > 0 ? (
-                    <button
-                      type="button"
-                      onClick={() => openModal('join')}
-                      className="px-4 py-2 bg-black hover:bg-surface-elevated text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer shadow-xs flex items-center gap-1.5"
-                    >
-                      <span>+ add yours or any cock!</span>
-                    </button>
+                    <Button variant="primary" onClick={() => openModal('join')}>
+                      Join the round
+                    </Button>
                   ) : (
-                    <span className="px-3 py-1.5 text-xs font-semibold text-retro-muted border border-border-glass rounded-xl">Round finished</span>
+                    <span className="px-3 py-1.5 text-xs font-semibold text-retro-muted border border-border-glass rounded-lg">Round finished</span>
                   )}
 
                   {amHost && secsLeft > 0 && (
                     <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setInvitePickerOpen((v) => !v)}
-                        className="px-3.5 py-2 text-xs font-bold text-retro-body border border-border-glass hover:bg-glass-w10 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
-                      >
-                        <Mail className="w-3.5 h-3.5 text-cyan-300" />
-                        <span>{invitePickerOpen ? 'Close Picker' : 'Invite a Friend'}</span>
-                      </button>
+                      <Button onClick={() => setInvitePickerOpen((v) => !v)}>
+                        <Mail className="w-3.5 h-3.5" />
+                        <span>{invitePickerOpen ? 'Close picker' : 'Invite a friend'}</span>
+                      </Button>
 
                       {invitePickerOpen && (
-                        <div className="absolute z-30 top-full left-0 mt-1.5 w-64 max-h-72 overflow-y-auto styled-scrollbar bg-surface-raised border border-border-glass rounded-xl shadow-xl p-2 space-y-1">
+                        <Card tone="raised" className="absolute z-30 top-full left-0 mt-1.5 w-64 max-h-72 overflow-y-auto styled-scrollbar p-2 space-y-1">
                           {candidateUsers.length === 0 ? (
                             <div className="text-xs text-retro-muted p-2 text-center">No online peers to invite.</div>
                           ) : (
@@ -807,13 +746,13 @@ export function BabecockPanel({
                                 type="button"
                                 disabled={sendingInvite !== null}
                                 onClick={() => sendInvite(u.id)}
-                                className="w-full flex items-center gap-2 p-1.5 rounded-xl hover:bg-glass-w10 disabled:opacity-40 text-left cursor-pointer transition-colors"
+                                className="w-full flex items-center gap-2 p-1.5 rounded-lg hover:bg-glass-w12 disabled:opacity-40 text-left cursor-pointer transition-colors"
                               >
-                                <div className="w-7 h-7 rounded-full bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-xs font-bold text-cyan-300 shrink-0">
+                                <div className="w-7 h-7 rounded-full bg-glass-w12 border border-border-glass flex items-center justify-center text-xs font-bold text-retro-fg shrink-0">
                                   {(u.display_name?.trim() || 'Unknown User').slice(0, 1).toUpperCase()}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <div className="text-xs font-bold text-retro-body truncate">{u.display_name?.trim() || 'Unknown User'}</div>
+                                  <div className="text-xs font-semibold text-retro-fg truncate">{u.display_name?.trim() || 'Unknown User'}</div>
                                 </div>
                                 {sendingInvite === u.id && (
                                   <span className="text-xs text-retro-muted animate-pulse">…</span>
@@ -821,7 +760,7 @@ export function BabecockPanel({
                               </button>
                             ))
                           )}
-                        </div>
+                        </Card>
                       )}
                     </div>
                   )}
@@ -830,23 +769,27 @@ export function BabecockPanel({
             )}
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Gallery Section */}
-      <div className="solid-panel rounded-xl overflow-hidden shadow-xs backdrop-blur-md">
-        <button
-          type="button"
-          onClick={() => setGalleryOpen((v) => !v)}
-          className="w-full flex items-center justify-between px-4 py-3.5 bg-glass-w8 backdrop-blur-md hover:bg-glass-w12 transition-colors cursor-pointer text-left border-b border-border-glass"
-        >
-          <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-retro-muted" />
-            <h3 className="text-xs font-black text-retro-fg uppercase tracking-wider">
-              Babecock Gallery <span className="text-retro-muted font-normal normal-case">(past 1h)</span>
-            </h3>
-          </div>
-          <span className="text-xs text-retro-muted">{galleryOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</span>
-        </button>
+      <Card className="overflow-hidden">
+        <CardHeader
+          icon={<Layers className="w-4 h-4" />}
+          title="Gallery (past 1h)"
+          right={
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={galleryOpen ? 'Collapse gallery' : 'Expand gallery'}
+              aria-expanded={galleryOpen}
+              onClick={() => setGalleryOpen((v) => !v)}
+              className="px-1.5"
+            >
+              {galleryOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            </Button>
+          }
+          className={galleryOpen ? '' : 'border-b-0'}
+        />
 
         {galleryOpen && (
           <div className="p-4">
@@ -860,10 +803,10 @@ export function BabecockPanel({
                     <div
                       key={g.id}
                       onClick={() => setExpandedRound(g)}
-                      className="bg-surface-raised border border-border-glass rounded-xl overflow-hidden space-y-1.5 p-2 shadow-xs cursor-pointer group hover:border-border-glass transition-colors"
+                      className="bg-glass-w5 border border-border-glass rounded-lg overflow-hidden space-y-1.5 p-2 cursor-pointer group hover:bg-glass-w8 transition-colors"
                     >
                       {op && (
-                        <div className="w-full aspect-square rounded-lg overflow-hidden bg-black relative">
+                        <div className="w-full aspect-square rounded-md overflow-hidden bg-black relative">
                           {op.mime_type.startsWith('video') ? (
                             <video src={resolveMediaUrl(op.content_url)} muted loop playsInline autoPlay className="w-full h-full object-cover" />
                           ) : (
@@ -875,7 +818,7 @@ export function BabecockPanel({
                         </div>
                       )}
                       <div className="flex items-center justify-between text-xs text-retro-muted px-1">
-                        <span className="font-bold text-retro-fg truncate">{g.host_name || 'Host'}</span>
+                        <span className="font-semibold text-retro-fg truncate">{g.host_name || 'Host'}</span>
                         <span className="text-[10px] text-retro-muted">{g.entries.length} cards</span>
                       </div>
                     </div>
@@ -885,172 +828,121 @@ export function BabecockPanel({
             )}
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Modal: Start or Join Round */}
-      {modal && (
-        <div className="fixed inset-0 z-[var(--z-lightbox)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-surface-raised border border-border-glass rounded-xl max-w-lg w-full overflow-hidden shadow-2xl space-y-4 p-5">
-            <div className="flex items-center justify-between border-b border-border-glass pb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-xl bg-orange-100 border border-orange-200 flex items-center justify-center text-orange-600">
-                  <Flame className="w-4 h-4" />
-                </div>
-                <div>
-                  <h2 className="text-xs font-black text-retro-fg uppercase tracking-wider">
-                    {modal === 'start' ? 'Post the OP Picture' : 'Join with your Picture'}
-                  </h2>
-                  <p className="text-[10px] text-retro-muted">
-                    {modal === 'start' ? 'You start the round. Challengers compare against yours' : `Round finishes in ${fmt(secsLeft)}`}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setModal(null)}
-                className="text-retro-muted hover:text-retro-body p-1 rounded-md cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+      <Modal
+        open={!!modal}
+        onClose={() => setModal(null)}
+        title={modal === 'start' ? 'Post the OP picture' : 'Join with your picture'}
+      >
+        <Tabs
+          tabs={[{ id: 'upload' as const, label: 'Upload' }, { id: 'url' as const, label: 'URL' }, { id: 'camera' as const, label: 'Camera' }]}
+          value={mode}
+          onChange={(m) => {
+            setMode(m)
+            setPreview(null)
+            setUrlInput('')
+            fileRef.current = null
+            setHasFile(false)
+          }}
+        />
 
-            {/* Mode Selectors */}
-            <div className="flex bg-surface-interactive p-1 rounded-xl border border-border-glass text-xs font-bold">
-              {(['upload', 'url', 'camera'] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => {
-                    setMode(m)
-                    setPreview(null)
-                    setUrlInput('')
-                    fileRef.current = null
-                    setHasFile(false)
-                  }}
-                  className={`flex-1 py-1.5 rounded-lg transition-all uppercase tracking-wider cursor-pointer flex items-center justify-center gap-1.5 ${mode === m ? 'bg-surface-raised text-retro-fg shadow-xs font-black' : 'text-retro-muted hover:text-retro-body'
-                    }`}
-                >
-                  {m === 'upload' && <UploadCloud className="w-3.5 h-3.5" />}
-                  {m === 'url' && <LinkIcon className="w-3.5 h-3.5" />}
-                  {m === 'camera' && <Camera className="w-3.5 h-3.5" />}
-                  <span>{m}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Mode Input Content */}
+        <div className="space-y-3">
+          {mode === 'camera' ? (
+            <>
+              <CameraCapture onCapture={handleCameraFile} onCancel={() => setMode('upload')} />
+              {hasFile && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-xs font-semibold text-emerald-800">
+                  <Check className="w-4 h-4" />
+                  <span>Snapshot captured and ready.</span>
+                  <Button variant="ghost" size="sm" className="ml-auto" onClick={() => { fileRef.current = null; setHasFile(false); setPreview(null) }}>
+                    Discard
+                  </Button>
+                </div>
+              )}
+            </>
+          ) : mode === 'url' ? (
             <div className="space-y-3">
-              {mode === 'camera' ? (
-                <>
-                  <CameraCapture onCapture={handleCameraFile} onCancel={() => setMode('upload')} />
-                  {hasFile && (
-                    <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-800">
-                      <Check className="w-4 h-4" />
-                      <span>Snapshot captured &amp; ready to post.</span>
-                      <button
-                        type="button"
-                        onClick={() => { fileRef.current = null; setHasFile(false); setPreview(null) }}
-                        className="ml-auto text-retro-muted hover:text-red-500 underline cursor-pointer"
-                      >
-                        Discard
-                      </button>
-                    </div>
-                  )}
-                </>
-              ) : mode === 'url' ? (
-                <div className="space-y-3">
-                  <div className="flex gap-2">
-                    <input
-                      type="url"
-                      value={urlInput}
-                      onChange={(e) => handleUrl(e.target.value)}
-                      placeholder="Paste image or video link (e.g. https://...)"
-                      className="flex-1 bg-surface-interactive border border-border-glass rounded-xl px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-black"
-                    />
-                  </div>
-                  {urlInput && (
-                    <div className="p-3 rounded-xl border border-border-glass bg-surface-raised text-xs text-retro-body flex items-center gap-2">
-                      <LinkIcon className="w-4 h-4 text-cyan-600 shrink-0" />
-                      <span className="truncate">URL ready. Will be fetched and stored on submit</span>
-                    </div>
-                  )}
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  value={urlInput}
+                  onChange={(e) => handleUrl(e.target.value)}
+                  placeholder="Paste an image or video link"
+                  className="flex-1 bg-glass-w5 border border-border-glass rounded-lg px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent"
+                />
+              </div>
+              {urlInput && (
+                <div className="p-3 rounded-lg border border-border-glass bg-glass-w5 text-xs text-retro-fg flex items-center gap-2">
+                  <LinkIcon className="w-4 h-4 text-retro-muted shrink-0" />
+                  <span className="truncate">Will be fetched and stored on submit</span>
                 </div>
-              ) : (
-                <>
-                  <DropZone onFiles={handleFile} onPasteUrl={handleUrl} compact={false} accept="image/jpeg, image/png, image/webp, image/gif" multiple={modal === 'start'}>
-                    <div className="space-y-1 text-center py-2">
-                      <p className="text-xs text-retro-body font-bold">Drop an image/video or click to browse</p>
-                      <p className="text-[10px] text-retro-muted">JPG, PNG, WebP, GIF, MP4, WebM (up to 50MB)</p>
-                    </div>
-                  </DropZone>
-                  {preview && (
-                    preview.startsWith('data:video') || preview.startsWith('blob:') ? (
-                      <video src={preview} controls className="w-full max-h-52 object-contain rounded-xl border border-border-glass bg-black" />
-                    ) : preview.startsWith('http://') || preview.startsWith('https://') ? (
-                      <div className="w-full text-center py-3 rounded-xl border border-border-glass bg-surface-raised text-xs text-retro-body flex items-center justify-center gap-2">
-                        <LinkIcon className="w-3.5 h-3.5 text-cyan-600" />
-                        <span>Link ready to submit</span>
-                      </div>
-                    ) : (
-                      <img src={preview} alt="Preview" className="w-full max-h-52 object-contain rounded-xl border border-border-glass bg-black" />
-                    )
-                  )}
-                </>
               )}
             </div>
-
-            {/* Actions */}
-            <div className="pt-2 border-t border-border-glass flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setModal(null)}
-                className="px-4 py-2 text-xs font-bold text-retro-muted hover:text-retro-fg border border-border-glass rounded-xl cursor-pointer transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={submitting || (!hasFile && !urlInput.trim() && !preview)}
-                onClick={submit}
-                className="px-5 py-2 bg-black hover:bg-surface-elevated text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {submitting ? 'Submitting...' : modal === 'start' ? 'Start Round' : 'Join Round'}
-              </button>
-            </div>
-          </div>
+          ) : (
+            <>
+              <DropZone onFiles={handleFile} onPasteUrl={handleUrl} compact={false} accept="image/jpeg, image/png, image/webp, image/gif" multiple={modal === 'start'}>
+                <div className="space-y-1 text-center py-2">
+                  <p className="text-xs text-retro-fg font-semibold">Drop an image/video or click to browse</p>
+                  <p className="text-[10px] text-retro-muted">JPG, PNG, WebP, GIF, MP4, WebM (up to 50MB)</p>
+                </div>
+              </DropZone>
+              {preview && (
+                preview.startsWith('data:video') || preview.startsWith('blob:') ? (
+                  <video src={preview} controls className="w-full max-h-52 object-contain rounded-lg border border-border-glass bg-black" />
+                ) : preview.startsWith('http://') || preview.startsWith('https://') ? (
+                  <div className="w-full text-center py-3 rounded-lg border border-border-glass bg-glass-w5 text-xs text-retro-fg flex items-center justify-center gap-2">
+                    <LinkIcon className="w-3.5 h-3.5 text-retro-muted" />
+                    <span>Link ready to submit</span>
+                  </div>
+                ) : (
+                  <img src={preview} alt="Preview" className="w-full max-h-52 object-contain rounded-lg border border-border-glass bg-black" />
+                )
+              )}
+            </>
+          )}
         </div>
-      )}
+
+        <div className="pt-2 border-t border-border-glass flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setModal(null)}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            disabled={submitting || (!hasFile && !urlInput.trim() && !preview)}
+            onClick={submit}
+          >
+            {submitting ? 'Submitting…' : modal === 'start' ? 'Start round' : 'Join round'}
+          </Button>
+        </div>
+      </Modal>
 
       {/* Expanded Gallery Round Lightbox */}
       {expandedRound && (
         <div
-          className="fixed inset-0 z-[var(--z-toast)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-orbit-fade-in"
+          className="fixed inset-0 bg-black/60 flex items-center justify-center p-4"
           onClick={() => setExpandedRound(null)}
         >
-          <div
-            className="bg-surface-raised border border-border-glass rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto styled-scrollbar p-5 space-y-4 shadow-2xl"
+          <Card
+            tone="raised"
+            className="max-w-3xl w-full max-h-[90vh] overflow-y-auto styled-scrollbar p-4 space-y-3"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-border-glass pb-3">
-              <div className="flex items-center gap-2">
-                <Flame className="w-4 h-4 text-orange-500" />
-                <h3 className="text-sm font-black text-retro-fg">
-                  Round by {expandedRound.host_name || 'Anonymous'}
-                </h3>
-                <span className="text-xs text-retro-muted">{expandedRound.entries.length} cards</span>
+            <div className="flex items-center justify-between gap-2 pb-2 border-b border-border-glass">
+              <div className="flex items-center gap-2 min-w-0">
+                <Flame className="w-4 h-4 text-orange-500 shrink-0" />
+                <Title className="truncate">Round by {expandedRound.host_name || 'Anonymous'}</Title>
+                <span className="text-xs text-retro-muted shrink-0">{expandedRound.entries.length} cards</span>
               </div>
-              <button
-                type="button"
-                onClick={() => setExpandedRound(null)}
-                className="text-retro-muted hover:text-retro-body p-1.5 rounded-md cursor-pointer"
-              >
+              <Button variant="ghost" size="sm" aria-label="Close" onClick={() => setExpandedRound(null)} className="px-1.5">
                 <X className="w-4 h-4" />
-              </button>
+              </Button>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {expandedRound.entries.map((entry) => (
-                <div key={entry.id} className="relative aspect-square rounded-xl overflow-hidden bg-black group">
+                <div key={entry.id} className="relative aspect-square rounded-lg overflow-hidden bg-black group">
                   {entry.mime_type.startsWith('video') ? (
                     <video src={resolveMediaUrl(entry.content_url)} muted loop playsInline autoPlay className="w-full h-full object-cover" />
                   ) : (
@@ -1059,8 +951,8 @@ export function BabecockPanel({
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); shareEntryToGroup(entry); }}
-                    className="absolute bottom-2 right-2 p-1.5 bg-black/70 backdrop-blur-sm rounded-lg text-retro-muted hover:text-white transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
-                    title="Share to Group Chat"
+                    className="absolute bottom-2 right-2 p-1.5 bg-black/70 rounded-lg text-retro-muted hover:text-white transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
+                    title="Share to group chat"
                   >
                     <Share2 className="w-4 h-4" />
                   </button>
@@ -1070,17 +962,16 @@ export function BabecockPanel({
 
             {selfId === expandedRound.host_id && (
               <div className="flex justify-end pt-2 border-t border-border-glass">
-                <button
-                  type="button"
+                <Button
+                  variant="primary"
                   disabled={postingToFeed}
                   onClick={() => postRoundToFeed(expandedRound)}
-                  className="px-4 py-2 bg-black hover:bg-surface-elevated text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-40"
                 >
-                  {postingToFeed ? 'Posting…' : 'Post to Feed'}
-                </button>
+                  {postingToFeed ? 'Posting…' : 'Post to feed'}
+                </Button>
               </div>
             )}
-          </div>
+          </Card>
         </div>
       )}
     </div>
