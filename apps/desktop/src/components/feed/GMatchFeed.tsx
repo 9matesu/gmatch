@@ -1198,7 +1198,8 @@ export function GMatchFeed({
                           hideUnavailable={false}
                           onExpand={() => toggleExpand(post)}
                           onDoubleTapLike={() => handleDoubleTap(post)}
-                        />
+                        onMediaUnavailable={() => hidePost(post.id)}
+                          />
                       ) : isVideo ? (
                         <NativeVideoPlayer
                                 natural
