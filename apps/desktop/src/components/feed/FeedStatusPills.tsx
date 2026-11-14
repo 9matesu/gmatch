@@ -27,7 +27,7 @@ function useOnline(): boolean {
  * An empty timeline is already explained by the single empty-state card below —
  * a second "empty feed" pill duplicated that message, so it is gone.
  */
-export function FeedStatusPills({ postCount }: { postCount: number }) {
+export function FeedStatusPills() {
   const online = useOnline();
 
   if (online) return null;

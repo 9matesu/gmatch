@@ -36,7 +36,6 @@ function baseProps(overrides: Partial<Overrides> = {}): Overrides {
   }
 }
 
-const at = (y: number, m: number, d: number, h = 12, min = 0) => new Date(y, m - 1, d, h, min, 0).getTime()
 
 const msg = (id: string, timestamp: number, senderId = 'peer'): ChatMessage => ({
   id,

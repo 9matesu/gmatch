@@ -10,24 +10,13 @@ import {
   tierForXp,
 } from '../game/prestige'
 import { ACHIEVEMENTS } from '../game/achievements'
-import { CAP_SKINS } from './capSkins'
 import { formatNum } from './format'
 import { Skeleton } from '../components/Skeleton'
-import {
-  BTN,
-  BTN_DANGER,
-  BTN_SMALL,
-  DISPLAY,
-  MONO,
-  MUTED,
-  PLATE,
-  SKIN,
-} from './styles'
+import { MONO, PLATE } from './styles'
 import {
   Tag as TagIcon,
   Lightning,
   Fire,
-  MagnifyingGlass,
   Plus,
   ArrowClockwise,
   X,

@@ -6,7 +6,6 @@ import { saveObject, getObject } from '../utils/storage';
 import { getApiBaseUrl, getApiWebSocketUrl, isCourierHost, orbitFetch, subscribeApiBase } from '../utils/api';
 import { mergeRoster } from '../utils/peerRoster';
 import { presenceBucket } from '../utils/compare';
-import { CHAT_WIPE_SECONDS } from '@orbit/shared';
 import { logger } from '../utils/logger';
 import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, hydrateDurableReplications, announcePeerOnline, PEER_ONLINE_EVENT, announceHeldObjects, setSwarmReceiptIdentity, setSwarmOperationHandler, setSwarmOperationAckHandler, sendSwarmFrame } from '../utils/p2pSwarm';
 import { broadcastPresence, fetchPresenceRosterFrom } from '../services/courierPresence';
@@ -19,7 +18,6 @@ import { resolveDisplayName } from '../utils/displayName';
 import { parseApiTimestamp } from '../utils/timeAgo';
 import { mediaFlag, resolveClaimedOwner, descriptorUrlFromBytes } from '../utils/objectDescriptor';
 
-const CHAT_WIPE_MS = CHAT_WIPE_SECONDS * 1000;
 /** Cap on frames parked while the relay socket is down. */
 const MAX_QUEUED_FRAMES = 200;
 /** How many nodes one roster round may read the presence mailbox of. */
@@ -251,7 +249,6 @@ export function useP2P(identity: OrbitIdentity | null) {
   const wsRef = useRef<WebSocket | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const sendHeartbeatRef = useRef<() => void>(() => {});
-  const historyLoadedRef = useRef(false);
 
   const selfUserRef = useRef<User>({
     id: identity?.orbitId || '',

@@ -5,13 +5,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { BlocklistSection } from './BlocklistSection'
 import {
   isTagBlocked,
-  isNoise,
-  saveBlocklist,
-  resetBlocklist,
   __resetBlocklist,
-  getActiveBlocklistData,
   updateActiveBlocklist,
-  DEFAULT_BLOCKLIST_DATA,
 } from '../../game/tagFilter'
 
 describe('BlocklistSection', () => {

@@ -23,7 +23,6 @@ export default function CachedImg({ src: rawSrc, fallbackSrc, onError, onLoading
   const isLocal = /^(gmcache|idle-file|vault|blob|data):/i.test(src)
   const [display, setDisplay] = useState<string>(isLocal ? src : '')
   const [inView, setInView] = useState<boolean>(isLocal || rest.loading === 'eager')
-  const [resolved, setResolved] = useState<boolean>(isLocal)
   const imgRef = useRef<HTMLImageElement | null>(null)
 
   // Consumers (the story ring avatars) need to know "still decoding" vs
@@ -64,22 +63,14 @@ export default function CachedImg({ src: rawSrc, fallbackSrc, onError, onLoading
     let live = true
     if (/^(gmcache|idle-file|vault|blob|data):/i.test(src)) {
       setDisplay(src)
-      setResolved(true)
       return
     }
     setDisplay(src)
     resolveImage(src)
       .then((local) => {
-        if (live && local) {
-          setDisplay(local)
-          setResolved(true)
-        }
+        if (live && local) setDisplay(local)
       })
-      .catch(() => {
-        if (live) {
-          setResolved(true)
-        }
-      })
+      .catch(() => {})
     return () => {
       live = false
     }

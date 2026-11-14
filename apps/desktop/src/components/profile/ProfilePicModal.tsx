@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Camera, FolderOpen, X, Check } from 'lucide-react';
 import { CameraCapture } from '../CameraCapture';
-import { DropZone } from '../DropZone';
 import { useMediaPicker } from '../media/MediaPickerModal';
 import { useCropper } from '../../hooks/useCropper';
 import { isCropableImage } from '../CropModal';

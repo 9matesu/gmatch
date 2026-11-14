@@ -6,13 +6,9 @@ import { useIdle } from "./hooks/useIdle";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { getApiBaseUrl, orbitFetch, invalidateCache, subscribeApiBase } from "./utils/api";
-import { courierThreadToChatMessages, chatRowEqual } from "./utils/courierChat";
-import { countChatUnread, countThreadUnread } from "./utils/chatUnread";
-import { countMentions, createMentionMatcher } from "./utils/mentions";
-import { loadSeen, saveSeen, readScopedJson, writeScopedJson } from "./utils/scopedSeen";
-import { useNotificationCenter } from "./hooks/useNotificationCenter";
+import { loadSeen, saveSeen } from "./utils/scopedSeen";
 import { useAppChat } from "./hooks/useAppChat";
-import type { AppNotification, NotificationTarget } from "./utils/notifications";
+import type { NotificationTarget } from "./utils/notifications";
 import { OrbitPeer, pollOffers } from "./utils/webrtc";
 import { saveObject, getAllObjects, deleteObject } from "./utils/storage";
 import type { SendPanelHandle } from "./components/SendPanel";
@@ -22,14 +18,13 @@ import { useConfirm } from "./components/ConfirmDialog";
 import { usePlaytime, useCoffeeGate } from "./hooks/usePlaytime";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import type { SettingsOpenTarget } from './components/settings/GMatchSettingsModal';
-import { userFacingError } from './utils/userError';
 import { ImageViewer } from "./components/ImageViewer";
 import { IdleOverlay } from "./components/IdleOverlay";
 import { useP2P } from "./hooks/useP2P";
 import { usePeerFeedPosts } from './hooks/usePeerFeedPosts'
 import type { ChatMessage } from "./hooks/useP2P";
 import { useGame } from "./hooks/useGame";
-import { enqueueableItems, isP2pLocal, shouldEnqueue } from "./utils/game";
+import { enqueueableItems, shouldEnqueue } from "./utils/game";
 import { mergeMyCards, filterToActiveDeck, galleryItemVisible, type CanonicalCard } from "./utils/cardCollection";
 import { outboxStatesByGroup } from "./services/postOutbox";
 import { buildMirrorRow } from "./utils/galleryMirror";
@@ -40,15 +35,13 @@ import { mapLimit } from "./services/booru";
 import { vaultPin, vaultHttpUrl } from "./services/vault";
 import { devFetchable } from "./services/imageCache";
 import { hashForView, resolveInitialView, viewFromHash } from "./utils/routing";
-import { DOM_ACTION_CONSENT } from "./utils/dominationMesh";
-import { playChime, playPress, playMsgReceive } from "./utils/sounds";
+import { playChime, playPress } from "./utils/sounds";
 import { useLobby } from "./hooks/useLobby";
 import { UserProfileModal } from "./components/UserProfileModal";
 import { SendCardModal } from "./components/cards/SendCardModal";
 import { MIN_GAME_CARDS, generateFallbackName, type User, type OrbitObject } from "@orbit/shared";
 import { applyCanonicalCard } from "./game/galleryMapping";
 import { areItemsStructurallyEqual, areUsersStructurallyEqual, areAnnouncementsStructurallyEqual } from "./utils/compare";
-import { parseApiTimestamp } from "./utils/timeAgo";
 import { OnboardingFlow } from "./firstRun/OnboardingFlow";
 import { isOnboardingComplete, readOnboardingState } from "./firstRun/onboardingState";
 import { DEFAULT_FEED_SORT, isFeedSort, type FeedSort } from "./components/feed/feedSort";
@@ -62,7 +55,6 @@ import { PEER_ONLINE_EVENT } from "./utils/p2pSwarm";
 import { localHeldMediaUrl } from "./utils/localMedia";
 import { GMatchDMs } from "./components/chat/GMatchDMs";
 import { toChatPeer, type ChatPeer } from "./components/chat/chatPeer";
-import type { GroupMember } from "./components/chat/GroupMembersPopover";
 import { AttachmentUploadModal } from "./components/AttachmentUploadModal";
 import { ProfileView } from "./components/views/ProfileView";
 import { DmMinimizedView } from "./components/views/MessagesView";
@@ -78,12 +70,12 @@ import { type MainViewType, type ActiveHackSession } from "./components/home/Com
 import { CommandIsland } from "./components/home/CommandIsland";
 import { ThemeDrawer } from "./components/theme/ThemeDrawer";
 import { NativeHeaderBar } from "./components/home/NativeHeaderBar";
-import { RoomsPreview, buildPreviewRows } from "./components/chat/RoomsPreview";
+import { RoomsPreview } from "./components/chat/RoomsPreview";
 import { ServersView } from "./components/servers/ServersView";
 import { PCDominationView } from "./components/views/PCDominationView";
 import { DominationEffects } from "./components/domination/DominationEffects";
 import type { ActiveHackDebuff } from "@orbit/shared";
-import { ChevronDown, ChevronRight, X, Bell } from "lucide-react";
+import { ChevronRight, X } from "lucide-react";
 import { ChatCircleText } from "@phosphor-icons/react";
 import { WallpaperBackground } from "./components/WallpaperBackground";
 import { ContextOverlay, ReportModal, type ContextMenuState } from "./components/ContextOverlay";
@@ -99,13 +91,8 @@ import AdminApp from "./admin/AdminApp";
 import { StoreView } from "./components/views/StoreView";
 import { logger } from './utils/logger';
 import { useNotifications } from './hooks/useNotifications';
-import { isKnownSiteCourier, cachedMailMode, detectMailMode } from "./utils/mail-mode";
-import { useCourierDms } from './hooks/useCourierDms';
-import { usePeerReports } from './hooks/usePeerReports';
-import { ensureGroupRoom, mergeGroupMessages, roomIdForGroup, type GroupRoomOps } from './services/groupRooms';
 import { useServerHeartbeat } from './hooks/useServerHeartbeat';
 import { usePresencePoll } from './hooks/usePresencePoll';
-import { usePresence } from './game/presenceStore';
 import { ingestSnapshot } from './game/presenceStore';
 import { hasStatefulRoutes } from './utils/nodeCapabilities';
 import { usePendingJoinVerify } from './hooks/usePendingJoinVerify';
@@ -114,8 +101,7 @@ import { dataUrlToBlob, localObjectBlobUrl } from "./utils/mediaData";
 import { recoverDescriptorRow } from "./utils/objectDescriptor";
 import { mediaUrlToCachedFile } from "./utils/cacheMedia";
 import { fresherPresence } from './utils/presence';
-import { resolveDisplayName, toNameRoster } from './utils/displayName';
-import { nameRoster as nameRosterFromDirectory, nameFor, rememberName, rememberNames } from './game/nameDirectory';
+import { nameRoster as nameRosterFromDirectory, nameFor, rememberNames } from './game/nameDirectory';
 import { UNKNOWN_NAME } from './utils/displayName';
 
 const MAX_GALLERY_ITEMS_IN_MEMORY = 80;
@@ -132,7 +118,6 @@ const desktopChatOnLoad = () => false;
 const DM_SEEN_KEY = 'gmatch_dm_seen_v1';
 const ROOM_SEEN_KEY = 'gmatch_room_seen_v1';
 /** Which conversation to restore on boot (also identity-scoped). */
-const LAST_DM_PEER_KEY = 'gmatch_last_dm_peer_v1';
 
 export default function Home() {
   useEffect(() => {
@@ -611,7 +596,7 @@ export default function Home() {
   const [hideUiForWallpaper, setHideUiForWallpaper] = useState(false)
   const [spaceUiDimmed, setSpaceUiDimmed] = useState(false)
   const wallpaperBgRef = useRef('')
-  const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsOpenTarget>('preferences')
+  const [settingsInitialTab] = useState<SettingsOpenTarget>('preferences')
 
   const handleSetWallpaper = (url: string, mime?: string) => {
     if (!url) return;

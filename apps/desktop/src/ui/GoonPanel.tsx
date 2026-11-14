@@ -4,7 +4,6 @@ import { gridSizeForMode, isGridMode } from '../game/store'
 import { HEAT_WINDOW_MS, heatMultiplier } from '../game/economy'
 import type { CapId, ViewMode } from '../game/types'
 import { playPress } from '../utils/sounds'
-import { offlineSvg } from '../services/offlineSvg'
 import { prefetchImages, resolveImage } from '../services/imageCache'
 import { isVideoUrl } from '../services/postFilter'
 import { redgifsPlayable } from '../services/redgifs'
@@ -278,7 +277,6 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
   }
 
   const showOffline = feedOffline || !current || failedUrl === current.url
-  const src = showOffline ? offlineSvg(current?.tags ?? []) : current.url
   // Motion posts (redgifs mp4/webm) play inline; gifs stay on <img>.
   const isMotion =
     !showOffline &&

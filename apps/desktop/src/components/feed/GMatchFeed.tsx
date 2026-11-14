@@ -31,7 +31,6 @@ import {
   ZoomOut,
   Zap,
   RefreshCw,
-  X,
   Loader2,
 } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
@@ -45,9 +44,8 @@ import { LiveCameraModal } from '../camera/LiveCameraModal';
 import { ObjectImage } from '../ObjectImage';
 import { Avatar } from '../Avatar';
 import CachedImg from '../../ui/CachedImg';
-import { LazyVideo } from '../LazyVideo';
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer';
-import { isMediaVideo, isVideoPost, resolveMediaUrl } from '../../utils/media';
+import { isVideoPost, resolveMediaUrl } from '../../utils/media';
 import { vaultPin, vaultBridge } from '../../services/vault';
 
 /** Sibling item MIME types for render-time video detection (see isVideoPost). */
@@ -914,7 +912,7 @@ export function GMatchFeed({
 
       {/* Selective status pills: only empty/conflict states, never a
           healthy timeline (see FeedStatusPills). */}
-      <FeedStatusPills postCount={displayPosts.length} />
+      <FeedStatusPills />
 
       {/* ONE quiet sync label (replaces the per-post chips): reflects real
           background publish work — active uploads / posts saved locally only.

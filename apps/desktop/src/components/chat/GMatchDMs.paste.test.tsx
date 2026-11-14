@@ -112,7 +112,7 @@ describe('GMatchDMs composer paste', () => {
     pasteInto(composer, { text: 'https://cdn.example/a.jpg' })
 
     await waitFor(() => expect(onOpenAttachment).toHaveBeenCalledTimes(1))
-    const [target, peerId, groupId, replyToId, files, url] = onOpenAttachment.mock.calls[0]
+    const [target, peerId, , , files, url] = onOpenAttachment.mock.calls[0]
     expect(target).toBe('pm')
     expect(peerId).toBe(PEER.orbitId)
     expect(files).toBeUndefined()

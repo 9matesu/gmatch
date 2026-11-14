@@ -24,7 +24,6 @@ import {
   Edit2,
   CheckCheck,
   Check,
-  SmilePlus,
   Trash,
   Lock,
   LogOut,
@@ -1250,7 +1249,7 @@ export function GMatchDMs({
                     </button>
                   </div>
                 )}
-                {messageRows.map((row, bi) => {
+                {messageRows.map((row) => {
                   if (row.kind === 'day') {
                     return (
                       <div

@@ -93,8 +93,7 @@ describe('GMatchFeed author header', () => {
 
   it('clicking the author avatar calls onSelectUser', () => {
     const onSelectUser = vi.fn();
-    const { container } = renderFeed([imagePost], { onSelectUser });
-    const card = container.querySelector('article') as HTMLElement;
+    const card = renderFeed([imagePost], { onSelectUser }).container.querySelector('article') as HTMLElement;
     const avatar = card.querySelector('[title="View profile"]') as HTMLElement;
     expect(avatar).toBeTruthy();
 
@@ -106,7 +105,7 @@ describe('GMatchFeed author header', () => {
 
   it('clicking the author name calls onSelectUser', () => {
     const onSelectUser = vi.fn();
-    const { container } = renderFeed([imagePost], { onSelectUser });
+    renderFeed([imagePost], { onSelectUser });
 
     fireEvent.click(screen.getByText('Alice Wonder'));
 

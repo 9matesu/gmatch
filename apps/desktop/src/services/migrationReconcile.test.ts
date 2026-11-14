@@ -24,7 +24,6 @@ import {
   saveWatermark,
   readWatermark,
   buildStageE,
-  WATERMARK_KEY,
   type ManifestTarget,
 } from './migrationReconcile'
 import type { RecoveryEntry } from './recoveryStatus'

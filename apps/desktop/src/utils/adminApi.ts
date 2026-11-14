@@ -5,7 +5,6 @@ import type {
   AdminMatch,
   AdminArchivedMatch,
   AdminTierMatch,
-  AdminObject,
   AdminLobbyImage,
   AdminReport,
   AdminRecommendation,

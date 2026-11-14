@@ -11,7 +11,7 @@ import {
   type CourierSignalPayload,
 } from './courierSignaling'
 import { generateIdentity, type OrbitIdentity } from '@orbit/crypto'
-import { open1to1, deliveryToken, seal1to1 } from '@orbit/protocol'
+import { open1to1, deliveryToken } from '@orbit/protocol'
 
 /** Minimal offline RTCPeerConnection double so the answerer path can be
  *  driven through the real ICE buffering / dedupe code. */
@@ -99,13 +99,6 @@ describe('courierSignaling', () => {
     class FakeIC { candidate: string; constructor(i: { candidate?: string }) { this.candidate = i.candidate ?? '' } }
     vi.stubGlobal('RTCIceCandidate', FakeIC)
     try {
-      const envelope = (payload: unknown) => seal1to1(
-        JSON.stringify(payload), 'signal',
-        { privateKeyHex: alice.privateKeyHex, publicKeyHex: alice.publicKeyHex, encryptionPrivHex: alice.encryptionPrivHex, encryptionPubHex: alice.encryptionPubHex },
-        { publicKeyHex: bob.publicKeyHex, encryptionPubHex: bob.encryptionPubHex },
-        { to: deliveryToken(bob.publicKeyHex), exp: Date.now() + 60_000 },
-      )
-
       // Answerer flow: offer -> ICE arrives AFTER setRemoteDescription applies.
       await handleInboundSignal({
         kind: 'signal',

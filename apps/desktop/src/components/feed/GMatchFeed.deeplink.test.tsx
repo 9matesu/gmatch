@@ -39,7 +39,6 @@ function post(id: string, caption: string) {
 }
 
 const composer = () => screen.queryByPlaceholderText('Add a comment...');
-const articleOf = (id: string) => document.querySelector(`[data-post-id="${id}"]`);
 
 function renderFeed(
   posts: any[],

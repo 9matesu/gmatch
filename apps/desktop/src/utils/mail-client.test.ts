@@ -320,7 +320,7 @@ describe('MailClient multi-base mailboxes (receiver drains every legitimate box)
 
   function multiFetch(byUrl: (url: string) => Response | 'ack') {
     const seen: string[] = []
-    const fetchImpl = makeFetch(async (url, init) => {
+    const fetchImpl = makeFetch(async (url) => {
       seen.push(`${new URL(url).origin}${new URL(url).pathname}`)
       const r = byUrl(String(url))
       if (r === 'ack') return okJson({ ok: true })

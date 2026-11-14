@@ -27,7 +27,7 @@ const mockedMulti = vi.mocked(fetchPostsMulti)
 const offline: BooruResponse = { posts: [], source: null, ok: false, offline: true }
 const foe = (id: string): BooruPost => ({ id, url: `https://x/${id}.jpg`, tags: ['gangbang'] })
 const post = (id: string) => ({ id, url: `https://x/${id}.jpg`, tags: ['gangbang'] })
-const dozen = () => Array.from({ length: 12 }, (_, i) => post(`pts{i}`))
+const dozen = () => Array.from({ length: 12 }, (_, i) => post(`pts${i}`))
 const settle = async (): Promise<void> => {
   for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r, 0))
 }

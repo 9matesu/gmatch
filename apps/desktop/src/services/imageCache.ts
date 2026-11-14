@@ -68,14 +68,6 @@ function destroyLegacyIdb(): void {
 // Pure (exported for tests).
 export { devFetchable } from './booruSources'
 
-function isDev(): boolean {
-  try {
-    return !!import.meta.env.DEV
-  } catch {
-    return false
-  }
-}
-
 // Background (speculative) byte fetches are limited so browser sockets — and
 // the IPC channel to the main-process cache — are never starved by a prefetch
 // sweep. This only ever gates PREFETCH: the on-demand path (resolveImageNow)

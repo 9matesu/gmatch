@@ -5,7 +5,6 @@ import { orbitFetch } from '../utils/api'
 import { getLocalObject, requestSwarmObject, PEER_ONLINE_EVENT } from '../utils/p2pSwarm'
 import { vaultProbe } from '../services/vault'
 import { resolveVideoMime, sniffFileHead } from '../utils/media'
-import { isMagnetUri } from '../utils/magnet'
 import { normalizeObjectId, isRequestableObjectId } from '../utils/objectRef'
 
 /**

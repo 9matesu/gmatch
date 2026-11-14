@@ -15,32 +15,32 @@ afterEach(() => {
 describe('FeedStatusPills (offline conflict only)', () => {
   it('renders nothing when online with posts', () => {
     setOnline(true);
-    const { container } = render(<FeedStatusPills postCount={5} />);
+    const { container } = render(<FeedStatusPills />);
     expect(container.firstElementChild).toBeNull();
   });
 
   it('renders nothing when online and empty (the empty card says it once)', () => {
     setOnline(true);
-    const { container } = render(<FeedStatusPills postCount={0} />);
+    const { container } = render(<FeedStatusPills />);
     expect(container.firstElementChild).toBeNull();
     expect(screen.queryByText(/empty feed/i)).toBeNull();
   });
 
   it('offline with posts: offline pill', () => {
     setOnline(false);
-    render(<FeedStatusPills postCount={5} />);
+    render(<FeedStatusPills />);
     expect(screen.getByRole('status')).toHaveTextContent(/offline/i);
   });
 
   it('offline and empty: offline pill still discloses the stale cache', () => {
     setOnline(false);
-    render(<FeedStatusPills postCount={0} />);
+    render(<FeedStatusPills />);
     expect(screen.getByRole('status')).toHaveTextContent(/offline/i);
   });
 
   it('reacts to connectivity flips without remount', () => {
     setOnline(true);
-    render(<FeedStatusPills postCount={5} />);
+    render(<FeedStatusPills />);
     expect(document.body.querySelector('[role="status"]')).toBeNull();
     act(() => {
       setOnline(false);

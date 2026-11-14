@@ -67,7 +67,6 @@ function main() {
   // --- read throughput + integrity -----------------------------------------
   const read = measure()
   let readBytes = 0
-  for (const key of cache.indexKeys ? cache.indexKeys() : []) { /* not exposed; read by name below */ }
   const names = fs.readdirSync(path.join(tmp, 'imgcache')).filter((f) => f.endsWith('.enc')).map((f) => f.slice(0, -4))
   let verified = 0
   for (const key of names) {

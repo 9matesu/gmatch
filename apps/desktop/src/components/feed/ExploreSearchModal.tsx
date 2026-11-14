@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { playPress } from '../../utils/sounds';
-import { Search, X, MessageCircle, Users, Image as ImageIcon, Hash, Play, Video } from 'lucide-react';
+import { Search, X, MessageCircle, Users, Image as ImageIcon, Hash, Play } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { FeedPost } from './GMatchFeed';
 import { ObjectImage } from '../ObjectImage';
