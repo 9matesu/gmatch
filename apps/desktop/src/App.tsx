@@ -281,7 +281,7 @@ export default function Home() {
     enqueueDecision,
   } = game;
 
-  const lobby = useLobby({ identity, settings }); // BISECT
+  const lobby = useLobby({ identity, settings });
   const notifications = useNotifications(lobby.state);
 
   // Wrapped lobby functions that request notification permission on user gesture

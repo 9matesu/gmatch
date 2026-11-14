@@ -39,6 +39,7 @@ import type { OrbitIdentity } from '@orbit/crypto';
 import type { OrbitObject as StoryItem } from '@orbit/shared';
 import { generateFallbackName } from '@orbit/shared';
 import { countHidden, isRenderable } from './isRenderable';
+import { hasInlineMedia } from './mediaReadiness';
 import { FeedGrid } from './FeedGrid';
 import { GMatchStories } from '../GMatchStories';
 import { PostComments } from './PostComments';
@@ -48,7 +49,7 @@ import { ObjectImage } from '../ObjectImage';
 import { Avatar } from '../Avatar';
 import CachedImg from '../../ui/CachedImg';
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer';
-import { isVideoPost } from '../../utils/media';
+import { isVideoPost, resolveMediaUrl } from '../../utils/media';
 import { vaultPin, vaultBridge } from '../../services/vault';
 
 /** Sibling item MIME types for render-time video detection (see isVideoPost). */
@@ -551,21 +552,51 @@ function GMatchFeedImpl({
   // "No preview" is not content. A post whose media never resolves is
   // dropped from the timeline instead of filling it with empty frames.
   const [deadPosts, setDeadPosts] = useState<Set<string>>(new Set());
+  // A row with NO words is only content once its bytes are real. Until then it
+  // must not appear (and must not flash): it renders hidden, off the visible
+  // list, and is promoted by the media itself. A failure drops it for good
+  // (`hidePost`), so a post never sits in the timeline as an empty frame.
+  const [mediaReady, setMediaReady] = useState<Set<string>>(new Set());
+  const promoteMedia = useCallback((id: string) => {
+    setMediaReady((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+  }, []);
   const hidePost = useCallback((id: string) => {
     setDeadPosts((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
   }, []);
+  // A text-less row must not appear (or flash) while its bytes are in flight.
+  // The card cannot probe itself: a hidden card has no box, so the lazy image
+  // never intersects and the row would wait forever. This is the one probe.
+  useEffect(() => {
+    let live = true;
+    for (const post of posts) {
+      if (post.caption?.trim()) continue;
+      if (mediaReady.has(post.id) || deadPosts.has(post.id)) continue;
+      const url = post.media?.[0]?.url || post.url;
+      if (!url || !/^https?:|^\//i.test(url)) continue; // inline or descriptor: no probe
+      if (hasInlineMedia(post)) continue;
+      const img = new Image();
+      img.onload = () => { if (live) promoteMedia(post.id); };
+      img.onerror = () => { if (live) hidePost(post.id); };
+      img.src = resolveMediaUrl(url);
+    }
+    return () => { live = false; };
+  }, [posts, mediaReady, deadPosts, promoteMedia, hidePost]);
+
   const hiddenCount = useMemo(() => countHidden(posts), [posts]);
   const visiblePosts = useMemo(
     () => posts.filter((p) => {
       if (p.is_archived) return false;
       // No words, no url, no media = no post. Never a card, never a slot.
       if (!isRenderable(p)) return false;
+      // Words carry the row on their own. Bytes that are already inline
+      // (data:/blob:) need no probe; anything else must arrive first.
+      if (!p.caption?.trim() && !mediaReady.has(p.id) && !hasInlineMedia(p)) return false;
       // Media that cannot be fetched right now keeps the post on screen (its
       // tile shows the placeholder). Hiding the whole post here is what made a
       // user's own old uploads disappear when no seeder held the bytes.
       return true;
     }),
-    [posts],
+    [posts, mediaReady],
   );
 
   // Hold the reader's place when rows arrive above them.
@@ -1239,6 +1270,7 @@ function GMatchFeedImpl({
                                 loop={true}
                                 hideUnavailable={false}
                           onMediaUnavailable={() => hidePost(post.id)}
+                        onLoad={() => promoteMedia(post.id)}
                                 onExpand={() => toggleExpand(post)}
                                 onDoubleTapLike={() => handleDoubleTap(post)}
                               />
@@ -1306,6 +1338,7 @@ function GMatchFeedImpl({
                           onExpand={() => toggleExpand(post)}
                           onDoubleTapLike={() => handleDoubleTap(post)}
                         onMediaUnavailable={() => hidePost(post.id)}
+                        onLoad={() => promoteMedia(post.id)}
                           />
                       ) : isVideo ? (
                         <NativeVideoPlayer
@@ -1326,6 +1359,7 @@ function GMatchFeedImpl({
                           alt={post.caption || 'Post image'}
                           className="w-full h-auto max-h-[min(680px,80vh)] group-data-[expanded=true]/post:max-h-[85vh] object-contain rounded-none"
                           loading="lazy"
+                          onLoad={() => promoteMedia(post.id)}
                         />
                       )}
                         </div>

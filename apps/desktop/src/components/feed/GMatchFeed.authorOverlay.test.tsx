@@ -41,6 +41,7 @@ describe('GMatchFeed author header', () => {
     author_name: 'Alice Wonder',
     url: 'https://example.com/clip.mp4',
     mime_type: 'video/mp4',
+    caption: 'a clip',
     created_at: new Date().toISOString(),
     like_count: 0,
     comment_count: 0,
