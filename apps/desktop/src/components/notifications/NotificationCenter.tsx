@@ -104,7 +104,7 @@ export function NotificationCenter(props: NotificationCenterProps) {
 
   return (
     <div
-      className="relative shrink-0 sm:flex-1 sm:min-w-0 max-w-md flex items-center"
+      className="relative flex items-center"
       style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
     >
       {/* RareUI notification bell: the swing-on-new + rolling count badge.
@@ -123,12 +123,13 @@ export function NotificationCenter(props: NotificationCenterProps) {
         title="Notifications"
         className="shrink-0 bg-glass-w8 text-retro-fg hover:bg-glass-w10"
       />
-      <span aria-live="polite" className="min-w-0 flex-1 hidden sm:block leading-tight px-2">
-        <span className="block text-[10px] font-bold uppercase tracking-wider text-retro-muted">
-          Notifications
+      {/* Dynamic only: the newest unread title. The permanent "Notifications"
+          label is gone  it never changed, so it was chrome, not information. */}
+      {preview && (
+        <span aria-live="polite" className="min-w-0 truncate text-xs text-retro-fg/80 px-2">
+          {preview}
         </span>
-        {preview && <span className="block truncate text-xs text-retro-fg/80">{preview}</span>}
-      </span>
+      )}
 
       {expanded && (
         <div

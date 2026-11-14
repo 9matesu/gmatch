@@ -80,14 +80,11 @@ export function NativeHeaderBar({
         <span className="text-[13px] font-bold tracking-wide text-retro-fg select-none ml-1">gMatch</span>
       </div>
 
-      {/* The Post button lives in the footer Command Island now — one focal
-          point at the bottom, not duplicated in the chrome. */}
-
-      {/* Right: notifications + mute + window controls (frameless: buttons
-          render only when the preload bridge exposes them. Browser/dev =
-          no bridge) */}
+      {/* Centre: the notification centre. One bell and its badge  the
+          permanent "Notifications / All quiet" text is gone, because a label
+          that never changes is chrome, not information. */}
       <div
-        className="flex items-center gap-2 text-retro-muted"
+        className="absolute left-1/2 -translate-x-1/2 flex items-center"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
         <NotificationCenter
@@ -99,6 +96,17 @@ export function NativeHeaderBar({
             onMarkLocalRead: () => {},
           })}
         />
+      </div>
+      {/* The Post button lives in the footer Command Island now — one focal
+          point at the bottom, not duplicated in the chrome. */}
+
+      {/* Right: notifications + mute + window controls (frameless: buttons
+          render only when the preload bridge exposes them. Browser/dev =
+          no bridge) */}
+      <div
+        className="flex items-center gap-2 text-retro-muted"
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+      >
 
         <button
           type="button"
