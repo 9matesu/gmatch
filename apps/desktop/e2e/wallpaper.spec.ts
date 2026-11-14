@@ -93,22 +93,6 @@ async function withAnImagePost(page: Page) {
   return expandedImage
 }
 
-/**
- * Click a context-menu entry.
- *
- * `force` because the shell re-renders on its roster/heartbeat polls, which
- * detaches and re-creates the menu node mid-click ("element is not stable …
- * element was detached from the DOM, retrying", looping until the test
- * timeout). The menu's presence is asserted separately, so the only thing this
- * needs to do is deliver the click to the right entry.
- */
-async function chooseMenuEntry(page: Page, label: string) {
-  await expect(page.getByRole('menu').first()).toBeVisible({ timeout: 20_000 })
-  const entry = page.getByText(label, { exact: true })
-  await expect(entry).toBeVisible({ timeout: 20_000 })
-  await entry.click({ force: true })
-}
-
 /** Chromium's native right-click is flaky on the transformed profile image.
  * Dispatch the same bubbling, cancelable DOM event at that real media element;
  * the app's window-level handler still decides whether/how to open the menu. */
@@ -116,20 +100,38 @@ async function openMediaContextMenu(image: import('@playwright/test').Locator) {
   await image.dispatchEvent('contextmenu', { button: 2, clientX: 240, clientY: 180 })
 }
 
-test('the OS wallpaper entry is offered on real image content', async ({ page }) => {
+/** Open the wallpaper entry and apply it to one target.
+ *
+ * The context menu is data, not markup: `Set as background` is ONE entry whose
+ * `Apply to` param picks the surface (this app / whole desktop), so a journey
+ * expands the entry, chooses, then presses Apply. */
+async function chooseBackground(page: Page, target: 'app' | 'os') {
+  await expect(page.getByRole('menu').first()).toBeVisible({ timeout: 20_000 })
+  const entry = page.getByRole('menuitem', { name: /Set as background/i })
+  await expect(entry).toBeVisible({ timeout: 20_000 })
+  await entry.click({ force: true })
+  await page.getByLabel('Apply to').selectOption(target)
+  await page.getByRole('button', { name: 'Apply', exact: true }).click({ force: true })
+}
+
+test('the wallpaper entry is offered on real image content', async ({ page }) => {
   const image = await withAnImagePost(page)
   await openMediaContextMenu(image)
 
-  const menu = page.getByRole('menu').first()
-  await expect(menu).toBeVisible({ timeout: 20_000 })
-  await expect(page.getByText('Set as OS wallpaper')).toBeVisible()
-  await expect(page.getByText('Set as app background')).toBeVisible()
+  await expect(page.getByRole('menu').first()).toBeVisible({ timeout: 20_000 })
+  const entry = page.getByRole('menuitem', { name: /Set as background/i })
+  await expect(entry).toBeVisible()
+  // Both surfaces are reachable from the one entry, not two competing ones.
+  await entry.click({ force: true })
+  await expect(page.getByLabel('Apply to')).toBeVisible()
+  await expect(page.getByRole('option', { name: 'This app' })).toHaveCount(1)
+  await expect(page.getByRole('option', { name: 'Whole desktop' })).toHaveCount(1)
 })
 
-test('choosing OS wallpaper in a browser reports the real reason, not silence', async ({ page }) => {
+test('choosing the desktop surface in a browser reports the real reason, not silence', async ({ page }) => {
   const image = await withAnImagePost(page)
   await openMediaContextMenu(image)
-  await chooseMenuEntry(page, 'Set as OS wallpaper')
+  await chooseBackground(page, 'os')
 
   // No Electron bridge in a browser build. The old code took the same branch
   // as a Windows SPI failure and told the user the feature was desktop-only —
@@ -142,10 +144,10 @@ test('choosing OS wallpaper in a browser reports the real reason, not silence', 
 test('the in-app background path works in a browser', async ({ page }) => {
   const image = await withAnImagePost(page)
   await openMediaContextMenu(image)
-  await chooseMenuEntry(page, 'Set as app background')
+  await chooseBackground(page, 'app')
 
   // No bridge required: this one is a renderer-only background, so it must
   // succeed rather than report a platform problem.
-  const failures = page.getByText(/desktop app|only available/i)
+  const failures = page.getByText(/only available|needs the gMatch desktop app/i)
   await expect(failures).toHaveCount(0, { timeout: 15_000 })
 })
