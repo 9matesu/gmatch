@@ -692,7 +692,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {ACTION_ORDER.map((action) => {
-                    const { label, icon: Icon, description, consent } = ACTION_LABELS[action];
+                    const { label, icon: Icon, consent } = ACTION_LABELS[action];
                     const allowed = Boolean(selectedTarget.consents?.[consent]);
                     const sendable = allowed && Boolean(selectedTarget.enabled) && selectedTarget.online !== false;
                     // Mesh-addressable peers skip the ledger entirely: no
@@ -730,7 +730,6 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                           )}
                         </div>
                         <div className="text-xs font-semibold text-retro-fg">{label}</div>
-                        <div className="text-xs text-retro-muted mt-1 leading-snug">{description}</div>
                         <div className={`mt-2 text-[10px] font-mono ${allowed ? 'text-emerald-400/80' : 'text-retro-muted'}`}>
                           {sending === action ? 'sending…' : allowed ? 'consented' : 'no consent'}
                         </div>

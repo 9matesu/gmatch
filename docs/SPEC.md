@@ -659,7 +659,37 @@ what it lives in.
   hidden. A 503 from the release host is the free-tier dyno waking up — an
   error to retry, not a missing release.
 
-### 12b. No hosted service — the own node is the world (gmatch 2.0)
+### 12b. No hosted WORLD — one hosted RENDEZVOUS (gmatch 2.1)
+
+**Amendment (2026-11-14).** gmatch 2.0 removed the hosted service *and* the
+rendezvous, which made "everyone signed in sees each other" impossible without
+both machines being publicly reachable. gmatch 2.1 splits the two again:
+
+- **No hosted world.** Still true: no third party stores a profile, a post, a
+  like, a presence row or a media byte. Each install keeps its own node, and
+  media never leaves the peers.
+- **One hosted rendezvous, and it is blind.** `site/functions/api/[[path]].ts`
+  (Cloudflare Pages, project `gmatch`) serves sealed mail (`PUT/GET
+  /api/mail/:token`, TTL 120 s), the server directory (`GET/POST
+  /api/servers`) and `GET /api/health`. Storage is **KV**: envelopes the host
+  cannot open, and directory rows (a name + an address). No D1, no Durable
+  Object, no WebSocket — the client polls every 20 s, so the egress budget is a
+  few hundred bytes per peer.
+- **`central.url` defaults to that rendezvous** (`utils/central.ts`). The old
+  `isRetiredCourier` drop is gone: the host answers `/api/health` again.
+  `none`/`off`/`0` still switches it off, and the app keeps working from the
+  node you are on.
+- **Why it is safe to point everyone at it:** the courier learns *who* is asking
+  for *which* mailbox and the size of the envelope — metadata, not content.
+  Presence is derived client-side from signed beacons with a 60 s TTL, so the
+  host stores no roster at all.
+
+Everything below is the gmatch 2.0 text, kept because the *world* is still
+host-free.
+
+---
+
+### (gmatch 2.0) No hosted service — the own node is the world
 
 **Decision (2026-11-07): there is no hosted service of any kind.** The end
 state is **direct peer-to-peer**: no third-party host stores posts, media,

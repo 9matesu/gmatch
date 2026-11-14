@@ -17,28 +17,20 @@ afterEach(() => {
 })
 
 describe('central utils', () => {
-  it('defaults to NO hosted hub (gmatch 2.0: the own node is the directory)', () => {
-    expect(getCentralApiUrl()).toBe('')
-    expect(hasCentral()).toBe(false)
+  it('defaults to the blind rendezvous (the meeting point, not a world)', () => {
+    expect(getCentralApiUrl()).toBe('https://gmatch.pages.dev')
+    expect(hasCentral()).toBe(true)
   })
 
   it('respects setCentralApiUrl and localStorage', () => {
     setCentralApiUrl('http://custom-node:9000')
     expect(getCentralApiUrl()).toBe('http://custom-node:9000')
     setCentralApiUrl('')
-    expect(getCentralApiUrl()).toBe('')
+    expect(getCentralApiUrl()).toBe('https://gmatch.pages.dev')
   })
 
   it('handles "none" central keyword', () => {
     setCentralApiUrl('none')
-    expect(getCentralApiUrl()).toBe('')
-    expect(hasCentral()).toBe(false)
-  })
-
-  it('ignores a pointer to the retired hosted rendezvous', () => {
-    // gmatch 2.0 emptied its D1 and removed the function. A stale pointer is
-    // dead state, never a dial target.
-    setCentralApiUrl('https://gmatch.pages.dev')
     expect(getCentralApiUrl()).toBe('')
     expect(hasCentral()).toBe(false)
   })

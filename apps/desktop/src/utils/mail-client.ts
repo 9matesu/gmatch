@@ -330,6 +330,10 @@ export class MailClient {
     // RTTs before the first message appeared. The per-token epoch mapping
     // and the "never ack what we cannot open" rule are preserved exactly;
     // only the waiting is parallel.
+    // The same envelope can sit in two boxes (a sender who did not know which
+    // node we were on sealed to both). Opening it twice would render the
+    // message twice and ack it twice, so ids are claimed once per drain.
+    const claimed = new Set<string>()
     const jobs: Array<Promise<void>> = []
     for (const base of this.bases()) {
       for (const token of this.watchedTokens()) {
@@ -343,8 +347,11 @@ export class MailClient {
           if (!Array.isArray(envelopes) || envelopes.length === 0) return
           const consumed: string[] = []
           for (const env of envelopes) {
+
+            if (!env.id || claimed.has(env.id)) continue
             try {
               const o = open1to1(env, this.deps.identity.encryptionPrivHex)
+              claimed.add(env.id)
               opened.push(o)
               consumed.push(env.id)
               this.deps.onMail(o, env)

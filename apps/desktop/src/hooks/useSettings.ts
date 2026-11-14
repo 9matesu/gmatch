@@ -54,8 +54,6 @@ export interface AppSettings {
   dominationIntensity: 'mild' | 'medium' | 'extreme'
   /** Panic pause: inbound effects are dropped until this timestamp (ms). */
   dominationInboundMutedUntil: number
-  // Creative Enhancements
-  streamerMode: boolean
   audioPack: 'chiptune' | 'arcade' | 'minimal' | 'silent'
   chatNotificationSfx: boolean
   duelPacing: 'instant' | 'fast' | 'dramatic'
@@ -104,7 +102,6 @@ const DEFAULTS: AppSettings = {
   cameraPermissionMode: 'prompt',
   dominationIntensity: 'medium',
   dominationInboundMutedUntil: 0,
-  streamerMode: false,
   audioPack: 'arcade',
   chatNotificationSfx: true,
   duelPacing: 'fast',

@@ -563,11 +563,6 @@ export function GMatchSettingsModal({
                         desc: 'Filter redundant images in the public gallery deck',
                         key: 'hideDuplicates' as const,
                       },
-                      {
-                        label: 'Streamer Privacy Masking',
-                        desc: 'Mask peer cryptographic hashes and identifiers',
-                        key: 'streamerMode' as const,
-                      },
                     ]).map((item) => {
                       const isOn = Boolean(settings[item.key]);
                       return (
