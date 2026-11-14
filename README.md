@@ -112,3 +112,8 @@ Do not open a public issue for an unfixed vulnerability.
 
 No license is granted. The source is published so that the shipped binary can
 be audited against it; all rights are reserved.
+
+## UI credits
+
+Some animated components in pps/desktop/src/components/rare/ are vendored
+from [Rare UI](https://rareui.com) (MIT + Commons Clause; attribution required).
