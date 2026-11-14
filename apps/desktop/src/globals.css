@@ -3,7 +3,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-@theme inline {
+@theme {
   /* Core canvas and surfaces. ONE panel colour per elevation, scaled by the one
      opacity knob (--panel-alpha): a panel must never re-inline a solid hex, or
      Settings -> Panel Opacity silently stops reaching it (see docs/DESIGN.md). */
@@ -1521,6 +1521,13 @@ html[data-motion="on"] {
    file). Contrast is measured on the light canvas (#f2f2f4):
      fg 15:1 · body 9:1 · muted 7:1 · faint 4.6:1.
    ────────────────────────────────────────────────────────────── */
+/* The canvas is set here, not only through a utility: a missing class must
+   not leave the app painted dark in light mode. */
+html.theme-light,
+html.theme-light body {
+  background-color: var(--color-surface-canvas);
+  color: var(--color-retro-fg);
+}
 .theme-light {
   color-scheme: light;
 
@@ -1557,3 +1564,37 @@ html[data-motion="on"] {
   --color-hud-accent: #18181b;
   --color-hud-accent-hover: #000000;
 }
+
+/* Explicit surface overrides. `@theme` utilities already read the variables,
+   but these classes are also used on elements that inline their own slate;
+   naming them makes the flip deterministic (and independent of the order
+   Tailwind emits its utilities in). */
+html.theme-light .solid-panel,
+html.theme-light .glass-card,
+html.theme-light .glass-panel,
+html.theme-light .glass-header,
+html.theme-light .glass-inset,
+html.theme-light .glass-toolbar {
+  background-color: var(--color-glass);
+}
+
+html.theme-light .bg-surface-canvas,
+html.theme-light .bg-retro-bg {
+  background-color: var(--color-surface-canvas);
+}
+
+html.theme-light .bg-surface-raised {
+  background-color: var(--color-surface-raised);
+}
+
+html.theme-light .bg-surface-interactive {
+  background-color: var(--color-surface-interactive);
+}
+
+html.theme-light .bg-glass-w5 { background-color: var(--color-glass-w5); }
+html.theme-light .bg-glass-w8 { background-color: var(--color-glass-w8); }
+html.theme-light .bg-glass-w10 { background-color: var(--color-glass-w10); }
+html.theme-light .bg-glass-w12 { background-color: var(--color-glass-w12); }
+html.theme-light .bg-glass-w20 { background-color: var(--color-glass-w20); }
+
+html.theme-light .border-border-glass { border-color: var(--color-border-glass); }

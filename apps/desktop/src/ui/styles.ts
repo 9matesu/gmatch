@@ -53,7 +53,7 @@ export const STAGE_FRAME =
 
 /** HP bar track + fill. Modern precision gauge. */
 export const HP_BAR =
-  'h-1.5 overflow-hidden rounded-full border border-white/10 bg-black/80 shadow-inner'
+  'h-1.5 overflow-hidden rounded-full border border-border-glass bg-surface-canvas/80 shadow-inner'
 export const HP_FILL =
   'h-full rounded-full bg-gradient-to-r from-pink-500 to-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)] transition-[width] duration-[120ms] ease-linear'
 export const HP_FILL_LOW =
