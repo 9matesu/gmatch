@@ -63,7 +63,10 @@ export function OnboardingFlow(props: Props) {
     writeOnboardingState(identityId, state);
   }, [identityId, state]);
 
-  if (isOnboardingComplete(state)) return null;
+  // Onboarding done is not the same as signed in: a returning user with no
+  // identity in this browser used to get a blank screen (this gate returned
+  // null and nothing else rendered). Ask for the identity.
+  if (isOnboardingComplete(state) && identity) return null;
 
   const finish = () => {
     const next: OnboardingState = { version: 1, completed: ['profile', 'ready'], current: 'ready' };
