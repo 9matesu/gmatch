@@ -36,6 +36,8 @@ import {
 } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { OrbitObject as StoryItem } from '@orbit/shared';
+import { generateFallbackName } from '@orbit/shared';
+import { timeAgo } from '../../utils/timeAgo';
 import { GMatchStories } from '../GMatchStories';
 import { PostComments } from './PostComments';
 import { SideSheet } from '../../ui/kit';
@@ -554,8 +556,8 @@ export function GMatchFeed({
     () => posts.filter((p) => {
       if (p.is_archived) return false;
       // A text-only post has no url and no media by design: it stays.
-      // This is an image network: a row with no bytes is not a post. Drop it.
-      if (!p.is_sponsored && !p.url && (!p.media || p.media.length === 0)) return false;
+      // No bytes AND no words = nothing to show. A caption alone is a post.
+      if (!p.is_sponsored && !p.url && (!p.media || p.media.length === 0) && !p.caption) return false;
       // Media that cannot be fetched right now keeps the post on screen (its
       // tile shows the placeholder). Hiding the whole post here is what made a
       // user's own old uploads disappear when no seeder held the bytes.
@@ -1066,7 +1068,24 @@ export function GMatchFeed({
                 {/* Post Media with Click to Lightbox & Double Tap Like.
                     A text-only post has no bytes at all, so the whole block is
                     skipped instead of rendering an empty frame. */}
-                {!post.url && !post.localPreviewUrl ? null : (() => {
+                {!post.url && !post.localPreviewUrl ? (
+                  <div className="px-4 pt-3 pb-1">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <div className="w-7 h-7 rounded-full overflow-hidden bg-surface-raised border border-border-glass shrink-0">
+                        {authorAvatarUrl ? (
+                          <img src={authorAvatarUrl} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="flex h-full w-full items-center justify-center text-[11px] font-semibold text-retro-muted">
+                            {(post.author_name || '?').slice(0, 1).toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[12px] font-semibold text-retro-fg truncate">{post.author_name || generateFallbackName(post.author_id)}</span>
+                      <span className="text-[11px] text-retro-faint shrink-0">{timeAgo(post.created_at)}</span>
+                    </div>
+                    <p className="text-[13px] sm:text-sm leading-relaxed text-retro-body whitespace-pre-wrap break-words">{post.caption}</p>
+                  </div>
+                ) : (() => {
                   const activeItem = multiMedia ? multiMedia[currentIdx] : null;
                   const activeUrl = activeItem ? activeItem.url : post.url;
                   const activeMime = activeItem ? activeItem.mime_type : post.mime_type;
@@ -1440,7 +1459,7 @@ export function GMatchFeed({
                   {(
                   <>
                   {/* Caption & Tags */}
-                  {post.caption && (
+                  {post.caption && post.url && (
                     <div className="text-xs text-retro-fg leading-relaxed">
                       <span
                         className="font-semibold text-retro-fg mr-1.5 cursor-pointer hover:underline"
