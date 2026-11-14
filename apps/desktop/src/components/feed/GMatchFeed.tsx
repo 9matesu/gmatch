@@ -544,9 +544,17 @@ export function GMatchFeed({
     // The timeline is filtered once and sorted once. The two sorts are separate
   // memos so the minute tick behind relative timestamps only re-ranks the
   // "for you" order — the "latest" order does not depend on the clock at all.
+  // "No preview" is not content. A post whose media never resolves is
+  // dropped from the timeline instead of filling it with empty frames.
+  const [deadPosts, setDeadPosts] = useState<Set<string>>(new Set());
+  const hidePost = useCallback((id: string) => {
+    setDeadPosts((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+  }, []);
   const visiblePosts = useMemo(
     () => posts.filter((p) => {
       if (p.is_archived) return false;
+      // A text-only post has no url and no media by design: it stays.
+      // This is an image network: a row with no bytes is not a post. Drop it.
       if (!p.is_sponsored && !p.url && (!p.media || p.media.length === 0)) return false;
       // Media that cannot be fetched right now keeps the post on screen (its
       // tile shows the placeholder). Hiding the whole post here is what made a
@@ -959,6 +967,7 @@ export function GMatchFeed({
         {/* Feed Posts List with Sharp Square Images */}
                   <div className={`mt-3 gap-3 ${feedCols === '1' ? 'columns-1' : feedCols === '3' ? 'columns-1 sm:columns-2 lg:columns-3' : feedCols === '4' ? 'columns-1 sm:columns-2 lg:columns-3 xl:columns-4' : feedCols === '5' ? 'columns-1 sm:columns-2 lg:columns-3 xl:columns-4 2xl:columns-5' : 'columns-1 sm:columns-2 lg:columns-3'}`}>
            {visiblePosts.map((post, _idx) => {
+              if (deadPosts.has(post.id)) return null;
             const isLiked = !!likedPosts[post.id];
             const isSaved = !!savedPosts[post.id];
              const currentLikes = likeCounts[post.id] ?? post.like_count ?? 0;
@@ -1122,6 +1131,7 @@ export function GMatchFeed({
                                 muted={true}
                                 loop={true}
                                 hideUnavailable={false}
+                          onMediaUnavailable={() => hidePost(post.id)}
                                 onExpand={() => toggleExpand(post)}
                                 onDoubleTapLike={() => handleDoubleTap(post)}
                               />

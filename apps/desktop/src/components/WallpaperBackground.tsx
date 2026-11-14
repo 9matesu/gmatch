@@ -54,7 +54,7 @@ export function WallpaperBackground({ wallpaperBg, wallpaperFit = 'cover', wallp
         )}
         {/* Scrim kept darker than the artwork so PLATE glass reads over bright
             wallpapers. App-wide by nature: every view shares it. */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/65 to-black/85" />
+        <div className="absolute inset-0 wallpaper-scrim" />
       </div>
 
       {hideUiForWallpaper && (

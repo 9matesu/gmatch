@@ -36,7 +36,7 @@ describe('GMatchFeed timeline filtering and resilience', () => {
     { id: 'offline-author', display_name: 'Offline User', online: false, last_seen: '2020-01-01T00:00:00Z' },
   ];
 
-  it('filters out blank posts that lack media and url', () => {
+  it('drops any row that has neither media nor a url', () => {
     const posts: any[] = [
       {
         id: 'blank-post-1',

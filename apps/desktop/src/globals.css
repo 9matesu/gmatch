@@ -11,7 +11,7 @@
 
   /* Panel opacity (Settings -> Panel Opacity): 1 = solid, 0.35 = most transparent.
      Default leans transparent: the wallpaper is the hero, panels are chrome. */
-  --panel-alpha: 0.62;
+  --panel-alpha: 0.42;
 
   /* Panel family - one slate, one opacity, under every name (used with backdrop-filter). */
   --color-glass: rgba(18, 18, 21, var(--panel-alpha));
@@ -325,7 +325,7 @@
    stays opaque so text reads over any wallpaper; Panel Opacity only scales
    panel surfaces (cards, dialogs, sheets over the dark canvas). */
 .glass-toolbar {
-  background: #18181b;
+  background: var(--color-surface-raised);
   border: 1px solid var(--color-border-glass);
   border-radius: var(--radius-lg);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
@@ -455,7 +455,7 @@
    Command Island Floating Dock
    ────────────────────────────────────────────────────────────── */
 .command-island {
-  background: rgba(18, 18, 21, calc(0.85 * var(--panel-alpha) + 0.1));
+  background: var(--color-glass-strong);
   border: 1px solid var(--color-border-glass);
   backdrop-filter: blur(calc(20px * var(--glass-blur, 0.7)));
   -webkit-backdrop-filter: blur(calc(20px * var(--glass-blur, 0.7)));
@@ -535,7 +535,7 @@
   position: relative;
   background:
     var(--glass-noise),
-    rgba(17, 17, 20, calc(0.84 * var(--panel-alpha)));
+    var(--color-glass-strong);
   border: 1px solid rgba(255, 255, 255, 0.125);
   border-radius: var(--radius-xl);
   box-shadow:
@@ -627,7 +627,7 @@
   background:
     var(--glass-noise),
     rgba(255, 255, 255, calc(0.11 * var(--panel-alpha))),
-    rgba(18, 18, 21, calc(0.76 * var(--panel-alpha)));
+    var(--color-glass);
   border-color: rgba(255, 255, 255, 0.30);
   box-shadow:
     0 12px 28px rgba(0, 0, 0, 0.36),
@@ -641,7 +641,7 @@
   background:
     var(--glass-noise),
     rgba(255, 255, 255, calc(0.08 * var(--panel-alpha))),
-    rgba(18, 18, 21, calc(0.72 * var(--panel-alpha)));
+    var(--color-glass);
   border: 1px solid rgba(255, 255, 255, 0.16);
   color: var(--color-retro-fg);
   box-shadow:
@@ -657,7 +657,7 @@
   border-color: rgba(255, 255, 255, 0.34);
   background:
     rgba(255, 255, 255, calc(0.12 * var(--panel-alpha))),
-    rgba(18, 18, 21, calc(0.82 * var(--panel-alpha)));
+    var(--color-glass);
   box-shadow:
     0 10px 26px rgba(0, 0, 0, 0.38),
     inset 0 1px 0 rgba(255, 255, 255, 0.24),
@@ -724,37 +724,38 @@
 /* App-wide material pass: every legacy surface utility inherits the same
    translucent, edge-lit glass treatment. Scoped to the authenticated shell so
    standalone login/onboarding surfaces keep their explicit styles. */
+/* The material pass names TOKENS, never its own slate: an `!important`
+   literal here is what kept the light theme from reaching every surface. */
 .app-glass .bg-surface-raised,
 .app-glass .bg-surface-interactive,
 .app-glass .bg-surface-elevated {
-  background:
-    rgba(22, 22, 25, var(--panel-alpha)) !important;
-  border-color: rgba(255, 255, 255, 0.13) !important;
+  background: var(--color-glass) !important;
+  border-color: var(--color-border-glass) !important;
   box-shadow:
     0 12px 30px rgba(0, 0, 0, 0.26),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.30) !important;
+    inset 0 1px 0 var(--color-border-glass),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18) !important;
 }
 
 .app-glass .bg-surface-elevated\/50 {
-  background: rgba(24, 24, 27, calc(0.80 * var(--panel-alpha))) !important;
-  border-color: rgba(255, 255, 255, 0.12) !important;
+  background: var(--color-glass) !important;
+  border-color: var(--color-border-glass) !important;
   box-shadow:
     0 10px 24px rgba(0, 0, 0, 0.24),
-    inset 0 1px 0 rgba(255, 255, 255, 0.10) !important;
+    inset 0 1px 0 var(--color-border-glass) !important;
 }
 
 .app-glass .bg-surface-canvas {
-  background-color: rgba(9, 9, 11, var(--panel-alpha)) !important;
+  background-color: var(--color-surface-canvas) !important;
 }
 .app-glass .bg-surface-canvas\/80 {
-  background-color: rgba(9, 9, 11, calc(0.80 * var(--panel-alpha))) !important;
+  background-color: color-mix(in srgb, var(--color-surface-canvas) 80%, transparent) !important;
 }
 .app-glass .bg-surface-canvas\/60 {
-  background-color: rgba(9, 9, 11, calc(0.60 * var(--panel-alpha))) !important;
+  background-color: color-mix(in srgb, var(--color-surface-canvas) 60%, transparent) !important;
 }
 .app-glass .bg-surface-canvas\/50 {
-  background-color: rgba(9, 9, 11, calc(0.50 * var(--panel-alpha))) !important;
+  background-color: color-mix(in srgb, var(--color-surface-canvas) 50%, transparent) !important;
 }
 
 @supports (backdrop-filter: blur(1px)) {
@@ -1007,7 +1008,7 @@
 .module {
   background:
     var(--glass-noise),
-    rgba(17, 17, 20, calc(0.84 * var(--panel-alpha)));
+    var(--color-glass-strong);
   border: 1px solid rgba(255, 255, 255, 0.125);
   border-radius: var(--radius-xl);
   box-shadow:
@@ -1020,7 +1021,7 @@
 .module-primary {
   background:
     var(--glass-noise),
-    rgba(19, 19, 22, calc(0.88 * var(--panel-alpha)));
+    var(--color-glass-strong);
   border: 1px solid rgba(255, 255, 255, 0.155);
   border-radius: var(--radius-xl);
   box-shadow:
@@ -1598,3 +1599,44 @@ html.theme-light .bg-glass-w12 { background-color: var(--color-glass-w12); }
 html.theme-light .bg-glass-w20 { background-color: var(--color-glass-w20); }
 
 html.theme-light .border-border-glass { border-color: var(--color-border-glass); }
+
+/* A scrim is black in both themes, so anything sitting on one is always
+   light text — the theme token would be dark and unreadable there. */
+html.theme-light [class*="bg-black/"] {
+  color: #fafafa;
+}
+
+html.theme-light [class*="bg-black/"] .text-retro-muted,
+html.theme-light [class*="bg-black/"] .text-retro-body {
+  color: #d4d4d8;
+}
+
+/* Wallpaper scrim: the artwork sits behind it, and the plate must read in
+   both themes. In light mode it is WHITE — a dark scrim is a black page. */
+.wallpaper-scrim {
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.80), rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.85));
+}
+
+html.theme-light .wallpaper-scrim {
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.92));
+}
+
+/* Flat: no elevation anywhere. Tailwind shadows compile to box-shadow, so
+   killing the property is the whole rule — every surface goes flat. */
+*,
+*::before,
+*::after {
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+[class*="drop-shadow"] {
+  filter: none !important;
+}
+
+/* Focus is drawn with an outline, not a shadow: keyboard users keep a visible
+   ring now that shadows are gone. */
+:focus-visible {
+  outline: 2px solid var(--color-retro-accent) !important;
+  outline-offset: 2px;
+}

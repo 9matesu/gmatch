@@ -17,7 +17,7 @@ import {
 import { cn } from "./utils";
 
 const SURFACE = "bg-[#F4F4F9] dark:bg-[#262626]";
-const GLYPH = "text-[#868593] dark:text-[#9B9AA7]";
+const GLYPH = "text-retro-muted";
 
 const COLORS = {
   red: "bg-[#FF3B30] dark:bg-[#FF453A]",
