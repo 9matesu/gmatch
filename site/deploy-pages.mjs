@@ -55,7 +55,6 @@ try {
     [
       'name = "gmatch"',
       'compatibility_date = "2026-10-24"',
-      'pages_build_output_dir = "."',
       '',
       '# Blind rendezvous storage: sealed envelopes (TTL 120 s) + directory rows.',
       '# No content table exists by design.',
