@@ -44,7 +44,17 @@ contextBridge.exposeInMainWorld('gmatch', {
   winMinimize: () => ipcRenderer.send('window:minimize'),
   winToggleMaximize: () => ipcRenderer.send('window:toggle-maximize'),
   winClose: () => ipcRenderer.send('window:close'),
-  trayStatus: (text: string) => ipcRenderer.send('tray:status', String(text || '')),
+  trayStatus: (text) => ipcRenderer.send('tray:status', String(text || '')),
+  /** The merged unread count; the main process owns what the OS shows. */
+  notifySync: (payload) =>
+    ipcRenderer.send('notify:sync', payload),
+  notifyRead: () => ipcRenderer.send('notify:read'),
+  /** Fired when the user clicks the native toast. */
+  onNotifyOpened: (cb) => {
+    const handler = () => cb()
+    ipcRenderer.on('notify:opened', handler)
+    return () => ipcRenderer.removeListener('notify:opened', handler)
+  },
   winReload: () => ipcRenderer.send('window:reload'),
   appVersion: () => ipcRenderer.invoke('app:version'),
   openExternal: (url) => ipcRenderer.invoke('shell:open', url),

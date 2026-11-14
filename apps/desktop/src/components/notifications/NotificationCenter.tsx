@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, AlertCircle, AlertTriangle, Info, X } from 'lucide-react';
 import { NotificationBell } from '../rare/notification-bell';
 import { useToast, durationFor, type ToastMessage } from '../Toast';
+import { useSettings } from '../../hooks/useSettings';
 import { NotificationsPanel } from '../NotificationsPanel';
 import type { NotificationItem, MatchInviteItem } from '../NotificationsPanel';
 import type { AppNotification, NotificationTarget } from '../../utils/notifications';
@@ -72,6 +73,18 @@ export function NotificationCenter(props: NotificationCenterProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const latestToast = messages.length ? messages[messages.length - 1] : null;
   const preview = latestTitle || latestToast?.text || "";
+
+  // One store feeds every surface: the badge, the tray, the overlay and the
+  // native toast. The main process decides what the OS shows with this count.
+  const { settings } = useSettings();
+  useEffect(() => {
+    window.gmatch?.notifySync?.({
+      count: unreadCount,
+      title: latestTitle || "",
+      body: preview || "",
+      hideContent: !!settings.hideNotificationContent,
+    });
+  }, [unreadCount, latestTitle, preview, settings.hideNotificationContent]);
 
   // Auto-expire non-sticky toasts on the header's clock (single owner).
   useEffect(() => {

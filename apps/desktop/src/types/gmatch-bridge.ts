@@ -68,6 +68,9 @@ export interface GmatchBridge {
   winClose?: () => void
   /** Tray tooltip text: the only state visible with the window closed. */
   trayStatus?: (text: string) => void
+  notifySync?: (payload: { count: number; title?: string; body?: string; hideContent?: boolean }) => void
+  notifyRead?: () => void
+  onNotifyOpened?: (cb: () => void) => () => void
   winReload?: () => void
   appVersion?: () => Promise<string>
   openExternal?: (url: string) => Promise<void>

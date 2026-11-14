@@ -17,6 +17,8 @@ export interface AppSettings {
   feedLayout: 'list' | 'grid'
   hideDuplicates: boolean
   soundEffects: boolean
+  /** Toast text is withheld on the lock screen (the OS may show it there). */
+  hideNotificationContent: boolean
   watchPartyEnabled: boolean
   autoRefresh: boolean
   allowRemoteWallpaper: boolean
@@ -88,6 +90,7 @@ const DEFAULTS: AppSettings = {
   feedLayout: 'list',
   hideDuplicates: false,
   soundEffects: true,
+  hideNotificationContent: false,
   watchPartyEnabled: true,
   autoRefresh: true,
   allowRemoteWallpaper: true,

@@ -681,6 +681,11 @@ export function GMatchSettingsModal({
                   <div className="space-y-3 divide-y divide-border-glass">
                     {([
                       {
+                        label: 'Hide notification content',
+                        desc: 'The toast says how many, never what (lock screens show toasts)',
+                        key: 'hideNotificationContent' as const,
+                      },
+                      {
                         label: 'Sound effects',
                         desc: 'Clicks, purchases and unlocks play a sound',
                         key: 'soundEffects' as const,
