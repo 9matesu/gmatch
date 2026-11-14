@@ -367,7 +367,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
               onClick={switchToVisual}
               className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
                 mode === 'visual'
-                  ? 'bg-black text-white shadow-xs'
+                  ? 'bg-retro-bg text-retro-fg shadow-xs'
                   : 'text-retro-muted hover:text-retro-fg'
               }`}
             >
@@ -379,7 +379,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
               onClick={switchToJson}
               className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
                 mode === 'json'
-                  ? 'bg-black text-white shadow-xs'
+                  ? 'bg-retro-bg text-retro-fg shadow-xs'
                   : 'text-retro-muted hover:text-retro-fg'
               }`}
             >
@@ -465,7 +465,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
                   type="button"
                   onClick={addTag}
                   disabled={!newTagInput.trim()}
-                  className="px-3 py-1.5 bg-retro-accent hover:bg-retro-accent-hover disabled:opacity-40 text-black rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer shrink-0"
+                  className="px-3 py-1.5 bg-retro-accent hover:bg-retro-accent-hover disabled:opacity-40 text-retro-accent-text rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer shrink-0"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Add</span>
@@ -582,7 +582,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
             type="button"
             onClick={handleSave}
             disabled={isSaving || Boolean(jsonError)}
-            className="px-4 py-2 bg-retro-accent hover:bg-retro-accent-hover disabled:opacity-40 text-black rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+            className="px-4 py-2 bg-retro-accent hover:bg-retro-accent-hover disabled:opacity-40 text-retro-accent-text rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
           >
             <Save className="w-3.5 h-3.5" />
             <span>{isSaving ? 'Saving...' : 'Save Changes'}</span>

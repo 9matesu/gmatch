@@ -264,7 +264,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                     const fullUrl = directUrl || (objectId ? resolveMediaUrl(objectId) : "");
                     onZoom(fullUrl, false, `Report: ${report.target_type}`, report.target_id);
                   }}
-                  className="absolute bottom-2 right-2 p-1.5 bg-black/70 hover:bg-black text-white text-xs rounded-lg border border-border-glass opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                  className="absolute bottom-2 right-2 p-1.5 bg-black/70 hover:bg-retro-bg text-retro-fg text-xs rounded-lg border border-border-glass opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                   title="Expand Full Evidence Media"
                 >
                   <Maximize2 className="w-3.5 h-3.5" />

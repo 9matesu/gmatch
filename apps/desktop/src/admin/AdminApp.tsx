@@ -381,7 +381,7 @@ export default function AdminPageClient({ identity: appIdentity }: { identity?: 
               <button
                 type="button"
                 onClick={() => setPin('admin')}
-                className="text-[10px] font-bold underline hover:text-white cursor-pointer ml-2 shrink-0"
+                className="text-[10px] font-bold underline hover:text-retro-fg cursor-pointer ml-2 shrink-0"
               >
                 Use admin
               </button>
@@ -403,7 +403,7 @@ export default function AdminPageClient({ identity: appIdentity }: { identity?: 
             <button
               type="submit"
               disabled={verifyingPin || !pin.trim()}
-              className="w-full py-2 bg-retro-accent hover:bg-retro-accent-hover text-black font-bold text-xs rounded-md uppercase tracking-wider transition-colors disabled:opacity-40 cursor-pointer shadow-[0_4px_12px_rgba(159,227,255,0.15)]"
+              className="w-full py-2 bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text font-bold text-xs rounded-md uppercase tracking-wider transition-colors disabled:opacity-40 cursor-pointer shadow-[0_4px_12px_rgba(159,227,255,0.15)]"
             >
               {verifyingPin ? "Verifying..." : "Unlock Admin Console"}
             </button>
@@ -417,7 +417,7 @@ export default function AdminPageClient({ identity: appIdentity }: { identity?: 
                 <button
                   type="button"
                   onClick={() => { void navigator.clipboard.writeText(identity.orbitId) }}
-                  className="text-retro-accent hover:text-white underline cursor-pointer"
+                  className="text-retro-accent hover:text-retro-fg underline cursor-pointer"
                   title="Copy your Orbit ID (needed for ADMIN_ORBIT_ID)"
                 >
                   Copy

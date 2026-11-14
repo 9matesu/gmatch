@@ -561,7 +561,7 @@ const selfId = identity?.orbitId || ''
                     <button
                       type="button"
                       onClick={onOpenCreateCard}
-                      className="px-3 py-1.5 text-xs font-bold bg-retro-accent text-black hover:bg-retro-accent-hover transition-colors cursor-pointer rounded-lg whitespace-nowrap"
+                      className="px-3 py-1.5 text-xs font-bold bg-retro-accent text-retro-accent-text hover:bg-retro-accent-hover transition-colors cursor-pointer rounded-lg whitespace-nowrap"
                     >
                       Create Card
                     </button>

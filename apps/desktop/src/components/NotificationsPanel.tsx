@@ -149,7 +149,7 @@ export function NotificationsPanel({
           <Bell className="w-3.5 h-3.5" />
           Notifications
           {unreadCount > 0 && (
-            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none bg-retro-accent text-black tabular-nums">
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none bg-retro-accent text-retro-accent-text tabular-nums">
               {unreadCount}
             </span>
           )}

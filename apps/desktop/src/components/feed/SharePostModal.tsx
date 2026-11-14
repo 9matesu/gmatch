@@ -295,7 +295,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
                     className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all disabled:cursor-not-allowed ${
                       isSent
                         ? 'bg-surface-interactive text-retro-muted border border-border-glass'
-                        : 'bg-black hover:bg-surface-elevated text-white disabled:opacity-40'
+                        : 'bg-retro-bg hover:bg-surface-elevated text-retro-fg disabled:opacity-40'
                     }`}
                   >
                     {isSent ? 'Sent' : isPending ? 'Sending…' : 'Send'}
@@ -335,7 +335,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
                         className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all disabled:cursor-not-allowed ${
                           isSent
                             ? 'bg-surface-interactive text-retro-muted border border-border-glass'
-                            : 'bg-black hover:bg-surface-elevated text-white disabled:opacity-40'
+                            : 'bg-retro-bg hover:bg-surface-elevated text-retro-fg disabled:opacity-40'
                         }`}
                       >
                         {isSent ? 'Sent' : isPending ? 'Sending…' : 'Send'}

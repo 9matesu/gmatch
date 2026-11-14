@@ -89,7 +89,7 @@ export function QueueControls({ state, match, matchRoundInfo, autoQueueEnabled, 
         <button
           type="button"
           onClick={async () => { const r = await onToggleAutoQueue(true); if (!r.ok) { toast(r.error || 'Could not join the queue.', 'warning'); } }}
-          className="px-4 py-1.5 text-xs font-medium bg-retro-accent text-black hover:bg-retro-accent-hover transition-colors cursor-pointer rounded-lg whitespace-nowrap flex items-center gap-1.5"
+          className="px-4 py-1.5 text-xs font-medium bg-retro-accent text-retro-accent-text hover:bg-retro-accent-hover transition-colors cursor-pointer rounded-lg whitespace-nowrap flex items-center gap-1.5"
         >
           <Play className="w-3.5 h-3.5" />
           Queue for Perverts

@@ -259,7 +259,7 @@ export function SlideshowManager({
               type="button"
               onClick={create}
               disabled={saving}
-              className="ml-auto px-4 py-1.5 bg-retro-accent text-black font-bold text-xs uppercase tracking-wider rounded-lg cursor-pointer disabled:opacity-40 hover:bg-retro-accent-hover transition-colors"
+              className="ml-auto px-4 py-1.5 bg-retro-accent text-retro-accent-text font-bold text-xs uppercase tracking-wider rounded-lg cursor-pointer disabled:opacity-40 hover:bg-retro-accent-hover transition-colors"
             >
               {saving ? 'Saving…' : 'Create Slideshow'}
             </button>

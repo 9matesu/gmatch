@@ -387,7 +387,7 @@ export function MatchRoundPanel({
                                 {formatGc(val)}
                               </span>
                             </div>
-                            <span className="absolute bottom-2 right-2 z-20 text-[10px] bg-retro-accent text-black font-black px-2 py-0.5 rounded-md shadow-md">
+                            <span className="absolute bottom-2 right-2 z-20 text-[10px] bg-retro-accent text-retro-accent-text font-black px-2 py-0.5 rounded-md shadow-md">
                               Locked in
                             </span>
                             <div className="relative w-full flex-1 min-h-0 bg-surface-canvas overflow-hidden">
@@ -458,7 +458,7 @@ export function MatchRoundPanel({
                       <button
                         type="button"
                         onClick={onOpenDeckBuilder}
-                        className="px-4 py-2 bg-retro-accent text-black font-bold text-xs rounded-lg hover:bg-retro-accent-hover transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                        className="px-4 py-2 bg-retro-accent text-retro-accent-text font-bold text-xs rounded-lg hover:bg-retro-accent-hover transition-colors cursor-pointer inline-flex items-center gap-1.5"
                       >
                         <LayoutGrid className="w-3.5 h-3.5" />
                         Open Deck Builder
@@ -647,7 +647,7 @@ export function MatchRoundPanel({
                         {isRoundResult && match.my_decision && (
                           <span
                             className={`absolute bottom-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shadow-lg ${
-                              match.my_decision === 'like' ? 'bg-emerald-500 text-black' : 'bg-rose-500 text-white'
+                              match.my_decision === 'like' ? 'bg-emerald-500 text-retro-accent-text' : 'bg-rose-500 text-retro-fg'
                             }`}
                           >
                             {match.my_decision === 'like' ? <><Check className="w-3 h-3 stroke-[3]" /> Liked</> : <><X className="w-3 h-3 stroke-[3]" /> Rejected</>}
@@ -752,7 +752,7 @@ export function MatchRoundPanel({
                         {isRoundResult && match.opponent_decision && (
                           <span
                             className={`absolute bottom-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shadow-lg ${
-                              match.opponent_decision === 'like' ? 'bg-emerald-500 text-black' : 'bg-rose-500 text-white'
+                              match.opponent_decision === 'like' ? 'bg-emerald-500 text-retro-accent-text' : 'bg-rose-500 text-retro-fg'
                             }`}
                           >
                             {match.opponent_decision === 'like' ? <><Check className="w-3 h-3 stroke-[3]" /> Liked</> : <><X className="w-3 h-3 stroke-[3]" /> Rejected</>}

@@ -129,7 +129,7 @@ export function UpdateSection({ toast }: {
               type="button"
               disabled={installing}
               onClick={() => { playPress(900); void install(); }}
-              className="px-3 py-1.5 rounded-lg bg-retro-accent text-black text-xs font-bold cursor-pointer flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-lg bg-retro-accent text-retro-accent-text text-xs font-bold cursor-pointer flex items-center gap-1.5"
             >
               <Rocket className="w-3.5 h-3.5" /> {installing ? 'Restarting…' : `Install & Restart`}
             </button>
@@ -143,7 +143,7 @@ export function UpdateSection({ toast }: {
                 if (bridge?.openExternal) void bridge.openExternal(url);
                 else if (typeof window !== 'undefined') window.open(url, '_blank');
               }}
-              className="px-3 py-1.5 rounded-lg bg-retro-accent text-black text-xs font-bold cursor-pointer flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-lg bg-retro-accent text-retro-accent-text text-xs font-bold cursor-pointer flex items-center gap-1.5"
             >
               <Download className="w-3.5 h-3.5" /> Download {latest.version}
             </button>

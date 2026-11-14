@@ -144,7 +144,7 @@ export function CentralAdminPanel({ central, identity, toast }: { central: strin
             <button
               type="button"
               onClick={() => setUnlockPin('admin')}
-              className="text-[10px] font-bold underline hover:text-white cursor-pointer ml-2 shrink-0"
+              className="text-[10px] font-bold underline hover:text-retro-fg cursor-pointer ml-2 shrink-0"
             >
               Use admin
             </button>

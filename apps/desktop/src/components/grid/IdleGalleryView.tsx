@@ -979,7 +979,7 @@ export default function IdleGalleryView({
                     )
                     e.dataTransfer.effectAllowed = 'copy'
                   }}
-                  className={`group relative aspect-square rounded-[10px] border bg-black shadow-[0_4px_10px_rgba(0,0,0,0.5)] cursor-grab active:cursor-grabbing ${
+                  className={`group relative aspect-square rounded-[10px] border bg-retro-bg shadow-[0_4px_10px_rgba(0,0,0,0.5)] cursor-grab active:cursor-grabbing ${
                     openMenuId === img.id ? 'z-30' : 'overflow-hidden'
                   } ${
                     isSelected
@@ -999,8 +999,8 @@ export default function IdleGalleryView({
                     aria-label={isSelected ? 'Deselect image' : 'Select image'}
                     className={`absolute left-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-md backdrop-blur-md transition-all cursor-pointer ${
                       isSelected
-                        ? 'bg-emerald-600/90 text-white opacity-100 shadow-md ring-1 ring-white/30'
-                        : 'bg-black/60 text-white/70 opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+                        ? 'bg-emerald-600/90 text-retro-fg opacity-100 shadow-md ring-1 ring-white/30'
+                        : 'bg-black/60 text-retro-fg/70 opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
                     }`}
                   >
                     {isSelected ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
@@ -1049,7 +1049,7 @@ export default function IdleGalleryView({
                   {/* Phase 5: local-cache status — never imply a keep is saved
                       when its bytes are not locally stored. */}
                   {img.saveState === 'downloading' && (
-                    <span className="pointer-events-none absolute bottom-1.5 left-1.5 z-20 rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] font-mono text-white/80 backdrop-blur-md">
+                    <span className="pointer-events-none absolute bottom-1.5 left-1.5 z-20 rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] font-mono text-retro-fg/80 backdrop-blur-md">
                       Caching…{pinProgress[img.url] != null ? ` ${pinProgress[img.url]}%` : ''}
                     </span>
                   )}
@@ -1180,7 +1180,7 @@ export default function IdleGalleryView({
                     type="button"
                     aria-label="Previous keepsake"
                     title="Previous"
-                    className="absolute left-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border-0 bg-black/60 p-0 text-white/90 backdrop-blur-sm transition-colors hover:bg-black/85 hover:text-white"
+                    className="absolute left-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border-0 bg-black/60 p-0 text-retro-fg/90 backdrop-blur-sm transition-colors hover:bg-black/85 hover:text-retro-fg"
                     onClick={(e) => {
                       e.stopPropagation()
                       stepViewer(-1)
@@ -1192,7 +1192,7 @@ export default function IdleGalleryView({
                     type="button"
                     aria-label="Next keepsake"
                     title="Next"
-                    className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border-0 bg-black/60 p-0 text-white/90 backdrop-blur-sm transition-colors hover:bg-black/85 hover:text-white"
+                    className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border-0 bg-black/60 p-0 text-retro-fg/90 backdrop-blur-sm transition-colors hover:bg-black/85 hover:text-retro-fg"
                     onClick={(e) => {
                       e.stopPropagation()
                       stepViewer(1)

@@ -438,7 +438,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                 <button
                   type="button"
                   onClick={() => void handleCashOutAll()}
-                  className="px-2.5 py-1.5 rounded bg-amber-500 text-black text-xs font-bold cursor-pointer transition-colors hover:bg-amber-400"
+                  className="px-2.5 py-1.5 rounded bg-amber-500 text-retro-accent-text text-xs font-bold cursor-pointer transition-colors hover:bg-amber-400"
                 >
                   Confirm
                 </button>
@@ -577,7 +577,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                   className="block w-full text-left cursor-pointer"
                   aria-label={`View card ${l.card?.name || l.cardId.slice(0, 8)}`}
                 >
-                  <div className="aspect-square bg-black">
+                  <div className="aspect-square bg-retro-bg">
                     <ObjectImage
                       objectId={l.card?.mediaObjectId}
                       contentUrl={l.card?.contentUrl}

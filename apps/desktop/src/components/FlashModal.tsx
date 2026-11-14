@@ -99,7 +99,7 @@ export function FlashModal({
             </div>
           </DropZone>
           {preview && (
-            <img src={preview} alt="Preview" className="w-full max-h-56 object-contain rounded-lg border border-border-glass bg-black" />
+            <img src={preview} alt="Preview" className="w-full max-h-56 object-contain rounded-lg border border-border-glass bg-retro-bg" />
           )}
         </>
       )}

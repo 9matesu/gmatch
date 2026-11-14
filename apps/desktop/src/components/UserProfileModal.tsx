@@ -315,7 +315,7 @@ export function UserProfileModal({
                 {hasStories && (
                   <div
                     onClick={handleStoryBadgeClick}
-                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-white text-retro-bg text-[10px] font-semibold flex items-center gap-0.5 cursor-pointer shadow-xs"
+                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-retro-accent text-retro-bg text-[10px] font-semibold flex items-center gap-0.5 cursor-pointer shadow-xs"
                   >
                     <Play className="w-2 h-2 fill-current" />
                     <span>Story</span>
@@ -401,7 +401,7 @@ export function UserProfileModal({
                     onSendCard(user.id);
                     onClose();
                   }}
-                  className="py-2 px-3 bg-white hover:bg-retro-fg text-retro-bg font-semibold text-xs rounded-md transition-all duration-150 active:scale-[0.96] shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
+                  className="py-2 px-3 bg-retro-accent hover:bg-retro-fg text-retro-bg font-semibold text-xs rounded-md transition-all duration-150 active:scale-[0.96] shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <Send className="w-3.5 h-3.5 stroke-[2]" />
                   <span>Send Card</span>
@@ -589,7 +589,7 @@ export function UserProfileModal({
             <button
               type="button"
               onClick={() => setShowPic(false)}
-              className="absolute top-3 right-3 text-white bg-black/70 p-1.5 rounded hover:bg-black transition-colors"
+              className="absolute top-3 right-3 text-retro-fg bg-black/70 p-1.5 rounded hover:bg-retro-bg transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
@@ -615,7 +615,7 @@ export function UserProfileModal({
             <button
               type="button"
               onClick={() => setSelectedCardImage(null)}
-              className="absolute top-3 right-3 text-white bg-black/70 p-1.5 rounded hover:bg-black transition-colors"
+              className="absolute top-3 right-3 text-retro-fg bg-black/70 p-1.5 rounded hover:bg-retro-bg transition-colors"
             >
               <X className="w-4 h-4" />
             </button>

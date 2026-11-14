@@ -177,7 +177,7 @@ export function DeleteAccountSection({
               type="button"
               onClick={runDelete}
               disabled={!canDelete || phase === 'erasing'}
-              className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-30 disabled:pointer-events-none text-white text-xs font-bold cursor-pointer inline-flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-30 disabled:pointer-events-none text-retro-fg text-xs font-bold cursor-pointer inline-flex items-center gap-1.5"
             >
               <Trash2 className="w-3.5 h-3.5" />
               {phase === 'erasing' ? 'Erasing…' : 'Delete forever'}

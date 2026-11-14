@@ -47,7 +47,7 @@ export function FlashOverlay({
             type="button"
             onClick={onDismiss}
             aria-label="Dismiss flash"
-            className="text-retro-body hover:text-white p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer"
+            className="text-retro-body hover:text-retro-fg p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer"
           >
             <X className="w-3.5 h-3.5" />
           </button>

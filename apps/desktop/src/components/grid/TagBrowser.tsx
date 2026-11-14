@@ -152,7 +152,7 @@ export default function TagBrowser({ onClose }: { onClose?: () => void }) {
                 onClick={() => setViewerId(p.id)}
                 title={p.tags.slice(0, 6).join(' ')}
                 aria-label={`View image tagged ${p.tags.slice(0, 3).join(' ') || 'booru post'}`}
-                className="group relative aspect-square cursor-pointer overflow-hidden rounded-[10px] border border-border-glass bg-black"
+                className="group relative aspect-square cursor-pointer overflow-hidden rounded-[10px] border border-border-glass bg-retro-bg"
               >
                 {p.kind === 'video' ? (
                   <video

@@ -742,7 +742,7 @@ export function ReportModal({
               onClick={() => setReportCategory(cat)}
               className={`px-3 py-1 border font-bold uppercase tracking-wider transition-colors ${
                 reportCategory === cat
-                  ? 'bg-retro-accent text-black border-retro-accent'
+                  ? 'bg-retro-accent text-retro-accent-text border-retro-accent'
                   : 'bg-retro-bg text-retro-muted border-border-glass hover:text-retro-fg'
               }`}
             >
@@ -761,7 +761,7 @@ export function ReportModal({
         <div className="flex gap-2 pt-1">
           <button
             onClick={() => onSubmit(reportModal.id, { objectId: reportModal.objectId })}
-            className="flex-1 bg-retro-error hover:bg-retro-red text-white font-bold py-2 text-xs transition-colors"
+            className="flex-1 bg-retro-error hover:bg-retro-red text-retro-fg font-bold py-2 text-xs transition-colors"
           >
             Submit Report & Block
           </button>

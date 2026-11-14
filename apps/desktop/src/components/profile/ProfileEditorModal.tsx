@@ -188,7 +188,7 @@ export function ProfileEditorModal({
                   {(name || 'U').charAt(0).toUpperCase()}
                 </div>
               )}
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-retro-fg">
                 <Camera className="w-5 h-5" />
               </div>
             </div>

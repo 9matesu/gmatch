@@ -506,7 +506,7 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
           <div className="absolute inset-0 bg-black/40 pointer-events-none" />
           <button
             type="button"
-            className="pointer-events-auto absolute top-4 left-4 text-[10px] font-mono font-bold px-2 py-1 bg-black/75 border border-border-glass text-retro-fg rounded hover:bg-black transition-colors cursor-pointer"
+            className="pointer-events-auto absolute top-4 left-4 text-[10px] font-mono font-bold px-2 py-1 bg-black/75 border border-border-glass text-retro-fg rounded hover:bg-retro-bg transition-colors cursor-pointer"
             onClick={() => removeEffect(gameBgEffect.id)}
           >
             Clear background
@@ -528,7 +528,7 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
           />
           <button
             type="button"
-            className="absolute top-4 right-4 p-2 bg-retro-panel/80 rounded-full text-retro-fg hover:text-white cursor-pointer"
+            className="absolute top-4 right-4 p-2 bg-retro-panel/80 rounded-full text-retro-fg hover:text-retro-fg cursor-pointer"
             onClick={() => removeEffect(popupVideoEffect.id)}
             aria-label="Close video"
           >
@@ -636,7 +636,7 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
                     void captureAndSend(ask.from, ask.payload);
                   }
                 }}
-                className="flex-1 px-4 py-2 rounded-lg bg-white text-black text-xs font-bold hover:bg-retro-fg cursor-pointer"
+                className="flex-1 px-4 py-2 rounded-lg bg-retro-accent text-retro-accent-text text-xs font-bold hover:bg-retro-fg cursor-pointer"
               >
                 Allow once
               </button>

@@ -213,7 +213,7 @@ export function ExploreSearchModal({
                       <>
                         <ObjectImage contentUrl={p.url} identity={identity} alt="" className="w-full h-full object-cover" />
                         {isMediaVideo(p.url) && (
-                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-white pointer-events-none">
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-retro-fg pointer-events-none">
                             <Play className="w-3.5 h-3.5 fill-white" />
                           </div>
                         )}
@@ -226,7 +226,7 @@ export function ExploreSearchModal({
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs font-bold text-retro-fg block truncate">{p.author_name}</span>
                       {isMediaVideo(p.url) && (
-                        <span className="px-1 py-0.2 rounded bg-black/60 border border-white/10 text-[10px] font-mono text-retro-accent uppercase tracking-wider">
+                        <span className="px-1 py-0.2 rounded bg-black/60 border border-border-glass text-[10px] font-mono text-retro-accent uppercase tracking-wider">
                           Video
                         </span>
                       )}

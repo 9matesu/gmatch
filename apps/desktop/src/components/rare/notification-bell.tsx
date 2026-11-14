@@ -241,7 +241,7 @@ function CountBadge({
         >
           {!dot && (
             <span
-              className="flex font-semibold leading-none tracking-tight text-white"
+              className="flex font-semibold leading-none tracking-tight text-retro-fg"
               // digits need the same width or the columns shift
               style={{ fontVariantNumeric: "tabular-nums" }}
             >

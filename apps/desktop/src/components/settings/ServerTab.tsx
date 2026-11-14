@@ -162,7 +162,7 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
           <button
             type="button"
             onClick={() => window.gmatch?.serverRelaunch?.()}
-            className="ml-auto rounded-lg bg-retro-accent px-3 py-1.5 text-xs font-bold text-black hover:bg-retro-fg cursor-pointer"
+            className="ml-auto rounded-lg bg-retro-accent px-3 py-1.5 text-xs font-bold text-retro-accent-text hover:bg-retro-fg cursor-pointer"
           >
             Restart now
           </button>

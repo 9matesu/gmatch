@@ -144,7 +144,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
           <button
             type="button"
             onClick={() => onNavigate?.("moderation")}
-            className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold tracking-wide transition-colors cursor-pointer"
+            className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-retro-fg rounded-lg text-xs font-bold tracking-wide transition-colors cursor-pointer"
           >
             Review Reports →
           </button>

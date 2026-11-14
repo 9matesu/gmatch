@@ -244,7 +244,7 @@ export function ValuationSummary({
       {/* Card of the Match Spotlight */}
       {spotlightCard && spotlightCard.delta > 0 && (
         <div className="flex items-center gap-3 p-3 bg-surface-canvas/50 border border-border-glass rounded-xl">
-          <div className="w-14 h-14 rounded-lg border border-border-glass overflow-hidden shrink-0 bg-black">
+          <div className="w-14 h-14 rounded-lg border border-border-glass overflow-hidden shrink-0 bg-retro-bg">
             <ObjectImage
               contentUrl={spotlightCard.url}
               objectId={spotlightCard.id}

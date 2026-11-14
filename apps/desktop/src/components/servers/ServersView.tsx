@@ -1869,7 +1869,7 @@ export function ServersView({
                   className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-retro-bg/80 backdrop-blur-sm"
                 >
                   <span
-                    className="flex h-16 w-16 items-center justify-center rounded-xl border text-2xl font-bold text-white/90 shadow-xl animate-orbit-pop"
+                    className="flex h-16 w-16 items-center justify-center rounded-xl border text-2xl font-bold text-retro-fg/90 shadow-xl animate-orbit-pop"
                     style={worldTileStyle(key)}
                   >
                     {worldGlyph(worldName)}

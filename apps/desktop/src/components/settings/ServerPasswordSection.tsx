@@ -85,7 +85,7 @@ export function ServerPasswordSection({
           type="button"
           disabled={busy || value.trim().length < 4}
           onClick={() => { playPress(880); void submit(false) }}
-          className="px-3 py-2 rounded-lg bg-retro-accent text-black text-xs font-bold disabled:opacity-40 cursor-pointer"
+          className="px-3 py-2 rounded-lg bg-retro-accent text-retro-accent-text text-xs font-bold disabled:opacity-40 cursor-pointer"
         >
           Set password
         </button>

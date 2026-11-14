@@ -73,8 +73,8 @@ export function MobileVirusOverlay({
   }, [onComplete]);
 
   return (
-    <div className="fixed inset-0 z-[var(--z-toast)] bg-black flex flex-col items-center justify-between p-4 select-none overflow-hidden font-sans cursor-default">
-      <div className="w-full z-20 bg-red-950/90 text-white p-3 rounded-xl border border-red-500/50 shadow-2xl flex items-center justify-between gap-3">
+    <div className="fixed inset-0 z-[var(--z-toast)] bg-retro-bg flex flex-col items-center justify-between p-4 select-none overflow-hidden font-sans cursor-default">
+      <div className="w-full z-20 bg-red-950/90 text-retro-fg p-3 rounded-xl border border-red-500/50 shadow-2xl flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
           <ShieldAlert className="w-6 h-6 text-red-400 shrink-0" />
           <div className="min-w-0">
@@ -89,7 +89,7 @@ export function MobileVirusOverlay({
 
         <div className="text-right shrink-0">
           <span className="text-[10px] text-red-200/70 block">ENDS IN</span>
-          <span className="text-xl font-bold tabular-nums text-white">{secondsRemaining}s</span>
+          <span className="text-xl font-bold tabular-nums text-retro-fg">{secondsRemaining}s</span>
         </div>
       </div>
 

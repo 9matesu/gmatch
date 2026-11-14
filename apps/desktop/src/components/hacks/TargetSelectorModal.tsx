@@ -99,7 +99,7 @@ export function TargetSelectorModal({
               </div>
 
               <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                isSelected ? 'border-retro-error bg-retro-error text-white' : 'border-border-glass'
+                isSelected ? 'border-retro-error bg-retro-error text-retro-fg' : 'border-border-glass'
               }`}>
                 {isSelected && <Crosshair className="w-3 h-3" />}
               </div>

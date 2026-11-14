@@ -368,7 +368,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
                     setActiveDeck(selectedDeck.id);
                     onEnterArena();
                   }}
-                  className="text-xs bg-retro-accent text-black font-black px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 hover:bg-retro-accent-hover cursor-pointer shadow-md"
+                  className="text-xs bg-retro-accent text-retro-accent-text font-black px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 hover:bg-retro-accent-hover cursor-pointer shadow-md"
                 >
                   <Swords className="w-3.5 h-3.5" />
                   Enter Arena
@@ -387,7 +387,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
                  maxLength={60}
                  className="flex-1 bg-surface-interactive border border-border-glass rounded-lg px-3 py-1.5 text-xs text-retro-fg outline-none focus:border-retro-accent/50"
                />
-               <button type="button" onClick={renameDeck} className="px-3 py-1.5 rounded-lg bg-cyan-500 text-white text-xs font-bold cursor-pointer">Save</button>
+               <button type="button" onClick={renameDeck} className="px-3 py-1.5 rounded-lg bg-cyan-500 text-retro-fg text-xs font-bold cursor-pointer">Save</button>
                <button type="button" onClick={() => setEditingName('')} className="px-3 py-1.5 rounded-lg border border-border-glass text-retro-muted text-xs cursor-pointer">Cancel</button>
              </div>
            )}
@@ -445,7 +445,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
                     <CardTile item={card} identity={identity} onClick={() => openCardDetail(card)} />
                     <button
                       onClick={() => removeCardFromDeck(canonicalId(card))}
-                      className="absolute top-2 right-2 bg-red-500/80 hover:bg-red-500 text-white p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute top-2 right-2 bg-red-500/80 hover:bg-red-500 text-retro-fg p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
                       title="Remove from deck"
                     >
                       <Trash2 className="w-3 h-3" />
@@ -488,7 +488,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
                       <CardTile item={card} identity={identity} onClick={() => openCardDetail(card)} />
                       <button
                         onClick={() => addCardToDeck(canonicalId(card))}
-                        className="absolute top-2 right-2 bg-cyan-500/80 hover:bg-cyan-500 text-white p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute top-2 right-2 bg-cyan-500/80 hover:bg-cyan-500 text-retro-fg p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
                         title="Add to deck (or drag into the deck above)"
                       >
                         <Plus className="w-3 h-3" />
@@ -520,7 +520,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
           <button
             onClick={() => void createDeck()}
             disabled={!newDeckName.trim()}
-            className="bg-cyan-500 hover:bg-cyan-600 disabled:bg-surface-interactive disabled:text-retro-muted text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1.5"
+            className="bg-cyan-500 hover:bg-cyan-600 disabled:bg-surface-interactive disabled:text-retro-muted text-retro-fg px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1.5"
           >
             <Plus className="w-4 h-4" />
             Create

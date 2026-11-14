@@ -85,7 +85,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                 type="button"
                 autoFocus
                 onClick={() => settle(false)}
-                className="px-3 py-1.5 text-xs font-medium border border-border-glass rounded-md text-retro-fg hover:bg-glass-w12 hover:text-white transition-all duration-150 active:scale-[0.96] cursor-pointer"
+                className="px-3 py-1.5 text-xs font-medium border border-border-glass rounded-md text-retro-fg hover:bg-glass-w12 hover:text-retro-fg transition-all duration-150 active:scale-[0.96] cursor-pointer"
               >
                 {pending.options.cancelLabel}
               </button>
@@ -96,8 +96,8 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                   pending.options.tone === 'danger'
                     ? 'border border-red-500/30 text-red-300 bg-red-500/15 hover:bg-red-500/25'
                     : pending.options.tone === 'accent'
-                      ? 'bg-white text-retro-bg hover:bg-retro-fg'
-                      : 'bg-white text-retro-bg hover:bg-retro-fg'
+                      ? 'bg-retro-accent text-retro-bg hover:bg-retro-fg'
+                      : 'bg-retro-accent text-retro-bg hover:bg-retro-fg'
                 }`}
               >
                 {pending.options.confirmLabel}

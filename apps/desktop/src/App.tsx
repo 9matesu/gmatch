@@ -4323,10 +4323,10 @@ export default function Home() {
                     onClick={() => { playPress(900); setDmMinimized(false); }}
                     title="Expand Direct Messages"
                     aria-label="Expand Direct Messages"
-                    className="pointer-events-auto flex items-center gap-2.5 bg-black text-white pl-2 pr-4 py-2 rounded-full shadow-2xl border border-border-strong hover:bg-surface-canvas transition-colors cursor-pointer active:scale-95"
+                    className="pointer-events-auto flex items-center gap-2.5 bg-retro-bg text-retro-fg pl-2 pr-4 py-2 rounded-full shadow-2xl border border-border-strong hover:bg-surface-canvas transition-colors cursor-pointer active:scale-95"
                   >
                     <span className="w-8 h-8 rounded-full bg-glass-w20 p-[2px] shrink-0">
-                      <span className="w-full h-full rounded-full bg-black overflow-hidden flex items-center justify-center text-xs font-bold text-white">
+                      <span className="w-full h-full rounded-full bg-retro-bg overflow-hidden flex items-center justify-center text-xs font-bold text-retro-fg">
                         {pmPeer ? (
                           profilePics[pmPeerId] ? (
                             <img src={resolveMediaUrl(profilePics[pmPeerId])} alt="" className="w-full h-full object-cover" />

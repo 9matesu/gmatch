@@ -3,10 +3,6 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* ──────────────────────────────────────────────────────────────
-   Design Tokens — Dark Glass / Metro / Acid Lime
-   ────────────────────────────────────────────────────────────── */
-
 @theme inline {
   /* Core canvas and surfaces. ONE panel colour per elevation, scaled by the one
      opacity knob (--panel-alpha): a panel must never re-inline a solid hex, or
@@ -1513,4 +1509,51 @@ html[data-motion="on"] {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Design Tokens — Dark Glass / Metro / Acid Lime
+   ────────────────────────────────────────────────────────────── */
+
+/* ──────────────────────────────────────────────────────────────
+   Light theme. The same tokens, flipped — every component reads tokens,
+   so this block IS the theme (no per-component override, no second CSS
+   file). Contrast is measured on the light canvas (#f2f2f4):
+     fg 15:1 · body 9:1 · muted 7:1 · faint 4.6:1.
+   ────────────────────────────────────────────────────────────── */
+.theme-light {
+  color-scheme: light;
+
+  --color-surface-canvas: #f2f2f4;
+  --color-retro-bg: #f2f2f4;
+
+  /* Panels are white, not black: the glass is the same idea inverted. */
+  --color-glass: rgba(255, 255, 255, var(--panel-alpha));
+  --color-glass-strong: rgba(255, 255, 255, calc(var(--panel-alpha) + 0.15));
+  --color-glass-solid: var(--color-glass-strong);
+  --color-surface-interactive: rgba(9, 9, 11, calc(0.06 * var(--panel-alpha) + 0.02));
+
+  /* White-alpha fills become black-alpha, or they vanish on light. */
+  --color-glass-w5: rgba(9, 9, 11, calc(0.04 * var(--panel-alpha) + 0.015));
+  --color-glass-w8: rgba(9, 9, 11, calc(0.07 * var(--panel-alpha) + 0.02));
+  --color-glass-w10: rgba(9, 9, 11, calc(0.10 * var(--panel-alpha) + 0.02));
+  --color-glass-w12: rgba(9, 9, 11, calc(0.12 * var(--panel-alpha) + 0.03));
+  --color-glass-w20: rgba(9, 9, 11, calc(0.20 * var(--panel-alpha) + 0.04));
+
+  --color-border-glass: rgba(9, 9, 11, 0.12);
+  --color-border-subtle: rgba(9, 9, 11, 0.08);
+  --color-border-strong: rgba(9, 9, 11, 0.22);
+
+  /* Type: the same hierarchy, dark on light. */
+  --color-retro-fg: #18181b;
+  --color-retro-body: #3f3f46;
+  --color-retro-muted: #52525b;
+  --color-retro-faint: #71717a;
+
+  /* The accent inverts: black pill, white text (it was white-on-black). */
+  --color-retro-accent: #18181b;
+  --color-retro-accent-hover: #000000;
+  --color-retro-accent-text: #ffffff;
+  --color-hud-accent: #18181b;
+  --color-hud-accent-hover: #000000;
 }

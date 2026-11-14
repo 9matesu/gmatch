@@ -923,7 +923,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                     void runPurge();
                   }}
                   disabled={purgeBusy || purgePreview.wouldDelete === 0}
-                  className="px-3 py-1.5 rounded-md text-xs font-bold bg-red-600/80 hover:bg-red-600 text-white disabled:opacity-40 cursor-pointer"
+                  className="px-3 py-1.5 rounded-md text-xs font-bold bg-red-600/80 hover:bg-red-600 text-retro-fg disabled:opacity-40 cursor-pointer"
                 >
                   {purgeBusy ? "Deleting…" : `Delete ${purgePreview.wouldDelete} account(s)`}
                 </button>

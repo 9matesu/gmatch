@@ -141,7 +141,7 @@ export function PostCreatorModal({
                   <button
                     type="button"
                     onClick={() => setMedia(media.filter((_, i) => i !== idx))}
-                    className="absolute top-1 right-1 p-0.5 bg-black/70 text-white rounded-full hover:bg-red-600 transition-colors"
+                    className="absolute top-1 right-1 p-0.5 bg-black/70 text-retro-fg rounded-full hover:bg-red-600 transition-colors"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -234,7 +234,7 @@ export function PostCreatorModal({
               <button
                 type="button"
                 onClick={handleAddTag}
-                className="px-3 py-1.5 chrome-accent text-black rounded-xl text-xs font-bold cursor-pointer"
+                className="px-3 py-1.5 chrome-accent text-retro-accent-text rounded-xl text-xs font-bold cursor-pointer"
               >
                 Add Tag
               </button>
@@ -270,7 +270,7 @@ export function PostCreatorModal({
             type="button"
             onClick={handlePublish}
             disabled={tags.length === 0 || media.length === 0}
-            className="flex-1 py-2.5 chrome-accent disabled:opacity-40 text-black rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md"
+            className="flex-1 py-2.5 chrome-accent disabled:opacity-40 text-retro-accent-text rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md"
           >
             Share Post
           </button>

@@ -318,14 +318,14 @@ export function AttachmentUploadModal({
               </DropZone>
               {preview && (
                 preview.startsWith('data:video') || preview.startsWith('blob:') ? (
-                  <video src={preview} controls className="w-full max-h-52 object-contain rounded-xl border border-border-glass bg-black" />
+                  <video src={preview} controls className="w-full max-h-52 object-contain rounded-xl border border-border-glass bg-retro-bg" />
                 ) : preview.startsWith('http://') || preview.startsWith('https://') ? (
                   <div className="w-full text-center py-3 rounded-xl border border-border-glass bg-surface-raised text-xs text-retro-body flex items-center justify-center gap-2">
                     <LinkIcon className="w-3.5 h-3.5 text-cyan-600" />
                     <span>Link ready to submit</span>
                   </div>
                 ) : (
-                  <img src={preview} alt="Preview" className="w-full max-h-52 object-contain rounded-xl border border-border-glass bg-black" />
+                  <img src={preview} alt="Preview" className="w-full max-h-52 object-contain rounded-xl border border-border-glass bg-retro-bg" />
                 )
               )}
             </>
@@ -351,7 +351,7 @@ export function AttachmentUploadModal({
             type="button"
             disabled={uploading || (!hasFile && !urlInput.trim() && !preview)}
             onClick={submit}
-            className="px-5 py-2 bg-black hover:bg-surface-elevated text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-5 py-2 bg-retro-bg hover:bg-surface-elevated text-retro-fg font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
             <span>{uploading ? 'Uploading…' : 'Attach'}</span>

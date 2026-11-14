@@ -292,7 +292,7 @@ export function YourMatchTab({
             <button
               type="button"
               onClick={() => setShowCreateCardModal(true)}
-              className="w-full py-3 text-sm font-medium bg-retro-accent text-black rounded-lg hover:bg-retro-accent-hover transition-colors cursor-pointer flex items-center justify-center gap-2"
+              className="w-full py-3 text-sm font-medium bg-retro-accent text-retro-accent-text rounded-lg hover:bg-retro-accent-hover transition-colors cursor-pointer flex items-center justify-center gap-2"
             >
               <Sparkles className="w-4 h-4" />
               <span>Create Card</span>

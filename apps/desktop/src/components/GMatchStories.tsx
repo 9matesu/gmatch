@@ -383,7 +383,7 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
                 <span className="text-xs font-black text-retro-muted">YOU</span>
               )}
             </div>
-            <div className="absolute bottom-0 right-0 w-4 h-4 rounded-full bg-[#0095f6] border-2 border-white flex items-center justify-center text-white shadow-xs">
+            <div className="absolute bottom-0 right-0 w-4 h-4 rounded-full bg-[#0095f6] border-2 border-border-glass flex items-center justify-center text-retro-fg shadow-xs">
               <Plus className="w-3 h-3 stroke-[3]" />
             </div>
           </div>
@@ -450,7 +450,7 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
         >
 {/* Main Story Canvas — full viewport, centered media, overlays float */}
           <div
-            className="relative w-full h-full max-w-none bg-black border-0 shadow-2xl overflow-hidden"
+            className="relative w-full h-full max-w-none bg-retro-bg border-0 shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Top Segmented Progress Bars */}
@@ -481,7 +481,7 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
             </div>
 
             {/* Top Header Bar: Avatar, Name, Time Ago, and Close */}
-            <div className="absolute top-6 left-3 right-3 z-30 flex items-center justify-between text-white drop-shadow-md">
+            <div className="absolute top-6 left-3 right-3 z-30 flex items-center justify-between text-retro-fg drop-shadow-md">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-full p-[1.5px] bg-retro-accent">
                   <div className="w-full h-full rounded-full bg-surface-canvas overflow-hidden flex items-center justify-center">
@@ -514,7 +514,7 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
                 <button
                   type="button"
                   onClick={closeStoryViewer}
-                  className="w-8 h-8 rounded-full bg-black/40 hover:bg-black/70 border border-white/20 flex items-center justify-center text-white transition-colors cursor-pointer"
+                  className="w-8 h-8 rounded-full bg-black/40 hover:bg-black/70 border border-border-glass flex items-center justify-center text-retro-fg transition-colors cursor-pointer"
                   aria-label="Close Story"
                 >
                   <X className="w-4 h-4" />
@@ -543,7 +543,7 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
             </div>
 
             {/* Center Media Presentation — fills canvas, image letterboxed dead-center */}
-            <div className="absolute inset-0 z-0 flex items-center justify-center bg-black overflow-hidden">
+            <div className="absolute inset-0 z-0 flex items-center justify-center bg-retro-bg overflow-hidden">
               <ObjectImage
                 objectId={currentStory.id}
                 contentUrl={currentStory.content_url}
@@ -576,7 +576,7 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
             {/* Bottom Floating Caption Pill */}
             {currentStory.caption && (
               <div className="absolute bottom-20 left-4 right-4 z-20">
-                <div className="p-3 bg-black/60 backdrop-blur-md border border-white/10 rounded-xl text-xs text-white leading-relaxed">
+                <div className="p-3 bg-black/60 backdrop-blur-md border border-border-glass rounded-xl text-xs text-retro-fg leading-relaxed">
                   {currentStory.caption}
                 </div>
               </div>
@@ -589,13 +589,13 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
                   onClick={handleLike}
                   className={`w-10 h-10 rounded-full border flex items-center justify-center transition-all cursor-pointer active:scale-80 shadow-md ${
                     likedStories.has(currentStory.id)
-                      ? 'bg-cyan-500 border-cyan-500 text-white'
-                      : 'bg-surface-raised/10 hover:bg-surface-raised/20 border-border-strong text-white'
+                      ? 'bg-cyan-500 border-cyan-500 text-retro-fg'
+                      : 'bg-surface-raised/10 hover:bg-surface-raised/20 border-border-strong text-retro-fg'
                   }`}
                   aria-label="Like story"
                 >
                   <Heart
-                    className={`w-5 h-5 ${likedStories.has(currentStory.id) ? 'fill-white text-white' : 'text-white'}`}
+                    className={`w-5 h-5 ${likedStories.has(currentStory.id) ? 'fill-white text-retro-fg' : 'text-retro-fg'}`}
                   />
                 </button>
                 <button
@@ -604,7 +604,7 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
                     playPress(880);
                     if (onStartPm) onStartPm({ id: activeGroup.userId, display_name: activeGroup.displayName });
                   }}
-                  className="h-10 px-5 rounded-full bg-surface-raised/10 hover:bg-surface-raised/20 border border-border-strong flex items-center justify-center gap-2 text-white transition-all cursor-pointer active:scale-95 shadow-md"
+                  className="h-10 px-5 rounded-full bg-surface-raised/10 hover:bg-surface-raised/20 border border-border-strong flex items-center justify-center gap-2 text-retro-fg transition-all cursor-pointer active:scale-95 shadow-md"
                   aria-label={`Message ${activeGroup.displayName}`}
                 >
                   <MessageCircle className="w-4 h-4" />

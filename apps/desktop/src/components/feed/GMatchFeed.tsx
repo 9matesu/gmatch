@@ -1005,7 +1005,7 @@ export function GMatchFeed({
 
                 {/* Ad Visual */}
                 <div
-                  className={`relative w-full aspect-[4/5] max-h-[min(420px,60vh)] bg-gradient-to-br ${GAME_AD_TEMPLATES.find((t) => t.mode === post.game_mode)?.gradient || 'from-zinc-800 to-zinc-900'} flex flex-col items-center justify-center text-white overflow-hidden`}
+                  className={`relative w-full aspect-[4/5] max-h-[min(420px,60vh)] bg-gradient-to-br ${GAME_AD_TEMPLATES.find((t) => t.mode === post.game_mode)?.gradient || 'from-zinc-800 to-zinc-900'} flex flex-col items-center justify-center text-retro-fg overflow-hidden`}
                 >
                   {(() => {
                     const AdIcon = (post.game_mode && AD_ICON_MAP[post.game_mode]) || Gamepad2;
@@ -1237,7 +1237,7 @@ export function GMatchFeed({
                                 onKeyDown={(e) => e.key === 'Enter' && handleAvatarClick(post.author_id)}
                                 title={authorHasStory ? 'Watch story' : 'View profile'}
                                 aria-label={authorHasStory ? `Watch story of ${post.author_name}` : `View profile of ${post.author_name}`}
-                                className={`relative w-8 h-8 rounded-full p-[1.5px] flex-shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${authorHasStory ? 'bg-white' : 'bg-glass-w12 border border-border-glass'}`}
+                                className={`relative w-8 h-8 rounded-full p-[1.5px] flex-shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${authorHasStory ? 'bg-retro-accent' : 'bg-glass-w12 border border-border-glass'}`}
                               >
                                 <div className="relative w-full h-full rounded-full bg-retro-panel overflow-hidden flex items-center justify-center text-xs font-semibold text-retro-fg">
                                   <Avatar id={post.author_id} size={32} imageUrl={profilePics[post.author_id] || post.author_avatar} fill={true} />
@@ -1250,15 +1250,15 @@ export function GMatchFeed({
                                     tabIndex={0}
                                     onClick={(e) => { e.stopPropagation(); handleNameClick(post.author_id); }}
                                     onKeyDown={(e) => e.key === 'Enter' && handleNameClick(post.author_id)}
-                                    className="text-xs font-semibold text-white hover:underline cursor-pointer leading-tight truncate min-w-0 [text-shadow:0_1px_4px_rgba(0,0,0,0.75)] focus-visible:outline-2 focus-visible:outline-white"
+                                    className="text-xs font-semibold text-retro-fg hover:underline cursor-pointer leading-tight truncate min-w-0 [text-shadow:0_1px_4px_rgba(0,0,0,0.75)] focus-visible:outline-2 focus-visible:outline-white"
                                   >
                                     {post.author_name}
                                   </span>
-                                  <PostTimestamp createdAt={post.created_at} className="text-xs text-white/75 leading-tight [text-shadow:0_1px_4px_rgba(0,0,0,0.75)]" />
+                                  <PostTimestamp createdAt={post.created_at} className="text-xs text-retro-fg/75 leading-tight [text-shadow:0_1px_4px_rgba(0,0,0,0.75)]" />
                                   {/* Sync state moved to the one feed-top label (B4): no per-post chips. */}
                                 </div>
                                 {post.location && (
-                                  <span className="text-xs text-white/75 leading-tight block truncate [text-shadow:0_1px_4px_rgba(0,0,0,0.75)]">{post.location}</span>
+                                  <span className="text-xs text-retro-fg/75 leading-tight block truncate [text-shadow:0_1px_4px_rgba(0,0,0,0.75)]">{post.location}</span>
                                 )}
                               </div>
                             </div>
@@ -1266,7 +1266,7 @@ export function GMatchFeed({
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); setOptionsPost(post); }}
-                              className="pointer-events-auto shrink-0 text-white/80 hover:text-white p-1.5 rounded-md cursor-pointer hover:bg-black/40 transition-colors focus-visible:outline-2 focus-visible:outline-white"
+                              className="pointer-events-auto shrink-0 text-retro-fg/80 hover:text-retro-fg p-1.5 rounded-md cursor-pointer hover:bg-black/40 transition-colors focus-visible:outline-2 focus-visible:outline-white"
                               aria-label="Post options"
                             >
                               <MoreHorizontal className="w-4 h-4" />
@@ -1282,7 +1282,7 @@ export function GMatchFeed({
                             type="button"
                             aria-label="Collapse post"
                             onClick={(e) => { e.stopPropagation(); toggleExpand(post); }}
-                            className="absolute left-2 top-2 z-10 w-8 h-8 rounded-full bg-black/45 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/70 transition-colors cursor-pointer"
+                            className="absolute left-2 top-2 z-10 w-8 h-8 rounded-full bg-black/45 backdrop-blur-sm text-retro-fg flex items-center justify-center hover:bg-black/70 transition-colors cursor-pointer"
                           >
                             <ChevronUp className="w-4 h-4" />
                           </button>
@@ -1294,7 +1294,7 @@ export function GMatchFeed({
                               playPress(700);
                               setZoomLevel((z) => (z === 1 ? 1.8 : z === 1.8 ? 2.6 : 1));
                             }}
-                            className="absolute bottom-2 right-2 z-10 h-8 pl-2.5 pr-3 rounded-full bg-black/60 backdrop-blur-sm text-white flex items-center gap-1.5 hover:bg-black/70 transition-colors cursor-pointer"
+                            className="absolute bottom-2 right-2 z-10 h-8 pl-2.5 pr-3 rounded-full bg-black/60 backdrop-blur-sm text-retro-fg flex items-center gap-1.5 hover:bg-black/70 transition-colors cursor-pointer"
                           >
                             {zoomLevel > 1 ? <ZoomOut className="w-3.5 h-3.5" /> : <ZoomIn className="w-3.5 h-3.5" />}
                             <span className="font-mono text-[10px]">{Math.round(zoomLevel * 100)}%</span>
@@ -1312,7 +1312,7 @@ export function GMatchFeed({
                               e.stopPropagation();
                               setMediaIdx((prev) => ({ ...prev, [post.id]: (currentIdx - 1 + multiMedia.length) % multiMedia.length }));
                             }}
-                            className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-black/45 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/70 transition-colors cursor-pointer"
+                            className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-black/45 backdrop-blur-sm text-retro-fg flex items-center justify-center hover:bg-black/70 transition-colors cursor-pointer"
                           >
                             <ChevronLeft className="w-4 h-4" />
                           </button>
@@ -1323,11 +1323,11 @@ export function GMatchFeed({
                               e.stopPropagation();
                               setMediaIdx((prev) => ({ ...prev, [post.id]: (currentIdx + 1) % multiMedia.length }));
                             }}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-black/45 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/70 transition-colors cursor-pointer"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-black/45 backdrop-blur-sm text-retro-fg flex items-center justify-center hover:bg-black/70 transition-colors cursor-pointer"
                           >
                             <ChevronRight className="w-4 h-4" />
                           </button>
-                          <div className="absolute top-2.5 right-2.5 z-10 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-xs text-[10px] font-medium text-white/90">
+                          <div className="absolute top-2.5 right-2.5 z-10 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-xs text-[10px] font-medium text-retro-fg/90">
                             {currentIdx + 1}/{multiMedia.length}
                           </div>
                         </>
@@ -1336,7 +1336,7 @@ export function GMatchFeed({
                       {/* Double Tap Heart Pop Animation */}
                       {doubleTapAnimationId === post.id && (
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 animate-orbit-pop">
-                          <Heart className="w-20 h-20 text-white fill-white opacity-90" />
+                          <Heart className="w-20 h-20 text-retro-fg fill-white opacity-90" />
                         </div>
                       )}
                     </div>

@@ -33,9 +33,9 @@ type Pending =
 /** Small preview surface shared by all panes: img for stills, video for mp4/webm. */
 function Preview({ url, isVideo }: { url: string; isVideo: boolean }) {
   if (isVideo) {
-    return <video src={url} controls muted playsInline className="max-h-56 w-auto max-w-full rounded-lg bg-black" />;
+    return <video src={url} controls muted playsInline className="max-h-56 w-auto max-w-full rounded-lg bg-retro-bg" />;
   }
-  return <img src={url} alt="Selected media preview" className="max-h-56 w-auto max-w-full rounded-lg object-contain bg-black" />;
+  return <img src={url} alt="Selected media preview" className="max-h-56 w-auto max-w-full rounded-lg object-contain bg-retro-bg" />;
 }
 
 export function MediaPickerPanel({
@@ -341,11 +341,11 @@ export function MediaPickerPanel({
                         )}
                         {selected && (
                           <span className="absolute inset-0 bg-retro-accent/20 flex items-center justify-center">
-                            <ImageIcon className="w-5 h-5 text-white drop-shadow" />
+                            <ImageIcon className="w-5 h-5 text-retro-fg drop-shadow" />
                           </span>
                         )}
                         {raw.startsWith('vault://') && !httpUrlMap[raw] && !unresolvable && (
-                          <span className="absolute inset-x-0 bottom-0 py-0.5 text-center text-[10px] bg-black/60 text-white/80">…</span>
+                          <span className="absolute inset-x-0 bottom-0 py-0.5 text-center text-[10px] bg-black/60 text-retro-fg/80">…</span>
                         )}
                       </button>
                     );
@@ -419,7 +419,7 @@ export function MediaPickerPanel({
                 <button
                   type="button"
                   onClick={previewUrlInput}
-                  className="px-3 py-1.5 rounded-lg chrome-accent text-black text-xs font-bold cursor-pointer active:scale-95 transition-transform"
+                  className="px-3 py-1.5 rounded-lg chrome-accent text-retro-accent-text text-xs font-bold cursor-pointer active:scale-95 transition-transform"
                 >
                   Preview
                 </button>
@@ -447,7 +447,7 @@ export function MediaPickerPanel({
                 <button
                   type="button"
                   onClick={confirm}
-                  className="px-4 py-1.5 rounded-lg chrome-accent text-black text-xs font-bold cursor-pointer active:scale-95 transition-transform"
+                  className="px-4 py-1.5 rounded-lg chrome-accent text-retro-accent-text text-xs font-bold cursor-pointer active:scale-95 transition-transform"
                 >
                   Use this media
                 </button>

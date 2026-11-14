@@ -90,7 +90,7 @@ export function AdminMediaCell({
     <div
       className={cn(
         sizeClasses[size],
-        "rounded overflow-hidden bg-black border border-border-glass cursor-pointer shrink-0 relative group",
+        "rounded overflow-hidden bg-retro-bg border border-border-glass cursor-pointer shrink-0 relative group",
         className
       )}
       onClick={handleClick}

@@ -127,7 +127,7 @@ export function CameraCapture({
             setStarting(true)
             setRetryNonce((value) => value + 1)
           }}
-          className="px-3 py-1.5 text-xs font-medium bg-retro-accent text-black hover:bg-retro-accent-hover rounded-lg cursor-pointer"
+          className="px-3 py-1.5 text-xs font-medium bg-retro-accent text-retro-accent-text hover:bg-retro-accent-hover rounded-lg cursor-pointer"
         >
           Retry Camera
         </button>
@@ -146,7 +146,7 @@ export function CameraCapture({
     <div className="space-y-3">
       {captured ? (
         <div className="space-y-3">
-          <img src={captured} alt="Captured preview" className="w-full max-h-64 object-contain rounded-lg border border-border-glass bg-black" />
+          <img src={captured} alt="Captured preview" className="w-full max-h-64 object-contain rounded-lg border border-border-glass bg-retro-bg" />
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -158,7 +158,7 @@ export function CameraCapture({
             <button
               type="button"
               onClick={confirmShot}
-              className="px-3 py-1.5 text-xs font-medium bg-retro-accent text-black hover:bg-retro-accent-hover rounded-lg cursor-pointer"
+              className="px-3 py-1.5 text-xs font-medium bg-retro-accent text-retro-accent-text hover:bg-retro-accent-hover rounded-lg cursor-pointer"
             >
               Use Photo
             </button>
@@ -173,7 +173,7 @@ export function CameraCapture({
         </div>
       ) : (
         <div className="space-y-3">
-          <div className="relative rounded-lg overflow-hidden border border-border-glass bg-black">
+          <div className="relative rounded-lg overflow-hidden border border-border-glass bg-retro-bg">
             <video ref={videoRef} playsInline muted className="w-full max-h-64 object-contain" />
             {starting && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/60">
@@ -186,7 +186,7 @@ export function CameraCapture({
               type="button"
               disabled={starting}
               onClick={takePhoto}
-              className="px-3 py-1.5 text-xs font-medium bg-retro-accent text-black hover:bg-retro-accent-hover disabled:opacity-40 rounded-lg cursor-pointer"
+              className="px-3 py-1.5 text-xs font-medium bg-retro-accent text-retro-accent-text hover:bg-retro-accent-hover disabled:opacity-40 rounded-lg cursor-pointer"
             >
               Capture
             </button>

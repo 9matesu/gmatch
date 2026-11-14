@@ -237,7 +237,7 @@ export function SpectateModal({
             <button
               type="button"
               onClick={() => { playPress(680); onClose() }}
-              className="p-1 text-retro-muted hover:text-white cursor-pointer"
+              className="p-1 text-retro-muted hover:text-retro-fg cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -420,7 +420,7 @@ export function SpectateModal({
                   <div className="flex items-center gap-3">
                     <div className="relative">
                       <Avatar id={pA.id} imageUrl={pA.pfp_url || undefined} size={42} />
-                      <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-cyan-500 border-2 border-white" />
+                      <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-cyan-500 border-2 border-border-glass" />
                     </div>
                     <div className="min-w-0">
                       <div className="text-xs font-bold truncate text-retro-fg">
@@ -460,7 +460,7 @@ export function SpectateModal({
                     </div>
                     <div className="relative">
                       <Avatar id={pB.id} imageUrl={pB.pfp_url || undefined} size={42} />
-                      <span className="absolute -bottom-1 -left-1 w-3.5 h-3.5 rounded-full bg-amber-500 border-2 border-white" />
+                      <span className="absolute -bottom-1 -left-1 w-3.5 h-3.5 rounded-full bg-amber-500 border-2 border-border-glass" />
                     </div>
                   </div>
                 </div>
@@ -499,7 +499,7 @@ export function SpectateModal({
                                 muted
                                 playsInline
                               />
-                              <span className="absolute bottom-2 right-2 bg-black/70 border border-border-glass text-[10px] font-bold text-white px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                              <span className="absolute bottom-2 right-2 bg-black/70 border border-border-glass text-[10px] font-bold text-retro-fg px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
                                 <ZoomIn className="w-3 h-3" />
                                 <span>ZOOM</span>
                               </span>
@@ -560,7 +560,7 @@ export function SpectateModal({
                                 muted
                                 playsInline
                               />
-                              <span className="absolute bottom-2 right-2 bg-black/70 border border-border-glass text-[10px] font-bold text-white px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                              <span className="absolute bottom-2 right-2 bg-black/70 border border-border-glass text-[10px] font-bold text-retro-fg px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
                                 <ZoomIn className="w-3 h-3" />
                                 <span>ZOOM</span>
                               </span>
@@ -613,7 +613,7 @@ export function SpectateModal({
                           <button
                             type="button"
                             onClick={() => openInBoard(id ?? url, url)}
-                            className="w-14 h-14 shrink-0 overflow-hidden border border-border-glass bg-black group relative cursor-zoom-in rounded-xl shadow-xs"
+                            className="w-14 h-14 shrink-0 overflow-hidden border border-border-glass bg-retro-bg group relative cursor-zoom-in rounded-xl shadow-xs"
                           >
                             <ObjectImage
                               contentUrl={url}

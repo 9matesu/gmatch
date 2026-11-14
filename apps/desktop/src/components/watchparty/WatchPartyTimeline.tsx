@@ -25,7 +25,7 @@ import { computeTargetPosition } from '../../utils/watchSync'
 import { getRoomVolume, setRoomVolume, readElementVolume, applyRoomVolume } from '../../utils/watchVolume'
 
 const BTN_ICON =
-  'p-1.5 rounded-md hover:bg-glass-w10 text-white/90 hover:text-white cursor-pointer transition-colors duration-150 select-none'
+  'p-1.5 rounded-md hover:bg-glass-w10 text-retro-fg/90 hover:text-retro-fg cursor-pointer transition-colors duration-150 select-none'
 
 export function WatchPartyTimeline({
   party,
@@ -251,18 +251,18 @@ export function WatchPartyTimeline({
         </div>
 
         <div
-          className="absolute left-0 top-1/2 -translate-y-1/2 h-1 group-hover/scrub:h-1.5 rounded-full bg-white pointer-events-none transition-all duration-150"
+          className="absolute left-0 top-1/2 -translate-y-1/2 h-1 group-hover/scrub:h-1.5 rounded-full bg-retro-accent pointer-events-none transition-all duration-150"
           style={{ width: `${progressPct}%` }}
         />
 
         <div
-          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-white shadow-lg border border-black/20 pointer-events-none transition-transform duration-150 scale-0 group-hover/scrub:scale-100"
+          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-retro-accent shadow-lg border border-black/20 pointer-events-none transition-transform duration-150 scale-0 group-hover/scrub:scale-100"
           style={{ left: `${progressPct}%` }}
         />
 
         {hoverTime !== null && (
           <div
-            className="absolute -top-7 -translate-x-1/2 px-2 py-0.5 rounded-md bg-black/90 border border-border-glass text-[10px] font-mono font-bold text-white shadow-lg pointer-events-none whitespace-nowrap"
+            className="absolute -top-7 -translate-x-1/2 px-2 py-0.5 rounded-md bg-black/90 border border-border-glass text-[10px] font-mono font-bold text-retro-fg shadow-lg pointer-events-none whitespace-nowrap"
             style={{ left: `${hoverPosition}%` }}
           >
             {formatVideoTime(hoverTime)}
@@ -271,7 +271,7 @@ export function WatchPartyTimeline({
       </div>
 
       {/* Tier 2: Grouped Controls Bar */}
-      <div className="flex items-center justify-between gap-2 mt-1 text-white">
+      <div className="flex items-center justify-between gap-2 mt-1 text-retro-fg">
         {/* Left Cluster: Transport, Volume, and Time Readout */}
         <div className="flex items-center gap-1.5 sm:gap-2">
           {/* Transport is host-only server-side. A viewer clicking these had
@@ -358,7 +358,7 @@ export function WatchPartyTimeline({
               aria-label="Toggle side panel"
               title={railOpen ? 'Hide side panel' : 'Show chat and queue'}
               onClick={onToggleRail}
-              className={`${BTN_ICON} ${railOpen ? 'bg-glass-w10 text-white' : ''}`}
+              className={`${BTN_ICON} ${railOpen ? 'bg-glass-w10 text-retro-fg' : ''}`}
             >
               {railOpen ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
             </button>

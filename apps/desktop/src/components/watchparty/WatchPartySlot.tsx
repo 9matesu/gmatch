@@ -283,7 +283,7 @@ export function WatchPartySlot({
       ref={wrapRef}
       data-active={active ? 'true' : 'false'}
       onClick={onSelect}
-      className={`watch-party-slot relative ${fill ? 'w-full h-full' : 'aspect-video'} bg-black cursor-pointer overflow-hidden flex items-center justify-center ${
+      className={`watch-party-slot relative ${fill ? 'w-full h-full' : 'aspect-video'} bg-retro-bg cursor-pointer overflow-hidden flex items-center justify-center ${
         active ? '' : 'border border-border-glass'
       }`}
     >
@@ -342,9 +342,9 @@ export function WatchPartySlot({
                   e.stopPropagation()
                   togglePlayback()
                 }}
-                className="pointer-events-auto w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-black/60 hover:bg-black/80 border border-border-glass text-white flex items-center justify-center shadow-lg transition-transform duration-150 active:scale-95 cursor-pointer"
+                className="pointer-events-auto w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-black/60 hover:bg-black/80 border border-border-glass text-retro-fg flex items-center justify-center shadow-lg transition-transform duration-150 active:scale-95 cursor-pointer"
               >
-                <Play className="w-7 h-7 sm:w-8 sm:h-8 fill-white text-white translate-x-0.5" />
+                <Play className="w-7 h-7 sm:w-8 sm:h-8 fill-white text-retro-fg translate-x-0.5" />
               </button>
             </div>
           )}

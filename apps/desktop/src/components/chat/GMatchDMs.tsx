@@ -805,7 +805,7 @@ export function GMatchDMs({
               ))}
             </div>
             <div className="flex gap-2">
-              <button type="button" onClick={submitNewGroup} className="px-3 py-1.5 bg-retro-accent text-black rounded-md text-xs font-bold cursor-pointer hover:bg-retro-accent-hover">Create</button>
+              <button type="button" onClick={submitNewGroup} className="px-3 py-1.5 bg-retro-accent text-retro-accent-text rounded-md text-xs font-bold cursor-pointer hover:bg-retro-accent-hover">Create</button>
               <button type="button" onClick={() => { setShowNewGroup(false); setNewGroupMembers(new Set()); }} className="px-3 py-1.5 bg-glass-w8 border border-border-glass rounded-md text-xs cursor-pointer hover:bg-glass-w12">Cancel</button>
             </div>
           </div>
@@ -906,7 +906,7 @@ export function GMatchDMs({
                     aria-label="New room name"
                     className="flex-1 min-w-0 bg-surface-raised border border-border-glass rounded-md px-2 py-1.5 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent/60"
                   />
-                  <button type="button" onClick={submitNewRoom} className="px-2.5 py-1.5 bg-retro-accent text-black rounded-md text-xs font-bold cursor-pointer hover:bg-retro-accent-hover">Create</button>
+                  <button type="button" onClick={submitNewRoom} className="px-2.5 py-1.5 bg-retro-accent text-retro-accent-text rounded-md text-xs font-bold cursor-pointer hover:bg-retro-accent-hover">Create</button>
                 </div>
               )}
               {rooms.map((r) => {
@@ -1014,14 +1014,14 @@ export function GMatchDMs({
                         {mentions > 0 ? (
                           <span
                             title={`${mentions} mention${mentions === 1 ? '' : 's'}`}
-                            className="shrink-0 min-w-[16px] h-4 px-1 rounded-full bg-retro-accent text-black text-[10px] font-semibold flex items-center justify-center tabular-nums"
+                            className="shrink-0 min-w-[16px] h-4 px-1 rounded-full bg-retro-accent text-retro-accent-text text-[10px] font-semibold flex items-center justify-center tabular-nums"
                           >
                             @{mentions}
                           </span>
                         ) : unread > 0 ? (
                           <span
                             title={`${unread} unread`}
-                            className="shrink-0 min-w-[16px] h-4 px-1 rounded-full bg-retro-accent/90 text-black text-[10px] font-semibold flex items-center justify-center tabular-nums"
+                            className="shrink-0 min-w-[16px] h-4 px-1 rounded-full bg-retro-accent/90 text-retro-accent-text text-[10px] font-semibold flex items-center justify-center tabular-nums"
                           >
                             {unread > 99 ? '99+' : unread}
                           </span>
@@ -1342,7 +1342,7 @@ export function GMatchDMs({
                                       onOpenImage?.(msg);
                                     }}
                                     title="Open image viewer"
-                                    className={`-mx-1 -mt-1 mb-1.5 rounded-md overflow-hidden bg-black cursor-pointer block ${msg.text ? '' : 'mb-0'}`}
+                                    className={`-mx-1 -mt-1 mb-1.5 rounded-md overflow-hidden bg-retro-bg cursor-pointer block ${msg.text ? '' : 'mb-0'}`}
                                   >
                                     <ObjectImage
                                       contentUrl={msg.attachmentUrl}
@@ -1363,7 +1363,7 @@ export function GMatchDMs({
                                       className="bg-glass-w10 border border-border-glass rounded px-2 py-1 text-xs text-retro-fg outline-none focus:border-retro-accent w-64"
                                       autoFocus
                                     />
-                                    <button type="button" onClick={() => handleEditMessage(msg)} className="px-2 py-1 bg-retro-accent text-black text-[10px] rounded cursor-pointer">Save</button>
+                                    <button type="button" onClick={() => handleEditMessage(msg)} className="px-2 py-1 bg-retro-accent text-retro-accent-text text-[10px] rounded cursor-pointer">Save</button>
                                     <button type="button" onClick={() => setEditingMessage(null)} className="px-2 py-1 bg-glass-w8 border border-border-glass text-[10px] rounded cursor-pointer">Cancel</button>
                                   </div>
                                 ) : (
@@ -1629,7 +1629,7 @@ export function GMatchDMs({
                 aria-label="Send message"
                 title="Send message"
                 disabled={!inputText.trim() && !pendingAttachment}
-                className="p-2 rounded-md bg-retro-accent hover:bg-retro-accent-hover text-black disabled:opacity-30 cursor-pointer transition-colors"
+                className="p-2 rounded-md bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text disabled:opacity-30 cursor-pointer transition-colors"
               >
                 <Send className="w-4 h-4" />
               </button>

@@ -649,7 +649,7 @@ export function GridReveal({
               layout="position"
               className={cn(
                 "block whitespace-nowrap text-[11px] font-medium leading-6",
-                reduce ? "text-white/75" : "bg-clip-text text-transparent",
+                reduce ? "text-retro-fg/75" : "bg-clip-text text-transparent",
               )}
               style={reduce ? undefined : SHIMMER}
               initial={{ opacity: 0 }}

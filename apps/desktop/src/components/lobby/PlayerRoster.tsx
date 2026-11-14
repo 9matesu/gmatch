@@ -149,7 +149,7 @@ function PlayerTile({
             event.stopPropagation()
             handleClick()
           }}
-          className="text-xs font-medium truncate text-white drop-shadow"
+          className="text-xs font-medium truncate text-retro-fg drop-shadow"
           title={player.display_name || player.id}
         >
           <span className="truncate">

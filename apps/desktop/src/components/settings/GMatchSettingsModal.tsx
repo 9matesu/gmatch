@@ -458,6 +458,26 @@ export function GMatchSettingsModal({
                 <div className="p-4 bg-glass-w5 border border-border-glass rounded-lg space-y-4">
                   <h4 className="text-xs font-medium text-retro-fg">Display &amp; layout</h4>
 
+                  {/* Theme: one switch, the whole light theme is a token block. */}
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs text-retro-muted">Theme</span>
+                    <div className="flex items-center gap-1 p-0.5 rounded-lg bg-glass-w4 border border-border-glass" role="group" aria-label="Theme">
+                      {(['dark', 'light'] as const).map((mode) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          aria-pressed={settings.theme === mode}
+                          onClick={() => { playPress(760); updateSettings('theme', mode); }}
+                          className={`px-2.5 py-1 rounded-md text-[11px] font-semibold capitalize transition-colors cursor-pointer ${
+                            settings.theme === mode ? 'bg-retro-accent text-retro-accent-text' : 'text-retro-muted hover:text-retro-fg'
+                          }`}
+                        >
+                          {mode}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Panel opacity */}
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">

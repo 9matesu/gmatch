@@ -184,7 +184,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
 
       {/* Media: carousel + zoom, capped for inline flow (not a dialog). */}
       <div
-        className="relative bg-black flex items-center justify-center overflow-hidden min-h-[280px]"
+        className="relative bg-retro-bg flex items-center justify-center overflow-hidden min-h-[280px]"
         onDoubleClick={handleDoubleTap}
       >
         {post.localPreviewUrl ? (
@@ -257,7 +257,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
         {/* Double Tap Heart Pop */}
         {doubleTapAnimation && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 animate-orbit-pop">
-            <Heart className="w-28 h-28 text-white fill-white drop-shadow-2xl opacity-90 animate-pulse" />
+            <Heart className="w-28 h-28 text-retro-fg fill-white drop-shadow-2xl opacity-90 animate-pulse" />
           </div>
         )}
 
@@ -273,7 +273,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
                   setActiveMediaIndex((i) => Math.max(0, i - 1));
                 }}
                 aria-label="Previous image"
-                className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 text-white hover:bg-black/80 cursor-pointer"
+                className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 text-retro-fg hover:bg-black/80 cursor-pointer"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
@@ -287,7 +287,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
                   setActiveMediaIndex((i) => Math.min(mediaItems.length - 1, i + 1));
                 }}
                 aria-label="Next image"
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 text-white hover:bg-black/80 cursor-pointer"
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 text-retro-fg hover:bg-black/80 cursor-pointer"
               >
                 <ChevronRight className="w-5 h-5" />
               </button>
@@ -298,7 +298,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
               {mediaItems.map((_, idx) => (
                 <span
                   key={idx}
-                  className={`w-1.5 h-1.5 rounded-full transition-all ${idx === activeMediaIndex ? 'bg-white w-3' : 'bg-glass-w20'
+                  className={`w-1.5 h-1.5 rounded-full transition-all ${idx === activeMediaIndex ? 'bg-retro-accent w-3' : 'bg-glass-w20'
                     }`}
                 />
               ))}
@@ -307,7 +307,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
         )}
 
         {/* Zoom controls pill */}
-        <div className="absolute top-3 left-3 flex items-center gap-1 bg-black/60 backdrop-blur-md rounded-full px-2.5 py-1 text-white text-[10px] font-medium border border-white/10">
+        <div className="absolute top-3 left-3 flex items-center gap-1 bg-black/60 backdrop-blur-md rounded-full px-2.5 py-1 text-retro-fg text-[10px] font-medium border border-border-glass">
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); handleZoomToggle(); }}

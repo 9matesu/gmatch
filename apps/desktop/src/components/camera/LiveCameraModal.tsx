@@ -182,7 +182,7 @@ export function LiveCameraModal({
         </div>
 
         {/* Viewfinder Viewport */}
-        <div className="relative aspect-square w-full bg-black flex items-center justify-center overflow-hidden">
+        <div className="relative aspect-square w-full bg-retro-bg flex items-center justify-center overflow-hidden">
           {cameraError ? (
             <div className="p-6 text-center space-y-3 bg-surface-canvas text-retro-fg w-full h-full flex flex-col items-center justify-center">
               <AlertCircle className="w-12 h-12 text-rose-500 mx-auto" />
@@ -220,14 +220,14 @@ export function LiveCameraModal({
               />
               {/* Instagram Grid Guide Overlay */}
               <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none opacity-25 border border-border-strong">
-                <div className="border-r border-b border-white" />
-                <div className="border-r border-b border-white" />
-                <div className="border-b border-white" />
-                <div className="border-r border-b border-white" />
-                <div className="border-r border-b border-white" />
-                <div className="border-b border-white" />
-                <div className="border-r border-white" />
-                <div className="border-r border-white" />
+                <div className="border-r border-b border-border-glass" />
+                <div className="border-r border-b border-border-glass" />
+                <div className="border-b border-border-glass" />
+                <div className="border-r border-b border-border-glass" />
+                <div className="border-r border-b border-border-glass" />
+                <div className="border-b border-border-glass" />
+                <div className="border-r border-border-glass" />
+                <div className="border-r border-border-glass" />
                 <div />
               </div>
             </>
@@ -276,7 +276,7 @@ export function LiveCameraModal({
                 disabled={!!cameraError || isStarting}
                 className="w-16 h-16 rounded-full bg-retro-accent p-1 cursor-pointer hover:scale-105 active:scale-95 transition-transform shadow-xl disabled:opacity-30"
               >
-                <div className="w-full h-full rounded-full border-2 border-white bg-surface-raised flex items-center justify-center" />
+                <div className="w-full h-full rounded-full border-2 border-border-glass bg-surface-raised flex items-center justify-center" />
               </button>
 
               <button

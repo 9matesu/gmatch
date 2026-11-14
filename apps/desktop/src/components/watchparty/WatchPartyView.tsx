@@ -85,9 +85,9 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
 
   // ROOM MODE: Full-bleed theater layout with video viewer and docked side rail
   return (
-    <div className="group/watch relative h-full flex-1 flex flex-row min-h-0 overflow-hidden bg-black">
+    <div className="group/watch relative h-full flex-1 flex flex-row min-h-0 overflow-hidden bg-retro-bg">
       {/* Video Viewer Container: takes remaining width, resizes automatically */}
-      <div className="flex-1 min-w-0 min-h-0 relative flex flex-col bg-black overflow-hidden">
+      <div className="flex-1 min-w-0 min-h-0 relative flex flex-col bg-retro-bg overflow-hidden">
         {parties.length === 1 ? (
           <WatchPartySlot
             party={parties[0]}

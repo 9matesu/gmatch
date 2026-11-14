@@ -51,7 +51,7 @@ export function PasskeyManager({ identity }: { identity: OrbitIdentity }) {
       </p>
       <button
         onClick={registerPasskey}
-        className="bg-retro-accent text-black px-4 py-2 text-xs font-bold hover:bg-retro-fg hover:text-retro-bg transition-colors"
+        className="bg-retro-accent text-retro-accent-text px-4 py-2 text-xs font-bold hover:bg-retro-fg hover:text-retro-bg transition-colors"
       >
         Register Passkey
       </button>

@@ -354,7 +354,7 @@ export function ImageViewer({
                     objectId={activeItem.id}
                     identity={identity}
                     className="max-w-[88vw] max-h-[68vh] object-contain rounded-xl shadow-2xl select-none"
-                    videoClassName="max-w-[88vw] max-h-[68vh] object-contain rounded-xl shadow-2xl bg-black"
+                    videoClassName="max-w-[88vw] max-h-[68vh] object-contain rounded-xl shadow-2xl bg-retro-bg"
                     controls
                     autoPlay
                     loop

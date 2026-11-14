@@ -51,7 +51,7 @@ export function AgeGateModal() {
           <span className="text-[10px] font-semibold uppercase tracking-wider text-retro-body bg-retro-panel px-2.5 py-1 rounded-md border border-border-glass">
             Age Verification
           </span>
-          <h2 id="age-gate-title" className="text-2xl font-black tracking-tighter text-white">Are you 18 or older?</h2>
+          <h2 id="age-gate-title" className="text-2xl font-black tracking-tighter text-retro-fg">Are you 18 or older?</h2>
           <p className="text-xs text-retro-body leading-relaxed max-w-xs mx-auto">
             gMatch contains adult media and community content intended exclusively for mature audiences (18+).
           </p>
@@ -63,7 +63,7 @@ export function AgeGateModal() {
             type="button"
             autoFocus
             onClick={handleConfirmAge}
-            className="w-full py-2.5 px-4 rounded-lg bg-white hover:bg-retro-fg active:scale-[0.99] text-black font-semibold text-xs shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2"
+            className="w-full py-2.5 px-4 rounded-lg bg-retro-accent hover:bg-retro-fg active:scale-[0.99] text-retro-accent-text font-semibold text-xs shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2"
           >
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             <span>I am 18 or Older. Enter</span>

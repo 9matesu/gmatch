@@ -306,7 +306,7 @@ export function GMatchProfile({
             )}
             {isSelf && (
               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <Camera className="w-5 h-5 text-white" />
+                <Camera className="w-5 h-5 text-retro-fg" />
               </div>
             )}
           </button>
@@ -442,11 +442,11 @@ export function GMatchProfile({
                   playsInline
                 />
                 {(isVideoPost(post.mime_type, post.url, post.media?.map((mm) => mm.mime_type) ?? [])) && (
-                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-white z-10">
+                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-retro-fg z-10">
                     <Play className="w-3 h-3 fill-white" />
                   </div>
                 )}
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 text-white text-xs font-medium z-10">
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 text-retro-fg text-xs font-medium z-10">
                   <div className="flex items-center gap-1">
                     <Heart className="w-4 h-4 fill-white" />
                     <span>{post.like_count || 0}</span>
@@ -490,11 +490,11 @@ export function GMatchProfile({
                   playsInline
                 />
                 {(isVideoPost(post.mime_type, post.url, post.media?.map((mm) => mm.mime_type) ?? [])) && (
-                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-white z-10">
+                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-retro-fg z-10">
                     <Play className="w-3 h-3 fill-white" />
                   </div>
                 )}
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white z-10">
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-retro-fg z-10">
                   <Bookmark className="w-5 h-5 fill-white" />
                 </div>
               </div>
@@ -531,7 +531,7 @@ export function GMatchProfile({
                   playsInline
                 />
                 {(isVideoPost(post.mime_type, post.url, post.media?.map((mm) => mm.mime_type) ?? [])) && (
-                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-white z-10">
+                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-retro-fg z-10">
                     <Play className="w-3 h-3 fill-white" />
                   </div>
                 )}
@@ -569,7 +569,7 @@ export function GMatchProfile({
                   playsInline
                 />
                 {(isVideoPost(card.mime_type, card.content_url || (card as any).url)) && (
-                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-white z-10">
+                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-retro-fg z-10">
                     <Play className="w-3 h-3 fill-white" />
                   </div>
                 )}

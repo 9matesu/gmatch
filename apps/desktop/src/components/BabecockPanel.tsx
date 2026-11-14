@@ -631,7 +631,7 @@ export function BabecockPanel({
                   const { cols, rows, spanFor } = computeCollageGrid(n)
                   return (
                     <div
-                      className="bg-black rounded-xl overflow-hidden w-full flex flex-col"
+                      className="bg-retro-bg rounded-xl overflow-hidden w-full flex flex-col"
                       style={{ aspectRatio: `${cols} / ${rows}`, minHeight: 280, maxHeight: 'min(62vh, 560px)' }}
                     >
                       <div className="text-[10px] uppercase font-bold text-retro-muted tracking-wider p-3 flex items-center justify-between border-b border-border-glass">
@@ -658,7 +658,7 @@ export function BabecockPanel({
                               onDrop={(e) => handleDropOnCell(e, pos)}
                               onDragEnd={handleDragEnd}
                               style={span > 1 ? { gridColumn: `span ${span}` } : undefined}
-                              className={`relative bg-black overflow-hidden ${amHost ? 'cursor-grab active:cursor-grabbing' : ''} ${draggedIdx === pos ? 'opacity-30' : ''}`}
+                              className={`relative bg-retro-bg overflow-hidden ${amHost ? 'cursor-grab active:cursor-grabbing' : ''} ${draggedIdx === pos ? 'opacity-30' : ''}`}
                             >
                               {entry.mime_type.startsWith('video') ? (
                                 <video src={resolveMediaUrl(entry.content_url)} muted loop playsInline autoPlay className="w-full h-full object-cover" />
@@ -666,14 +666,14 @@ export function BabecockPanel({
                                 <ObjectImage contentUrl={entry.content_url} identity={identity ?? null} alt="" className="w-full h-full object-cover" />
                               )}
                               {isOp && (
-                                <span className="absolute top-1 left-1 bg-amber-400 text-black text-[10px] font-black px-1.5 py-0.5 rounded shadow-xs flex items-center gap-0.5">
+                                <span className="absolute top-1 left-1 bg-amber-400 text-retro-accent-text text-[10px] font-black px-1.5 py-0.5 rounded shadow-xs flex items-center gap-0.5">
                                   <Sparkles className="w-2 h-2" />
                                   <span>OP</span>
                                 </span>
                               )}
                               <span
                                 onClick={() => onOpenProfile?.(entry.user_id)}
-                                className="absolute bottom-1 left-1 right-1 text-[10px] font-bold text-white bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded truncate cursor-pointer hover:bg-black/80"
+                                className="absolute bottom-1 left-1 right-1 text-[10px] font-bold text-retro-fg bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded truncate cursor-pointer hover:bg-black/80"
                               >
                                 {entry.display_name || 'Anonymous'}
                                 {entry.user_id === selfId && ' (you)'}
@@ -690,7 +690,7 @@ export function BabecockPanel({
                       const isOp = entry.user_id === round.host_id
                       return (
                         <div key={entry.id} className="flex flex-col items-center gap-1.5 shrink-0">
-                          <div className={`rounded-xl overflow-hidden border-2 bg-black ${isOp ? 'border-amber-500 w-44 h-60 shadow-xl' : 'border-border-glass w-32 h-44'}`}>
+                          <div className={`rounded-xl overflow-hidden border-2 bg-retro-bg ${isOp ? 'border-amber-500 w-44 h-60 shadow-xl' : 'border-border-glass w-32 h-44'}`}>
                             {entry.mime_type.startsWith('video') ? (
                               <video src={resolveMediaUrl(entry.content_url)} muted loop playsInline autoPlay className="w-full h-full object-cover" />
                             ) : (
@@ -806,14 +806,14 @@ export function BabecockPanel({
                       className="bg-glass-w5 border border-border-glass rounded-lg overflow-hidden space-y-1.5 p-2 cursor-pointer group hover:bg-glass-w8 transition-colors"
                     >
                       {op && (
-                        <div className="w-full aspect-square rounded-md overflow-hidden bg-black relative">
+                        <div className="w-full aspect-square rounded-md overflow-hidden bg-retro-bg relative">
                           {op.mime_type.startsWith('video') ? (
                             <video src={resolveMediaUrl(op.content_url)} muted loop playsInline autoPlay className="w-full h-full object-cover" />
                           ) : (
                             <ObjectImage contentUrl={op.content_url} identity={identity ?? null} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                           )}
                           <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30">
-                            <ZoomIn className="w-6 h-6 text-white" />
+                            <ZoomIn className="w-6 h-6 text-retro-fg" />
                           </span>
                         </div>
                       )}
@@ -891,14 +891,14 @@ export function BabecockPanel({
               </DropZone>
               {preview && (
                 preview.startsWith('data:video') || preview.startsWith('blob:') ? (
-                  <video src={preview} controls className="w-full max-h-52 object-contain rounded-lg border border-border-glass bg-black" />
+                  <video src={preview} controls className="w-full max-h-52 object-contain rounded-lg border border-border-glass bg-retro-bg" />
                 ) : preview.startsWith('http://') || preview.startsWith('https://') ? (
                   <div className="w-full text-center py-3 rounded-lg border border-border-glass bg-glass-w5 text-xs text-retro-fg flex items-center justify-center gap-2">
                     <LinkIcon className="w-3.5 h-3.5 text-retro-muted" />
                     <span>Link ready to submit</span>
                   </div>
                 ) : (
-                  <img src={preview} alt="Preview" className="w-full max-h-52 object-contain rounded-lg border border-border-glass bg-black" />
+                  <img src={preview} alt="Preview" className="w-full max-h-52 object-contain rounded-lg border border-border-glass bg-retro-bg" />
                 )
               )}
             </>
@@ -944,7 +944,7 @@ export function BabecockPanel({
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {expandedRound.entries.map((entry) => (
-                <div key={entry.id} className="relative aspect-square rounded-lg overflow-hidden bg-black group">
+                <div key={entry.id} className="relative aspect-square rounded-lg overflow-hidden bg-retro-bg group">
                   {entry.mime_type.startsWith('video') ? (
                     <video src={resolveMediaUrl(entry.content_url)} muted loop playsInline autoPlay className="w-full h-full object-cover" />
                   ) : (
@@ -953,7 +953,7 @@ export function BabecockPanel({
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); shareEntryToGroup(entry); }}
-                    className="absolute bottom-2 right-2 p-1.5 bg-black/70 rounded-lg text-retro-muted hover:text-white transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
+                    className="absolute bottom-2 right-2 p-1.5 bg-black/70 rounded-lg text-retro-muted hover:text-retro-fg transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
                     title="Share to group chat"
                   >
                     <Share2 className="w-4 h-4" />

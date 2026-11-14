@@ -9,11 +9,11 @@ export function Badge({
 }) {
   const variants = {
     default: 'bg-retro-panel text-retro-muted border-border-glass',
-    success: 'bg-surface-raised text-retro-fg border-white font-extrabold',
-    warning: 'bg-retro-panel text-white border-border-glass font-bold',
+    success: 'bg-surface-raised text-retro-fg border-border-glass font-extrabold',
+    warning: 'bg-retro-panel text-retro-fg border-border-glass font-bold',
     danger: 'bg-retro-bg text-retro-muted border-border-glass',
     info: 'bg-retro-panel text-retro-fg border-border-glass',
-    accent: 'bg-surface-raised text-retro-fg border-white font-bold',
+    accent: 'bg-surface-raised text-retro-fg border-border-glass font-bold',
   }
 
   return (

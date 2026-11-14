@@ -136,7 +136,7 @@ function ProfileStep(props: Props & { onDone: () => void }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-black tracking-tighter text-white">Set up your profile</h1>
+          <h1 className="text-2xl font-black tracking-tighter text-retro-fg">Set up your profile</h1>
           <p className="text-xs text-retro-muted">Only your name is required. Everything else you can add later.</p>
         </div>
       </div>
@@ -212,7 +212,7 @@ function ProfileStep(props: Props & { onDone: () => void }) {
         type="button"
         onClick={() => void enter()}
         disabled={busy || (!isImporting && !name.trim()) || (isImporting && !secretKey.trim())}
-        className="w-full py-2.5 px-4 rounded-lg bg-white hover:bg-retro-fg active:scale-[0.99] text-black font-semibold text-xs shadow-sm transition-all disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
+        className="w-full py-2.5 px-4 rounded-lg bg-retro-accent hover:bg-retro-fg active:scale-[0.99] text-retro-accent-text font-semibold text-xs shadow-sm transition-all disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
       >
         {busy ? (
           <span>Joining…</span>

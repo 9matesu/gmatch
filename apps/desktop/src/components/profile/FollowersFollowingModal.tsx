@@ -282,7 +282,7 @@ export function FollowersFollowingModal({
                         : 'bg-glass-w20'
                       }`}
                   >
-                    <div className="w-full h-full rounded-full bg-surface-raised overflow-hidden border border-white flex items-center justify-center text-xs font-black text-retro-fg">
+                    <div className="w-full h-full rounded-full bg-surface-raised overflow-hidden border border-border-glass flex items-center justify-center text-xs font-black text-retro-fg">
                       {userPfp ? (
                         <img src={resolveMediaUrl(userPfp)} alt="" className="w-full h-full object-cover" />
                       ) : (

@@ -358,7 +358,7 @@ export function IdentityModal({
                 type="button"
                 disabled={submitting || !keyInput.trim()}
                 onClick={() => handleLoginSubmit()}
-                className="w-full py-2.5 bg-retro-accent hover:bg-retro-accent-hover text-black font-medium text-xs rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                className="w-full py-2.5 bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text font-medium text-xs rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
               >
                 {submitting ? "Restoring..." : "Restore & Log In"}
               </button>

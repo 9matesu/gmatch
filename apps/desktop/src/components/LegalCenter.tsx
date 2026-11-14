@@ -100,7 +100,7 @@ export function LegalCenter({
               <Scale className="w-4 h-4" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-sm font-semibold text-white truncate">Legal center for gMatch</h2>
+              <h2 className="text-sm font-semibold text-retro-fg truncate">Legal center for gMatch</h2>
               <p className="text-xs text-retro-muted">
                 {doc.title} · v{doc.version}
               </p>
@@ -111,7 +111,7 @@ export function LegalCenter({
               <button
                 type="button"
                 onClick={() => { playPress(700); onClose() }}
-                className="p-1.5 rounded-lg text-retro-muted hover:text-white hover:bg-retro-panel transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg text-retro-muted hover:text-retro-fg hover:bg-retro-panel transition-colors cursor-pointer"
                 aria-label="Close"
               >
                 <X className="w-4 h-4" />
@@ -129,7 +129,7 @@ export function LegalCenter({
                 type="button"
                 onClick={() => { playPress(650); setActive(id) }}
                 className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                  active === id ? 'bg-retro-panel text-white border border-border-glass' : 'text-retro-muted hover:text-white hover:bg-retro-panel/50 border border-transparent'
+                  active === id ? 'bg-retro-panel text-retro-fg border border-border-glass' : 'text-retro-muted hover:text-retro-fg hover:bg-retro-panel/50 border border-transparent'
                 }`}
               >
                 {NAV_LABELS[id]}
@@ -147,7 +147,7 @@ export function LegalCenter({
                   type="button"
                   onClick={() => setActive(id)}
                   className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] border cursor-pointer ${
-                    active === id ? 'bg-retro-panel text-white border-border-glass' : 'text-retro-muted border-border-glass'
+                    active === id ? 'bg-retro-panel text-retro-fg border-border-glass' : 'text-retro-muted border-border-glass'
                   }`}
                 >
                   {NAV_LABELS[id]}
@@ -168,7 +168,7 @@ export function LegalCenter({
               const block = doc.body.slice(start + 1, end)
               return (
                 <section key={heading}>
-                  <h4 className="font-semibold text-white mb-1">{heading.replace(/^## /, '')}</h4>
+                  <h4 className="font-semibold text-retro-fg mb-1">{heading.replace(/^## /, '')}</h4>
                   {block.map((line, j) =>
                     line.startsWith('- ') ? (
                       <ul key={j} className="list-disc pl-5 text-retro-muted space-y-1 my-1">
@@ -191,14 +191,14 @@ export function LegalCenter({
           <button
             type="button"
             onClick={() => { playPress(720); download() }}
-            className="px-3 py-2 rounded-lg border border-border-glass text-retro-fg hover:text-white hover:bg-retro-panel text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
+            className="px-3 py-2 rounded-lg border border-border-glass text-retro-fg hover:text-retro-fg hover:bg-retro-panel text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
           >
             <Download className="w-3.5 h-3.5" /> Download Markdown
           </button>
           <button
             type="button"
             onClick={() => { playPress(750); markLegalAccepted(); onAccept?.(); if (!onAccept) onClose() }}
-            className="px-4 py-2 bg-white hover:bg-retro-fg text-black font-semibold text-xs rounded-lg transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
+            className="px-4 py-2 bg-retro-accent hover:bg-retro-fg text-retro-accent-text font-semibold text-xs rounded-lg transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
           >
             <Check className="w-3.5 h-3.5" /> I Accept the Terms
           </button>

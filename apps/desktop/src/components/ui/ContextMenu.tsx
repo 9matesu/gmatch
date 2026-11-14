@@ -200,7 +200,7 @@ export function ContextMenu({ x, y, title, subtitle, actions, onDismiss, width =
                   <button
                     type="button"
                     onClick={() => void run(a)}
-                    className="w-full mt-1 px-2 py-1 rounded-md bg-white text-black text-[11px] font-semibold hover:bg-retro-fg transition-colors cursor-pointer"
+                    className="w-full mt-1 px-2 py-1 rounded-md bg-retro-accent text-retro-accent-text text-[11px] font-semibold hover:bg-retro-fg transition-colors cursor-pointer"
                   >
                     Apply
                   </button>

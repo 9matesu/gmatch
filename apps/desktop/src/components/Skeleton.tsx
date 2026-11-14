@@ -9,7 +9,7 @@ export function CardSkeleton() {
         <Skeleton className="h-4 w-14" />
         <Skeleton className="h-4 w-4" />
       </div>
-      <div className="aspect-square bg-black flex items-center justify-center">
+      <div className="aspect-square bg-retro-bg flex items-center justify-center">
         <Skeleton className="h-full w-full" />
       </div>
       <div className="p-4 space-y-2">

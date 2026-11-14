@@ -58,7 +58,7 @@ export interface AppSettings {
   chatNotificationSfx: boolean
   duelPacing: 'instant' | 'fast' | 'dramatic'
   accentColor: 'pink' | 'cyan' | 'gold' | 'emerald' | 'violet'
-  theme: 'dark' | 'instagram-white'
+  theme: 'dark' | 'light'
   /**
    * Opt-in local media vault: gallery keeps + card bytes stored on disk
    * (userData/media-vault, 3GB LRU). Off = memory-only, nothing hits disk.
@@ -176,8 +176,11 @@ export function useSettings() {
   useEffect(() => {
     save(settings)
     if (typeof document !== 'undefined') {
-      document.documentElement.classList.remove('theme-instagram-white')
-      document.documentElement.setAttribute('data-theme', 'dark')
+      // One switch, one class: the whole light theme lives in globals.css
+      // under .theme-light (tokens only, no per-component override).
+      const light = settings.theme === 'light'
+      document.documentElement.classList.toggle('theme-light', light)
+      document.documentElement.setAttribute('data-theme', light ? 'light' : 'dark')
     }
   }, [settings])
 

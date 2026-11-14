@@ -98,11 +98,11 @@ function PreviewThumbnail({ file, onRemove, onDragStart }: {
       )}
       <button
         onClick={(e) => { e.stopPropagation(); onRemove() }}
-        className="absolute top-1 right-1 w-5 h-5 bg-retro-error text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-retro-error"
+        className="absolute top-1 right-1 w-5 h-5 bg-retro-error text-retro-fg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-retro-error"
       >
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
       </button>
-      <div className="absolute bottom-1 left-1 text-[10px] text-white bg-black/70 px-1">
+      <div className="absolute bottom-1 left-1 text-[10px] text-retro-fg bg-black/70 px-1">
         {(file.size / 1024).toFixed(0)}KB
       </div>
     </div>
@@ -497,14 +497,14 @@ export const SendPanel = forwardRef<SendPanelHandle, {
           <button
             type="button"
             onClick={() => setMode('file')}
-            className={`flex-1 py-1.5 transition-colors rounded whitespace-nowrap ${mode === 'file' ? 'bg-retro-accent text-black font-extrabold' : 'text-retro-muted hover:text-retro-fg'}`}
+            className={`flex-1 py-1.5 transition-colors rounded whitespace-nowrap ${mode === 'file' ? 'bg-retro-accent text-retro-accent-text font-extrabold' : 'text-retro-muted hover:text-retro-fg'}`}
           >
             Media Files (Img/Vid)
           </button>
           <button
             type="button"
             onClick={() => setMode('link')}
-            className={`flex-1 py-1.5 transition-colors rounded whitespace-nowrap ${mode === 'link' ? 'bg-retro-accent text-black font-extrabold' : 'text-retro-muted hover:text-retro-fg'}`}
+            className={`flex-1 py-1.5 transition-colors rounded whitespace-nowrap ${mode === 'link' ? 'bg-retro-accent text-retro-accent-text font-extrabold' : 'text-retro-muted hover:text-retro-fg'}`}
           >
             Media Link (Img/Vid)
           </button>
@@ -651,7 +651,7 @@ export const SendPanel = forwardRef<SendPanelHandle, {
           type="button"
           onClick={handleUpload}
           disabled={!canSend}
-          className={`w-full chrome-accent text-black font-bold py-3 px-6 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-xs uppercase tracking-wider ${
+          className={`w-full chrome-accent text-retro-accent-text font-bold py-3 px-6 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-xs uppercase tracking-wider ${
             buttonClicked ? 'scale-[0.97] brightness-125' : ''
           }`}
         >

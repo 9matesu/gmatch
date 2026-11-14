@@ -378,7 +378,7 @@ function PrestigeTab() {
         </div>
 
         <p className="text-xs text-retro-muted leading-relaxed">
-          Brainmelt burns your current run to forge permanent Corruption Shards. Each granting <b className="text-white">+10% passive multiplier</b> across all future runs.
+          Brainmelt burns your current run to forge permanent Corruption Shards. Each granting <b className="text-retro-fg">+10% passive multiplier</b> across all future runs.
         </p>
 
         {/* Reset vs Keep Rules */}

@@ -559,7 +559,7 @@ function extForMime(mime: string): string {
             type="button"
             onClick={handleShare}
             disabled={uploading || (mediaList.length === 0 && !caption.trim())}
-            className="text-xs font-semibold text-retro-bg bg-white hover:bg-retro-fg disabled:opacity-40 cursor-pointer transition-all duration-150 active:scale-[0.96] px-4 py-1.5 rounded-md shadow-xs"
+            className="text-xs font-semibold text-retro-bg bg-retro-accent hover:bg-retro-fg disabled:opacity-40 cursor-pointer transition-all duration-150 active:scale-[0.96] px-4 py-1.5 rounded-md shadow-xs"
           >
             {uploading ? 'Sharing...' : (mode === 'story' ? 'Share Story' : 'Share')}
           </button>
@@ -629,7 +629,7 @@ function extForMime(mime: string): string {
           )}
 
           {activeTab === 'camera' && (
-            <div className="border border-border-glass rounded-xl overflow-hidden bg-black p-2 flex flex-col items-center gap-3">
+            <div className="border border-border-glass rounded-xl overflow-hidden bg-retro-bg p-2 flex flex-col items-center gap-3">
               {cameraError ? (
                 <div className="p-6 text-center text-xs text-retro-error font-bold">
                   {cameraError}
@@ -642,7 +642,7 @@ function extForMime(mime: string): string {
               <button
                 type="button"
                 onClick={capturePhoto}
-                className="px-5 py-2 rounded-xl chrome-accent text-black text-xs font-bold flex items-center gap-2 shadow-md cursor-pointer active:scale-95 transition-all"
+                className="px-5 py-2 rounded-xl chrome-accent text-retro-accent-text text-xs font-bold flex items-center gap-2 shadow-md cursor-pointer active:scale-95 transition-all"
               >
                 <Camera className="w-4 h-4" />
                 <span>Snap Picture</span>
@@ -667,7 +667,7 @@ function extForMime(mime: string): string {
           {/* Carousel & Multi-Media Viewer */}
           {mediaList.length > 0 && currentMedia && (
             <div className="space-y-3">
-              <div className="relative w-full rounded-xl overflow-hidden bg-black flex items-center justify-center border border-border-glass group">
+              <div className="relative w-full rounded-xl overflow-hidden bg-retro-bg flex items-center justify-center border border-border-glass group">
                 {currentMedia.isVideoPage ? (
                   <div className="w-full aspect-video flex flex-col items-center justify-center gap-2 p-4 text-center">
                     <span className="w-10 h-10 rounded-full bg-glass-w12 border border-border-glass flex items-center justify-center text-retro-fg text-xs font-black">▶</span>
@@ -700,7 +700,7 @@ function extForMime(mime: string): string {
                 )}
 
                 {/* Aspect Ratio Switcher */}
-                <div className="absolute bottom-3 left-3 bg-black/75 backdrop-blur-md rounded-xl p-1 flex items-center gap-1 text-[10px] font-bold text-white z-10">
+                <div className="absolute bottom-3 left-3 bg-black/75 backdrop-blur-md rounded-xl p-1 flex items-center gap-1 text-[10px] font-bold text-retro-fg z-10">
                   {(['square', 'portrait', 'landscape'] as const).map((ratio) => (
                     <button
                       key={ratio}
@@ -708,7 +708,7 @@ function extForMime(mime: string): string {
                       onClick={() => setAspectRatio(ratio)}
                       className={`px-2 py-1 rounded-lg capitalize transition-all ${aspectRatio === ratio
                         ? 'bg-surface-raised text-retro-fg font-black'
-                        : 'text-retro-body hover:text-white'
+                        : 'text-retro-body hover:text-retro-fg'
                         }`}
                     >
                       {ratio}
@@ -722,14 +722,14 @@ function extForMime(mime: string): string {
                     <button
                       type="button"
                       onClick={() => { playPress(750); setActiveMediaIndex((prev) => (prev > 0 ? prev - 1 : mediaList.length - 1)); }}
-                      className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center transition-all cursor-pointer"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 hover:bg-black/90 text-retro-fg flex items-center justify-center transition-all cursor-pointer"
                     >
                       <ChevronLeft className="w-5 h-5" />
                     </button>
                     <button
                       type="button"
                       onClick={() => { playPress(750); setActiveMediaIndex((prev) => (prev < mediaList.length - 1 ? prev + 1 : 0)); }}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center transition-all cursor-pointer"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 hover:bg-black/90 text-retro-fg flex items-center justify-center transition-all cursor-pointer"
                     >
                       <ChevronRight className="w-5 h-5" />
                     </button>
@@ -740,7 +740,7 @@ function extForMime(mime: string): string {
                 <button
                   type="button"
                   onClick={() => removeMedia(activeMediaIndex)}
-                  className="absolute top-3 right-3 p-1.5 rounded-xl bg-black/75 hover:bg-red-600 text-white transition-colors cursor-pointer"
+                  className="absolute top-3 right-3 p-1.5 rounded-xl bg-black/75 hover:bg-red-600 text-retro-fg transition-colors cursor-pointer"
                   title="Remove this photo"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -754,7 +754,7 @@ function extForMime(mime: string): string {
                     <div
                       key={m.id}
                       onClick={() => setActiveMediaIndex(idx)}
-                      className={`relative w-14 h-14 rounded-md overflow-hidden shrink-0 border cursor-pointer transition-all duration-150 active:scale-[0.96] ${activeMediaIndex === idx ? 'border-white ring-1 ring-white' : 'border-border-glass opacity-60 hover:opacity-100'
+                      className={`relative w-14 h-14 rounded-md overflow-hidden shrink-0 border cursor-pointer transition-all duration-150 active:scale-[0.96] ${activeMediaIndex === idx ? 'border-border-glass ring-1 ring-white' : 'border-border-glass opacity-60 hover:opacity-100'
                         }`}
                     >
                       {m.isVideoPage ? (
@@ -764,7 +764,7 @@ function extForMime(mime: string): string {
                       ) : (
                         <img src={m.previewUrl} alt="" className="w-full h-full object-cover" />
                       )}
-                      <span className="absolute bottom-0.5 right-0.5 px-1 bg-black/70 text-[10px] font-bold text-white rounded">
+                      <span className="absolute bottom-0.5 right-0.5 px-1 bg-black/70 text-[10px] font-bold text-retro-fg rounded">
                         #{idx + 1}
                       </span>
                     </div>

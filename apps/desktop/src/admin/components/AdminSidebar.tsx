@@ -100,7 +100,7 @@ export function AdminSidebar({
                       <span className={cn(
                         "text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold",
                         active ? "bg-retro-selection text-retro-accent" : "bg-glass-w8 text-retro-muted",
-                        tab.id === "reports" && tab.badge && Number(tab.badge) > 0 && "bg-red-500 text-white"
+                        tab.id === "reports" && tab.badge && Number(tab.badge) > 0 && "bg-red-500 text-retro-fg"
                       )}>
                         {tab.badge}
                       </span>

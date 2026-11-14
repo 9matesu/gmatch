@@ -95,7 +95,7 @@ export function WorldRow({
           the measured status is the dot on the tile's corner. */}
       <span className="relative shrink-0" aria-hidden>
         <span
-          className="flex h-9 w-9 items-center justify-center rounded-lg border text-xs font-bold text-white/90 shadow-inner"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border text-xs font-bold text-retro-fg/90 shadow-inner"
           style={worldTileStyle(key)}
         >
           {worldGlyph(server.name)}

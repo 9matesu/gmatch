@@ -156,7 +156,7 @@ export function CropModal({
       <div className="w-full max-w-sm bg-retro-bg border border-border-glass rounded-xl p-4 space-y-3 animate-orbit-pop" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold">{title}</h3>
-          <button type="button" onClick={onCancel} aria-label="Cancel crop" className="p-1.5 rounded-lg text-retro-muted hover:text-white hover:bg-retro-panel cursor-pointer transition-colors">
+          <button type="button" onClick={onCancel} aria-label="Cancel crop" className="p-1.5 rounded-lg text-retro-muted hover:text-retro-fg hover:bg-retro-panel cursor-pointer transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -164,7 +164,7 @@ export function CropModal({
           {loadError ? (
             <div className="text-xs text-retro-muted text-center">Could not load this image. It will be used uncropped.</div>
           ) : (
-            <div className="relative overflow-hidden rounded-lg border border-border-glass bg-black touch-none select-none" style={{ width: fw || 'auto', height: fh || 'auto' }}>
+            <div className="relative overflow-hidden rounded-lg border border-border-glass bg-retro-bg touch-none select-none" style={{ width: fw || 'auto', height: fh || 'auto' }}>
               {img && (
                 <img
                   src={src}
@@ -200,7 +200,7 @@ export function CropModal({
               key={a.id}
               type="button"
               onClick={() => { playPress(720); setAspect(a.id); setPan({ x: 0, y: 0 }); }}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-colors border ${aspect === a.id ? 'bg-retro-fg text-retro-bg border-border-glass' : 'text-retro-muted border-border-glass hover:text-white hover:bg-retro-panel'}`}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-colors border ${aspect === a.id ? 'bg-retro-fg text-retro-bg border-border-glass' : 'text-retro-muted border-border-glass hover:text-retro-fg hover:bg-retro-panel'}`}
             >
               {a.label}
             </button>
@@ -214,7 +214,7 @@ export function CropModal({
           <button type="button" onClick={onCancel} className="px-3 py-2 rounded-lg text-xs font-semibold text-retro-fg hover:bg-retro-panel cursor-pointer transition-colors">
             Cancel
           </button>
-          <button type="button" onClick={exportCrop} className="px-4 py-2 rounded-lg bg-retro-fg hover:bg-white text-black text-xs font-bold cursor-pointer transition-colors flex items-center gap-1.5">
+          <button type="button" onClick={exportCrop} className="px-4 py-2 rounded-lg bg-retro-fg hover:bg-retro-accent text-retro-accent-text text-xs font-bold cursor-pointer transition-colors flex items-center gap-1.5">
             <Check className="w-3.5 h-3.5" /> {loadError ? 'Use uncropped' : 'Apply'}
           </button>
         </div>

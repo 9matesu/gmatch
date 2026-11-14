@@ -270,7 +270,7 @@ export function CardZoomModal({
                 contentUrl={imageUrl}
                 identity={identity}
                 className="max-w-[82vw] max-h-[68vh] object-contain rounded-xl shadow-2xl pointer-events-auto"
-                videoClassName="max-w-[82vw] max-h-[68vh] object-contain rounded-xl shadow-2xl pointer-events-auto bg-black"
+                videoClassName="max-w-[82vw] max-h-[68vh] object-contain rounded-xl shadow-2xl pointer-events-auto bg-retro-bg"
                 autoPlay
                 loop
                 controls
