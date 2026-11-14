@@ -71,7 +71,7 @@ export function NotificationCenter(props: NotificationCenterProps) {
   const [expanded, setExpanded] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const latestToast = messages.length ? messages[messages.length - 1] : null;
-  const preview = latestTitle || latestToast?.text || 'All quiet';
+  const preview = latestTitle || latestToast?.text || "";
 
   // Auto-expire non-sticky toasts on the header's clock (single owner).
   useEffect(() => {
@@ -119,7 +119,7 @@ export function NotificationCenter(props: NotificationCenterProps) {
         data-notifications-toggle="true"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
-        aria-label={`Notifications${unreadCount > 0 ? `: ${unreadCount} unread` : ''}. ${preview}. Activate to ${expanded ? 'collapse' : 'expand'}.`}
+        aria-label={`Notifications${unreadCount > 0 ? `: ${unreadCount} unread` : ''}${preview ? `. ${preview}` : ''}. Activate to ${expanded ? 'collapse' : 'expand'}.`}
         title="Notifications"
         className="shrink-0 bg-glass-w8 text-retro-fg hover:bg-glass-w10"
       />
@@ -127,7 +127,7 @@ export function NotificationCenter(props: NotificationCenterProps) {
         <span className="block text-[10px] font-bold uppercase tracking-wider text-retro-muted">
           Notifications
         </span>
-        <span className="block truncate text-xs text-retro-fg/80">{preview}</span>
+        {preview && <span className="block truncate text-xs text-retro-fg/80">{preview}</span>}
       </span>
 
       {expanded && (

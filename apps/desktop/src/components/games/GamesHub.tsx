@@ -68,7 +68,6 @@ export function GamesHub({
             {[
               { id: 'duel' as const, label: '1v1 Arena' },
               { id: 'ranks' as const, label: 'Rankings' },
-              { id: 'babecock' as const, label: 'Babecock' },
             ].map((mode) => (
               <button
                 key={mode.id}
@@ -101,7 +100,14 @@ export function GamesHub({
         )}
 
         {subTab === 'babecock' && (
-          <div role="tabpanel" id="arena-panel-babecock" aria-labelledby="arena-tab-babecock" className="solid-panel rounded-xl p-4 backdrop-blur-md">
+          <div role="tabpanel" id="arena-panel-babecock" aria-label="Babecock" className="solid-panel rounded-xl p-4 backdrop-blur-md space-y-3">
+            <button
+              type="button"
+              onClick={() => onSubTabChange?.('duel')}
+              className="text-[11px] text-retro-muted hover:text-retro-fg transition-colors cursor-pointer"
+            >
+              ← Back to Arena
+            </button>
             <BabecockPanel identity={identity} />
           </div>
         )}

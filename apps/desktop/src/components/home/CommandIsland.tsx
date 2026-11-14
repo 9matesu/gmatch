@@ -229,7 +229,7 @@ export function CommandIsland({
                 aria-current={isActive ? 'page' : undefined}
                 className={`relative flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full text-xs font-medium transition-all ${
                   isActive
-                    ? 'bg-retro-accent text-retro-accent-text'
+                    ? 'bg-glass-w15 text-retro-fg'
                     : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
                 }`}
               >
@@ -295,7 +295,7 @@ export function CommandIsland({
             aria-label="Messages"
             className={`relative flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full text-xs font-medium transition-all ${
               messagesOpen || mainView === 'messages' || mainView === 'rooms'
-                ? 'bg-retro-accent text-retro-accent-text'
+                ? 'bg-glass-w15 text-retro-fg'
                 : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
             }`}
           >
@@ -320,7 +320,7 @@ export function CommandIsland({
             title={`Profile (${displayName})`}
             className={`relative flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
               mainView === 'profile'
-                ? 'bg-retro-accent text-retro-accent-text'
+                ? 'bg-glass-w15 text-retro-fg'
                 : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
             }`}
           >
@@ -374,7 +374,7 @@ export function CommandIsland({
               title="Store & Boosters"
               className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-all ${
                 mainView === 'store'
-                  ? 'bg-retro-accent text-retro-accent-text'
+                  ? 'bg-glass-w15 text-retro-fg'
                   : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
               }`}
             >
@@ -391,7 +391,7 @@ export function CommandIsland({
               title="Public & Private Servers"
               className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-all ${
                 mainView === 'servers'
-                  ? 'bg-retro-accent text-retro-accent-text'
+                  ? 'bg-glass-w15 text-retro-fg'
                   : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
               }`}
             >
@@ -408,7 +408,7 @@ export function CommandIsland({
               title="PC Domination Battles"
               className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-all ${
                 mainView === 'pc_domination'
-                  ? 'bg-retro-accent text-retro-accent-text'
+                  ? 'bg-glass-w15 text-retro-fg'
                   : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
               }`}
             >
@@ -429,7 +429,7 @@ export function CommandIsland({
               title="Custom Wallpaper Settings"
               className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-all ${
                 themeOpen
-                  ? 'bg-retro-accent text-retro-accent-text'
+                  ? 'bg-glass-w15 text-retro-fg'
                   : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
               }`}
             >
@@ -450,7 +450,7 @@ export function CommandIsland({
               title="Application Settings"
               className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-all ${
                 settingsOpen
-                  ? 'bg-retro-accent text-retro-accent-text'
+                  ? 'bg-glass-w15 text-retro-fg'
                   : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
               }`}
             >
