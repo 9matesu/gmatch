@@ -36,10 +36,40 @@ const BTN_SIZE: Record<ButtonSize, string> = {
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant
   size?: ButtonSize
+  /** Async work in flight: the label is replaced and the button is disabled. */
+  loading?: boolean
+  loadingLabel?: string
 }
 
-export function Button({ variant = 'secondary', size = 'md', className = '', type = 'button', ...rest }: ButtonProps) {
-  return <button type={type} className={`${BTN_BASE} ${BTN_VARIANT[variant]} ${BTN_SIZE[size]} ${className}`} {...rest} />
+export function Button({
+  variant = 'secondary',
+  size = 'md',
+  className = '',
+  type = 'button',
+  loading = false,
+  loadingLabel,
+  disabled,
+  children,
+  ...rest
+}: ButtonProps) {
+  return (
+    <button
+      type={type}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
+      className={`${BTN_BASE} ${BTN_VARIANT[variant]} ${BTN_SIZE[size]} ${className}`}
+      {...rest}
+    >
+      {loading ? (
+        <>
+          <span className="w-3 h-3 rounded-full border-2 border-current border-t-transparent animate-spin" aria-hidden />
+          {loadingLabel ?? 'Working…'}
+        </>
+      ) : (
+        children
+      )}
+    </button>
+  )
 }
 
 // ─── Card ───────────────────────────────────────────────────────────────────
@@ -278,6 +308,35 @@ export function Tabs<T extends string>({
 }
 
 // ─── Title ──────────────────────────────────────────────────────────────────
+
+/**
+ * Page title + optional action. The top of the type scale: a page title is
+ * clearly bigger than a section title (Title), and there is at most ONE per
+ * screen. No subtitle that repeats the title — put the fact in the body.
+ */
+export function PageHeader({
+  title,
+  action,
+  meta,
+  className = '',
+}: {
+  title: ReactNode
+  action?: ReactNode
+  meta?: ReactNode
+  className?: string
+}) {
+  return (
+    <div className={`flex items-start justify-between gap-3 ${className}`}>
+      <div className="min-w-0">
+        <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-retro-fg truncate">{title}</h1>
+        {meta != null && meta !== '' && (
+          <div className="text-[11px] text-retro-muted mt-0.5 truncate">{meta}</div>
+        )}
+      </div>
+      {action && <div className="shrink-0">{action}</div>}
+    </div>
+  )
+}
 
 /** Section title. ONE label that says what it does — no sub-subtitles. */
 export function Title({ children, className = '' }: { children: ReactNode; className?: string }) {

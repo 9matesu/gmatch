@@ -474,14 +474,10 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
               <h2 className="text-xs font-bold text-retro-fg tracking-wider">
                 PC Domination
               </h2>
-              <p className="text-[10px] text-retro-muted">Opt-in pranks between friends. Every effect costs g$ and needs consent</p>
             </div>
           </div>
-          <div className="p-8 text-center max-w-md mx-auto space-y-2">
-            <p className="text-xs text-retro-muted leading-relaxed">
-              Log in to use Domination. Switch on <span className="text-retro-fg font-medium">Receive</span> to let opted-in
-              effects land on your screen, or send effects to players who have.
-            </p>
+          <div className="p-8 text-center">
+            <p className="text-xs text-retro-muted">Log in to use Domination.</p>
           </div>
         </div>
       </div>
@@ -514,14 +510,12 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
             <h2 className="text-xs font-bold text-retro-fg tracking-wider">
               PC Domination
             </h2>
-            <p className="text-[10px] text-retro-muted truncate">Opt-in pranks between friends. Every effect costs g$ and needs consent</p>
           </div>
         </div>
         <div className="flex items-center gap-2 rounded-xl glass-panel px-3 py-2">
           <Radio className={`w-3.5 h-3.5 ${receiving && !paused ? 'text-emerald-400' : 'text-retro-muted'}`} />
-          <div className="text-xs leading-tight">
-            <div className="font-medium">{receiving ? (paused ? 'Receiving (paused)' : 'Receiving effects') : 'Not receiving'}</div>
-            <div className="text-retro-muted">Sending is always available</div>
+          <div className="text-xs leading-tight font-medium">
+            {receiving ? (paused ? 'Receiving (paused)' : 'Receiving') : 'Not receiving'}
           </div>
           <button
             type="button"
@@ -690,6 +684,24 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                   </div>
                   <div className="text-xs font-mono text-retro-muted">{formatCount(points)} g$</div>
                 </div>
+                {(() => {
+                  // A state shared by every card is stated once here; the cards then
+                  // carry only the exception.
+                  const allowedCount = ACTION_ORDER.filter(
+                    (a) => Boolean(selectedTarget.consents?.[ACTION_LABELS[a].consent]),
+                  ).length
+                  const allAllowed = allowedCount === ACTION_ORDER.length
+                  const noneAllowed = allowedCount === 0
+                  const allFree = Boolean(mesh && mesh.peerKnown(selectedTarget.id))
+                  if (allAllowed && !allFree) return null
+                  return (
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-retro-muted -mt-1">
+                      {noneAllowed && <span>No consent yet — ask in the Consent tab.</span>}
+                      {!noneAllowed && !allAllowed && <span>Some effects are not consented.</span>}
+                      {allFree && <span className="text-emerald-400/80">Free via mesh.</span>}
+                    </div>
+                  )
+                })()}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {ACTION_ORDER.map((action) => {
                     const { label, icon: Icon, consent } = ACTION_LABELS[action];
@@ -722,7 +734,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <Icon className="w-4 h-4 text-retro-muted" />
                           {meshable ? (
-                            <span className="text-xs font-mono text-emerald-400/80">Free via mesh</span>
+                            <span className="text-xs font-mono text-emerald-400/80">Free</span>
                           ) : price != null ? (
                             <span className="text-xs font-mono text-retro-muted">{price} g$</span>
                           ) : (
@@ -730,16 +742,19 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                           )}
                         </div>
                         <div className="text-xs font-semibold text-retro-fg">{label}</div>
-                        <div className={`mt-2 text-[10px] font-mono ${allowed ? 'text-emerald-400/80' : 'text-retro-muted'}`}>
-                          {sending === action ? 'sending…' : allowed ? 'consented' : 'no consent'}
-                        </div>
+                        {/* Consented is the default and lives in the group line; the card
+                            only states what is different. */}
+                        {!allowed || sending === action ? (
+                          <div className={`mt-2 text-[10px] font-mono ${allowed ? 'text-emerald-400/80' : 'text-rose-300/80'}`}>
+                            {sending === action ? 'sending…' : 'no consent'}
+                          </div>
+                        ) : null}
                       </button>
                     );
                   })}
                 </div>
-                <p className="text-xs text-retro-muted leading-relaxed px-1">
-                  Charged only when the server accepts the send. If the connection drops mid-send, check
-                  History → Outbox before retrying.
+                <p className="text-[10px] text-retro-muted leading-relaxed px-1">
+                  A drop mid-send? Check History → Outbox before retrying.
                 </p>
               </>
             )}

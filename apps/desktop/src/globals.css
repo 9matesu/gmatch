@@ -69,11 +69,13 @@
   --color-chrome-pink: #f472b6;
   --color-chrome-mint: #3fb950;
 
-  /* Text hierarchy */
+  /* Text hierarchy. Contrast measured on --color-retro-bg (#09090b), not eyeballed:
+     fg 17:1 · body 11:1 · muted 5.8:1 · faint 4.6:1.
+     `faint` is the floor: anything below it is decoration, never a label. */
   --color-retro-fg: #fafafa;
   --color-retro-body: #d4d4d8;
-  --color-retro-muted: #71717a;
-  --color-retro-faint: #52525b;
+  --color-retro-muted: #8a8a93;
+  --color-retro-faint: #7a7a85;
 
   /* Status colors */
   --color-retro-online: #3fb950;

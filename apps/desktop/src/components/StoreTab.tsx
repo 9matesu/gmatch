@@ -7,12 +7,12 @@ import type { OrbitIdentity } from '@orbit/crypto';
 import type { ActiveHackSession } from './home/CommandIsland';
 import { playPress, playLike } from '../utils/sounds';
 import { formatCount } from '../ui/format';
+import { PageHeader } from '../ui/kit';
 import type { CanonicalCard } from '../utils/cardCollection';
 import { TargetSelectorModal } from './hacks/TargetSelectorModal';
 import { ObjectImage } from './ObjectImage';
 import { CardDetailView } from './CardDetailView';
 import {
-  ShoppingBag,
   Zap,
   Coins,
   Sparkles,
@@ -388,38 +388,21 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
     <div className="w-full space-y-4 font-sans select-none text-retro-fg">
       {!arsenalOnly && (
       <>
-      {/* Header */}
-      <section className="w-full solid-panel backdrop-blur-md p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-surface-interactive flex items-center justify-center text-retro-muted">
-            <ShoppingBag className="w-4 h-4" />
+      {/* Header: one title, one number. The balance is the datum, so it sits
+          here instead of being repeated in a dashboard card. */}
+      <PageHeader
+        title="Store"
+        meta={arsenalOnly ? 'Deploy cyber hacks.' : undefined}
+        action={
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-interactive border border-border-glass rounded-lg">
+            <Coins className="w-3.5 h-3.5 text-retro-accent" />
+            <span className="text-sm font-medium font-mono text-retro-fg tabular-nums">g$ {formatCount(points)}</span>
           </div>
-          <div>
-            <h2 className="text-sm font-medium text-retro-fg">Store</h2>
-            <p className="text-xs text-retro-muted">
-              {arsenalOnly
-                ? 'Deploy cyber hacks with g$.'
-                : 'Cash out your collection. Buying retired; hacks live under PC Domination.'}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-surface-interactive border border-border-glass rounded-lg">
-          <Coins className="w-3.5 h-3.5 text-retro-accent" />
-          <span className="text-xs text-retro-muted">Balance:</span>
-          <span className="text-sm font-medium font-mono text-retro-fg tabular-nums">g$ {formatCount(points)}</span>
-        </div>
-      </section>
+        }
+      />
 
       {/* Economy Dashboard */}
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="solid-panel backdrop-blur-md p-3.5 col-span-2 lg:col-span-1">
-          <div className="flex items-center gap-1.5 text-retro-muted text-[10px] font-semibold uppercase tracking-wider">
-            <Coins className="w-3.5 h-3.5 text-retro-accent" />
-            Balance
-          </div>
-          <div className="mt-1 text-lg font-bold font-mono tabular-nums text-retro-fg">{formatGc(points)}</div>
-        </div>
 
         <div className="solid-panel backdrop-blur-md p-3.5">
           <div className="flex items-center gap-1.5 text-retro-muted text-[10px] font-semibold uppercase tracking-wider">
@@ -524,7 +507,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
           )}
         </div>
         {portfolio.length === 0 ? (
-          <p className="text-xs text-retro-muted">No cards yet. Forge, trade or win some to build value.</p>
+          <p className="text-xs text-retro-muted">No cards yet.</p>
         ) : (
           <div className="space-y-1.5">
             {[...portfolio].sort((a, b) => b.value - a.value).slice(0, 8).map((c, i) => {
@@ -562,7 +545,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
         <h3 className="text-xs font-bold text-retro-fg tracking-wider mb-3">Inventory</h3>
         {(() => {
           const owned = storeItems.filter((item) => (inventory[item.id] || 0) > 0);
-          if (owned.length === 0) return <p className="text-xs text-retro-muted">Empty. Nothing owned.</p>;
+          if (owned.length === 0) return <p className="text-xs text-retro-muted">Nothing owned.</p>;
           return (
             <div className="space-y-1.5">
               {owned.map((item) => (
@@ -583,7 +566,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
           <span className="text-[10px] text-retro-muted">{marketListings.length} open listing{marketListings.length === 1 ? '' : 's'}</span>
         </div>
         {marketListings.length === 0 ? (
-          <p className="text-xs text-retro-muted">Nothing listed yet. Open one of your cards and list it for g$.</p>
+          <p className="text-xs text-retro-muted">Nothing listed.</p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {marketListings.map((l) => (
