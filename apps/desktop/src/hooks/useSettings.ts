@@ -64,6 +64,20 @@ export interface AppSettings {
    * (userData/media-vault, 3GB LRU). Off = memory-only, nothing hits disk.
    */
   localVault: boolean
+  /**
+   * Mesh discovery: announce this install on public WebTorrent trackers
+   * (rotating infohash) so peers on other machines can find each other.
+   * Off = no announce, no tracker traffic.
+   */
+  meshEnabled: boolean
+  /**
+   * Community key: the default is the OPEN mesh (a shared secret baked
+   * into the build — it stops casual enumeration, not someone reading the
+   * code). An invite key closes the mesh to that group.
+   */
+  meshCommunityKey: string
+  /** Advertise availability as a salted hash instead of plain ids. */
+  meshObfuscateHave: boolean
 }
 
 const DEFAULTS: AppSettings = {
@@ -107,6 +121,9 @@ const DEFAULTS: AppSettings = {
   duelPacing: 'fast',
   accentColor: 'pink',
   theme: 'dark',
+  meshEnabled: true,
+  meshCommunityKey: 'gmatch-open-mesh-v1',
+  meshObfuscateHave: false,
   localVault: true,
 }
 
@@ -146,6 +163,11 @@ function save(settings: AppSettings) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
   } catch {}
+}
+
+/** Synchronous read for callers outside React (the mesh starts in an effect). */
+export function readSettings(): AppSettings {
+  return load();
 }
 
 export function useSettings() {

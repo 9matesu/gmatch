@@ -10,7 +10,7 @@ import { defaultIceConfig, sanitizeCandidate } from './ice-hygiene'
 import { peerNodeFor } from './peerNodes'
 import { logger } from './logger'
 
-function readTurnEnv(): Record<string, string | undefined> {
+export function readTurnEnv(): Record<string, string | undefined> {
   if (typeof process !== 'undefined' && process.env) return process.env as Record<string, string | undefined>
   if (typeof window !== 'undefined') return (window as unknown as { __ENV?: Record<string, string | undefined> }).__ENV ?? {}
   return {}
@@ -49,6 +49,36 @@ export interface PeerMeshConnection {
 }
 
 const activeMeshPeers = new Map<string, PeerMeshConnection>()
+
+/**
+ * Register a connection established OUTSIDE the courier (tracker discovery).
+ * The swarm frames, the roster and the transport registry all read this same
+ * map, so a tracker-found peer is a first-class peer.
+ */
+export function registerMeshConnection(conn: PeerMeshConnection): void {
+  const existing = activeMeshPeers.get(conn.peerOrbitId)
+  if (existing && existing.pc !== conn.pc) {
+    try {
+      existing.close()
+    } catch {
+      /* already closed */
+    }
+  }
+  activeMeshPeers.set(conn.peerOrbitId, conn)
+}
+
+/** The live connection for a peer, if any (used by the mesh to send). */
+export function getMeshConnection(peerOrbitId: string): PeerMeshConnection | undefined {
+  return activeMeshPeers.get(peerOrbitId)
+}
+
+/** Drop a connection (channel closed, HELLO failed). */
+export function dropMeshConnection(peerOrbitId: string, pc?: RTCPeerConnection): void {
+  const existing = activeMeshPeers.get(peerOrbitId)
+  if (!existing) return
+  if (pc && existing.pc !== pc) return
+  activeMeshPeers.delete(peerOrbitId)
+}
 const pendingSessions = new Map<string, {
   pc: RTCPeerConnection
   channel?: RTCDataChannel

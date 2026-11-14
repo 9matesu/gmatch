@@ -88,16 +88,17 @@ describe('turnCredentials + config', () => {
 
   it('without TURN: STUN only, no forced transport policy', () => {
     const cfg = peerConnectionConfig(null)
-    expect(cfg.iceServers).toHaveLength(1)
+    expect(cfg.iceServers!.length).toBe(STUN_SERVERS.length)
     expect(cfg.iceTransportPolicy).toBeUndefined()
   })
 
   it('with TURN: relay-only transport (no direct P2P, no IP exposure)', () => {
     const turn = { url: 'turn:x', username: 'u', credential: 'p' }
     const cfg = peerConnectionConfig(turn)
-    expect(cfg.iceServers).toHaveLength(2)
+    expect(cfg.iceServers!.length).toBe(STUN_SERVERS.length + 1)
     expect(cfg.iceTransportPolicy).toBe('relay')
-    expect(iceServersFor(turn)[1]).toMatchObject({ urls: 'turn:x' })
+    // TURN is appended after the STUN list, wherever that list ends.
+    expect(iceServersFor(turn).some((s) => s.urls === 'turn:x')).toBe(true)
   })
 
   // Fix 1.0.1 #4: no hardcoded API keys/credentials. The old defaultTurn()
@@ -109,13 +110,15 @@ describe('turnCredentials + config', () => {
     expect((mod as Record<string, unknown>).defaultTurn).toBeUndefined()
   })
 
-  it('STUN is Cloudflare (stateless, anonymous NAT discovery)', () => {
-    expect(STUN_SERVERS).toEqual([{ urls: 'stun:stun.cloudflare.com:3478' }])
+  it('STUN is a public, stateless list (Cloudflare first)', () => {
+    expect(STUN_SERVERS.length).toBeGreaterThanOrEqual(3)
+    expect(STUN_SERVERS[0]).toEqual({ urls: 'stun:stun.cloudflare.com:3478' })
+    expect(STUN_SERVERS.every((s) => String(s.urls).startsWith('stun:'))).toBe(true)
   })
 
-  it('defaultIceConfig: no env → STUN only (1 server), NOT forced relay', () => {
+  it('defaultIceConfig: no env → STUN only, NOT forced relay', () => {
     const cfg = defaultIceConfig({})
-    expect(cfg.iceServers).toHaveLength(1)
+    expect(cfg.iceServers!.length).toBe(STUN_SERVERS.length)
     expect(cfg.iceServers!.every((s) => String(s.urls).startsWith('stun:'))).toBe(true)
     expect(cfg.iceTransportPolicy).toBeUndefined()
   })
@@ -136,7 +139,7 @@ describe('turnCredentials + config', () => {
       NEXT_PUBLIC_TURN_CREDENTIAL: 'p',
     })
     expect(cfg.iceTransportPolicy).toBe('relay')
-    expect(cfg.iceServers![1].urls).toBe('turn:x')
+    expect(cfg.iceServers!.some((s) => s.urls === 'turn:x')).toBe(true)
   })
 
   it('env contract unchanged: turnCredentials({}) is still null', () => {

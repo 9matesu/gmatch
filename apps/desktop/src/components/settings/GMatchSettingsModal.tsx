@@ -231,6 +231,22 @@ export function GMatchSettingsModal({
   const [wallpaperExpanded, setWallpaperExpanded] = useState(() => initialTab === 'wallpaper');
   const [copiedId, setCopiedId] = useState(false);
   const [customWallpaperInput, setCustomWallpaperInput] = useState(settings.wallpaperUrl || '');
+  // Community key: draft while typing, commit on blur so one keystroke does
+  // not restart the mesh. Invalid keys are refused (and the draft resets).
+  const [meshKeyDraft, setMeshKeyDraft] = useState(settings.meshCommunityKey);
+  const commitMeshKey = () => {
+    const value = meshKeyDraft.trim();
+    if (!/^[A-Za-z0-9_-]{16,64}$/.test(value)) {
+      setMeshKeyDraft(settings.meshCommunityKey);
+      toast?.('Community key must be 16-64 letters, numbers, - or _', 'warning');
+      return;
+    }
+    if (value === settings.meshCommunityKey) return;
+    updateSettings('meshCommunityKey', value);
+    // Announce on the new infohash now, not up to 30 minutes later.
+    window.dispatchEvent(new CustomEvent('gmatch:mesh-reannounce'));
+    toast?.('Community key updated — announcing again', 'success');
+  };
 
   useEffect(() => {
     setActiveTab(resolveTab(initialTab));
@@ -848,6 +864,55 @@ export function GMatchSettingsModal({
                     <p className="text-[10px] text-retro-muted">Desktop app only. The browser build always streams.</p>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Mesh: who this install announces itself to. */}
+            {activeTab === 'preferences' && (
+              <div className="p-4 bg-glass-w5 border border-border-glass rounded-lg space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-medium text-retro-fg">Mesh discovery</div>
+                    <div className="text-[10px] text-retro-muted leading-relaxed">
+                      Announce this install on public trackers so peers on other machines can find you.
+                      Only a rotating daily id and an offer leave the machine — no name, no catalog.
+                      Your IP is visible to the tracker and to the peers you connect to.
+                    </div>
+                  </div>
+                  <Switch
+                    label="Mesh discovery"
+                    checked={settings.meshEnabled}
+                    onChange={() => updateSettings('meshEnabled', !settings.meshEnabled)}
+                  />
+                </div>
+
+                {settings.meshEnabled && (
+                  <>
+                    <label className="block">
+                      <span className="block text-[10px] text-retro-muted mb-1">Community key</span>
+                      <input
+                        type="text"
+                        value={meshKeyDraft}
+                        onChange={(e) => setMeshKeyDraft(e.target.value)}
+                        onBlur={commitMeshKey}
+                        placeholder="gmatch-open-mesh-v1"
+                        className="w-full bg-retro-bg border border-border-glass rounded-md px-2 py-1.5 text-xs font-mono text-retro-fg outline-none"
+                      />
+                      <span className="block text-[10px] text-retro-muted mt-1">
+                        Default = open mesh (stops casual enumeration, not someone reading the code).
+                        An invite key closes the mesh to that group.
+                      </span>
+                    </label>
+                    <label className="flex items-center justify-between gap-2 cursor-pointer">
+                      <span className="text-[10px] text-retro-muted">Hide which files I hold (salted)</span>
+                      <input
+                        type="checkbox"
+                        checked={settings.meshObfuscateHave}
+                        onChange={(e) => updateSettings('meshObfuscateHave', e.target.checked)}
+                      />
+                    </label>
+                  </>
+                )}
               </div>
             )}
 

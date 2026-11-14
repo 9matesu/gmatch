@@ -10,6 +10,8 @@ import { CHAT_WIPE_SECONDS } from '@orbit/shared';
 import { logger } from '../utils/logger';
 import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, hydrateDurableReplications, announcePeerOnline, PEER_ONLINE_EVENT, announceHeldObjects, setSwarmReceiptIdentity, setSwarmOperationHandler, setSwarmOperationAckHandler, sendSwarmFrame } from '../utils/p2pSwarm';
 import { broadcastPresence, fetchPresenceRosterFrom } from '../services/courierPresence';
+import { startMesh, type MeshHandle } from '../utils/mesh/mesh';
+import { readSettings } from './useSettings';
 import { knownNodes, rememberKnownNode, rememberPeerNode } from '../utils/peerNodes';
 import { broadcastMeshFrame, onMeshMessage, connectToPeerMesh, setMeshIceFailureHandler, MESH_BACKPRESSURE_HIGH_BYTES } from '../utils/courierSignaling';
 import { createTransportRegistry } from '../utils/transportState';
@@ -167,6 +169,39 @@ function transmitOverWebSocket(socket: WebSocket | null, queue: SwarmAnnounce[],
 
 export function useP2P(identity: OrbitIdentity | null) {
   const [peers, setPeers] = useState<User[]>([]);
+
+  // Mesh discovery: announce a rotating infohash on public trackers so peers
+  // on other machines can find this one. The node relay stays the floor.
+  const meshRef = useRef<MeshHandle | null>(null);
+  useEffect(() => {
+    if (!identity || typeof window === 'undefined') return;
+    const settings = readSettings();
+    if (!settings.meshEnabled) return;
+    let dead = false;
+    void startMesh({
+      identity: {
+        orbitId: identity.orbitId,
+        publicKeyHex: identity.publicKeyHex,
+        privateKeyHex: identity.privateKeyHex,
+        encryptionPubHex: identity.encryptionPubHex,
+      },
+      communityKey: () => readSettings().meshCommunityKey,
+    }).then((mesh) => {
+      if (dead) { mesh.stop(); return; }
+      meshRef.current = mesh;
+    });
+    // Settings -> Mesh commits a new community key: re-announce on the new
+    // infohash now instead of waiting for the next 30-minute tick.
+    const onReannounce = () => void meshRef.current?.refresh();
+    window.addEventListener('gmatch:mesh-reannounce', onReannounce);
+
+    return () => {
+      dead = true;
+      window.removeEventListener('gmatch:mesh-reannounce', onReannounce);
+      meshRef.current?.stop();
+      meshRef.current = null;
+    };
+  }, [identity]);
   // v1 replication receipts: this node signs durable-custody attestations for
   // objects it fetches, and validates receipts for objects it serves.
   useEffect(() => {

@@ -202,6 +202,22 @@ export function isRelayableSwarmFrame(inner: unknown): boolean {
   switch (type) {
     case 'SWARM_WANT':
       return bounded(inner.id, 256)
+    case 'SWARM_HELLO':
+      // A signed HELLO: the transcript covers both DTLS fingerprints + nonces.
+      return (
+        typeof inner.v === 'number' &&
+        bounded(inner.orbitId, 64) &&
+        bounded(inner.pubKeyHex, 128) &&
+        bounded(inner.sig, 256) &&
+        bounded(inner.fp, 128) &&
+        bounded(inner.nonce, 64)
+      )
+    case 'SWARM_PEX':
+      // Verified peers only; the client caps the list.
+      return Array.isArray(inner.peers) && inner.peers.length <= 32
+    case 'SWARM_HAVE_SUMMARY':
+      // Availability summary: how many objects, not which ones.
+      return typeof inner.count === 'number' && inner.count >= 0 && inner.count <= 1_000_000
     case 'SWARM_HAVE':
       return Array.isArray(inner.ids) && inner.ids.every((id) => bounded(id, 256))
     case 'SWARM_CHUNK':
