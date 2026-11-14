@@ -48,8 +48,10 @@ async function publishPost(page: import('@playwright/test').Page, caption: strin
 
 /** The composer flow, usable from any page (a peer's context included). */
 async function composePost(page: import('@playwright/test').Page, caption: string) {
-  await page.getByRole('button', { name: 'Create Post', exact: true }).click()
-  const drop = page.getByText('Drag & drop photos or click to browse')
+  await page.getByRole('button', { name: 'Create a post', exact: true }).click()
+  // One media picker for every entry point: choose Upload, then drop.
+  await page.getByRole('button', { name: 'Upload', exact: true }).click()
+  const drop = page.getByText('Drop a file, click to browse, or paste from the clipboard')
   await expect(drop).toBeVisible({ timeout: 20_000 })
   // Real user flow: clicking the dropzone opens the OS file chooser; other
   // hidden inputs on the page make setInputFiles().first() ambiguous.
@@ -59,7 +61,7 @@ async function composePost(page: import('@playwright/test').Page, caption: strin
   ])
   await chooser.setFiles({ name: 'e2e-post.png', mimeType: 'image/png', buffer: PNG_1x1 })
   // The 1.0.x composer crops every upload: apply the default crop first.
-  const apply = page.getByRole('button', { name: 'Apply', exact: true })
+  const apply = page.getByRole('button', { name: 'Use this media', exact: true })
   await expect(apply).toBeVisible({ timeout: 10_000 })
   await apply.click()
   await page.getByPlaceholder('Write a caption...').fill(caption)

@@ -50,9 +50,11 @@ export function justifyRows(items: JustifiedInput[], opts: JustifiedOptions): { 
     const natural = (width - gaps) / ratioSum
     // Cropping a row means scaling it down until it fits the cap; the last row
     // keeps the target height instead of stretching a lone tile to full width.
-    const height = row.length === 1 && last ? Math.min(target, natural) : natural
-    const clamped = Math.max(target * (1 - maxCrop), Math.min(height, target * (1 + maxCrop)))
-    rows.push({ ids: row.map((it) => it.id), height: Math.round(last && row.length === 1 ? clamped : height), last })
+    // Cropping a row means scaling it down until it fits the cap; a single tile
+    // left on the last line keeps the target height instead of stretching to the
+    // full container width, and a short last line stops at the same crop cap.
+    const height = row.length === 1 && last ? target : natural
+    rows.push({ ids: row.map((it) => it.id), height: Math.round(last ? Math.min(height, target * (1 + maxCrop)) : height), last })
     row = []
     ratioSum = 0
   }

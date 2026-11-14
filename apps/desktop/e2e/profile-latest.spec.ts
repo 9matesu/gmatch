@@ -11,15 +11,17 @@ const PNG_1x1 = Buffer.from(
 /** Real composer flow: open Create Post, attach a real image, apply crop,
  *  caption + share. Mirrors social.spec.ts. */
 async function publishPost(page: import('@playwright/test').Page, caption: string) {
-  await page.getByRole('button', { name: 'Create Post', exact: true }).click()
-  const drop = page.getByText('Drag & drop photos or click to browse')
+  await page.getByRole('button', { name: 'Create a post', exact: true }).click()
+  // One media picker for every entry point: choose Upload, then drop.
+  await page.getByRole('button', { name: 'Upload', exact: true }).click()
+  const drop = page.getByText('Drop a file, click to browse, or paste from the clipboard')
   await expect(drop).toBeVisible({ timeout: 20_000 })
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
     drop.click(),
   ])
   await chooser.setFiles({ name: 'profile-post.png', mimeType: 'image/png', buffer: PNG_1x1 })
-  const apply = page.getByRole('button', { name: 'Apply', exact: true })
+  const apply = page.getByRole('button', { name: 'Use this media', exact: true })
   await expect(apply).toBeVisible({ timeout: 10_000 })
   await apply.click()
   await page.getByPlaceholder('Write a caption...').fill(caption)

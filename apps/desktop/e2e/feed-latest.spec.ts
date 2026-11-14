@@ -12,17 +12,20 @@ const PNG_1x1 = Buffer.from(
  *  caption + share. Mirrors social.spec.ts so this journey exercises the same
  *  path a real user takes. */
 async function publishPost(page: import('@playwright/test').Page, caption: string) {
-  await page.getByRole('button', { name: 'Create Post', exact: true }).click()
-  const drop = page.getByText('Drag & drop photos or click to browse')
+  await page.getByRole('button', { name: 'Create a post', exact: true }).click()
+  // One media picker for every entry point: choose Upload, then drop.
+  await page.getByRole('button', { name: 'Upload', exact: true }).click()
+  const drop = page.getByText('Drop a file, click to browse, or paste from the clipboard')
   await expect(drop).toBeVisible({ timeout: 20_000 })
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
     drop.click(),
   ])
   await chooser.setFiles({ name: 'e2e-post.png', mimeType: 'image/png', buffer: PNG_1x1 })
-  const apply = page.getByRole('button', { name: 'Apply', exact: true })
-  await expect(apply).toBeVisible({ timeout: 10_000 })
-  await apply.click()
+  // The picker confirms the choice; the cropper only appears for an edit.
+  const use = page.getByRole('button', { name: 'Use this media', exact: true })
+  await expect(use).toBeVisible({ timeout: 10_000 })
+  await use.click()
   await page.getByPlaceholder('Write a caption...').fill(caption)
   await page.getByRole('button', { name: 'Share', exact: true }).click()
   await expect(page.getByText('Post shared.')).toBeVisible({ timeout: 20_000 })
