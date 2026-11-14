@@ -202,7 +202,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-black text-retro-fg uppercase tracking-wider">Content & Games</h1>
+          <h1 className="text-lg font-black text-retro-fg tracking-wider">Content & Games</h1>
           <p className="text-xs text-retro-muted mt-0.5">Manage public feed media, live duels, game sessions, and broadcast notices</p>
         </div>
       </div>
@@ -517,7 +517,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
             {/* Custom Rooms */}
             <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
               <div className="px-4 py-3 border-b border-border-glass flex items-center justify-between">
-                <h2 className="text-xs font-bold uppercase tracking-wider text-retro-fg">Multiplayer Rooms ({rooms.length})</h2>
+                <h2 className="text-xs font-bold tracking-wider text-retro-fg">Multiplayer Rooms ({rooms.length})</h2>
               </div>
               {rooms.length === 0 ? (
                 <AdminEmptyState title="No active rooms" description="Zero custom rooms running" illustration="folder" />
@@ -548,7 +548,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
             {/* Babecock Sessions */}
             <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
               <div className="px-4 py-3 border-b border-border-glass flex items-center justify-between">
-                <h2 className="text-xs font-bold uppercase tracking-wider text-retro-fg">Babecock Rounds ({babecockRounds.length})</h2>
+                <h2 className="text-xs font-bold tracking-wider text-retro-fg">Babecock Rounds ({babecockRounds.length})</h2>
               </div>
               {babecockRounds.length === 0 ? (
                 <AdminEmptyState title="No active rounds" description="Zero babecock rounds running" illustration="folder" />
@@ -586,7 +586,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
           <div className="rounded-xl border border-border-glass bg-surface-raised p-4 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xs font-bold uppercase tracking-wider text-retro-fg">Broadcast Banner Notices</h2>
+                <h2 className="text-xs font-bold tracking-wider text-retro-fg">Broadcast Banner Notices</h2>
                 <p className="text-xs text-retro-muted mt-0.5">Platform-wide alert banners shown at the top of player screens</p>
               </div>
               <button
@@ -639,7 +639,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
           {/* Feedback & Recommendations */}
           <div className="rounded-xl border border-border-glass bg-surface-raised p-4 space-y-4">
             <div>
-              <h2 className="text-xs font-bold uppercase tracking-wider text-retro-fg">Community Feedback & Suggestions</h2>
+              <h2 className="text-xs font-bold tracking-wider text-retro-fg">Community Feedback & Suggestions</h2>
               <p className="text-xs text-retro-muted mt-0.5">Submissions from player in-app recommendation forms</p>
             </div>
 

@@ -911,7 +911,7 @@ export function ReportModal({
         className="bg-retro-panel border border-retro-error max-w-sm w-full p-5 space-y-3"
         onClick={e => e.stopPropagation()}
       >
-        <h3 className="text-sm font-bold text-retro-error uppercase tracking-wider">
+        <h3 className="text-sm font-bold text-retro-error tracking-wider">
           Report User: {reportModal.name}
         </h3>
         {reportModal.objectId && (

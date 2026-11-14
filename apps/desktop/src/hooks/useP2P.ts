@@ -694,17 +694,20 @@ export function useP2P(identity: OrbitIdentity | null) {
             }
 
             if (rawData.type === 'lobby-chat' && rawData.action === 'new' && rawData.message && rawData.message.id) {
-              const m = rawData.message as { id: string; sender_id: string; sender_name: string | null; body: string; created_at: string; channel?: string };
+              const m = rawData.message as { id: string; sender_id: string; sender_name: string | null; body: string; created_at: string; channel?: string; attachment_id?: string | null; attachment_url?: string | null; attachment_mime?: string | null };
               const chan = m.channel || rawData.channel || 'global_lobby';
               setChatMessages(prev => {
                 if (prev.some(x => x.id === m.id)) return prev;
                 return [...prev, {
                   id: m.id,
                   senderId: m.sender_id,
-                   senderName: m.sender_name?.trim() || 'Unknown User',
+                  senderName: m.sender_name?.trim() || 'Unknown User',
                   text: m.body,
                   timestamp: parseApiTimestamp(m.created_at)?.getTime() || Date.now(),
                   channel: chan,
+                  attachmentId: m.attachment_id || undefined,
+                  attachmentUrl: m.attachment_id ? `/api/objects/${m.attachment_id}` : undefined,
+                  attachmentMime: m.attachment_mime || undefined,
                 }].sort((a, b) => a.timestamp - b.timestamp);
               });
               return;
@@ -917,10 +920,10 @@ export function useP2P(identity: OrbitIdentity | null) {
     try {
       const res = await orbitFetch('/api/lobby/chat', { method: 'GET' }, identity)
       if (!res.ok) return
-      const data = await res.json() as { messages?: Array<{ id: string; sender_id: string; sender_name: string | null; body: string; created_at: string; channel?: string }> }
+      const data = await res.json() as { messages?: Array<{ id: string; sender_id: string; sender_name: string | null; body: string; created_at: string; channel?: string; attachment_id?: string | null; attachment_url?: string | null; attachment_mime?: string | null }> }
       if (!Array.isArray(data.messages)) return
       const mapped: ChatMessage[] = data.messages
-        .filter((m) => m && m.id && m.body)
+        .filter((m) => m && m.id && (m.body || m.attachment_id))
         .map((m) => ({
           id: m.id,
           senderId: m.sender_id,
@@ -928,6 +931,9 @@ export function useP2P(identity: OrbitIdentity | null) {
           text: m.body,
           timestamp: parseApiTimestamp(m.created_at)?.getTime() || Date.now(),
           channel: m.channel || 'global_lobby',
+          attachmentId: m.attachment_id || undefined,
+          attachmentUrl: m.attachment_id ? `/api/objects/${m.attachment_id}` : undefined,
+          attachmentMime: m.attachment_mime || undefined,
         }))
       setChatMessages((prev) => {
         const byId = new Map(prev.map((m) => [m.id, m]))
@@ -1032,9 +1038,16 @@ export function useP2P(identity: OrbitIdentity | null) {
       broadcastMeshFrame(JSON.stringify(msg));
     },
     [identity]
-  );  const sendChatMessage = useCallback((text: string, channel: string = 'global_lobby') => {
+  );
+
+  const sendChatMessage = useCallback((
+    text: string,
+    channel: string = 'global_lobby',
+    attachment?: { id: string; url: string; isVideo?: boolean },
+  ) => {
     const selfUser = selfUserRef.current;
     if (!selfUser) return;
+    if (!text.trim() && !attachment) return;
     const chatMsg: ChatMessage = {
       id: `chat-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       senderId: selfUser.id,
@@ -1050,7 +1063,11 @@ export function useP2P(identity: OrbitIdentity | null) {
       text,
       timestamp: Date.now(),
       channel,
+      attachmentId: attachment?.id,
+      attachmentUrl: attachment?.url,
+      attachmentMime: attachment?.isVideo ? 'video/mp4' : attachment ? 'image/*' : undefined,
     };
+
     const msg: SwarmAnnounce = {
       type: 'CHAT',
       user: selfUser,
@@ -1081,7 +1098,12 @@ export function useP2P(identity: OrbitIdentity | null) {
       void orbitFetch('/api/lobby/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: chatMsg.id, body: chatMsg.text, channel }),
+        body: JSON.stringify({
+          id: chatMsg.id,
+          body: chatMsg.text,
+          channel,
+          attachment_id: attachment?.id,
+        }),
       }, identity).catch(() => {});
     }
   }, [identity]);

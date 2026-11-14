@@ -159,7 +159,7 @@ export function GalleryView({
               <Layers className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-xs font-bold text-retro-fg uppercase tracking-wider">
+              <h2 className="text-xs font-bold text-retro-fg tracking-wider">
                 Cards Collection ({filteredItems.length})
               </h2>
               <p className="text-[10px] text-retro-muted">Your unlocked deck, received trades, and favorites</p>

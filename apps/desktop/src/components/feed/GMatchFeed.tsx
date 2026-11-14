@@ -1495,7 +1495,7 @@ export function GMatchFeed({
           {displayPosts.length === 0 && (
             <div className="border border-border-glass rounded-lg p-10 text-center space-y-5 my-4 max-w-md mx-auto">
               <div>
-                <h2 className="text-2xl font-black tracking-tighter uppercase text-retro-fg">{emptyCopy.title}</h2>
+                <h2 className="text-2xl font-black tracking-tighter text-retro-fg">{emptyCopy.title}</h2>
                 <p className="text-xs text-retro-muted mt-2 leading-relaxed">
                   {emptyCopy.body}
                 </p>

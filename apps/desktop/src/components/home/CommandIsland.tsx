@@ -244,11 +244,11 @@ export function CommandIsland({
       {/* Primary Floating Command Island Dock */}
       <nav
         aria-label="Command Island"
-        className={`command-island fixed bottom-5 left-1/2 -translate-x-1/2 z-[var(--z-dropdown)] flex max-w-[calc(100vw-1.5rem)] items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full select-none transition-all duration-300 overflow-hidden flex-nowrap ${recessed ? 'island-recessed' : ''}`}
+        className={`command-island fixed bottom-5 left-1/2 -translate-x-1/2 z-[var(--z-dropdown)] flex max-w-[calc(100vw-1.5rem)] w-max items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full select-none transition-all duration-300 overflow-x-auto flex-nowrap ${recessed ? 'island-recessed' : ''}`}
       >
-        {/* Left zone: primary nav tabs — flex-1 so the Post button sits
-            exactly at the island's center when the satellite is collapsed. */}
-        <div className="flex items-center gap-0.5 sm:gap-1 flex-1 justify-end min-w-0">
+        {/* Left zone: primary nav tabs, kept intact (shrink-0) so a narrow
+            window scrolls the dock instead of squashing the icons. */}
+        <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 justify-end">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = item.active;
@@ -280,11 +280,10 @@ export function CommandIsland({
 
         <div className="h-4 w-[1px] bg-glass-w10 mx-0.5 shrink-0" />
 
-        {/* Center: THE Post button — one focal point, dead-center of the
-            island. Hover OR click open the SAME media-picker bubble (never
-            two different modals); a pick flows into the composer
-            pre-attached. The balance counter is gone: the g$ ledger lives in
-            the Vault, not in the chrome. */}
+        {/* Center: THE Post button — one focal point in the island. Hover OR
+            click open the SAME media-picker bubble (never two different
+            modals); a pick flows into the composer pre-attached. The balance
+            counter is gone: the g$ ledger lives in the Vault, not the chrome. */}
         {onOpenCreatePost && (
           <div
             className="relative shrink-0"
@@ -299,7 +298,7 @@ export function CommandIsland({
               aria-haspopup={onPickMedia ? 'dialog' : undefined}
               aria-expanded={onPickMedia ? postPickerOpen : undefined}
               title="Create a post — hover or click for the media picker"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-retro-accent text-retro-accent-text hover:bg-retro-accent-hover active:scale-95 transition-all text-xs font-bold uppercase tracking-wide"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-retro-accent text-retro-accent-text hover:bg-retro-accent-hover hover:-translate-y-0.5 hover:shadow-[0_6px_18px_-6px_var(--color-retro-accent)] active:scale-95 active:translate-y-0 transition-all text-xs font-bold tracking-wide"
             >
               <Plus className="w-3.5 h-3.5" weight="bold" />
               <span className="hidden sm:inline">Post</span>
@@ -310,7 +309,7 @@ export function CommandIsland({
         <div className="h-4 w-[1px] bg-glass-w10 mx-0.5 shrink-0" />
 
         {/* Right zone: chat, profile, contextual action, extra tools. */}
-        <div className="flex items-center gap-0.5 sm:gap-1 flex-1 justify-start min-w-0">
+        <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 justify-start">
 
           {/* The notification bell lives in the header now (single entry point);
               the footer island no longer duplicates it. */}
@@ -574,10 +573,11 @@ export function CommandIsland({
           </div>
         )}
         </div>
+      </nav>
 
-        {/* The picker bubble renders OUTSIDE the pill (the island clips
-            overflow), fixed above the island's center — the same spot as the
-            Post button it belongs to. */}
+      {/* The picker bubble renders OUTSIDE the pill so the island's own
+          overflow/transform can never clip it; fixed above the island's
+          center — the same spot as the Post button it belongs to. */}
         {postPickerOpen && onPickMedia && (
           <div
             role="dialog"
@@ -594,7 +594,6 @@ export function CommandIsland({
             />
           </div>
         )}
-      </nav>
     </>
   );
 }

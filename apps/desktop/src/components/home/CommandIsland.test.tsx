@@ -124,13 +124,13 @@ describe('CommandIsland count badges', () => {
 });
 
 describe('CommandIsland styling & layout compliance', () => {
-  it('pill bar has no scrollbar and uses overflow-hidden flex-nowrap', () => {
+  it('pill bar keeps one row and scrolls silently instead of spilling, and the picker lives outside it', () => {
     render(<CommandIsland mainView="feed" setMainView={vi.fn()} />);
     const nav = screen.getByRole('navigation', { name: 'Command Island' });
-    expect(nav.className).toContain('overflow-hidden');
+    expect(nav.className).toContain('overflow-x-auto');
     expect(nav.className).toContain('flex-nowrap');
     expect(nav.className).not.toContain('styled-scrollbar');
-    expect(nav.className).not.toContain('overflow-x-auto');
+    expect(nav.className).not.toContain('flex-1');
   });
 
   it('servers button is uncolored and does not have text-retro-online green', async () => {
@@ -156,7 +156,11 @@ describe('CommandIsland post button (footer, centered, one picker flow)', () => 
 
     // Click toggles the bubble — the same dialog hover opens.
     fireEvent.click(screen.getByLabelText('Create a post'));
-    expect(screen.getByRole('dialog', { name: 'Pick post media' })).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog', { name: 'Pick post media' });
+    // The bubble must not live inside the dock: the island translates itself by
+    // -50%, which makes it a containing block for fixed children and clipped
+    // the bubble to the pill's height before.
+    expect(dialog.closest('nav')).toBeNull();
 
     // A second click closes it again.
     fireEvent.click(screen.getByLabelText('Create a post'));

@@ -464,6 +464,13 @@
   border-radius: 9999px;
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65);
   transition: border-color 150ms ease-out;
+  /* Narrow windows: the dock scrolls instead of spilling icons off-screen,
+     silently (no track/thumb fighting the glass look). */
+  scrollbar-width: none;
+}
+
+.command-island::-webkit-scrollbar {
+  display: none;
 }
 
 .command-island:hover {

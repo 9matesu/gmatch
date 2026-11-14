@@ -98,6 +98,7 @@ import GridWorkspace from "./components/grid/GridWorkspace";
 import AdminApp from "./admin/AdminApp";
 import { StoreView } from "./components/views/StoreView";
 import { logger } from './utils/logger';
+import { ScrollProgress } from './components/rare/scroll-progress';
 import { useNotifications } from './hooks/useNotifications';
 import { isKnownSiteCourier, cachedMailMode, detectMailMode } from "./utils/mail-mode";
 import { useCourierDms } from './hooks/useCourierDms';
@@ -437,7 +438,7 @@ export default function Home() {
   const [selectedGalleryIds, setSelectedGalleryIds] = useState<Set<string>>(new Set());
   const [attachmentModal, setAttachmentModal] = useState<{
     isOpen: boolean
-    target: 'pm' | 'group'
+    target: 'pm' | 'group' | 'lobby'
     peerId?: string
     groupId?: string
     replyToId?: string
@@ -2209,6 +2210,7 @@ export default function Home() {
     setActiveRoomId,
     chatMessages,
     lobby,
+    sendChatMessage,
   })
 
   const handleSetProfilePic = async (file: File) => {
@@ -3629,6 +3631,13 @@ export default function Home() {
                   <div ref={mainScrollRef} className="mobile-app-scroll flex-1 min-w-0 min-h-0 w-full flex flex-col relative z-10 overflow-y-auto styled-scrollbar pb-24">
                     <h1 className="sr-only">{`gMatch - ${typeof mainView === 'string' ? mainView.charAt(0).toUpperCase() + mainView.slice(1) : 'Home'}`}</h1>
 
+                    {/* Reading-progress pill (RareUI scroll-progress): tracks the
+                        main scroll area while the timeline is open, parked above
+                        the command island. */}
+                    {mainView === 'feed' && (
+                      <ScrollProgress containerRef={mainScrollRef} className="bottom-[calc(var(--island-clearance)+2.5rem)]" />
+                    )}
+
                   {/* Modals & Config */}
                   {isIdle && settings.idleEnabled && (
                     <IdleOverlay items={items} identity={identity} onExit={() => { }} />
@@ -4446,7 +4455,13 @@ export default function Home() {
                 onClose={closeAttachmentModal}
                 onSuccess={handleAttachmentSuccess}
                 identity={identity}
-                title={attachmentModal?.target === 'pm' ? 'Attach to Message' : 'Attach to Group Chat'}
+                title={
+                  attachmentModal?.target === 'pm'
+                    ? 'Attach to Message'
+                    : attachmentModal?.target === 'lobby'
+                      ? 'Attach to Lobby Chat'
+                      : 'Attach to Group Chat'
+                }
                 recipientId={attachmentModal?.peerId}
                 initialFiles={attachmentModal?.initialFiles}
                 initialUrl={attachmentModal?.initialUrl}

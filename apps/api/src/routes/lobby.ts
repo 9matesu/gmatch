@@ -695,28 +695,36 @@ lobby.get('/chat', orbitAuth, async (c) => {
   try {
     if (channel) {
 const rows = await c.env.DB.prepare(
-        `SELECT id, sender_id, sender_name, body, created_at, COALESCE(channel, 'global_lobby') as channel FROM LobbyChat
-         WHERE COALESCE(channel, 'global_lobby') = ? AND hidden_at IS NULL AND datetime(created_at) >= datetime('now', '-12 hours')
-         ORDER BY created_at ASC
+        `SELECT lc.id, lc.sender_id, lc.sender_name, lc.body, lc.created_at,
+                COALESCE(lc.channel, 'global_lobby') as channel,
+                lc.attachment_id,
+                o.content_url as attachment_url, o.mime_type as attachment_mime
+         FROM LobbyChat lc LEFT JOIN Objects o ON o.id = lc.attachment_id
+         WHERE COALESCE(lc.channel, 'global_lobby') = ? AND lc.hidden_at IS NULL AND datetime(lc.created_at) >= datetime('now', '-12 hours')
+         ORDER BY lc.created_at ASC
          LIMIT 500`
-      ).bind(channel).all<{ id: string; sender_id: string; sender_name: string | null; body: string; created_at: string; channel: string }>()
+      ).bind(channel).all<{ id: string; sender_id: string; sender_name: string | null; body: string; created_at: string; channel: string; attachment_id: string | null; attachment_url: string | null; attachment_mime: string | null }>()
       return c.json({ messages: rows.results })
     }
 
     const rows = await c.env.DB.prepare(
-       `SELECT id, sender_id, sender_name, body, created_at, COALESCE(channel, 'global_lobby') as channel FROM LobbyChat
-        WHERE hidden_at IS NULL AND datetime(created_at) >= datetime('now', '-12 hours')
-        ORDER BY created_at ASC
+       `SELECT lc.id, lc.sender_id, lc.sender_name, lc.body, lc.created_at,
+               COALESCE(lc.channel, 'global_lobby') as channel,
+               lc.attachment_id,
+               o.content_url as attachment_url, o.mime_type as attachment_mime
+        FROM LobbyChat lc LEFT JOIN Objects o ON o.id = lc.attachment_id
+        WHERE lc.hidden_at IS NULL AND datetime(lc.created_at) >= datetime('now', '-12 hours')
+        ORDER BY lc.created_at ASC
         LIMIT 500`
-    ).all<{ id: string; sender_id: string; sender_name: string | null; body: string; created_at: string; channel: string }>()
+    ).all<{ id: string; sender_id: string; sender_name: string | null; body: string; created_at: string; channel: string; attachment_id: string | null; attachment_url: string | null; attachment_mime: string | null }>()
     return c.json({ messages: rows.results })
   } catch {
     const rows = await c.env.DB.prepare(
-      `SELECT id, sender_id, sender_name, body, created_at FROM LobbyChat
+      `SELECT id, sender_id, sender_name, body, created_at, attachment_id FROM LobbyChat
        WHERE hidden_at IS NULL AND datetime(created_at) >= datetime('now', '-12 hours')
        ORDER BY created_at ASC
        LIMIT 500`
-    ).all<{ id: string; sender_id: string; sender_name: string | null; body: string; created_at: string }>()
+    ).all<{ id: string; sender_id: string; sender_name: string | null; body: string; created_at: string; attachment_id: string | null }>()
     return c.json({ messages: rows.results })
   }
 })
@@ -726,22 +734,52 @@ lobby.post('/chat', orbitAuth, async (c) => {
   let body: any = {}
   try { body = await c.req.json() } catch { body = {} }
   const text = typeof body.body === 'string' ? body.body.trim().slice(0, 500) : ''
-  if (!text) return c.json({ error: 'Message cannot be empty' }, 400)
+  const attachmentId =
+    typeof body.attachment_id === 'string' && body.attachment_id.trim() && body.attachment_id.length <= 64
+      ? body.attachment_id.trim()
+      : null
+  if (!text && !attachmentId) return c.json({ error: 'Message cannot be empty' }, 400)
 
   const channel = typeof body.channel === 'string' && body.channel ? body.channel : 'global_lobby'
   const senderName = (await findDisplayName(c.env.DB, orbitId))?.trim() || 'Unknown User'
   const id = typeof body.id === 'string' && body.id.length <= 64 ? body.id : crypto.randomUUID()
   const createdAt = new Date().toISOString()
-  const message = { id, sender_id: orbitId, sender_name: senderName, body: text, created_at: createdAt, channel }
-  
+
+  // The lobby is public: only an object this identity owns (or one already
+  // marked public) may be attached, so a row cannot point at someone else's
+  // private media.
+  let attachmentUrl: string | null = null
+  let attachmentMime: string | null = null
+  if (attachmentId) {
+    const object = await c.env.DB.prepare(
+      'SELECT content_url, mime_type, is_public, owner_id, hidden_at FROM Objects WHERE id = ?'
+    ).bind(attachmentId).first<{ content_url: string | null; mime_type: string | null; is_public: number; owner_id: string; hidden_at: string | null }>()
+    if (!object || object.hidden_at || (object.owner_id !== orbitId && !object.is_public)) {
+      return c.json({ error: 'Attachment not found' }, 404)
+    }
+    attachmentUrl = object.content_url
+    attachmentMime = object.mime_type
+  }
+
+  const message = {
+    id, sender_id: orbitId, sender_name: senderName, body: text, created_at: createdAt, channel,
+    attachment_id: attachmentId, attachment_url: attachmentUrl, attachment_mime: attachmentMime,
+  }
+
   try {
     await c.env.DB.prepare(
-      'INSERT INTO LobbyChat (id, sender_id, sender_name, body, created_at, channel) VALUES (?, ?, ?, ?, ?, ?)'
-    ).bind(id, orbitId, message.sender_name, text, createdAt, channel).run()
+      'INSERT INTO LobbyChat (id, sender_id, sender_name, body, created_at, channel, attachment_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).bind(id, orbitId, message.sender_name, text, createdAt, channel, attachmentId).run()
   } catch {
-    await c.env.DB.prepare(
-      'INSERT INTO LobbyChat (id, sender_id, sender_name, body, created_at) VALUES (?, ?, ?, ?, ?)'
-    ).bind(id, orbitId, message.sender_name, text, createdAt).run()
+    try {
+      await c.env.DB.prepare(
+        'INSERT INTO LobbyChat (id, sender_id, sender_name, body, created_at, channel) VALUES (?, ?, ?, ?, ?, ?)'
+      ).bind(id, orbitId, message.sender_name, text, createdAt, channel).run()
+    } catch {
+      await c.env.DB.prepare(
+        'INSERT INTO LobbyChat (id, sender_id, sender_name, body, created_at) VALUES (?, ?, ?, ?, ?)'
+      ).bind(id, orbitId, message.sender_name, text, createdAt).run()
+    }
   }
 
   // Push to the auth'd lobby room AND the legacy global swarm room so every

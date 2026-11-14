@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
-import { Bell, CheckCircle2, AlertCircle, AlertTriangle, Info, X } from 'lucide-react';
+import { CheckCircle2, AlertCircle, AlertTriangle, Info, X } from 'lucide-react';
+import { NotificationBell } from '../rare/notification-bell';
 import { useToast, durationFor, type ToastMessage } from '../Toast';
 import { NotificationsPanel } from '../NotificationsPanel';
 import type { NotificationItem, MatchInviteItem } from '../NotificationsPanel';
@@ -106,37 +107,28 @@ export function NotificationCenter(props: NotificationCenterProps) {
       className="relative shrink-0 sm:flex-1 sm:min-w-0 max-w-md flex items-center"
       style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
     >
-      <button
-        ref={triggerRef}
-        type="button"
+      {/* RareUI notification bell: the swing-on-new + rolling count badge.
+          Same toggle contract as before — data-notifications-toggle, the full
+          aria-label and the Escape-focus ref all live on this button. */}
+      <NotificationBell
+        ref={triggerRef as never}
+        count={unreadCount}
+        max={99}
+        size={32}
+        color="red"
         data-notifications-toggle="true"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
         aria-label={`Notifications${unreadCount > 0 ? `: ${unreadCount} unread` : ''}. ${preview}. Activate to ${expanded ? 'collapse' : 'expand'}.`}
         title="Notifications"
-        className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg border border-border-glass bg-glass-w5 hover:bg-glass-w10 text-left cursor-pointer transition-colors"
-      >
-        <span
-          className={`relative shrink-0 grid place-items-center w-7 h-7 rounded-md transition-colors ${
-            unreadCount > 0
-              ? 'bg-retro-accent text-retro-accent-text'
-              : 'bg-glass-w8 text-retro-fg'
-          }`}
-        >
-          <Bell className="w-4 h-4" />
-          {unreadCount > 0 && (
-            <span aria-hidden className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-retro-accent text-retro-accent-text ring-2 ring-retro-bg text-[10px] font-bold flex items-center justify-center tabular-nums">
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </span>
-          )}
+        className="shrink-0 bg-glass-w8 text-retro-fg hover:bg-glass-w10"
+      />
+      <span aria-live="polite" className="min-w-0 flex-1 hidden sm:block leading-tight px-2">
+        <span className="block text-[10px] font-bold uppercase tracking-wider text-retro-muted">
+          Notifications
         </span>
-        <span aria-live="polite" className="min-w-0 flex-1 hidden sm:block leading-tight">
-          <span className="block text-[10px] font-bold uppercase tracking-wider text-retro-muted">
-            Notifications
-          </span>
-          <span className="block truncate text-xs text-retro-fg/80">{preview}</span>
-        </span>
-      </button>
+        <span className="block truncate text-xs text-retro-fg/80">{preview}</span>
+      </span>
 
       {expanded && (
         <div

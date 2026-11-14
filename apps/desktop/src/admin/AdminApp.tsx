@@ -366,7 +366,7 @@ export default function AdminPageClient({ identity: appIdentity }: { identity?: 
           <div className="flex items-center justify-between border-b border-border-glass pb-3">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-retro-accent" />
-              <h1 className="text-sm font-bold text-retro-fg uppercase tracking-wider">Admin Operations</h1>
+              <h1 className="text-sm font-bold text-retro-fg tracking-wider">Admin Operations</h1>
             </div>
 
           </div>

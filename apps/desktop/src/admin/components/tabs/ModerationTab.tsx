@@ -308,7 +308,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-black text-retro-fg uppercase tracking-wider">Moderation & Safety</h1>
+          <h1 className="text-lg font-black text-retro-fg tracking-wider">Moderation & Safety</h1>
           <p className="text-xs text-retro-muted mt-0.5">Triage user reports, review chat & comments, and enforce account bans</p>
         </div>
       </div>

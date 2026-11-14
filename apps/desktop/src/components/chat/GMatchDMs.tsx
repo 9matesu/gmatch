@@ -173,7 +173,7 @@ export function GMatchDMs({
   onSayRoom?: (roomId: string, text: string) => void;
   onLeaveRoom?: (roomId: string) => void;
   getRoomMessages?: (roomId: string) => ChatMessage[];
-  onSendMessage?: (text: string, channel?: string) => void;
+  onSendMessage?: (text: string, channel?: string, attachment?: { id: string; url: string; isVideo?: boolean }) => void;
   onSendPm?: (peerId: string, text: string, replyToId?: string, attachment?: { id: string; url: string; isVideo?: boolean }) => void;
   /**
    * Open the attachment modal, optionally pre-seeded from a paste: `files` for
@@ -182,7 +182,7 @@ export function GMatchDMs({
    * place instead of duplicating them for pasted media.
    */
   onOpenAttachment?: (
-    target: 'pm' | 'group',
+    target: 'pm' | 'group' | 'lobby',
     peerId?: string,
     groupId?: string,
     replyToId?: string,
@@ -338,9 +338,9 @@ export function GMatchDMs({
     } else if (openTarget === 'group' && activeGroupId) {
       onSendGroupMessage?.(activeGroupId, text || ' ', replyingTo?.id, pendingAttachment ?? undefined);
     } else if (isLobbyGroup) {
-      onSendMessage?.(text || ' ', 'global_lobby');
+      onSendMessage?.(text || ' ', 'global_lobby', pendingAttachment ?? undefined);
     } else if (isQueueGroup) {
-      onSendMessage?.(text || ' ', 'card_queue');
+      onSendMessage?.(text || ' ', 'card_queue', pendingAttachment ?? undefined);
     } else if (activePmPeer) {
       onSendPm?.(activePmPeer.orbitId, text, replyingTo?.id, pendingAttachment ?? undefined);
     }
@@ -350,9 +350,10 @@ export function GMatchDMs({
   };
 
   /** Where an attachment can be sent right now, or null if attachments are off. */
-  const attachmentTarget = (): { target: 'pm' | 'group'; peerId?: string; groupId?: string } | null => {
+  const attachmentTarget = (): { target: 'pm' | 'group' | 'lobby'; peerId?: string; groupId?: string } | null => {
     if (openTarget === 'group' && activeGroupId) return { target: 'group', groupId: activeGroupId };
     if (openTarget === 'peer' && activePmPeer) return { target: 'pm', peerId: activePmPeer.orbitId };
+    if (isLobbyGroup) return { target: 'lobby' };
     return null;
   };
 
@@ -394,7 +395,7 @@ export function GMatchDMs({
       showPasteNotice(
         openTarget === 'room'
           ? 'Sealed rooms are text only.'
-          : 'Attachments need a direct message or a group.',
+          : 'This conversation cannot take attachments.',
       );
       return;
     }
@@ -1083,7 +1084,7 @@ export function GMatchDMs({
                 </div>
 
                 <div className="min-w-0">
-                  <h3 className="text-sm font-black uppercase tracking-tight text-retro-fg truncate">{headerTitle}</h3>
+                  <h3 className="text-sm font-black tracking-tight text-retro-fg truncate">{headerTitle}</h3>
                   {peerTyping && openTarget === 'peer' ? (
                     <span className="text-[10px] text-retro-accent block" role="status" aria-live="polite">
                       typing…
@@ -1218,8 +1219,9 @@ export function GMatchDMs({
                  onFiles={() => {
                    if (openTarget === 'group' && activeGroupId) onOpenAttachment?.('group', undefined, activeGroupId, replyingTo?.id);
                    else if (openTarget === 'peer' && activePmPeer) onOpenAttachment?.('pm', activePmPeer.orbitId, undefined, replyingTo?.id);
+                    else if (isLobbyGroup) onOpenAttachment?.('lobby');
                  }}
-                 disabled={openTarget === 'room' || (!activePmPeer && openTarget !== 'group')}
+                 disabled={openTarget === 'room'}
                  clickToBrowse={false}
                  bare
                  className="flex-1 min-h-0 flex flex-col"
@@ -1228,7 +1230,7 @@ export function GMatchDMs({
                               {displayedMessages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3 text-retro-muted my-auto select-none">
                   <MessageSquare className="w-6 h-6 text-retro-faint" />
-                  <p className="text-base font-black uppercase tracking-tight text-retro-fg">{headerTitle}</p>
+                  <p className="text-base font-black tracking-tight text-retro-fg">{headerTitle}</p>
                   <p className="text-xs text-retro-muted">No messages yet.</p>
                   {isLobbyGroup && (
                     <p className="text-[10px] text-retro-muted flex items-center gap-1"><Clock3 className="w-3 h-3" /> Clears every 12 hours</p>
@@ -1285,18 +1287,18 @@ export function GMatchDMs({
                     <div key={row.key} className={`flex items-end gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}>
                       {!isOwn && (
                         <div
-                          className="w-6 h-6 rounded-full bg-surface-raised border border-border-glass text-retro-muted overflow-hidden flex items-center justify-center text-[10px] font-medium shrink-0 mb-1 select-none cursor-pointer hover:ring-1 hover:ring-retro-accent/50 transition-shadow"
+                          className="w-7 h-7 rounded-full bg-surface-raised border border-border-glass text-retro-muted overflow-hidden flex items-center justify-center text-[11px] font-medium shrink-0 mb-1 select-none cursor-pointer hover:ring-1 hover:ring-retro-accent/50 transition-shadow"
                           onClick={() => onOpenProfile?.(first.senderId)}
                           title={senderName}
                         >
                           {pfp ? <img src={resolveMediaUrl(pfp)} alt="" className="w-full h-full object-cover" /> : senderName.charAt(0).toUpperCase()}
                         </div>
                       )}
-                      <div className={`flex flex-col max-w-[78%] sm:max-w-[70%] ${isOwn ? 'items-end' : 'items-start'}`}>
+                      <div className={`flex flex-col max-w-[86%] sm:max-w-[76%] ${isOwn ? 'items-end' : 'items-start'}`}>
                         {!isOwn && (
                           <button
                             type="button"
-                            className="text-[10px] text-retro-muted ml-2 mb-0.5 select-text cursor-pointer hover:text-retro-accent transition-colors inline-flex items-center"
+                            className="text-[11px] font-semibold text-retro-muted ml-2 mb-0.5 select-text cursor-pointer hover:text-retro-accent transition-colors inline-flex items-center"
                             onClick={() => onOpenProfile?.(first.senderId)}
                           >
                             {senderName}
@@ -1318,7 +1320,7 @@ export function GMatchDMs({
                                 id={`chat-msg-${msg.id}`}
                                 data-message-id={msg.id}
                                 onClick={() => setActionFor(showActions ? null : msg.id)}
-                                className={`w-fit max-w-full px-3 py-2 rounded-lg text-xs leading-relaxed select-text cursor-pointer break-words whitespace-pre-wrap ${block.length > 1 ? 'mt-0.5' : ''} ${
+                                className={`w-fit max-w-full px-3.5 py-2.5 rounded-2xl text-[13px] sm:text-sm leading-relaxed select-text cursor-pointer break-words whitespace-pre-wrap transition-shadow motion-safe:animate-orbit-fade-in hover:shadow-[0_2px_12px_rgba(0,0,0,0.25)] ${block.length > 1 ? 'mt-0.5' : ''} ${
                                   highlightedMessage === msg.id ? 'ring-2 ring-retro-accent/70' : ''
                                 } ${
                                   msg.deletedAt
@@ -1347,8 +1349,8 @@ export function GMatchDMs({
                                       mimeType={msg.attachmentMime}
                                       identity={identity}
                                       alt="Attached image"
-                                      className="max-w-56 sm:max-w-64 max-h-56 rounded-md object-contain hover:opacity-90 transition-opacity"
-                                      videoClassName="max-w-56 sm:max-w-64 max-h-56 rounded-md object-contain hover:opacity-90 transition-opacity"
+                                      className="max-w-64 sm:max-w-72 max-h-64 rounded-lg object-contain hover:opacity-90 transition-opacity"
+                                      videoClassName="max-w-64 sm:max-w-72 max-h-64 rounded-lg object-contain hover:opacity-90 transition-opacity"
                                     />
                                   </button>
                                 )}
@@ -1561,13 +1563,15 @@ export function GMatchDMs({
                 </div>
               ) : (
               <>
-              {(activePmPeer && openTarget === 'peer') || openTarget === 'group' ? (
+              {(activePmPeer && openTarget === 'peer') || openTarget === 'group' || isLobbyGroup ? (
                 <button
                   type="button"
                   onClick={() => {
                     playPress(840);
                     if (openTarget === 'group' && activeGroupId) {
                       onOpenAttachment?.('group', undefined, activeGroupId, replyingTo?.id);
+                    } else if (isLobbyGroup) {
+                      onOpenAttachment?.('lobby');
                     } else if (activePmPeer) {
                       onOpenAttachment?.('pm', activePmPeer.orbitId, undefined, replyingTo?.id);
                     }
@@ -1637,7 +1641,7 @@ export function GMatchDMs({
           <div className="flex-1 flex flex-col items-center justify-center text-center p-8 space-y-4">
             <MessageSquare className="w-6 h-6 text-retro-faint" />
             <div className="space-y-1">
-              <h2 className="text-2xl font-black uppercase tracking-tighter text-retro-fg">Messages</h2>
+              <h2 className="text-2xl font-black tracking-tighter text-retro-fg">Messages</h2>
               <p className="text-xs text-retro-muted max-w-xs">Select a conversation.</p>
             </div>
           </div>

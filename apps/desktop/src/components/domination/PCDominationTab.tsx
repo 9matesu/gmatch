@@ -471,7 +471,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
               <Monitor className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-xs font-bold text-retro-fg uppercase tracking-wider">
+              <h2 className="text-xs font-bold text-retro-fg tracking-wider">
                 PC Domination
               </h2>
               <p className="text-[10px] text-retro-muted">Opt-in pranks between friends. Every effect costs g$ and needs consent</p>
@@ -511,7 +511,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
             <Monitor className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <h2 className="text-xs font-bold text-retro-fg uppercase tracking-wider">
+            <h2 className="text-xs font-bold text-retro-fg tracking-wider">
               PC Domination
             </h2>
             <p className="text-[10px] text-retro-muted truncate">Opt-in pranks between friends. Every effect costs g$ and needs consent</p>

@@ -101,7 +101,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
       {/* Header & Status Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-black text-retro-fg uppercase tracking-wider">Operations Overview</h1>
+          <h1 className="text-lg font-black text-retro-fg tracking-wider">Operations Overview</h1>
           <p className="text-xs text-retro-muted mt-0.5">Live platform health, security status, and core metrics</p>
         </div>
         <div className="flex items-center gap-3">
@@ -133,7 +133,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
               <ShieldAlert className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-xs font-bold text-rose-300 uppercase tracking-wider">
+              <h3 className="text-xs font-bold text-rose-300 tracking-wider">
                 {pendingReports} Pending Moderation Case{pendingReports === 1 ? '' : 's'}
               </h3>
               <p className="text-xs text-retro-muted mt-0.5">
@@ -257,7 +257,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
       {/* Quick Operational Triggers */}
       <div className="rounded-xl border border-border-glass bg-surface-raised p-4">
         <div className="flex items-center justify-between pb-3 border-b border-border-glass mb-3">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-retro-fg">Admin Quick Actions</h2>
+          <h2 className="text-xs font-bold tracking-wider text-retro-fg">Admin Quick Actions</h2>
           <span className="text-[10px] text-retro-muted">Safe operational triggers</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -318,7 +318,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
           <div className="px-4 py-3 border-b border-border-glass flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Globe className="w-4 h-4 text-cyan-400" />
-              <h2 className="text-xs font-bold uppercase tracking-wider text-retro-fg">Recent Public Posts</h2>
+              <h2 className="text-xs font-bold tracking-wider text-retro-fg">Recent Public Posts</h2>
             </div>
             <button
               type="button"
@@ -364,7 +364,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
           <div className="px-4 py-3 border-b border-border-glass flex items-center justify-between">
             <div className="flex items-center gap-2">
               <GitCompare className="w-4 h-4 text-purple-400" />
-              <h2 className="text-xs font-bold uppercase tracking-wider text-retro-fg">Active Duels ({liveMatches.length})</h2>
+              <h2 className="text-xs font-bold tracking-wider text-retro-fg">Active Duels ({liveMatches.length})</h2>
             </div>
             <button
               type="button"

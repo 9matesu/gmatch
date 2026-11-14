@@ -87,7 +87,7 @@ export interface AppChatContext {
   setPmUnreadCount: React.Dispatch<React.SetStateAction<number>>
   attachmentModal: {
     isOpen: boolean
-    target: 'pm' | 'group'
+    target: 'pm' | 'group' | 'lobby'
     peerId?: string
     groupId?: string
     replyToId?: string
@@ -96,7 +96,7 @@ export interface AppChatContext {
   } | null
   setAttachmentModal: React.Dispatch<React.SetStateAction<{
     isOpen: boolean
-    target: 'pm' | 'group'
+    target: 'pm' | 'group' | 'lobby'
     peerId?: string
     groupId?: string
     replyToId?: string
@@ -110,6 +110,7 @@ export interface AppChatContext {
   setActiveRoomId: React.Dispatch<React.SetStateAction<string | null>>
   chatMessages: ChatMessage[]
   lobby: ReturnType<typeof useLobby>
+  sendChatMessage: (text: string, channel?: string, attachment?: { id: string; url: string; isVideo?: boolean }) => void
 }
 export function useAppChat(ctx: AppChatContext) {
   const {
@@ -147,6 +148,7 @@ export function useAppChat(ctx: AppChatContext) {
     setActiveRoomId,
     chatMessages,
     lobby,
+    sendChatMessage,
   } = ctx
 
   const courier = useCourierDms(identity, {
@@ -1219,7 +1221,7 @@ export function useAppChat(ctx: AppChatContext) {
   }, [identity, loadGroupMessages, toast, groupRoomOps, myProfile.displayName])
 
   const openAttachmentModal = useCallback((
-    target: 'pm' | 'group',
+    target: 'pm' | 'group' | 'lobby',
     peerId?: string,
     groupId?: string,
     replyToId?: string,
@@ -1259,9 +1261,11 @@ export function useAppChat(ctx: AppChatContext) {
       void sendPm(attachmentModal.peerId, '', attachmentModal.replyToId, finalAttachment)
     } else if (attachmentModal.target === 'group' && attachmentModal.groupId) {
       void sendGroupMessage(attachmentModal.groupId, '', attachmentModal.replyToId, finalAttachment)
+    } else if (attachmentModal.target === 'lobby') {
+      sendChatMessage('', 'global_lobby', finalAttachment)
     }
     closeAttachmentModal()
-  }, [attachmentModal, identity, sendPm, sendGroupMessage, closeAttachmentModal])
+  }, [attachmentModal, identity, sendPm, sendGroupMessage, sendChatMessage, closeAttachmentModal])
 
   const handleGroupPickerSelect = useCallback((groupId: string) => {
     const pendingAttachment = (window as any).__pendingBabecockAttachment

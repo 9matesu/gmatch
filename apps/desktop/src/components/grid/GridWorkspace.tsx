@@ -103,7 +103,7 @@ export default function GridWorkspace({
       <div className="relative flex h-full min-h-0 items-center justify-center overflow-hidden bg-surface-canvas p-4 sm:p-8">
         <div className="glass-card flex max-h-full w-full max-w-2xl flex-col rounded-xl p-6 sm:p-8 space-y-5 overflow-y-auto styled-scrollbar">
           <div className="shrink-0 text-center">
-            <h2 className="text-2xl font-black tracking-tighter uppercase text-retro-fg">Pick your pleasure</h2>
+            <h2 className="text-2xl font-black tracking-tighter text-retro-fg">Pick your pleasure</h2>
             <p className="text-sm text-retro-muted mt-1.5">
               Tap {4} pills to tune your feed. Nothing is fetched before that.
             </p>
@@ -227,7 +227,7 @@ export default function GridWorkspace({
                   <Images size={16} weight="bold" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white tracking-wide uppercase">
+                  <h3 className="text-sm font-bold text-white tracking-wide ">
                     Drained Foes Gallery
                   </h3>
                   <p className="text-xs text-white/40">Collected keepsake archive & cards</p>
@@ -273,7 +273,7 @@ export default function GridWorkspace({
                   <MagnifyingGlass size={16} weight="bold" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white tracking-wide uppercase">
+                  <h3 className="text-sm font-bold text-white tracking-wide ">
                     Tag Browser
                   </h3>
                   <p className="text-xs text-white/40">Browse live images by your owned tags</p>

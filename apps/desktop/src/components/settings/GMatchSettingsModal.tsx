@@ -360,7 +360,7 @@ export function GMatchSettingsModal({
               <div className="w-7 h-7 rounded-lg bg-glass-w10 flex items-center justify-center text-retro-muted">
                 <Settings className="w-4 h-4" />
               </div>
-              <h2 id="settings-title" className="text-base font-black uppercase tracking-tight text-retro-fg">Settings</h2>
+              <h2 id="settings-title" className="text-base font-black tracking-tight text-retro-fg">Settings</h2>
             </div>
 
             <button
@@ -420,7 +420,7 @@ export function GMatchSettingsModal({
         <div className="flex-1 flex flex-col h-full overflow-hidden bg-transparent">
           {/* Top Bar */}
           <div className="hidden md:flex items-center justify-between px-5 py-3.5 border-b border-border-glass bg-glass-w5">
-            <h3 className="text-lg font-black uppercase tracking-tight text-retro-fg">
+            <h3 className="text-lg font-black tracking-tight text-retro-fg">
               {navItems.find((n) => n.id === activeTab)?.label}
             </h3>
             <button

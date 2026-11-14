@@ -184,7 +184,7 @@ export function WatchPartyRoomList({
           you left was simply gone from the UI. */}
       {recents.length > 0 && (
         <div className="mb-5">
-          <h3 className="text-[10px] font-semibold uppercase tracking-wider text-retro-muted mb-2">
+          <h3 className="text-[10px] font-semibold tracking-wider text-retro-muted mb-2">
             Recently watched
           </h3>
           <div className="flex flex-wrap gap-2">

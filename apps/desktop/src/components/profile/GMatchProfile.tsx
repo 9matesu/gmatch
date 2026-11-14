@@ -331,7 +331,7 @@ export function GMatchProfile({
         {/* Name & Bio */}
         <div className="space-y-1">
           <div className="flex items-center gap-1.5">
-            <h2 className="text-xl font-black tracking-tight uppercase text-retro-fg">{displayName}</h2>
+            <h2 className="text-xl font-black tracking-tight text-retro-fg">{displayName}</h2>
             {isVerified && (
               <span title="Verified">
                 <CheckCircle2 className="w-4 h-4 text-retro-accent shrink-0" />

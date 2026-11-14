@@ -52,7 +52,7 @@ export function AgeGateModal() {
           <span className="text-[10px] font-semibold uppercase tracking-wider text-retro-body bg-retro-panel px-2.5 py-1 rounded-md border border-border-glass">
             Age Verification
           </span>
-          <h2 id="age-gate-title" className="text-2xl font-black uppercase tracking-tighter text-white">Are you 18 or older?</h2>
+          <h2 id="age-gate-title" className="text-2xl font-black tracking-tighter text-white">Are you 18 or older?</h2>
           <p className="text-xs text-retro-body leading-relaxed max-w-xs mx-auto">
             gMatch contains adult media and community content intended exclusively for mature audiences (18+).
           </p>

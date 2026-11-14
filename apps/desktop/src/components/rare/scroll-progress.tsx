@@ -24,6 +24,17 @@ const useIsoLayoutEffect =
 
 type Size = { width: number; height: number }
 
+// Stable empty default: an inline `= []` would mint a NEW array on every
+// render, so the measuring layout effect below would see changed deps each
+// pass — setState -> render -> measure -> ... React aborts with "Maximum
+// update depth exceeded". One module-level array never changes identity.
+const EMPTY_SECTIONS: ScrollProgressSection[] = []
+
+/** setState only when the shape actually differs (stops a ResizeObserver loop). */
+function sameSize(a: Size | undefined, b: Size) {
+  return a?.width === b.width && a?.height === b.height
+}
+
 export type ScrollProgressProps = React.ComponentProps<"div"> & {
   sections?: ScrollProgressSection[]
   containerRef?: React.RefObject<HTMLElement | null>
@@ -32,7 +43,7 @@ export type ScrollProgressProps = React.ComponentProps<"div"> & {
 
 const ScrollProgress = ({
   className,
-  sections = [],
+  sections = EMPTY_SECTIONS,
   containerRef,
   offset = 120,
   ...props
@@ -51,6 +62,9 @@ const ScrollProgress = ({
 
   const [activeId, setActiveId] = React.useState(sections[0]?.id)
   const [open, setOpen] = React.useState(false)
+  // Adapted from RareUI: with no sections the pill is a pure reading-progress
+  // ring — the section menu would be an empty popover.
+  const canOpen = sections.length > 0
 
   const scrollLock = React.useRef(false)
   const scrollLockTimer = React.useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -98,18 +112,23 @@ const ScrollProgress = ({
 
   useIsoLayoutEffect(() => {
     const measure = () => {
-      if (labelRef.current) setLabelWidth(labelRef.current.offsetWidth)
+      if (labelRef.current) {
+        const w = labelRef.current.offsetWidth
+        setLabelWidth((prev) => (prev === w ? prev : w))
+      }
       if (collapsedRef.current) {
-        setCollapsedSize({
+        const next = {
           width: collapsedRef.current.offsetWidth,
           height: collapsedRef.current.offsetHeight,
-        })
+        }
+        setCollapsedSize((prev) => (prev && sameSize(prev, next) ? prev : next))
       }
       if (openRef.current) {
-        setOpenSize({
+        const next = {
           width: openRef.current.offsetWidth,
           height: openRef.current.offsetHeight,
-        })
+        }
+        setOpenSize((prev) => (prev && sameSize(prev, next) ? prev : next))
       }
     }
 
@@ -295,7 +314,7 @@ const ScrollProgress = ({
               <motion.button
                 key="pill"
                 type="button"
-                onClick={() => setOpen(true)}
+                onClick={() => canOpen && setOpen(true)}
                 aria-label="Show sections"
                 className="absolute inset-0 flex items-center gap-2.5 py-1.5 pl-2 pr-4"
                 initial={{

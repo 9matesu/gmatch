@@ -134,7 +134,7 @@ function ProfileStep(props: Props & { onDone: () => void }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-black uppercase tracking-tighter text-white">Set up your profile</h1>
+          <h1 className="text-2xl font-black tracking-tighter text-white">Set up your profile</h1>
           <p className="text-xs text-retro-muted">Only your name is required. Everything else you can add later.</p>
         </div>
       </div>

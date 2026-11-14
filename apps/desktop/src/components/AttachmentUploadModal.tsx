@@ -236,7 +236,7 @@ export function AttachmentUploadModal({
               <ImagePlus className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-xs font-black text-retro-fg uppercase tracking-wider">{title}</h2>
+              <h2 className="text-xs font-black text-retro-fg tracking-wider">{title}</h2>
             </div>
           </div>
           <button

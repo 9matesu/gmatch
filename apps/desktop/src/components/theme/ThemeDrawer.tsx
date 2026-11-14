@@ -150,7 +150,7 @@ export function ThemeDrawer({ isOpen, onClose, settings, updateSettings, toast }
       <div className="flex items-center justify-between pb-2 border-b border-border-glass">
         <div className="flex items-center gap-2">
           <PaintBrush className="w-4 h-4 text-retro-accent" />
-          <h3 className="text-xs font-bold tracking-wide uppercase text-retro-fg">Theme &amp; Appearance</h3>
+          <h3 className="text-xs font-bold tracking-wide text-retro-fg">Theme &amp; Appearance</h3>
         </div>
         <button
           type="button"

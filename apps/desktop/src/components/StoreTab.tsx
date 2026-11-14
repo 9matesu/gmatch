@@ -512,7 +512,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
       {/* Most valuable cards */}
       <section className="solid-panel backdrop-blur-md p-4">
         <div className="flex items-center justify-between gap-2 mb-3">
-          <h3 className="text-xs font-bold text-retro-fg uppercase tracking-wider">Most valuable cards</h3>
+          <h3 className="text-xs font-bold text-retro-fg tracking-wider">Most valuable cards</h3>
           {onOpenCardCollection && (
             <button
               type="button"
@@ -559,7 +559,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
 
       {/* Inventory (read-only) */}
       <section className="solid-panel backdrop-blur-md p-4">
-        <h3 className="text-xs font-bold text-retro-fg uppercase tracking-wider mb-3">Inventory</h3>
+        <h3 className="text-xs font-bold text-retro-fg tracking-wider mb-3">Inventory</h3>
         {(() => {
           const owned = storeItems.filter((item) => (inventory[item.id] || 0) > 0);
           if (owned.length === 0) return <p className="text-xs text-retro-muted">Empty. Nothing owned.</p>;
@@ -579,7 +579,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
       {/* Community Market — Steam-style buy/sell between players */}
       <section className="solid-panel backdrop-blur-md p-4">
         <div className="flex items-center justify-between gap-2 mb-3">
-          <h3 className="text-xs font-bold text-retro-fg uppercase tracking-wider">Community Market</h3>
+          <h3 className="text-xs font-bold text-retro-fg tracking-wider">Community Market</h3>
           <span className="text-[10px] text-retro-muted">{marketListings.length} open listing{marketListings.length === 1 ? '' : 's'}</span>
         </div>
         {marketListings.length === 0 ? (

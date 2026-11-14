@@ -312,7 +312,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-black text-retro-fg uppercase tracking-wider">Users & Economy</h1>
+          <h1 className="text-lg font-black text-retro-fg tracking-wider">Users & Economy</h1>
           <p className="text-xs text-retro-muted mt-0.5">Manage player identities, minted cards catalog, marketplace, and currency ledger</p>
         </div>
       </div>

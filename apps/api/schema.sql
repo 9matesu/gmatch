@@ -454,7 +454,8 @@ CREATE TABLE IF NOT EXISTS LobbyChat (
   body TEXT NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   channel TEXT NOT NULL DEFAULT 'global_lobby',
-  hidden_at DATETIME
+  hidden_at DATETIME,
+  attachment_id TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_lobbychat_created ON LobbyChat(created_at);
 CREATE INDEX IF NOT EXISTS idx_lobbychat_channel ON LobbyChat(channel, created_at);

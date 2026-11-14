@@ -158,7 +158,7 @@ export function CardZoomModal({
       >
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="truncate">
-            <h3 className="text-xs font-bold tracking-wide uppercase text-retro-fg truncate">{title}</h3>
+            <h3 className="text-xs font-bold tracking-wide text-retro-fg truncate">{title}</h3>
             {subtitle && <p className="text-[10px] text-retro-muted truncate">{subtitle}</p>}
           </div>
         </div>

@@ -57,7 +57,7 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
       <div className="p-2 sm:p-4 h-full flex-1 flex flex-col min-h-0 overflow-hidden">
         <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden glass-card rounded-xl border border-border-glass bg-surface-canvas/60 backdrop-blur-md">
           <div className="glass-header flex items-center justify-between px-4 py-3 border-b border-border-glass">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-retro-fg flex items-center gap-2">
+            <h3 className="text-xs font-bold tracking-wider text-retro-fg flex items-center gap-2">
               <Clapperboard className="w-4 h-4 text-retro-accent" />
               Watch
             </h3>

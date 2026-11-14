@@ -163,7 +163,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-black text-retro-fg uppercase tracking-wider">System & Settings</h1>
+          <h1 className="text-lg font-black text-retro-fg tracking-wider">System & Settings</h1>
           <p className="text-xs text-retro-muted mt-0.5">Platform configurations, administrative audit log, and database maintenance</p>
         </div>
       </div>
@@ -363,7 +363,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
             <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-5 space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-xs font-bold text-red-300 uppercase tracking-wider">Run Database Cleanup</h3>
+                  <h3 className="text-xs font-bold text-red-300 tracking-wider">Run Database Cleanup</h3>
                   <p className="text-[10px] text-retro-muted mt-1">Expires stale content, sweeps orphan blobs, and resets daily scores.</p>
                 </div>
                 <button
@@ -379,7 +379,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
             <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-5 space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-xs font-bold text-red-300 uppercase tracking-wider">Clean ALL Posts & Reset</h3>
+                  <h3 className="text-xs font-bold text-red-300 tracking-wider">Clean ALL Posts & Reset</h3>
                   <p className="text-[10px] text-retro-muted mt-1">Purges all user posts, media objects, likes and comments platform-wide.</p>
                 </div>
                 <button
@@ -395,7 +395,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5 space-y-3 md:col-span-2">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-xs font-bold text-amber-300 uppercase tracking-wider">Migrate Lobby → Posts</h3>
+                  <h3 className="text-xs font-bold text-amber-300 tracking-wider">Migrate Lobby → Posts</h3>
                   <p className="text-[10px] text-retro-muted mt-1">Transfers all lobby board images into user gMatch profiles under Posts, preserving metadata.</p>
                 </div>
                 <button

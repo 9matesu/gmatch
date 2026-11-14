@@ -19,6 +19,7 @@ import {
   ArrowUpRight,
 } from 'lucide-react'
 import { HELP_TOPICS } from '../help/helpContent'
+import { BounceSidebar, type BounceSidebarItem } from './rare/bounce-sidebar'
 import { useCommunityInvite, openCommunityInvite } from '../services/community'
 import feedImg from '../assets/screenshots/feed.png'
 import cardsImg from '../assets/screenshots/cards.png'
@@ -100,7 +101,7 @@ function TopicBody({ topicId }: { topicId: string }) {
 
       {topic.sections.map((s) => (
         <section key={s.heading} className="space-y-1.5">
-          <h4 className="text-xs font-bold text-retro-fg uppercase tracking-wider">{s.heading}</h4>
+          <h4 className="text-xs font-bold text-retro-fg tracking-wider">{s.heading}</h4>
           {s.body && <p className="text-xs text-retro-muted leading-relaxed">{s.body}</p>}
           {s.bullets && (
             <ul className="text-xs text-retro-muted leading-relaxed list-disc pl-4 space-y-1">
@@ -140,6 +141,12 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
   const quickstartShot = TOPIC_IMAGES['getting-started']
   const networkShot = TOPIC_IMAGES['network']
 
+  const helpNavItems: BounceSidebarItem[] = TABS.map((t) => t.label)
+  const helpNavActiveIndex = Math.max(
+    0,
+    TABS.findIndex((t) => t.id === tab),
+  )
+
   return (
     <div
       className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 select-none font-sans"
@@ -155,7 +162,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-border-glass shrink-0 bg-surface-raised">
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-bold tracking-wide text-retro-fg uppercase">Help &amp; Guide</h2>
+            <h2 className="text-sm font-bold tracking-wide text-retro-fg ">Help &amp; Guide</h2>
             {currentTabDef && (
               <span className="text-[10px] text-retro-muted font-mono hidden sm:inline">
                 / {currentTabDef.label}
@@ -174,85 +181,24 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
 
         {/* Two-Column Body */}
         <div className="flex-1 min-h-0 flex flex-col sm:flex-row overflow-hidden">
-          {/* Left Navigation Sidebar */}
+          {/* Left Navigation Sidebar — RareUI bounce sidebar: a spring dot
+              arcs to the active topic. Type is the interface; the old icon
+              buttons are gone (Swiss reduction). */}
           <nav
             aria-label="Help topics"
-            className="w-full sm:w-56 shrink-0 border-b sm:border-b-0 sm:border-r border-border-glass bg-surface-canvas/50 p-2 overflow-y-auto styled-scrollbar flex sm:flex-col gap-0.5"
+            className="w-full sm:w-56 shrink-0 border-b sm:border-b-0 sm:border-r border-border-glass bg-surface-canvas/50 p-3 overflow-y-auto styled-scrollbar"
           >
-            {/* Start Group */}
-            <div className="hidden sm:block px-2 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-retro-muted">
-              Start
-            </div>
-            {TABS.filter((t) => t.group === 'start').map((t) => {
-              const Icon = t.icon
-              const active = tab === t.id
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => setTab(t.id)}
-                  aria-current={active ? 'true' : undefined}
-                  className={`w-full px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-2 cursor-pointer text-left whitespace-nowrap ${
-                    active
-                      ? 'bg-surface-interactive text-retro-fg font-bold border border-border-glass'
-                      : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w5 border border-transparent'
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5 shrink-0" />
-                  <span className="truncate">{t.label}</span>
-                </button>
-              )
-            })}
-
-            {/* Features Group */}
-            <div className="hidden sm:block px-2 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-retro-muted">
-              Features
-            </div>
-            {TABS.filter((t) => t.group === 'features').map((t) => {
-              const Icon = t.icon
-              const active = tab === t.id
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => setTab(t.id)}
-                  aria-current={active ? 'true' : undefined}
-                  className={`w-full px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-2 cursor-pointer text-left whitespace-nowrap ${
-                    active
-                      ? 'bg-surface-interactive text-retro-fg font-bold border border-border-glass'
-                      : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w5 border border-transparent'
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5 shrink-0" />
-                  <span className="truncate">{t.label}</span>
-                </button>
-              )
-            })}
-
-            {/* System Group */}
-            <div className="hidden sm:block px-2 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-retro-muted">
-              Network &amp; Security
-            </div>
-            {TABS.filter((t) => t.group === 'system').map((t) => {
-              const Icon = t.icon
-              const active = tab === t.id
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => setTab(t.id)}
-                  aria-current={active ? 'true' : undefined}
-                  className={`w-full px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-2 cursor-pointer text-left whitespace-nowrap ${
-                    active
-                      ? 'bg-surface-interactive text-retro-fg font-bold border border-border-glass'
-                      : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w5 border border-transparent'
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5 shrink-0" />
-                  <span className="truncate">{t.label}</span>
-                </button>
-              )
-            })}
+            <BounceSidebar
+              items={helpNavItems}
+              value={helpNavActiveIndex}
+              onChange={(i) => {
+                const item = helpNavItems[i]
+                const label = typeof item === 'string' ? item : item?.label
+                const target = TABS.find((t) => t.label === label)
+                if (target) setTab(target.id)
+              }}
+              dotColor="var(--color-retro-accent)"
+            />
           </nav>
 
           {/* Right Content Area */}
@@ -297,7 +243,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                 )}
 
                 <section className="space-y-2">
-                  <h4 className="text-xs font-bold text-retro-fg uppercase tracking-wider">How it works</h4>
+                  <h4 className="text-xs font-bold text-retro-fg tracking-wider">How it works</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                     <div className="p-3 bg-surface-interactive/60 border border-border-glass rounded-lg space-y-1">
                       <span className="font-bold text-retro-fg">1. Keys stay on your device</span>
@@ -327,7 +273,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                 </section>
 
                 <section className="space-y-2 pt-2 border-t border-border-glass">
-                  <h4 className="text-xs font-bold text-retro-fg uppercase tracking-wider">Troubleshooting &amp; Logs</h4>
+                  <h4 className="text-xs font-bold text-retro-fg tracking-wider">Troubleshooting &amp; Logs</h4>
                   <p className="text-retro-muted leading-relaxed">
                     If an action fails or a peer appears offline, diagnostic events are logged locally to help identify network and storage issues.
                   </p>
@@ -353,7 +299,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                   </p>
                 </div>
                 <section className="space-y-2">
-                  <h4 className="text-xs font-bold text-retro-fg uppercase tracking-wider">How to send</h4>
+                  <h4 className="text-xs font-bold text-retro-fg tracking-wider">How to send</h4>
                   <ol className="text-xs text-retro-muted space-y-1.5 list-decimal list-inside leading-relaxed">
                     <li><span className="text-retro-fg font-medium">Select recipients</span>: choose a peer from the roster or active chat</li>
                     <li><span className="text-retro-fg font-medium">Drop or browse file</span>: preview images and videos before sending</li>
@@ -362,7 +308,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                   </ol>
                 </section>
                 <section className="space-y-2">
-                  <h4 className="text-xs font-bold text-retro-fg uppercase tracking-wider">Transmission Options</h4>
+                  <h4 className="text-xs font-bold text-retro-fg tracking-wider">Transmission Options</h4>
                   <div className="space-y-2">
                     <div className="bg-surface-interactive/60 p-3 border border-border-glass rounded-lg">
                       <span className="text-retro-fg font-medium">Encrypted Media</span>: Sealed directly to the recipient public encryption key.
@@ -400,13 +346,13 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                 )}
 
                 <section className="space-y-1.5">
-                  <h4 className="text-xs font-bold text-retro-fg uppercase tracking-wider">Network Directory</h4>
+                  <h4 className="text-xs font-bold text-retro-fg tracking-wider">Network Directory</h4>
                   <p className="text-xs text-retro-muted leading-relaxed">
                     The directory lists active nodes and online peers. Discovered peers are ranked by online presence and activity.
                   </p>
                 </section>
                 <section className="space-y-1.5">
-                  <h4 className="text-xs font-bold text-retro-fg uppercase tracking-wider">Hosting a Node</h4>
+                  <h4 className="text-xs font-bold text-retro-fg tracking-wider">Hosting a Node</h4>
                   <ul className="text-xs text-retro-muted space-y-1.5 list-disc list-inside leading-relaxed">
                     <li><span className="text-retro-fg font-medium">Host a world</span>: Open Settings &gt; Server and switch to Host mode. Your computer hosts a local sidecar.</li>
                     <li><span className="text-retro-fg font-medium">Share with friends</span>: In the Servers tab, copy your node code or LAN address to allow friends to connect.</li>
@@ -423,19 +369,19 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                   </p>
                 </div>
                 <section className="space-y-1.5">
-                  <h4 className="text-xs font-bold text-retro-fg uppercase tracking-wider">Pseudonymous by Design</h4>
+                  <h4 className="text-xs font-bold text-retro-fg tracking-wider">Pseudonymous by Design</h4>
                   <p className="text-xs text-retro-muted leading-relaxed">
                     Your account is derived entirely from cryptographic keys on this machine. There are no passwords, emails, or phone numbers tied to your presence.
                   </p>
                 </section>
                 <section className="space-y-1.5">
-                  <h4 className="text-xs font-bold text-retro-fg uppercase tracking-wider">End-to-End Encryption</h4>
+                  <h4 className="text-xs font-bold text-retro-fg tracking-wider">End-to-End Encryption</h4>
                   <p className="text-xs text-retro-muted leading-relaxed">
                     Direct messages and private transfers are encrypted using X25519 keys. The courier relay operates blindly and cannot read message bodies or user relationships.
                   </p>
                 </section>
                 <section className="space-y-1.5">
-                  <h4 className="text-xs font-bold text-retro-fg uppercase tracking-wider">18+ Content Policy</h4>
+                  <h4 className="text-xs font-bold text-retro-fg tracking-wider">18+ Content Policy</h4>
                   <p className="text-xs text-retro-muted leading-relaxed">
                     This network is restricted to adults 18+. Client-side blocklists strictly prohibit illegal content, child exploitation, and non-consensual material.
                   </p>

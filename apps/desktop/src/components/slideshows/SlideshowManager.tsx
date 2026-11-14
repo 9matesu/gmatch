@@ -170,7 +170,7 @@ export function SlideshowManager({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Film className="w-4 h-4 text-retro-muted" />
-          <h2 className="text-xs font-bold text-retro-fg uppercase tracking-wider">Slideshows</h2>
+          <h2 className="text-xs font-bold text-retro-fg tracking-wider">Slideshows</h2>
         </div>
         <div className="flex items-center gap-2">
           <button
