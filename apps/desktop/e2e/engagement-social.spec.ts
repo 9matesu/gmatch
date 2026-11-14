@@ -108,7 +108,10 @@ async function postIdFor(page: Page, caption: string): Promise<string> {
 async function likePostFromPeer(peerPage: Page, postId: string) {
   await peerPage.goto(`/#/feed?post=${encodeURIComponent(postId)}`)
   const article = peerPage.locator(`[data-post-id="${postId}"]`)
-  await expect(article.getByPlaceholder('Add a comment...')).toBeVisible({ timeout: 30_000 })
+  // The card has no "Add a comment..." label any more: the comment icon in the
+  // action row opens the same thread. What this journey needs is the card being
+  // fully rendered (its action row present), so that is what it waits for.
+  await expect(article.getByRole('button', { name: 'Comment' })).toBeVisible({ timeout: 30_000 })
   const like = article.getByRole('button', { name: 'Like post' })
   await expect(like).toHaveAttribute('aria-pressed', 'false')
   await like.click()
