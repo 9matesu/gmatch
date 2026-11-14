@@ -242,6 +242,11 @@ export async function startMesh(opts: MeshOptions): Promise<MeshHandle> {
       return bytes;
     },
     offers: () => (pendingOffer && Date.now() - pendingOffer.at < OFFER_TTL_MS ? [pendingOffer] : []),
+    answer: () => {
+      const owed = pendingAnswer;
+      pendingAnswer = null;
+      return owed;
+    },
     onAnswers: (answers) => {
       for (const answer of answers) void acceptAnswer(answer);
     },

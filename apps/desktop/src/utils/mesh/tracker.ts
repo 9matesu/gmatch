@@ -44,6 +44,8 @@ export interface TrackerClientOptions {
   peerId: () => Uint8Array;
   /** Offers we want answered right now (usually empty: we answer, not ask). */
   offers?: () => TrackerOffer[];
+  /** An answer we owe a peer, sent on the next announce. */
+  answer?: () => TrackerAnswer | null;
   /** How many peers we still want. */
   numWant?: number;
   onAnswers?: (answers: TrackerAnswer[]) => void;
@@ -80,6 +82,7 @@ function announcePayload(
   peerId: Uint8Array,
   offers: TrackerOffer[],
   numWant: number,
+  answer: TrackerAnswer | null,
 ): string {
   const fields = [
     `"action":"announce"`,
@@ -92,6 +95,10 @@ function announcePayload(
     `"event":"started"`,
     `"compact":0`,
   ];
+  if (answer) {
+    fields.push(`"offer_id":"${binaryJson(idBytes(answer.offerId))}"`);
+    fields.push(`"answer":${JSON.stringify(answer.answer)}`);
+  }
   if (offers.length > 0) {
     const list = offers
       .slice(0, 2)
@@ -139,7 +146,8 @@ export async function startTrackerClient(opts: TrackerClientOptions): Promise<Tr
     const peerId = opts.peerId();
     const offers = (opts.offers?.() ?? []).filter((o) => o.offerId && o.offer);
     for (const infoHash of hashes) {
-      const payload = announcePayload(infoHash, peerId, offers, opts.numWant ?? 2);
+      const answer = opts.answer?.() ?? null;
+      const payload = announcePayload(infoHash, peerId, offers, opts.numWant ?? 2, answer);
       for (const [tracker, socket] of sockets) {
         if (socket.readyState !== 1) continue;
         try {
