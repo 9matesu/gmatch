@@ -71,7 +71,7 @@ export function ProfileView({
   shareGroups: { id: string; name: string; member_count: number }[];
 }) {
   return (
-    <div className="p-4 sm:p-8 w-full max-w-[1600px] mx-auto">
+    <div className="p-4 sm:p-6 w-full max-w-3xl mx-auto">
       <GMatchProfile
         identity={identity}
         myUser={myUser}

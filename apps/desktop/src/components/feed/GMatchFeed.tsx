@@ -170,6 +170,7 @@ export function GMatchFeed({
   toast,
   onUserContext,
   onForceRefresh,
+  onPingAttention,
   feedStatus = 'ready',
   onResolveMissingPost,
 }: {
@@ -215,6 +216,7 @@ export function GMatchFeed({
   onOpenNetwork?: (userId: string) => void;
   onUserContext?: (e: React.MouseEvent, userId: string, displayName: string) => void;
   /** Retrieve-by-force: drops cached/inflight feed responses, then reloads. */
+  onPingAttention?: () => void;
   onForceRefresh?: () => void;
   /** Initial load vs refresh vs blind-courier node vs read error. */
   feedStatus?: 'idle' | 'loading' | 'ready' | 'offline' | 'error';
@@ -856,6 +858,7 @@ export function GMatchFeed({
       <FeedHeader
         onRefresh={onForceRefresh ? () => { onForceRefresh(); } : undefined}
         onOpenSearch={() => setShowExploreSearch(true)}
+        onPingAttention={onPingAttention}
         sortTabs={
           <div className="flex items-center gap-1 text-xs">
             {(['latest', 'trending'] as const).map((mode) => (

@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, RefreshCw, Search } from 'lucide-react';
+import { ChevronDown, Radio, RefreshCw, Search } from 'lucide-react';
 import { playPress } from '../../utils/sounds';
 
 interface FeedHeaderProps {
@@ -13,6 +13,8 @@ interface FeedHeaderProps {
   colsControls?: React.ReactNode;
   /** Collapse control; omit to hide the chevron. */
   onToggleCollapse?: () => void;
+  /** Self-ping: floats the caller to the top of the roster for 30 s. */
+  onPingAttention?: () => void;
 }
 
 export function FeedHeader({
@@ -21,6 +23,7 @@ export function FeedHeader({
   sortTabs,
   colsControls,
   onToggleCollapse,
+  onPingAttention,
 }: FeedHeaderProps) {
   return (
     <header className="sticky top-0 z-30 w-full glass-toolbar border-0 border-b border-border-glass rounded-none px-3 sm:px-6 py-1.5 flex items-center justify-between gap-2">
@@ -30,6 +33,19 @@ export function FeedHeader({
 
       <div className="flex items-center gap-1 shrink-0">
         {colsControls}
+
+        {onPingAttention && (
+          <button
+            type="button"
+            onClick={() => { playPress(880); onPingAttention(); }}
+            title="Ping: put yourself at the top of the roster for 30s"
+            aria-label="Ping for attention"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold text-retro-body hover:text-retro-fg hover:bg-glass-w8 transition-colors cursor-pointer"
+          >
+            <Radio className="w-4 h-4" />
+            <span className="hidden sm:inline">Ping</span>
+          </button>
+        )}
 
         {onRefresh && (
           <button
