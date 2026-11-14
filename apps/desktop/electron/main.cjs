@@ -57,6 +57,16 @@ function mainLog(line) {
   try { appendWithRotation(mainLogPath(), line) } catch { /* last resort only */ }
 }
 
+// Closing the window is not quitting (gMatch lives in the tray). Only an
+// explicit "Sair do gMatch", a Windows session end, or the updater's
+// restart may end the process; every path sets this first.
+let isQuitting = false
+let appTray = null
+function quitApp() {
+  isQuitting = true
+  app.quit()
+}
+
 // Startup sampler (see startupMetrics.cjs). Module-level so createWindow's
 // did-finish-load handler and the renderer's boot:mark IPC can reach it.
 let bootMetrics = null
@@ -66,18 +76,12 @@ process.on('uncaughtException', (err) => {
 })
 process.on('unhandledRejection', (reason) => mainLog(`unhandledRejection: ${reason?.stack || reason}`))
 
-// Update handoff: once the swap script is spawned, quitting must not be
-// blocked by the renderer's save-your-keys unload gate.
-let updateHandoff = false
-// Explicit renderer reload (context menu, Ctrl+R): the key-save flush runs
-// synchronously in beforeunload itself, so the stay/leave gate is pure noise
-// here - let reloads through unasked. Close keeps the dialog.
-let reloadWanted = false
 
 // One-shot camera permission consumed by setPermissionRequestHandler.
 let cameraGrantOnce = false
 const { createSecureStore } = require('./secureStore.cjs')
 const apiSidecar = require('./apiSidecar.cjs')
+const { createTray } = require('./tray.cjs')
 const serverMode = require('./server-mode.cjs')
 
 // Secure KV (security plan B.3): renderer's sensitive localStorage keys are
@@ -1586,30 +1590,12 @@ function createWindow() {
     bootMetrics?.mark('did-finish-load')
   })
   win.once('ready-to-show', () => bootMetrics?.mark('ready-to-show'))
-  // The renderer's beforeunload key-save gate must NEVER silently block the
-  // close button (1.0.1 bug: "cant close app" — in Electron, a prevented
   // unload just cancels the window close). Surface the page's message as a
-  // real native dialog instead: Stay saves nothing, Leave closes.
-  win.webContents.on('will-prevent-unload', (event) => {
-    if (updateHandoff || reloadWanted) { reloadWanted = false; event.preventDefault(); return }
-    const choice = dialog.showMessageBoxSync(win, {
-      type: 'warning',
-      buttons: ['Stay', 'Leave anyway'],
-      defaultId: 0,
-      cancelId: 0,
-      title: 'Save your secret key first?',
-      message: 'Your account is only recoverable with your secret key.',
-      detail: 'Open Settings → Identity & Keys to copy or download it. If you already backed it up, you can close safely.',
-    })
-    if (choice === 1) event.preventDefault()
-  })
   // Ctrl/Cmd+R = plain refresh (frameless window, no menu accelerators).
   win.webContents.on('before-input-event', (event, input) => {
     if (input.type === 'keyDown' && input.key.toLowerCase() === 'r' && (input.control || input.meta)) {
       event.preventDefault()
-      reloadWanted = true
       win.webContents.reload()
-      setTimeout(() => { reloadWanted = false }, 3000)
     }
   })
   // Only use the dev server when explicitly requested — never guess a port,
@@ -1663,16 +1649,16 @@ app.whenReady().then(async () => {
     if (!w) return
     if (w.isMaximized()) w.unmaximize(); else w.maximize()
   })
-  ipcMain.on('window:close', (e) => BrowserWindow.fromWebContents(e.sender)?.close())
+  // The X (and Alt+F4, and the taskbar's "Close window"  one event on Windows,
+  // indistinguishable from the X) minimizes: the button stays in the taskbar so
+  // the orange flash can find it. Quitting is a tray action only.
+  ipcMain.on('window:close', (e) => BrowserWindow.fromWebContents(e.sender)?.minimize())
   // Reload = refresh, never the stay/leave dialog: the beforeunload handlers
   // (key save + idle save) run synchronously before the reload lands.
   ipcMain.on('window:reload', (e) => {
     const w = BrowserWindow.fromWebContents(e.sender)
     if (!w) return
-    reloadWanted = true
     w.webContents.reload()
-    // Safety: if no unload attempt materializes, don't leak the bypass.
-    setTimeout(() => { reloadWanted = false }, 3000)
   })
   const storageKeyPath = path.join(app.getPath('userData'), 'storage.key')
   let diskKey = null
@@ -1812,7 +1798,13 @@ app.whenReady().then(async () => {
     app.on(evt, () => { if (wallpaperWin.hasPendingSwap()) void wallpaperWin.restoreWallpaper() })
   }
   // A stray domination video window must not outlive the app either.
-  app.on('before-quit', () => { if (domVideoWin) { try { domVideoWin.destroy() } catch { /* gone */ } domVideoWin = null } })
+  app.on('session-end', () => {
+  // Logoff/shutdown: no prompt, no tray, just go (and save what we have).
+  mainLog('session-end: quitting')
+  isQuitting = true
+})
+
+app.on('before-quit', () => { if (domVideoWin) { try { domVideoWin.destroy() } catch { /* gone */ } domVideoWin = null } })
   // Camera stays denied by default; the renderer consumes a one-shot grant
   // only AFTER the victim clicks "Allow once" on the in-app prompt.
   ipcMain.handle('camera:grant-once', () => { cameraGrantOnce = true; return { ok: true } })
@@ -1946,7 +1938,8 @@ app.whenReady().then(async () => {
   ipcMain.handle('update:state', () => (updater ? updater.getState() : { phase: 'unsupported', current: app.getVersion() }))
   ipcMain.handle('update:install', () => {
     if (!updater) return { ok: false, error: 'updates only work in packaged builds' }
-    updateHandoff = true
+    // The swap script restarts the app: that is a real quit, not a close.
+    isQuitting = true
     return updater.install()
   })
   // Topology: packaged builds default to HOST mode (bundled Bun sidecar,
@@ -2009,6 +2002,21 @@ app.whenReady().then(async () => {
   mainLog(`boot: creating window (v${app.getVersion()}, packaged=${app.isPackaged})`)
   createWindow()
   bootMetrics.mark('window.created')
+  // The tray is the exit: the window closing never quits, so without this
+  // there would be no way out at all.
+  const focusWindow = () => {
+    const w = BrowserWindow.getAllWindows()[0]
+    if (!w) { try { createWindow() } catch { /* best effort */ } return }
+    if (w.isMinimized()) w.restore()
+    w.show()
+    w.focus()
+  }
+  try {
+    appTray = createTray({ onOpen: focusWindow, onQuit: quitApp })
+  } catch (err) {
+    mainLog(`tray unavailable: ${err?.message || err}`)
+  }
+  ipcMain.on('tray:status', (_e, text) => appTray?.setTooltip(text))
   updater?.schedule()
   // Start the bundled server in the background (host mode only). Failures
   // surface as dialogs + log lines; they can never take the window with them.
@@ -2075,8 +2083,14 @@ app.on('before-quit', () => {
   try { bootMetrics?.finish('quit') } catch { /* diagnostics only */ }
   apiSidecar.stopApi(); try { if (secureKV) secureKV.flush() } catch { /* best effort */ }
 })
-app.on('will-quit', () => { apiSidecar.stopApi() })
+app.on('will-quit', () => {
+  try { appTray?.destroy() } catch { /* already gone */ }
+  appTray = null
+  apiSidecar.stopApi()
+})
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
+  // Windows/Linux: the app stays in the tray (the mesh keeps running).
+  // macOS already behaves this way.
+  if (isQuitting) quitApp()
 })

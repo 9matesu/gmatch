@@ -44,6 +44,7 @@ contextBridge.exposeInMainWorld('gmatch', {
   winMinimize: () => ipcRenderer.send('window:minimize'),
   winToggleMaximize: () => ipcRenderer.send('window:toggle-maximize'),
   winClose: () => ipcRenderer.send('window:close'),
+  trayStatus: (text: string) => ipcRenderer.send('tray:status', String(text || '')),
   winReload: () => ipcRenderer.send('window:reload'),
   appVersion: () => ipcRenderer.invoke('app:version'),
   openExternal: (url) => ipcRenderer.invoke('shell:open', url),

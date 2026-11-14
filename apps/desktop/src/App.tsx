@@ -2073,11 +2073,20 @@ export default function Home() {
   // fell back to whatever record the opener had. The hook is reference
   // counted, so a surface may also mount it without adding a second poll.
   usePresencePoll(identity ?? null);
+
   // Mesh reachability feeds the SAME presence store. A blind courier keeps no
   // roster, so "online" for a peer we hold a live channel to has to come from
   // the transport. Ingested as a fresh sighting; it decays by the store's own
   // 60s rule once the peer goes quiet.
   const peerPresenceKey = peers.map((p) => p.id).filter(Boolean).join(',')
+  // The tray tooltip is the only state a user sees when the window is closed.
+  useEffect(() => {
+    const n = peerPresenceKey ? peerPresenceKey.split(',').length : 0
+    const link = isWsConnected ? 'connected' : 'reconnecting'
+    window.gmatch?.trayStatus?.(
+      n > 0 ? `gMatch - ${link} - ${n} ${n === 1 ? 'peer' : 'peers'}` : `gMatch - ${link}`,
+    )
+  }, [peerPresenceKey, isWsConnected])
   useEffect(() => {
     if (!peerPresenceKey) return
     const seenAt = new Date().toISOString()

@@ -66,6 +66,8 @@ export interface GmatchBridge {
   winMinimize?: () => void
   winToggleMaximize?: () => void
   winClose?: () => void
+  /** Tray tooltip text: the only state visible with the window closed. */
+  trayStatus?: (text: string) => void
   winReload?: () => void
   appVersion?: () => Promise<string>
   openExternal?: (url: string) => Promise<void>
