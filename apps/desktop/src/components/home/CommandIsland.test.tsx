@@ -168,6 +168,25 @@ describe('CommandIsland post button (footer, centered, one picker flow)', () => 
     vi.useRealTimers();
   });
 
+  it('a click after a hover-open keeps the bubble open (the button must not eat its own reveal)', () => {
+    vi.useFakeTimers();
+    render(<CommandIsland mainView="feed" setMainView={vi.fn()} onOpenCreatePost={vi.fn()} onPickMedia={vi.fn()} />);
+    const button = screen.getByLabelText('Create a post');
+    // The pointer lands, the 180ms intent timer fires, THEN the click arrives.
+    fireEvent.mouseEnter(button.parentElement!);
+    act(() => { vi.advanceTimersByTime(250); });
+    expect(screen.getByRole('dialog', { name: 'Pick post media' })).toBeInTheDocument();
+    fireEvent.click(button);
+    // Regression: a toggle closed exactly what hover had just revealed, so the
+    // Post button read as "does nothing" and the e2e composer hung on a tab
+    // that was never rendered.
+    expect(screen.getByRole('dialog', { name: 'Pick post media' })).toBeInTheDocument();
+    // The NEXT click still closes it (the hover flag was consumed).
+    fireEvent.click(button);
+    expect(screen.queryByRole('dialog', { name: 'Pick post media' })).toBeNull();
+    vi.useRealTimers();
+  });
+
   it('hover pops the bubble after the intent delay and a pick is handed over', () => {
     vi.useFakeTimers();
     const onPickMedia = vi.fn();

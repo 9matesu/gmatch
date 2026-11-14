@@ -122,6 +122,12 @@ export function CommandIsland({
 }: CommandIslandProps) {
   const [satelliteOpen, setSatelliteOpen] = useState<boolean>(readSatelliteOpen);
   const [postPickerOpen, setPostPickerOpen] = useState(false);
+  // Hover opens this bubble ~180ms after the pointer lands, so a CLICK that
+  // follows has usually already been served by the hover. A toggle then closed
+  // exactly what the pointer had just revealed: the button read as "does
+  // nothing" (and the e2e composer hung on a tab that was never there). A
+  // click after a hover-open keeps it open; the next one closes.
+  const hoverOpened = useRef(false);
   const hoverTimer = useRef<number | null>(null);
   const leaveTimer = useRef<number | null>(null);
   const communityUrl = useCommunityInvite();
@@ -132,17 +138,34 @@ export function CommandIsland({
     if (!onPickMedia) return;
     if (leaveTimer.current) { window.clearTimeout(leaveTimer.current); leaveTimer.current = null; }
     if (hoverTimer.current) window.clearTimeout(hoverTimer.current);
-    hoverTimer.current = window.setTimeout(() => setPostPickerOpen(true), 180);
+    hoverTimer.current = window.setTimeout(() => {
+      hoverOpened.current = true;
+      setPostPickerOpen(true);
+    }, 180);
   };
   const closePickerSoon = () => {
     if (hoverTimer.current) { window.clearTimeout(hoverTimer.current); hoverTimer.current = null; }
     if (leaveTimer.current) window.clearTimeout(leaveTimer.current);
-    leaveTimer.current = window.setTimeout(() => setPostPickerOpen(false), 260);
+    leaveTimer.current = window.setTimeout(() => {
+      hoverOpened.current = false;
+      setPostPickerOpen(false);
+    }, 260);
+  };
+  /** Every close goes through here, so the hover flag cannot go stale. */
+  const closePicker = () => {
+    hoverOpened.current = false;
+    setPostPickerOpen(false);
   };
   const togglePicker = () => {
     playPress(900);
     if (hoverTimer.current) { window.clearTimeout(hoverTimer.current); hoverTimer.current = null; }
     if (leaveTimer.current) { window.clearTimeout(leaveTimer.current); leaveTimer.current = null; }
+    // A click that follows a hover-open must not undo it.
+    if (hoverOpened.current) {
+      hoverOpened.current = false;
+      setPostPickerOpen(true);
+      return;
+    }
     setPostPickerOpen((v) => !v);
   };
 
@@ -256,7 +279,7 @@ export function CommandIsland({
             className="relative shrink-0"
             onMouseEnter={openPickerSoon}
             onMouseLeave={closePickerSoon}
-            onKeyDown={(e) => { if (e.key === 'Escape') setPostPickerOpen(false); }}
+            onKeyDown={(e) => { if (e.key === 'Escape') closePicker(); }}
           >
             <button
               type="button"
@@ -548,14 +571,14 @@ export function CommandIsland({
             <MediaPickerPanel
               compact
               options={{ accept: ['image', 'video'], sources: ['browse', 'upload', 'url'], title: 'Pick post media' }}
-              onPick={(sel) => { setPostPickerOpen(false); onPickMedia(sel); }}
-              onClose={() => setPostPickerOpen(false)}
+              onPick={(sel) => { closePicker(); onPickMedia(sel); }}
+              onClose={closePicker}
             />
             {/* Text-only posts have no media: one click opens the composer
                 with an empty body instead of forcing a pick first. */}
             <button
               type="button"
-              onClick={() => { setPostPickerOpen(false); onOpenCreatePost?.(); }}
+              onClick={() => { closePicker(); onOpenCreatePost?.(); }}
               className="mt-1.5 w-full px-3 py-1.5 rounded-lg text-[11px] font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w10 transition-colors cursor-pointer"
             >
               Write a text post
