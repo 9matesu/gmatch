@@ -893,6 +893,14 @@
   background: rgba(245, 247, 250, 0.2);
 }
 
+/* Long lists: 500 cards is a style/layout/paint pass over 500 cards for
+   every frame otherwise. The browser skips the ones outside the viewport;
+   `auto <h>` is the height it last saw for THAT row, not a constant. */
+.cv-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 640px;
+}
+
 .styled-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: rgba(245, 247, 250, 0.12) transparent;

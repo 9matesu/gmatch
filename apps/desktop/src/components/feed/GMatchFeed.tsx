@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef, memo } from 'react';
 import { createPortal } from 'react-dom';
 import { useCropper } from '../../hooks/useCropper';
 import { DEFAULT_FEED_SORT, FEED_SORT_LABELS, firstLikeCrossed, type FeedSort } from './feedSort'
@@ -134,7 +134,7 @@ const AD_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> =
   store: ShoppingBag,
 }
 
-export function GMatchFeed({
+function GMatchFeedImpl({
   identity,
   posts,
   stories,
@@ -568,6 +568,33 @@ export function GMatchFeed({
     [posts],
   );
 
+  // Hold the reader's place when rows arrive above them.
+  //
+  // The timeline is newest-first, so a post published while you are reading
+  // is inserted at the very top, 4000px above your viewport. Chromium's
+  // scroll anchoring is supposed to absorb that, but a row with
+  // `content-visibility: auto` has no box while it is skipped, so the anchor
+  // node can vanish and the page jumps by exactly the inserted height. Doing
+  // the arithmetic here is deterministic and costs one layout read per
+  // prepend.
+  const listRef = useRef<HTMLDivElement | null>(null)
+  const anchorRef = useRef<{ id?: string; top: number }>({ top: 0 })
+  const firstPostId = visiblePosts[0]?.id
+  useLayoutEffect(() => {
+    const el = listRef.current
+    const scroller = el?.closest<HTMLElement>('.mobile-app-scroll')
+    if (!el || !scroller) return
+    const top = el.getBoundingClientRect().top
+    const prev = anchorRef.current
+    if (prev.id && prev.id !== firstPostId && scroller.scrollTop > 0) {
+      const inserted = top - prev.top
+      // Only a prepend (content pushed DOWN) is compensated; a removal above
+      // would otherwise scroll the reader backwards.
+      if (inserted > 0) scroller.scrollTop += inserted
+    }
+    anchorRef.current = { id: firstPostId, top: el.getBoundingClientRect().top }
+  }, [firstPostId])
+
   // The timestamp is parsed ONCE per post, not inside every comparator call.
   const latestPosts = useMemo(() => {
     const stamped = visiblePosts.map((p) => ({ p, t: Date.parse(p.created_at) || 0 }));
@@ -978,7 +1005,11 @@ export function GMatchFeed({
       {/* Feed Content Column (Posts) */}
       <div className="w-full flex flex-col px-2 sm:px-4 py-2 space-y-3">
         {/* Feed Posts List with Sharp Square Images */}
-                  <div className={feedLayout === 'grid' ? 'mt-3' : 'mt-3 mx-auto w-full max-w-[600px]'} data-feed-layout={feedLayout}>
+                  <div
+                    ref={listRef}
+                    className={feedLayout === 'grid' ? 'mt-3' : 'mt-3 mx-auto w-full max-w-[600px]'}
+                    data-feed-layout={feedLayout}
+                  >
            {feedLayout === 'grid' ? (
              <FeedGrid
                posts={visiblePosts}
@@ -1075,7 +1106,7 @@ export function GMatchFeed({
                 key={post.id}
                 data-post-id={post.id}
                 onContextMenu={(e) => { e.preventDefault(); setOptionsPost(post) }}
-                className={`relative bg-surface-raised border border-border-glass rounded-[10px] overflow-hidden flex flex-col mb-3 break-inside-avoid ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
+                className={`cv-row relative bg-surface-raised border border-border-glass rounded-[10px] overflow-hidden flex flex-col mb-3 break-inside-avoid ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
               >
                 {/* Repost attribution: a quiet line, not a filled band, so the
                     post reads as one media-first tile, Instagram-style. */}
@@ -1729,4 +1760,10 @@ export function GMatchFeed({
   );
 }
 
-
+/** Memoized: the feed is a pure function of its props. App re-renders on its
+ *  own clock (idle tick, presence, roster), and rebuilding 500 cards because a
+ *  counter moved is the difference between a 60fps list and a 1fps one. The
+ *  props (useCallback/useMemo upstream) are the only reason to render. The cast
+ *  only restores the signature `memo` cannot infer from a destructured
+ *  parameter with defaults; the props contract is unchanged. */
+export const GMatchFeed = memo(GMatchFeedImpl) as typeof GMatchFeedImpl

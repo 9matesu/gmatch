@@ -50,7 +50,7 @@ import { AnnouncementBanner } from "./components/feed/AnnouncementBanner";
 import { findUserById } from "./utils/userLookup";
 import { resolveObjectRefId } from "./utils/objectRef";
 import { reconcilePublishedPost } from "./utils/feedPublish";
-import { mergeRecentPushes, rememberPushed, type PushedEntry } from "./utils/feedMerge";
+import { mergeRecentPushes, rememberPushed, sameTimeline, type PushedEntry } from "./utils/feedMerge";
 import { PEER_ONLINE_EVENT } from "./utils/p2pSwarm";
 import { localHeldMediaUrl } from "./utils/localMedia";
 import { GMatchDMs } from "./components/chat/GMatchDMs";
@@ -281,7 +281,7 @@ export default function Home() {
     enqueueDecision,
   } = game;
 
-  const lobby = useLobby({ identity, settings });
+  const lobby = useLobby({ identity, settings }); // BISECT
   const notifications = useNotifications(lobby.state);
 
   // Wrapped lobby functions that request notification permission on user gesture
@@ -1464,7 +1464,13 @@ export default function Home() {
         if (seq !== feedRequestSeqRef.current) return []
         if (!Array.isArray(data?.posts)) { setFeedStatus('error'); return [] }
         const posts = data.posts as FeedPost[]
-        setServerPosts(mergeRecentPushes(posts, feedPushedRef.current))
+        setServerPosts((prev) => {
+          const next = mergeRecentPushes(posts, feedPushedRef.current)
+          // A snapshot that says exactly what is on screen keeps the old array:
+          // a new reference here is a full re-render of the timeline for the
+          // same pixels (once a second, on every socket push / focus refresh).
+          return sameTimeline(prev, next) ? prev : next
+        })
         setFeedStatus('ready')
         setHasMoreFeed(posts.length >= 50)
         setProfilePics((prev) => {

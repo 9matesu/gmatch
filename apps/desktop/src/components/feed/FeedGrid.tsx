@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Layers } from 'lucide-react'
 import type { FeedPost } from './GMatchFeed'
 import { justifyRows, type JustifiedInput } from './justifyRows'
 import { ObjectImage } from '../ObjectImage'
@@ -10,8 +11,15 @@ import type { OrbitIdentity } from '@orbit/crypto'
  * must not re-probe a picture it already measured.
  */
 const ratios = new Map<string, number>()
+/** A text-only post has no pixels, so the row math gives it a card shape. */
+const TEXT_TILE_RATIO = 1.5
+
+function hasMedia(post: FeedPost): boolean {
+  return Boolean(post.media?.[0]?.url || post.url)
+}
+
 function ratioOf(post: FeedPost): number | undefined {
-  return ratios.get(post.id) ?? ratios.get(post.media?.[0]?.id || '')
+  return ratios.get(post.id) ?? ratios.get(post.media?.[0]?.id || '') ?? (hasMedia(post) ? undefined : TEXT_TILE_RATIO)
 }
 
 function remember(post: FeedPost, w: number, h: number) {
@@ -116,31 +124,51 @@ export function FeedGrid({ posts, identity, onOpen, likedPosts, likeCounts, onTo
                 onClick={() => onOpen(post)}
                 title={post.caption || undefined}
                 aria-label={post.caption ? `Open post: ${post.caption.slice(0, 60)}` : 'Open post'}
-                className="group relative min-w-0 overflow-hidden bg-surface-raised border border-border-glass rounded-[10px] cursor-pointer"
+                className="cv-row group relative min-w-0 overflow-hidden bg-surface-raised border border-border-glass rounded-[10px] cursor-pointer"
                 style={{ flexGrow: ratioOf(post) || 1, flexBasis: 0 }}
               >
-                {isObject ? (
-                  <ObjectImage
-                    objectId={post.media?.[0]?.id}
-                    contentUrl={url}
-                    identity={identity}
-                    mimeType={mime}
-                    className="w-full h-full object-cover"
-                    videoClassName="w-full h-full object-cover"
-                    hideUnavailable
-                  />
-                ) : (
-                  <img
-                    src={resolveMediaUrl(url)}
-                    alt=""
-                    loading="lazy"
-                    decoding="async"
-                    className="w-full h-full object-cover"
-                  />
-                )}
+                {hasMedia(post) ? (
+                  isObject ? (
+                    <ObjectImage
+                      objectId={post.media?.[0]?.id}
+                      contentUrl={url}
+                      identity={identity}
+                      mimeType={mime}
+                      className="w-full h-full object-cover"
+                      videoClassName="w-full h-full object-cover"
+                      hideUnavailable
+                    />
+                  ) : (
+                    <img
+                      src={resolveMediaUrl(url)}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      className="w-full h-full object-cover"
+                    />
+                  )
+                ) : null}
+                {!hasMedia(post) ? (
+                  // Text-only post: the words are the tile, not a hole.
+                  <span className="flex h-full w-full flex-col justify-between gap-2 p-3 text-left">
+                    <span className="line-clamp-6 text-[13px] leading-snug text-retro-body">
+                      {post.caption?.trim() || '(no caption)'}
+                    </span>
+                    <span className="text-[11px] text-retro-faint">{post.author_name}</span>
+                  </span>
+                ) : null}
                 {video && (
                   <span className="absolute left-2 top-2 px-1.5 py-0.5 rounded bg-black/60 text-[11px] text-white">
                     video
+                  </span>
+                )}
+                {(post.media?.length ?? 0) > 1 && (
+                  <span
+                    className="absolute right-2 top-2 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[11px] text-white"
+                    aria-label={`${post.media!.length} images`}
+                  >
+                    <Layers className="h-3 w-3" />
+                    {post.media!.length}
                   </span>
                 )}
                 <span className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/70 to-transparent px-2 pb-1.5 pt-6 text-[12px] text-white opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
