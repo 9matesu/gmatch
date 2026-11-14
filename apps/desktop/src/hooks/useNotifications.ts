@@ -88,6 +88,10 @@ export function useNotifications(lobbyState?: LobbyState | null) {
   // Register Service Worker
   useEffect(() => {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+    // Never in `vite dev`: the worker caches the app shell, so every edit was
+    // served from `goonmatch-v1` and the running app silently stayed on the old
+    // bundle. Offline support is a packaged-build concern.
+    if (import.meta.env.DEV) return;
 
     let cancelled = false;
 

@@ -3673,6 +3673,7 @@ export default function Home() {
                             {!collapsedModules.feed && (
                               <GMatchFeed
                                 identity={identity}
+                                onPingAttention={() => { void pingAttention(); }}
                                 posts={feedPosts}
                                 stories={stories}
                                 storiesLoading={storiesLoading}
