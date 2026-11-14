@@ -362,7 +362,7 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
       {/* Stories Horizontal Carousel */}
       <div
         ref={scrollRef}
-        className="flex items-center gap-3.5 sm:gap-4 overflow-x-auto scrollbar-none py-1 px-1 scroll-smooth"
+        className={`flex items-center gap-3.5 sm:gap-4 overflow-x-auto scrollbar-none px-1 scroll-smooth ${visibleGroupedUsers.length === 0 ? 'py-0' : 'py-1'}`}
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         {/* Current User Story / Add Story Circle */}
@@ -383,7 +383,7 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
                 <span className="text-xs font-black text-retro-muted">YOU</span>
               )}
             </div>
-            <div className="absolute bottom-0 right-0 w-4 h-4 rounded-full bg-[#0095f6] border-2 border-border-glass flex items-center justify-center text-retro-fg shadow-xs">
+            <div aria-hidden="true" className="absolute bottom-0 right-0 w-4 h-4 rounded-full bg-retro-accent border-2 border-border-glass flex items-center justify-center text-retro-accent-text">
               <Plus className="w-3 h-3 stroke-[3]" />
             </div>
           </div>
@@ -431,11 +431,7 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
             </span>
           </div>
         ))}
-        {visibleGroupedUsers.length === 0 && !loading && (
-          <div className="text-xs text-retro-muted py-2 italic px-2">
-            No active stories yet.
-          </div>
-        )}
+
       </div>
 
       {/* ── 2. Fullscreen Instagram Story Viewer Lightbox ── */}

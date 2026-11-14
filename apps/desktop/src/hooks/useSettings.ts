@@ -13,6 +13,8 @@ const FEED_COLS_MIGRATED_KEY = 'gmatch.feed_cols_migrated.v1'
 export interface AppSettings {
   galleryCols: '2' | '3'
   feedCols: '1' | '2' | '3' | '4' | '5'
+  /** Timeline shape: a Twitter-style column or a justified image grid. */
+  feedLayout: 'list' | 'grid'
   hideDuplicates: boolean
   soundEffects: boolean
   watchPartyEnabled: boolean
@@ -83,6 +85,7 @@ export interface AppSettings {
 const DEFAULTS: AppSettings = {
   galleryCols: '2',
   feedCols: '2',
+  feedLayout: 'list',
   hideDuplicates: false,
   soundEffects: true,
   watchPartyEnabled: true,

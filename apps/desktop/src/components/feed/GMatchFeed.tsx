@@ -32,11 +32,14 @@ import {
   Zap,
   RefreshCw,
   Loader2,
+  Rows3,
+  LayoutGrid,
 } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { OrbitObject as StoryItem } from '@orbit/shared';
 import { generateFallbackName } from '@orbit/shared';
-import { timeAgo } from '../../utils/timeAgo';
+import { countHidden, isRenderable } from './isRenderable';
+import { FeedGrid } from './FeedGrid';
 import { GMatchStories } from '../GMatchStories';
 import { PostComments } from './PostComments';
 import { SideSheet } from '../../ui/kit';
@@ -45,7 +48,7 @@ import { ObjectImage } from '../ObjectImage';
 import { Avatar } from '../Avatar';
 import CachedImg from '../../ui/CachedImg';
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer';
-import { isVideoPost, resolveMediaUrl } from '../../utils/media';
+import { isVideoPost } from '../../utils/media';
 import { vaultPin, vaultBridge } from '../../services/vault';
 
 /** Sibling item MIME types for render-time video detection (see isVideoPost). */
@@ -165,8 +168,8 @@ export function GMatchFeed({
   isLoadingMore = false,
   feedSort = DEFAULT_FEED_SORT,
   onFeedSortChange,
-  feedCols = '1',
-  onFeedColsChange,
+  feedLayout = 'list',
+  onFeedLayoutChange,
   toast,
   onUserContext,
   onForceRefresh,
@@ -210,8 +213,9 @@ export function GMatchFeed({
   isLoadingMore?: boolean;
   feedSort?: FeedSort;
   onFeedSortChange?: (sort: FeedSort) => void;
-  feedCols?: '1' | '2' | '3' | '4' | '5';
-  onFeedColsChange?: (cols: '1' | '2' | '3' | '4' | '5') => void;
+  /** Timeline shape: the Twitter-style column or the justified image grid. */
+  feedLayout?: 'list' | 'grid';
+  onFeedLayoutChange?: (layout: 'list' | 'grid') => void;
   toast?: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
   onOpenNetwork?: (userId: string) => void;
   onUserContext?: (e: React.MouseEvent, userId: string, displayName: string) => void;
@@ -550,12 +554,12 @@ export function GMatchFeed({
   const hidePost = useCallback((id: string) => {
     setDeadPosts((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
   }, []);
+  const hiddenCount = useMemo(() => countHidden(posts), [posts]);
   const visiblePosts = useMemo(
     () => posts.filter((p) => {
       if (p.is_archived) return false;
-      // A text-only post has no url and no media by design: it stays.
-      // No bytes AND no words = nothing to show. A caption alone is a post.
-      if (!p.is_sponsored && !p.url && (!p.media || p.media.length === 0) && !p.caption) return false;
+      // No words, no url, no media = no post. Never a card, never a slot.
+      if (!isRenderable(p)) return false;
       // Media that cannot be fetched right now keeps the post on screen (its
       // tile shows the placeholder). Hiding the whole post here is what made a
       // user's own old uploads disappear when no seeder held the bytes.
@@ -884,26 +888,26 @@ export function GMatchFeed({
             ))}
           </div>
         }
-        colsControls={
+        layoutToggle={
           <div
             role="group"
-            aria-label="Feed columns"
-            className="flex items-center rounded-md bg-glass-w5 border border-border-glass p-0.5 text-xs"
+            aria-label="Feed layout"
+            className="flex items-center rounded-md bg-glass-w5 border border-border-glass p-0.5"
           >
-            {(['1', '2', '3', '4', '5'] as const).map((cols) => (
+            {(['list', 'grid'] as const).map((layout) => (
               <button
-                key={cols}
+                key={layout}
                 type="button"
-                onClick={() => { playPress(720); onFeedColsChange?.(cols); }}
-                aria-pressed={feedCols === cols}
-                title={`${cols}-column feed`}
-                aria-label={`${cols}-column feed`}
-                className={`px-2 py-1 rounded transition-all duration-150 active:scale-[0.96] cursor-pointer font-medium ${feedCols === cols
-                    ? 'bg-retro-accent text-retro-accent-text font-semibold'
+                onClick={() => { playPress(720); onFeedLayoutChange?.(layout); }}
+                aria-pressed={feedLayout === layout}
+                title={layout === 'list' ? 'Timeline' : 'Grid'}
+                aria-label={layout === 'list' ? 'Timeline layout' : 'Grid layout'}
+                className={`p-1.5 rounded transition-colors duration-150 cursor-pointer ${feedLayout === layout
+                    ? 'bg-glass-w20 text-retro-fg'
                     : 'text-retro-muted hover:text-retro-fg'
                   }`}
               >
-                {cols}
+                {layout === 'list' ? <Rows3 className="w-4 h-4" /> : <LayoutGrid className="w-4 h-4" />}
               </button>
             ))}
           </div>
@@ -913,6 +917,15 @@ export function GMatchFeed({
       {/* Selective status pills: only empty/conflict states, never a
           healthy timeline (see FeedStatusPills). */}
       <FeedStatusPills />
+
+      {/* Dev-only census: rows dropped for having no content at all. It is
+          the honest way to see that the predicate, not the network, is
+          what emptied the timeline. */}
+      {import.meta.env.DEV && hiddenCount > 0 && (
+        <div className="px-3 sm:px-6 pt-1 text-[11px] text-retro-faint" data-testid="feed-hidden-count">
+          {hiddenCount} hidden: no content
+        </div>
+      )}
 
       {/* ONE quiet sync label (replaces the per-post chips): reflects real
           background publish work — active uploads / posts saved locally only.
@@ -963,9 +976,21 @@ export function GMatchFeed({
       </div>
 
       {/* Feed Content Column (Posts) */}
-      <div className="w-full max-w-[1400px] mx-auto flex flex-col px-2 sm:px-4 py-2 space-y-3">
+      <div className="w-full flex flex-col px-2 sm:px-4 py-2 space-y-3">
         {/* Feed Posts List with Sharp Square Images */}
-                  <div className={`mt-3 gap-3 ${feedCols === '1' ? 'columns-1' : feedCols === '3' ? 'columns-1 sm:columns-2 lg:columns-3' : feedCols === '4' ? 'columns-1 sm:columns-2 lg:columns-3 xl:columns-4' : feedCols === '5' ? 'columns-1 sm:columns-2 lg:columns-3 xl:columns-4 2xl:columns-5' : 'columns-1 sm:columns-2 lg:columns-3'}`}>
+                  <div className={feedLayout === 'grid' ? 'mt-3' : 'mt-3 mx-auto w-full max-w-[600px]'} data-feed-layout={feedLayout}>
+           {feedLayout === 'grid' ? (
+             <FeedGrid
+               posts={visiblePosts}
+               identity={identity}
+               profilePics={profilePics}
+               likedPosts={likedPosts}
+               likeCounts={likeCounts}
+               onToggleLike={toggleLike}
+               onOpen={(post) => { toggleExpand(post); }}
+             />
+           ) : (
+             <>
            {visiblePosts.map((post, _idx) => {
               if (deadPosts.has(post.id)) return null;
             const isLiked = !!likedPosts[post.id];
@@ -995,8 +1020,6 @@ export function GMatchFeed({
            const multiMedia = Array.isArray(post.media) && post.media.length > 1 ? post.media : null;
             const currentIdx = multiMedia ? Math.min(Math.max(0, mediaIdx[post.id] || 0), multiMedia.length - 1) : 0;
             const expanded = expandedPostId === post.id;
-            const rawAvatar = profilePics[post.author_id] || post.author_avatar;
-            const authorAvatarUrl = rawAvatar ? resolveMediaUrl(rawAvatar) : '';
 
             return post.is_sponsored ? (
               <article
@@ -1052,7 +1075,7 @@ export function GMatchFeed({
                 key={post.id}
                 data-post-id={post.id}
                 onContextMenu={(e) => { e.preventDefault(); setOptionsPost(post) }}
-                className={`relative bg-retro-panel border border-border-glass rounded-lg overflow-hidden flex flex-col shadow-xs mb-3 break-inside-avoid ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
+                className={`relative bg-surface-raised border border-border-glass rounded-[10px] overflow-hidden flex flex-col mb-3 break-inside-avoid ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
               >
                 {/* Repost attribution: a quiet line, not a filled band, so the
                     post reads as one media-first tile, Instagram-style. */}
@@ -1063,27 +1086,63 @@ export function GMatchFeed({
                   </div>
                 )}
 
-                {/* Post Media with Click to Lightbox & Double Tap Like.
-                    A text-only post has no bytes at all, so the whole block is
-                    skipped instead of rendering an empty frame. */}
-                {!post.url && !post.localPreviewUrl ? (
-                  <div className="px-4 pt-3 pb-1">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <div className="w-7 h-7 rounded-full overflow-hidden bg-surface-raised border border-border-glass shrink-0">
-                        {authorAvatarUrl ? (
-                          <img src={authorAvatarUrl} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <span className="flex h-full w-full items-center justify-center text-[11px] font-semibold text-retro-muted">
-                            {(post.author_name || '?').slice(0, 1).toUpperCase()}
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-[12px] font-semibold text-retro-fg truncate">{post.author_name || generateFallbackName(post.author_id)}</span>
-                      <span className="text-[11px] text-retro-faint shrink-0">{timeAgo(post.created_at)}</span>
+                {/* One header row per post: avatar, name, handle, time, menu.
+                    It used to be a gradient painted over the picture, which
+                    drew the author and "No preview" on the same line. */}
+                <div
+                  data-testid="post-author-overlay"
+                  className="flex items-center gap-3 px-3 pt-3 pb-2"
+                  onContextMenu={(e) => onUserContext?.(e, post.author_id, post.author_name)}
+                >
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => { e.stopPropagation(); handleAvatarClick(post.author_id); }}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAvatarClick(post.author_id)}
+                    title={authorHasStory ? 'Watch story' : 'View profile'}
+                    aria-label={authorHasStory ? `Watch story of ${post.author_name}` : `View profile of ${post.author_name}`}
+                    className={`relative w-10 h-10 rounded-full p-[2px] flex-shrink-0 cursor-pointer ${authorHasStory ? 'bg-retro-accent' : 'bg-transparent'}`}
+                  >
+                    <div className="relative w-full h-full rounded-full bg-surface-raised overflow-hidden">
+                      <Avatar id={post.author_id} size={40} imageUrl={profilePics[post.author_id] || post.author_avatar} fill={true} />
                     </div>
-                    <p className="text-[13px] sm:text-sm leading-relaxed text-retro-body whitespace-pre-wrap break-words">{post.caption}</p>
                   </div>
-                ) : (() => {
+                  <div className="flex min-w-0 flex-1 items-baseline gap-1.5">
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => { e.stopPropagation(); handleNameClick(post.author_id); }}
+                      onKeyDown={(e) => e.key === 'Enter' && handleNameClick(post.author_id)}
+                      className="truncate text-sm font-semibold text-retro-fg hover:underline cursor-pointer"
+                    >
+                      {post.author_name || generateFallbackName(post.author_id)}
+                    </span>
+                    <span className="shrink-0 text-xs text-retro-faint">@{post.author_id.slice(0, 8)}</span>
+                    <span className="shrink-0 text-xs text-retro-faint" aria-hidden="true">·</span>
+                    <PostTimestamp createdAt={post.created_at} className="shrink-0 text-xs text-retro-faint" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setOptionsPost(post); }}
+                    className="shrink-0 p-1.5 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w10 cursor-pointer transition-colors"
+                    aria-label="Post options"
+                    title="Post options"
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Body: the words are content, so they sit above the media
+                    (Twitter order) instead of under the action row. */}
+                {post.caption ? (
+                  <p className="px-3 pb-2 text-[15px] leading-5 text-retro-body whitespace-pre-wrap break-words">
+                    <Linkify text={post.caption} />
+                  </p>
+                ) : null}
+
+                {/* Media. A post with no bytes at all renders nothing here
+                    (no empty frame, no "No preview"). */}
+                {!post.url && !post.localPreviewUrl ? null : (() => {
                   const activeItem = multiMedia ? multiMedia[currentIdx] : null;
                   const activeUrl = activeItem ? activeItem.url : post.url;
                   const activeMime = activeItem ? activeItem.mime_type : post.mime_type;
@@ -1241,67 +1300,6 @@ export function GMatchFeed({
                         </div>
                       </div>
 
-                      {/* Author identity rides ON the media over a top scrim:
-                          the card has no header bar of its own, so the
-                          identity is the first thing you read over the
-                          picture. The scrim is pointer-events-none so a click
-                          anywhere else still expands the post; the controls opt
-                          back in. The right padding reserves the strip the
-                          video player's own top-right control occupies. */}
-                      {!expanded && (
-                        <div
-                          data-testid="post-author-overlay"
-                          className="pointer-events-none absolute inset-x-0 top-0 z-30 bg-gradient-to-b from-black/75 via-black/35 to-transparent pl-3 pr-12 pt-3 pb-8"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <div
-                              className="pointer-events-auto flex min-w-0 items-center gap-2.5"
-                              onContextMenu={(e) => onUserContext?.(e, post.author_id, post.author_name)}
-                            >
-                              <div
-                                role="button"
-                                tabIndex={0}
-                                onClick={(e) => { e.stopPropagation(); handleAvatarClick(post.author_id); }}
-                                onKeyDown={(e) => e.key === 'Enter' && handleAvatarClick(post.author_id)}
-                                title={authorHasStory ? 'Watch story' : 'View profile'}
-                                aria-label={authorHasStory ? `Watch story of ${post.author_name}` : `View profile of ${post.author_name}`}
-                                className={`relative w-8 h-8 rounded-full p-[1.5px] flex-shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${authorHasStory ? 'bg-retro-accent' : 'bg-glass-w12 border border-border-glass'}`}
-                              >
-                                <div className="relative w-full h-full rounded-full bg-retro-panel overflow-hidden flex items-center justify-center text-xs font-semibold text-retro-fg">
-                                  <Avatar id={post.author_id} size={32} imageUrl={profilePics[post.author_id] || post.author_avatar} fill={true} />
-                                </div>
-                              </div>
-                              <div className="flex flex-col justify-center min-w-0 self-center leading-tight">
-                                <div className="flex items-baseline gap-1.5 min-w-0">
-                                  <span
-                                    role="button"
-                                    tabIndex={0}
-                                    onClick={(e) => { e.stopPropagation(); handleNameClick(post.author_id); }}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleNameClick(post.author_id)}
-                                    className="text-xs font-semibold text-retro-fg hover:underline cursor-pointer leading-tight truncate min-w-0 [text-shadow:0_1px_4px_rgba(0,0,0,0.75)] focus-visible:outline-2 focus-visible:outline-white"
-                                  >
-                                    {post.author_name}
-                                  </span>
-                                  <PostTimestamp createdAt={post.created_at} className="text-xs text-retro-fg/75 leading-tight [text-shadow:0_1px_4px_rgba(0,0,0,0.75)]" />
-                                  {/* Sync state moved to the one feed-top label (B4): no per-post chips. */}
-                                </div>
-                                {post.location && (
-                                  <span className="text-xs text-retro-fg/75 leading-tight block truncate [text-shadow:0_1px_4px_rgba(0,0,0,0.75)]">{post.location}</span>
-                                )}
-                              </div>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); setOptionsPost(post); }}
-                              className="pointer-events-auto shrink-0 text-retro-fg/80 hover:text-retro-fg p-1.5 rounded-md cursor-pointer hover:bg-black/40 transition-colors focus-visible:outline-2 focus-visible:outline-white"
-                              aria-label="Post options"
-                            >
-                              <MoreHorizontal className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      )}
 
                       {/* Zoom + collapse overlays (expanded only) */}
                       {expanded && (
@@ -1384,7 +1382,7 @@ export function GMatchFeed({
                         className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-[0.98]"
                       >
                         <Heart
-                          className={`w-5 h-5 transition-colors stroke-[1.75] ${isLiked ? 'text-rose-500 fill-rose-500' : 'text-retro-muted hover:text-retro-fg'
+                          className={`w-4 h-4 transition-colors stroke-[1.75] ${isLiked ? 'text-rose-500 fill-rose-500' : 'text-retro-muted hover:text-retro-fg'
                             }`}
                         />
                       </button>
@@ -1395,7 +1393,7 @@ export function GMatchFeed({
                         aria-label="Comment"
                         className="p-1.5 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-[0.98]"
                       >
-                        <MessageCircle className="w-5 h-5 stroke-[1.75]" />
+                        <MessageCircle className="w-4 h-4 stroke-[1.75]" />
                       </button>
 
                       <button
@@ -1404,7 +1402,7 @@ export function GMatchFeed({
                         aria-label="Share post"
                         className="p-1.5 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-[0.98]"
                       >
-                        <Send className="w-5 h-5 stroke-[1.75]" />
+                        <Send className="w-4 h-4 stroke-[1.75]" />
                       </button>
                     </div>
 
@@ -1415,7 +1413,7 @@ export function GMatchFeed({
                       className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-[0.98]"
                     >
                       <Bookmark
-                        className={`w-5 h-5 transition-colors stroke-[1.75] ${isSaved ? 'text-retro-fg fill-retro-fg' : 'text-retro-muted hover:text-retro-fg'
+                        className={`w-4 h-4 transition-colors stroke-[1.75] ${isSaved ? 'text-retro-fg fill-retro-fg' : 'text-retro-muted hover:text-retro-fg'
                           }`}
                       />
                     </button>
@@ -1433,42 +1431,30 @@ export function GMatchFeed({
                         className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-[0.98]"
                       >
                         <FolderPlus
-                          className={`w-5 h-5 stroke-[1.75] transition-colors ${vaultSaved.has(post.url) ? 'text-emerald-400' : 'text-retro-muted hover:text-retro-fg'}`}
+                          className={`w-4 h-4 stroke-[1.75] transition-colors ${vaultSaved.has(post.url) ? 'text-emerald-400' : 'text-retro-muted hover:text-retro-fg'}`}
                         />
                       </button>
                     )}
                   </div>
 
-                  {/* Likes: "Liked by Ana, Bo and 12 others" (falls back to
-                      the bare count until the preview arrives or when this
-                      client is the only liker). */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      playPress(700);
-                      setLikersModalPostId(post.id);
-                    }}
-                    className="text-left text-xs font-semibold text-retro-fg tracking-tight hover:underline cursor-pointer w-fit transition-colors"
-                    aria-label="View who liked this post"
-                  >
-                    {likedByLabel || `${currentLikes.toLocaleString()} ${currentLikes === 1 ? 'like' : 'likes'}`}
-                  </button>
+                  {/* Likes: named likers when the row carries them, otherwise the
+                      bare count. Zero is not shown as a datum. */}
+                  {(likedByLabel || currentLikes > 0) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        playPress(700);
+                        setLikersModalPostId(post.id);
+                      }}
+                      className="text-left text-xs text-retro-muted hover:text-retro-fg hover:underline cursor-pointer w-fit transition-colors"
+                      aria-label="View who liked this post"
+                    >
+                      {likedByLabel || `${currentLikes.toLocaleString()} ${currentLikes === 1 ? 'like' : 'likes'}`}
+                    </button>
+                  )}
 
                   {(
                   <>
-                  {/* Caption & Tags */}
-                  {post.caption && post.url && (
-                    <div className="text-xs text-retro-fg leading-relaxed">
-                      <span
-                        className="font-semibold text-retro-fg mr-1.5 cursor-pointer hover:underline"
-                        onClick={() => onSelectUser?.(post.author_id)}
-                      >
-                        {post.author_name}
-                      </span>
-                      <Linkify text={post.caption} />
-                    </div>
-                  )}
-
                   {/* Tag Badges */}
                   {post.tags && post.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-0.5">
@@ -1509,21 +1495,15 @@ export function GMatchFeed({
                         </div>
                       )}
                     </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => toggleExpand(post)}
-                      className="text-left text-xs text-retro-muted hover:text-retro-fg cursor-pointer"
-                    >
-                      Add a comment...
-                    </button>
-                  )}
+                  ) : null}
                   </>
                   )}
                 </div>
               </article>
             );
           })}
+             </>
+           )}
 
           {displayPosts.length === 0 && (
             <div className="border border-border-glass rounded-lg p-10 text-center space-y-5 my-4 max-w-md mx-auto">

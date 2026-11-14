@@ -3497,7 +3497,7 @@ export default function Home() {
   const myPostTags = identity ? deriveProfileTags(serverPosts.filter(p => p.author_id === identity.orbitId), []) : []
 
   return (
-    <main id="main-content" className="h-[100dvh] max-h-[100dvh] min-h-0 w-full flex flex-col items-center justify-start relative overflow-hidden" style={{ background: 'var(--color-retro-bg)' }}>
+    <main id="main-content" className="h-[100dvh] max-h-[100dvh] min-h-0 w-full flex flex-col items-center justify-start relative overflow-hidden">
       <WallpaperBackground
         wallpaperBg={wallpaperBg}
         wallpaperFit={settings.wallpaperFit}
@@ -3768,8 +3768,8 @@ export default function Home() {
                                   // re-fetch the previous ranking.
                                   setFeedSort(mode);
                                 }}
-                                feedCols={settings.feedCols}
-                                onFeedColsChange={(cols) => updateSettings('feedCols', cols)}
+                                feedLayout={settings.feedLayout}
+                                onFeedLayoutChange={(layout) => updateSettings('feedLayout', layout)}
                                 toast={toast}
                               />
                             )}

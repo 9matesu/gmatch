@@ -57,25 +57,22 @@ describe('GMatchFeed author header', () => {
       />,
     );
 
-  it('rides the author identity ON the media, over a top scrim', () => {
+  it('gives the author a real header row above the media', () => {
     const { container } = renderFeed([imagePost]);
     const card = container.querySelector('article') as HTMLElement;
     expect(card).toBeTruthy();
 
-    // No separate header row above the picture: the identity is an overlay.
+    // Not an overlay: the identity sits above the picture, on the card's own
+    // surface, so it never shares a line with "No preview".
     const overlay = card.querySelector('[data-testid="post-author-overlay"]') as HTMLElement;
     expect(overlay).toBeTruthy();
-    expect(overlay.className).toMatch('absolute');
-    expect(overlay.className).toMatch('top-0');
-    expect(overlay.className).toMatch('bg-gradient-to-b');
+    expect(overlay.className).not.toMatch('absolute');
+    expect(overlay.className).not.toMatch('bg-gradient-to-b');
     expect(overlay.textContent).toContain('Alice Wonder');
     expect(overlay.querySelector('[title="View profile"]')).toBeTruthy();
 
-    // The overlay lives INSIDE the media node so it paints over the picture,
-    // and the media keeps its own click surface (role="button").
-    const mediaBox = card.querySelector('.group\\/post') as HTMLElement;
-    expect(mediaBox.contains(overlay)).toBe(true);
-    const media = card.querySelector('div[role="button"]') as HTMLElement;
+    // The media keeps its own click surface, outside the header.
+    const media = card.querySelector('.group\\/post div[role="button"]') as HTMLElement;
     expect(media).toBeTruthy();
     expect(overlay.contains(media)).toBe(false);
   });
@@ -116,7 +113,7 @@ describe('GMatchFeed author header', () => {
   it('clicking the media expands inline instead of opening a lightbox', () => {
     const { container } = renderFeed([imagePost]);
     const card = container.querySelector('article') as HTMLElement;
-    const mediaBox = card.querySelector('div[role="button"]') as HTMLElement;
+    const mediaBox = card.querySelector('.group\\/post div[role="button"]') as HTMLElement;
 
     fireEvent.click(mediaBox);
 

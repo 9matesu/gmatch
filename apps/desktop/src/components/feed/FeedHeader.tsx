@@ -9,8 +9,8 @@ interface FeedHeaderProps {
   onRefresh?: () => void;
   /** Sort tabs (For You / Latest) rendered inline — one bar, one row. */
   sortTabs?: React.ReactNode;
-  /** Grid 1-5 picker, rendered next to search. */
-  colsControls?: React.ReactNode;
+  /** Timeline/grid switch, rendered next to search. */
+  layoutToggle?: React.ReactNode;
   /** Collapse control; omit to hide the chevron. */
   onToggleCollapse?: () => void;
   /** Self-ping: floats the caller to the top of the roster for 30 s. */
@@ -21,7 +21,7 @@ export function FeedHeader({
   onOpenSearch,
   onRefresh,
   sortTabs,
-  colsControls,
+  layoutToggle,
   onToggleCollapse,
   onPingAttention,
 }: FeedHeaderProps) {
@@ -32,7 +32,7 @@ export function FeedHeader({
       </div>
 
       <div className="flex items-center gap-1 shrink-0">
-        {colsControls}
+        {layoutToggle}
 
         {onPingAttention && (
           <button
@@ -59,7 +59,7 @@ export function FeedHeader({
             aria-label="Reload feed toolbar"
             className="p-2 rounded-md text-retro-body hover:bg-glass-w8 transition-colors cursor-pointer"
           >
-            <RefreshCw className="w-5 h-5" />
+            <RefreshCw className="w-4 h-4" />
           </button>
         )}
 
@@ -70,7 +70,7 @@ export function FeedHeader({
           aria-label="Search"
           className="p-2 rounded-md text-retro-body hover:bg-glass-w8 transition-colors cursor-pointer"
         >
-          <Search className="w-5 h-5" />
+          <Search className="w-4 h-4" />
         </button>
 
         {onToggleCollapse && (

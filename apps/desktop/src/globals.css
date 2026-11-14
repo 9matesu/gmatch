@@ -1,6 +1,26 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Geist (OFL) is bundled: the app renders the same face offline, with no CDN
+   request on a cold start. One variable file per subset, weight 100-900. */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/geist-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/geist-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme {
@@ -11,7 +31,7 @@
 
   /* Panel opacity (Settings -> Panel Opacity): 1 = solid, 0.35 = most transparent.
      Default leans transparent: the wallpaper is the hero, panels are chrome. */
-  --panel-alpha: 0.42;
+  --panel-alpha: 0.94;
 
   /* Panel family - one slate, one opacity, under every name (used with backdrop-filter). */
   --color-glass: rgba(18, 18, 21, var(--panel-alpha));
@@ -117,11 +137,11 @@
 
   /* Radius scale (Concentric geometry) */
   --radius: 6px;
-  --radius-sm: 4px;
+  --radius-sm: 6px;
   --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
-  --radius-2xl: 16px;
+  --radius-lg: 10px;
+  --radius-xl: 10px;
+  --radius-2xl: 10px;
   --radius-full: 9999px;
 
   /* Spacing tokens */
@@ -308,18 +328,6 @@
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.38);
 }
 
-@supports (backdrop-filter: blur(1px)) {
-  .glass-panel {
-    -webkit-backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
-    backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
-  }
-}
-
-@supports not (backdrop-filter: blur(1px)) {
-  .glass-panel {
-    background: var(--color-glass-strong);
-  }
-}
 
 /* Glass toolbar: floating controls, dock. Chrome painted over the wallpaper
    stays opaque so text reads over any wallpaper; Panel Opacity only scales
@@ -342,12 +350,6 @@
     inset 0 -1px 0 rgba(0, 0, 0, 0.42);
 }
 
-@supports (backdrop-filter: blur(1px)) {
-  .glass-surface {
-    -webkit-backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
-    backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
-  }
-}
 
 .glass-tab,
 .glass-button {
@@ -457,8 +459,6 @@
 .command-island {
   background: var(--color-glass-strong);
   border: 1px solid var(--color-border-glass);
-  backdrop-filter: blur(calc(20px * var(--glass-blur, 0.7)));
-  -webkit-backdrop-filter: blur(calc(20px * var(--glass-blur, 0.7)));
   border-radius: 9999px;
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65);
   transition: border-color 150ms ease-out;
@@ -504,17 +504,9 @@
   .glass-surface,
   .glass-tab,
   .glass-button {
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
   }
 }
 
-@supports (backdrop-filter: blur(1px)) {
-  .glass-toolbar {
-    -webkit-backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
-    backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
-  }
-}
 
 .glass-sidebar {
   background:
@@ -524,12 +516,6 @@
   box-shadow: 18px 0 48px rgba(0, 0, 0, 0.28), inset -1px 0 0 rgba(0, 0, 0, 0.32);
 }
 
-@supports (backdrop-filter: blur(1px)) {
-  .glass-sidebar {
-    -webkit-backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
-    backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
-  }
-}
 
 .glass-card {
   position: relative;
@@ -544,12 +530,6 @@
     inset 0 -1px 0 rgba(0, 0, 0, 0.34);
 }
 
-@supports (backdrop-filter: blur(1px)) {
-  .glass-card {
-    -webkit-backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
-    backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
-  }
-}
 
 .glass-header {
   background: rgba(255, 255, 255, calc(0.045 * var(--panel-alpha)));
@@ -758,15 +738,6 @@
   background-color: color-mix(in srgb, var(--color-surface-canvas) 50%, transparent) !important;
 }
 
-@supports (backdrop-filter: blur(1px)) {
-  .app-glass .bg-surface-raised,
-  .app-glass .bg-surface-interactive,
-  .app-glass .bg-surface-elevated,
-  .app-glass .bg-surface-elevated\/50 {
-    -webkit-backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
-    backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
-  }
-}
 
 @media (prefers-reduced-transparency: reduce) {
   .app-glass .bg-surface-raised,
@@ -774,25 +745,14 @@
   .app-glass .bg-surface-elevated,
   .app-glass .bg-surface-elevated\/50 {
     background: var(--color-glass-strong) !important;
-    -webkit-backdrop-filter: none !important;
-    backdrop-filter: none !important;
   }
 }
 
-@supports (backdrop-filter: blur(1px)) {
-  .module,
-  .module-primary {
-    -webkit-backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
-    backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
-  }
-}
 
 @media (prefers-reduced-transparency: reduce) {
   .module,
   .module-primary {
     background: var(--color-glass-strong);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
   }
 }
 
@@ -895,12 +855,6 @@
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
 }
 
-@supports (backdrop-filter: blur(1px)) {
-  .solid-panel {
-    -webkit-backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
-    backdrop-filter: blur(calc(14px * var(--glass-blur, 0.7)));
-  }
-}
 
 /* Status indicator */
 .status-dot {
@@ -1419,8 +1373,6 @@ html[data-motion="on"] {
   .glass-panel,
   .glass-toolbar,
   .btn-skeuo {
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
   }
 
   .metallic-card-border,
@@ -1507,8 +1459,6 @@ html[data-motion="on"] {
   .glass-action,
   .solid-panel {
     background: var(--color-glass-strong);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
   }
 }
 
@@ -1556,7 +1506,7 @@ html.theme-light body {
   --color-retro-fg: #18181b;
   --color-retro-body: #3f3f46;
   --color-retro-muted: #52525b;
-  --color-retro-faint: #71717a;
+  --color-retro-faint: #82828b;
 
   /* The accent inverts: black pill, white text (it was white-on-black). */
   --color-retro-accent: #18181b;
@@ -1613,14 +1563,6 @@ html.theme-light [class*="bg-black/"] .text-retro-body {
 
 /* Wallpaper scrim: the artwork sits behind it, and the plate must read in
    both themes. In light mode it is WHITE — a dark scrim is a black page. */
-.wallpaper-scrim {
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.80), rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.85));
-}
-
-html.theme-light .wallpaper-scrim {
-  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.92));
-}
-
 /* Flat: no elevation anywhere. Tailwind shadows compile to box-shadow, so
    killing the property is the whole rule — every surface goes flat. */
 *,

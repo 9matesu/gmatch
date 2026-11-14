@@ -34,12 +34,6 @@ export function WallpaperBackground({ wallpaperBg, wallpaperFit = 'cover', wallp
           }`}
         onClick={() => { if (hideUiForWallpaper) onRestore() }}
       >
-        {wallpaperFit !== 'repeat' && !isVideo && (
-          <div
-            className="absolute -inset-10 bg-cover bg-center filter blur-3xl opacity-40 scale-110 transform-gpu"
-            style={{ backgroundImage: `url("${wallpaperBg}")` }}
-          />
-        )}
         {isVideo ? (
           <video
             className={`absolute inset-0 w-full h-full ${videoStyle.objectFit}`}
@@ -52,9 +46,6 @@ export function WallpaperBackground({ wallpaperBg, wallpaperFit = 'cover', wallp
         ) : (
           <div className={`absolute inset-0 ${wallpaperFit === 'repeat' ? '' : 'bg-center'}`} style={imgStyle} />
         )}
-        {/* Scrim kept darker than the artwork so PLATE glass reads over bright
-            wallpapers. App-wide by nature: every view shares it. */}
-        <div className="absolute inset-0 wallpaper-scrim" />
       </div>
 
       {hideUiForWallpaper && (

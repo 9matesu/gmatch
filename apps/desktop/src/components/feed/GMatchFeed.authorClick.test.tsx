@@ -80,9 +80,9 @@ describe('GMatchFeed author and name click behavior', () => {
     const nameEl = screen.getByText('Alice Wonder');
     const row = nameEl.closest('div.flex');
     expect(row?.className).toMatch('items-baseline');
-    expect(nameEl.className).toMatch('leading-tight');
+    expect(nameEl.className).toMatch('truncate');
     const timeEl = row?.querySelector('time');
-    expect(timeEl?.className).toMatch('leading-tight');
+    expect(timeEl?.className).toMatch('shrink-0');
     expect(timeEl?.className).toMatch('shrink-0');
   });
 });
