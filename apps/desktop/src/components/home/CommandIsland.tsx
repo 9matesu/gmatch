@@ -551,6 +551,15 @@ export function CommandIsland({
               onPick={(sel) => { setPostPickerOpen(false); onPickMedia(sel); }}
               onClose={() => setPostPickerOpen(false)}
             />
+            {/* Text-only posts have no media: one click opens the composer
+                with an empty body instead of forcing a pick first. */}
+            <button
+              type="button"
+              onClick={() => { setPostPickerOpen(false); onOpenCreatePost?.(); }}
+              className="mt-1.5 w-full px-3 py-1.5 rounded-lg text-[11px] font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w10 transition-colors cursor-pointer"
+            >
+              Write a text post
+            </button>
           </div>
         )}
     </>

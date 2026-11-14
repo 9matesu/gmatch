@@ -1051,8 +1051,10 @@ export function GMatchFeed({
                   </div>
                 )}
 
-                {/* Post Media with Click to Lightbox & Double Tap Like */}
-                {(() => {
+                {/* Post Media with Click to Lightbox & Double Tap Like.
+                    A text-only post has no bytes at all, so the whole block is
+                    skipped instead of rendering an empty frame. */}
+                {!post.url && !post.localPreviewUrl ? null : (() => {
                   const activeItem = multiMedia ? multiMedia[currentIdx] : null;
                   const activeUrl = activeItem ? activeItem.url : post.url;
                   const activeMime = activeItem ? activeItem.mime_type : post.mime_type;

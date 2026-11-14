@@ -251,14 +251,28 @@ objects.post('/', orbitAuth, async (c) => {
       expiresAt = null
     }
 
+    const objectId = crypto.randomUUID()
+
+    // A text-only post is still a post: no media, just the written body. The
+    // feed renders it like any other row (caption + author), so this is a row
+    // with no bytes, not a different kind of object.
     if (!imageFile && !linkUrl) {
-      return c.json({ error: 'Provide either an image file or a URL' }, 400)
+      const body = postCaption || caption
+      if (!body) return c.json({ error: 'Write something, or add an image' }, 400)
+      await c.env.DB.prepare(
+        "INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_url, caption, is_public, post_caption, location, post_tags, is_story, expires_at, post_group, is_chat) VALUES (?, ?, 0, 'text/plain', NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      ).bind(
+        objectId, orbitId, caption, isPublic, postCaption, location, postTags, isStory, expiresAt, postGroup, isChat
+      ).run()
+      if (isPublic === 1) {
+        await c.env.DB.prepare('UPDATE Users SET posts_count = COALESCE(posts_count, 0) + 1 WHERE id = ?').bind(orbitId).run().catch(() => { })
+      }
+      return c.json({ id: objectId, type: 'text', size: 0 }, 200)
     }
     if (imageFile && linkUrl) {
       return c.json({ error: 'Provide either an image file or a URL, not both' }, 400)
     }
 
-    const objectId = crypto.randomUUID()
     let imageSize = 0
 
     if (linkUrl) {

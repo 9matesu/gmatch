@@ -293,8 +293,8 @@ function extForMime(mime: string): string {
       toast?.('Please sign in to share posts', 'error');
       return;
     }
-    if (mediaList.length === 0) {
-      toast?.('Please add at least one photo or video', 'warning');
+    if (mediaList.length === 0 && !caption.trim()) {
+      toast?.('Write something, or add a photo', 'warning');
       return;
     }
 
@@ -307,6 +307,45 @@ function extForMime(mime: string): string {
       // first row carries caption/location/tags.
       const postGroup = crypto.randomUUID();
       const ids: string[] = [];
+
+      // Text-only post (Twitter-style): the same object row with no bytes. The
+      // API accepts it and the feed renders the written body.
+      if (mediaList.length === 0) {
+        const form = new FormData();
+        form.append('post_caption', caption.trim());
+        form.append('location', location.trim());
+        form.append('tags', tags.trim());
+        form.append('is_public', mode === 'story' ? '0' : '1');
+        form.append('post_group', postGroup);
+        const res = await orbitFetch('/api/objects', { method: 'POST', body: form }, identity);
+        if (!res.ok) {
+          const err = await res.json().catch(() => null);
+          throw new Error(err?.error || 'Could not publish the post');
+        }
+        const data = await res.json();
+        toast?.('Post shared.', 'success');
+        onPostCreated?.({
+          id: data.id,
+          author_id: identity.orbitId,
+          author_name: 'You',
+          author_avatar: null,
+          url: '',
+          mediaUrls: [],
+          localPreviewUrl: null,
+          mime_type: undefined,
+          caption: caption.trim(),
+          location: location.trim(),
+          tags: tags.split(/[\s,#]+/).map((t) => t.trim()).filter(Boolean),
+          created_at: new Date().toISOString(),
+          like_count: 0,
+          comment_count: 0,
+          is_liked: false,
+          is_saved: false,
+        });
+        onClose();
+        return;
+      }
+
       let primaryId = '';
       let primaryLocalUrl: string | null = null;
       let primaryMime: string | null = null;
@@ -452,7 +491,7 @@ function extForMime(mime: string): string {
         author_id: identity.orbitId,
         author_name: 'You',
         author_avatar: null,
-        url: primaryId ? `/api/objects/${primaryId}` : mediaList[0].previewUrl,
+        url: primaryId ? `/api/objects/${primaryId}` : (mediaList[0]?.previewUrl || ''),
         mediaUrls: ids.map((id) => `/api/objects/${id}`),
         localPreviewUrl: primaryLocalUrl,
         mime_type: primaryMime || undefined,
@@ -473,6 +512,24 @@ function extForMime(mime: string): string {
       setUploading(false);
     }
   };
+
+  // The written body is not media: it renders for every post, including a
+  // text-only one (no bytes attached).
+  const captionField = (
+              <div>
+                <textarea
+                  value={caption}
+                  onChange={(e) => setCaption(e.target.value)}
+                  placeholder={mediaList.length === 0 ? 'What is happening?!' : 'Write a caption...'}
+                  rows={3}
+                  maxLength={1000}
+                  className="w-full bg-retro-bg border border-border-glass rounded-lg p-3 text-xs text-retro-fg focus:outline-none focus:border-border-glass transition-colors placeholder:text-retro-muted resize-none"
+                />
+                <div className="text-right text-[10px] font-mono text-retro-muted mt-0.5">
+                  {caption.length}/1000
+                </div>
+              </div>
+  )
 
   const currentMedia = mediaList[activeMediaIndex] || mediaList[0];
 
@@ -501,7 +558,7 @@ function extForMime(mime: string): string {
           <button
             type="button"
             onClick={handleShare}
-            disabled={uploading || mediaList.length === 0}
+            disabled={uploading || (mediaList.length === 0 && !caption.trim())}
             className="text-xs font-semibold text-retro-bg bg-white hover:bg-retro-fg disabled:opacity-40 cursor-pointer transition-all duration-150 active:scale-[0.96] px-4 py-1.5 rounded-md shadow-xs"
           >
             {uploading ? 'Sharing...' : (mode === 'story' ? 'Share Story' : 'Share')}
@@ -549,6 +606,8 @@ function extForMime(mime: string): string {
 
         {/* Body Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 styled-scrollbar">
+          {captionField}
+
           {/* Active Tab Modalities */}
           {activeTab === 'upload' && (
             <div
@@ -734,20 +793,7 @@ function extForMime(mime: string): string {
                 </div>
               )}
 
-              {/* Description / Caption */}
-              <div>
-                <textarea
-                  value={caption}
-                  onChange={(e) => setCaption(e.target.value)}
-                  placeholder="Write a caption..."
-                  rows={3}
-                  maxLength={1000}
-                  className="w-full bg-retro-bg border border-border-glass rounded-lg p-3 text-xs text-retro-fg focus:outline-none focus:border-border-glass transition-colors placeholder:text-retro-muted resize-none"
-                />
-                <div className="text-right text-[10px] font-mono text-retro-muted mt-0.5">
-                  {caption.length}/1000
-                </div>
-              </div>
+
 
               {/* Location & Tags inputs */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
