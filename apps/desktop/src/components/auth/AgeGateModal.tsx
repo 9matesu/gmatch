@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { ShieldAlert, CheckCircle2, XCircle } from 'lucide-react';
-import { playPress, playWin } from '../../utils/sounds';
+import { playPress } from '../../utils/sounds';
 
 export function AgeGateModal() {
   // Read synchronously so the gate never flashes the login screen behind it.
@@ -18,7 +18,6 @@ export function AgeGateModal() {
   });
 
   const handleConfirmAge = () => {
-    playWin();
     try {
       localStorage.setItem('goonMatch_age_verified', 'true');
     } catch {}

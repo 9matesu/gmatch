@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { playPress, playWin } from '../../utils/sounds';
+import { playPress } from '../../utils/sounds';
 import {
   Heart,
   Send,
@@ -104,7 +104,6 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
     isVideoPost(mime, url, mediaItems.map((m) => m.mime));
 
   const handleDoubleTap = () => {
-    playWin();
     if (!isLiked && post && onToggleLike) {
       onToggleLike(post);
     }

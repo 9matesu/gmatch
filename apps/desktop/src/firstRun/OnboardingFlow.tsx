@@ -18,7 +18,7 @@ import {
   writeOnboardingState,
 } from './onboardingState';
 import { saveUserProfile } from '../utils/profile';
-import { playWin, playPress } from '../utils/sounds';
+import { playPress } from '../utils/sounds';
 import { isDefaultPeerName } from '@orbit/shared';
 
 type Profile = { displayName: string; tags: string[]; pfpUrl?: string };
@@ -121,7 +121,6 @@ function ProfileStep(props: Props & { onDone: () => void }) {
         await saveUserProfile(identity, { display_name: effectiveName });
         onProfileUpdated({ displayName: effectiveName, tags: initialProfile.tags, pfpUrl: initialProfile.pfpUrl });
       }
-      playWin();
       onDone();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not complete setup');

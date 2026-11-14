@@ -39,10 +39,15 @@ describe('ContextOverlay Custom Context Menu', () => {
     );
 
     expect(screen.getByText('Video')).toBeInTheDocument();
-    expect(screen.getByText('Save Video As...')).toBeInTheDocument();
-    expect(screen.getByText('Copy Video Link')).toBeInTheDocument();
+    expect(screen.getByText('Copy video link')).toBeInTheDocument();
 
-    const copyBtn = screen.getByText('Copy Video Link');
+    // Save is parameterized: the file name is a field inside the menu, not a
+    // separate dialog.
+    await userEvent.click(screen.getByText('Save video as…'));
+    const name = screen.getByLabelText('File name') as HTMLInputElement;
+    expect(name.value).toBe('clip.mp4');
+
+    const copyBtn = screen.getByText('Copy video link');
     await userEvent.click(copyBtn);
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith('https://example.com/clip.mp4');
     expect(defaultProps.toast).toHaveBeenCalledWith('Video link copied', 'info');
@@ -67,12 +72,17 @@ describe('ContextOverlay Custom Context Menu', () => {
         }}
       />
     )
-    await userEvent.click(screen.getByText('Set as app background'))
+    await userEvent.click(screen.getByText('Set as background'))
+    await userEvent.click(screen.getByText('Apply'))
     expect(onSetWallpaper).toHaveBeenCalledWith('/api/objects/abc123', 'app', 'image/jpeg')
-    await userEvent.click(screen.getByText('Set as OS wallpaper'))
+
+    // Same menu, one parameter: switch the target and apply again.
+    await userEvent.click(screen.getByText('Set as background'))
+    await userEvent.selectOptions(screen.getByLabelText('Apply to'), 'os')
+    await userEvent.click(screen.getByText('Apply'))
     expect(onSetWallpaper).toHaveBeenCalledWith('/api/objects/abc123', 'os', 'image/jpeg')
 
-    // Avatars/icons opt out: no wallpaper entries at all.
+    // Avatars/icons opt out: no wallpaper entry at all.
     rerender(
       <ContextOverlay
         {...defaultProps}
@@ -80,8 +90,7 @@ describe('ContextOverlay Custom Context Menu', () => {
         contextMenu={{ x: 100, y: 100, type: 'media', data: { src: 'https://x/a.jpg', isVideo: false, noWallpaper: true } }}
       />
     )
-    expect(screen.queryByText('Set as app background')).toBeNull()
-    expect(screen.queryByText('Set as OS wallpaper')).toBeNull()
+    expect(screen.queryByText('Set as background')).toBeNull()
   })
 
   it('offers wallpaper entries on keepsake item menus', async () => {

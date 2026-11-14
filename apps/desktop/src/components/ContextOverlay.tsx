@@ -12,19 +12,11 @@ import {
   CheckSquare,
   RefreshCw,
   ArrowUp,
-  Download,
   Trash2,
   Search,
-  Image as ImageIcon,
-  Video as VideoIcon,
-  Monitor,
-  Repeat,
-  Play,
-  Pause,
-  Volume2,
-  VolumeX,
 } from 'lucide-react';
-import { downloadMedia, copyImageToClipboard, isMediaVideo, resolveMediaUrl } from '../utils/media';
+import { MediaContextMenu } from './ContextMenuMedia';
+import { isMediaVideo } from '../utils/media';
 
 export type ContextMenuType = 'user' | 'item' | 'media' | 'input' | 'selection' | 'link' | 'general';
 
@@ -106,6 +98,20 @@ export function ContextOverlay({
 
   if (!contextMenu) return null;
 
+  // Media is the one menu every surface needs (feed, chat, cards, gallery), and
+  // the one that takes parameters. It is DATA: see MediaContextMenu below.
+  if (contextMenu.type === 'media') {
+    return (
+      <MediaContextMenu
+        ctx={contextMenu}
+        onDismiss={onDismiss}
+        toast={toast}
+        onRepostImage={onRepostImage}
+        onSetWallpaper={onSetWallpaper}
+      />
+    );
+  }
+
   const menuWidth = 220;
   const menuHeight = contextMenu.type === 'item' ? 320 : contextMenu.type === 'user' ? 280 : 220;
   const left = typeof window !== 'undefined'
@@ -134,197 +140,6 @@ export function ContextOverlay({
         style={{ top, left }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* ─── MEDIA CONTEXT MENU (Images, Videos) ─── */}
-        {contextMenu.type === 'media' && (() => {
-          const { src, originalUrl, isVideo, videoEl, noWallpaper, keepsakeId } = contextMenu.data;
-          const resolved = resolveMediaUrl(src);
-          const wallpaperUrl = originalUrl || src;
-          const wallpaperMime = isVideo ? 'video/mp4' : 'image/jpeg';
-
-          return (
-            <>
-              <div className="px-2.5 py-1 flex items-center justify-between text-[10px] font-semibold text-retro-muted uppercase tracking-wider border-b border-border-glass/40 mb-1">
-                <span className="flex items-center gap-1">
-                  {isVideo ? <VideoIcon className="w-3 h-3 text-retro-accent" /> : <ImageIcon className="w-3 h-3 text-retro-accent" />}
-                  {isVideo ? 'Video' : 'Image'}
-                </span>
-                <span className="font-mono text-[10px] truncate max-w-[100px]" title={src}>
-                  {src ? src.split('/').pop()?.split('?')[0] : ''}
-                </span>
-              </div>
-
-              {/* Video Specific Controls */}
-              {isVideo && videoEl && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (videoEl.paused) videoEl.play();
-                      else videoEl.pause();
-                      onDismiss();
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2">
-                      {videoEl.paused ? <Play className="w-3.5 h-3.5 fill-current text-retro-accent" /> : <Pause className="w-3.5 h-3.5 fill-current text-retro-accent" />}
-                      <span>{videoEl.paused ? 'Play Video' : 'Pause Video'}</span>
-                    </div>
-                    <span className="text-[10px] text-retro-muted font-mono">Space</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      videoEl.muted = !videoEl.muted;
-                      onDismiss();
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2">
-                      {videoEl.muted ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5 text-retro-muted" />}
-                      <span>{videoEl.muted ? 'Unmute Audio' : 'Mute Audio'}</span>
-                    </div>
-                    <span className="text-[10px] text-retro-muted font-mono">M</span>
-                  </button>
-
-                  <div className="my-1 border-t border-border-glass/50" />
-                </>
-              )}
-
-              {/* Save Media As */}
-              <button
-                type="button"
-                onClick={async () => {
-                  toast('Downloading media...', 'info');
-                  const ok = await downloadMedia(src);
-                  if (ok) toast('Media download started', 'success');
-                  else toast('Download failed', 'error');
-                  onDismiss();
-                }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <Download className="w-3.5 h-3.5 text-retro-accent" />
-                  <span>{isVideo ? 'Save Video As...' : 'Save Image As...'}</span>
-                </div>
-              </button>
-
-              {/* Copy Image / Video Link */}
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(resolved);
-                  toast(isVideo ? 'Video link copied' : 'Image link copied', 'info');
-                  onDismiss();
-                }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <Copy className="w-3.5 h-3.5 text-retro-muted" />
-                  <span>{isVideo ? 'Copy Video Link' : 'Copy Image Link'}</span>
-                </div>
-              </button>
-
-              {/* Copy Image to Clipboard (PNG) */}
-              {!isVideo && (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    toast('Copying image to clipboard...', 'info');
-                    const ok = await copyImageToClipboard(src);
-                    if (ok) toast('Image copied to clipboard', 'success');
-                    else toast('Could not copy image bytes (link copied)', 'warning');
-                    onDismiss();
-                  }}
-                  className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer"
-                >
-                  <div className="flex items-center gap-2">
-                    <Clipboard className="w-3.5 h-3.5 text-retro-muted" />
-                    <span>Copy Image</span>
-                  </div>
-                </button>
-              )}
-
-              {/* Open in New Tab */}
-              <button
-                type="button"
-                onClick={() => {
-                  // Keepsakes resolve local-only through the gallery (never the
-                  // raw tile src, which may be an unresolved remote preview).
-                  if (keepsakeId) {
-                    window.dispatchEvent(
-                      new CustomEvent('gmatch:open-keepsake', { detail: { keepsakeId } }),
-                    );
-                    onDismiss();
-                    return;
-                  }
-                  window.open(resolved, '_blank', 'noopener,noreferrer');
-                  onDismiss();
-                }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <ExternalLink className="w-3.5 h-3.5 text-retro-muted" />
-                  <span>Open in New Window</span>
-                </div>
-              </button>
-
-              {/* Repost to Feed CTA */}
-              {onRepostImage && (
-                <>
-                  <div className="my-1 border-t border-border-glass/50" />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onRepostImage(resolved);
-                      onDismiss();
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer text-retro-accent"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Repeat className="w-3.5 h-3.5 text-retro-accent" />
-                      <span>Repost to Feed</span>
-                    </div>
-                  </button>
-                </>
-              )}
-
-              {/* Wallpaper (content images only — avatars/icons opt out) */}
-              {onSetWallpaper && !noWallpaper && (
-                <>
-                  <div className="my-1 border-t border-border-glass/50" />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onSetWallpaper(wallpaperUrl, 'app', wallpaperMime);
-                      onDismiss();
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2">
-                      <ImageIcon className="w-3.5 h-3.5 text-retro-muted" />
-                      <span>Set as app background</span>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onSetWallpaper(wallpaperUrl, 'os', wallpaperMime);
-                      onDismiss();
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Monitor className="w-3.5 h-3.5 text-retro-muted" />
-                      <span>Set as OS wallpaper</span>
-                    </div>
-                  </button>
-                </>
-              )}
-            </>
-          );
-        })()}
-
         {/* ─── INPUT / TEXTAREA CONTEXT MENU ─── */}
         {contextMenu.type === 'input' && (() => {
           const { element, hasSelection } = contextMenu.data;

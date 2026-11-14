@@ -1,10 +1,11 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useGame } from '../../game/store'
 import type { GalleryImage } from '../../game/types'
-import { IconTrash, IconWallpaper, IconX, IconRefresh, IconChevronL, IconChevronR } from '../../ui/icons'
+import { IconTrash, IconWallpaper, IconX, IconChevronL, IconChevronR } from '../../ui/icons'
 import { DND_KEEPSAKE } from '../DropZone'
 import { offlineSvg } from '../../services/offlineSvg'
 import { redgifsPlayable } from '../../services/redgifs'
+import { GALLERY_ACTION_EVENT, type GalleryActionDetail } from '../../utils/galleryActions'
 import CachedImg from '../../ui/CachedImg'
 import MediaViewerModal from '../../ui/MediaViewerModal'
 import { EmptyState } from '../EmptyState'
@@ -25,13 +26,9 @@ import {
   Repeat,
   Sparkles,
   ImagePlus,
-  MoreVertical,
   ExternalLink,
 } from 'lucide-react'
 import { MUTED } from '../../ui/styles'
-
-const HOVER_BTN =
-  'glass-button absolute flex cursor-pointer items-center justify-center rounded-lg p-0 opacity-0 focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100'
 
 const RARITY_ORDER: Record<string, number> = {
   Common: 1,
@@ -352,6 +349,10 @@ export default function IdleGalleryView({
   const setBackground = useGame((s) => s.setBackground)
   const removeGalleryImage = useGame((s) => s.removeGalleryImage)
 
+  // The context-menu bridge runs outside React's render, so it needs the latest
+  // resolver without re-subscribing on every render.
+  const forwardUrlRef = useRef<(img: GalleryImage) => string>(() => '')
+
   // Filters, search, sort, tags & pagination
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | 'image' | 'video'>('all')
@@ -375,6 +376,66 @@ export default function IdleGalleryView({
   useEffect(() => {
     void repairKeepsakeVault(galleryRef.current)
   }, [])
+
+  // The shared media context menu asks; the gallery owns the bytes, so it runs
+  // the action against its own store. Keeps this view free of a second dropdown.
+  useEffect(() => {
+    const onAction = (e: Event) => {
+      const detail = (e as CustomEvent<GalleryActionDetail>).detail
+      if (!detail?.keepsakeId) return
+      const img = useGame.getState().gallery.find((g) => g.id === detail.keepsakeId)
+      if (!img) return
+      switch (detail.action) {
+        case 'repost':
+          onRepostImage?.({
+            url: forwardUrlRef.current(img),
+            tags: img.tags,
+            name: img.tags.slice(0, 3).join(' ') || 'Keepsake',
+            kind: img.kind,
+            mimeType: img.kind === 'video' ? 'video/mp4' : undefined,
+          })
+          break
+        case 'story':
+          onAddToStory?.({
+            url: forwardUrlRef.current(img),
+            tags: img.tags,
+            name: img.tags.slice(0, 3).join(' ') || 'Keepsake',
+            kind: img.kind,
+            mimeType: img.kind === 'video' ? 'video/mp4' : undefined,
+          })
+          break
+        case 'card':
+          onCreateCard?.({
+            url: img.url,
+            tags: img.tags.slice(0, 8),
+            name: img.tags.slice(0, 3).join(' ') || 'Keepsake',
+          })
+          break
+        case 'feature':
+          featureImage(img.id)
+          break
+        case 'backdrop': {
+          const url = forwardUrlRef.current(img)
+          setBackground(url)
+          onSetWallpaper?.(url, img.kind === 'video' ? 'video/mp4' : undefined)
+          break
+        }
+        case 'delete':
+          if (window.confirm('Delete this keepsake permanently?')) {
+            removeGalleryImage(img.id)
+            setViewerId((v) => (v === img.id ? null : v))
+            setSelectedIds((prev) => {
+              const next = new Set(prev)
+              next.delete(img.id)
+              return next
+            })
+          }
+          break
+      }
+    }
+    window.addEventListener(GALLERY_ACTION_EVENT, onAction)
+    return () => window.removeEventListener(GALLERY_ACTION_EVENT, onAction)
+  }, [onRepostImage, onAddToStory, onCreateCard, onSetWallpaper, setBackground, featureImage, removeGalleryImage])
 
   useEffect(() => {
     if (!openMenuId) return
@@ -647,6 +708,7 @@ export default function IdleGalleryView({
     const r = resolveKeepsakeLocal(img, vaultUrls, localUrls)
     return r.kind === 'local' ? r.url : img.url
   }
+  forwardUrlRef.current = forwardUrl
 
   // Cross-surface open: the context menu dispatches this for keepsake tiles so
   // "Open in New Tab" resolves local bytes instead of the raw <img> src.
@@ -1017,153 +1079,6 @@ export default function IdleGalleryView({
                       Missing locally · Retry
                     </button>
                   )}
-
-                  {/* Top-right More Options Menu Button & Dropdown */}
-                  <div className="absolute right-1.5 top-1.5 z-20">
-                    <button
-                      type="button"
-                      className={`${HOVER_BTN} ${
-                        openMenuId === img.id ? '!opacity-100 ring-1 ring-white/30' : ''
-                      } relative right-auto top-auto h-6 w-6 rounded-md bg-black/75 hover:bg-black/90 text-white/80 hover:text-white border border-white/10 shadow-md backdrop-blur-md cursor-pointer transition-all`}
-                      title="More options"
-                      aria-label={`Options for ${img.tags.slice(0, 2).join(' ') || 'keepsake'}`}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setOpenMenuId((prev) => (prev === img.id ? null : img.id))
-                      }}
-                    >
-                      <MoreVertical size={13} />
-                    </button>
-
-                    {openMenuId === img.id && (
-                      <div
-                        className="absolute right-0 top-7 z-30 w-44 py-1 bg-surface-raised/95 backdrop-blur-xl border border-border-glass rounded-xl shadow-2xl text-xs flex flex-col animate-orbit-fade-in"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {onRepostImage && (
-                          <button
-                            type="button"
-                            className="flex items-center gap-2 px-3 py-1.5 text-left text-retro-fg hover:bg-glass-w10 transition-colors cursor-pointer"
-                            title="Repost to feed"
-                            aria-label={`Repost ${img.tags.slice(0, 2).join(' ') || 'image'} to feed`}
-                            onClick={() => {
-                              setOpenMenuId(null)
-                              onRepostImage({
-                                url: forwardUrl(img),
-                                tags: img.tags,
-                                name: img.tags.slice(0, 3).join(' ') || 'Keepsake',
-                                kind: img.kind,
-                                mimeType: img.kind === 'video' ? 'video/mp4' : undefined,
-                              })
-                            }}
-                          >
-                            <Repeat size={13} className="text-sky-400" />
-                            <span>Repost to feed</span>
-                          </button>
-                        )}
-
-                        {onAddToStory && (
-                          <button
-                            type="button"
-                            className="flex items-center gap-2 px-3 py-1.5 text-left text-retro-fg hover:bg-glass-w10 transition-colors cursor-pointer"
-                            title="Add to story"
-                            aria-label={`Add ${img.tags.slice(0, 2).join(' ') || 'image'} to story`}
-                            onClick={() => {
-                              setOpenMenuId(null)
-                              onAddToStory({
-                                url: forwardUrl(img),
-                                tags: img.tags,
-                                name: img.tags.slice(0, 3).join(' ') || 'Keepsake',
-                                kind: img.kind,
-                                mimeType: img.kind === 'video' ? 'video/mp4' : undefined,
-                              })
-                            }}
-                          >
-                            <Sparkles size={13} className="text-amber-400" />
-                            <span>Add to story</span>
-                          </button>
-                        )}
-
-                        {onCreateCard && (
-                          <button
-                            type="button"
-                            className="flex items-center gap-2 px-3 py-1.5 text-left text-retro-fg hover:bg-glass-w10 transition-colors cursor-pointer"
-                            title="Turn into a card"
-                            aria-label={`Turn ${img.tags.slice(0, 2).join(' ') || 'keepsake'} into a card`}
-                            onClick={() => {
-                              setOpenMenuId(null)
-                              onCreateCard({
-                                url: isMotion && img.url.includes('redgifs') ? redgifsPlayable(img.url) : img.url,
-                                tags: img.tags.slice(0, 8),
-                                name: img.tags.slice(0, 3).join(' ') || 'Keepsake',
-                              })
-                            }}
-                          >
-                            <ImagePlus size={13} className="text-purple-400" />
-                            <span>Create card</span>
-                          </button>
-                        )}
-
-                        <button
-                          type="button"
-                          className="flex items-center gap-2 px-3 py-1.5 text-left text-retro-fg hover:bg-glass-w10 transition-colors cursor-pointer"
-                          title="Re-feature in the Goon Panel"
-                          aria-label={`Re-feature ${img.tags.slice(0, 2).join(' ') || 'keepsake'}`}
-                          onClick={() => {
-                            setOpenMenuId(null)
-                            featureImage(img.id)
-                          }}
-                        >
-                          <IconRefresh size={13} className="text-emerald-400" />
-                          <span>Re-feature</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          disabled={isBackdrop}
-                          className="flex items-center gap-2 px-3 py-1.5 text-left text-retro-fg hover:bg-glass-w10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-default"
-                          title={isBackdrop ? 'This is the app backdrop' : 'Set as app backdrop'}
-                          aria-label={
-                            isBackdrop
-                              ? 'Current app backdrop'
-                              : `Set ${img.tags.slice(0, 2).join(' ') || 'image'} as app backdrop`
-                          }
-                          onClick={() => {
-                            setOpenMenuId(null)
-                            setBackground(img.url)
-                            onSetWallpaper?.(img.url, isMotion ? 'video/mp4' : undefined)
-                          }}
-                        >
-                          <IconWallpaper size={13} className="text-cyan-400" />
-                          <span>{isBackdrop ? 'Active backdrop' : 'Set backdrop'}</span>
-                        </button>
-
-                        <div className="h-[1px] bg-border-glass my-1" />
-
-                        <button
-                          type="button"
-                          className="flex items-center gap-2 px-3 py-1.5 text-left text-rose-400 hover:bg-rose-500/15 transition-colors cursor-pointer"
-                          title="Delete permanently from the gallery"
-                          aria-label={`Delete ${img.tags.slice(0, 2).join(' ') || 'keepsake'} permanently`}
-                          onClick={() => {
-                            setOpenMenuId(null)
-                            if (window.confirm('Delete this keepsake permanently?')) {
-                              removeGalleryImage(img.id)
-                              if (viewerId === img.id) setViewerId(null)
-                              setSelectedIds((prev) => {
-                                const next = new Set(prev)
-                                next.delete(img.id)
-                                return next
-                              })
-                            }
-                          }}
-                        >
-                          <IconTrash size={13} />
-                          <span>Delete</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
                 </div>
               )
             })}

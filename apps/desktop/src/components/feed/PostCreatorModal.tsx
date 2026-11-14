@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from 'react';
-import { playPress, playWin } from '../../utils/sounds';
+import { playPress } from '../../utils/sounds';
 import { useCropper } from '../../hooks/useCropper';
 import { isCropableImage } from '../CropModal';
 import { PlusSquare, X, Upload, Camera } from 'lucide-react';
@@ -93,7 +93,6 @@ export function PostCreatorModal({
       }
     }
 
-    playWin();
     toast?.('Posted.', 'success');
     onClose();
     setMedia([]);

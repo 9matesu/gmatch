@@ -117,7 +117,6 @@ export function CommandIsland({
   onOpenProfile,
   onOpenAdmin,
   showAdmin,
-  onOpenCreateCard,
   gridSize: _gridSize,
   onGridSizeChange: _onGridSizeChange,
 }: CommandIslandProps) {
@@ -206,38 +205,6 @@ export function CommandIsland({
     },
   ];
 
-  // Contextual action depending on current view. Post lives permanently at
-  // the island's center now; only Forge stays contextual.
-  const renderContextualAction = () => {
-    if (mainView === 'gallery') {
-      return (
-        <button
-          type="button"
-          onClick={() => {
-            playPress(900);
-            onOpenCreateCard?.();
-          }}
-          className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full bg-retro-accent text-retro-accent-text hover:bg-retro-accent-hover active:scale-[0.98] transition-all text-xs font-semibold"
-          title="Forge Card"
-          aria-label="Forge Card"
-        >
-          <Plus className="w-3.5 h-3.5" weight="bold" />
-          <span className="hidden sm:inline">Forge</span>
-        </button>
-      );
-    }
-
-    // There is deliberately no "Play" button here for the Arena view. It used
-    // to render one that called handleNavClick('games') from inside the branch
-    // that only renders when mainView is ALREADY 'games' — so it set the view
-    // to the value it already had and did nothing but make a noise. Labelled
-    // "Play" and styled as the primary green CTA, that is worse than no button:
-    // it is the most prominent control on the screen and it does not work. The
-    // real action is "Queue for Perverts" in the Arena itself, and the Help >
-    // Card Duels guide now says so.
-
-    return null;
-  };
 
   return (
     <>
@@ -367,15 +334,7 @@ export function CommandIsland({
             <span className="text-xs font-medium hidden md:inline">Profile</span>
           </button>
 
-        {/* Contextual Capsule */}
-        {renderContextualAction() && (
-          <>
-            <div className="h-4 w-[1px] bg-glass-w10 mx-0.5 shrink-0" />
-            <div className="flex items-center gap-1 shrink-0">
-              {renderContextualAction()}
-            </div>
-          </>
-        )}
+
 
         <div className="h-4 w-[1px] bg-glass-w10 mx-0.5 shrink-0" />
 

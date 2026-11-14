@@ -191,20 +191,14 @@ describe('IdleGalleryView', () => {
       />
     )
 
-    // Hover / options dropdown on tile
-    const moreTileBtn = screen.getAllByRole('button', { name: /^Options for /i })[0]
-    await userEvent.click(moreTileBtn)
-
-    const repostTileBtn = screen.getByRole('button', { name: /Repost .* to feed/i })
-    await userEvent.click(repostTileBtn)
+    // The tile menu is the shared context menu now: it asks through the
+    // bridge, and the gallery runs the action against its own store.
+    const last = images[images.length - 1]
+    window.dispatchEvent(new CustomEvent('gmatch:gallery-action', { detail: { action: 'repost', keepsakeId: last.id } }))
     expect(onRepost).toHaveBeenCalledTimes(1)
-    expect(onRepost).toHaveBeenCalledWith(
-      expect.objectContaining({ url: images[images.length - 1].url })
-    )
+    expect(onRepost).toHaveBeenCalledWith(expect.objectContaining({ url: last.url }))
 
-    await userEvent.click(moreTileBtn)
-    const storyTileBtn = screen.getByRole('button', { name: /Add .* to story/i })
-    await userEvent.click(storyTileBtn)
+    window.dispatchEvent(new CustomEvent('gmatch:gallery-action', { detail: { action: 'story', keepsakeId: last.id } }))
     expect(onAddToStory).toHaveBeenCalledTimes(1)
 
     // Click on thumbnail to open viewer modal

@@ -98,7 +98,6 @@ import GridWorkspace from "./components/grid/GridWorkspace";
 import AdminApp from "./admin/AdminApp";
 import { StoreView } from "./components/views/StoreView";
 import { logger } from './utils/logger';
-import { ScrollProgress } from './components/rare/scroll-progress';
 import { useNotifications } from './hooks/useNotifications';
 import { isKnownSiteCourier, cachedMailMode, detectMailMode } from "./utils/mail-mode";
 import { useCourierDms } from './hooks/useCourierDms';
@@ -3631,14 +3630,7 @@ export default function Home() {
                   <div ref={mainScrollRef} className="mobile-app-scroll flex-1 min-w-0 min-h-0 w-full flex flex-col relative z-10 overflow-y-auto styled-scrollbar pb-24">
                     <h1 className="sr-only">{`gMatch - ${typeof mainView === 'string' ? mainView.charAt(0).toUpperCase() + mainView.slice(1) : 'Home'}`}</h1>
 
-                    {/* Reading-progress pill (RareUI scroll-progress): tracks the
-                        main scroll area while the timeline is open, parked above
-                        the command island. */}
-                    {mainView === 'feed' && (
-                      <ScrollProgress containerRef={mainScrollRef} className="bottom-[calc(var(--island-clearance)+2.5rem)]" />
-                    )}
-
-                  {/* Modals & Config */}
+                    {/* Modals & Config */}
                   {isIdle && settings.idleEnabled && (
                     <IdleOverlay items={items} identity={identity} onExit={() => { }} />
                   )}
@@ -4571,7 +4563,6 @@ export default function Home() {
               onLogout={() => { setChatOpen(false); setIdentityModalMode('logout'); }}
                onOpenProfile={() => handleSetMainView('profile')}
                onOpenAdmin={() => setAdminModalOpen(true)}
-               onOpenCreateCard={() => { setChatOpen(false); setShowCreateCardModal(true); }}
               gridSize={idleViewMode}
               onGridSizeChange={(m) => setIdleViewMode(m)}
             />
