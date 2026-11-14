@@ -2021,6 +2021,7 @@ app.on('before-quit', () => { if (domVideoWin) { try { domVideoWin.destroy() } c
   // Start the bundled server in the background (host mode only). Failures
   // surface as dialogs + log lines; they can never take the window with them.
   const startSidecarBg = async () => {
+    bootMetrics.mark('sidecar.spawn')
     if (app.isPackaged) {
       if (packagedServer.mode !== 'host') return
       process.env.GMATCH_HOST_MODE = '1'
@@ -2028,6 +2029,7 @@ app.on('before-quit', () => { if (domVideoWin) { try { domVideoWin.destroy() } c
       try {
         await apiSidecar.startApi()
         mainLog('boot: bundled server ready')
+        bootMetrics.mark('sidecar.healthy')
       } catch (err) {
         mainLog(`bundled server start failed: ${err?.message || err}`)
         try {

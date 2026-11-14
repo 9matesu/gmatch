@@ -2078,6 +2078,13 @@ export default function Home() {
   // roster, so "online" for a peer we hold a live channel to has to come from
   // the transport. Ingested as a fresh sighting; it decays by the store's own
   // 60s rule once the peer goes quiet.
+  // Boot timeline: the mesh is a phase (the node answers, the socket is up).
+  const meshReadyRef = useRef(false)
+  useEffect(() => {
+    if (!isWsConnected || meshReadyRef.current) return
+    meshReadyRef.current = true
+    window.gmatch?.bootMark?.('mesh:ready')
+  }, [isWsConnected])
   const peerPresenceKey = peers.map((p) => p.id).filter(Boolean).join(',')
   // The tray tooltip is the only state a user sees when the window is closed.
   useEffect(() => {
