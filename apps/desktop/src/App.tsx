@@ -4,7 +4,7 @@ import { getSecureItem, setSecureItem } from './utils/secure-storage'
 import { useSettings } from "./hooks/useSettings";
 import { useIdle } from "./hooks/useIdle";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from "react";
 import { getApiBaseUrl, orbitFetch, invalidateCache, subscribeApiBase } from "./utils/api";
 import { loadSeen, saveSeen } from "./utils/scopedSeen";
 import { useAppChat } from "./hooks/useAppChat";
@@ -88,7 +88,7 @@ import { GalleryTabView } from "./components/views/GalleryTabView";
 import { CreateCardModal } from "./components/CreateCardModal";
 import { CardDetailView } from "./components/CardDetailView";
 import GridWorkspace from "./components/grid/GridWorkspace";
-import AdminApp from "./admin/AdminApp";
+const AdminApp = lazy(() => import("./admin/AdminApp"));
 import { StoreView } from "./components/views/StoreView";
 import { logger } from './utils/logger';
 import { useNotifications } from './hooks/useNotifications';
@@ -4557,6 +4557,7 @@ export default function Home() {
               </div>
             )}
 
+
             {/* Centered Floating Dynamic Island Navigation HUD */}
             <CommandIsland
               mainView={mainView}
@@ -4613,7 +4614,9 @@ export default function Home() {
          <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 p-2 sm:p-6" role="dialog" aria-modal="true" aria-label="Admin control panel" onMouseDown={(e) => { if (e.target === e.currentTarget) setAdminModalOpen(false) }}>
            <div className="relative flex h-[92vh] w-full max-w-[1500px] min-h-0 flex-col overflow-hidden rounded-xl border border-border-glass bg-retro-bg shadow-2xl">
              <button type="button" aria-label="Close admin control panel" onClick={() => setAdminModalOpen(false)} className="absolute right-3 top-3 z-20 rounded-md border border-border-glass bg-surface-raised px-2 py-1 text-xs text-retro-muted hover:text-retro-fg cursor-pointer">Close</button>
+               <Suspense fallback={<PageSkeleton />}>
              <div className="min-h-0 flex-1 overflow-y-auto"><AdminApp identity={identity} /></div>
+               </Suspense>
            </div>
          </div>
        )}
