@@ -4,7 +4,7 @@ One Electron desktop app, one multiplayer game. The **gmatch shell** (feed,
 card duels, chat, P2P, hacks, moderation, admin — vendored from the orbit repo
 in the 2026-09 merge) wraps the **Babecock · Idle** game (ex-GoonGrid): click
 pictures to earn **pts**, buy **tags** (parsed live from booru sources) that
-generate passive income and reshape your idle feed, buy images into your
+reshape the feed you are shown, buy images into your
 **Gallery**, pop **GoonCaps**, climb the **Pornification** ladder, and
 **Brainmelt** (prestige). Idle pts are a local-only currency (the save file);
 the server g$ ledger (`EconomyService`) backs duels, hacks and trades — two
@@ -85,7 +85,7 @@ separate economies, no bridge between them.
 2. Click it → +clickPower pts, splat animation, +XP. Every 25th click is a
    **CRIT** ("cumshot flash") worth x10.
 3. Spend pts in the Tag Market / Image Shop / GoonCap Vending Machine.
-4. Owned tags tick passive pts/s and bias which images appear.
+4. Owned tags bias which images appear, and decide what the market offers.
 5. Reach Pornification tier thresholds → new titles, UI accents, unlocks.
 6. Brainmelt (prestige) resets pts/tags for Corruption shards (+10% global mult each).
 7. **Heat combo**: clicks within 2s of each other stack a streak; every 10
@@ -96,7 +96,7 @@ separate economies, no bridge between them.
 ## 2. Currencies
 
 - **pts** — the idle game's currency, LOCAL ONLY (2026-09-11 simplification):
-  earned by clicks + passive income, spent in the Tag Market / Image Shop /
+  earned by clicks alone (no passive, no offline), spent in the Tag Market / Image Shop /
   GoonCap Vending Machine. Lives in the localStorage save; never synced to the
   server. The old `idle-credit`/`idle-debit` ledger bridge (plan D4) was
   removed with `economy-idle.ts`, `walletBridge` and `walletSync`.
@@ -113,7 +113,8 @@ separate economies, no bridge between them.
 - On boot the client fetches ~60 posts from a random healthy source, splits the
   booru `tags` field, filters blocklist (§8) + noise, ranks by frequency, and
   offers the top ~24 as purchasable tags (refresh button re-parses).
-- Each tag: `cost = base * 1.15^owned`, `income` pts/s, `weight` (feed bias).
+- Each tag: `cost = base * 1.15^owned`, `income` (rarity score: rarer = pricier =
+  rarer in the feed), `weight` (feed bias).
   base/income derived from tag length + frequency (rarer tag = pricier = better).
 - Max 20 owned levels per tag. Owned tags list = the feed query (top 5 by level).
 - No hardcoded starter tags: the player picks exactly 4 on the setup screen
@@ -143,9 +144,7 @@ separate economies, no bridge between them.
 | Cap | Cost | Effect |
 |---|---|---|
 | E-Girl Spit | 150 pts | x2 click power, permanent |
-| Braceface | 900 pts | auto-click 1/s, permanent |
-| Pornmeat | 5k pts | x2 passive pts/s, permanent |
-| Brain Drain | 50k pts | x10 everything, permanent |
+| Brain Drain | 50k pts | x10 click power, permanent |
 
 Stacking: different caps stack; same-cap pops stack permanently (no timers, no wear).
 
@@ -248,7 +247,7 @@ text overlays kept for caption hunts, §6).
 - Age-gate overlay on first launch (must tick "I am 18+"). NSFW blur toggle in
   header (blurs images until hover) — default ON.
 - Toasts for purchases/unlocks live in the header 🔔 tab (capped at 50, no
-  floating overlay spam); offline-earnings modal on load.
+  floating overlay spam).
 - Publishing a post shows it immediately: the upload response (its bytes are
   already durable locally) becomes an optimistic feed tile, and the node is
   re-read through a cache-bypassing refresh until it lists the row
@@ -346,12 +345,12 @@ hard line is the most important tested code in the repo.
 - Shards = floor(sqrt(totalEarned / 1e6)); each shard +10% global multiplier.
 - Resets: pts, XP/tier, tags, caps. Keeps: gallery images, shards, achievements.
 
-## 10. Achievements (small, spicy, 13 total)
+## 10. Achievements (small, spicy, 12 total)
 
 First Click, 100 Clicks, First Tag, Tag Collector (10 tags), Gallery of Sins
-(10 images), Diamond Hands, Crit Addict (50 crits), Cap Connoisseur (all 4),
-First Brainmelt, 10 Shards, Goon Master (tier 10), Offline Slut (collect
-offline earnings). Each +5% click power. Persist across prestige.
+(10 images), Diamond Hands, Crit Addict (50 crits), Cap Connoisseur (both caps on sale),
+First Brainmelt, 10 Shards, Goon Master (tier 10), Heat Demon (80-click
+heat streak). Each +5% click power. Persist across prestige.
 
 ## 10b. Domination economy & spy payoff (connected loops)
 
@@ -586,7 +585,8 @@ what it lives in.
 ## 11. Save
 
 - zustand state → localStorage `gmatch.save.v1`, autosave every 10s + on unload.
-- Offline earnings = elapsed * pts/s * 25%, capped 8h, shown in modal on load.
+- No offline earnings: the clicker pays on clicks only, so there is nothing to
+  collect when the app reopens.
 
 ## 12. Server topology (per-install node, opt-in client mode)
 

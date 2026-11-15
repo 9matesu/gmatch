@@ -17,14 +17,6 @@ export const RARITY_THRESHOLDS: Record<Rarity, number> = {
   Diamond: 5000,
 }
 
-/** Passive pts/s per owned image by rarity (SPEC §4). */
-export const RARITY_INCOME: Record<Rarity, number> = {
-  Common: 1,
-  Copper: 3,
-  Silver: 10,
-  Gold: 30,
-  Diamond: 100,
-}
 
 export const GALLERY_COST_GROWTH = 1.1
 
@@ -45,6 +37,3 @@ export function imageRarity(rarityBase: number, gallerySize: number, clicks = 0)
   return rarityFor(imageBuyCost(rarityBase, gallerySize) + clicks)
 }
 
-export function rarityIncome(rarity: Rarity): number {
-  return RARITY_INCOME[rarity]
-}

@@ -1,13 +1,13 @@
 import { create } from 'zustand'
 import { getSecureItem } from '../utils/secure-storage'
-import { clickGain, clickPower, heatMultiplier, heatStreakAfter, isCrit, passiveGps } from './economy'
+import { clickGain, heatMultiplier, heatStreakAfter, isCrit } from './economy'
 import type { EconomyInput } from './economy'
 import { buyTag as buyTagLevel, deriveTagStats, discoverTags, feedQuery, mergeTags as mergeTagList, normalizeCustomTag, removeTag as removeTagList, setupTag, soloTag as soloTagList, toggleTag as toggleTagLevel, validateCustomTag } from './tags'
 import { buildRoundQueries, roundQueryKey, PILLS_PER_ROUND, RECENT_QUERY_DEPTH } from './queryBuilder'
 import { getUserExcludes, isNoise, isQueryBlocked, rankTags, setUserExcludes } from './tagFilter'
 import { learnPurge, setCoRules, setFeedIntent } from './tagCooccur'
 import { KILL_XP, foeMaxHp, killBonusPoints } from './battle'
-import { CAPS, activeCaps, capAutoClicksPerSec, popCap as popCapList } from './caps'
+import { CAPS, activeCaps, popCap as popCapList } from './caps'
 import { imageRarity } from './rarity'
 import { applyBrainmelt, canBrainmelt, tierForXp, titleForTier } from './prestige'
 import { ACHIEVEMENTS, newlyEarned } from './achievements'
@@ -17,7 +17,6 @@ import {
   SAVE_VERSION,
   defaultSave,
   deserialize,
-  offlineEarnings,
   serialize,
 } from './save'
 import type { SaveData } from './save'
@@ -98,7 +97,6 @@ export interface GameState {
   imageReady: boolean
   setImageReady: (ready: boolean) => void
   toasts: Toast[]
-  offlineGain: number
 
   clickImage: () => ClickResult
   clickCell: (index: number) => ClickResult
@@ -158,7 +156,6 @@ export interface GameState {
   load: () => void
   /** Re-read the save from the slot the active identity owns (plan A1). */
   reload: () => void
-  collectOffline: () => void
   verifyAge: () => void
   dismissToast: (id: number) => void
   clearToasts: () => void
@@ -247,7 +244,6 @@ function statsOf(s: GameState): AchievementStats {
     prestiges: s.prestigeCount,
     shards: s.shards,
     tier: tierForXp(s.xp),
-    collectedOfflineEarnings: s.collectedOfflineEarnings,
     maxHeatStreak: s.maxHeatStreak,
   }
 }
@@ -1404,31 +1400,23 @@ export const useGame = create<GameState>((set, get) => ({
     return true
   },
 
+  /**
+   * Cap housekeeping only. The idle economy is gone: a tick used to add
+   * passive pts/s (tag levels + gallery) and auto-click income, which made the
+   * game play itself. Points now move on clicks alone, so the only thing left
+   * for the clock to do is expire legacy timed caps and keep `lastSeenAt`
+   * honest (the header shows presence from it).
+   */
   tick: (dtMs = 1000) => {
+    void dtMs
     const s = get()
     const now = Date.now()
-    // `activeCaps` allocates a NEW array every call, so storing it as-is gave
-    // every subscriber of `s.caps` a fresh reference once per second and
-    // re-rendered the whole panel on every tick. Keep the old array when
-    // nothing expired: the contents are identical, so the identity should be.
     const live = activeCaps(s.caps, now)
-    const caps = live.length === s.caps.length ? s.caps : live
-    const input: EconomyInput = { ...econ(s), caps }
-    const gps = passiveGps(input, now)
-    const auto = capAutoClicksPerSec(caps, now)
-    const gain = (gps + clickPower(input, now) * auto) * (dtMs / 1000)
-
-    // Passive points income remains, but HP damage and KO only happen via active user clicks.
     set({
-      caps,
-      points: s.points + gain,
-      totalEarned: s.totalEarned + gain,
-      xp: s.xp + gain * 0.01,
+      caps: live.length === s.caps.length ? s.caps : live,
       lastSeenAt: now,
-      ...progress({ ...s, points: s.points + gain }, s.xp),
     })
   },
-
   save: () => {
     const s = get()
     const now = Date.now()
@@ -1485,17 +1473,7 @@ export const useGame = create<GameState>((set, get) => ({
       })),
       now,
     )
-    const gps = passiveGps(
-      {
-        shards: d.shards,
-        achievementsEarned: d.achievements.length,
-        tags,
-        gallery: d.gallery,
-        caps,
-      },
-      now,
-    )
-    const gain = d.ageAccepted ? offlineEarnings(gps, now - d.lastSeenAt) : 0
+
     set({
       loaded: true,
       points: d.points,
@@ -1524,34 +1502,12 @@ export const useGame = create<GameState>((set, get) => ({
       backgroundUrl: d.backgroundUrl,
       viewMode: d.viewMode,
       lastSeenAt: now,
-      offlineGain: gain >= 1 ? gain : 0,
     })
   },
 
   reload: () => {
     set({ loaded: false })
     get().load()
-  },
-
-  collectOffline: () => {
-    const s = get()
-    if (s.offlineGain <= 0) return
-    const next: GameState = {
-      ...s,
-      points: s.points + s.offlineGain,
-      totalEarned: s.totalEarned + s.offlineGain,
-      xp: s.xp + s.offlineGain * 0.01,
-      collectedOfflineEarnings: true,
-      offlineGain: 0,
-    }
-    set({
-      points: next.points,
-      totalEarned: next.totalEarned,
-      xp: next.xp,
-      collectedOfflineEarnings: true,
-      offlineGain: 0,
-      ...progress(next, s.xp),
-    })
   },
 
   verifyAge: () => {

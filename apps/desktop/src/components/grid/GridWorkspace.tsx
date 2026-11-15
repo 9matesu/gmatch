@@ -73,7 +73,7 @@ export default function GridWorkspace({
   }
 
   // The shell's AgeGateModal is the single 18+ gate (plan 5.5): mirror it
-  // into the idle store so offline earnings + feed unlock the same way.
+  // into the clicker store so the feed and the click game unlock together.
   useEffect(() => {
     if (
       typeof localStorage !== 'undefined' &&

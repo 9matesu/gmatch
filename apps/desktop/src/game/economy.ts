@@ -1,6 +1,5 @@
 import { achievementClickMult } from './achievements'
-import { capClickMult, capPassiveMult } from './caps'
-import { rarityIncome } from './rarity'
+import { capClickMult } from './caps'
 import type { ActiveCap, GalleryImage, OwnedTag } from './types'
 
 export const BASE_CLICK = 1
@@ -40,24 +39,12 @@ export function clickGain(input: EconomyInput, clickNumber: number, now: number,
   return clickPower(input, now) * (isCrit(clickNumber) ? CRIT_MULT : 1) * heatMultiplier(heatStreak)
 }
 
-export function tagIncome(tags: OwnedTag[]): number {
-  return tags.reduce((sum, t) => sum + t.income * t.level, 0)
-}
-
-export function galleryIncome(gallery: GalleryImage[]): number {
-  return gallery.reduce((sum, img) => sum + rarityIncome(img.rarity), 0)
-}
-
-/** Passive pts/s from tags + gallery, scaled by shards and passive caps. Nerfed to 25% so clicking stays king. */
-export function passiveGps(input: EconomyInput, now: number): number {
-  return (
-    (tagIncome(input.tags) + galleryIncome(input.gallery)) *
-    shardMultiplier(input.shards) *
-    capPassiveMult(input.caps, now) *
-    0.25
-  )
-}
-
+/**
+ * The clicker is a CLICK game: points come from the player, not from a clock.
+ * Passive income (tag levels, gallery keepsakes, auto-click caps, offline
+ * earnings) was removed with the idle economy — the whole promise of the
+ * genre is "your time is worth more than your waiting".
+ */
 /**
  * Heat combo (addiction hook): clicks within HEAT_WINDOW_MS of each other
  * stack heat; every HEAT_STACK clicks of streak adds +HEAT_STEP to the click

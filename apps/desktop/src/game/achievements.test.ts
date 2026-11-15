@@ -17,7 +17,6 @@ function stats(over: Partial<AchievementStats> = {}): AchievementStats {
     prestiges: 0,
     shards: 0,
     tier: 1,
-    collectedOfflineEarnings: false,
     maxHeatStreak: 0,
     ...over,
   }
@@ -25,7 +24,7 @@ function stats(over: Partial<AchievementStats> = {}): AchievementStats {
 
 describe('achievement list (SPEC §10)', () => {
   it('has exactly 12 achievements with the spec names', () => {
-    expect(ACHIEVEMENTS).toHaveLength(13)
+    expect(ACHIEVEMENTS).toHaveLength(12)
     expect(ACHIEVEMENTS.map((a) => a.name)).toEqual([
       'First Click',
       '100 Clicks',
@@ -39,7 +38,6 @@ describe('achievement list (SPEC §10)', () => {
       '10 Shards',
       'Goon Master',
       'Heat Demon',
-      'Offline Slut',
     ])
   })
 
@@ -70,12 +68,11 @@ describe('newlyEarned', () => {
     expect(newlyEarned([], stats({ prestiges: 1 }))).toContain('first_brainmelt')
     expect(newlyEarned([], stats({ shards: 10 }))).toContain('ten_shards')
     expect(newlyEarned([], stats({ tier: 10 }))).toContain('goon_master')
-    expect(newlyEarned([], stats({ collectedOfflineEarnings: true }))).toContain('offline_slut')
   })
 
-  it('Cap Connoisseur needs all four caps', () => {
-    expect(newlyEarned([], stats({ capsUsed: ['blue', 'filter', 'hypno'] }))).not.toContain('cap_connoisseur')
-    expect(newlyEarned([], stats({ capsUsed: ['blue', 'filter', 'hypno', 'melt'] }))).toContain('cap_connoisseur')
+  it('Cap Connoisseur needs both caps on sale', () => {
+    expect(newlyEarned([], stats({ capsUsed: ['blue'] }))).not.toContain('cap_connoisseur')
+    expect(newlyEarned([], stats({ capsUsed: ['blue', 'melt'] }))).toContain('cap_connoisseur')
   })
 })
 

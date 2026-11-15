@@ -105,7 +105,7 @@ function TagsTab() {
           }}
           title={
             isOwned
-              ? `${t.name} · Lv${t.level} · +${formatNum(t.income)}/s · click ${on ? 'OFF' : 'ON'} · right-click = solo · double-click = pick for merge`
+              ? `${t.name} · Lv${t.level} · Lv${t.level} owned · click ${on ? 'OFF' : 'ON'} · right-click = solo · double-click = pick for merge`
               : `${t.name} · buy for ${formatNum(cost)} pts`
           }
           className={`inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-all duration-150 ${

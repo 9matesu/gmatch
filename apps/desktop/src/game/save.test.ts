@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
-  OFFLINE_CAP_MS,
   SAVE_KEY,
   SAVE_VERSION,
   defaultSave,
   deserialize,
-  offlineEarnings,
   serialize,
 } from './save'
 
@@ -68,22 +66,5 @@ describe('serialize / deserialize round-trip', () => {
     expect(back).not.toBeNull()
     expect(back!.points).toBe(777)
     expect(back!.totalEarned).toBe(888)
-  })
-})
-
-describe('offline earnings (SPEC §11) nerfed 25%/25%', () => {
-  it('elapsed * pts/s * 25%', () => {
-    expect(offlineEarnings(10, 60_000)).toBe(150)
-    expect(offlineEarnings(0, 60_000)).toBe(0)
-  })
-
-  it('caps at 8 hours', () => {
-    expect(OFFLINE_CAP_MS).toBe(8 * 60 * 60 * 1000)
-    expect(offlineEarnings(10, OFFLINE_CAP_MS)).toBe(10 * 8 * 3600 * 0.25)
-    expect(offlineEarnings(10, OFFLINE_CAP_MS * 10)).toBe(offlineEarnings(10, OFFLINE_CAP_MS))
-  })
-
-  it('clamps negative elapsed time to zero', () => {
-    expect(offlineEarnings(10, -5_000)).toBe(0)
   })
 })

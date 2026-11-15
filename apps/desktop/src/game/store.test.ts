@@ -485,15 +485,16 @@ describe('shufflePosts (never sequential)', () => {
 })
 
 describe('tick', () => {
-  it('pays passive pts/s from owned tags (quartered)', () => {
+  it('pays nothing: points move on clicks alone', () => {
     useGame.setState({
-      points: 0,
+      points: 10,
+      totalEarned: 10,
       tags: [{ name: 'wet', level: 2, base: 10, income: 5, weight: 2 }],
     })
     useGame.getState().tick(1000)
     const s = useGame.getState()
-    expect(s.points).toBeGreaterThanOrEqual(2.5)
-    expect(s.totalEarned).toBeGreaterThanOrEqual(2.5)
+    expect(s.points).toBe(10)
+    expect(s.totalEarned).toBe(10)
   })
 
   it('legacy timed caps still prune, permanent pops persist', () => {
@@ -546,27 +547,6 @@ describe('save / load / offline earnings', () => {
     expect(useGame.getState().ageVerified).toBe(true)
   })
 
-  it('offers offline earnings on load and collects them', () => {
-    const past = Date.now() - 60_000
-    mem.set(
-      SAVE_KEY,
-      serialize({
-        ...defaultSave(past),
-        points: 123,
-        ageAccepted: true,
-        tags: [{ name: 'wet', level: 1, base: 10, income: 5, weight: 1 }],
-        lastSeenAt: past,
-      }),
-    )
-    useGame.getState().load()
-    const s = useGame.getState()
-    expect(s.points).toBe(123)
-    expect(s.offlineGain).toBeCloseTo(18.75, 0) // 60s * 1.25 gps * 25% (passive+offline quartered)
-    s.collectOffline()
-    expect(useGame.getState().points).toBeCloseTo(141.75, 0)
-    expect(useGame.getState().collectedOfflineEarnings).toBe(true)
-    expect(useGame.getState().achievements).toContain('offline_slut')
-  })
 
   it('load is idempotent (StrictMode-safe)', () => {
     mem.set(SAVE_KEY, serialize({ ...defaultSave(), points: 42, ageAccepted: true }))
@@ -737,16 +717,16 @@ describe('3x3 grid mode', () => {
     expect(s.current).toBeNull()
   })
 
-  it('tick generates points passively but does not damage squares without player clicking', () => {
+  it('tick neither pays nor damages squares without player clicking', () => {
     useGame.setState({ queue: dozen(), grid: [] })
     useGame.getState().setViewMode('grid')
-    // Braceface (filter cap): permanent 1 auto-click/s.
-    useGame.setState({ caps: [{ capId: 'filter', expiresAt: Number.POSITIVE_INFINITY }] })
+    // The auto-click cap is retired: nothing may act on a foe but the player.
+    useGame.setState({ points: 3 })
     const before = useGame.getState().grid[0].hp
     const ptsBefore = useGame.getState().points
     useGame.getState().tick(1000)
     expect(useGame.getState().grid[0].hp).toBe(before)
-    expect(useGame.getState().points).toBeGreaterThan(ptsBefore)
+    expect(useGame.getState().points).toBe(ptsBefore)
   })
 
   it('KO on single foe queues a non-blocking KoDrop from foe tags', () => {

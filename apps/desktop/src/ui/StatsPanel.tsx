@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useGame } from '../game/store'
-import { clickPower, passiveGps } from '../game/economy'
+import { CRIT_MULT, clickPower } from '../game/economy'
 import { clearImageCache, imageCacheStats, type ImageCacheStats } from '../services/imageCache'
 import { formatNum } from './format'
 import { MONO, PLATE } from './styles'
@@ -30,7 +30,6 @@ export default function StatsPanel() {
     gallery: s.gallery,
     caps: s.caps,
   }
-  const gps = passiveGps(input, now)
   const cp = clickPower(input, now)
 
   const [cache, setCache] = useState<ImageCacheStats | null>(null)
@@ -61,17 +60,16 @@ export default function StatsPanel() {
     <aside className={`${PLATE} p-3.5 space-y-3`}>
       {/* Modern 2x2 Telemetry Grid */}
       <div className="grid grid-cols-2 gap-1.5">
-        {/* Passive Income */}
+        {/* What a crit is worth: the only number the click game has. */}
         <div className="rounded-xl border border-border-glass bg-glass-w5 p-2 flex flex-col justify-between">
           <div className="flex items-center gap-1 text-[10px] font-medium text-retro-muted truncate">
             <Coins className="w-3.5 h-3.5 text-amber-400 shrink-0" weight="fill" />
-            <span>Passive</span>
+            <span>Per crit</span>
           </div>
           <div className={`${MONO} text-xs font-bold text-retro-fg mt-1`}>
-            +{formatNum(gps)}/s
+            +{formatNum(cp * CRIT_MULT)}
           </div>
         </div>
-
         {/* Click Power */}
         <div className="rounded-xl border border-border-glass bg-glass-w5 p-2 flex flex-col justify-between">
           <div className="flex items-center gap-1 text-[10px] font-medium text-retro-muted truncate">
