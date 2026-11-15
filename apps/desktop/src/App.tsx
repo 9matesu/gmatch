@@ -51,6 +51,7 @@ import { findUserById } from "./utils/userLookup";
 import { resolveObjectRefId } from "./utils/objectRef";
 import { reconcilePublishedPost } from "./utils/feedPublish";
 import { mergeRecentPushes, rememberPushed, sameTimeline, type PushedEntry } from "./utils/feedMerge";
+import { useStableCallback } from "./hooks/useStableCallback";
 import { PEER_ONLINE_EVENT } from "./utils/p2pSwarm";
 import { localHeldMediaUrl } from "./utils/localMedia";
 import { GMatchDMs } from "./components/chat/GMatchDMs";
@@ -3514,6 +3515,108 @@ export default function Home() {
     }
   }, [identity, toast, loadGallery])
 
+  // A fresh array on every render is a fresh prop: the timeline would re-render
+  // even when no group changed. The shape is the one the picker reads.
+  const shareGroups = useMemo(
+    () => chatGroups.map((g) => ({ id: g.id, name: g.name, member_count: g.member_count })),
+    [chatGroups],
+  );
+
+  const onOpenNetwork = useStableCallback((userId: string) => openUserNetwork(userId));
+  // Stable identities for everything the memoized timeline receives. An inline
+  // arrow is a new reference on every App render, which makes `memo` on the
+  // feed decorative: the whole column re-rendered for nothing. These read the
+  // latest closure at call time, so there is no dependency array to drift.
+  const onPingAttention = useStableCallback(() => { void pingAttention(); });
+  const onAddStory = useStableCallback(() => setShowStoryModal(true));
+  const onOpenStory = useStableCallback((userId: string) => {
+    setExpandedItemId(null);
+    setMainView('feed');
+    setStoryViewerUserId(userId);
+  });
+  const onActiveStoryClose = useStableCallback(() => setStoryViewerUserId(null));
+  const onOpenPostCreator = useStableCallback(() => setShowCreatePostModal(true));
+  const onFollowSuggestion = useStableCallback((id: string) => { void toggleFollowUser(id); });
+  const onSelectUser = useStableCallback((uId: string) => {
+    const target = findUserById(users, uId);
+    if (target) {
+      setSelectedProfileUser(target);
+      return;
+    }
+    // Same silent no-op GamesView had: the roster is capped (100 rows
+    // server-side) and a fresh peer may not be in it yet, so clicking a post
+    // author's avatar did NOTHING. Fetch the row.
+    if (!identity) return;
+    void orbitFetch(`/api/users/${encodeURIComponent(uId)}`, {}, identity)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.user?.id) setSelectedProfileUser(data.user as User);
+      })
+      .catch(() => { });
+  });
+  const onStartPm = useStableCallback((user: { id: string; display_name?: string }) => {
+    const target = findUserById(users, user.id);
+    setPmPeer(toChatPeer(target) || toChatPeer(user));
+    handleSetMainView('messages');
+  });
+  const onOpenGameAd = useStableCallback((mode: string) => {
+    // `mode` is one of the tab ids the card passes; the setter is the narrow
+    // authority, so it casts once here instead of the prop lying.
+    if (mode === 'coffee') {
+      setManualCoffeeOpen(true);
+    } else if (mode === 'store') {
+      handleSetMainView('store');
+    } else if (mode !== 'discord') {
+      setGamesSubTab(mode as Parameters<typeof setGamesSubTab>[0]);
+      setMainView('games');
+    }
+  });
+  const onReportComment = useStableCallback((commentId: string) => reportTarget('post_comment', commentId));
+  const onUserContext = useStableCallback((e: React.MouseEvent, userId: string, displayName: string) => {
+    const u = findUserById(users, userId);
+    openContextMenu('user', u || { id: userId, display_name: displayName })(e);
+  });
+  const onArchivePost = useStableCallback(async (id: string) => {
+    if (!identity) return;
+    try {
+      const res = await orbitFetch(`/api/objects/${id}/archive`, { method: 'POST' }, identity);
+      if (!res.ok) throw new Error(String(res.status));
+      const { is_archived } = await res.json();
+      setArchivedPostIds((prev) => {
+        const next = new Set(prev);
+        if (is_archived) next.add(id); else next.delete(id);
+        return next;
+      });
+      toast(is_archived ? 'Post archived' : 'Post unarchived', 'info');
+    } catch {
+      toast('Archive failed. Try again.', 'error');
+    }
+  });
+  const onDeletePost = useStableCallback((id: string) => {
+    setDeletedPostIds((prev) => new Set(prev).add(id));
+    deletePostOnServer(id);
+    toast('Post deleted', 'success');
+  });
+  const onRepostPost = useStableCallback((post: FeedPost) => {
+    setRepostedPosts((prev) => [
+      {
+        ...post,
+        id: `repost_${post.id}_${Date.now()}`,
+        is_reposted: true,
+        reposted_by: myProfile.displayName || 'You',
+      },
+      ...prev,
+    ]);
+  });
+  const onFeedSortChange = useStableCallback((mode: FeedSort) => {
+    // The feed effect is keyed on `feedSort`; loading from here would close
+    // over the OLD sort and re-fetch the previous ranking.
+    setFeedSort(mode);
+  });
+  const onFeedLayoutChange = useStableCallback((layout: 'grid' | 'list') =>
+    updateSettings('feedLayout', layout),
+  );
+
   if (!isLoaded) return <PageSkeleton />;
 
   const myPostTags = identity ? deriveProfileTags(serverPosts.filter(p => p.author_id === identity.orbitId), []) : []
@@ -3680,119 +3783,47 @@ export default function Home() {
                             {!collapsedModules.feed && (
                               <GMatchFeed
                                 identity={identity}
-                                onPingAttention={() => { void pingAttention(); }}
+                                onPingAttention={onPingAttention}
                                 posts={feedPosts}
                                 stories={stories}
                                 storiesLoading={storiesLoading}
                                 followingIds={followingIds}
                                 profilePics={profilePics}
                                 onSendDm={sendPm}
-                                onAddStory={() => setShowStoryModal(true)}
-                                onOpenStory={(userId) => {
-                                  setExpandedItemId(null);
-                                  setMainView('feed');
-                                  setStoryViewerUserId(userId);
-                                }}
+                                onAddStory={onAddStory}
+                                onOpenStory={onOpenStory}
                                 activeStoryUserId={storyViewerUserId}
-                                onActiveStoryClose={() => setStoryViewerUserId(null)}
-                                onOpenPostCreator={() => setShowCreatePostModal(true)}
-                                shareGroups={chatGroups.map((g) => ({ id: g.id, name: g.name, member_count: g.member_count }))}
-                                onFollowSuggestion={(id) => { void toggleFollowUser(id); }}
+                                onActiveStoryClose={onActiveStoryClose}
+                                onOpenPostCreator={onOpenPostCreator}
+                                shareGroups={shareGroups}
+                                onFollowSuggestion={onFollowSuggestion}
                                 myProfileTags={myProfile.tags}
-                                onSelectUser={(uId) => {
-                                  const target = findUserById(users, uId);
-                                  if (target) {
-                                    setSelectedProfileUser(target);
-                                    return;
-                                  }
-                                  // Same silent no-op GamesView had: the roster
-                                  // is capped (100 rows server-side) and a fresh
-                                  // peer may not be in it yet, so clicking a post
-                                  // author's avatar did NOTHING. Fetch the row.
-                                  if (!identity) return;
-                                  void orbitFetch(`/api/users/${encodeURIComponent(uId)}`, {}, identity)
-                                    .then((res) => (res.ok ? res.json() : null))
-                                    .then((data) => {
-                                      if (data?.user?.id) setSelectedProfileUser(data.user as User);
-                                    })
-                                    .catch(() => { });
-                                }}
+                                onSelectUser={onSelectUser}
                                 users={users}
-                                onStartPm={(user) => {
-                                  const target = findUserById(users, user.id);
-                                  setPmPeer(toChatPeer(target) || toChatPeer(user));
-                                  handleSetMainView('messages');
-                                }}
-                                onOpenGameAd={(mode) => {
-                                  if (mode === 'coffee') {
-                                    setManualCoffeeOpen(true);
-                                  } else if (mode === 'store') {
-                                    handleSetMainView('store');
-                                  } else if (mode !== 'discord') {
-                                    setGamesSubTab(mode);
-                                    setMainView('games');
-                                  }
-                                }}
+                                onStartPm={onStartPm}
+                                onOpenGameAd={onOpenGameAd}
                                 onPersistLike={persistLike}
                                 onPersistSave={persistSave}
                                 onPersistComment={persistComment}
                                 onPersistReport={persistReport}
-                                onReportComment={(commentId) => reportTarget('post_comment', commentId)}
+                                onReportComment={onReportComment}
                                 onPublishPost={publishPost}
                                 onForceRefresh={forceRefreshFeed}
                                 feedStatus={feedStatus}
                                 onResolveMissingPost={resolvePostById}
                                 onDeletePostApi={deletePostOnServer}
-                                onOpenNetwork={(userId) => openUserNetwork(userId)}
-                                onUserContext={(e, userId, displayName) => {
-                                  const u = findUserById(users, userId)
-                                  openContextMenu('user', u || { id: userId, display_name: displayName })(e)
-                                }}
-                                onArchivePost={async (id) => {
-                                  if (!identity) return
-                                  try {
-                                    const res = await orbitFetch(`/api/objects/${id}/archive`, { method: 'POST' }, identity)
-                                    if (!res.ok) throw new Error(String(res.status))
-                                    const { is_archived } = await res.json()
-                                    setArchivedPostIds((prev) => {
-                                      const next = new Set(prev)
-                                      if (is_archived) next.add(id); else next.delete(id)
-                                      return next
-                                    })
-                                    toast(is_archived ? 'Post archived' : 'Post unarchived', 'info')
-                                  } catch {
-                                    toast('Archive failed. Try again.', 'error')
-                                  }
-                                }}
-                                onDeletePost={(id) => {
-                                  setDeletedPostIds((prev) => new Set(prev).add(id));
-                                  deletePostOnServer(id);
-                                  toast('Post deleted', 'success');
-                                }}
-                                onRepostPost={(post) => {
-                                  setRepostedPosts((prev) => [
-                                    {
-                                      ...post,
-                                      id: `repost_${post.id}_${Date.now()}`,
-                                      is_reposted: true,
-                                      reposted_by: myProfile.displayName || 'You',
-                                    },
-                                    ...prev,
-                                  ]);
-                                }}
+                                onOpenNetwork={onOpenNetwork}
+                                onUserContext={onUserContext}
+                                onArchivePost={onArchivePost}
+                                onDeletePost={onDeletePost}
+                                onRepostPost={onRepostPost}
                                 onLoadMore={loadMoreFeedPosts}
                                 isLoadingMore={isLoadingMoreFeed}
                                 hasMore={hasMoreFeed}
                                 feedSort={feedSort}
-                                onFeedSortChange={(mode) => {
-                                  // The feed effect is keyed on `feedSort`; loading
-                                  // from here would close over the OLD sort and
-                                  // re-fetch the previous ranking.
-                                  setFeedSort(mode);
-                                }}
+                                onFeedSortChange={onFeedSortChange}
                                 feedLayout={settings.feedLayout}
-                                onFeedLayoutChange={(layout) => updateSettings('feedLayout', layout)}
-                                toast={toast}
+                                onFeedLayoutChange={onFeedLayoutChange}
                               />
                             )}
                           </section>
