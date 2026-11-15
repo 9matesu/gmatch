@@ -46,6 +46,11 @@ export function WallpaperBackground({ wallpaperBg, wallpaperFit = 'cover', wallp
         ) : (
           <div className={`absolute inset-0 ${wallpaperFit === 'repeat' ? '' : 'bg-center'}`} style={imgStyle} />
         )}
+        {/* The plate every foreground pixel sits on. Without it a light-theme
+            app over a dark photo is dark text on a dark photo, and the same
+            wallpaper in the dark theme leaves muted text unreadable. One
+            token, both themes, no per-component colour. */}
+        <div className="absolute inset-0 bg-wallpaper-scrim" aria-hidden="true" />
       </div>
 
       {hideUiForWallpaper && (

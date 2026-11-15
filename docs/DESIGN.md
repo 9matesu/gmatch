@@ -143,3 +143,21 @@ grep -n "text-sm" src/components/feed/GMatchFeed.tsx src/components/feed/PostCom
 ```
 Codified (with the exemption lists and the em-dash/placeholder nuances):
 `bash apps/desktop/design-gates.sh` — every count must read 0, all scrims /70.
+
+## Text over a wallpaper (measured, 2026-11)
+
+A wallpaper replaces the canvas the type tokens were measured against, so the
+worst case is the scrim composited over an adversarial photo (white in the dark
+theme, black in the light one). Measured at the shipped values:
+
+| theme | scrim | worst plate | fg | body | muted | faint |
+|---|---|---|---|---|---|---|
+| dark | `rgba(9,9,11,.45)` | `rgb(144,144,145)` | 3.04 | 2.15 | 1.08 | 1.34 |
+| light | `rgba(244,244,246,.55)` | `rgb(134,134,135)` | 4.88 | 2.88 | 2.13 | 1.05 |
+
+So the scrim is a plate, not a guarantee: no scrim below ~0.85 alpha can carry
+`muted` over an adversarial photo (that is an opaque canvas, i.e. no wallpaper).
+The rule that actually holds is the one already written above `.glass-toolbar`:
+**text sits on chrome, and chrome is opaque**. Hence the title bar uses
+`bg-retro-bg` (it is the window frame, and a `drag` region), and the scrim
+exists for the gaps between panels, which carry no text by construction.

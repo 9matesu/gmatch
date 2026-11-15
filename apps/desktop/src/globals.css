@@ -29,6 +29,21 @@
      Settings -> Panel Opacity silently stops reaching it (see docs/DESIGN.md). */
   --color-surface-canvas: #09090b;
 
+  /* Wallpaper scrim: the artwork is the hero, but text has to read over it.
+     Dark plate in the dark theme, light plate in the light one  a dark scrim
+     over a light theme is just a black page. One token, so no component
+     ever inlines a scrim colour of its own. */
+  --color-wallpaper-scrim: rgba(9, 9, 11, 0.45);
+
+  /* Rarity ladder. These are TEXT colours on a card, so they were the one
+     palette that could not flip: a light grey label on a white card in the
+     light theme is a 1.4:1 rumour. One token per tier, inverted below. */
+  --color-rarity-common: #b8b8c4;
+  --color-rarity-copper: #e08a4c;
+  --color-rarity-silver: #cfd6e6;
+  --color-rarity-gold: #ffd75e;
+  --color-rarity-diamond: #5ee0ff;
+
   /* Panel opacity (Settings -> Panel Opacity): 1 = solid, 0.35 = most transparent.
      Default leans transparent: the wallpaper is the hero, panels are chrome. */
   --panel-alpha: 0.94;
@@ -1491,6 +1506,8 @@ html.theme-light body {
   color-scheme: light;
 
   --color-surface-canvas: #f2f2f4;
+  /* Light theme over a dark photo still needs a light plate (see :root). */
+  --color-wallpaper-scrim: rgba(244, 244, 246, 0.55);
   --color-retro-bg: #f2f2f4;
 
   /* Panels are white, not black: the glass is the same idea inverted. */
@@ -1522,6 +1539,13 @@ html.theme-light body {
   --color-retro-accent-text: #ffffff;
   --color-hud-accent: #18181b;
   --color-hud-accent-hover: #000000;
+
+  /* The ladder inverted: dark enough to read on a white card. */
+  --color-rarity-common: #52525b;
+  --color-rarity-copper: #9a4a12;
+  --color-rarity-silver: #5b6472;
+  --color-rarity-gold: #8a5a00;
+  --color-rarity-diamond: #0e7490;
 }
 
 /* Explicit surface overrides. `@theme` utilities already read the variables,
@@ -1569,8 +1593,6 @@ html.theme-light [class*="bg-black/"] .text-retro-body {
   color: #d4d4d8;
 }
 
-/* Wallpaper scrim: the artwork sits behind it, and the plate must read in
-   both themes. In light mode it is WHITE — a dark scrim is a black page. */
 /* Flat: no elevation anywhere. Tailwind shadows compile to box-shadow, so
    killing the property is the whole rule — every surface goes flat. */
 *,

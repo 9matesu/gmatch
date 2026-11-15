@@ -40,7 +40,7 @@ export function NativeHeaderBar({
 
   return (
     <header
-      className="relative w-full h-9 flex items-center justify-between px-3 select-none z-[var(--z-dropdown)] bg-transparent text-xs"
+      className="relative w-full h-9 flex items-center justify-between px-3 select-none z-[var(--z-dropdown)] bg-retro-bg text-xs"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
       {/* Left: Navigators & Branding */}

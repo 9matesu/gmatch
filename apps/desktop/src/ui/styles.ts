@@ -67,12 +67,14 @@ export const FLOAT_GC_CRIT = 'text-xl text-amber-300 font-black drop-shadow-[0_0
 /** Full-bleed feed image (was .goon-image). */
 export const GOON_IMAGE = 'block h-full w-full object-contain'
 
-/** Rarity badge palette (was .rarity-*) — game semantics, kept as content colors. */
+/** Rarity badge palette (was .rarity-*): game semantics, but these are TEXT
+ *  colours on a card, so one token per tier keeps them readable in both
+ *  themes (a light grey label on a white card was a 1.4:1 rumour). The
+ *  diamond glow went with the rest of the shadows (flat UI). */
 export const RARITY: Record<string, string> = {
-  common: 'text-[#b8b8c4]',
-  copper: 'text-[#e08a4c] border-[rgba(224,138,76,0.5)]',
-  silver: 'text-[#cfd6e6] border-[rgba(207,214,230,0.5)]',
-  gold: 'text-[#ffd75e] border-[rgba(255,215,94,0.5)]',
-  diamond:
-    'text-[#5ee0ff] border-[rgba(94,224,255,0.6)] [text-shadow:0_0_10px_rgba(94,224,255,0.6)]',
+  common: 'text-rarity-common',
+  copper: 'text-rarity-copper border-rarity-copper/50',
+  silver: 'text-rarity-silver border-rarity-silver/50',
+  gold: 'text-rarity-gold border-rarity-gold/50',
+  diamond: 'text-rarity-diamond border-rarity-diamond/60',
 }
