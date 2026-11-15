@@ -143,7 +143,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     id: 'idle',
     title: 'Clicker',
     tabLabel: 'Clicker',
-    blurb: 'Babecock Idle: clicking, heat, tags, gallery and prestige.',
+    blurb: 'Clicker: heat, crits, tags, gallery and prestige.',
     sections: [
       {
         heading: 'The loop',
