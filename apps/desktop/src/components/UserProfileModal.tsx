@@ -117,7 +117,7 @@ export function UserProfileModal({
     onSendDm,
     onCopyLink,
     onReportPost,
-    zIndexClass: 'z-[90]',
+    zIndexClass: 'z-[var(--z-modal)]',
   });
 
   // Fetch follower/following counts for every profile INCLUDING your own:

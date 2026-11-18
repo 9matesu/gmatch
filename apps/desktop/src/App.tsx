@@ -1100,6 +1100,13 @@ export default function Home() {
   const lastSavedProfileRef = useRef<{ displayName: string; tags: string[] } | null>(null)
   const [lobbyLightboxUrl, setLobbyLightboxUrl] = useState<string | null>(null)
   const [selectedProfileUser, setSelectedProfileUser] = useState<User | null>(null)
+
+  // One overlay at a time: a profile opened from a post lightbox dismisses
+  // the lightbox, so the two never stack (and the profile can sit on the
+    // shared modal layer instead of floating above the whole app).
+  useEffect(() => {
+    if (selectedProfileUser) setExpandedItemId(null)
+  }, [selectedProfileUser])
   const [selectedProfilePosts, setSelectedProfilePosts] = useState<FeedPost[]>([])
   const [pmPeer, setPmPeer] = useState<ChatPeer | null>(null)
   /** Normalized partner id; '' when no conversation is open. */
