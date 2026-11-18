@@ -216,6 +216,14 @@ text overlays kept for caption hunts, §6).
   instead of a `{"type":"p2p"}` descriptor. Nothing is matched by caption,
   size, date or "looks like the same picture".
 
+**One booru implementation, two runtimes (2026-11).** The main process is the
+authority: it fetches, filters and only then crosses IPC. The renderer keeps a
+parser set for the browser/dev fallback (no bridge there) and it must not drift:
+the main-process parsers are pinned by fixtures (`electron/imhentai.test.cjs`,
+`booru-*.test.cjs`) and the blocklist by `blocklistParity.test.ts`. A provider
+change lands in main first; the renderer copy is a dev convenience, not a second
+product path.
+
 ### 6b. Feed/market queries (user spec: player picks, no hardcodes)
 
 - No hardcoded/default tags anywhere: the setup screen collects exactly 4
