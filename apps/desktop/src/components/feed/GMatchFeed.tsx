@@ -1049,7 +1049,7 @@ function GMatchFeedImpl({
                likedPosts={likedPosts}
                likeCounts={likeCounts}
                onToggleLike={toggleLike}
-               onOpen={(post) => { toggleExpand(post); }}
+               onOpen={toggleExpand}
              />
            ) : (
              <>
