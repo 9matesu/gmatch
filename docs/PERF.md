@@ -45,7 +45,7 @@ Posture: measure first, change only what the data justifies (ponytail).
   | AttachmentUploadModal | 1 | 0 | preview lives in state, modal-scoped, GC'd with component — blob replaced on next pick; accepted (video preview only) |
   | CreatePostModal | 1 | 0 | handoff: previewUrl becomes the post's image until server reconcile — revoking would blank the just-posted card |
   | MatchCardUpload | 1 | 2 | paired |
-  | CardZoom/CreateCard/Identity/ImageViewer/LegalCenter/SnapshotSection/useCropper | 1 | ≥1 | paired |
+  | CardZoom/CreateCard/Identity/ImageViewer/LegalCenter/useCropper | 1 | ≥1 | paired |
   | ProfilePicModal | 2 | 0 | crop flow replaces preview with dataURL before save; blob only transient; accepted |
 - BabecockPanel:195 / AttachmentUploadModal:78 video previews — modal-lifetime
   blobs, freed when the modal unmounts (React drops the reference; browser
