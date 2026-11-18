@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
-import type { User, OrbitObject, Relationship } from '@orbit/shared';
+import type { User, OrbitObject } from '@orbit/shared';
 import type { OrbitIdentity } from '@orbit/crypto';
 import {
   X,
@@ -24,7 +24,6 @@ export interface FollowersFollowingModalProps {
   currentUserId?: string;
   users: User[];
   followingIds: string[];
-  relationships?: Relationship[];
   profilePics?: Record<string, string>;
   stories?: OrbitObject[];
   onToggleFollow?: (userId: string) => void;

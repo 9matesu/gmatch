@@ -23,8 +23,6 @@ import { IdleOverlay } from "./components/IdleOverlay";
 import { useP2P } from "./hooks/useP2P";
 import { usePeerFeedPosts } from './hooks/usePeerFeedPosts'
 import type { ChatMessage } from "./hooks/useP2P";
-import { useGame } from "./hooks/useGame";
-import { enqueueableItems, shouldEnqueue } from "./utils/game";
 import { mergeMyCards, filterToActiveDeck, galleryItemVisible, type CanonicalCard } from "./utils/cardCollection";
 import { outboxStatesByGroup } from "./services/postOutbox";
 import { buildMirrorRow } from "./utils/galleryMirror";
@@ -274,13 +272,6 @@ export default function Home() {
     else document.documentElement.removeAttribute('data-motion');
   }, [settings.animatedChrome]);
 
-  const game = useGame({ users, identity });
-  const {
-    relationships,
-    spinTarget,
-    decisionMap,
-    enqueueDecision,
-  } = game;
 
   const lobby = useLobby({ identity, settings });
   const notifications = useNotifications(lobby.state);
@@ -449,7 +440,6 @@ export default function Home() {
   const mainScrollRef = useRef<HTMLDivElement>(null)
   const usersRef = useRef(users)
   const notifiedIdsRef = useRef(new Set<string>())
-  const decisionMapRef = useRef(decisionMap)
   const usersRequestRef = useRef(0)
   /** loadUsers is declared ~1100 lines below the first caller (toggleFollowUser),
    *  so early callers reach it through this ref instead of re-creating the
@@ -457,7 +447,6 @@ export default function Home() {
   const loadUsersRef = useRef<(() => void) | null>(null)
 
   useEffect(() => { usersRef.current = users }, [users])
-  useEffect(() => { decisionMapRef.current = decisionMap }, [decisionMap])
 
   const handleSetMainView = useCallback((view: MainViewType) => {
     const targetView = view === 'messages' ? 'rooms' : view;
@@ -2590,9 +2579,6 @@ export default function Home() {
           }
           if (!prevIds.has(item.id) && item.owner_id !== identity?.orbitId) {
             notifiedIdsRef.current.add(item.id)
-            if (shouldEnqueue(item, decisionMap, identity?.orbitId || '')) {
-              enqueueDecision(item)
-            }
           }
         }
         const merged = Array.from(itemMap.values()).sort((a, b) => {
@@ -2667,13 +2653,6 @@ export default function Home() {
         return bTime - aTime;
       });
 
-      // Server-inbox items join the decision game the same way p2p items do (F-U7)
-      const toEnqueue = enqueueableItems(payloadList, decisionMapRef.current, identity.orbitId, notifiedIdsRef.current);
-      for (const item of toEnqueue) {
-        notifiedIdsRef.current.add(item.id);
-        enqueueDecision(item);
-      }
-
       setItems(prev => areItemsStructurallyEqual(prev, payloadList) ? prev : payloadList);
       setItemsLoading(false);
 
@@ -2719,7 +2698,7 @@ export default function Home() {
         setItems(prev => areItemsStructurallyEqual(prev, payloadList) ? prev : payloadList);
         setItemsLoading(false);
       });
-  }, [identity, updateSettings, toast, enqueueDecision, myProfile.displayName]);
+  }, [identity, updateSettings, toast, myProfile.displayName]);
 
 
   const loadStories = useCallback(() => {
@@ -4123,7 +4102,6 @@ export default function Home() {
                       soundEnabled={settings.soundEffects}
                       users={users}
                       profilePics={profilePics}
-                      spinTarget={spinTarget}
                       selectedIds={selectedIds}
                       setSelectedIds={setSelectedIds}
                       sendPanelRef={sendPanelRef}
@@ -4400,7 +4378,6 @@ export default function Home() {
                 stories={stories}
                 activeVirusHack={activeVirusHack}
                 setActiveHacks={setActiveHacks}
-                relationships={relationships}
                 followingIds={followingIds}
                 items={items}
                 identityModalMode={identityModalMode}

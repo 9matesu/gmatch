@@ -25,7 +25,6 @@ export interface GlobalModalsProps {
   stories: OrbitObject[];
   activeVirusHack: ActiveHackDebuff | null;
   setActiveHacks: React.Dispatch<React.SetStateAction<ActiveHackDebuff[]>>;
-  relationships: any;
   followingIds: string[];
   items: OrbitObject[];
 
@@ -92,7 +91,7 @@ export interface GlobalModalsProps {
 }
 
 export function GlobalModals(props: GlobalModalsProps) {
-  const { identity, users, profilePics, settings, updateSettings, setMyProfile, stories, activeVirusHack, setActiveHacks, relationships, followingIds, items, identityModalMode, setIdentityModalMode, exportIdentity, loginWithExportedId, clearIdentity, handleFullConfigDownload, handleFullConfigRestore, showHelpModal, setShowHelpModal, showFlashModal, setShowFlashModal, showSettingsModal, setShowSettingsModal, settingsInitialTab = 'preferences', showCreatePostModal, setShowCreatePostModal, createPostInitialData, setCreatePostInitialData, showStoryModal, setShowStoryModal, followersModalState, setFollowersModalState, showCoffee, manualCoffeeOpen, triggerReason, dismissCoffee, setManualCoffeeOpen, handleSetMainView, setMainView, setDmMinimized, setPmPeer, setSelectedProfileUser, setSelectedIds, setExpandedItemId, setStoryViewerUserId, loadUsers, loadGallery, loadStories, loadServerFeed, toggleFollowUser, toast, pfpInputRef, handleSetProfilePic, lobby } = props;
+  const { identity, users, profilePics, settings, updateSettings, setMyProfile, stories, activeVirusHack, setActiveHacks, followingIds, items, identityModalMode, setIdentityModalMode, exportIdentity, loginWithExportedId, clearIdentity, handleFullConfigDownload, handleFullConfigRestore, showHelpModal, setShowHelpModal, showFlashModal, setShowFlashModal, showSettingsModal, setShowSettingsModal, settingsInitialTab = 'preferences', showCreatePostModal, setShowCreatePostModal, createPostInitialData, setCreatePostInitialData, showStoryModal, setShowStoryModal, followersModalState, setFollowersModalState, showCoffee, manualCoffeeOpen, triggerReason, dismissCoffee, setManualCoffeeOpen, handleSetMainView, setMainView, setDmMinimized, setPmPeer, setSelectedProfileUser, setSelectedIds, setExpandedItemId, setStoryViewerUserId, loadUsers, loadGallery, loadStories, loadServerFeed, toggleFollowUser, toast, pfpInputRef, handleSetProfilePic, lobby } = props;
 
 
 
@@ -239,7 +238,6 @@ export function GlobalModals(props: GlobalModalsProps) {
           targetDisplayName={followersModalState.targetName ?? null}
           users={users}
           followingIds={followingIds}
-          relationships={relationships}
           profilePics={profilePics}
           stories={stories}
           onToggleFollow={(uId) => {
