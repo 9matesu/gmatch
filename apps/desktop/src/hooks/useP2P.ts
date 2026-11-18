@@ -79,7 +79,7 @@ export interface ChatMessage {
  * of the wrong type is dropped, and a frame that does not fit its declared
  * shape never reaches a handler.
  */
-function routeInboundFrame(
+export function routeInboundFrame(
   raw: unknown,
   onSwarm: (msg: SwarmMessage) => void,
   onAnnounce: (msg: SwarmAnnounce) => void,
