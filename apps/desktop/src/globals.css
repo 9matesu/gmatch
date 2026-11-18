@@ -1655,13 +1655,23 @@ html.theme-light [class*="bg-black/"] .text-retro-body {
   color: #d4d4d8;
 }
 
-/* Flat: no elevation anywhere. Tailwind shadows compile to box-shadow, so
-   killing the property is the whole rule — every surface goes flat. */
+/* Flat: no elevation and no blur anywhere. Tailwind shadows compile to
+   box-shadow and backdrop-blur to backdrop-filter, so killing the property is
+   the whole rule — every surface goes flat. The --glass-blur token (Settings ->
+   Glass blur) stays the single place that decides how much blur a build wants;
+   setting it to 0 here is the same gate, not a second one. */
 *,
 *::before,
 *::after {
   box-shadow: none !important;
   text-shadow: none !important;
+}
+
+*,
+*::before,
+*::after {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }
 
 [class*="drop-shadow"] {
