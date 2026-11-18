@@ -7,7 +7,7 @@ import { buildRoundQueries, roundQueryKey, PILLS_PER_ROUND, RECENT_QUERY_DEPTH }
 import { getUserExcludes, isNoise, isQueryBlocked, rankTags, setUserExcludes } from './tagFilter'
 import { learnPurge, setCoRules, setFeedIntent } from './tagCooccur'
 import { KILL_XP, foeMaxHp, killBonusPoints } from './battle'
-import { CAPS, activeCaps, popCap as popCapList } from './caps'
+import { ALL_CAP_IDS, CAPS, activeCaps, popCap as popCapList } from './caps'
 import { imageRarity } from './rarity'
 import { applyBrainmelt, canBrainmelt, tierForXp, titleForTier } from './prestige'
 import { ACHIEVEMENTS, newlyEarned } from './achievements'
@@ -1339,6 +1339,9 @@ export const useGame = create<GameState>((set, get) => ({
   },
 
   popCap: (capId) => {
+    // Retired ids stay in CAPS so an old save still resolves, but nothing may
+    // BUY one: at cost 0 they were free no-ops in the machine.
+    if (!ALL_CAP_IDS.includes(capId)) return false
     const s = get()
     const def = CAPS[capId]
     if (s.points < def.cost) return false

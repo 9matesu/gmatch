@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react
 import { useGame } from '../game/store'
 import { gridSizeForMode, isGridMode } from '../game/store'
 import { HEAT_WINDOW_MS, heatMultiplier } from '../game/economy'
+import { ALL_CAP_IDS } from '../game/caps'
 import type { CapId, ViewMode } from '../game/types'
 import { playPress } from '../utils/sounds'
 import { prefetchImages, resolveImage } from '../services/imageCache'
@@ -50,7 +51,7 @@ interface Float {
   cell: number | null
 }
 
-const CAP_ORDER: CapId[] = ['blue', 'filter', 'hypno', 'melt']
+const CAP_ORDER: readonly CapId[] = ALL_CAP_IDS
 
 /** Autoplay is opt-in: honor prefers-reduced-motion (SPEC §7 a11y). */
 function useReducedMotion(): boolean {
@@ -201,9 +202,10 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
         }
         return
       }
-      if (e.key === '1' || e.key === '2' || e.key === '3' || e.key === '4') {
+      const capIndex = Number(e.key) - 1
+      if (/^[1-9]$/.test(e.key) && capIndex < CAP_ORDER.length) {
         e.preventDefault()
-        st.popCap(CAP_ORDER[Number(e.key) - 1])
+        st.popCap(CAP_ORDER[capIndex])
         return
       }
       if (e.key === 'ArrowLeft') {

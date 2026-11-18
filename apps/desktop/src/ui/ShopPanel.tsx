@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { useGame } from '../game/store'
 import { MAX_TAG_LEVEL, tagCost } from '../game/tags'
-import { CAPS, capEffectLabel, capStacks } from '../game/caps'
-import type { CapId } from '../game/types'
+import { ALL_CAP_IDS, CAPS, capEffectLabel, capStacks } from '../game/caps'
 import {
   PRESTIGE_MIN_TIER,
   canBrainmelt,
@@ -287,7 +286,7 @@ function CapsTab() {
       </div>
 
       <div className="flex flex-col gap-2">
-        {(Object.keys(CAPS) as CapId[]).map((id, idx) => {
+        {ALL_CAP_IDS.map((id, idx) => {
           const def = CAPS[id]
           const afford = points >= def.cost
           const st = capStacks(caps, id, now)
@@ -450,7 +449,7 @@ export default function ShopPanel() {
   }
 
   const ownedTagsCount = tags.filter((t) => t.level > 0).length
-  const totalCapsStacks = Object.keys(CAPS).reduce((acc, k) => acc + capStacks(caps, k as CapId, now).count, 0)
+  const totalCapsStacks = ALL_CAP_IDS.reduce((acc, id) => acc + capStacks(caps, id, now).count, 0)
   const currentTier = tierForXp(xp)
 
   return (
