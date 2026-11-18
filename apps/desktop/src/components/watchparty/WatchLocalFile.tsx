@@ -133,17 +133,10 @@ export function WatchLocalFile({
         aria-label="Choose a local video file"
         onChange={(e) => void pick(e.target.files?.[0] || null)}
       />
-      <div
-        role="button"
-        tabIndex={0}
+      <button
+        type="button"
         aria-label="Drop a local video file here, or activate to browse"
         onClick={() => inputRef.current?.click()}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            inputRef.current?.click()
-          }
-        }}
         onDragOver={(e) => {
           e.preventDefault()
           setDragOver(true)
@@ -161,7 +154,7 @@ export function WatchLocalFile({
         <FileVideo className="h-5 w-5 text-retro-muted" />
         <p className="text-xs text-retro-fg">Drop a video file here, or browse</p>
         <p className={`text-2xs ${MUTED}`}>MP4, WebM, MOV and other files your browser can play</p>
-      </div>
+      </button>
 
       {meta && file && (
         <div className="rounded-lg border border-edge bg-glass-w5 px-3 py-2 text-xs">

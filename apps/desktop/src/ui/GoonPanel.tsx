@@ -254,7 +254,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
     setShakeKey((k) => k + 1)
   }
 
-  const handleClick = (e: MouseEvent<HTMLDivElement>) => {
+  const handleClick = (e: MouseEvent<HTMLElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
     const { gain, crit, heat } = clickImage()
     playHit(crit)
@@ -613,21 +613,14 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           )}
         </div>
       ) : (
-        <div
+        <button
+          type="button"
           // No `key` here on purpose ÔÇö see the grid tile above. This div holds
           // the <img>/<video>, and a per-click key remounted them.
           className={`${STAGE_FRAME} border-beam relative min-h-0 flex-1 ${imageReady ? 'cursor-pointer active:cursor-grabbing' : 'cursor-progress'} max-[1100px]:min-h-[320px]`}
           onClick={handleClick}
           onAuxClick={handleAuxClick}
-          role="button"
-          tabIndex={0}
           aria-label="Attack the current foe"
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault()
-              clickImage()
-            }
-          }}
         >
           {critFlashEl}
           {koPopEl}
@@ -755,7 +748,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                 {f.text}
               </span>
             ))}
-        </div>
+        </button>
       )}
       <div className="flex flex-none flex-wrap items-center gap-2 px-1 py-0.5">
         {/* Hoverable novelty tray: KO drops never pause gameplay. */}

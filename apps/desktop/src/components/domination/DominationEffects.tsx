@@ -472,14 +472,14 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
   return (
     <>
       {blurEffect && (
-        <div
+        <button
+          type="button"
           className="fixed inset-0 z-[var(--z-modal)] cursor-pointer"
           style={{
             backdropFilter: `blur(${blurEffect.data.intensity}px)`,
             backgroundColor: 'rgba(0,0,0,0.1)',
           }}
           onClick={() => removeEffect(blurEffect.id)}
-          role="button"
           aria-label="Clear blur"
         />
       )}

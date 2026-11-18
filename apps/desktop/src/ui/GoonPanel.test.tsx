@@ -71,7 +71,7 @@ describe('GoonPanel click feedback', () => {
     const video = container.querySelector('video')!
     expect(video).toBeTruthy()
 
-    fireEvent.click(container.querySelector('[role="button"][aria-label="Attack the current foe"]')!)
+    fireEvent.click(container.querySelector('button[aria-label="Attack the current foe"]')!)
 
     // Same node object, not merely an equivalent one.
     expect(container.querySelector('video')).toBe(video)
@@ -83,7 +83,7 @@ describe('GoonPanel click feedback', () => {
     const img = container.querySelector('img[alt="goon feed"]')!
     expect(img).toBeTruthy()
 
-    fireEvent.click(container.querySelector('[role="button"][aria-label="Attack the current foe"]')!)
+    fireEvent.click(container.querySelector('button[aria-label="Attack the current foe"]')!)
 
     expect(container.querySelector('img[alt="goon feed"]')).toBe(img)
   })
@@ -142,7 +142,7 @@ describe('GoonPanel click feedback', () => {
   it('emits a per-hit flash above the media and keeps it hit-restartable', () => {
     seedSingle(100, 100)
     const { container } = render(<GoonPanel />)
-    const stage = container.querySelector('[role="button"][aria-label="Attack the current foe"]')!
+    const stage = container.querySelector('button[aria-label="Attack the current foe"]')!
     // Scoring is gated on the picture having painted; jsdom never loads
     // images, so fire the load the browser would.
     fireEvent.load(container.querySelector('img[alt="goon feed"]')!)
@@ -172,7 +172,7 @@ describe('GoonPanel click feedback', () => {
     // known click count rather than whatever ran before.
     useGame.setState({ clicks: 0, crits: 0, foeClicks: 0 } as never)
     const { container } = render(<GoonPanel />)
-    const stage = container.querySelector('[role="button"][aria-label="Attack the current foe"]')!
+    const stage = container.querySelector('button[aria-label="Attack the current foe"]')!
     expect(useGame.getState().imageReady).toBe(false)
 
     fireEvent.click(stage)

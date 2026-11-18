@@ -129,15 +129,14 @@ function TagsTab() {
           />
           <span className="truncate font-medium">{t.name}</span>
           {isOwned && (
-            <span
-              role="button"
-              tabIndex={-1}
+            <button
+              type="button"
               aria-label={`Delete ${t.name}`}
               onClick={(e) => { e.stopPropagation(); deleteTag(t.name) }}
               className="-mr-1 hidden shrink-0 rounded p-0.5 text-retro-muted hover:text-danger-fg group-hover:inline-flex"
             >
               <X className="h-3 w-3" />
-            </span>
+            </button>
           )}
         </button>
       </span>

@@ -1156,29 +1156,25 @@ function GMatchFeedImpl({
                   className="flex items-center gap-3 px-3 pt-3 pb-2"
                   onContextMenu={(e) => onUserContext?.(e, post.author_id, post.author_name)}
                 >
-                  <div
-                    role="button"
-                    tabIndex={0}
+                  <button
+                    type="button"
                     onClick={(e) => { e.stopPropagation(); handleAvatarClick(post.author_id); }}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAvatarClick(post.author_id)}
                     title={authorHasStory ? 'Watch story' : 'View profile'}
                     aria-label={authorHasStory ? `Watch story of ${post.author_name}` : `View profile of ${post.author_name}`}
                     className={`relative w-10 h-10 rounded-full p-[2px] flex-shrink-0 cursor-pointer ${authorHasStory ? 'bg-retro-accent' : 'bg-transparent'}`}
                   >
-                    <div className="relative w-full h-full rounded-full bg-surface-raised overflow-hidden">
+                    <span className="relative block w-full h-full rounded-full bg-surface-raised overflow-hidden">
                       <Avatar id={post.author_id} size={40} imageUrl={profilePics[post.author_id] || post.author_avatar} fill={true} />
-                    </div>
-                  </div>
+                    </span>
+                  </button>
                   <div className="flex min-w-0 flex-1 items-baseline gap-1.5">
-                    <span
-                      role="button"
-                      tabIndex={0}
+                    <button
+                      type="button"
                       onClick={(e) => { e.stopPropagation(); handleNameClick(post.author_id); }}
-                      onKeyDown={(e) => e.key === 'Enter' && handleNameClick(post.author_id)}
                       className="truncate text-sm font-semibold text-retro-fg hover:underline cursor-pointer"
                     >
                       {post.author_name || generateFallbackName(post.author_id)}
-                    </span>
+                    </button>
                     <span className="shrink-0 text-xs text-retro-faint">@{post.author_id.slice(0, 8)}</span>
                     <span className="shrink-0 text-xs text-retro-faint" aria-hidden="true">·</span>
                     <PostTimestamp createdAt={post.created_at} className="shrink-0 text-xs text-retro-faint" />
