@@ -101,6 +101,14 @@ by hand.
 
 ## Boot flow (`electron/main.cjs`)
 
+`main.cjs` is the composition root: it owns startup, the window and the
+lifecycle, and registers the IPC handlers from `electron/ipc/*.cjs`, one module
+per capability with its dependencies injected (`secure`, `cache`, `vault`,
+`window`, `server`, `notify`, `app`, `booru`, `update`,
+`domination-media`). A handler group is read in one file instead of inside a
+2k-line orchestrator; `node --check` + `eslint electron` cover them (there is no
+tsc for `.cjs`).
+
 1. `requestSingleInstanceLock` — duplicate launches exit after focusing.
 2. `migrateUserData()` — one-shot move from the legacy `@goongrid` profile.
 3. `mainLog()` + `uncaughtException`/`unhandledRejection` handlers — a fatal
