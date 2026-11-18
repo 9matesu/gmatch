@@ -67,6 +67,7 @@ export function GamesHub({
           <div className="flex items-center gap-1 p-1 rounded-full bg-surface-raised/60 backdrop-blur-md border border-edge" role="tablist" aria-label="Arena Modes">
             {[
               { id: 'duel' as const, label: '1v1 Arena' },
+              { id: 'babecock' as const, label: 'Babecock' },
               { id: 'ranks' as const, label: 'Rankings' },
             ].map((mode) => (
               <button
