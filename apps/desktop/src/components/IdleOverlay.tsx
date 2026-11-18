@@ -95,7 +95,7 @@ export function IdleOverlay({ items, identity, onExit }: {
             key={currentItem?.id}
             src={currentUrl}
             alt=""
-            className="max-w-[95vw] max-h-[90vh] object-contain animate-fadeIn"
+            className="max-w-[95vw] max-h-(--max-h-dialog) object-contain animate-fadeIn"
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
           />
           <div className="absolute bottom-6 text-2xs text-retro-muted font-sans">

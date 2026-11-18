@@ -652,7 +652,7 @@ export const SendPanel = forwardRef<SendPanelHandle, {
           onClick={handleUpload}
           disabled={!canSend}
           className={`w-full chrome-accent text-retro-accent-text font-bold py-3 px-6 transition disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-xs uppercase tracking-wider ${
-            buttonClicked ? 'scale-[0.97] brightness-125' : ''
+            buttonClicked ? 'scale-(--scale-press) brightness-125' : ''
           }`}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 2L11 13" /><path d="M22 2l-7 20-4-9-9-4 20-7z" /></svg>

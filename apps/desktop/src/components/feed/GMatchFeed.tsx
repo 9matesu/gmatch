@@ -936,7 +936,7 @@ function GMatchFeedImpl({
                 key={mode}
                 type="button"
                 onClick={() => { playPress(720); onFeedSortChange?.(mode); }}
-                className={`px-3 py-1.5 rounded-md transition duration-150 active:scale-[0.96] cursor-pointer font-medium ${feedSort === mode
+                className={`px-3 py-1.5 rounded-md transition duration-150 active:scale-(--scale-press-sm) cursor-pointer font-medium ${feedSort === mode
                     ? 'bg-glass-w12 text-retro-fg shadow-xs border border-edge'
                     : 'text-retro-muted hover:text-retro-fg'
                   }`}
@@ -1121,7 +1121,7 @@ function GMatchFeedImpl({
                               // the vercel-style refactor dropped these handlers).
                               onOpenGameAd?.(post.game_mode || 'duel');
                             }}
-                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-retro-accent text-retro-accent-text font-bold text-xs uppercase tracking-wider hover:bg-retro-accent-hover transition-colors active:scale-[0.98] shadow-lg"
+                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-retro-accent text-retro-accent-text font-bold text-xs uppercase tracking-wider hover:bg-retro-accent-hover transition-colors active:scale-(--scale-press) shadow-lg"
                           >
                             <span>{post.cta_label || 'Play Now'}</span>
                             <ChevronRight className="w-3.5 h-3.5" />
@@ -1137,7 +1137,7 @@ function GMatchFeedImpl({
                 key={post.id}
                 data-post-id={post.id}
                 onContextMenu={(e) => { e.preventDefault(); setOptionsPost(post) }}
-                className={`cv-row relative bg-surface-raised border border-edge rounded-[10px] overflow-hidden flex flex-col mb-3 break-inside-avoid ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
+                className={`cv-row relative bg-surface-raised border border-edge rounded-lg overflow-hidden flex flex-col mb-3 break-inside-avoid ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
               >
                 {/* Repost attribution: a quiet line, not a filled band, so the
                     post reads as one media-first tile, Instagram-style. */}
@@ -1257,8 +1257,8 @@ function GMatchFeedImpl({
                                 contentUrl={url}
                                 identity={identity}
                                 mimeType={mime}
-                                className="w-full h-auto max-h-[min(680px,80vh)] group-data-[expanded=true]/post:max-h-[85vh] object-contain rounded-none"
-                                videoClassName="w-full max-h-[min(680px,80vh)] group-data-[expanded=true]/post:max-h-[85vh] object-contain rounded-none"
+                                className="w-full h-auto max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
+                                videoClassName="w-full max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
                                 controls={true}
                                 alwaysShowControls={true}
                                 autoPlay={true}
@@ -1274,7 +1274,7 @@ function GMatchFeedImpl({
                               <NativeVideoPlayer
                                 natural
                                 src={url}
-                                videoClassName="w-full max-h-[min(680px,80vh)] group-data-[expanded=true]/post:max-h-[85vh] object-contain rounded-none"
+                                videoClassName="w-full max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
                                 controls={true}
                                 alwaysShowControls={true}
                                 autoPlay={true}
@@ -1287,7 +1287,7 @@ function GMatchFeedImpl({
                               <CachedImg
                                 src={url}
                                 alt={post.caption || 'Post image'}
-                                className="w-full h-auto max-h-[min(680px,80vh)] group-data-[expanded=true]/post:max-h-[85vh] object-contain rounded-none"
+                                className="w-full h-auto max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
                                 loading="lazy"
                               />
                             )}
@@ -1300,7 +1300,7 @@ function GMatchFeedImpl({
                           <NativeVideoPlayer
                                 natural
                                 src={post.localPreviewUrl}
-                            videoClassName="w-full max-h-[min(680px,80vh)] group-data-[expanded=true]/post:max-h-[85vh] object-contain rounded-none"
+                            videoClassName="w-full max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
                             controls={true}
                             alwaysShowControls={true}
                             autoPlay={true}
@@ -1313,7 +1313,7 @@ function GMatchFeedImpl({
                           <img
                             src={post.localPreviewUrl}
                             alt={post.caption || 'Post image'}
-                            className="w-full h-auto max-h-[min(680px,80vh)] group-data-[expanded=true]/post:max-h-[85vh] object-contain rounded-none"
+                            className="w-full h-auto max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
                             draggable={false}
                           />
                         )
@@ -1323,8 +1323,8 @@ function GMatchFeedImpl({
                           contentUrl={post.url}
                           identity={identity}
                           mimeType={post.mime_type}
-                          className="w-full h-auto max-h-[min(680px,80vh)] group-data-[expanded=true]/post:max-h-[85vh] object-contain rounded-none"
-                          videoClassName="w-full max-h-[min(680px,80vh)] group-data-[expanded=true]/post:max-h-[85vh] object-contain rounded-none"
+                          className="w-full h-auto max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
+                          videoClassName="w-full max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
                           controls={true}
                           alwaysShowControls={true}
                           autoPlay={true}
@@ -1340,7 +1340,7 @@ function GMatchFeedImpl({
                         <NativeVideoPlayer
                                 natural
                                 src={post.url}
-                          videoClassName="w-full max-h-[min(680px,80vh)] group-data-[expanded=true]/post:max-h-[85vh] object-contain rounded-none"
+                          videoClassName="w-full max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
                           controls={true}
                           alwaysShowControls={true}
                           autoPlay={true}
@@ -1353,7 +1353,7 @@ function GMatchFeedImpl({
                         <CachedImg
                           src={post.url}
                           alt={post.caption || 'Post image'}
-                          className="w-full h-auto max-h-[min(680px,80vh)] group-data-[expanded=true]/post:max-h-[85vh] object-contain rounded-none"
+                          className="w-full h-auto max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
                           loading="lazy"
                           onLoad={() => promoteMedia(post.id)}
                         />
@@ -1440,7 +1440,7 @@ function GMatchFeedImpl({
                         onClick={() => toggleLike(post)}
                         aria-label="Like post"
                         aria-pressed={isLiked}
-                        className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-[0.98]"
+                        className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-(--scale-press)"
                       >
                         <Heart
                           className={`w-4 h-4 transition-colors stroke-[1.75] ${isLiked ? 'text-danger-fg fill-danger' : 'text-retro-muted hover:text-retro-fg'
@@ -1452,7 +1452,7 @@ function GMatchFeedImpl({
                         type="button"
                         onClick={() => toggleExpand(post)}
                         aria-label="Comment"
-                        className="p-1.5 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-[0.98]"
+                        className="p-1.5 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-(--scale-press)"
                       >
                         <MessageCircle className="w-4 h-4 stroke-[1.75]" />
                       </button>
@@ -1461,7 +1461,7 @@ function GMatchFeedImpl({
                         type="button"
                         onClick={() => setSharingPost(post)}
                         aria-label="Share post"
-                        className="p-1.5 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-[0.98]"
+                        className="p-1.5 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-(--scale-press)"
                       >
                         <Send className="w-4 h-4 stroke-[1.75]" />
                       </button>
@@ -1471,7 +1471,7 @@ function GMatchFeedImpl({
                       type="button"
                       onClick={() => toggleSave(post)}
                       aria-label="Save post"
-                      className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-[0.98]"
+                      className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-(--scale-press)"
                     >
                       <Bookmark
                         className={`w-4 h-4 transition-colors stroke-[1.75] ${isSaved ? 'text-retro-fg fill-retro-fg' : 'text-retro-muted hover:text-retro-fg'
@@ -1489,7 +1489,7 @@ function GMatchFeedImpl({
                         onClick={() => void savePostToVault(post)}
                         aria-label="Save to Vault"
                         title="Save the media to your Vault (offline copy)"
-                        className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-[0.98]"
+                        className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-(--scale-press)"
                       >
                         <FolderPlus
                           className={`w-4 h-4 stroke-[1.75] transition-colors ${vaultSaved.has(post.url) ? 'text-success-fg' : 'text-retro-muted hover:text-retro-fg'}`}
@@ -1578,7 +1578,7 @@ function GMatchFeedImpl({
                 <button
                   type="button"
                   onClick={() => { playPress(800); onForceRefresh(); }}
-                  className="px-4 py-2 text-xs font-semibold rounded-md transition duration-150 active:scale-[0.96] cursor-pointer inline-flex items-center gap-1.5 border border-edge text-retro-body hover:text-retro-fg hover:bg-glass-w10"
+                  className="px-4 py-2 text-xs font-semibold rounded-md transition duration-150 active:scale-(--scale-press-sm) cursor-pointer inline-flex items-center gap-1.5 border border-edge text-retro-body hover:text-retro-fg hover:bg-glass-w10"
                 >
                   <RefreshCw className="w-4 h-4 stroke-[2]" />
                   <span>Reload feed</span>
@@ -1590,7 +1590,7 @@ function GMatchFeedImpl({
                   if (onOpenPostCreator) onOpenPostCreator();
                   else setShowCustomPostCreator(true);
                 }}
-                className="create-action px-4 py-2 text-xs font-semibold rounded-md transition duration-150 active:scale-[0.96] shadow-xs cursor-pointer inline-flex items-center gap-1.5"
+                className="create-action px-4 py-2 text-xs font-semibold rounded-md transition duration-150 active:scale-(--scale-press-sm) shadow-xs cursor-pointer inline-flex items-center gap-1.5"
               >
                 <PlusSquare className="w-4 h-4 stroke-[2]" />
                 <span>Upload your first post</span>

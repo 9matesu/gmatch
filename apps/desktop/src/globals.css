@@ -171,6 +171,18 @@
   --font-mono: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
   /* Radius scale (Concentric geometry) */
+  /* Press feedback. 57 call sites hand-rolled scale-[0.98]/[0.96]/[0.99];
+     one knob, two strengths (the 0.99/0.97 variants merge into press). */
+  /* Dialog heights. Six different vh values were inlined across the modals;
+     these are the ones that mean a ROLE (dialog / sheet / panel), not a
+     one-off layout number. 68/72/88vh stay literal: they are content fits. */
+  --max-h-dialog: 90vh;
+  --max-h-dialog-sm: 85vh;
+  --max-h-dialog-fit: min(680px, 80vh);
+  --max-h-panel: 80vh;
+  --max-h-sheet: 70vh;
+  --scale-press: 0.98;
+  --scale-press-sm: 0.96;
   --radius: 6px;
   --radius-sm: 6px;
   --radius-md: 6px;

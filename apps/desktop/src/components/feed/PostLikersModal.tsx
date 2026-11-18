@@ -98,7 +98,7 @@ export function PostLikersModal({
       aria-label="Post likes"
     >
       <div
-        className="bg-surface-raised w-full max-w-sm rounded-t-xl sm:rounded-xl border border-edge shadow-2xl overflow-hidden flex flex-col max-h-[80vh] sm:max-h-[500px] animate-orbit-slide-up"
+        className="bg-surface-raised w-full max-w-sm rounded-t-xl sm:rounded-xl border border-edge shadow-2xl overflow-hidden flex flex-col max-h-(--max-h-panel) sm:max-h-[500px] animate-orbit-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

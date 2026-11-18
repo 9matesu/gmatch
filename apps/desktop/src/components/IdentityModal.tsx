@@ -238,7 +238,7 @@ export function IdentityModal({
           </button>
         </div>
 
-        <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto styled-scrollbar">
+        <div className="p-4 space-y-4 max-h-(--max-h-sheet) overflow-y-auto styled-scrollbar">
           {mode === "export" && (
             <div className="space-y-4">
               <div className="p-3 bg-surface-interactive border border-edge rounded-lg space-y-1">
@@ -385,7 +385,7 @@ export function IdentityModal({
                 <button
                   type="button"
                   onClick={() => setMode("export")}
-                  className="flex-1 py-2.5 bg-glass-w8 border border-edge text-retro-fg font-medium text-xs rounded-lg transition-colors cursor-pointer hover:bg-glass-w12 active:scale-[0.98]"
+                  className="flex-1 py-2.5 bg-glass-w8 border border-edge text-retro-fg font-medium text-xs rounded-lg transition-colors cursor-pointer hover:bg-glass-w12 active:scale-(--scale-press)"
                 >
                   Export key first
                 </button>
@@ -393,7 +393,7 @@ export function IdentityModal({
                 <button
                   type="button"
                   onClick={handleConfirmLogout}
-                  className="flex-1 py-2.5 bg-retro-error/15 border border-retro-error/40 text-retro-error font-semibold text-xs rounded-lg transition-colors cursor-pointer hover:bg-retro-error/25 active:scale-[0.98]"
+                  className="flex-1 py-2.5 bg-retro-error/15 border border-retro-error/40 text-retro-error font-semibold text-xs rounded-lg transition-colors cursor-pointer hover:bg-retro-error/25 active:scale-(--scale-press)"
                 >
                   Sign out
                 </button>

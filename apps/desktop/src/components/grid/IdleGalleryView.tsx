@@ -307,7 +307,7 @@ function KeepsakeErrorState({
   return (
     <div
       role="alert"
-      className="flex max-h-[70vh] min-h-[240px] w-[320px] max-w-full flex-col items-center justify-center gap-2 rounded-lg border border-edge bg-black/60 p-6 text-center"
+      className="flex max-h-(--max-h-sheet) min-h-[240px] w-[320px] max-w-full flex-col items-center justify-center gap-2 rounded-lg border border-edge bg-black/60 p-6 text-center"
     >
       <span className="text-xs font-semibold text-retro-fg">{title}</span>
       {state !== 'pending' && (
@@ -918,7 +918,7 @@ export default function IdleGalleryView({
       )}
 
       {backgroundUrl && (
-        <div className="mx-4 my-2 flex items-center gap-2.5 rounded-[10px] border border-edge bg-retro-bg px-3 py-1.5 text-xs text-retro-muted">
+        <div className="mx-4 my-2 flex items-center gap-2.5 rounded-lg border border-edge bg-retro-bg px-3 py-1.5 text-xs text-retro-muted">
           <span>App backdrop is active</span>
           <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setBackground(null)} title="Remove the app backdrop">
             <IconX size={12} /> Clear
@@ -979,7 +979,7 @@ export default function IdleGalleryView({
                     )
                     e.dataTransfer.effectAllowed = 'copy'
                   }}
-                  className={`group relative aspect-square rounded-[10px] border bg-retro-bg cursor-grab active:cursor-grabbing ${
+                  className={`group relative aspect-square rounded-lg border bg-retro-bg cursor-grab active:cursor-grabbing ${
                     openMenuId === img.id ? 'z-30' : 'overflow-hidden'
                   } ${
                     isSelected
@@ -1136,15 +1136,15 @@ export default function IdleGalleryView({
       {/* Viewer Modal */}
       {viewer && (
         <MediaViewerModal onClose={() => setViewerId(null)} label="Keepsake viewer">
-          <figure className="relative flex max-h-[80vh] min-h-0 w-auto max-w-full flex-col items-center">
+          <figure className="relative flex max-h-(--max-h-panel) min-h-0 w-auto max-w-full flex-col items-center">
             <div className="relative min-h-0 w-auto max-w-full" data-keepsake-id={viewer.id}>
               {viewerResolved.status === 'local' ? (
                 viewerResolved.media === 'video' ? (
                   <NativeVideoPlayer
                     src={viewerResolved.url}
                     poster={viewer.preview || undefined}
-                    className="max-h-[70vh] w-auto max-w-full rounded-lg"
-                    videoClassName="max-h-[70vh] w-auto max-w-full rounded-lg object-contain"
+                    className="max-h-(--max-h-sheet) w-auto max-w-full rounded-lg"
+                    videoClassName="max-h-(--max-h-sheet) w-auto max-w-full rounded-lg object-contain"
                     controls
                     autoPlay
                     muted={false}
@@ -1155,7 +1155,7 @@ export default function IdleGalleryView({
                   <img
                     src={viewerResolved.url}
                     alt={viewer.tags.slice(0, 3).join(' ') || 'keepsake'}
-                    className="max-h-[70vh] w-auto max-w-full rounded-lg object-contain"
+                    className="max-h-(--max-h-sheet) w-auto max-w-full rounded-lg object-contain"
                     referrerPolicy="no-referrer"
                   />
                 )

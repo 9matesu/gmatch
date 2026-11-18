@@ -152,7 +152,7 @@ export default function TagBrowser({ onClose }: { onClose?: () => void }) {
                 onClick={() => setViewerId(p.id)}
                 title={p.tags.slice(0, 6).join(' ')}
                 aria-label={`View image tagged ${p.tags.slice(0, 3).join(' ') || 'booru post'}`}
-                className="group relative aspect-square cursor-pointer overflow-hidden rounded-[10px] border border-edge bg-retro-bg"
+                className="group relative aspect-square cursor-pointer overflow-hidden rounded-lg border border-edge bg-retro-bg"
               >
                 {p.kind === 'video' ? (
                   <video
@@ -181,12 +181,12 @@ export default function TagBrowser({ onClose }: { onClose?: () => void }) {
 
       {viewer && (
         <MediaViewerModal onClose={() => setViewerId(null)} label="Tag browser viewer">
-          <figure className="relative flex max-h-[80vh] min-h-0 w-auto max-w-full flex-col items-center">
+          <figure className="relative flex max-h-(--max-h-panel) min-h-0 w-auto max-w-full flex-col items-center">
             {viewer.kind === 'video' ? (
               <video
                 src={viewer.url}
                 poster={viewer.preview || undefined}
-                className="max-h-[70vh] w-auto max-w-full rounded-lg object-contain"
+                className="max-h-(--max-h-sheet) w-auto max-w-full rounded-lg object-contain"
                 controls
                 autoPlay
                 muted={false}
@@ -197,7 +197,7 @@ export default function TagBrowser({ onClose }: { onClose?: () => void }) {
               <img
                 src={viewer.url || offlineSvg(viewer.tags)}
                 alt={viewer.tags.slice(0, 3).join(' ') || 'booru post'}
-                className="max-h-[70vh] w-auto max-w-full rounded-lg object-contain"
+                className="max-h-(--max-h-sheet) w-auto max-w-full rounded-lg object-contain"
                 referrerPolicy="no-referrer"
               />
             )}

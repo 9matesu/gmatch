@@ -212,7 +212,7 @@ function ProfileStep(props: Props & { onDone: () => void }) {
         type="button"
         onClick={() => void enter()}
         disabled={busy || (!isImporting && !name.trim()) || (isImporting && !secretKey.trim())}
-        className="w-full py-2.5 px-4 rounded-lg bg-retro-accent hover:bg-retro-fg active:scale-[0.99] text-retro-accent-text font-semibold text-xs shadow-sm transition disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
+        className="w-full py-2.5 px-4 rounded-lg bg-retro-accent hover:bg-retro-fg active:scale-(--scale-press) text-retro-accent-text font-semibold text-xs shadow-sm transition disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
       >
         {busy ? (
           <span>Joining…</span>

@@ -27,7 +27,7 @@ export const PANEL = 'min-h-0 overflow-y-auto p-3.5 sm:p-4'
 
 /** Contract button: flat glass fill, 1px border, press = 0.98 scale. */
 export const BTN =
-  'cursor-pointer rounded-lg border border-edge bg-glass-w8 hover:bg-glass-w12 active:scale-[0.98] px-3.5 py-2 text-xs font-semibold text-retro-fg transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100'
+  'cursor-pointer rounded-lg border border-edge bg-glass-w8 hover:bg-glass-w12 active:scale-(--scale-press) px-3.5 py-2 text-xs font-semibold text-retro-fg transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100'
 
 export const BTN_SMALL = 'rounded-lg px-2.5 py-1 text-xs'
 

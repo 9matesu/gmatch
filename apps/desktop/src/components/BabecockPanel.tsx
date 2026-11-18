@@ -928,7 +928,7 @@ export function BabecockPanel({
         >
           <Card
             tone="raised"
-            className="max-w-3xl w-full max-h-[90vh] overflow-y-auto styled-scrollbar p-4 space-y-3"
+            className="max-w-3xl w-full max-h-(--max-h-dialog) overflow-y-auto styled-scrollbar p-4 space-y-3"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between gap-2 pb-2 border-b border-edge">

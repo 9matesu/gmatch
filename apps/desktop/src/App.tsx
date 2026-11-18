@@ -4249,12 +4249,12 @@ export default function Home() {
                     className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer animate-orbit-fade-in"
                     onClick={() => setLobbyLightboxUrl(null)}
                   >
-                    <div className="relative max-w-4xl max-h-[90vh] flex items-center justify-center" onClick={e => e.stopPropagation()}>
+                    <div className="relative max-w-4xl max-h-(--max-h-dialog) flex items-center justify-center" onClick={e => e.stopPropagation()}>
                       { }
                       <img
                         src={lobbyLightboxUrl}
                         alt="Lobby image"
-                        className="max-w-full max-h-[85vh] object-contain rounded-lg border-2 border-edge shadow-2xl"
+                        className="max-w-full max-h-(--max-h-dialog-sm) object-contain rounded-lg border-2 border-edge shadow-2xl"
                       />
                       <button
                         type="button"

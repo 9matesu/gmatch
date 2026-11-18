@@ -192,8 +192,8 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
             <NativeVideoPlayer
               key={post.localPreviewUrl}
               src={post.localPreviewUrl}
-              className="w-full h-full max-h-[70vh] object-contain"
-              videoClassName="w-full h-full max-h-[70vh] object-contain"
+              className="w-full h-full max-h-(--max-h-sheet) object-contain"
+              videoClassName="w-full h-full max-h-(--max-h-sheet) object-contain"
               autoPlay={true}
               controls={true}
               alwaysShowControls={true}
@@ -210,7 +210,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
               <img
                 src={post.localPreviewUrl}
                 alt={post.caption || ''}
-                className="w-full h-full object-contain max-h-[70vh]"
+                className="w-full h-full object-contain max-h-(--max-h-sheet)"
                 draggable={false}
               />
             </div>
@@ -223,8 +223,8 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
             identity={identity}
             mimeType={activeMedia.mime || post.mime_type}
             loading="eager"
-            className="w-full h-full max-h-[70vh] object-contain"
-            videoClassName="w-full h-full max-h-[70vh] object-contain"
+            className="w-full h-full max-h-(--max-h-sheet) object-contain"
+            videoClassName="w-full h-full max-h-(--max-h-sheet) object-contain"
             autoPlay={true}
             controls={true}
             alwaysShowControls={true}
@@ -244,7 +244,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
               identity={identity}
               mimeType={activeMedia?.mime || post.mime_type}
               alt=""
-              className="w-full h-full object-contain max-h-[70vh]"
+              className="w-full h-full object-contain max-h-(--max-h-sheet)"
               muted={false}
               autoPlay={false}
               controls={false}

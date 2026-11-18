@@ -59,8 +59,8 @@ export function FlashOverlay({
           identity={identity ?? null}
           mimeType={flash.mime_type}
           alt="Flash"
-          className="w-full max-h-[70vh] object-contain"
-          videoClassName="w-full max-h-[70vh] object-contain"
+          className="w-full max-h-(--max-h-sheet) object-contain"
+          videoClassName="w-full max-h-(--max-h-sheet) object-contain"
           autoPlay
           loop
           muted

@@ -559,7 +559,7 @@ function extForMime(mime: string): string {
             type="button"
             onClick={handleShare}
             disabled={uploading || (mediaList.length === 0 && !caption.trim())}
-            className="text-xs font-semibold text-retro-bg bg-retro-accent hover:bg-retro-fg disabled:opacity-40 cursor-pointer transition duration-150 active:scale-[0.96] px-4 py-1.5 rounded-md shadow-xs"
+            className="text-xs font-semibold text-retro-bg bg-retro-accent hover:bg-retro-fg disabled:opacity-40 cursor-pointer transition duration-150 active:scale-(--scale-press-sm) px-4 py-1.5 rounded-md shadow-xs"
           >
             {uploading ? 'Sharing...' : (mode === 'story' ? 'Share Story' : 'Share')}
           </button>
@@ -754,7 +754,7 @@ function extForMime(mime: string): string {
                     <div
                       key={m.id}
                       onClick={() => setActiveMediaIndex(idx)}
-                      className={`relative w-14 h-14 rounded-md overflow-hidden shrink-0 border cursor-pointer transition duration-150 active:scale-[0.96] ${activeMediaIndex === idx ? 'border-edge ring-1 ring-white' : 'border-edge opacity-60 hover:opacity-100'
+                      className={`relative w-14 h-14 rounded-md overflow-hidden shrink-0 border cursor-pointer transition duration-150 active:scale-(--scale-press-sm) ${activeMediaIndex === idx ? 'border-edge ring-1 ring-white' : 'border-edge opacity-60 hover:opacity-100'
                         }`}
                     >
                       {m.isVideoPage ? (
@@ -775,7 +775,7 @@ function extForMime(mime: string): string {
                       type="button"
                       onClick={() => moveMedia(activeMediaIndex, activeMediaIndex - 1)}
                       disabled={activeMediaIndex === 0}
-                      className="px-2 py-1 bg-glass-w12 border border-edge rounded text-2xs font-mono font-semibold disabled:opacity-30 hover:bg-glass-w20 cursor-pointer transition duration-150 active:scale-[0.96]"
+                      className="px-2 py-1 bg-glass-w12 border border-edge rounded text-2xs font-mono font-semibold disabled:opacity-30 hover:bg-glass-w20 cursor-pointer transition duration-150 active:scale-(--scale-press-sm)"
                       title="Move photo left"
                     >
                       ←
@@ -784,7 +784,7 @@ function extForMime(mime: string): string {
                       type="button"
                       onClick={() => moveMedia(activeMediaIndex, activeMediaIndex + 1)}
                       disabled={activeMediaIndex === mediaList.length - 1}
-                      className="px-2 py-1 bg-glass-w12 border border-edge rounded text-2xs font-mono font-semibold disabled:opacity-30 hover:bg-glass-w20 cursor-pointer transition duration-150 active:scale-[0.96]"
+                      className="px-2 py-1 bg-glass-w12 border border-edge rounded text-2xs font-mono font-semibold disabled:opacity-30 hover:bg-glass-w20 cursor-pointer transition duration-150 active:scale-(--scale-press-sm)"
                       title="Move photo right"
                     >
                       →

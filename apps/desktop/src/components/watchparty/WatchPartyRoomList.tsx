@@ -194,7 +194,7 @@ export function WatchPartyRoomList({
                 type="button"
                 onClick={() => void joinPartyById(identity, r.id)}
                 aria-label={`Reopen room ${r.name}`}
-                className="px-3 py-1.5 rounded-full border border-edge bg-surface-canvas/60 hover:bg-surface-raised text-xs text-retro-fg hover:text-retro-fg transition-colors cursor-pointer active:scale-[0.98]"
+                className="px-3 py-1.5 rounded-full border border-edge bg-surface-canvas/60 hover:bg-surface-raised text-xs text-retro-fg hover:text-retro-fg transition-colors cursor-pointer active:scale-(--scale-press)"
               >
                 <History className="w-3 h-3 inline mr-1.5 -mt-0.5" />
                 {r.name}
@@ -211,7 +211,7 @@ export function WatchPartyRoomList({
           type="button"
           onClick={onNewParty}
           aria-label="Create a new room"
-          className="group relative flex flex-col aspect-video sm:aspect-auto sm:min-h-[220px] rounded-xl border border-dashed border-edge hover:border-retro-fg bg-surface-canvas/40 hover:bg-glass-w8 p-5 items-center justify-center text-center transition duration-150 cursor-pointer active:scale-[0.98] shadow-sm"
+          className="group relative flex flex-col aspect-video sm:aspect-auto sm:min-h-[220px] rounded-xl border border-dashed border-edge hover:border-retro-fg bg-surface-canvas/40 hover:bg-glass-w8 p-5 items-center justify-center text-center transition duration-150 cursor-pointer active:scale-(--scale-press) shadow-sm"
         >
           <div className="w-12 h-12 rounded-full border border-edge bg-surface-raised flex items-center justify-center text-retro-muted group-hover:text-retro-fg group-hover:border-retro-fg/50 group-hover:scale-110 transition duration-150 mb-3 shadow-md">
             <Plus className="w-6 h-6 stroke-[2.5]" />
@@ -231,7 +231,7 @@ export function WatchPartyRoomList({
             type="button"
             onClick={() => void joinPartyById(identity, r.id)}
             aria-label={`Join room ${r.name}`}
-            className="group relative flex flex-col rounded-xl border border-edge hover:border-retro-fg/60 bg-surface-canvas/60 hover:bg-surface-raised/80 overflow-hidden text-left transition duration-150 cursor-pointer active:scale-[0.98] shadow-md hover:shadow-xl"
+            className="group relative flex flex-col rounded-xl border border-edge hover:border-retro-fg/60 bg-surface-canvas/60 hover:bg-surface-raised/80 overflow-hidden text-left transition duration-150 cursor-pointer active:scale-(--scale-press) shadow-md hover:shadow-xl"
           >
             {/* 16:9 Thumbnail Area */}
             <div className="relative aspect-video w-full overflow-hidden bg-retro-bg">

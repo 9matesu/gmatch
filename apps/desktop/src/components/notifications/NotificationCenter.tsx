@@ -148,7 +148,7 @@ export function NotificationCenter(props: NotificationCenterProps) {
         <div
           role="region"
           aria-label="Notification centre"
-          className="absolute left-1/2 -translate-x-1/2 top-full mt-1 w-[min(420px,92vw)] max-h-[70vh] flex flex-col bg-retro-bg/95 border border-edge rounded-lg shadow-2xl backdrop-blur-md z-[var(--z-dropdown)] overflow-hidden"
+          className="absolute left-1/2 -translate-x-1/2 top-full mt-1 w-[min(420px,92vw)] max-h-(--max-h-sheet) flex flex-col bg-retro-bg/95 border border-edge rounded-lg shadow-2xl backdrop-blur-md z-[var(--z-dropdown)] overflow-hidden"
         >
           {/* Transient toasts: an error stays until dismissed, so it needs a
               home inside the same surface rather than a floating overlay. */}

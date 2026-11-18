@@ -316,7 +316,7 @@ export function FormModal<T extends Record<string, unknown>>({
   return (
     <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4 bg-black/70 animate-orbit-fade-in">
       <div className={cn(
-        "w-full max-w-lg bg-surface-elevated border border-edge rounded-xl shadow-2xl overflow-hidden animate-orbit-pop max-h-[90vh] flex flex-col",
+        "w-full max-w-lg bg-surface-elevated border border-edge rounded-xl shadow-2xl overflow-hidden animate-orbit-pop max-h-(--max-h-dialog) flex flex-col",
         className
       )}>
         <div className="p-5 border-b border-edge flex items-start justify-between">
@@ -522,7 +522,7 @@ export function DetailModal({ isOpen, onClose, title, subtitle, children, data, 
   return (
     <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4 bg-black/70 animate-orbit-fade-in">
       <div className={cn(
-        "w-full bg-surface-elevated border border-edge rounded-xl shadow-2xl overflow-hidden animate-orbit-pop max-h-[90vh] flex flex-col",
+        "w-full bg-surface-elevated border border-edge rounded-xl shadow-2xl overflow-hidden animate-orbit-pop max-h-(--max-h-dialog) flex flex-col",
         sizeClasses[size]
       )}>
         <div className="p-5 border-b border-edge flex items-start justify-between">

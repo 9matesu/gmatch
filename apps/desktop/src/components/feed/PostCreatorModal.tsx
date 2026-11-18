@@ -105,7 +105,7 @@ export function PostCreatorModal({
       className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 select-none animate-orbit-fade-in"
     >
       <div
-        className="bg-glass backdrop-blur-2xl text-retro-fg w-full max-w-lg rounded-xl border border-edge shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-orbit-slide-up"
+        className="bg-glass backdrop-blur-2xl text-retro-fg w-full max-w-lg rounded-xl border border-edge shadow-2xl overflow-hidden flex flex-col max-h-(--max-h-dialog) animate-orbit-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

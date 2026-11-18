@@ -253,7 +253,7 @@ export function CommandIsland({
                 className={`relative flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full text-xs font-medium transition ${
                   isActive
                     ? 'bg-glass-w15 text-retro-fg'
-                    : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
+                    : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-(--scale-press)'
                 }`}
               >
                 <Icon className="w-4 h-4" weight={isActive ? 'fill' : 'regular'} />
@@ -319,7 +319,7 @@ export function CommandIsland({
             className={`relative flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full text-xs font-medium transition ${
               messagesOpen || mainView === 'messages' || mainView === 'rooms'
                 ? 'bg-glass-w15 text-retro-fg'
-                : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
+                : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-(--scale-press)'
             }`}
           >
             <ChatCircleText
@@ -344,7 +344,7 @@ export function CommandIsland({
             className={`relative flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full text-xs font-medium transition ${
               mainView === 'profile'
                 ? 'bg-glass-w15 text-retro-fg'
-                : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
+                : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-(--scale-press)'
             }`}
           >
             <div className="w-5 h-5 rounded-full overflow-hidden border border-edge bg-black/40 flex items-center justify-center shrink-0">
@@ -368,7 +368,7 @@ export function CommandIsland({
           aria-label="More options"
           aria-pressed={satelliteOpen}
           title={satelliteOpen ? 'Collapse extra tools' : 'Expand extra tools to the right'}
-          className={`p-1.5 rounded-full transition shrink-0 active:scale-[0.98] ${
+          className={`p-1.5 rounded-full transition shrink-0 active:scale-(--scale-press) ${
             satelliteOpen
               ? 'bg-glass-w15 text-retro-fg shadow-inner'
               : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8'
@@ -398,7 +398,7 @@ export function CommandIsland({
               className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition ${
                 mainView === 'store'
                   ? 'bg-glass-w15 text-retro-fg'
-                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
+                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-(--scale-press)'
               }`}
             >
               <ShoppingBag className="w-3.5 h-3.5 shrink-0" weight={mainView === 'store' ? 'fill' : 'regular'} />
@@ -415,7 +415,7 @@ export function CommandIsland({
               className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition ${
                 mainView === 'servers'
                   ? 'bg-glass-w15 text-retro-fg'
-                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
+                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-(--scale-press)'
               }`}
             >
               <HardDrives className="w-3.5 h-3.5 shrink-0" weight={mainView === 'servers' ? 'fill' : 'regular'} />
@@ -432,7 +432,7 @@ export function CommandIsland({
               className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition ${
                 mainView === 'pc_domination'
                   ? 'bg-glass-w15 text-retro-fg'
-                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
+                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-(--scale-press)'
               }`}
             >
               <Monitor className="w-3.5 h-3.5 shrink-0" weight={mainView === 'pc_domination' ? 'fill' : 'regular'} />
@@ -453,7 +453,7 @@ export function CommandIsland({
               className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition ${
                 themeOpen
                   ? 'bg-glass-w15 text-retro-fg'
-                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
+                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-(--scale-press)'
               }`}
             >
               <PaintBrush className="w-3.5 h-3.5 shrink-0" weight={themeOpen ? 'fill' : 'regular'} />
@@ -474,7 +474,7 @@ export function CommandIsland({
               className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition ${
                 settingsOpen
                   ? 'bg-glass-w15 text-retro-fg'
-                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
+                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-(--scale-press)'
               }`}
             >
               <Gear className="w-3.5 h-3.5 shrink-0" weight={settingsOpen ? 'fill' : 'regular'} />
@@ -491,7 +491,7 @@ export function CommandIsland({
               }}
               aria-label="Help"
               title="Help & documentation"
-              className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98] transition"
+              className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-(--scale-press) transition"
             >
               <Question className="w-3.5 h-3.5 shrink-0" />
               <span className="text-xs hidden xl:inline">Help</span>
@@ -508,7 +508,7 @@ export function CommandIsland({
               }}
               aria-label="Community"
               title="Join the community"
-              className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98] transition"
+              className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-(--scale-press) transition"
             >
               <UsersThree className="w-3.5 h-3.5 shrink-0" />
               <span className="text-xs hidden xl:inline">Community</span>
@@ -526,7 +526,7 @@ export function CommandIsland({
                 }}
                 aria-label="Admin"
                 title="Admin Control Panel"
-                className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98] transition"
+                className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-(--scale-press) transition"
               >
                 <ShieldCheck className="w-3.5 h-3.5 shrink-0" weight="regular" />
                 <span className="text-xs hidden xl:inline">Admin</span>
@@ -545,7 +545,7 @@ export function CommandIsland({
                   }}
                   aria-label="Log out"
                   title="Log out"
-                  className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98] transition"
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-(--scale-press) transition"
                 >
                   <SignOut className="w-3.5 h-3.5 shrink-0" />
                   <span className="text-xs hidden xl:inline">Logout</span>

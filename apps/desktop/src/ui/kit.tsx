@@ -19,7 +19,7 @@ export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost'
 export type ButtonSize = 'sm' | 'md'
 
 const BTN_BASE =
-  'cursor-pointer inline-flex items-center justify-center gap-1.5 rounded-lg font-semibold text-xs transition-colors duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100 select-none'
+  'cursor-pointer inline-flex items-center justify-center gap-1.5 rounded-lg font-semibold text-xs transition-colors duration-150 active:scale-(--scale-press) disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100 select-none'
 
 const BTN_VARIANT: Record<ButtonVariant, string> = {
   primary: 'bg-retro-accent text-retro-accent-text! hover:bg-retro-accent-hover border border-transparent font-bold',

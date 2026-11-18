@@ -89,7 +89,7 @@ export function ExploreSearchModal({
       onClick={onClose}
     >
       <div
-        className="bg-surface-raised w-full sm:max-w-lg h-full sm:h-[80vh] max-h-[80vh] rounded-none sm:rounded-xl border border-edge shadow-2xl overflow-hidden flex flex-col text-retro-fg animate-orbit-pop"
+        className="bg-surface-raised w-full sm:max-w-lg h-full sm:h-[80vh] max-h-(--max-h-panel) rounded-none sm:rounded-xl border border-edge shadow-2xl overflow-hidden flex flex-col text-retro-fg animate-orbit-pop"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

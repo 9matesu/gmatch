@@ -103,12 +103,12 @@ export function SlideshowPlayer({
         </button>
       )}
 
-      <div className="max-w-[90vw] max-h-[90vh] flex flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
+      <div className="max-w-[90vw] max-h-(--max-h-dialog) flex flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
         {image.url ? (
           isVideo ? (
-            <video src={resolveMediaUrl(image.url)} autoPlay loop muted playsInline className="max-w-[90vw] max-h-[80vh] rounded-xl shadow-2xl" />
+            <video src={resolveMediaUrl(image.url)} autoPlay loop muted playsInline className="max-w-[90vw] max-h-(--max-h-panel) rounded-xl shadow-2xl" />
           ) : (
-            <img src={resolveMediaUrl(image.url)} alt={current?.caption || ''} className="max-w-[90vw] max-h-[80vh] rounded-xl shadow-2xl object-contain" />
+            <img src={resolveMediaUrl(image.url)} alt={current?.caption || ''} className="max-w-[90vw] max-h-(--max-h-panel) rounded-xl shadow-2xl object-contain" />
           )
         ) : (
           <div className="w-[70vw] h-[50vh] flex items-center justify-center bg-glass-w5 rounded-xl">

@@ -401,7 +401,7 @@ export function UserProfileModal({
                     onSendCard(user.id);
                     onClose();
                   }}
-                  className="py-2 px-3 bg-retro-accent hover:bg-retro-fg text-retro-bg font-semibold text-xs rounded-md transition duration-150 active:scale-[0.96] shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
+                  className="py-2 px-3 bg-retro-accent hover:bg-retro-fg text-retro-bg font-semibold text-xs rounded-md transition duration-150 active:scale-(--scale-press-sm) shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <Send className="w-3.5 h-3.5 stroke-[2]" />
                   <span>Send Card</span>
@@ -415,7 +415,7 @@ export function UserProfileModal({
                     onStartPm({ id: user.id, display_name: displayName });
                     onClose();
                   }}
-                  className="py-2 px-3 bg-glass-w12 hover:bg-glass-w20 border border-edge text-retro-fg font-semibold text-xs rounded-md transition duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5"
+                  className="py-2 px-3 bg-glass-w12 hover:bg-glass-w20 border border-edge text-retro-fg font-semibold text-xs rounded-md transition duration-150 active:scale-(--scale-press-sm) cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <MessageCircle className="w-3.5 h-3.5 stroke-[1.75]" />
                   <span>Message</span>
@@ -426,7 +426,7 @@ export function UserProfileModal({
                 <button
                   type="button"
                   onClick={() => onInviteToGame(user.id)}
-                  className="py-2 px-3 bg-glass-w12 hover:bg-glass-w12 border border-edge text-retro-fg font-semibold text-xs rounded-md transition duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5"
+                  className="py-2 px-3 bg-glass-w12 hover:bg-glass-w12 border border-edge text-retro-fg font-semibold text-xs rounded-md transition duration-150 active:scale-(--scale-press-sm) cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <Swords className="w-3.5 h-3.5 stroke-[1.75]" />
                   <span>Invite to Game</span>
@@ -438,7 +438,7 @@ export function UserProfileModal({
                   type="button"
                   onClick={onPingAttention}
                   title="Float your profile to the top of the roster for 30 seconds"
-                  className="py-2 px-3 bg-glass-w12 hover:bg-glass-w20 border border-edge text-retro-fg font-semibold text-xs rounded-md transition duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5"
+                  className="py-2 px-3 bg-glass-w12 hover:bg-glass-w20 border border-edge text-retro-fg font-semibold text-xs rounded-md transition duration-150 active:scale-(--scale-press-sm) cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <Bell className="w-3.5 h-3.5 stroke-[1.75]" />
                   <span>Ping</span>
@@ -452,7 +452,7 @@ export function UserProfileModal({
                 <button
                   type="button"
                   onClick={() => followHandler(user.id)}
-                  className={`flex-1 py-2 px-3 border text-xs font-semibold rounded-md transition duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5 ${
+                  className={`flex-1 py-2 px-3 border text-xs font-semibold rounded-md transition duration-150 active:scale-(--scale-press-sm) cursor-pointer flex items-center justify-center gap-1.5 ${
                      following
                        ? 'border-warning/30 bg-warning/10 text-warning-fg'
                       : 'border-edge bg-retro-bg text-retro-fg hover:border-edge hover:bg-retro-panel'
@@ -470,7 +470,7 @@ export function UserProfileModal({
                     onBlockUser(user.id);
                     onClose();
                   }}
-                  className="py-2 px-3 border border-danger/25 bg-danger/10 hover:bg-danger/20 text-danger-fg text-xs font-medium rounded-md transition duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5"
+                  className="py-2 px-3 border border-danger/25 bg-danger/10 hover:bg-danger/20 text-danger-fg text-xs font-medium rounded-md transition duration-150 active:scale-(--scale-press-sm) cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <Ban className="w-3.5 h-3.5" />
                   <span>Block</span>
@@ -483,7 +483,7 @@ export function UserProfileModal({
                     onReportUser(user.id, user.display_name?.trim() || 'Unknown User');
                     onClose();
                   }}
-                  className="py-2 px-3 border border-danger/25 bg-danger/10 hover:bg-danger/20 text-danger-fg text-xs font-medium rounded-md transition duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5"
+                  className="py-2 px-3 border border-danger/25 bg-danger/10 hover:bg-danger/20 text-danger-fg text-xs font-medium rounded-md transition duration-150 active:scale-(--scale-press-sm) cursor-pointer flex items-center justify-center gap-1.5"
                   title="Report this user"
                 >
                   <Flag className="w-3.5 h-3.5" />
@@ -584,8 +584,8 @@ export function UserProfileModal({
           className="fixed inset-0 z-[var(--z-system)] flex items-center justify-center bg-black/70 p-4 cursor-pointer"
           onClick={() => setShowPic(false)}
         >
-          <div className="relative max-w-sm max-h-[80vh]" onClick={(e) => e.stopPropagation()}>
-            <img src={resolveMediaUrl(profilePic)} alt={displayName} className="max-w-full max-h-[80vh] rounded-lg border border-edge shadow-xl object-contain" />
+          <div className="relative max-w-sm max-h-(--max-h-panel)" onClick={(e) => e.stopPropagation()}>
+            <img src={resolveMediaUrl(profilePic)} alt={displayName} className="max-w-full max-h-(--max-h-panel) rounded-lg border border-edge shadow-xl object-contain" />
             <button
               type="button"
               onClick={() => setShowPic(false)}
@@ -603,12 +603,12 @@ export function UserProfileModal({
           className="fixed inset-0 z-[var(--z-system)] flex items-center justify-center bg-black/70 p-4 cursor-pointer"
           onClick={() => setSelectedCardImage(null)}
         >
-          <div className="relative max-w-md max-h-[85vh]" onClick={(e) => e.stopPropagation()}>
+          <div className="relative max-w-md max-h-(--max-h-dialog-sm)" onClick={(e) => e.stopPropagation()}>
             <ObjectImage
               contentUrl={selectedCardImage}
               identity={null}
               alt="Card preview"
-              className="max-w-full max-h-[85vh] rounded-lg border border-edge shadow-xl object-contain"
+              className="max-w-full max-h-(--max-h-dialog-sm) rounded-lg border border-edge shadow-xl object-contain"
               controls
               autoPlay
             />

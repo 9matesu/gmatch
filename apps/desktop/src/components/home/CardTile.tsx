@@ -143,7 +143,7 @@ export function CardTile({
           ? `perspective(1000px) rotateX(${tilt.rotateX.toFixed(2)}deg) rotateY(${tilt.rotateY.toFixed(2)}deg) scale3d(1.02, 1.02, 1.02)`
           : undefined,
       } as React.CSSProperties}
-      className={`holo-card group relative select-none cursor-pointer transition-transform duration-150 ease-out active:scale-[0.96] rounded-xl border border-edge bg-retro-bg overflow-hidden shadow-xs hover:border-edge-strong ${
+      className={`holo-card group relative select-none cursor-pointer transition-transform duration-150 ease-out active:scale-(--scale-press-sm) rounded-xl border border-edge bg-retro-bg overflow-hidden shadow-xs hover:border-edge-strong ${
         selected ? 'ring-2 ring-retro-accent shadow-xl z-10' : ''
       }`}
       onMouseMove={handleMouseMove}

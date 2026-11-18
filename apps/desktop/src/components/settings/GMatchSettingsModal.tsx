@@ -141,7 +141,7 @@ function FeedSettingsTab({
           <button
             type="button"
             onClick={() => setShowPicksEditor(true)}
-            className="px-3 py-1.5 rounded-lg border border-edge text-xs font-semibold text-retro-fg hover:bg-glass-w10 cursor-pointer active:scale-[0.98] transition-colors"
+            className="px-3 py-1.5 rounded-lg border border-edge text-xs font-semibold text-retro-fg hover:bg-glass-w10 cursor-pointer active:scale-(--scale-press) transition-colors"
           >
             Change starter tags
           </button>
@@ -169,7 +169,7 @@ function FeedSettingsTab({
             type="button"
             disabled={!draft.trim()}
             onClick={add}
-            className="px-4 py-2 bg-retro-accent hover:bg-retro-accent-hover disabled:opacity-40 text-retro-accent-text rounded-lg text-xs font-semibold cursor-pointer shrink-0 active:scale-[0.98] transition-colors"
+            className="px-4 py-2 bg-retro-accent hover:bg-retro-accent-hover disabled:opacity-40 text-retro-accent-text rounded-lg text-xs font-semibold cursor-pointer shrink-0 active:scale-(--scale-press) transition-colors"
           >
             Add
           </button>
@@ -205,7 +205,7 @@ function FeedSettingsTab({
           <button
             type="button"
             onClick={() => onNavigateTab('blocklist')}
-            className="px-3.5 py-2 bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text rounded-lg text-xs font-semibold cursor-pointer shrink-0 active:scale-[0.98] transition-colors"
+            className="px-3.5 py-2 bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text rounded-lg text-xs font-semibold cursor-pointer shrink-0 active:scale-(--scale-press) transition-colors"
           >
             Configure
           </button>
@@ -781,7 +781,7 @@ export function GMatchSettingsModal({
                           <button
                             type="button"
                             onClick={applyCustomWallpaper}
-                            className="px-4 py-2 bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text rounded-lg text-xs font-semibold cursor-pointer active:scale-[0.98] transition-colors"
+                            className="px-4 py-2 bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text rounded-lg text-xs font-semibold cursor-pointer active:scale-(--scale-press) transition-colors"
                           >
                             Apply
                           </button>
@@ -969,7 +969,7 @@ export function GMatchSettingsModal({
                     <button
                       type="button"
                       onClick={handleCopyId}
-                      className="px-3 py-1.5 bg-glass-w8 hover:bg-glass-w12 border border-edge text-retro-fg rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer shrink-0 transition-colors active:scale-[0.98]"
+                      className="px-3 py-1.5 bg-glass-w8 hover:bg-glass-w12 border border-edge text-retro-fg rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer shrink-0 transition-colors active:scale-(--scale-press)"
                     >
                       {copiedId ? <Check className="w-3.5 h-3.5 text-retro-fg" /> : <Copy className="w-3.5 h-3.5" />}
                       <span>{copiedId ? 'Copied' : 'Copy'}</span>
@@ -986,7 +986,7 @@ export function GMatchSettingsModal({
                   <button
                     type="button"
                     onClick={() => { playPress(700); setShowLegalCenter(true); }}
-                    className="w-full text-left p-3 bg-retro-panel/10 border border-edge rounded-lg text-xs font-medium text-retro-fg hover:bg-retro-panel/20 transition-colors cursor-pointer active:scale-[0.98]"
+                    className="w-full text-left p-3 bg-retro-panel/10 border border-edge rounded-lg text-xs font-medium text-retro-fg hover:bg-retro-panel/20 transition-colors cursor-pointer active:scale-(--scale-press)"
                   >
                     <div className="flex items-center justify-between">
                       <span>Legal Terms</span>
@@ -1003,7 +1003,7 @@ export function GMatchSettingsModal({
                   <button
                     type="button"
                     onClick={() => onOpenIdentityModal?.('export')}
-                    className="p-4 bg-glass-w5 border border-edge hover:bg-glass-w10 hover:border-retro-accent rounded-lg text-left space-y-2 transition cursor-pointer group active:scale-[0.98]"
+                    className="p-4 bg-glass-w5 border border-edge hover:bg-glass-w10 hover:border-retro-accent rounded-lg text-left space-y-2 transition cursor-pointer group active:scale-(--scale-press)"
                   >
                     <div className="w-8 h-8 rounded-lg bg-glass-w10 border border-edge text-retro-fg flex items-center justify-center">
                       <Download className="w-4 h-4" />
@@ -1017,7 +1017,7 @@ export function GMatchSettingsModal({
                   <button
                     type="button"
                     onClick={() => onOpenIdentityModal?.('login')}
-                    className="p-4 bg-glass-w5 border border-edge hover:bg-glass-w10 hover:border-retro-accent rounded-lg text-left space-y-2 transition cursor-pointer group active:scale-[0.98]"
+                    className="p-4 bg-glass-w5 border border-edge hover:bg-glass-w10 hover:border-retro-accent rounded-lg text-left space-y-2 transition cursor-pointer group active:scale-(--scale-press)"
                   >
                     <div className="w-8 h-8 rounded-lg bg-glass-w10 border border-edge text-retro-fg flex items-center justify-center">
                       <LogIn className="w-4 h-4" />
@@ -1042,7 +1042,7 @@ export function GMatchSettingsModal({
                     <button
                       type="button"
                       onClick={() => onOpenIdentityModal?.('logout')}
-                      className="px-3.5 py-2 bg-retro-error/15 border border-retro-error/40 text-retro-error hover:bg-retro-error/25 rounded-lg text-xs font-semibold cursor-pointer transition-colors flex items-center justify-center gap-1.5 active:scale-[0.98] shrink-0"
+                      className="px-3.5 py-2 bg-retro-error/15 border border-retro-error/40 text-retro-error hover:bg-retro-error/25 rounded-lg text-xs font-semibold cursor-pointer transition-colors flex items-center justify-center gap-1.5 active:scale-(--scale-press) shrink-0"
                     >
                       <LogOut className="w-3.5 h-3.5" />
                       <span>Log Out</span>

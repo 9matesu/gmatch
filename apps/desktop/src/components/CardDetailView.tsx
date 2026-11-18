@@ -215,7 +215,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
 
   return (
     <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 p-4 overflow-y-auto" onClick={onClose}>
-      <div className="glass-card max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      <div className="glass-card max-w-2xl w-full max-h-(--max-h-dialog) flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="glass-header flex items-center justify-between px-5 py-4 shrink-0">
           <div className="min-w-0">
             <h2 className="text-lg font-bold text-retro-fg truncate">{card.name || 'Unnamed Card'}</h2>
