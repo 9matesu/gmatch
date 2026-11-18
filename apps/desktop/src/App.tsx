@@ -25,11 +25,10 @@ import type { SettingsOpenTarget } from './components/settings/GMatchSettingsMod
 import { ImageViewer } from "./components/ImageViewer";
 import { IdleOverlay } from "./components/IdleOverlay";
 import { useP2P } from "./hooks/useP2P";
-import { usePeerFeedPosts } from './hooks/usePeerFeedPosts'
+import { useFeedController } from './features/feed/useFeedController';
 import type { ChatMessage } from "./hooks/useP2P";
 import { mergeMyCards, filterToActiveDeck, galleryItemVisible, type CanonicalCard } from "./utils/cardCollection";
 import { outboxStatesByGroup } from "./services/postOutbox";
-import { localFeedPosts } from "./utils/localFeed";
 import { buildMirrorRow } from "./utils/galleryMirror";
 import { collectConfigBundle, applyConfigBundle, applyStashFromBundle, parseConfigBundle, configDownloadFilename, bundleToString } from "./utils/configBackup";
 import { runMigrations } from "./utils/migration";
@@ -53,7 +52,6 @@ import { AnnouncementBanner } from "./components/feed/AnnouncementBanner";
 import { findUserById } from "./utils/userLookup";
 import { resolveObjectRefId } from "./utils/objectRef";
 import { reconcilePublishedPost } from "./utils/feedPublish";
-import { mergeRecentPushes, rememberPushed, sameTimeline, type PushedEntry } from "./utils/feedMerge";
 import { useStableCallback } from "./hooks/useStableCallback";
 import { PEER_ONLINE_EVENT } from "./utils/p2pSwarm";
 import { localHeldMediaUrl } from "./utils/localMedia";
@@ -1206,181 +1204,48 @@ export default function Home() {
   const [repostedPosts, setRepostedPosts] = useState<FeedPost[]>([])
   const [archivedPostIds, setArchivedPostIds] = useState<Set<string>>(() => new Set())
   const [deletedPostIds, setDeletedPostIds] = useState<Set<string>>(() => new Set())
-  const [serverPosts, setServerPosts] = useState<FeedPost[]>([])
-  // Posts the player just published, shown before the node has indexed them.
-  // The upload response is the truth (the bytes are already durable locally);
-  // waiting for the next feed read is what made a successful post look lost.
-  const [optimisticPosts, setOptimisticPosts] = useState<FeedPost[]>([])
-  // Own posts on the player's own profile: fetched explicitly (author_id
-  // query) because the general feed snapshot (50 rows) may not carry them.
-  const [myProfilePosts, setMyProfilePosts] = useState<FeedPost[]>([])
-  /**
-   * A permalink (`#/feed?post=`) or notification target can name a post that
-   * the 50-row snapshot does not carry (old, unranked, archived out of the
-   * window). The targeted single-post read lands here so the deep link still
-   * resolves; an entry is retired as soon as the snapshot lists it.
-   */
-  const [pinnedPosts, setPinnedPosts] = useState<FeedPost[]>([])
-  /**
-   * Initial load vs background refresh vs "this node hosts no feed" (a blind
-   * courier 404s every stateful route) vs a recoverable read error. Without
-   * this split an empty list was indistinguishable from a failed read.
-   */
-  const [feedStatus, setFeedStatus] = useState<'idle' | 'loading' | 'ready' | 'offline' | 'error'>('idle')
-  /** Monotonic request id: a slow older snapshot must never clobber a newer one. */
-  const feedRequestSeqRef = useRef(0)
-  /** Posts pushed over WS while a snapshot request was already in flight. */
-  const feedPushedRef = useRef<Map<string, PushedEntry<FeedPost>>>(new Map())
-  const [hasMoreFeed, setHasMoreFeed] = useState(true)
   const [followingIds, setFollowingIds] = useState<string[]>([])
   const [pmMessagesByPeer, setPmMessagesByPeer] = useState<Record<string, ChatMessage[]>>({})
 
-  // Peer-replicated posts (L4): projected from the durable operation log, no
-  // node route involved. Empty until something has been replicated.
-  const peerFeedPosts = usePeerFeedPosts(identity?.orbitId)
-
-  // Server posts now carry `media: {id,url,mime_type}[]` for multi-image posts.
-  // Map that into `mediaUrls` so the existing feed/lightbox carousel works.
-  const normalizeFeedPost = useCallback((p: FeedPost): FeedPost => {
-    const media = (p as any).media
-    if (Array.isArray(media) && media.length > 1) {
-      return { ...p, mediaUrls: media.map((m: any) => m.url).filter(Boolean) }
-    }
-    return p
-  }, [])
-
-  // The outbox is durable storage, not state: bump a counter when it changes
-  // so a post that is still local/pending appears (and updates) without a reload.
-  const [outboxTick, setOutboxTick] = useState(0)
-  useEffect(() => {
-    const bump = () => setOutboxTick((n) => n + 1)
-    window.addEventListener('gmatch:post-outbox-changed', bump)
-    return () => window.removeEventListener('gmatch:post-outbox-changed', bump)
-  }, [])
-
-  const feedPosts: FeedPost[] = useMemo(() => {
-    // Real public posts from the server feed
-    const serverVisible = serverPosts
-      .filter(
-        (p) => !deletedPostIds.has(p.id)
-      )
-      .map(normalizeFeedPost);
-    // My durable posts the node has not echoed back yet (see utils/localFeed).
-    const serverIds = new Set(serverVisible.map((p) => p.id));
-    const localPending = localFeedPosts(identity, myProfile.displayName).filter(
-      (p) => !serverIds.has(p.id) && !deletedPostIds.has(p.id),
-    );
-    // Public posts: both own uploaded public posts and peer public posts received via P2P
-    const seenServerIds = new Set(serverVisible.map((p) => p.id));
-    const localPublicPosts: FeedPost[] = items
-      .filter((obj) => ((obj as any).is_public === 1 || (obj as any).is_public === true) && !deletedPostIds.has(obj.id) && !seenServerIds.has(obj.id))
-      .map((obj) => {
-        const isSelf = obj.owner_id === identity?.orbitId;
-        // An unverified owner claim is a relay, not a proof: it may not borrow
-        // another user's directory name or avatar.
-        const unverified = (obj as any).owner_verified === false;
-        const authorUser = !isSelf && !unverified && obj.owner_id
-          ? findUserById(users, obj.owner_id)
-          : null;
-        const authorName = isSelf
-          ? (myProfile.displayName || 'You')
-          : (authorUser?.display_name || (obj as any).author_name || (obj as any).sender_name || 'Player');
-        const authorAvatar = isSelf
-          ? (profilePics[identity?.orbitId || ''] || null)
-          : (authorUser?.pfp_url || (!unverified && obj.owner_id ? profilePics[obj.owner_id] : null) || null);
-        // `data` may be a legacy data-URL string; an ArrayBuffer here is raw
-        // media, not a URL, and must never be coerced into one.
-        const rawData = (obj as any).data;
-        const legacyDataUrl = typeof rawData === 'string' && rawData.length > 0 ? rawData : '';
-        const localUrl = obj.content_url || (obj as any).source_url || legacyDataUrl || (obj as any).url || `/api/objects/${obj.id}`;
-        return ({
-          id: obj.id,
-          author_id: obj.owner_id || identity?.orbitId || 'peer',
-          author_name: authorName,
-          author_avatar: authorAvatar,
-          url: localUrl,
-          mime_type: obj.mime_type || (isMediaVideo(localUrl) ? 'video/mp4' : 'image/jpeg'),
-          caption: obj.caption || (obj as any).post_caption || '',
-          location: (obj as any).location || '',
-          tags: Array.isArray((obj as any).tags) ? (obj as any).tags : [],
-          created_at: obj.created_at || new Date().toISOString(),
-          like_count: (obj as any).likes_count || (obj as any).like_count || 0,
-          comment_count: (obj as any).comment_count || 0,
-          is_liked: false,
-          is_saved: false,
-          is_archived: archivedPostIds.has(obj.id),
-        });
-      });
-
-    // A just-uploaded post outranks the server snapshot until the node indexes
-    // it. Deduped by id, so the tile never appears twice once the row lands.
-    const optimisticVisible = optimisticPosts.filter(
-      (p) =>
-        !deletedPostIds.has(p.id) &&
-        !seenServerIds.has(p.id) &&
-        !localPublicPosts.some((l) => l.id === p.id),
-    );
-
-    // A deep-linked post the snapshot does not carry yet. Same dedupe rule: it
-    // disappears the moment the snapshot (or the local/P2P list) has it.
-    const pinnedVisible = pinnedPosts.filter(
-      (p) => !deletedPostIds.has(p.id) && !seenServerIds.has(p.id),
-    );
-
-    // Peer-replicated rows from the durable operation log (L4). Keyed by the
-    // same media objectId as server/local rows, so a post read from any source
-    // is one tile. These are what keep the feed readable when the node hosts
-    // no stateful routes at all (the blind courier 404s /api/posts).
-    const knownIds = new Set([
-      ...seenServerIds,
-      ...localPublicPosts.map((p) => p.id),
-      ...optimisticVisible.map((p) => p.id),
-    ]);
-    const peerVisible = peerFeedPosts
-      .filter((p) => !deletedPostIds.has(p.id) && !knownIds.has(p.id))
-      .map((p) => {
-        const isSelf = p.author_id === identity?.orbitId;
-        const author = findUserById(users, p.author_id);
-        if (!isSelf && !author) return p;
-        return {
-          ...p,
-          author_name: isSelf ? (myProfile.displayName || 'You') : (author?.display_name || p.author_name),
-          author_avatar: isSelf
-            ? (profilePics[identity?.orbitId || ''] || null)
-            : (author?.pfp_url || p.author_avatar || null),
-        };
-      });
-
-    // Own profile posts fetched explicitly (author_id query): dedupe against
-    // the server snapshot so a post that is both in the general feed and the
-    // user's own post list appears once.
-    const myProfileVisible = myProfilePosts.filter(
-      (p) => !deletedPostIds.has(p.id) && !seenServerIds.has(p.id),
-    );
-
-    // One row per post: the local (durable) copy and the session optimistic
-    // copy describe the same id, and without this a fresh publish rendered twice
-    // (once from the outbox, once from the optimistic tile).
-    const merged = [...optimisticVisible, ...localPending, ...pinnedVisible, ...peerVisible, ...serverVisible, ...repostedPosts, ...localPublicPosts, ...myProfileVisible];
-    const seen = new Set<string>();
-    return merged.filter((p) => {
-      if (seen.has(p.id)) return false;
-      seen.add(p.id);
-      return true;
-    });
-  }, [items, profilePics, identity, myProfile, repostedPosts, archivedPostIds, deletedPostIds, serverPosts, normalizeFeedPost, users, optimisticPosts, outboxTick, pinnedPosts, peerFeedPosts, myProfilePosts]);
-
-  const feedPostsRef = useRef<FeedPost[]>(feedPosts)
-  useEffect(() => { feedPostsRef.current = feedPosts }, [feedPosts])
-
-  // ─── Public posts feed (server) ───
-  const [isLoadingMoreFeed, setIsLoadingMoreFeed] = useState(false)
   const [feedSort, setFeedSort] = useState<FeedSort>(() => {
     try { const s = localStorage.getItem('orbit_feed_sort'); return isFeedSort(s) ? s : DEFAULT_FEED_SORT } catch { return DEFAULT_FEED_SORT }
   })
   useEffect(() => {
     try { localStorage.setItem('orbit_feed_sort', feedSort) } catch { }
   }, [feedSort])
+
+  // Feed (timeline projection + snapshot repository) lives in
+  // features/feed/. The controller owns the request sequence, the WS push
+  // memory, the pinned deep-link row and the outbox tick; the merge itself
+  // is pure (features/feed/feedProjection.ts).
+  const feed = useFeedController({
+    identity,
+    users,
+    profilePics,
+    myProfile,
+    items,
+    deletedPostIds,
+    archivedPostIds,
+    feedSort,
+    normalizePost: (p: FeedPost) => {
+      const media = (p as any).media
+      if (Array.isArray(media) && media.length > 1) {
+        return { ...p, mediaUrls: media.map((m: any) => m.url).filter(Boolean) }
+      }
+      return p
+    },
+  })
+  const {
+    posts: feedPosts, status: feedStatus, hasMore: hasMoreFeed,
+    loadingMore: isLoadingMoreFeed, load: loadServerFeed, refresh: forceRefreshFeed,
+    loadMore: loadMoreFeedPosts, resolvePostById, setServerPosts, setOptimisticPosts,
+    setMyProfilePosts,
+    pushPost: rememberPushedPost, reset: resetFeed,
+  } = feed
+
+  const feedPostsRef = useRef<FeedPost[]>(feedPosts)
+  useEffect(() => { feedPostsRef.current = feedPosts }, [feedPosts])
+
 
   useEffect(() => {
     if (!selectedProfileUser) {
@@ -1442,54 +1307,6 @@ export default function Home() {
     return () => { cancelled = true }
   }, [identity, selectedProfileUser])
 
-  const loadServerFeed = useCallback((): Promise<FeedPost[]> => {
-    if (!identity) return Promise.resolve([])
-    // Every trigger shares one ordering: a response that is no longer the
-    // newest request is discarded instead of replacing fresher state.
-    const seq = ++feedRequestSeqRef.current
-    setFeedStatus((prev) => (prev === 'idle' ? 'loading' : prev))
-    setHasMoreFeed(true)
-    return orbitFetch(`/api/posts?limit=50&sort=${feedSort}`, {}, identity)
-      .then(async (res): Promise<FeedPost[]> => {
-        if (seq !== feedRequestSeqRef.current) return []
-        // A blind courier answers 404 for every stateful route: this node hosts
-        // no feed. That is a state, not a failure the user should retry.
-        if (res.status === 404) { setFeedStatus('offline'); return [] }
-        if (!res.ok) { setFeedStatus('error'); return [] }
-        const data = await res.json().catch(() => null)
-        if (seq !== feedRequestSeqRef.current) return []
-        if (!Array.isArray(data?.posts)) { setFeedStatus('error'); return [] }
-        const posts = data.posts as FeedPost[]
-        setServerPosts((prev) => {
-          const next = mergeRecentPushes(posts, feedPushedRef.current)
-          // A snapshot that says exactly what is on screen keeps the old array:
-          // a new reference here is a full re-render of the timeline for the
-          // same pixels (once a second, on every socket push / focus refresh).
-          return sameTimeline(prev, next) ? prev : next
-        })
-        setFeedStatus('ready')
-        setHasMoreFeed(posts.length >= 50)
-        setProfilePics((prev) => {
-          let changed = false
-          const next = { ...prev }
-          for (const p of posts) {
-            if (p.author_id && p.author_avatar && next[p.author_id] !== p.author_avatar) {
-              next[p.author_id] = p.author_avatar
-              changed = true
-            }
-          }
-          return changed ? next : prev
-        })
-        return posts
-      })
-      .catch(() => {
-        if (seq === feedRequestSeqRef.current) {
-          // Keep a working feed on screen when only a background refresh fails.
-          setFeedStatus((prev) => (prev === 'ready' ? 'ready' : 'error'))
-        }
-        return []
-      })
-  }, [identity, feedSort])
 
   /**
    * Targeted read for a deep link whose post is not in the current snapshot
@@ -1498,27 +1315,10 @@ export default function Home() {
    * not host the route (blind courier, P2P-only post) simply 404s and the
    * deep link keeps the local/P2P copy as its fallback.
    */
-  const resolvePostById = useCallback(async (postId: string): Promise<boolean> => {
-    if (!identity || !postId) return false
-    if (feedPostsRef.current.some((p) => p.id === postId)) return true
-    const res = await orbitFetch(`/api/posts/${encodeURIComponent(postId)}`, {}, identity).catch(() => null)
-    if (!res || !res.ok) return false
-    const data = await res.json().catch(() => null)
-    const raw = data && typeof data === 'object' ? ((data as any).post ?? data) : null
-    // Never pin an answer to a different id than the one requested.
-    if (!raw || typeof raw !== 'object' || String(raw.id || '') !== postId) return false
-    const post = normalizeFeedPost(raw as FeedPost)
-    setPinnedPosts((prev) => [post, ...prev.filter((p) => p.id !== post.id)].slice(0, 8))
-    return true
-  }, [identity, normalizeFeedPost])
 
   // Retrieve-by-force: drop cached/inflight feed responses, then reload. A
   // plain reload inside the 3s GET cache (or a stuck inflight request) would
   // otherwise keep serving the stale snapshot that hides fresh posts.
-  const forceRefreshFeed = useCallback(() => {
-    invalidateCache('/api/posts')
-    return loadServerFeed()
-  }, [loadServerFeed])
 
   /**
    * A peer coming online is the only signal this client gets that (a) a full
@@ -1595,43 +1395,6 @@ export default function Home() {
     })()
   }, [forceRefreshFeed])
 
-  const loadMoreFeedPosts = useCallback(async () => {
-    if (isLoadingMoreFeed) return
-    setIsLoadingMoreFeed(true)
-    try {
-      // 1. Fetch next batch from server posts endpoint
-      const nextOffset = serverPosts.length
-      if (identity) {
-        const res = await orbitFetch(`/api/posts?offset=${nextOffset}&limit=20&sort=${feedSort}`, {}, identity).catch(() => null)
-        if (res && res.ok) {
-          const data = await res.json().catch(() => null)
-          if (Array.isArray(data?.posts) && data.posts.length > 0) {
-            // Appending supersedes any snapshot request still on the wire: a
-            // refresh that started before these rows existed must not land and
-            // unmount what the reader already scrolled to.
-            feedRequestSeqRef.current++
-            setServerPosts((prev) => {
-              const seen = new Set(prev.map((p) => p.id))
-              const added = (data.posts as FeedPost[]).filter((p) => !seen.has(p.id))
-              return [...prev, ...added]
-            })
-            setIsLoadingMoreFeed(false)
-            if (data.posts.length < 20) setHasMoreFeed(false)
-            return
-          }
-          setHasMoreFeed(false)
-        } else {
-          // A failed page must not leave the sentinel armed: that turns into an
-          // infinite retry loop on a node that does not serve the feed.
-          setHasMoreFeed(false)
-        }
-      }
-    } catch {
-      setHasMoreFeed(false)
-    } finally {
-      setIsLoadingMoreFeed(false)
-    }
-  }, [identity, serverPosts.length, isLoadingMoreFeed, feedSort])
 
   // ─── Instagram-style follows ───
   const loadFollowing = useCallback(() => {
@@ -2048,19 +1811,19 @@ export default function Home() {
   const [feedBaseline, setFeedBaseline] = useState<number | null>(null)
   useEffect(() => {
     if (mainView !== 'feed' && feedBaseline !== null) return
-    const newest = serverPosts.reduce((m, p) => {
+    const newest = feed.serverPosts.reduce((m, p) => {
       const t = Date.parse(String((p as any).created_at || ''))
       return Number.isFinite(t) && t > m ? t : m
     }, feedBaseline ?? 0)
     if (newest !== (feedBaseline ?? 0)) setFeedBaseline(newest)
-  }, [mainView, serverPosts, feedBaseline])
+  }, [mainView, feed.serverPosts, feedBaseline])
   const feedNewPostsCount = useMemo(() => {
     if (mainView === 'feed' || feedBaseline === null) return 0
-    return serverPosts.filter((p) => {
+    return feed.serverPosts.filter((p) => {
       const t = Date.parse(String((p as any).created_at || ''))
       return Number.isFinite(t) && t > feedBaseline
     }).length
-  }, [mainView, serverPosts, feedBaseline])
+  }, [mainView, feed.serverPosts, feedBaseline])
 
   // Blind-courier DM path (plan P3.3): inert on full nodes (legacy inbox),
   // active only when the API 404s /api/pm (official SITE).
@@ -2537,7 +2300,7 @@ export default function Home() {
   // profile always reflects what the player actually uses in-game.
   useEffect(() => {
     if (!identity) return;
-    const ownPosts = serverPosts.filter(p => p.author_id === identity.orbitId);
+    const ownPosts = feed.serverPosts.filter(p => p.author_id === identity.orbitId);
     const derived = deriveProfileTags(ownPosts, myProfile.tags);
     if (JSON.stringify(derived) === JSON.stringify(syncedTagsRef.current)) return;
     syncedTagsRef.current = derived;
@@ -2547,7 +2310,7 @@ export default function Home() {
       display_name: myProfile?.displayName || identity.orbitId.slice(0, 8),
       tags: derived,
     }).catch(() => { });
-  }, [serverPosts, identity, myProfile.tags]);
+  }, [feed.serverPosts, identity, myProfile.tags]);
 
   useEffect(() => {
     const onFeedNew = (e: Event) => {
@@ -2555,7 +2318,7 @@ export default function Home() {
       if (!post || !post.id) return;
       // A snapshot request may already be on the wire; remember the push so its
       // (older) response cannot swallow the post.
-      rememberPushed(feedPushedRef.current, post);
+      rememberPushedPost(post);
       setServerPosts((prev) => {
         const seen = new Set(prev.map((p) => p.id));
         if (seen.has(post.id)) return prev;
@@ -2951,13 +2714,8 @@ export default function Home() {
   // snapshot read for account A must never render under account B, and any
   // request still on the wire is superseded.
   useEffect(() => {
-    feedRequestSeqRef.current++
-    feedPushedRef.current.clear()
-    setServerPosts([])
-    setPinnedPosts([])
-    setOptimisticPosts([])
-    setFeedStatus('idle')
-  }, [identity?.orbitId])
+    resetFeed()
+  }, [identity?.orbitId, resetFeed])
 
   // Initial mount effect - show skeletons only once
   useEffect(() => {
@@ -3556,7 +3314,7 @@ export default function Home() {
 
   if (!isLoaded) return <PageSkeleton />;
 
-  const myPostTags = identity ? deriveProfileTags(serverPosts.filter(p => p.author_id === identity.orbitId), []) : []
+  const myPostTags = identity ? deriveProfileTags(feed.serverPosts.filter(p => p.author_id === identity.orbitId), []) : []
 
   return (
     <main id="main-content" className="h-[100dvh] max-h-[100dvh] min-h-0 w-full flex flex-col items-center justify-start relative overflow-hidden">
