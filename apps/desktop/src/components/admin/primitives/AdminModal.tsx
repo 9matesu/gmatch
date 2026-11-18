@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { X } from "lucide-react";
 import { cn } from "../../../lib/utils";
+import { Modal } from "../../../ui/kit";
 import type { RowAction, BulkAction } from "../../../utils/adminTypes";
 
 interface AdminActionMenuProps<T> {
@@ -177,55 +178,37 @@ export function ConfirmDialog({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4 bg-black/70 animate-orbit-fade-in">
-      <div className="w-full max-w-md bg-surface-elevated border border-edge rounded-xl shadow-2xl overflow-hidden animate-orbit-pop">
-        <div className="p-5 space-y-4">
-          <div className="flex items-start justify-between">
-            <div>
-              <h3 className="text-sm font-bold text-retro-fg">{title}</h3>
-              {description && (
-                <p className="text-xs text-retro-muted mt-1">{description}</p>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1 rounded hover:bg-glass-w10 text-retro-muted hover:text-retro-fg transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          {children}
-        </div>
-        <div className="flex items-center justify-end gap-2 px-5 pb-5 border-t border-edge">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isLoading}
-            className="px-3 py-1.5 text-xs font-bold rounded border border-edge text-retro-fg hover:bg-glass-w10 transition-colors disabled:opacity-40"
-          >
-            {cancelLabel}
-          </button>
-          <button
-            type="button"
-            onClick={async () => {
-              await onConfirm();
-              onClose();
-            }}
-            disabled={isLoading}
-            className={cn(
-              "px-3 py-1.5 text-xs font-bold rounded flex items-center gap-1.5 transition-colors disabled:opacity-40",
-              variant === "danger" && "bg-danger/20 text-danger-fg border border-danger/30 hover:bg-danger/30",
-              variant === "primary" && "bg-info text-retro-accent-text border border-info hover:bg-info",
-              variant === "default" && "bg-surface-interactive text-retro-fg border border-edge hover:bg-glass-w10"
-            )}
-          >
-            {isLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            {confirmLabel}
-          </button>
-        </div>
+    <Modal title={title} onClose={onClose} maxWidth="max-w-md" dismissable={false}>
+      {description && <p className="text-xs text-retro-muted">{description}</p>}
+      {children}
+      <div className="flex items-center justify-end gap-2 pt-1">
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={isLoading}
+          className="px-3 py-1.5 text-xs font-bold rounded border border-edge text-retro-fg hover:bg-glass-w10 transition-colors disabled:opacity-40"
+        >
+          {cancelLabel}
+        </button>
+        <button
+          type="button"
+          onClick={async () => {
+            await onConfirm();
+            onClose();
+          }}
+          disabled={isLoading}
+          className={cn(
+            "px-3 py-1.5 text-xs font-bold rounded flex items-center gap-1.5 transition-colors disabled:opacity-40",
+            variant === "danger" && "bg-danger/20 text-danger-fg border border-danger/30 hover:bg-danger/30",
+            variant === "primary" && "bg-info text-retro-accent-text border border-info hover:bg-info",
+            variant === "default" && "bg-surface-interactive text-retro-fg border border-edge hover:bg-glass-w10"
+          )}
+        >
+          {isLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+          {confirmLabel}
+        </button>
       </div>
-    </div>
+    </Modal>
   );
 }
 
