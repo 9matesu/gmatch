@@ -44,6 +44,15 @@ function readPendingMigrations(currentVersion: number): Array<{ version: number;
     .sort((a, b) => a.version - b.version)
 }
 
+/** Highest version on disk: what a fresh database ends at after migrate(). */
+export function latestMigrationVersion(): number {
+  if (!existsSync(MIGRATIONS_DIR)) return 0
+  const versions = readdirSync(MIGRATIONS_DIR)
+    .filter((f) => /^\d+_.*\.sql$/.test(f))
+    .map((f) => parseInt(f, 10))
+  return versions.length ? Math.max(...versions) : 0
+}
+
 export async function migrate(client: Client): Promise<void> {
   // 1. Apply the canonical schema. Every statement is idempotent
   //    (CREATE TABLE/INDEX IF NOT EXISTS), so this is safe on fresh and

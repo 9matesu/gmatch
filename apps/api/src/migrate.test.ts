@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { apiRootFor, migrate } from './migrate'
+import { apiRootFor, latestMigrationVersion, migrate } from './migrate'
 
 // Verifies the gMatch Phase 1 migrations (014-017) bring an existing
 // pre-gMatch database up to the current canonical schema, and that the
@@ -31,11 +31,11 @@ async function userVersion(client: Awaited<ReturnType<typeof createClient>>): Pr
 }
 
 describe('gMatch Phase 1 migrations', () => {
-  it('migrates a fresh in-memory DB to user_version 58 with all new tables/columns', async () => {
+  it('migrates a fresh in-memory DB to the newest migration with all new tables/columns', async () => {
     const client = createClient({ url: ':memory:' })
     await migrate(client)
 
-    expect(await userVersion(client)).toBe(58)
+    expect(await userVersion(client)).toBe(latestMigrationVersion())
 
     // Gossip relay envelopes (migration 055, plan G1)
     expect(await tableExists(client, 'GossipEnvelopes')).toBe(true)
@@ -340,7 +340,7 @@ describe('gMatch Phase 1 migrations', () => {
     const client = createClient({ url: ':memory:' })
     await migrate(client)
     const versionAfterFirst = await userVersion(client)
-    expect(versionAfterFirst).toBe(58)
+    expect(versionAfterFirst).toBe(latestMigrationVersion())
     expect(await columnExists(client, 'ServerDirectory', 'tags')).toBe(true)
 
     // Running migrate() again is a no-op
@@ -369,15 +369,15 @@ describe('gMatch Phase 1 migrations', () => {
     // deferred until migration 053 has added the column.
     await migrate(client)
 
-    expect(await userVersion(client)).toBe(58)
+    expect(await userVersion(client)).toBe(latestMigrationVersion())
     expect(await columnExists(client, 'Objects', 'is_avatar')).toBe(true)
     expect(await indexExists(client, 'idx_objects_is_avatar')).toBe(true)
   })
 
-  it('upgrades a pre-gMatch snapshot (user_version 13) by applying 014-058', async () => {
+  it('upgrades a pre-gMatch snapshot (user_version 13) by applying every pending migration', async () => {
     const client = createClient({ url: ':memory:' })
     await migrate(client)
-    expect(await userVersion(client)).toBe(58)
+    expect(await userVersion(client)).toBe(latestMigrationVersion())
 
     // Tear down gMatch additions so we're effectively at pre-014 state.
     await client.execute('DROP TABLE IF EXISTS Saves')
@@ -400,10 +400,10 @@ describe('gMatch Phase 1 migrations', () => {
     // Pretend we're still on the pre-gMatch migration version.
     await client.execute('PRAGMA user_version = 13')
 
-    // Re-run migrate — it should detect user_version=13 and apply 014-058 in order
+    // Re-run migrate — it should detect user_version=13 and apply every pending migration in order
     await migrate(client)
 
-    expect(await userVersion(client)).toBe(58)
+    expect(await userVersion(client)).toBe(latestMigrationVersion())
     expect(await tableExists(client, 'Followers')).toBe(true)
     expect(await tableExists(client, 'Comments')).toBe(true)
     expect(await tableExists(client, 'CommentLikes')).toBe(true)
