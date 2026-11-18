@@ -256,10 +256,11 @@ export function IdentityModal({
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-retro-muted block">
+                <label htmlFor="identity-backup-key" className="text-xs font-medium text-retro-muted block">
                   Encoded backup key
                 </label>
                 <textarea
+                  id="identity-backup-key"
                   readOnly
                   value={encodedString}
                   rows={3}

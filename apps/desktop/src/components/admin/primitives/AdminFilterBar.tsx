@@ -63,8 +63,9 @@ export function AdminFilterBar({
       case "text":
         return (
           <div className="flex-1 min-w-[180px] max-w-[300px]">
-            <label className="text-2xs font-bold text-retro-muted uppercase tracking-wider mb-1 block">{config.label}</label>
+            <label htmlFor={'filter-' + config.key} className="text-2xs font-bold text-retro-muted uppercase tracking-wider mb-1 block">{config.label}</label>
             <input
+              id={'filter-' + config.key}
               type="text"
               value={(value as string) || ""}
               onChange={e => handleFilterChange(config.key, e.target.value)}
@@ -77,8 +78,9 @@ export function AdminFilterBar({
       case "select":
         return (
           <div className="flex-1 min-w-[160px] max-w-[240px]">
-            <label className="text-2xs font-bold text-retro-muted uppercase tracking-wider mb-1 block">{config.label}</label>
+            <label htmlFor={'filter-' + config.key} className="text-2xs font-bold text-retro-muted uppercase tracking-wider mb-1 block">{config.label}</label>
             <select
+              id={'filter-' + config.key}
               value={(value as string) || ""}
               onChange={e => handleFilterChange(config.key, e.target.value || undefined)}
               className="w-full bg-surface-canvas border border-edge rounded px-2 py-1.5 text-xs outline-none focus:border-retro-accent"
@@ -94,8 +96,9 @@ export function AdminFilterBar({
       case "multi-select":
         return (
           <div className="flex-1 min-w-[200px] max-w-[300px] relative">
-            <label className="text-2xs font-bold text-retro-muted uppercase tracking-wider mb-1 block">{config.label}</label>
+            <span className="text-2xs font-bold text-retro-muted uppercase tracking-wider mb-1 block">{config.label}</span>
             <MultiSelect
+              label={config.label}
               value={(value as string[]) || []}
               options={config.options || []}
               onChange={vals => handleFilterChange(config.key, vals)}
@@ -107,7 +110,7 @@ export function AdminFilterBar({
       case "date-range":
         return (
           <div className="flex-1 min-w-[280px] max-w-[400px]">
-            <label className="text-2xs font-bold text-retro-muted uppercase tracking-wider mb-1 block">{config.label}</label>
+            <span className="text-2xs font-bold text-retro-muted uppercase tracking-wider mb-1 block">{config.label}</span>
             <DateRangePicker
               value={value as { from?: string; to?: string } || {}}
               onChange={val => handleFilterChange(config.key, val)}
@@ -118,8 +121,9 @@ export function AdminFilterBar({
       case "number":
         return (
           <div className="flex-1 min-w-[140px] max-w-[200px]">
-            <label className="text-2xs font-bold text-retro-muted uppercase tracking-wider mb-1 block">{config.label}</label>
+            <label htmlFor={'filter-' + config.key} className="text-2xs font-bold text-retro-muted uppercase tracking-wider mb-1 block">{config.label}</label>
             <input
+              id={'filter-' + config.key}
               type="number"
               value={(value as string) || ""}
               onChange={e => handleFilterChange(config.key, e.target.value ? Number(e.target.value) : undefined)}
@@ -211,11 +215,13 @@ export function AdminFilterBar({
   );
 }
 
-function MultiSelect({ value, options, onChange, placeholder }: {
+function MultiSelect({ value, options, onChange, placeholder, label }: {
   value: string[];
   options: Array<{ value: string; label: string }>;
   onChange: (value: string[]) => void;
   placeholder: string;
+  /** Accessible name: the trigger is a button, not a native select. */
+  label?: string;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -234,6 +240,7 @@ function MultiSelect({ value, options, onChange, placeholder }: {
     <div className="relative" ref={ref}>
       <button
         type="button"
+        aria-label={label}
         onClick={() => setOpen(!open)}
         className={cn(
           "w-full bg-surface-canvas border border-edge rounded px-2 py-1.5 text-xs outline-none focus:border-retro-accent flex items-center justify-between",
@@ -285,8 +292,9 @@ function DateRangePicker({ value, onChange }: {
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1">
-        <label className="text-2xs text-retro-faint uppercase tracking-wider mb-0.5 block">From</label>
+        <label htmlFor="filter-date-from" className="text-2xs text-retro-faint uppercase tracking-wider mb-0.5 block">From</label>
         <input
+          id="filter-date-from"
           type="date"
           value={value.from || ""}
           onChange={e => onChange({ ...value, from: e.target.value || undefined })}
@@ -294,8 +302,9 @@ function DateRangePicker({ value, onChange }: {
         />
       </div>
       <div className="flex-1">
-        <label className="text-2xs text-retro-faint uppercase tracking-wider mb-0.5 block">To</label>
+        <label htmlFor="filter-date-to" className="text-2xs text-retro-faint uppercase tracking-wider mb-0.5 block">To</label>
         <input
+          id="filter-date-to"
           type="date"
           value={value.to || ""}
           onChange={e => onChange({ ...value, to: e.target.value || undefined })}

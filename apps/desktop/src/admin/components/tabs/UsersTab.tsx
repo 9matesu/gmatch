@@ -770,8 +770,9 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
           variant="danger"
         >
           <div className="mt-3 space-y-2 text-left">
-            <label className="text-2xs font-bold text-retro-muted uppercase block">Reason</label>
+            <label htmlFor="admin-ban-reason" className="text-2xs font-bold text-retro-muted uppercase block">Reason</label>
             <input
+              id="admin-ban-reason"
               type="text"
               value={banReason}
               onChange={e => setBanReason(e.target.value)}
@@ -803,8 +804,9 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
         >
           <div className="mt-3 grid grid-cols-2 gap-3 text-left">
             <div>
-              <label className="text-2xs font-bold text-retro-muted uppercase block">GCoins (g$)</label>
+              <label htmlFor="admin-balance-gcoins" className="text-2xs font-bold text-retro-muted uppercase block">GCoins (g$)</label>
               <input
+                id="admin-balance-gcoins"
                 type="number"
                 value={balanceData.gcoins}
                 onChange={e => setBalanceData(p => ({ ...p, gcoins: Number(e.target.value) || 0 }))}
@@ -812,8 +814,9 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
               />
             </div>
             <div>
-              <label className="text-2xs font-bold text-retro-muted uppercase block">Score (Points)</label>
+              <label htmlFor="admin-balance-score" className="text-2xs font-bold text-retro-muted uppercase block">Score (Points)</label>
               <input
+                id="admin-balance-score"
                 type="number"
                 value={balanceData.score}
                 onChange={e => setBalanceData(p => ({ ...p, score: Number(e.target.value) || 0 }))}
@@ -821,8 +824,9 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
               />
             </div>
             <div>
-              <label className="text-2xs font-bold text-retro-muted uppercase block">Likes Received</label>
+              <label htmlFor="admin-balance-likes" className="text-2xs font-bold text-retro-muted uppercase block">Likes Received</label>
               <input
+                id="admin-balance-likes"
                 type="number"
                 value={balanceData.likes}
                 onChange={e => setBalanceData(p => ({ ...p, likes: Number(e.target.value) || 0 }))}

@@ -802,7 +802,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
               {CONSENT_ROWS.map(({ key, label, desc }) => {
                 const value = Boolean((settings as any)[key]);
                 return (
-                  <label key={key} className="flex items-start gap-3 px-4 py-3 hover:bg-glass-w10 cursor-pointer transition-colors">
+                  <div key={key} className="flex items-start gap-3 px-4 py-3 hover:bg-glass-w10 cursor-pointer transition-colors">
                       <button
                         type="button"
                         role="switch"
@@ -827,7 +827,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                       <div className="text-xs font-medium text-retro-fg">{label}</div>
                       <div className="text-xs text-retro-muted leading-snug mt-0.5">{desc}</div>
                     </div>
-                  </label>
+                  </div>
                 );
               })}
             </div>

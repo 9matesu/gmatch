@@ -692,8 +692,9 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
           title="Create System Notice"
         >
           <div className="space-y-4 text-left p-2">
-            <label className="text-2xs font-bold text-retro-muted uppercase block">Announcement Message</label>
+            <label htmlFor="admin-announcement" className="text-2xs font-bold text-retro-muted uppercase block">Announcement Message</label>
             <textarea
+              id="admin-announcement"
               value={newAnnouncementText}
               onChange={e => setNewAnnouncementText(e.target.value)}
               placeholder="Type notification text..."

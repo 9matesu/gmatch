@@ -204,8 +204,9 @@ export function ProfileEditorModal({
           {/* Form Fields */}
           <div className="space-y-3">
             <div>
-              <label className="text-xs font-medium text-retro-body block mb-1.5">Name</label>
+              <label htmlFor="profile-name" className="text-xs font-medium text-retro-body block mb-1.5">Name</label>
               <input
+                id="profile-name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -217,8 +218,9 @@ export function ProfileEditorModal({
             </div>
 
             <div>
-              <label className="text-xs font-medium text-retro-body block mb-1.5">Bio</label>
+              <label htmlFor="profile-bio" className="text-xs font-medium text-retro-body block mb-1.5">Bio</label>
               <textarea
+                id="profile-bio"
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
                 placeholder="Write a pornified bio... What do you like?"
@@ -232,10 +234,11 @@ export function ProfileEditorModal({
             </div>
 
             <div>
-              <label className="text-xs font-medium text-retro-body block mb-1.5">Favorite Website</label>
+              <label htmlFor="profile-website" className="text-xs font-medium text-retro-body block mb-1.5">Favorite Website</label>
               <div className="flex items-center gap-2 bg-surface-interactive border border-edge rounded-lg px-3 py-2">
                 <Globe className="w-4 h-4 text-retro-muted shrink-0" />
                 <input
+                id="profile-website"
                   type="url"
                   value={website}
                   onChange={(e) => setWebsite(e.target.value)}
@@ -246,9 +249,9 @@ export function ProfileEditorModal({
             </div>
 
             <div>
-              <label className="text-xs font-medium text-retro-body block mb-1.5">
+              <span className="text-xs font-medium text-retro-body block mb-1.5">
                 Tags <span className="text-retro-muted font-normal">· {tags.length}/{MAX_TAGS} · drive your feed</span>
-              </label>
+              </span>
               {tags.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {tags.map((t) => (

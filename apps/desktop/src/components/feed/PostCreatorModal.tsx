@@ -128,9 +128,9 @@ export function PostCreatorModal({
           {/* Media preview list & add buttons */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-retro-fg block">
+              <span className="text-xs font-bold text-retro-fg block">
                 Media Attachments ({media.length}/5)
-              </label>
+              </span>
               <span className="text-2xs text-retro-muted">Up to 5 images or videos</span>
             </div>
 
@@ -191,10 +191,10 @@ export function PostCreatorModal({
           {/* Mandatory Tags Section */}
           <div className="space-y-1.5 p-3.5 bg-retro-warning/10 border border-retro-warning/30 rounded-xl">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-black text-retro-warning flex items-center gap-1.5">
+              <span className="text-xs font-black text-retro-warning flex items-center gap-1.5">
                 <span>Required Tags *</span>
                 <span className="text-2xs font-medium text-retro-muted">(Must add at least 1 tag)</span>
-              </label>
+              </span>
               <span className="text-2xs font-black text-retro-warning">{tags.length} added</span>
             </div>
 
@@ -243,10 +243,11 @@ export function PostCreatorModal({
 
           {/* Optional Caption */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-retro-fg block">
+            <label htmlFor="post-caption" className="text-xs font-bold text-retro-fg block">
               Caption / Description <span className="text-retro-muted font-normal">(Optional)</span>
             </label>
             <textarea
+              id="post-caption"
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
               placeholder="Write a caption for your post or art piece..."

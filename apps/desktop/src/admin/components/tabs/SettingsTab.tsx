@@ -203,9 +203,10 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
               </div>
             </div>
             <div className="space-y-3">
-              <label className="text-2xs font-bold text-retro-muted uppercase tracking-wider block">Discord Invite URL</label>
+              <label htmlFor="admin-discord-invite" className="text-2xs font-bold text-retro-muted uppercase tracking-wider block">Discord Invite URL</label>
               <div className="flex items-center gap-2">
                 <input
+                id="admin-discord-invite"
                   type="text"
                   value={discordLink}
                   onChange={e => setDiscordLink(e.target.value)}
@@ -232,10 +233,11 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
               </div>
             </div>
             <div className="space-y-3">
-              <label className="text-2xs font-bold text-retro-muted uppercase tracking-wider block">Cashout Rate (basis points)</label>
+              <label htmlFor="admin-cashout-bps" className="text-2xs font-bold text-retro-muted uppercase tracking-wider block">Cashout Rate (basis points)</label>
               <p className="text-xs text-retro-muted">1 bp = 0.01%. Current: {(cashoutRateBps / 100).toFixed(2)}% (12500 = 125%)</p>
               <div className="flex items-center gap-2">
                 <input
+                id="admin-cashout-bps"
                   type="number"
                   value={cashoutRateBps}
                   onChange={e => setCashoutRateBps(Math.max(0, Math.floor(Number(e.target.value) || 0)))}

@@ -1996,10 +1996,11 @@ export function ServersView({
 
               {!mine(deleteTarget) && (
                 <div className="space-y-1.5 pt-1">
-                  <label className="block text-2xs font-semibold text-retro-fg">
+                  <label htmlFor="central-admin-passcode" className="block text-2xs font-semibold text-retro-fg">
                     Central Admin Passcode
                   </label>
                   <input
+                    id="central-admin-passcode"
                     type="password"
                     aria-label="Central admin passcode"
                     value={deletePasscode}

@@ -180,9 +180,9 @@ export function ActionModal({
         <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs">
           {needsUrl && (
             <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-retro-fg">
+              <span className="block text-xs font-medium text-retro-fg">
                 {action === 'popup_video' ? 'Video (mp4/webm)' : 'Image'}
-              </label>
+              </span>
               <button
                 type="button"
                 onClick={() => void openMediaPicker().then((sel) => { if (sel) void takeSelection(sel); })}
@@ -218,8 +218,9 @@ export function ActionModal({
 
           {needsText && (
             <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-retro-fg">Message</label>
+              <label htmlFor="domination-message" className="block text-xs font-medium text-retro-fg">Message</label>
               <textarea
+                id="domination-message"
                 rows={3}
                 maxLength={action === 'text_overlay' ? 120 : 280}
                 placeholder="What they will see…"
@@ -233,10 +234,11 @@ export function ActionModal({
           {action === 'text_overlay' && (
             <div className="grid grid-cols-3 gap-2.5 p-3 rounded-lg glass-inset">
               <div>
-                <label className="block text-2xs text-retro-muted mb-1 flex items-center gap-1">
+                <label htmlFor="domination-position" className="block text-2xs text-retro-muted mb-1 flex items-center gap-1">
                   <Layers className="w-3 h-3" /> Position
                 </label>
                 <select
+                  id="domination-position"
                   value={position}
                   onChange={(e) => setPosition(e.target.value as any)}
                   className={`${field} p-2`}
@@ -249,10 +251,11 @@ export function ActionModal({
                 </select>
               </div>
               <div>
-                <label className="block text-2xs text-retro-muted mb-1 flex items-center gap-1">
+                <label htmlFor="domination-size" className="block text-2xs text-retro-muted mb-1 flex items-center gap-1">
                   <Sliders className="w-3 h-3" /> Size
                 </label>
                 <select
+                  id="domination-size"
                   value={size}
                   onChange={(e) => setSize(e.target.value as any)}
                   className={`${field} p-2`}
@@ -263,10 +266,11 @@ export function ActionModal({
                 </select>
               </div>
               <div>
-                <label className="block text-2xs text-retro-muted mb-1 flex items-center gap-1">
+                <label htmlFor="domination-color" className="block text-2xs text-retro-muted mb-1 flex items-center gap-1">
                   <Palette className="w-3 h-3" /> Color
                 </label>
                 <input
+                  id="domination-color"
                   type="color"
                   value={color}
                   onChange={(e) => setColor(e.target.value)}
@@ -279,10 +283,11 @@ export function ActionModal({
           {action === 'blur' && (
             <div className="p-3.5 rounded-lg glass-inset space-y-2">
               <div className="flex justify-between items-center text-xs">
-                <label className="font-medium text-retro-fg">Blur strength</label>
+                <label htmlFor="domination-blur" className="font-medium text-retro-fg">Blur strength</label>
                 <span className="font-mono text-retro-muted">{intensity}px</span>
               </div>
               <input
+                  id="domination-blur"
                 type="range"
                 min="2"
                 max="24"
@@ -296,10 +301,11 @@ export function ActionModal({
           {action !== 'camera' && (
             <div className="p-3.5 rounded-lg glass-inset space-y-2">
               <div className="flex justify-between items-center text-xs">
-                <label className="font-medium text-retro-fg">Duration</label>
+                <label htmlFor="domination-duration" className="font-medium text-retro-fg">Duration</label>
                 <span className="font-mono text-retro-muted">{duration}s</span>
               </div>
               <input
+                  id="domination-duration"
                 type="range"
                 aria-label="Duration"
                 min="3"

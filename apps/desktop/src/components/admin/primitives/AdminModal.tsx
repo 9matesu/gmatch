@@ -335,16 +335,27 @@ export function FormModal<T extends Record<string, unknown>>({
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-4">
           {fields.map(field => (
             <div key={String(field.key)} className="space-y-1.5">
-              <label className="text-2xs font-bold text-retro-muted uppercase tracking-wider flex items-center gap-1">
-                {field.label}
-                {field.required && <span className="text-danger-fg">*</span>}
-              </label>
+              {/* A label may only wrap a labelable control. The checkbox branch
+                  already carries its own inner label, and a custom render is not
+                  one element we can name, so those two get a group heading. */}
+              {field.type === 'checkbox' || field.render || field.type === 'tags' ? (
+                <span className="text-2xs font-bold text-retro-muted uppercase tracking-wider flex items-center gap-1">
+                  {field.label}
+                  {field.required && <span className="text-danger-fg">*</span>}
+                </span>
+              ) : (
+                <label htmlFor={'field-' + String(field.key)} className="text-2xs font-bold text-retro-muted uppercase tracking-wider flex items-center gap-1">
+                  {field.label}
+                  {field.required && <span className="text-danger-fg">*</span>}
+                </label>
+              )}
               {field.render ? (
                 field.render(formData[field.key], (v: unknown) => handleChange(String(field.key), v))
               ) : (
                 <>
                   {field.type === "textarea" ? (
                     <textarea
+                      id={'field-' + String(field.key)}
                       value={(formData[field.key] as string) || ""}
                       onChange={e => handleChange(String(field.key), e.target.value)}
                       onBlur={() => handleBlur(String(field.key))}
@@ -355,6 +366,7 @@ export function FormModal<T extends Record<string, unknown>>({
                     />
                   ) : field.type === "select" ? (
                     <select
+                      id={'field-' + String(field.key)}
                       value={(formData[field.key] as string) || ""}
                       onChange={e => handleChange(String(field.key), e.target.value || undefined)}
                       onBlur={() => handleBlur(String(field.key))}
@@ -384,6 +396,7 @@ export function FormModal<T extends Record<string, unknown>>({
                     />
                   ) : (
                     <input
+                      id={'field-' + String(field.key)}
                       type={field.type === "password" ? "password" : field.type}
                       value={(formData[field.key] as string) || ""}
                       onChange={e => handleChange(String(field.key), field.type === "number" ? (e.target.value ? Number(e.target.value) : undefined) : e.target.value)}
