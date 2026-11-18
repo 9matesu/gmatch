@@ -21,13 +21,14 @@ export function LeagueBoard({ league, users, onOpenProfile }: LeagueBoardProps) 
   return (
     <div className="space-y-1.5 max-h-96 overflow-y-auto styled-scrollbar">
       {league.map((entry, rank) => (
-        <div
+        <button
           key={entry.user_id}
+          type="button"
           onClick={() => {
             const userObj = users?.find(u => u.id === entry.user_id) || { id: entry.user_id, display_name: entry.display_name } as User
             onOpenProfile?.(userObj)
           }}
-          className="border border-edge rounded p-2.5 bg-retro-panel flex items-center justify-between gap-3 hover:border-retro-accent transition-colors cursor-pointer"
+          className="w-full text-left border border-edge rounded p-2.5 bg-retro-panel flex items-center justify-between gap-3 hover:border-retro-accent transition-colors cursor-pointer"
         >
           <div className="flex items-center gap-3 min-w-0">
             <span className={`text-xs font-black font-mono w-6 text-center ${
@@ -44,7 +45,7 @@ export function LeagueBoard({ league, users, onOpenProfile }: LeagueBoardProps) 
           <div className="text-xs font-black text-retro-accent font-mono shrink-0">
             {entry.points} PTS
           </div>
-        </div>
+        </button>
       ))}
     </div>
   )

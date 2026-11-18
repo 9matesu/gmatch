@@ -1520,13 +1520,14 @@ function GMatchFeedImpl({
                   {post.tags && post.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-0.5">
                       {post.tags.map((t) => (
-                        <span
+                        <button
                           key={t}
+                          type="button"
                           onClick={() => boostTagAffinity([t])}
                           className="text-xs font-mono px-1.5 py-0.5 rounded bg-glass-w12 text-retro-body hover:text-retro-fg cursor-pointer transition-colors"
                         >
                           #{t.replace(/^#/, '')}
-                        </span>
+                        </button>
                       ))}
                     </div>
                   )}

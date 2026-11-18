@@ -164,10 +164,11 @@ export function PostLikersModal({
               // profilePics is synced from loadUsers on every boot + save.
               const avatar = profilePics[liker.user_id] || liker.pfp_url;
               return (
-                <div
+                <button
                   key={liker.user_id}
+                  type="button"
                   onClick={() => handleUserClick(liker.user_id)}
-                  className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-glass-w12 transition-colors cursor-pointer group"
+                  className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-glass-w12 transition-colors cursor-pointer group text-left"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-9 h-9 rounded-full bg-glass-w20 border border-edge overflow-hidden shrink-0 flex items-center justify-center">
@@ -195,7 +196,7 @@ export function PostLikersModal({
                   <span className="text-xs font-medium text-retro-muted group-hover:text-retro-fg shrink-0 transition-colors px-2 py-1 rounded bg-glass-w06">
                     View
                   </span>
-                </div>
+                </button>
               );
             })
           )}
