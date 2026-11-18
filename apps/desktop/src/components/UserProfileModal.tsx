@@ -315,7 +315,7 @@ export function UserProfileModal({
                 {hasStories && (
                   <div
                     onClick={handleStoryBadgeClick}
-                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-retro-accent text-retro-bg text-[10px] font-semibold flex items-center gap-0.5 cursor-pointer shadow-xs"
+                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-retro-accent text-retro-bg text-2xs font-semibold flex items-center gap-0.5 cursor-pointer shadow-xs"
                   >
                     <Play className="w-2 h-2 fill-current" />
                     <span>Story</span>
@@ -326,7 +326,7 @@ export function UserProfileModal({
               <div className="flex-1 flex items-center justify-around text-center">
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold text-retro-fg font-mono tabular-nums">{userPosts.length}</span>
-                  <span className="text-[10px] text-retro-muted">posts</span>
+                  <span className="text-2xs text-retro-muted">posts</span>
                 </div>
 
                 <div
@@ -340,7 +340,7 @@ export function UserProfileModal({
                   <span className="text-sm font-semibold text-retro-fg group-hover:underline font-mono tabular-nums">
                     {followersCount !== null ? followersCount : (user.likes_received ?? 0)}
                   </span>
-                  <span className="text-[10px] text-retro-muted">followers</span>
+                  <span className="text-2xs text-retro-muted">followers</span>
                 </div>
 
                 <div
@@ -354,7 +354,7 @@ export function UserProfileModal({
                   <span className="text-sm font-semibold text-retro-fg font-mono tabular-nums">
                     {followingCount !== null ? followingCount : (user.following_count ?? 0)}
                   </span>
-                  <span className="text-[10px] text-retro-muted">following</span>
+                  <span className="text-2xs text-retro-muted">following</span>
                 </div>
               </div>
             </div>
@@ -367,7 +367,7 @@ export function UserProfileModal({
                 <button
                   type="button"
                   onClick={handleCopy}
-                  className="text-[10px] text-retro-muted hover:text-retro-fg px-2 py-0.5 border border-border-glass bg-retro-bg rounded-md cursor-pointer flex items-center gap-1 shrink-0 transition-colors"
+                  className="text-2xs text-retro-muted hover:text-retro-fg px-2 py-0.5 border border-border-glass bg-retro-bg rounded-md cursor-pointer flex items-center gap-1 shrink-0 transition-colors"
                   title="Copy ID"
                 >
                   {copied ? <Check className="w-2.5 h-2.5 text-emerald-400" /> : <Copy className="w-2.5 h-2.5" />}
@@ -382,7 +382,7 @@ export function UserProfileModal({
                 {tags.map((tag) => (
                   <span
                     key={tag}
-                    className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-md bg-retro-bg border border-border-glass text-retro-muted"
+                    className="text-2xs font-mono font-medium px-2 py-0.5 rounded-md bg-retro-bg border border-border-glass text-retro-muted"
                   >
                     #{tag}
                   </span>

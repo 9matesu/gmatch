@@ -159,7 +159,7 @@ export function CardZoomModal({
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="truncate">
             <h3 className="text-xs font-bold tracking-wide text-retro-fg truncate">{title}</h3>
-            {subtitle && <p className="text-[10px] text-retro-muted truncate">{subtitle}</p>}
+            {subtitle && <p className="text-2xs text-retro-muted truncate">{subtitle}</p>}
           </div>
         </div>
 
@@ -175,7 +175,7 @@ export function CardZoomModal({
             >
               <ZoomOut className="w-3.5 h-3.5" />
             </button>
-            <span className="text-[10px] font-mono px-1 text-retro-muted min-w-[36px] text-center tabular-nums">
+            <span className="text-2xs font-mono px-1 text-retro-muted min-w-[36px] text-center tabular-nums">
               {Math.round(scale * 100)}%
             </span>
             <button
@@ -304,13 +304,13 @@ export function CardZoomModal({
 
       {/* Bottom Caption Bar / Instructions */}
       <div
-        className="flex flex-wrap items-center justify-between gap-2 z-10 bg-retro-panel/80 border border-border-glass px-4 py-2 rounded-lg text-retro-muted text-[10px]"
+        className="flex flex-wrap items-center justify-between gap-2 z-10 bg-retro-panel/80 border border-border-glass px-4 py-2 rounded-lg text-retro-muted text-2xs"
         onClick={e => e.stopPropagation()}
       >
         <span>
           {caption ? <strong className="text-retro-fg">{caption}</strong> : 'Click image to toggle 2x zoom · Drag to pan when zoomed'}
         </span>
-        <span className="font-mono text-[10px] text-retro-muted hidden sm:inline">
+        <span className="font-mono text-2xs text-retro-muted hidden sm:inline">
           [Esc] to close · [+] / [−] to zoom
         </span>
       </div>

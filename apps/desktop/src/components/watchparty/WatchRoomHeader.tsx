@@ -81,7 +81,7 @@ export function WatchRoomHeader({ party, identity, profilePics: _profilePics }: 
           )}
           <button type="button" onClick={() => void invite()} aria-label="Copy invite link" title={copied ? 'Copied' : 'Invite'} className="relative p-1.5 rounded-md hover:bg-glass-w10 text-retro-muted hover:text-retro-fg cursor-pointer">
             <Share className="w-4 h-4" />
-            {copied && <span className="absolute -top-6 left-1/2 -translate-x-1/2 rounded-md bg-glass-w12 px-1.5 py-0.5 text-[10px] text-retro-fg">Copied</span>}
+            {copied && <span className="absolute -top-6 left-1/2 -translate-x-1/2 rounded-md bg-glass-w12 px-1.5 py-0.5 text-2xs text-retro-fg">Copied</span>}
           </button>
           {isHost && (
             <button type="button" onClick={() => setSettingsOpen(true)} aria-label="Room settings" title="Room settings" className="p-1.5 rounded-md hover:bg-glass-w10 text-retro-muted hover:text-retro-fg cursor-pointer">
@@ -99,7 +99,7 @@ export function WatchRoomHeader({ party, identity, profilePics: _profilePics }: 
         {inviteError && <p className="text-xs text-retro-error">{inviteError}</p>}
         {party.mediaName && <p className={`truncate ${MUTED}`}>{party.mediaName}</p>}
         {currentEntry && (
-          <p className={`truncate font-mono text-[10px] ${MUTED}`}>
+          <p className={`truncate font-mono text-2xs ${MUTED}`}>
             via {currentEntry.provider || 'direct'} · {syncLabel}
           </p>
         )}
@@ -122,8 +122,8 @@ export function WatchRoomHeader({ party, identity, profilePics: _profilePics }: 
                   <div className="text-xs text-retro-muted">One active invite. Minting replaces it; revoke disables it.</div>
                 </div>
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => void invite()} disabled={inviteBusy} className={`${BTN} px-2 py-1 text-[10px] disabled:opacity-40`}>New invite</button>
-                  <button type="button" onClick={() => void revokePartyInvite(identity, party.id)} className={`${BTN} px-2 py-1 text-[10px]`}>Revoke</button>
+                  <button type="button" onClick={() => void invite()} disabled={inviteBusy} className={`${BTN} px-2 py-1 text-2xs disabled:opacity-40`}>New invite</button>
+                  <button type="button" onClick={() => void revokePartyInvite(identity, party.id)} className={`${BTN} px-2 py-1 text-2xs`}>Revoke</button>
                 </div>
               </div>
             )}
@@ -149,7 +149,7 @@ export function WatchRoomHeader({ party, identity, profilePics: _profilePics }: 
               <Switch checked={party.requireApproval} onChange={() => setPartySettings(party.id, { requireApproval: !party.requireApproval })} />
             </div>
             <ul className="border-t border-border-glass pt-2 space-y-1 max-h-52 overflow-y-auto styled-scrollbar">
-              <li className="text-[10px] uppercase tracking-wider text-retro-muted">Members</li>
+              <li className="text-2xs uppercase tracking-wider text-retro-muted">Members</li>
               {party.members.map((m) => (
                 <li key={m.id} className="flex items-center gap-2">
                   <span className="text-xs text-retro-fg truncate flex-1">{m.name || m.id.slice(0, 8)}</span>
@@ -157,10 +157,10 @@ export function WatchRoomHeader({ party, identity, profilePics: _profilePics }: 
                     <span className={MUTED}>host</span>
                   ) : m.id === identity.orbitId ? null : (
                     <div className="flex gap-1">
-                      <button type="button" onClick={() => transferParty(party.id, m.id)} className={`${BTN} px-1.5 py-0.5 text-[10px]`}>Host</button>
-                      <button type="button" onClick={() => muteParty(party.id, m.id, !m.muted)} className={`${BTN} px-1.5 py-0.5 text-[10px]`}>{m.muted ? 'Unmute' : 'Mute'}</button>
-                      <button type="button" onClick={() => kickParty(party.id, m.id)} className={`${BTN} px-1.5 py-0.5 text-[10px]`}>Kick</button>
-                      <button type="button" onClick={() => banParty(party.id, m.id)} className={`${BTN} px-1.5 py-0.5 text-[10px]`}>Ban</button>
+                      <button type="button" onClick={() => transferParty(party.id, m.id)} className={`${BTN} px-1.5 py-0.5 text-2xs`}>Host</button>
+                      <button type="button" onClick={() => muteParty(party.id, m.id, !m.muted)} className={`${BTN} px-1.5 py-0.5 text-2xs`}>{m.muted ? 'Unmute' : 'Mute'}</button>
+                      <button type="button" onClick={() => kickParty(party.id, m.id)} className={`${BTN} px-1.5 py-0.5 text-2xs`}>Kick</button>
+                      <button type="button" onClick={() => banParty(party.id, m.id)} className={`${BTN} px-1.5 py-0.5 text-2xs`}>Ban</button>
                     </div>
                   )}
                 </li>

@@ -226,7 +226,7 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0,
       <div className="glass-surface w-full max-w-5xl max-h-[92dvh] overflow-y-auto rounded-xl p-4 sm:p-6 text-retro-fg">
         <div className="flex items-start justify-between gap-4 mb-5">
           <div>
-            <div className="flex items-center gap-2 text-retro-accent text-[10px] font-black uppercase tracking-[0.18em]">
+            <div className="flex items-center gap-2 text-retro-accent text-2xs font-black uppercase tracking-[0.18em]">
               <Sparkles className="w-4 h-4" /> Card Forge
             </div>
             <h2 className="text-xl sm:text-2xl font-black mt-1">Create a unique card</h2>
@@ -252,20 +252,20 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0,
                 </div>
                 <div className="p-3 flex-1 flex flex-col justify-between">
                   <div>
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-retro-muted">Chrome edition</div>
+                    <div className="text-2xs uppercase tracking-[0.18em] text-retro-muted">Chrome edition</div>
                     <div className="text-base font-black truncate mt-1">{name.trim() || 'Your Card Name'}</div>
                     <div className="flex flex-wrap gap-1 mt-2">
-                      {(tags.length ? tags : ['your-tags']).map((tag) => <span key={tag} className="text-[10px] rounded-full border px-1.5 py-0.5" style={{ borderColor: '#9FE3FF88', color: '#9FE3FF' }}>#{tag}</span>)}
+                      {(tags.length ? tags : ['your-tags']).map((tag) => <span key={tag} className="text-2xs rounded-full border px-1.5 py-0.5" style={{ borderColor: '#9FE3FF88', color: '#9FE3FF' }}>#{tag}</span>)}
                     </div>
                   </div>
                   <div className="mt-4 flex items-end justify-between gap-2">
-                    <span className="text-[10px] text-retro-muted line-clamp-2">{description.trim() || 'Polished silver edge'}</span>
-                    <span className="text-[10px] font-mono font-bold" style={{ color: '#9FE3FF' }}>VALUE TBD</span>
+                    <span className="text-2xs text-retro-muted line-clamp-2">{description.trim() || 'Polished silver edge'}</span>
+                    <span className="text-2xs font-mono font-bold" style={{ color: '#9FE3FF' }}>VALUE TBD</span>
                   </div>
                 </div>
               </div>
             </div>
-            <span className="text-[10px] text-retro-muted">Live preview</span>
+            <span className="text-2xs text-retro-muted">Live preview</span>
           </div>
 
           <div className="space-y-4">
@@ -273,7 +273,7 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0,
               <div className="space-y-2 py-2">
                 <ImagePlus className="w-7 h-7 mx-auto text-retro-accent" />
                 <p className="text-sm text-retro-body">Drop an image or video, browse, or paste a URL</p>
-                <p className="text-[10px] text-retro-muted">Or drag a keepsake in from the Gallery panel. The original media stays private until you share or play it.</p>
+                <p className="text-2xs text-retro-muted">Or drag a keepsake in from the Gallery panel. The original media stays private until you share or play it.</p>
               </div>
             </DropZone>
 
@@ -288,24 +288,24 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0,
 
             <div className="grid sm:grid-cols-2 gap-3">
               <label className="space-y-1.5 sm:col-span-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-retro-muted">Card name *</span>
+                <span className="text-2xs font-bold uppercase tracking-wider text-retro-muted">Card name *</span>
                 <input value={name} onChange={(event) => setName(event.target.value.slice(0, 80))} placeholder="Give a unique name to this nice card" className="w-full px-3 py-2.5 text-sm" autoFocus />
               </label>
               <label className="space-y-1.5 sm:col-span-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-retro-muted">Description</span>
+                <span className="text-2xs font-bold uppercase tracking-wider text-retro-muted">Description</span>
                 <textarea value={description} onChange={(event) => setDescription(event.target.value.slice(0, 240))} placeholder="What's all that about? Describe your gooning material if you feel like so." rows={3} className="w-full px-3 py-2.5 text-sm resize-none" />
               </label>
               <div className="sm:col-span-2 space-y-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-retro-muted">Tags <span className="normal-case font-normal">({tags.length}/{MAX_TAGS}). Comma or space separated</span></span>
+                <span className="text-2xs font-bold uppercase tracking-wider text-retro-muted">Tags <span className="normal-case font-normal">({tags.length}/{MAX_TAGS}). Comma or space separated</span></span>
                 <div className="flex gap-2">
                   <div className="relative flex-1"><Tag className="absolute left-3 top-3 w-4 h-4 text-retro-muted" /><input value={tagInput} maxLength={MAX_TAGS * 25} onChange={(event) => setTagInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ',') { event.preventDefault(); addTag(); } }} onBlur={() => { if (tagInput.trim()) addTag(); }} placeholder="futa, bbc, BWNO, hentai" className="w-full pl-9 pr-3 py-2.5 text-sm" /></div>
                   <button type="button" onClick={addTag} disabled={tags.length >= MAX_TAGS || !tagInput.trim()} className="glass-button px-3 rounded-xl disabled:opacity-40" aria-label="Add tag"><Plus className="w-4 h-4" /></button>
                 </div>
-                <div className="flex flex-wrap gap-1.5 min-h-6">{tags.map((tag) => <button type="button" key={tag} onClick={() => setTags((current) => current.filter((item) => item !== tag))} className="glass-button rounded-full px-2 py-1 text-[10px] text-retro-body">#{tag} x</button>)}</div>
+                <div className="flex flex-wrap gap-1.5 min-h-6">{tags.map((tag) => <button type="button" key={tag} onClick={() => setTags((current) => current.filter((item) => item !== tag))} className="glass-button rounded-full px-2 py-1 text-2xs text-retro-body">#{tag} x</button>)}</div>
               </div>
             </div>
 
-            {creating && <div className="space-y-1"><div className="flex justify-between text-[10px] text-retro-muted"><span>Forging card...</span><span>{progress}%</span></div><div className="h-1.5 rounded-full bg-black/30 overflow-hidden"><div className="h-full bg-retro-accent transition-all" style={{ width: `${progress}%` }} /></div></div>}
+            {creating && <div className="space-y-1"><div className="flex justify-between text-2xs text-retro-muted"><span>Forging card...</span><span>{progress}%</span></div><div className="h-1.5 rounded-full bg-black/30 overflow-hidden"><div className="h-full bg-retro-accent transition-all" style={{ width: `${progress}%` }} /></div></div>}
             {error && <div className="rounded-xl border border-retro-error/30 bg-retro-error/10 px-3 py-2 text-xs text-retro-error">{error}</div>}
             <div className="flex justify-end gap-2 pt-1">
               <button type="button" onClick={onClose} className="glass-button px-4 py-2.5 rounded-xl text-xs font-bold">Cancel</button>

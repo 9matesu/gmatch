@@ -104,7 +104,7 @@ export function GamesHub({
             <button
               type="button"
               onClick={() => onSubTabChange?.('duel')}
-              className="text-[11px] text-retro-muted hover:text-retro-fg transition-colors cursor-pointer"
+              className="text-2xs text-retro-muted hover:text-retro-fg transition-colors cursor-pointer"
             >
               ← Back to Arena
             </button>

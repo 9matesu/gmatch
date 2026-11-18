@@ -167,11 +167,11 @@ export function CardTile({
       <div className="holo-card-inner flex flex-col h-full rounded-[6px] overflow-hidden" style={{ boxShadow: `inset 0 0 0 1.5px ${accent}66` }}>
         {/* Top Badges */}
         <div className="absolute top-2 left-2 z-20 flex flex-wrap items-center gap-1">
-          <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md border backdrop-blur-xs ${rarity.badgeClass}`}>
+          <span className={`text-2xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md border backdrop-blur-xs ${rarity.badgeClass}`}>
             {rarity.label}
           </span>
           {frameType !== 'chrome' && (
-            <span className={`text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded-md border font-mono backdrop-blur-xs ${
+            <span className={`text-2xs font-medium uppercase tracking-wider px-1.5 py-0.5 rounded-md border font-mono backdrop-blur-xs ${
               frameType === 'holo'
                 ? 'bg-purple-950/90 text-purple-200 border-purple-400/60'
                 : frameType === 'carbon'
@@ -184,7 +184,7 @@ export function CardTile({
             </span>
           )}
           {isReceived && (
-            <span className="text-[10px] font-medium px-1.5 py-0.5 bg-black/75 text-purple-300 rounded-md border border-purple-400/30 flex items-center gap-1 backdrop-blur-xs">
+            <span className="text-2xs font-medium px-1.5 py-0.5 bg-black/75 text-purple-300 rounded-md border border-purple-400/30 flex items-center gap-1 backdrop-blur-xs">
               <Gift className="w-2.5 h-2.5 text-purple-400" />
               <span>RECEIVED</span>
             </span>
@@ -194,7 +194,7 @@ export function CardTile({
         {/* Top-Right Badges: Expiry Timer & Select Checkbox */}
         <div className="absolute top-2 right-2 z-20 flex items-center gap-1">
           {minsLeft !== null && minsLeft > 0 && (
-            <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 bg-black/75 text-amber-300 rounded-md border border-amber-400/30 backdrop-blur-xs flex items-center gap-1">
+            <span className="text-2xs font-mono font-medium px-1.5 py-0.5 bg-black/75 text-amber-300 rounded-md border border-amber-400/30 backdrop-blur-xs flex items-center gap-1">
               <Clock className="w-2.5 h-2.5" />
               <span>{minsLeft > 60 ? `${Math.floor(minsLeft / 60)}h` : `${minsLeft}m`}</span>
             </span>
@@ -239,13 +239,13 @@ export function CardTile({
               {cardTitle}
             </div>
             {hasValuation && (
-              <div className="shrink-0 text-[10px] font-mono font-bold tabular-nums tracking-tight" style={{ color: accent }}>
+              <div className="shrink-0 text-2xs font-mono font-bold tabular-nums tracking-tight" style={{ color: accent }}>
                 {formatGc(cardValue)}
               </div>
             )}
           </div>
 
-          <div className="flex items-center justify-between gap-2 text-[10px] font-mono text-retro-muted">
+          <div className="flex items-center justify-between gap-2 text-2xs font-mono text-retro-muted">
             {ownerLabel && (
               <span className="truncate">
                 by{' '}
@@ -277,7 +277,7 @@ export function CardTile({
               {itemTags.map((tag) => (
                 <span
                   key={tag}
-                  className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-retro-panel border border-border-glass text-retro-muted truncate max-w-[90px]"
+                  className="text-2xs font-mono font-medium px-1.5 py-0.5 rounded bg-retro-panel border border-border-glass text-retro-muted truncate max-w-[90px]"
                   style={{ color: accent }}
                 >
                   #{tag}

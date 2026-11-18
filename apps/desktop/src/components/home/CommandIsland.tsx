@@ -579,7 +579,7 @@ export function CommandIsland({
             <button
               type="button"
               onClick={() => { closePicker(); onOpenCreatePost?.(); }}
-              className="mt-1.5 w-full px-3 py-1.5 rounded-lg text-[11px] font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w10 transition-colors cursor-pointer"
+              className="mt-1.5 w-full px-3 py-1.5 rounded-lg text-2xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w10 transition-colors cursor-pointer"
             >
               Write a text post
             </button>

@@ -160,13 +160,13 @@ export function WatchLocalFile({
       >
         <FileVideo className="h-5 w-5 text-retro-muted" />
         <p className="text-xs text-retro-fg">Drop a video file here, or browse</p>
-        <p className={`text-[10px] ${MUTED}`}>MP4, WebM, MOV and other files your browser can play</p>
+        <p className={`text-2xs ${MUTED}`}>MP4, WebM, MOV and other files your browser can play</p>
       </div>
 
       {meta && file && (
         <div className="rounded-lg border border-border-glass bg-glass-w5 px-3 py-2 text-xs">
           <p className="truncate font-semibold text-retro-fg">{meta.name}</p>
-          <p className={`mt-0.5 font-mono text-[10px] ${MUTED}`}>
+          <p className={`mt-0.5 font-mono text-2xs ${MUTED}`}>
             {formatBytes(meta.size)}
             {meta.duration !== null && Number.isFinite(meta.duration) ? ` · ${Math.round(meta.duration)}s` : ''}
             {` · sha256:${meta.hash.slice(0, 12)}…`}

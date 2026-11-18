@@ -525,7 +525,7 @@ function extForMime(mime: string): string {
                   maxLength={1000}
                   className="w-full bg-retro-bg border border-border-glass rounded-lg p-3 text-xs text-retro-fg focus:outline-none focus:border-border-glass transition-colors placeholder:text-retro-muted resize-none"
                 />
-                <div className="text-right text-[10px] font-mono text-retro-muted mt-0.5">
+                <div className="text-right text-2xs font-mono text-retro-muted mt-0.5">
                   {caption.length}/1000
                 </div>
               </div>
@@ -616,7 +616,7 @@ function extForMime(mime: string): string {
             >
               <UploadCloud className="w-8 h-8 text-retro-muted group-hover:text-retro-accent group-hover:scale-110 transition-transform" />
               <p className="text-xs font-bold text-retro-body">Drag &amp; drop photos or click to browse</p>
-              <span className="text-[10px] text-retro-muted">Images and video, up to {MAX_MEDIA}. {mediaList.length}/{MAX_MEDIA} added</span>
+              <span className="text-2xs text-retro-muted">Images and video, up to {MAX_MEDIA}. {mediaList.length}/{MAX_MEDIA} added</span>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -659,7 +659,7 @@ function extForMime(mime: string): string {
               >
                 <FolderOpen className="w-7 h-7 text-retro-muted group-hover:text-retro-accent transition-colors" />
                 <p className="text-xs font-bold text-retro-body">From your media, this device, or a link</p>
-                <span className="text-[10px] text-retro-muted">Previewed before it attaches. {mediaList.length}/{MAX_MEDIA} added</span>
+                <span className="text-2xs text-retro-muted">Previewed before it attaches. {mediaList.length}/{MAX_MEDIA} added</span>
               </button>
             </div>
           )}
@@ -672,10 +672,10 @@ function extForMime(mime: string): string {
                   <div className="w-full aspect-video flex flex-col items-center justify-center gap-2 p-4 text-center">
                     <span className="w-10 h-10 rounded-full bg-glass-w12 border border-border-glass flex items-center justify-center text-retro-fg text-xs font-black">▶</span>
                     <span className="text-xs font-semibold text-retro-fg">Video link attached</span>
-                    <span className="text-[10px] text-retro-muted break-all max-w-full">
+                    <span className="text-2xs text-retro-muted break-all max-w-full">
                       {(currentMedia.originalUrl || currentMedia.previewUrl).slice(0, 80)}
                     </span>
-                    <span className="text-[10px] text-retro-muted">
+                    <span className="text-2xs text-retro-muted">
                       {currentMedia.resolveNote || 'Media attaches when you share'}
                     </span>
                   </div>
@@ -700,7 +700,7 @@ function extForMime(mime: string): string {
                 )}
 
                 {/* Aspect Ratio Switcher */}
-                <div className="absolute bottom-3 left-3 bg-black/75 backdrop-blur-md rounded-xl p-1 flex items-center gap-1 text-[10px] font-bold text-retro-fg z-10">
+                <div className="absolute bottom-3 left-3 bg-black/75 backdrop-blur-md rounded-xl p-1 flex items-center gap-1 text-2xs font-bold text-retro-fg z-10">
                   {(['square', 'portrait', 'landscape'] as const).map((ratio) => (
                     <button
                       key={ratio}
@@ -764,7 +764,7 @@ function extForMime(mime: string): string {
                       ) : (
                         <img src={m.previewUrl} alt="" className="w-full h-full object-cover" />
                       )}
-                      <span className="absolute bottom-0.5 right-0.5 px-1 bg-black/70 text-[10px] font-bold text-retro-fg rounded">
+                      <span className="absolute bottom-0.5 right-0.5 px-1 bg-black/70 text-2xs font-bold text-retro-fg rounded">
                         #{idx + 1}
                       </span>
                     </div>
@@ -775,7 +775,7 @@ function extForMime(mime: string): string {
                       type="button"
                       onClick={() => moveMedia(activeMediaIndex, activeMediaIndex - 1)}
                       disabled={activeMediaIndex === 0}
-                      className="px-2 py-1 bg-glass-w12 border border-border-glass rounded text-[10px] font-mono font-semibold disabled:opacity-30 hover:bg-glass-w20 cursor-pointer transition-all duration-150 active:scale-[0.96]"
+                      className="px-2 py-1 bg-glass-w12 border border-border-glass rounded text-2xs font-mono font-semibold disabled:opacity-30 hover:bg-glass-w20 cursor-pointer transition-all duration-150 active:scale-[0.96]"
                       title="Move photo left"
                     >
                       ←
@@ -784,7 +784,7 @@ function extForMime(mime: string): string {
                       type="button"
                       onClick={() => moveMedia(activeMediaIndex, activeMediaIndex + 1)}
                       disabled={activeMediaIndex === mediaList.length - 1}
-                      className="px-2 py-1 bg-glass-w12 border border-border-glass rounded text-[10px] font-mono font-semibold disabled:opacity-30 hover:bg-glass-w20 cursor-pointer transition-all duration-150 active:scale-[0.96]"
+                      className="px-2 py-1 bg-glass-w12 border border-border-glass rounded text-2xs font-mono font-semibold disabled:opacity-30 hover:bg-glass-w20 cursor-pointer transition-all duration-150 active:scale-[0.96]"
                       title="Move photo right"
                     >
                       →

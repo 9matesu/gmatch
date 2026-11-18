@@ -168,7 +168,7 @@ export function DropZone({
           <p className={`${compact ? 'text-xs' : 'text-sm'} text-retro-muted`}>
             Drop image/video, click to browse, or paste (Ctrl+V) link
           </p>
-          {!compact && <p className="text-[10px] text-retro-muted/60">JPG, PNG, WebP, GIF, MP4, WebM, Twitter/X</p>}
+          {!compact && <p className="text-2xs text-retro-muted/60">JPG, PNG, WebP, GIF, MP4, WebM, Twitter/X</p>}
         </div>
       )}
     </div>

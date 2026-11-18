@@ -184,7 +184,7 @@ export function WatchPartyRoomList({
           you left was simply gone from the UI. */}
       {recents.length > 0 && (
         <div className="mb-5">
-          <h3 className="text-[10px] font-semibold tracking-wider text-retro-muted mb-2">
+          <h3 className="text-2xs font-semibold tracking-wider text-retro-muted mb-2">
             Recently watched
           </h3>
           <div className="flex flex-wrap gap-2">
@@ -238,7 +238,7 @@ export function WatchPartyRoomList({
               <RoomThumbnail mediaUrl={r.mediaUrl} name={r.name} identity={identity} />
 
               {/* Top-Right Member Badge */}
-              <div className="absolute top-2 right-2 flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-black/80 backdrop-blur-md text-retro-fg border border-border-glass shadow-sm z-10">
+              <div className="absolute top-2 right-2 flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs font-mono font-bold bg-black/80 backdrop-blur-md text-retro-fg border border-border-glass shadow-sm z-10">
                 <Users className="w-3 h-3 text-retro-muted" />
                 <span>{r.members}</span>
               </div>
@@ -262,12 +262,12 @@ export function WatchPartyRoomList({
                 </p>
               </div>
 
-              <div className="flex items-center justify-between pt-1.5 border-t border-border-subtle/40 text-[10px] text-retro-muted">
+              <div className="flex items-center justify-between pt-1.5 border-t border-border-subtle/40 text-2xs text-retro-muted">
                 <span className="flex items-center gap-1.5">
                   <span className={`w-1.5 h-1.5 rounded-full ${r.members > 0 ? 'bg-emerald-400 animate-pulse' : 'bg-retro-muted/40'}`} />
                   {r.members > 0 ? 'Active' : 'Persistent'}
                 </span>
-                <span className="font-mono text-[10px] uppercase tracking-wider text-retro-muted/60">
+                <span className="font-mono text-2xs uppercase tracking-wider text-retro-muted/60">
                   {r.id.slice(0, 8)}
                 </span>
               </div>

@@ -115,7 +115,7 @@ export function CardHeader({
         {icon && <span className="shrink-0 text-retro-muted">{icon}</span>}
         <div className="min-w-0">
           <div className="text-xs font-semibold text-retro-fg truncate">{title}</div>
-          {caption != null && <div className="text-[10px] text-retro-muted truncate">{caption}</div>}
+          {caption != null && <div className="text-2xs text-retro-muted truncate">{caption}</div>}
         </div>
       </div>
       {right && <div className="flex items-center gap-2 shrink-0">{right}</div>}
@@ -330,7 +330,7 @@ export function PageHeader({
       <div className="min-w-0">
         <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-retro-fg truncate">{title}</h1>
         {meta != null && meta !== '' && (
-          <div className="text-[11px] text-retro-muted mt-0.5 truncate">{meta}</div>
+          <div className="text-2xs text-retro-muted mt-0.5 truncate">{meta}</div>
         )}
       </div>
       {action && <div className="shrink-0">{action}</div>}

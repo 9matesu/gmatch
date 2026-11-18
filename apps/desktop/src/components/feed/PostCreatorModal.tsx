@@ -131,7 +131,7 @@ export function PostCreatorModal({
               <label className="text-xs font-bold text-retro-fg block">
                 Media Attachments ({media.length}/5)
               </label>
-              <span className="text-[10px] text-retro-muted">Up to 5 images or videos</span>
+              <span className="text-2xs text-retro-muted">Up to 5 images or videos</span>
             </div>
 
             <div className="grid grid-cols-5 gap-2">
@@ -158,7 +158,7 @@ export function PostCreatorModal({
                     title="Upload from device"
                   >
                     <Upload className="w-4 h-4" />
-                    <span className="text-[10px] font-bold">Add</span>
+                    <span className="text-2xs font-bold">Add</span>
                   </button>
 
                   {/* Snap with Camera */}
@@ -172,7 +172,7 @@ export function PostCreatorModal({
                     title="Take live photo"
                   >
                     <Camera className="w-4 h-4 text-retro-warning" />
-                    <span className="text-[10px] font-bold">Snap</span>
+                    <span className="text-2xs font-bold">Snap</span>
                   </button>
                 </>
               )}
@@ -193,9 +193,9 @@ export function PostCreatorModal({
             <div className="flex items-center justify-between">
               <label className="text-xs font-black text-retro-warning flex items-center gap-1.5">
                 <span>Required Tags *</span>
-                <span className="text-[10px] font-medium text-retro-muted">(Must add at least 1 tag)</span>
+                <span className="text-2xs font-medium text-retro-muted">(Must add at least 1 tag)</span>
               </label>
-              <span className="text-[10px] font-black text-retro-warning">{tags.length} added</span>
+              <span className="text-2xs font-black text-retro-warning">{tags.length} added</span>
             </div>
 
             {/* Tags Badges */}

@@ -335,7 +335,7 @@ export function FormModal<T extends Record<string, unknown>>({
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-4">
           {fields.map(field => (
             <div key={String(field.key)} className="space-y-1.5">
-              <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider flex items-center gap-1">
+              <label className="text-2xs font-bold text-retro-muted uppercase tracking-wider flex items-center gap-1">
                 {field.label}
                 {field.required && <span className="text-red-400">*</span>}
               </label>
@@ -394,7 +394,7 @@ export function FormModal<T extends Record<string, unknown>>({
                     />
                   )}
                   {errors[String(field.key)] && (
-                    <p className="text-[10px] text-red-400">{errors[String(field.key)]}</p>
+                    <p className="text-2xs text-red-400">{errors[String(field.key)]}</p>
                   )}
                 </>
               )}
@@ -472,7 +472,7 @@ function TagsInput({ value, onChange, placeholder }: {
               <button
                 type="button"
                 onClick={() => handleRemove(tag)}
-                className="text-retro-muted hover:text-red-400 text-[10px] leading-none"
+                className="text-retro-muted hover:text-red-400 text-2xs leading-none"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -531,7 +531,7 @@ export function DetailModal({ isOpen, onClose, title, subtitle, children, data, 
             <div className="divide-y divide-border-glass">
               {Object.entries(data).map(([key, val]) => (
                 <div key={key} className="py-2 flex items-center justify-between text-xs gap-3">
-                  <span className="text-retro-muted uppercase text-[10px] font-mono shrink-0">{key}</span>
+                  <span className="text-retro-muted uppercase text-2xs font-mono shrink-0">{key}</span>
                   <span className="font-mono text-retro-fg truncate text-right">
                     {val === null || val === undefined ? "—" : typeof val === "object" ? JSON.stringify(val) : String(val)}
                   </span>

@@ -580,7 +580,7 @@ export function NativeVideoPlayer({
               strip, and a permanent "HD Video" label on every clip was noise. */}
           <div className="flex items-center gap-1.5 pointer-events-auto">
             {playbackRate !== 1 && (
-              <span className="px-1.5 py-0.5 rounded-md bg-retro-accent/20 border border-retro-accent/40 text-[10px] font-bold text-retro-accent">
+              <span className="px-1.5 py-0.5 rounded-md bg-retro-accent/20 border border-retro-accent/40 text-2xs font-bold text-retro-accent">
                 {playbackRate}x
               </span>
             )}
@@ -636,7 +636,7 @@ export function NativeVideoPlayer({
 
             {hoverTime !== null && (
               <div
-                className="absolute -top-7 -translate-x-1/2 px-2 py-0.5 rounded bg-black/90 border border-border-glass text-[10px] font-mono font-bold text-retro-fg shadow-lg pointer-events-none"
+                className="absolute -top-7 -translate-x-1/2 px-2 py-0.5 rounded bg-black/90 border border-border-glass text-2xs font-mono font-bold text-retro-fg shadow-lg pointer-events-none"
                 style={{ left: `${hoverPosition}%` }}
               >
                 {formatVideoTime(hoverTime)}
@@ -686,7 +686,7 @@ export function NativeVideoPlayer({
                 />
               </div>
 
-              <div className="text-[10px] font-mono text-zinc-300 ml-1 select-none">
+              <div className="text-2xs font-mono text-zinc-300 ml-1 select-none">
                 <span>{formatVideoTime(currentTime)}</span>
                 <span className="opacity-40 mx-1">/</span>
                 <span className="opacity-75">{formatVideoTime(duration)}</span>
@@ -699,7 +699,7 @@ export function NativeVideoPlayer({
                   type="button"
                   onClick={cycleSpeed}
                   title="Playback Speed"
-                  className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold hover:bg-glass-w10 text-zinc-300 hover:text-retro-fg transition-colors cursor-pointer"
+                  className="px-1.5 py-0.5 rounded text-2xs font-mono font-bold hover:bg-glass-w10 text-zinc-300 hover:text-retro-fg transition-colors cursor-pointer"
                 >
                   {playbackRate}x
                 </button>

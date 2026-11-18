@@ -122,8 +122,8 @@ export function ContextMenu({ x, y, title, subtitle, actions, onDismiss, width =
       >
         {(title || subtitle) && (
           <div className="px-2.5 py-1 mb-1 border-b border-border-glass/40">
-            {title && <div className="flex items-center gap-1.5 text-[10px] font-semibold tracking-wider text-retro-muted uppercase">{title}</div>}
-            {subtitle && <div className="text-[10px] font-mono text-retro-faint truncate" title={String(subtitle)}>{subtitle}</div>}
+            {title && <div className="flex items-center gap-1.5 text-2xs font-semibold tracking-wider text-retro-muted uppercase">{title}</div>}
+            {subtitle && <div className="text-2xs font-mono text-retro-faint truncate" title={String(subtitle)}>{subtitle}</div>}
           </div>
         )}
 
@@ -150,7 +150,7 @@ export function ContextMenu({ x, y, title, subtitle, actions, onDismiss, width =
                   {a.icon}
                   <span className="truncate">{a.label}</span>
                 </span>
-                {a.hint && <span className="text-[10px] text-retro-muted font-mono shrink-0">{a.hint}</span>}
+                {a.hint && <span className="text-2xs text-retro-muted font-mono shrink-0">{a.hint}</span>}
               </button>
 
               {expanded && a.params && (
@@ -160,7 +160,7 @@ export function ContextMenu({ x, y, title, subtitle, actions, onDismiss, width =
                     if (p.type === 'select') {
                       return (
                         <label key={p.id} className="block">
-                          <span className="block text-[10px] text-retro-muted mb-0.5">{p.label}</span>
+                          <span className="block text-2xs text-retro-muted mb-0.5">{p.label}</span>
                           <select
                             value={String(v ?? '')}
                             onChange={(e) => setValue(a.id, p.id, e.target.value)}
@@ -174,7 +174,7 @@ export function ContextMenu({ x, y, title, subtitle, actions, onDismiss, width =
                     if (p.type === 'toggle') {
                       return (
                         <label key={p.id} className="flex items-center justify-between gap-2 cursor-pointer">
-                          <span className="text-[10px] text-retro-muted">{p.label}</span>
+                          <span className="text-2xs text-retro-muted">{p.label}</span>
                           <input
                             type="checkbox"
                             checked={Boolean(v)}
@@ -186,7 +186,7 @@ export function ContextMenu({ x, y, title, subtitle, actions, onDismiss, width =
                     }
                     return (
                       <label key={p.id} className="block">
-                        <span className="block text-[10px] text-retro-muted mb-0.5">{p.label}</span>
+                        <span className="block text-2xs text-retro-muted mb-0.5">{p.label}</span>
                         <input
                           type="text"
                           value={String(v ?? '')}
@@ -200,7 +200,7 @@ export function ContextMenu({ x, y, title, subtitle, actions, onDismiss, width =
                   <button
                     type="button"
                     onClick={() => void run(a)}
-                    className="w-full mt-1 px-2 py-1 rounded-md bg-retro-accent text-retro-accent-text text-[11px] font-semibold hover:bg-retro-fg transition-colors cursor-pointer"
+                    className="w-full mt-1 px-2 py-1 rounded-md bg-retro-accent text-retro-accent-text text-2xs font-semibold hover:bg-retro-fg transition-colors cursor-pointer"
                   >
                     Apply
                   </button>

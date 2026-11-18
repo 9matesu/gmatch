@@ -506,7 +506,7 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
           <div className="absolute inset-0 bg-black/40 pointer-events-none" />
           <button
             type="button"
-            className="pointer-events-auto absolute top-4 left-4 text-[10px] font-mono font-bold px-2 py-1 bg-black/75 border border-border-glass text-retro-fg rounded hover:bg-retro-bg transition-colors cursor-pointer"
+            className="pointer-events-auto absolute top-4 left-4 text-2xs font-mono font-bold px-2 py-1 bg-black/75 border border-border-glass text-retro-fg rounded hover:bg-retro-bg transition-colors cursor-pointer"
             onClick={() => removeEffect(gameBgEffect.id)}
           >
             Clear background

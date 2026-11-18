@@ -139,7 +139,7 @@ export function AdminHeader({
             <div className="absolute right-0 top-full mt-2 z-50 min-w-[200px] bg-surface-elevated border border-border-glass rounded-lg shadow-lg overflow-hidden animate-orbit-pop">
               <div className="px-3 py-2 border-b border-border-glass">
                 <p className="text-xs font-bold text-retro-fg truncate">{user?.name || "Administrator"}</p>
-                <p className="text-[10px] text-retro-muted truncate font-mono">Admin Console</p>
+                <p className="text-2xs text-retro-muted truncate font-mono">Admin Console</p>
               </div>
               <button
                 type="button"

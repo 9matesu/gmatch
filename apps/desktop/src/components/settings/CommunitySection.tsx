@@ -28,7 +28,7 @@ export function CommunitySection({ toast }: { toast?: (message: string, type?: '
   return (
     <div className="p-4 bg-glass-w5 border border-border-glass rounded-lg space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[10px] font-medium uppercase tracking-wider text-retro-muted">
+        <span className="text-2xs font-medium uppercase tracking-wider text-retro-muted">
           Community &amp; support
         </span>
         <UsersThree className="w-4 h-4 text-retro-fg" />

@@ -38,7 +38,7 @@ export function LeagueBoard({ league, users, onOpenProfile }: LeagueBoardProps) 
             <Avatar id={entry.user_id} imageUrl={entry.pfp_url || undefined} size={28} />
             <div className="min-w-0 truncate">
               <span className="text-xs font-bold text-retro-fg truncate">{entry.display_name?.trim() || 'Unknown User'}</span>
-              <span className="text-[10px] text-retro-muted ml-2">{entry.wins}W {entry.losses ?? 0}L · Tier {entry.tier}</span>
+              <span className="text-2xs text-retro-muted ml-2">{entry.wins}W {entry.losses ?? 0}L · Tier {entry.tier}</span>
             </div>
           </div>
           <div className="text-xs font-black text-retro-accent font-mono shrink-0">

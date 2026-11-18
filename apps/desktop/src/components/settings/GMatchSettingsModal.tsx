@@ -425,10 +425,10 @@ export function GMatchSettingsModal({
               </div>
               <div className="min-w-0">
                 <span className="text-xs font-medium block truncate">{identity?.orbitId ? `@${identity.orbitId.substring(0, 8)}` : 'Guest'}</span>
-                <span className="text-[10px] text-retro-online">Online</span>
+                <span className="text-2xs text-retro-online">Online</span>
               </div>
             </div>
-            <span className="text-[10px] font-mono text-retro-muted">v1.0.0</span>
+            <span className="text-2xs font-mono text-retro-muted">v1.0.0</span>
           </div>
         </div>
 
@@ -468,7 +468,7 @@ export function GMatchSettingsModal({
                           type="button"
                           aria-pressed={settings.theme === mode}
                           onClick={() => { playPress(760); updateSettings('theme', mode); }}
-                          className={`px-2.5 py-1 rounded-md text-[11px] font-semibold capitalize transition-colors cursor-pointer ${
+                          className={`px-2.5 py-1 rounded-md text-2xs font-semibold capitalize transition-colors cursor-pointer ${
                             settings.theme === mode ? 'bg-retro-accent text-retro-accent-text' : 'text-retro-muted hover:text-retro-fg'
                           }`}
                         >
@@ -494,7 +494,7 @@ export function GMatchSettingsModal({
                       onChange={(e) => updateSettings('panelOpacity', Number(e.target.value) / 100)}
                       className="w-full accent-retro-accent cursor-pointer"
                     />
-                    <p className="text-[10px] text-retro-body">Panel and card transparency. Text keeps its backing.</p>
+                    <p className="text-2xs text-retro-body">Panel and card transparency. Text keeps its backing.</p>
                   </div>
 
                   {/* Glass blur */}
@@ -513,7 +513,7 @@ export function GMatchSettingsModal({
                       onChange={(e) => updateSettings('glassBlur', Number(e.target.value) / 100)}
                       className="w-full accent-retro-accent cursor-pointer"
                     />
-                    <p className="text-[10px] text-retro-body">Backdrop blur strength. 0% disables it.</p>
+                    <p className="text-2xs text-retro-body">Backdrop blur strength. 0% disables it.</p>
                   </div>
 
                   {/* Animated chrome (perf gate) */}
@@ -766,7 +766,7 @@ export function GMatchSettingsModal({
                         <label className="border border-dashed border-border-glass hover:border-retro-accent rounded-lg bg-glass-w5 p-3 flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors text-center">
                           <Upload className="w-5 h-5 text-retro-muted" />
                           <span className="text-xs font-semibold text-retro-body">Browse file to upload</span>
-                          <span className="text-[10px] text-retro-muted">JPG, PNG, WebP, GIF, MP4 (downscaled to 1920px)</span>
+                          <span className="text-2xs text-retro-muted">JPG, PNG, WebP, GIF, MP4 (downscaled to 1920px)</span>
                           <input type="file" accept="image/*,video/*" onChange={handleWallpaperFile} className="hidden" />
                         </label>
 
@@ -886,7 +886,7 @@ export function GMatchSettingsModal({
                     </div>
                   )}
                   {!vaultBridge() && (
-                    <p className="text-[10px] text-retro-muted">Desktop app only. The browser build always streams.</p>
+                    <p className="text-2xs text-retro-muted">Desktop app only. The browser build always streams.</p>
                   )}
                 </div>
               </div>
@@ -898,7 +898,7 @@ export function GMatchSettingsModal({
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-xs font-medium text-retro-fg">Mesh discovery</div>
-                    <div className="text-[10px] text-retro-muted leading-relaxed">
+                    <div className="text-2xs text-retro-muted leading-relaxed">
                       Announce this install on public trackers so peers on other machines can find you.
                       Only a rotating daily id and an offer leave the machine — no name, no catalog.
                       Your IP is visible to the tracker and to the peers you connect to.
@@ -914,7 +914,7 @@ export function GMatchSettingsModal({
                 {settings.meshEnabled && (
                   <>
                     <label className="block">
-                      <span className="block text-[10px] text-retro-muted mb-1">Community key</span>
+                      <span className="block text-2xs text-retro-muted mb-1">Community key</span>
                       <input
                         type="text"
                         value={meshKeyDraft}
@@ -923,13 +923,13 @@ export function GMatchSettingsModal({
                         placeholder="gmatch-open-mesh-v1"
                         className="w-full bg-retro-bg border border-border-glass rounded-md px-2 py-1.5 text-xs font-mono text-retro-fg outline-none"
                       />
-                      <span className="block text-[10px] text-retro-muted mt-1">
+                      <span className="block text-2xs text-retro-muted mt-1">
                         Default = open mesh (stops casual enumeration, not someone reading the code).
                         An invite key closes the mesh to that group.
                       </span>
                     </label>
                     <label className="flex items-center justify-between gap-2 cursor-pointer">
-                      <span className="text-[10px] text-retro-muted">Hide which files I hold (salted)</span>
+                      <span className="text-2xs text-retro-muted">Hide which files I hold (salted)</span>
                       <input
                         type="checkbox"
                         checked={settings.meshObfuscateHave}
@@ -953,7 +953,7 @@ export function GMatchSettingsModal({
                 {/* Orbit ID Display */}
                 <div className="p-4 bg-glass-w5 border border-border-glass rounded-lg space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-retro-muted">
+                    <span className="text-2xs font-medium uppercase tracking-wider text-retro-muted">
                       Cryptographic Identity Key
                     </span>
                     <span className="text-xs text-retro-muted font-medium flex items-center gap-1.5">
@@ -992,7 +992,7 @@ export function GMatchSettingsModal({
                       <span>Legal Terms</span>
                       <FileText className="w-3.5 h-3.5" />
                     </div>
-                    <p className="text-[10px] text-retro-muted mt-1">
+                    <p className="text-2xs text-retro-muted mt-1">
                       Terms of Use, Privacy, and related policies. Read-only — no acceptance required here.
                     </p>
                   </button>

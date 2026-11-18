@@ -97,12 +97,12 @@ export function MatchChat({ matchId, selfId, messages, onSend, onLoad, soundEnab
                       }`}
                     >
                       {!mine && (
-                        <div className="text-[10px] font-bold text-retro-muted uppercase tracking-wider mb-0.5 select-none">
+                        <div className="text-2xs font-bold text-retro-muted uppercase tracking-wider mb-0.5 select-none">
                           {m.sender_name?.trim() || 'Unknown User'}
                         </div>
                       )}
                       <div className="break-words whitespace-pre-wrap leading-relaxed select-text cursor-text"><Linkify text={m.body} /></div>
-                      <time className={`mt-1 block text-[10px] select-none ${mine ? 'text-retro-muted text-right' : 'text-retro-muted'}`} dateTime={m.created_at}>
+                      <time className={`mt-1 block text-2xs select-none ${mine ? 'text-retro-muted text-right' : 'text-retro-muted'}`} dateTime={m.created_at}>
                         {formatAbsoluteTime(m.created_at, { hour: '2-digit', minute: '2-digit' })}
                       </time>
                     </div>

@@ -146,7 +146,7 @@ export function LegalCenter({
                   key={id}
                   type="button"
                   onClick={() => setActive(id)}
-                  className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] border cursor-pointer ${
+                  className={`shrink-0 px-2.5 py-1 rounded-full text-2xs border cursor-pointer ${
                     active === id ? 'bg-retro-panel text-retro-fg border-border-glass' : 'text-retro-muted border-border-glass'
                   }`}
                 >

@@ -211,7 +211,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
 
         {recents.length > 0 && (
           <div className="px-3 pt-3 flex items-center gap-2 overflow-x-auto styled-scrollbar">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-retro-muted shrink-0">Recent</span>
+            <span className="text-2xs font-bold uppercase tracking-wider text-retro-muted shrink-0">Recent</span>
             {recents.map((r) => (
               <button
                 key={r.id}
@@ -223,7 +223,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
                 {profilePics[r.id] ? (
                   <img src={resolveMediaUrl(profilePics[r.id])} alt="" className="w-4 h-4 rounded-full object-cover" />
                 ) : (
-                  <span className="w-4 h-4 rounded-full bg-glass-w10 flex items-center justify-center text-[10px]">{r.name.slice(0, 1).toUpperCase()}</span>
+                  <span className="w-4 h-4 rounded-full bg-glass-w10 flex items-center justify-center text-2xs">{r.name.slice(0, 1).toUpperCase()}</span>
                 )}
                 <span className="max-w-[110px] truncate">{r.name}</span>
               </button>
@@ -261,7 +261,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
 
           {/* Friends Section */}
           <div className="space-y-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-retro-muted px-1">Direct Friends &amp; Peers</span>
+            <span className="text-2xs font-bold uppercase tracking-wider text-retro-muted px-1">Direct Friends &amp; Peers</span>
             {followingIds
               .filter((fId) => (userNames[fId] || fId).toLowerCase().includes(shareSearch.toLowerCase()))
               .map((fId) => {
@@ -283,7 +283,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
                     </div>
                     <div>
                        <span className="text-xs font-bold text-retro-fg block truncate max-w-[160px]">{name}</span>
-                      <span className="text-[10px] text-retro-muted">Direct Message</span>
+                      <span className="text-2xs text-retro-muted">Direct Message</span>
                     </div>
                   </div>
 
@@ -307,7 +307,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
 
           {groups.length > 0 && (
             <div className="space-y-1.5">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-retro-muted px-1">Groups</span>
+              <span className="text-2xs font-bold uppercase tracking-wider text-retro-muted px-1">Groups</span>
               {groups
                 .filter((g) => g.name.toLowerCase().includes(shareSearch.toLowerCase()))
                 .map((g) => {
@@ -324,7 +324,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
                         </div>
                         <div>
                           <span className="text-xs font-bold text-retro-fg block truncate max-w-[160px]">{g.name}</span>
-                          <span className="text-[10px] text-retro-muted">{g.member_count} members</span>
+                          <span className="text-2xs text-retro-muted">{g.member_count} members</span>
                         </div>
                       </div>
                       <button

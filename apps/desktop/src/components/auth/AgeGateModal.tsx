@@ -48,7 +48,7 @@ export function AgeGateModal() {
         </div>
 
         <div className="space-y-1.5">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-retro-body bg-retro-panel px-2.5 py-1 rounded-md border border-border-glass">
+          <span className="text-2xs font-semibold uppercase tracking-wider text-retro-body bg-retro-panel px-2.5 py-1 rounded-md border border-border-glass">
             Age Verification
           </span>
           <h2 id="age-gate-title" className="text-2xl font-black tracking-tighter text-retro-fg">Are you 18 or older?</h2>

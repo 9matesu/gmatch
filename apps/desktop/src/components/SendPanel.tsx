@@ -87,12 +87,12 @@ function PreviewThumbnail({ file, onRemove, onDragStart }: {
         />
       )}
       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-        <span className="text-[10px] text-retro-fg truncate max-w-[70px] px-1">
+        <span className="text-2xs text-retro-fg truncate max-w-[70px] px-1">
           {file.name.substring(0, 12)}
         </span>
       </div>
       {isVid && (
-        <div className="absolute top-1 left-1 bg-black/75 text-retro-accent text-[10px] font-bold px-1 rounded">
+        <div className="absolute top-1 left-1 bg-black/75 text-retro-accent text-2xs font-bold px-1 rounded">
           ▶
         </div>
       )}
@@ -102,7 +102,7 @@ function PreviewThumbnail({ file, onRemove, onDragStart }: {
       >
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
       </button>
-      <div className="absolute bottom-1 left-1 text-[10px] text-retro-fg bg-black/70 px-1">
+      <div className="absolute bottom-1 left-1 text-2xs text-retro-fg bg-black/70 px-1">
         {(file.size / 1024).toFixed(0)}KB
       </div>
     </div>
@@ -436,7 +436,7 @@ export const SendPanel = forwardRef<SendPanelHandle, {
       <div className="p-4 space-y-4">
         <div className="border border-retro-accent/60 bg-glass-w10 px-3 py-2 flex items-start gap-2">
           <div className="min-w-0">
-            <div className="text-[10px] font-medium text-retro-accent">Sending to</div>
+            <div className="text-2xs font-medium text-retro-accent">Sending to</div>
             <div className="text-xs text-retro-fg truncate">
               {recipientNames.length > 0 ? recipientNames.join(', ') : 'No player selected. Choose a player before sending'}
             </div>
@@ -444,7 +444,7 @@ export const SendPanel = forwardRef<SendPanelHandle, {
         </div>
 
         {backgroundUploads.length > 0 && (
-          <div className="border border-border-glass bg-retro-bg px-3 py-2 flex items-center justify-between gap-3 text-[10px] text-retro-muted">
+          <div className="border border-border-glass bg-retro-bg px-3 py-2 flex items-center justify-between gap-3 text-2xs text-retro-muted">
             <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-retro-accent animate-pulse" />Uploading in background</span>
             <span>{backgroundUploads.length} image{backgroundUploads.length === 1 ? '' : 's'} queued</span>
           </div>
@@ -470,7 +470,7 @@ export const SendPanel = forwardRef<SendPanelHandle, {
                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
               />
             )}
-            <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-[10px] text-retro-fg px-2 py-1 flex items-center justify-between">
+            <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-2xs text-retro-fg px-2 py-1 flex items-center justify-between">
               <span className="truncate">{allFiles[0].name}</span>
               <span>{(allFiles[0].size / 1024).toFixed(0)}KB</span>
             </div>
@@ -577,7 +577,7 @@ export const SendPanel = forwardRef<SendPanelHandle, {
               <label className="flex items-center justify-between p-2.5 bg-retro-panel border border-border-glass cursor-pointer hover:border-retro-accent transition-colors select-none">
                 <div>
                   <div className="text-xs font-semibold text-retro-fg">Encrypt</div>
-                  <div className="text-[10px] text-retro-muted">End-to-end encrypted</div>
+                  <div className="text-2xs text-retro-muted">End-to-end encrypted</div>
                 </div>
                 <input
                   type="checkbox"
@@ -591,7 +591,7 @@ export const SendPanel = forwardRef<SendPanelHandle, {
               <label className="flex items-center justify-between p-2.5 bg-retro-panel border border-border-glass cursor-pointer hover:border-retro-accent transition-colors select-none">
                 <div>
                   <div className="text-xs font-semibold text-retro-warning">Set as Background</div>
-                  <div className="text-[10px] text-retro-muted">Remote wallpaper</div>
+                  <div className="text-2xs text-retro-muted">Remote wallpaper</div>
                 </div>
                 <input
                   type="checkbox"
@@ -605,7 +605,7 @@ export const SendPanel = forwardRef<SendPanelHandle, {
                 <label className="flex items-center justify-between p-2.5 bg-retro-panel border border-border-glass cursor-pointer hover:border-retro-accent transition-colors select-none">
                   <div>
                     <div className="text-xs font-semibold text-retro-warning">Auto-Delete</div>
-                    <div className="text-[10px] text-retro-muted">Auto-removes after timer</div>
+                    <div className="text-2xs text-retro-muted">Auto-removes after timer</div>
                   </div>
                   <input
                     type="checkbox"
@@ -616,7 +616,7 @@ export const SendPanel = forwardRef<SendPanelHandle, {
                 </label>
                 {timebombHours > 0 && (
                   <div className="flex items-center gap-2 pl-3">
-                    <span className="text-[10px] text-retro-muted">Expires in:</span>
+                    <span className="text-2xs text-retro-muted">Expires in:</span>
                     <select
                       value={timebombHours}
                       onChange={(e) => setTimebombHours(parseInt(e.target.value, 10))}
@@ -634,7 +634,7 @@ export const SendPanel = forwardRef<SendPanelHandle, {
               <label className="flex items-center justify-between p-2.5 bg-retro-panel border border-border-glass cursor-pointer hover:border-retro-accent transition-colors select-none">
                 <div>
                   <div className="text-xs font-semibold text-retro-accent">Auto-Forward</div>
-                  <div className="text-[10px] text-retro-muted">Forward to all contacts</div>
+                  <div className="text-2xs text-retro-muted">Forward to all contacts</div>
                 </div>
                 <input
                   type="checkbox"

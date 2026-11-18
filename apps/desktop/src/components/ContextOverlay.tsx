@@ -146,7 +146,7 @@ export function ContextOverlay({
 
           return (
             <>
-              <div className="px-2.5 py-1 text-[10px] font-semibold text-retro-muted uppercase tracking-wider border-b border-border-glass/40 mb-1">
+              <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-border-glass/40 mb-1">
                 Edit
               </div>
 
@@ -170,7 +170,7 @@ export function ContextOverlay({
                   <Scissors className="w-3.5 h-3.5" />
                   <span>Cut</span>
                 </div>
-                <span className="text-[10px] text-retro-muted font-mono">Ctrl+X</span>
+                <span className="text-2xs text-retro-muted font-mono">Ctrl+X</span>
               </button>
 
               {/* Copy */}
@@ -193,7 +193,7 @@ export function ContextOverlay({
                   <Copy className="w-3.5 h-3.5" />
                   <span>Copy</span>
                 </div>
-                <span className="text-[10px] text-retro-muted font-mono">Ctrl+C</span>
+                <span className="text-2xs text-retro-muted font-mono">Ctrl+C</span>
               </button>
 
               {/* Paste */}
@@ -229,7 +229,7 @@ export function ContextOverlay({
                   <Clipboard className="w-3.5 h-3.5" />
                   <span>Paste</span>
                 </div>
-                <span className="text-[10px] text-retro-muted font-mono">Ctrl+V</span>
+                <span className="text-2xs text-retro-muted font-mono">Ctrl+V</span>
               </button>
 
               <div className="my-1 border-t border-border-glass/50" />
@@ -250,7 +250,7 @@ export function ContextOverlay({
                   <CheckSquare className="w-3.5 h-3.5 text-retro-muted" />
                   <span>Select All</span>
                 </div>
-                <span className="text-[10px] text-retro-muted font-mono">Ctrl+A</span>
+                <span className="text-2xs text-retro-muted font-mono">Ctrl+A</span>
               </button>
 
               {/* Clear */}
@@ -280,7 +280,7 @@ export function ContextOverlay({
 
           return (
             <>
-              <div className="px-2.5 py-1 text-[10px] font-semibold text-retro-muted uppercase tracking-wider border-b border-border-glass/40 mb-1 truncate">
+              <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-border-glass/40 mb-1 truncate">
                 &ldquo;{text.slice(0, 18)}&rdquo;
               </div>
 
@@ -298,7 +298,7 @@ export function ContextOverlay({
                   <Copy className="w-3.5 h-3.5 text-retro-accent" />
                   <span>Copy</span>
                 </div>
-                <span className="text-[10px] text-retro-muted font-mono">Ctrl+C</span>
+                <span className="text-2xs text-retro-muted font-mono">Ctrl+C</span>
               </button>
 
               {/* Search on gMatch */}
@@ -331,7 +331,7 @@ export function ContextOverlay({
                   <CheckSquare className="w-3.5 h-3.5 text-retro-muted" />
                   <span>Select All</span>
                 </div>
-                <span className="text-[10px] text-retro-muted font-mono">Ctrl+A</span>
+                <span className="text-2xs text-retro-muted font-mono">Ctrl+A</span>
               </button>
             </>
           );
@@ -343,7 +343,7 @@ export function ContextOverlay({
 
           return (
             <>
-              <div className="px-2.5 py-1 text-[10px] font-semibold text-retro-muted uppercase tracking-wider border-b border-border-glass/40 mb-1 truncate">
+              <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-border-glass/40 mb-1 truncate">
                 Link
               </div>
 
@@ -382,7 +382,7 @@ export function ContextOverlay({
         {/* ─── GENERAL / BACKGROUND CONTEXT MENU ─── */}
         {contextMenu.type === 'general' && (
           <>
-            <div className="px-2.5 py-1 text-[10px] font-semibold text-retro-muted uppercase tracking-wider border-b border-border-glass/40 mb-1">
+            <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-border-glass/40 mb-1">
               gMatch
             </div>
 
@@ -400,7 +400,7 @@ export function ContextOverlay({
                 <RefreshCw className="w-3.5 h-3.5 text-retro-accent" />
                 <span>Reload</span>
               </div>
-              <span className="text-[10px] text-retro-muted font-mono">Ctrl+R</span>
+              <span className="text-2xs text-retro-muted font-mono">Ctrl+R</span>
             </button>
 
             <button
@@ -437,7 +437,7 @@ export function ContextOverlay({
         {/* ─── USER CONTEXT MENU ─── */}
         {contextMenu.type === 'user' && (
           <>
-            <div className="px-2.5 py-1 text-[10px] font-semibold text-retro-muted uppercase tracking-wider border-b border-border-glass/40 mb-1">
+            <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-border-glass/40 mb-1">
               User: {contextMenu.data.display_name || 'Peer'}
             </div>
 
@@ -538,7 +538,7 @@ export function ContextOverlay({
         {/* ─── ITEM CONTEXT MENU ─── */}
         {contextMenu.type === 'item' && (
           <>
-            <div className="px-2.5 py-1 text-[10px] font-semibold text-retro-muted uppercase tracking-wider border-b border-border-glass/40 mb-1">
+            <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-border-glass/40 mb-1">
               Keepsake
             </div>
 
@@ -730,11 +730,11 @@ export function ReportModal({
           Report User: {reportModal.name}
         </h3>
         {reportModal.objectId && (
-          <p className="text-[10px] text-retro-muted font-sans truncate" title={reportModal.objectId}>
+          <p className="text-2xs text-retro-muted font-sans truncate" title={reportModal.objectId}>
             Attached evidence: {reportModal.objectId}
           </p>
         )}
-        <div className="flex flex-wrap gap-1.5 text-[10px]">
+        <div className="flex flex-wrap gap-1.5 text-2xs">
           {(['inappropriate', 'harassment', 'spam', 'abuse'] as const).map(cat => (
             <button
               key={cat}

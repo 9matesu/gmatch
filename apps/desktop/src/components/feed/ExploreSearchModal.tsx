@@ -136,7 +136,7 @@ export function ExploreSearchModal({
           {/* Users */}
           {matchedUsers.length > 0 && (
             <div className="space-y-1">
-              <span className="text-[10px] font-black uppercase tracking-wider text-retro-muted px-1">
+              <span className="text-2xs font-black uppercase tracking-wider text-retro-muted px-1">
                 People
               </span>
               {matchedUsers.map((u) => {
@@ -167,7 +167,7 @@ export function ExploreSearchModal({
                         <span className="text-xs font-bold text-retro-fg block truncate">
                            {u.display_name?.trim() || 'Unknown User'}
                         </span>
-                        <span className="text-[10px] text-retro-muted block font-mono truncate">
+                        <span className="text-2xs text-retro-muted block font-mono truncate">
                           {id.slice(0, 14)}...
                         </span>
                       </div>
@@ -195,7 +195,7 @@ export function ExploreSearchModal({
           {/* Posts */}
           {matchedPosts.length > 0 && (
             <div className="space-y-1">
-              <span className="text-[10px] font-black uppercase tracking-wider text-retro-muted px-1">
+              <span className="text-2xs font-black uppercase tracking-wider text-retro-muted px-1">
                 Posts
               </span>
               {matchedPosts.slice(0, 8).map((p) => (
@@ -226,7 +226,7 @@ export function ExploreSearchModal({
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs font-bold text-retro-fg block truncate">{p.author_name}</span>
                       {isMediaVideo(p.url) && (
-                        <span className="px-1 py-0.2 rounded bg-black/60 border border-border-glass text-[10px] font-mono text-retro-accent uppercase tracking-wider">
+                        <span className="px-1 py-0.2 rounded bg-black/60 border border-border-glass text-2xs font-mono text-retro-accent uppercase tracking-wider">
                           Video
                         </span>
                       )}
@@ -241,7 +241,7 @@ export function ExploreSearchModal({
           {/* Tags */}
           {matchedTags.length > 0 && (
             <div className="space-y-1.5">
-              <span className="text-[10px] font-black uppercase tracking-wider text-retro-muted px-1">
+              <span className="text-2xs font-black uppercase tracking-wider text-retro-muted px-1">
                 Tags
               </span>
               <div className="flex flex-wrap gap-1.5 px-1">

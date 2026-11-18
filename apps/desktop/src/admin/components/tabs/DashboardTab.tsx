@@ -109,7 +109,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <span className="text-retro-fg">System Online</span>
             <span className="text-retro-faint">·</span>
-            <span className="text-[10px] text-retro-muted font-mono">
+            <span className="text-2xs text-retro-muted font-mono">
               Refreshed {lastRefreshed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </span>
           </div>
@@ -171,7 +171,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
         <div className="p-4 rounded-xl border border-border-glass bg-surface-raised">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-retro-muted">Online Users</p>
+              <p className="text-2xs font-bold uppercase tracking-wider text-retro-muted">Online Users</p>
               <p className="text-2xl font-black text-emerald-400 mt-1">{onlineUsers.toLocaleString()}</p>
             </div>
             <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
@@ -187,7 +187,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
         )}>
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-retro-muted">Open Reports</p>
+              <p className="text-2xs font-bold uppercase tracking-wider text-retro-muted">Open Reports</p>
               <p className={cn("text-2xl font-black mt-1", pendingReports > 0 ? "text-rose-400" : "text-retro-fg")}>
                 {pendingReports.toLocaleString()}
               </p>
@@ -205,7 +205,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
         <div className="p-4 rounded-xl border border-border-glass bg-surface-raised">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-retro-muted">Active Duels</p>
+              <p className="text-2xs font-bold uppercase tracking-wider text-retro-muted">Active Duels</p>
               <p className="text-2xl font-black text-purple-400 mt-1">{activeDuels.toLocaleString()}</p>
             </div>
             <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center">
@@ -218,7 +218,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
         <div className="p-4 rounded-xl border border-border-glass bg-surface-raised">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-retro-muted">Total Accounts</p>
+              <p className="text-2xs font-bold uppercase tracking-wider text-retro-muted">Total Accounts</p>
               <p className="text-2xl font-black text-cyan-400 mt-1">{totalUsers.toLocaleString()}</p>
             </div>
             <div className="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center">
@@ -231,7 +231,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
         <div className="p-4 rounded-xl border border-border-glass bg-surface-raised">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-retro-muted">In Match Queue</p>
+              <p className="text-2xs font-bold uppercase tracking-wider text-retro-muted">In Match Queue</p>
               <p className="text-2xl font-black text-blue-400 mt-1">{queueWaiting.toLocaleString()}</p>
             </div>
             <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center">
@@ -244,7 +244,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
         <div className="p-4 rounded-xl border border-border-glass bg-surface-raised">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-retro-muted">Public Media</p>
+              <p className="text-2xs font-bold uppercase tracking-wider text-retro-muted">Public Media</p>
               <p className="text-2xl font-black text-amber-400 mt-1">{totalPosts.toLocaleString()}</p>
             </div>
             <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center">
@@ -258,7 +258,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
       <div className="rounded-xl border border-border-glass bg-surface-raised p-4">
         <div className="flex items-center justify-between pb-3 border-b border-border-glass mb-3">
           <h2 className="text-xs font-bold tracking-wider text-retro-fg">Admin Quick Actions</h2>
-          <span className="text-[10px] text-retro-muted">Safe operational triggers</span>
+          <span className="text-2xs text-retro-muted">Safe operational triggers</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <button
@@ -270,7 +270,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
               <GitCompare className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
               <span className="text-xs font-bold text-retro-fg">Force Matchup</span>
             </div>
-            <p className="text-[10px] text-retro-muted">Pair all waiting players in the duel queue</p>
+            <p className="text-2xs text-retro-muted">Pair all waiting players in the duel queue</p>
           </button>
 
           <button
@@ -282,7 +282,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
               <Megaphone className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
               <span className="text-xs font-bold text-retro-fg">Broadcast Notice</span>
             </div>
-            <p className="text-[10px] text-retro-muted">Publish system announcement banner</p>
+            <p className="text-2xs text-retro-muted">Publish system announcement banner</p>
           </button>
 
           <button
@@ -294,7 +294,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
               <TrendingUp className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
               <span className="text-xs font-bold text-retro-fg">Database Maintenance</span>
             </div>
-            <p className="text-[10px] text-retro-muted">Sweep expired items and optimize storage</p>
+            <p className="text-2xs text-retro-muted">Sweep expired items and optimize storage</p>
           </button>
 
           <button
@@ -306,7 +306,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
               <BarChart2 className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
               <span className="text-xs font-bold text-retro-fg">View Audit Log</span>
             </div>
-            <p className="text-[10px] text-retro-muted">Review administrative access and actions</p>
+            <p className="text-2xs text-retro-muted">Review administrative access and actions</p>
           </button>
         </div>
       </div>
@@ -323,7 +323,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
             <button
               type="button"
               onClick={() => onNavigate?.("content")}
-              className="text-[10px] text-retro-muted hover:text-retro-fg cursor-pointer"
+              className="text-2xs text-retro-muted hover:text-retro-fg cursor-pointer"
             >
               View All →
             </button>
@@ -345,11 +345,11 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
                   />
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-semibold text-retro-fg truncate">{post.post_caption || "Public Post"}</p>
-                    <p className="text-[10px] text-retro-muted truncate">
+                    <p className="text-2xs text-retro-muted truncate">
                       By {post.author_name || "Unknown"} · {formatAbsoluteTime(post.created_at, { dateStyle: 'short' })}
                     </p>
                   </div>
-                  <div className="flex items-center gap-1.5 text-[10px]">
+                  <div className="flex items-center gap-1.5 text-2xs">
                     <Badge variant="neutral" size="sm">{post.like_count || 0} likes</Badge>
                     <Badge variant="neutral" size="sm">{post.comment_count || 0} comments</Badge>
                   </div>
@@ -369,7 +369,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
             <button
               type="button"
               onClick={() => onNavigate?.("content")}
-              className="text-[10px] text-retro-muted hover:text-retro-fg cursor-pointer"
+              className="text-2xs text-retro-muted hover:text-retro-fg cursor-pointer"
             >
               Manage Matches →
             </button>
@@ -378,7 +378,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
             <div className="p-8 text-center text-xs text-retro-muted">
               <CheckCircle2 className="w-8 h-8 text-emerald-400/60 mx-auto mb-2" />
               <p className="font-semibold text-retro-fg">No Active Duels Right Now</p>
-              <p className="text-[10px] text-retro-muted mt-0.5">Players in queue will automatically pair into new matches</p>
+              <p className="text-2xs text-retro-muted mt-0.5">Players in queue will automatically pair into new matches</p>
             </div>
           ) : (
             <div className="divide-y divide-border-subtle">
@@ -387,10 +387,10 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 text-xs font-bold text-retro-fg">
                       <span className="truncate">{match.user_a_name || match.user_a.slice(0, 8)}</span>
-                      <span className="text-retro-muted font-normal text-[10px]">vs</span>
+                      <span className="text-retro-muted font-normal text-2xs">vs</span>
                       <span className="truncate">{match.user_b_name || match.user_b.slice(0, 8)}</span>
                     </div>
-                    <p className="text-[10px] text-retro-muted mt-0.5">
+                    <p className="text-2xs text-retro-muted mt-0.5">
                       Round {match.round_seq || 1} · Phase: {match.phase || match.status}
                     </p>
                   </div>

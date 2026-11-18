@@ -174,7 +174,7 @@ export function YourMatchTab({
                   })
                 }
               }}
-              className="absolute top-1.5 right-1.5 bg-black/80 border border-border-glass text-retro-fg text-[10px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity font-bold flex items-center gap-1 cursor-pointer"
+              className="absolute top-1.5 right-1.5 bg-black/80 border border-border-glass text-retro-fg text-2xs px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity font-bold flex items-center gap-1 cursor-pointer"
               title="Zoom into card"
             >
               <ZoomIn className="w-3 h-3" />
@@ -182,12 +182,12 @@ export function YourMatchTab({
             </button>
           </>
         ) : img?.failed ? (
-          <div className="w-full h-full flex items-center justify-center text-retro-muted text-[10px] px-1 text-center">Unavailable</div>
+          <div className="w-full h-full flex items-center justify-center text-retro-muted text-2xs px-1 text-center">Unavailable</div>
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-retro-muted text-[10px] px-1 text-center">{placeholder}</div>
+          <div className="w-full h-full flex items-center justify-center text-retro-muted text-2xs px-1 text-center">{placeholder}</div>
         )}
       </div>
-      <div className="mt-1 text-center text-[10px] font-medium text-retro-muted truncate">{label}</div>
+      <div className="mt-1 text-center text-2xs font-medium text-retro-muted truncate">{label}</div>
     </div>
   )
 

@@ -658,9 +658,9 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                     )}
                     <div className="min-w-0 flex-1">
                       <div className="text-xs font-medium truncate text-retro-fg">{t.displayName}</div>
-                      <div className="text-[10px] text-retro-muted">{consentCountOf(t)}/7 effects allowed</div>
+                      <div className="text-2xs text-retro-muted">{consentCountOf(t)}/7 effects allowed</div>
                     </div>
-                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border shrink-0 ${chip.cls}`}>{chip.text}</span>
+                    <span className={`text-2xs font-mono px-1.5 py-0.5 rounded border shrink-0 ${chip.cls}`}>{chip.text}</span>
                   </button>
                 );
               })}
@@ -695,7 +695,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                   const allFree = Boolean(mesh && mesh.peerKnown(selectedTarget.id))
                   if (allAllowed && !allFree) return null
                   return (
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-retro-muted -mt-1">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-retro-muted -mt-1">
                       {noneAllowed && <span>No consent yet — ask in the Consent tab.</span>}
                       {!noneAllowed && !allAllowed && <span>Some effects are not consented.</span>}
                       {allFree && <span className="text-emerald-400/80">Free via mesh.</span>}
@@ -745,7 +745,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                         {/* Consented is the default and lives in the group line; the card
                             only states what is different. */}
                         {!allowed || sending === action ? (
-                          <div className={`mt-2 text-[10px] font-mono ${allowed ? 'text-emerald-400/80' : 'text-rose-300/80'}`}>
+                          <div className={`mt-2 text-2xs font-mono ${allowed ? 'text-emerald-400/80' : 'text-rose-300/80'}`}>
                             {sending === action ? 'sending…' : 'no consent'}
                           </div>
                         ) : null}
@@ -753,7 +753,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                     );
                   })}
                 </div>
-                <p className="text-[10px] text-retro-muted leading-relaxed px-1">
+                <p className="text-2xs text-retro-muted leading-relaxed px-1">
                   A drop mid-send? Check History → Outbox before retrying.
                 </p>
               </>
@@ -796,7 +796,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
             <div className="px-4 py-3 border-b border-border-subtle flex items-center gap-1.5">
               <Shield className="w-3.5 h-3.5 text-retro-muted" />
               <span className="text-xs font-medium text-retro-fg">What others may send you</span>
-              {!receiving && <span className="text-[10px] text-retro-muted ml-2">(saved. Inactive while Receiving is off)</span>}
+              {!receiving && <span className="text-2xs text-retro-muted ml-2">(saved. Inactive while Receiving is off)</span>}
             </div>
             <div className="divide-y divide-border-subtle">
               {CONSENT_ROWS.map(({ key, label, desc }) => {
@@ -911,7 +911,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                     </div>
                   </div>
                   <span
-                    className={`shrink-0 text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+                    className={`shrink-0 text-2xs font-mono px-1.5 py-0.5 rounded border ${
                       st === 'executed' || st === 'completed'
                         ? 'text-emerald-400 border-emerald-500/30'
                         : st === 'sent' || st === 'landed'

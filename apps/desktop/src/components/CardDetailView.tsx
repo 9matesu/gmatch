@@ -276,7 +276,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
               {card.tags && card.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                   {card.tags.map((tag) => (
-                    <span key={tag} className="text-[10px] rounded-full border px-2 py-0.5" style={{ borderColor: `${card.accentColor || '#9FE3FF'}88`, color: card.accentColor || '#9FE3FF' }}>
+                    <span key={tag} className="text-2xs rounded-full border px-2 py-0.5" style={{ borderColor: `${card.accentColor || '#9FE3FF'}88`, color: card.accentColor || '#9FE3FF' }}>
                       #{tag}
                     </span>
                   ))}
@@ -289,7 +289,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
           {canBuy && (
             <div className="glass-inset flex items-center justify-between gap-3 p-4">
               <div>
-                <div className="text-[10px] uppercase tracking-wider text-retro-muted font-bold">Community market price</div>
+                <div className="text-2xs uppercase tracking-wider text-retro-muted font-bold">Community market price</div>
                 <div className="text-lg font-black font-mono text-cyan-300 tabular-nums">{formatGc(listingPrice ?? 0)} g$</div>
               </div>
               <button
@@ -375,7 +375,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
                       <div className="text-retro-muted text-xs mb-0.5">Cash out value</div>
                       <div className="font-bold text-retro-fg">
                         {formatGc(computeCashoutPayout(card.value ?? 0, cashoutRate))}
-                        <span className="ml-2 text-[10px] text-retro-muted font-mono">({(cashoutRate / 100).toFixed(1)}% rate)</span>
+                        <span className="ml-2 text-2xs text-retro-muted font-mono">({(cashoutRate / 100).toFixed(1)}% rate)</span>
                       </div>
                     </div>
                     {confirmCashout ? (
@@ -402,7 +402,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
                       </button>
                     )}
                   </div>
-                  <p className="text-[10px] text-retro-muted mt-2">
+                  <p className="text-2xs text-retro-muted mt-2">
                     Listing sells it to another player for g$; cashing out burns it for a fixed payout instead.
                   </p>
                 </div>

@@ -70,7 +70,7 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
           <span className="text-xs font-medium text-retro-fg">
             {state.mode === 'host' ? 'This computer hosts the server' : 'Connected to a friend’s server'}
           </span>
-          <span className={`glass-inset ml-auto text-[10px] px-2 py-0.5 rounded-full font-mono ${state.mode === 'host' ? 'text-emerald-200' : 'text-retro-fg'}`}>
+          <span className={`glass-inset ml-auto text-2xs px-2 py-0.5 rounded-full font-mono ${state.mode === 'host' ? 'text-emerald-200' : 'text-retro-fg'}`}>
             {state.mode.toUpperCase()}
           </span>
         </div>

@@ -893,7 +893,7 @@ export default function IdleGalleryView({
               type="button"
               onClick={() => toggleTag(t)}
               aria-pressed={activeTags.has(t)}
-              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border cursor-pointer transition-colors ${
+              className={`px-2 py-0.5 rounded-full text-2xs font-semibold border cursor-pointer transition-colors ${
                 activeTags.has(t)
                   ? 'bg-glass-w20 border-retro-fg/70 text-retro-fg'
                   : 'border-border-glass text-retro-muted hover:text-retro-body'
@@ -909,7 +909,7 @@ export default function IdleGalleryView({
                 setActiveTags(new Set())
                 setPage(0)
               }}
-              className="text-[10px] text-retro-muted hover:text-retro-fg cursor-pointer underline ml-1"
+              className="text-2xs text-retro-muted hover:text-retro-fg cursor-pointer underline ml-1"
             >
               clear ({activeTags.size})
             </button>
@@ -1049,7 +1049,7 @@ export default function IdleGalleryView({
                   {/* Phase 5: local-cache status — never imply a keep is saved
                       when its bytes are not locally stored. */}
                   {img.saveState === 'downloading' && (
-                    <span className="pointer-events-none absolute bottom-1.5 left-1.5 z-20 rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] font-mono text-retro-fg/80 backdrop-blur-md">
+                    <span className="pointer-events-none absolute bottom-1.5 left-1.5 z-20 rounded-md bg-black/70 px-1.5 py-0.5 text-2xs font-mono text-retro-fg/80 backdrop-blur-md">
                       Caching…{pinProgress[img.url] != null ? ` ${pinProgress[img.url]}%` : ''}
                     </span>
                   )}
@@ -1061,7 +1061,7 @@ export default function IdleGalleryView({
                         await retryKeepsake(img)
                       }}
                       title="Could not cache this keep locally. The source link is kept for a retry."
-                      className="absolute bottom-1.5 left-1.5 z-20 rounded-md border border-rose-500/40 bg-black/75 px-1.5 py-0.5 text-[10px] font-mono text-rose-300 backdrop-blur-md cursor-pointer hover:bg-black/90"
+                      className="absolute bottom-1.5 left-1.5 z-20 rounded-md border border-rose-500/40 bg-black/75 px-1.5 py-0.5 text-2xs font-mono text-rose-300 backdrop-blur-md cursor-pointer hover:bg-black/90"
                     >
                       Not cached · Retry
                     </button>
@@ -1074,7 +1074,7 @@ export default function IdleGalleryView({
                         await retryKeepsake(img)
                       }}
                       title="This keep was saved but its local bytes are no longer readable. Retry to fetch them again."
-                      className="absolute bottom-1.5 left-1.5 z-20 rounded-md border border-amber-500/40 bg-black/75 px-1.5 py-0.5 text-[10px] font-mono text-amber-300 backdrop-blur-md cursor-pointer hover:bg-black/90"
+                      className="absolute bottom-1.5 left-1.5 z-20 rounded-md border border-amber-500/40 bg-black/75 px-1.5 py-0.5 text-2xs font-mono text-amber-300 backdrop-blur-md cursor-pointer hover:bg-black/90"
                     >
                       Missing locally · Retry
                     </button>

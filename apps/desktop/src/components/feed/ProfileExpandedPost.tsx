@@ -156,7 +156,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
             <div className="flex items-center gap-1">
               <span className="text-xs font-semibold text-retro-fg hover:underline">{post.author_name}</span>
             </div>
-            <span className="text-[10px] text-retro-muted font-medium block">
+            <span className="text-2xs text-retro-muted font-medium block">
               {post.location ? `${post.location} · ` : ''}{timeAgo(post.created_at)}
             </span>
           </div>
@@ -307,7 +307,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
         )}
 
         {/* Zoom controls pill */}
-        <div className="absolute top-3 left-3 flex items-center gap-1 bg-black/60 backdrop-blur-md rounded-full px-2.5 py-1 text-retro-fg text-[10px] font-medium border border-border-glass">
+        <div className="absolute top-3 left-3 flex items-center gap-1 bg-black/60 backdrop-blur-md rounded-full px-2.5 py-1 text-retro-fg text-2xs font-medium border border-border-glass">
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); handleZoomToggle(); }}

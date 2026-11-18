@@ -980,7 +980,7 @@ function GMatchFeedImpl({
           the honest way to see that the predicate, not the network, is
           what emptied the timeline. */}
       {import.meta.env.DEV && hiddenCount > 0 && (
-        <div className="px-3 sm:px-6 pt-1 text-[11px] text-retro-faint" data-testid="feed-hidden-count">
+        <div className="px-3 sm:px-6 pt-1 text-2xs text-retro-faint" data-testid="feed-hidden-count">
           {hiddenCount} hidden: no content
         </div>
       )}
@@ -991,7 +991,7 @@ function GMatchFeedImpl({
       {syncCounts.pending > 0 || syncCounts.local > 0 ? (
         <div
           role="status"
-          className="w-full py-1 px-3 flex items-center gap-1.5 text-[10px] font-mono text-retro-muted border-b border-border-glass bg-glass-w4 select-none"
+          className="w-full py-1 px-3 flex items-center gap-1.5 text-2xs font-mono text-retro-muted border-b border-border-glass bg-glass-w4 select-none"
         >
           {syncCounts.pending > 0 ? (
             <>
@@ -1012,7 +1012,7 @@ function GMatchFeedImpl({
 
       {/* Discreet grey loading label when stories/content are loading */}
       {storiesLoading && (
-        <div className="w-full py-1.5 px-3 flex items-center justify-center gap-1.5 text-[10px] font-mono text-retro-muted border-b border-border-glass bg-glass-w4 select-none">
+        <div className="w-full py-1.5 px-3 flex items-center justify-center gap-1.5 text-2xs font-mono text-retro-muted border-b border-border-glass bg-glass-w4 select-none">
           <Loader2 className="w-3 h-3 animate-spin text-retro-muted shrink-0" />
           <span>Loading content...</span>
         </div>
@@ -1388,7 +1388,7 @@ function GMatchFeedImpl({
                             className="absolute bottom-2 right-2 z-10 h-8 pl-2.5 pr-3 rounded-full bg-black/60 backdrop-blur-sm text-retro-fg flex items-center gap-1.5 hover:bg-black/70 transition-colors cursor-pointer"
                           >
                             {zoomLevel > 1 ? <ZoomOut className="w-3.5 h-3.5" /> : <ZoomIn className="w-3.5 h-3.5" />}
-                            <span className="font-mono text-[10px]">{Math.round(zoomLevel * 100)}%</span>
+                            <span className="font-mono text-2xs">{Math.round(zoomLevel * 100)}%</span>
                           </button>
                         </>
                       )}
@@ -1418,7 +1418,7 @@ function GMatchFeedImpl({
                           >
                             <ChevronRight className="w-4 h-4" />
                           </button>
-                          <div className="absolute top-2.5 right-2.5 z-10 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-xs text-[10px] font-medium text-retro-fg/90">
+                          <div className="absolute top-2.5 right-2.5 z-10 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-xs text-2xs font-medium text-retro-fg/90">
                             {currentIdx + 1}/{multiMedia.length}
                           </div>
                         </>
@@ -1601,7 +1601,7 @@ function GMatchFeedImpl({
               </button>
               {followSuggestions.length > 0 && (
                 <div className="pt-2 border-t border-border-glass">
-                  <p className="text-[10px] uppercase tracking-wider text-retro-muted mb-2">Or follow someone</p>
+                  <p className="text-2xs uppercase tracking-wider text-retro-muted mb-2">Or follow someone</p>
                   <div className="flex items-center justify-center gap-3">
                     {followSuggestions.map((s) => (
                       <button
@@ -1614,8 +1614,8 @@ function GMatchFeedImpl({
                         <span className="relative w-10 h-10 rounded-full overflow-hidden border border-border-glass flex items-center justify-center text-xs text-retro-fg bg-glass-w5">
                           <Avatar id={s.id} size={40} imageUrl={profilePics?.[s.id]} fill={true} />
                         </span>
-                        <span className="text-[10px] text-retro-muted truncate max-w-[72px] group-hover:text-retro-fg">{s.display_name}</span>
-                        <span className="text-[10px] text-retro-fg border border-border-glass rounded-md px-1.5 py-0.5 group-hover:bg-glass-w10">Follow</span>
+                        <span className="text-2xs text-retro-muted truncate max-w-[72px] group-hover:text-retro-fg">{s.display_name}</span>
+                        <span className="text-2xs text-retro-fg border border-border-glass rounded-md px-1.5 py-0.5 group-hover:bg-glass-w10">Follow</span>
                       </button>
                     ))}
                   </div>

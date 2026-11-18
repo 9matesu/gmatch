@@ -171,7 +171,7 @@ function ProfileStep(props: Props & { onDone: () => void }) {
         <div className="space-y-1.5">
           <label htmlFor="onboarding-display-name" className="text-xs font-medium text-retro-fg flex items-center justify-between">
             <span>Display Name</span>
-            <span className="text-[10px] text-retro-muted font-normal">Required · public handle</span>
+            <span className="text-2xs text-retro-muted font-normal">Required · public handle</span>
           </label>
           <div className="flex items-center gap-2">
             <input

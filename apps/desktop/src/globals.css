@@ -74,6 +74,12 @@
   --blur-2xl: calc(40px * var(--glass-blur, 0.7));
   --blur-3xl: calc(64px * var(--glass-blur, 0.7));
 
+  /* Type scale, smallest first. 10px carried 585 arbitrary values and
+     11px another 15: two magic sizes doing one job. Line-height 1.5
+     keeps the rendered box exactly where it was. */
+  --text-2xs: 0.625rem;
+  --text-2xs--line-height: 1.5;
+
   /* Hairline borders and highlights */
   --color-border-glass: #27272a;
   --color-border-subtle: #1f1f23;

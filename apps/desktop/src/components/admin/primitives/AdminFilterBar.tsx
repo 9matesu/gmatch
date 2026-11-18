@@ -63,7 +63,7 @@ export function AdminFilterBar({
       case "text":
         return (
           <div className="flex-1 min-w-[180px] max-w-[300px]">
-            <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider mb-1 block">{config.label}</label>
+            <label className="text-2xs font-bold text-retro-muted uppercase tracking-wider mb-1 block">{config.label}</label>
             <input
               type="text"
               value={(value as string) || ""}
@@ -77,7 +77,7 @@ export function AdminFilterBar({
       case "select":
         return (
           <div className="flex-1 min-w-[160px] max-w-[240px]">
-            <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider mb-1 block">{config.label}</label>
+            <label className="text-2xs font-bold text-retro-muted uppercase tracking-wider mb-1 block">{config.label}</label>
             <select
               value={(value as string) || ""}
               onChange={e => handleFilterChange(config.key, e.target.value || undefined)}
@@ -94,7 +94,7 @@ export function AdminFilterBar({
       case "multi-select":
         return (
           <div className="flex-1 min-w-[200px] max-w-[300px] relative">
-            <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider mb-1 block">{config.label}</label>
+            <label className="text-2xs font-bold text-retro-muted uppercase tracking-wider mb-1 block">{config.label}</label>
             <MultiSelect
               value={(value as string[]) || []}
               options={config.options || []}
@@ -107,7 +107,7 @@ export function AdminFilterBar({
       case "date-range":
         return (
           <div className="flex-1 min-w-[280px] max-w-[400px]">
-            <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider mb-1 block">{config.label}</label>
+            <label className="text-2xs font-bold text-retro-muted uppercase tracking-wider mb-1 block">{config.label}</label>
             <DateRangePicker
               value={value as { from?: string; to?: string } || {}}
               onChange={val => handleFilterChange(config.key, val)}
@@ -118,7 +118,7 @@ export function AdminFilterBar({
       case "number":
         return (
           <div className="flex-1 min-w-[140px] max-w-[200px]">
-            <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider mb-1 block">{config.label}</label>
+            <label className="text-2xs font-bold text-retro-muted uppercase tracking-wider mb-1 block">{config.label}</label>
             <input
               type="number"
               value={(value as string) || ""}
@@ -139,7 +139,7 @@ export function AdminFilterBar({
                 onChange={e => handleFilterChange(config.key, e.target.checked || undefined)}
                 className="w-4 h-4 accent-cyan-500 rounded border border-border-glass bg-surface-canvas cursor-pointer"
               />
-              <span className="text-[10px] font-bold text-retro-muted uppercase tracking-wider">{config.label}</span>
+              <span className="text-2xs font-bold text-retro-muted uppercase tracking-wider">{config.label}</span>
             </label>
           </div>
         );
@@ -169,7 +169,7 @@ export function AdminFilterBar({
           <Filter className="w-4 h-4 text-retro-muted" />
           <span className="text-xs font-bold uppercase tracking-wider text-retro-fg">Filters</span>
           {activeFilterCount > 0 && (
-            <span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-300 text-[10px] font-bold rounded-full">
+            <span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-300 text-2xs font-bold rounded-full">
               {activeFilterCount}
             </span>
           )}
@@ -180,7 +180,7 @@ export function AdminFilterBar({
             <button
               type="button"
               onClick={handleClearAll}
-              className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 transition-colors"
+              className="px-2.5 py-1 text-2xs font-bold uppercase tracking-wider rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 transition-colors"
             >
               <X className="w-3 h-3 mr-1" />
               Clear All
@@ -285,7 +285,7 @@ function DateRangePicker({ value, onChange }: {
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1">
-        <label className="text-[10px] text-retro-faint uppercase tracking-wider mb-0.5 block">From</label>
+        <label className="text-2xs text-retro-faint uppercase tracking-wider mb-0.5 block">From</label>
         <input
           type="date"
           value={value.from || ""}
@@ -294,7 +294,7 @@ function DateRangePicker({ value, onChange }: {
         />
       </div>
       <div className="flex-1">
-        <label className="text-[10px] text-retro-faint uppercase tracking-wider mb-0.5 block">To</label>
+        <label className="text-2xs text-retro-faint uppercase tracking-wider mb-0.5 block">To</label>
         <input
           type="date"
           value={value.to || ""}

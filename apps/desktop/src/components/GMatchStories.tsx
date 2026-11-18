@@ -490,16 +490,16 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
                         onError={() => setPfpFailed((prev) => (prev[activeGroup.userId] ? prev : { ...prev, [activeGroup.userId]: true }))}
                       />
                     ) : (
-                      <span className="text-[10px] font-bold">{activeGroup.displayName.substring(0, 1)}</span>
+                      <span className="text-2xs font-bold">{activeGroup.displayName.substring(0, 1)}</span>
                     )}
                   </div>
                 </div>
                 <div>
                   <div className="text-xs font-bold leading-tight">{activeGroup.displayName}</div>
-                  <div className="text-[10px] text-retro-body font-medium">{formatTimeAgo(currentStory.created_at)}</div>
+                  <div className="text-2xs text-retro-body font-medium">{formatTimeAgo(currentStory.created_at)}</div>
                   {/* The view count is the author's receipt: only their own story carries one. */}
                   {currentStory.owner_id === currentUserId && typeof currentStory.view_count === 'number' && (
-                    <div className="text-[10px] text-retro-body font-medium">
+                    <div className="text-2xs text-retro-body font-medium">
                       {currentStory.view_count} {currentStory.view_count === 1 ? 'view' : 'views'}
                     </div>
                   )}

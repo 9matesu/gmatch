@@ -40,7 +40,7 @@ export function FlashOverlay({
             )}
             <div className="min-w-0">
               <div className="text-xs font-black text-yellow-300 uppercase tracking-widest">Flash Drop</div>
-              <div className="text-[10px] text-retro-body font-mono truncate">{flash.owner_name || 'Anonymous'}</div>
+              <div className="text-2xs text-retro-body font-mono truncate">{flash.owner_name || 'Anonymous'}</div>
             </div>
           </div>
           <button
@@ -76,7 +76,7 @@ export function FlashOverlay({
             <Heart className={`w-3.5 h-3.5 ${flash.liked_by_me ? 'fill-current' : ''}`} />
             <span>{flash.likes_count}</span>
           </button>
-          <div className="text-[10px] text-retro-muted font-mono">
+          <div className="text-2xs text-retro-muted font-mono">
             {flash.mime_type.startsWith('video') ? 'VIDEO' : 'IMAGE'} · Flash Drop
           </div>
         </div>

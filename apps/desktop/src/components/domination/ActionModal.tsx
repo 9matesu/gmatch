@@ -204,11 +204,11 @@ export function ActionModal({
                 </span>
               </button>
               {inlineName && (
-                <p className="text-[10px] text-retro-muted">
+                <p className="text-2xs text-retro-muted">
                   Inline: {inlineName} — the image rides sealed in the request, so it reaches them with no shared server.
                 </p>
               )}
-              <p className="text-[10px] text-retro-muted">
+              <p className="text-2xs text-retro-muted">
                 {action === 'popup_video'
                   ? 'Paste a direct https media link. Their client loads it straight.'
                   : 'From your media, this device, or a direct https link (picked images ride sealed to them, up to 4 MB).'}
@@ -233,7 +233,7 @@ export function ActionModal({
           {action === 'text_overlay' && (
             <div className="grid grid-cols-3 gap-2.5 p-3 rounded-lg glass-inset">
               <div>
-                <label className="block text-[10px] text-retro-muted mb-1 flex items-center gap-1">
+                <label className="block text-2xs text-retro-muted mb-1 flex items-center gap-1">
                   <Layers className="w-3 h-3" /> Position
                 </label>
                 <select
@@ -249,7 +249,7 @@ export function ActionModal({
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] text-retro-muted mb-1 flex items-center gap-1">
+                <label className="block text-2xs text-retro-muted mb-1 flex items-center gap-1">
                   <Sliders className="w-3 h-3" /> Size
                 </label>
                 <select
@@ -263,7 +263,7 @@ export function ActionModal({
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] text-retro-muted mb-1 flex items-center gap-1">
+                <label className="block text-2xs text-retro-muted mb-1 flex items-center gap-1">
                   <Palette className="w-3 h-3" /> Color
                 </label>
                 <input

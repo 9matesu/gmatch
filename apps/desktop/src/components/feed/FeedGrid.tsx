@@ -154,17 +154,17 @@ export function FeedGrid({ posts, identity, onOpen, likedPosts, likeCounts, onTo
                     <span className="line-clamp-6 text-[13px] leading-snug text-retro-body">
                       {post.caption?.trim() || '(no caption)'}
                     </span>
-                    <span className="text-[11px] text-retro-faint">{post.author_name}</span>
+                    <span className="text-2xs text-retro-faint">{post.author_name}</span>
                   </span>
                 ) : null}
                 {video && (
-                  <span className="absolute left-2 top-2 px-1.5 py-0.5 rounded bg-black/60 text-[11px] text-white">
+                  <span className="absolute left-2 top-2 px-1.5 py-0.5 rounded bg-black/60 text-2xs text-white">
                     video
                   </span>
                 )}
                 {(post.media?.length ?? 0) > 1 && (
                   <span
-                    className="absolute right-2 top-2 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[11px] text-white"
+                    className="absolute right-2 top-2 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-2xs text-white"
                     aria-label={`${post.media!.length} images`}
                   >
                     <Layers className="h-3 w-3" />

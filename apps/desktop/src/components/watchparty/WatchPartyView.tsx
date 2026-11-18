@@ -133,7 +133,7 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
         {active && <WatchRoomHeader party={active} identity={identity} profilePics={profilePics} />}
 
         <div className="flex items-start justify-between gap-2 px-3 py-1.5 border-b border-border-glass">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-retro-fg">In this room</p>
+          <p className="text-2xs font-bold uppercase tracking-wider text-retro-fg">In this room</p>
         </div>
 
         {active && active.members.length > 0 && (
@@ -142,9 +142,9 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
               <li key={m.id} className="flex items-center gap-2">
                 <Avatar id={m.id} size={18} imageUrl={profilePics[m.id] || null} />
                 <span className="text-xs text-retro-fg truncate flex-1">{m.name || m.id}</span>
-                {m.muted ? <span className={`text-[10px] uppercase tracking-wider ${MUTED}`}>muted</span> : null}
-                {m.id === active.host && <span className="text-[10px] uppercase tracking-wider text-retro-muted">host</span>}
-                {m.id === identity.orbitId && <span className="text-[10px] uppercase tracking-wider text-retro-muted">you</span>}
+                {m.muted ? <span className={`text-2xs uppercase tracking-wider ${MUTED}`}>muted</span> : null}
+                {m.id === active.host && <span className="text-2xs uppercase tracking-wider text-retro-muted">host</span>}
+                {m.id === identity.orbitId && <span className="text-2xs uppercase tracking-wider text-retro-muted">you</span>}
               </li>
             ))}
           </ul>

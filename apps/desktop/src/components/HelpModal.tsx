@@ -93,7 +93,7 @@ function TopicBody({ topicId }: { topicId: string }) {
             className="w-full max-h-56 object-cover object-top block"
             loading="lazy"
           />
-          <div className="px-3 py-1 bg-surface-canvas/90 text-[10px] text-retro-muted font-mono border-t border-border-glass">
+          <div className="px-3 py-1 bg-surface-canvas/90 text-2xs text-retro-muted font-mono border-t border-border-glass">
             {shot.caption}
           </div>
         </div>
@@ -164,7 +164,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
           <div className="flex items-center gap-2">
             <h2 className="text-sm font-bold tracking-wide text-retro-fg ">Help &amp; Guide</h2>
             {currentTabDef && (
-              <span className="text-[10px] text-retro-muted font-mono hidden sm:inline">
+              <span className="text-2xs text-retro-muted font-mono hidden sm:inline">
                 / {currentTabDef.label}
               </span>
             )}
@@ -236,7 +236,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                       className="w-full max-h-56 object-cover object-top block"
                       loading="lazy"
                     />
-                    <div className="px-3 py-1 bg-surface-canvas/90 text-[10px] text-retro-muted font-mono border-t border-border-glass">
+                    <div className="px-3 py-1 bg-surface-canvas/90 text-2xs text-retro-muted font-mono border-t border-border-glass">
                       {quickstartShot.caption}
                     </div>
                   </div>
@@ -339,7 +339,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                       className="w-full max-h-56 object-cover object-top block"
                       loading="lazy"
                     />
-                    <div className="px-3 py-1 bg-surface-canvas/90 text-[10px] text-retro-muted font-mono border-t border-border-glass">
+                    <div className="px-3 py-1 bg-surface-canvas/90 text-2xs text-retro-muted font-mono border-t border-border-glass">
                       {networkShot.caption}
                     </div>
                   </div>

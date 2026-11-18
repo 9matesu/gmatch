@@ -205,7 +205,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
               {report.reported_is_banned && <Badge variant="danger" size="sm" dot>User Banned</Badge>}
             </div>
             <p className="text-xs text-retro-fg font-medium mt-1 truncate">{report.preview || report.reason || "Reported Item"}</p>
-            <p className="text-[10px] text-retro-muted mt-0.5">
+            <p className="text-2xs text-retro-muted mt-0.5">
               Reported by {report.reporter_name || report.reporter_id.slice(0, 8)} · {formatAbsoluteTime(report.created_at)}
               {report.reason && ` · Reason: ${report.reason}`}
             </p>
@@ -217,7 +217,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                   type="button"
                   onClick={() => handleReportAction(report, "delete")}
                   disabled={actionLoading === report.id}
-                  className="px-2.5 py-1 text-[10px] font-bold rounded-md border border-red-500/30 text-red-300 hover:bg-red-500/10 disabled:opacity-40 cursor-pointer"
+                  className="px-2.5 py-1 text-2xs font-bold rounded-md border border-red-500/30 text-red-300 hover:bg-red-500/10 disabled:opacity-40 cursor-pointer"
                 >
                   {actionLoading === report.id ? "..." : "Delete"}
                 </button>
@@ -225,7 +225,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                   type="button"
                   onClick={() => handleReportAction(report, "ban")}
                   disabled={actionLoading === report.id}
-                  className="px-2.5 py-1 text-[10px] font-bold rounded-md border border-red-500/30 text-red-300 hover:bg-red-500/10 disabled:opacity-40 cursor-pointer"
+                  className="px-2.5 py-1 text-2xs font-bold rounded-md border border-red-500/30 text-red-300 hover:bg-red-500/10 disabled:opacity-40 cursor-pointer"
                 >
                   {actionLoading === report.id ? "..." : "Ban"}
                 </button>
@@ -233,13 +233,13 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                   type="button"
                   onClick={() => handleReportAction(report, "deny")}
                   disabled={actionLoading === report.id}
-                  className="px-2.5 py-1 text-[10px] font-bold rounded-md border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-40 cursor-pointer"
+                  className="px-2.5 py-1 text-2xs font-bold rounded-md border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-40 cursor-pointer"
                 >
                   {actionLoading === report.id ? "..." : "Dismiss"}
                 </button>
               </div>
             ) : (
-              <span className="text-[10px] text-retro-muted font-mono">Resolved: {report.action}</span>
+              <span className="text-2xs text-retro-muted font-mono">Resolved: {report.action}</span>
             )}
           </div>
         </div>
@@ -273,9 +273,9 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
             )}
             <div className="flex-1 min-w-0 space-y-2 text-xs">
               <div className="flex items-center gap-2">
-                <span className="text-retro-muted font-mono text-[10px]">CASE ID:</span>
+                <span className="text-retro-muted font-mono text-2xs">CASE ID:</span>
                 <span className="font-mono text-retro-fg">{report.id}</span>
-                <span className="text-retro-muted font-mono text-[10px] ml-2">TARGET:</span>
+                <span className="text-retro-muted font-mono text-2xs ml-2">TARGET:</span>
                 <span className="font-mono text-retro-fg">{report.target_type}:{report.target_id}</span>
               </div>
               {caseDetail[report.id]?.reported_user && (
@@ -333,12 +333,12 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
               <Icon className="w-3.5 h-3.5" />
               {tab.label}
               {tab.id === "reports" && reportsTotal > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 bg-rose-500/20 text-rose-300 rounded-full text-[10px]">
+                <span className="ml-1 px-1.5 py-0.2 bg-rose-500/20 text-rose-300 rounded-full text-2xs">
                   {reportsTotal}
                 </span>
               )}
               {tab.id === "bans" && bansTotal > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 bg-glass-w10 text-retro-muted rounded-full text-[10px]">
+                <span className="ml-1 px-1.5 py-0.2 bg-glass-w10 text-retro-muted rounded-full text-2xs">
                   {bansTotal}
                 </span>
               )}
@@ -424,7 +424,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-retro-fg">{c.user_name || c.user_id.slice(0, 8)}</span>
-                          <span className="text-[10px] text-retro-muted">{formatAbsoluteTime(c.created_at)}</span>
+                          <span className="text-2xs text-retro-muted">{formatAbsoluteTime(c.created_at)}</span>
                           {c.hidden_at && <Badge variant="warning" size="sm">Hidden</Badge>}
                         </div>
                         <p className="text-xs text-retro-body mt-1">{c.body}</p>
@@ -434,7 +434,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                           <button
                             type="button"
                             onClick={() => { onAction("unhideComment", c.id); setTimeout(fetchComments, 300); }}
-                            className="px-2 py-1 text-[10px] font-semibold rounded border border-border-glass text-retro-muted hover:text-retro-fg cursor-pointer"
+                            className="px-2 py-1 text-2xs font-semibold rounded border border-border-glass text-retro-muted hover:text-retro-fg cursor-pointer"
                           >
                             Unhide
                           </button>
@@ -442,7 +442,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                           <button
                             type="button"
                             onClick={() => { onAction("hideComment", c.id); setTimeout(fetchComments, 300); }}
-                            className="px-2 py-1 text-[10px] font-semibold rounded border border-amber-500/30 text-amber-300 hover:bg-amber-500/10 cursor-pointer"
+                            className="px-2 py-1 text-2xs font-semibold rounded border border-amber-500/30 text-amber-300 hover:bg-amber-500/10 cursor-pointer"
                           >
                             Hide
                           </button>
@@ -450,7 +450,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                         <button
                           type="button"
                           onClick={() => { onAction("deleteComment", c.id); setTimeout(fetchComments, 300); }}
-                          className="px-2 py-1 text-[10px] font-semibold rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 cursor-pointer"
+                          className="px-2 py-1 text-2xs font-semibold rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 cursor-pointer"
                         >
                           Delete
                         </button>
@@ -470,14 +470,14 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                         <div className="flex items-center gap-2">
                           <Badge variant="neutral" size="sm">#{m.channel || "lobby"}</Badge>
                           <span className="text-xs font-bold text-retro-fg">{m.sender_name || m.sender_id.slice(0, 8)}</span>
-                          <span className="text-[10px] text-retro-muted">{formatAbsoluteTime(m.created_at)}</span>
+                          <span className="text-2xs text-retro-muted">{formatAbsoluteTime(m.created_at)}</span>
                         </div>
                         <p className="text-xs text-retro-body mt-1">{m.body}</p>
                       </div>
                       <button
                         type="button"
                         onClick={() => { onAction("deleteChatMessage", m.id); setTimeout(fetchChat, 300); }}
-                        className="px-2 py-1 text-[10px] font-semibold rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 cursor-pointer"
+                        className="px-2 py-1 text-2xs font-semibold rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 cursor-pointer"
                       >
                         Delete
                       </button>
@@ -500,7 +500,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
               <div className="p-8 text-center text-xs text-retro-muted">
                 <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
                 <p className="font-semibold text-retro-fg">No Banned Users</p>
-                <p className="text-[10px] text-retro-muted mt-0.5">There are currently no active account bans or suspensions</p>
+                <p className="text-2xs text-retro-muted mt-0.5">There are currently no active account bans or suspensions</p>
               </div>
             ) : (
               <div className="divide-y divide-border-subtle">
@@ -510,13 +510,13 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold text-retro-fg">{user.display_name || user.id.slice(0, 10)}</span>
                         <Badge variant="danger" size="sm" dot>Banned</Badge>
-                        <span className="text-[10px] text-retro-muted font-mono">{user.id}</span>
+                        <span className="text-2xs text-retro-muted font-mono">{user.id}</span>
                       </div>
                       <p className="text-xs text-red-300 mt-1">
                         Reason: {user.ban_reason || "Admin policy violation"}
                       </p>
                       {user.ban_created_at && (
-                        <p className="text-[10px] text-retro-muted mt-0.5">
+                        <p className="text-2xs text-retro-muted mt-0.5">
                           Banned on {formatAbsoluteTime(user.ban_created_at)}
                         </p>
                       )}

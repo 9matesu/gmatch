@@ -187,7 +187,7 @@ export function PostLikersModal({
                       <span className="text-xs font-semibold text-retro-fg truncate group-hover:underline">
                         {liker.display_name}
                       </span>
-                      <span className="text-[10px] text-retro-muted font-mono truncate">
+                      <span className="text-2xs text-retro-muted font-mono truncate">
                         @{liker.user_id.slice(0, 14)}...
                       </span>
                     </div>

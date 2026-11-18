@@ -345,7 +345,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-semibold text-retro-fg">Content Blocklist (blocklist.json)</h3>
                 <span
-                  className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-medium border ${
+                  className={`text-2xs px-2 py-0.5 rounded-full font-mono font-medium border ${
                     isModified
                       ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
                       : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
@@ -416,11 +416,11 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-retro-fg capitalize">{cat}</span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono border ${meta.badgeBg}`}>
+                    <span className={`text-2xs px-2 py-0.5 rounded-full font-mono border ${meta.badgeBg}`}>
                       {count}
                     </span>
                   </div>
-                  <p className="text-[10px] text-retro-muted truncate">{meta.desc}</p>
+                  <p className="text-2xs text-retro-muted truncate">{meta.desc}</p>
                 </button>
               )
             })}
@@ -529,12 +529,12 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
             <div className="flex items-center gap-2">
               <span className="text-xs font-mono text-retro-muted">shared/blocklist.json</span>
               {jsonError ? (
-                <span className="text-[10px] text-red-400 flex items-center gap-1 font-mono">
+                <span className="text-2xs text-red-400 flex items-center gap-1 font-mono">
                   <AlertCircle className="w-3 h-3" />
                   {jsonError}
                 </span>
               ) : (
-                <span className="text-[10px] text-emerald-400 flex items-center gap-1 font-mono">
+                <span className="text-2xs text-emerald-400 flex items-center gap-1 font-mono">
                   <Check className="w-3 h-3" />
                   Valid JSON
                 </span>

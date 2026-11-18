@@ -169,7 +169,7 @@ export function UpdateSection({ toast }: {
         </div>
       </div>
       {updater && phase === 'error' && (
-        <div className="flex items-start justify-between gap-3 text-[10px] text-retro-muted">
+        <div className="flex items-start justify-between gap-3 text-2xs text-retro-muted">
           <p className="flex items-start gap-1.5 min-w-0">
             <ShieldAlert className="w-3 h-3 shrink-0 mt-px text-amber-400" />
             <span className="break-words">{status?.error || 'Update failed'}. You can grab the .exe manually.</span>
@@ -180,7 +180,7 @@ export function UpdateSection({ toast }: {
         </div>
       )}
       {updater && phase === 'ready' && (
-        <p className="text-[10px] text-retro-muted flex items-start gap-1.5">
+        <p className="text-2xs text-retro-muted flex items-start gap-1.5">
           {status?.verified ? <ShieldCheck className="w-3 h-3 shrink-0 mt-px text-emerald-400" /> : <ShieldCheck className="w-3 h-3 shrink-0 mt-px text-amber-400" />}
           {status?.verified
             ? 'Download verified (SHA-256 matches the release digest).'
@@ -188,7 +188,7 @@ export function UpdateSection({ toast }: {
         </p>
       )}
       {!updater && hasUpdateFallback && (
-        <p className="text-[10px] text-retro-muted flex items-start gap-1.5">
+        <p className="text-2xs text-retro-muted flex items-start gap-1.5">
           <ShieldCheck className="w-3 h-3 shrink-0 mt-px" />
           Verify before running: <code className="font-mono break-all">SHA-256 {latest?.sha256}</code>. In
           PowerShell: <code className="font-mono">Get-FileHash $env:USERPROFILE\Downloads\{latest?.file} -Algorithm SHA256</code>

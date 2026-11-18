@@ -161,10 +161,10 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
         <div className="glass-surface border border-border-glass rounded-xl p-5 sm:p-6 shadow-2xl space-y-4">
           <div className="flex items-center justify-between border-b border-border-glass pb-3">
             <div>
-              <span className="text-[10px] font-mono text-retro-muted uppercase tracking-wider">In session</span>
+              <span className="text-2xs font-mono text-retro-muted uppercase tracking-wider">In session</span>
               <h2 className="text-base font-bold text-retro-fg">{session.itemName}</h2>
             </div>
-            <span className={`px-3 py-1 rounded-full font-mono text-[10px] font-bold tracking-wider border ${
+            <span className={`px-3 py-1 rounded-full font-mono text-2xs font-bold tracking-wider border ${
               feedError
                 ? 'bg-glass-w5 border-border-glass text-retro-muted'
                 : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
@@ -175,19 +175,19 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div className="bg-black/40 p-3.5 rounded-xl border border-border-glass space-y-1">
-              <span className="text-retro-muted block text-[10px] uppercase tracking-wider font-bold">Player</span>
+              <span className="text-retro-muted block text-2xs uppercase tracking-wider font-bold">Player</span>
               <p className="text-retro-fg font-bold truncate">{feed?.target?.display_name || session.targetUserName}</p>
               {feed?.target?.bio ? (
-                <p className="text-[10px] text-retro-body italic mt-1 line-clamp-2">&quot;{feed.target.bio}&quot;</p>
+                <p className="text-2xs text-retro-body italic mt-1 line-clamp-2">&quot;{feed.target.bio}&quot;</p>
               ) : null}
             </div>
 
             <div className="bg-black/40 p-3.5 rounded-xl border border-border-glass space-y-1">
-              <span className="text-retro-muted block text-[10px] uppercase tracking-wider font-bold">Session</span>
+              <span className="text-retro-muted block text-2xs uppercase tracking-wider font-bold">Session</span>
               <p className={feedError ? 'text-amber-300 font-bold' : 'text-emerald-300 font-bold'}>
                 {feedError || 'Live'}
               </p>
-              <p className="text-[10px] text-retro-muted">Their public posts are visible while the timer runs</p>
+              <p className="text-2xs text-retro-muted">Their public posts are visible while the timer runs</p>
             </div>
           </div>
         </div>
@@ -208,7 +208,7 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
             <div className="space-y-3 text-xs">
               {feed.intercepted.map((m, i) => (
                 <div key={`${m.created_at}-${i}`} className="p-3 rounded-xl bg-black/40 border border-border-glass space-y-1">
-                  <div className="flex items-center justify-between text-[10px] text-retro-muted">
+                  <div className="flex items-center justify-between text-2xs text-retro-muted">
                     <span className="font-bold text-retro-fg">{feed.target.display_name}</span>
                     <span>{timeAgo(m.created_at)}</span>
                   </div>
@@ -239,7 +239,7 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
                   <p className="text-xs text-retro-body line-clamp-2 break-words">
                     {p.caption || <span className="text-retro-muted italic">(no caption)</span>}
                   </p>
-                  <div className="flex items-center justify-between text-[10px] text-retro-muted">
+                  <div className="flex items-center justify-between text-2xs text-retro-muted">
                     <span className="inline-flex items-center gap-1">
                       <Heart className="w-3 h-3" /> {p.likes}
                     </span>

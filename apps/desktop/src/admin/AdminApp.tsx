@@ -381,7 +381,7 @@ export default function AdminPageClient({ identity: appIdentity }: { identity?: 
               <button
                 type="button"
                 onClick={() => setPin('admin')}
-                className="text-[10px] font-bold underline hover:text-retro-fg cursor-pointer ml-2 shrink-0"
+                className="text-2xs font-bold underline hover:text-retro-fg cursor-pointer ml-2 shrink-0"
               >
                 Use admin
               </button>
@@ -409,7 +409,7 @@ export default function AdminPageClient({ identity: appIdentity }: { identity?: 
             </button>
           </form>
 
-          <div className="text-[10px] text-retro-muted font-mono text-center pt-1 space-y-0.5">
+          <div className="text-2xs text-retro-muted font-mono text-center pt-1 space-y-0.5">
             <div>Target: {getApiBaseUrl()}</div>
             <div className="flex items-center justify-center gap-1.5">
               <span>Signed as: <span className="font-mono">{identity?.orbitId || "No identity. Sign in first."}</span></span>

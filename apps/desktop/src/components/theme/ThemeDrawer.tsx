@@ -167,7 +167,7 @@ export function ThemeDrawer({ isOpen, onClose, settings, updateSettings, toast }
         {/* Panel Opacity */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <label htmlFor="theme-panel-opacity" className="text-[10px] font-medium text-retro-muted flex items-center gap-1">
+            <label htmlFor="theme-panel-opacity" className="text-2xs font-medium text-retro-muted flex items-center gap-1">
               <Sliders className="w-3.5 h-3.5 text-retro-muted" /> Panel Opacity
             </label>
             <span className="text-xs font-mono font-bold text-retro-fg tabular-nums">{panelOpacityVal}%</span>
@@ -187,7 +187,7 @@ export function ThemeDrawer({ isOpen, onClose, settings, updateSettings, toast }
         {/* Glass Blur */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <label htmlFor="theme-glass-blur" className="text-[10px] font-medium text-retro-muted flex items-center gap-1">
+            <label htmlFor="theme-glass-blur" className="text-2xs font-medium text-retro-muted flex items-center gap-1">
               <ImageIcon className="w-3.5 h-3.5 text-retro-muted" /> Glass Blur
             </label>
             <span className="text-xs font-mono font-bold text-retro-fg tabular-nums">{glassBlurVal}%</span>
@@ -208,12 +208,12 @@ export function ThemeDrawer({ isOpen, onClose, settings, updateSettings, toast }
       {/* Wallpaper */}
       <div className="space-y-2 pt-1 border-t border-border-glass">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-semibold text-retro-muted uppercase tracking-wider">Wallpaper</span>
+          <span className="text-2xs font-semibold text-retro-muted uppercase tracking-wider">Wallpaper</span>
           {settings.wallpaperUrl && (
             <button
               type="button"
               onClick={() => { playPress(750); clearWallpaper(); }}
-              className="text-[10px] text-retro-muted hover:text-retro-fg flex items-center gap-1 cursor-pointer transition-colors"
+              className="text-2xs text-retro-muted hover:text-retro-fg flex items-center gap-1 cursor-pointer transition-colors"
             >
               <ArrowCounterClockwise className="w-3 h-3" /> Reset default
             </button>
@@ -251,7 +251,7 @@ export function ThemeDrawer({ isOpen, onClose, settings, updateSettings, toast }
 
       {/* Fit & Slideshow options */}
       <div className="flex items-center justify-between gap-2 pt-1 text-xs">
-        <div className="flex items-center gap-1 text-[10px] text-retro-muted">
+        <div className="flex items-center gap-1 text-2xs text-retro-muted">
           <ArrowsOut className="w-3.5 h-3.5" />
           <span>Fit:</span>
           {(['cover', 'contain'] as const).map((fit) => (
@@ -259,7 +259,7 @@ export function ThemeDrawer({ isOpen, onClose, settings, updateSettings, toast }
               key={fit}
               type="button"
               onClick={() => { playPress(750); updateSettings('wallpaperFit', fit); }}
-              className={`px-2 py-0.5 rounded capitalize text-[10px] font-medium transition-all cursor-pointer ${
+              className={`px-2 py-0.5 rounded capitalize text-2xs font-medium transition-all cursor-pointer ${
                 settings.wallpaperFit === fit
                   ? 'bg-retro-accent text-retro-accent-text font-bold'
                   : 'text-retro-muted hover:text-retro-fg'
@@ -276,7 +276,7 @@ export function ThemeDrawer({ isOpen, onClose, settings, updateSettings, toast }
             playPress(800);
             updateSettings('wallpaperSlideshow', !settings.wallpaperSlideshow);
           }}
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-medium transition-all cursor-pointer ${
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-2xs font-medium transition-all cursor-pointer ${
             settings.wallpaperSlideshow
               ? 'bg-retro-accent text-retro-accent-text border-transparent font-bold'
               : 'bg-surface-interactive/40 border-border-subtle text-retro-muted hover:text-retro-fg'

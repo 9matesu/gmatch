@@ -836,7 +836,7 @@ export function GMatchDMs({
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between gap-1">
                 <span className="text-xs font-medium text-retro-body truncate flex items-center gap-1"><Globe className="w-3 h-3 text-retro-muted" /> Lobby Lounge</span>
-                <span className="text-[10px] text-retro-muted shrink-0 tabular-nums">{lobbyMessages.length}</span>
+                <span className="text-2xs text-retro-muted shrink-0 tabular-nums">{lobbyMessages.length}</span>
               </div>
               <p className="text-xs truncate mt-0.5 text-retro-muted">{lastLobbyMsg}</p>
             </div>
@@ -853,7 +853,7 @@ export function GMatchDMs({
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between gap-1">
                 <span className="text-xs font-medium text-retro-body truncate flex items-center gap-1"><Gamepad2 className="w-3 h-3 text-retro-muted" /> Card Queue</span>
-                <span className="text-[10px] text-retro-muted shrink-0 tabular-nums">{queueMessages.length}</span>
+                <span className="text-2xs text-retro-muted shrink-0 tabular-nums">{queueMessages.length}</span>
               </div>
               <p className="text-xs truncate mt-0.5 text-retro-muted">{lastQueueMsg}</p>
             </div>
@@ -922,7 +922,7 @@ export function GMatchDMs({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1">
                         <span className="text-xs font-medium text-retro-body truncate block">{r.name}</span>
-                        <span className="text-[10px] text-retro-muted shrink-0 tabular-nums">{r.members.length}</span>
+                        <span className="text-2xs text-retro-muted shrink-0 tabular-nums">{r.members.length}</span>
                       </div>
                       <p className="text-xs truncate mt-0.5 text-retro-muted">{last?.text || 'Sealed group chat'}</p>
                       {roomUnread(r) && <span className="w-1.5 h-1.5 rounded-full bg-retro-accent shrink-0" aria-label="Unread" />}
@@ -955,7 +955,7 @@ export function GMatchDMs({
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-xs font-medium text-retro-body truncate">{name}</div>
-                        <div className="text-[10px] text-retro-muted">Send message</div>
+                        <div className="text-2xs text-retro-muted">Send message</div>
                       </div>
                     </button>
                   );
@@ -1013,19 +1013,19 @@ export function GMatchDMs({
                         {mentions > 0 ? (
                           <span
                             title={`${mentions} mention${mentions === 1 ? '' : 's'}`}
-                            className="shrink-0 min-w-[16px] h-4 px-1 rounded-full bg-retro-accent text-retro-accent-text text-[10px] font-semibold flex items-center justify-center tabular-nums"
+                            className="shrink-0 min-w-[16px] h-4 px-1 rounded-full bg-retro-accent text-retro-accent-text text-2xs font-semibold flex items-center justify-center tabular-nums"
                           >
                             @{mentions}
                           </span>
                         ) : unread > 0 ? (
                           <span
                             title={`${unread} unread`}
-                            className="shrink-0 min-w-[16px] h-4 px-1 rounded-full bg-retro-accent/90 text-retro-accent-text text-[10px] font-semibold flex items-center justify-center tabular-nums"
+                            className="shrink-0 min-w-[16px] h-4 px-1 rounded-full bg-retro-accent/90 text-retro-accent-text text-2xs font-semibold flex items-center justify-center tabular-nums"
                           >
                             {unread > 99 ? '99+' : unread}
                           </span>
                         ) : (
-                          <span className="text-[10px] text-retro-muted shrink-0 tabular-nums">
+                          <span className="text-2xs text-retro-muted shrink-0 tabular-nums">
                             {thread.last_created_at ? formatAbsoluteTime(thread.last_created_at, { hour: '2-digit', minute: '2-digit' }) : ''}
                           </span>
                         )}
@@ -1085,11 +1085,11 @@ export function GMatchDMs({
                 <div className="min-w-0">
                   <h3 className="text-sm font-black tracking-tight text-retro-fg truncate">{headerTitle}</h3>
                   {peerTyping && openTarget === 'peer' ? (
-                    <span className="text-[10px] text-retro-accent block" role="status" aria-live="polite">
+                    <span className="text-2xs text-retro-accent block" role="status" aria-live="polite">
                       typing…
                     </span>
                   ) : (
-                    <span className="text-[10px] text-retro-muted block">{headerSubtitle}</span>
+                    <span className="text-2xs text-retro-muted block">{headerSubtitle}</span>
                   )}
                 </div>
               </div>
@@ -1180,7 +1180,7 @@ export function GMatchDMs({
                  {conversationSearch.trim().length >= 2 && (
                    <div className="max-h-44 overflow-y-auto styled-scrollbar" role="listbox" aria-label="Conversation search results">
                      {conversationHits.length === 0 ? (
-                       <p className="text-[10px] text-retro-muted py-2">No matches in this conversation.</p>
+                       <p className="text-2xs text-retro-muted py-2">No matches in this conversation.</p>
                      ) : (
                        conversationHits.map((hit) => (
                          <button
@@ -1191,7 +1191,7 @@ export function GMatchDMs({
                            onClick={() => jumpToMessage(hit.messageId)}
                            className="w-full text-left px-2 py-1.5 rounded hover:bg-glass-w8 cursor-pointer"
                          >
-                           <span className="block text-[10px] text-retro-muted">{new Date(hit.ts).toLocaleString()}</span>
+                           <span className="block text-2xs text-retro-muted">{new Date(hit.ts).toLocaleString()}</span>
                            <span className="block text-xs text-retro-body truncate">{hit.text}</span>
                          </button>
                        ))
@@ -1232,7 +1232,7 @@ export function GMatchDMs({
                   <p className="text-base font-black tracking-tight text-retro-fg">{headerTitle}</p>
                   <p className="text-xs text-retro-muted">No messages yet.</p>
                   {isLobbyGroup && (
-                    <p className="text-[10px] text-retro-muted flex items-center gap-1"><Clock3 className="w-3 h-3" /> Clears every 12 hours</p>
+                    <p className="text-2xs text-retro-muted flex items-center gap-1"><Clock3 className="w-3 h-3" /> Clears every 12 hours</p>
                   )}
                 </div>
               ) : (
@@ -1243,7 +1243,7 @@ export function GMatchDMs({
                       type="button"
                       onClick={handleLoadHistory}
                       disabled={loadingHistory}
-                      className="px-3 py-1.5 rounded-md bg-glass-w8 border border-border-glass text-[10px] text-retro-muted hover:text-retro-fg hover:bg-glass-w12 transition-colors cursor-pointer disabled:opacity-40"
+                      className="px-3 py-1.5 rounded-md bg-glass-w8 border border-border-glass text-2xs text-retro-muted hover:text-retro-fg hover:bg-glass-w12 transition-colors cursor-pointer disabled:opacity-40"
                     >
                       {loadingHistory ? 'Loading…' : 'Load earlier messages'}
                     </button>
@@ -1260,7 +1260,7 @@ export function GMatchDMs({
                         aria-label={`Messages from ${row.label}`}
                       >
                         <span className="h-px flex-1 bg-border-glass" />
-                        <span className="text-[10px] font-medium uppercase tracking-wider text-retro-muted">
+                        <span className="text-2xs font-medium uppercase tracking-wider text-retro-muted">
                           {row.label}
                         </span>
                         <span className="h-px flex-1 bg-border-glass" />
@@ -1279,14 +1279,14 @@ export function GMatchDMs({
                     {showBoundary && (
                       <div className="flex items-center gap-2 py-1 select-none" role="separator" aria-label="New messages">
                         <span className="h-px flex-1 bg-retro-accent/40" />
-                        <span className="text-[10px] uppercase tracking-wider text-retro-accent">New messages</span>
+                        <span className="text-2xs uppercase tracking-wider text-retro-accent">New messages</span>
                         <span className="h-px flex-1 bg-retro-accent/40" />
                       </div>
                     )}
                     <div key={row.key} className={`flex items-end gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}>
                       {!isOwn && (
                         <div
-                          className="w-7 h-7 rounded-full bg-surface-raised border border-border-glass text-retro-muted overflow-hidden flex items-center justify-center text-[11px] font-medium shrink-0 mb-1 select-none cursor-pointer hover:ring-1 hover:ring-retro-accent/50 transition-shadow"
+                          className="w-7 h-7 rounded-full bg-surface-raised border border-border-glass text-retro-muted overflow-hidden flex items-center justify-center text-2xs font-medium shrink-0 mb-1 select-none cursor-pointer hover:ring-1 hover:ring-retro-accent/50 transition-shadow"
                           onClick={() => onOpenProfile?.(first.senderId)}
                           title={senderName}
                         >
@@ -1297,7 +1297,7 @@ export function GMatchDMs({
                         {!isOwn && (
                           <button
                             type="button"
-                            className="text-[11px] font-semibold text-retro-muted ml-2 mb-0.5 select-text cursor-pointer hover:text-retro-accent transition-colors inline-flex items-center"
+                            className="text-2xs font-semibold text-retro-muted ml-2 mb-0.5 select-text cursor-pointer hover:text-retro-accent transition-colors inline-flex items-center"
                             onClick={() => onOpenProfile?.(first.senderId)}
                           >
                             {senderName}
@@ -1310,7 +1310,7 @@ export function GMatchDMs({
                           return (
                             <div key={msg.id} data-message-row={msg.id} className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-full`}>
                               {replyTarget && (
-                                <div className="text-[10px] text-retro-muted px-2.5 py-1 mb-0.5 bg-glass-w5 rounded-md border-l-2 border-retro-accent/50 truncate max-w-full w-fit">
+                                <div className="text-2xs text-retro-muted px-2.5 py-1 mb-0.5 bg-glass-w5 rounded-md border-l-2 border-retro-accent/50 truncate max-w-full w-fit">
                                   <CornerUpLeft className="w-3 h-3 inline mr-1" />
                                   {replyTarget.senderId === identity?.orbitId ? 'You' : displayNameFor(replyTarget.senderId)}: {replyTarget.text}
                                 </div>
@@ -1362,8 +1362,8 @@ export function GMatchDMs({
                                       className="bg-glass-w10 border border-border-glass rounded px-2 py-1 text-xs text-retro-fg outline-none focus:border-retro-accent w-64"
                                       autoFocus
                                     />
-                                    <button type="button" onClick={() => handleEditMessage(msg)} className="px-2 py-1 bg-retro-accent text-retro-accent-text text-[10px] rounded cursor-pointer">Save</button>
-                                    <button type="button" onClick={() => setEditingMessage(null)} className="px-2 py-1 bg-glass-w8 border border-border-glass text-[10px] rounded cursor-pointer">Cancel</button>
+                                    <button type="button" onClick={() => handleEditMessage(msg)} className="px-2 py-1 bg-retro-accent text-retro-accent-text text-2xs rounded cursor-pointer">Save</button>
+                                    <button type="button" onClick={() => setEditingMessage(null)} className="px-2 py-1 bg-glass-w8 border border-border-glass text-2xs rounded cursor-pointer">Cancel</button>
                                   </div>
                                 ) : (
                                   <Linkify text={msg.text} />
@@ -1378,12 +1378,12 @@ export function GMatchDMs({
                                       hid a failed message that was followed by
                                       another one — it read as if it had landed. */}
                                   {isLast && (
-                                    <time className="text-[10px] text-retro-muted select-none" dateTime={new Date(msg.timestamp).toISOString()}>
+                                    <time className="text-2xs text-retro-muted select-none" dateTime={new Date(msg.timestamp).toISOString()}>
                                       {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </time>
                                   )}
                                   {isOwn && msg.courierStatus === 'failed' && (
-                                    <span title="Not delivered" className="text-[10px] text-rose-400">not delivered</span>
+                                    <span title="Not delivered" className="text-2xs text-rose-400">not delivered</span>
                                   )}
                                   {isOwn && msg.courierStatus === 'sending' && (
                                     <span title="Sending"><Clock3 className="w-3 h-3 text-retro-muted" /></span>
@@ -1396,7 +1396,7 @@ export function GMatchDMs({
                                     <span title="Delivered"><Check className="w-3 h-3 text-retro-muted" /></span>
                                   ) : null}
                                   {msg.editedAt && (
-                                    <span className="text-[10px] text-retro-muted">Edited</span>
+                                    <span className="text-2xs text-retro-muted">Edited</span>
                                   )}
                                 </div>
                               )}
@@ -1411,7 +1411,7 @@ export function GMatchDMs({
                                         onClick={() => onReactMessage?.(activePmPeer?.orbitId || '', msg.id, emoji, !mine)}
                                         title={`${actors.length} reaction${actors.length === 1 ? '' : 's'}`}
                                         aria-pressed={mine}
-                                        className={`px-1.5 py-0.5 rounded-full border text-[10px] cursor-pointer transition-colors ${mine ? 'border-retro-accent/60 bg-retro-accent/15 text-retro-fg' : 'border-border-glass bg-glass-w8 text-retro-muted hover:bg-glass-w12'}`}
+                                        className={`px-1.5 py-0.5 rounded-full border text-2xs cursor-pointer transition-colors ${mine ? 'border-retro-accent/60 bg-retro-accent/15 text-retro-fg' : 'border-border-glass bg-glass-w8 text-retro-muted hover:bg-glass-w12'}`}
                                       >
                                         {emoji} {actors.length}
                                       </button>
@@ -1426,9 +1426,9 @@ export function GMatchDMs({
                                 if (openTarget === 'room') {
                                   return (
                                     <div className={`flex flex-wrap items-center gap-1 mt-1 ${isOwn ? 'justify-end' : ''}`}>
-                                      <button type="button" onClick={() => copyMessage(msg.text)} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-[10px] flex items-center gap-1 cursor-pointer hover:bg-glass-w12"><Copy className="w-3 h-3" /> Copy</button>
+                                      <button type="button" onClick={() => copyMessage(msg.text)} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-2xs flex items-center gap-1 cursor-pointer hover:bg-glass-w12"><Copy className="w-3 h-3" /> Copy</button>
                                       {!msg.attachmentMime?.startsWith('video/') && msg.attachmentUrl && (
-                                        <button type="button" onClick={() => void copyAttachmentImage(msg)} disabled={copyingImage === msg.id} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-[10px] flex items-center gap-1 cursor-pointer hover:bg-glass-w12 disabled:opacity-50"><ImagePlus className="w-3 h-3" /> {copyingImage === msg.id ? 'Copying…' : 'Copy image'}</button>
+                                        <button type="button" onClick={() => void copyAttachmentImage(msg)} disabled={copyingImage === msg.id} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-2xs flex items-center gap-1 cursor-pointer hover:bg-glass-w12 disabled:opacity-50"><ImagePlus className="w-3 h-3" /> {copyingImage === msg.id ? 'Copying…' : 'Copy image'}</button>
                                       )}
                                     </div>
                                   );
@@ -1461,37 +1461,37 @@ export function GMatchDMs({
                                       })}
                                     </div>
                                   )}
-                                  <button type="button" onClick={() => { setReplyingTo(msg); setActionFor(null); }} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-[10px] flex items-center gap-1 cursor-pointer hover:bg-glass-w12"><Reply className="w-3 h-3" /> Reply</button>
-                                  <button type="button" onClick={() => copyMessage(msg.text)} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-[10px] flex items-center gap-1 cursor-pointer hover:bg-glass-w12"><Copy className="w-3 h-3" /> Copy</button>
+                                  <button type="button" onClick={() => { setReplyingTo(msg); setActionFor(null); }} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-2xs flex items-center gap-1 cursor-pointer hover:bg-glass-w12"><Reply className="w-3 h-3" /> Reply</button>
+                                  <button type="button" onClick={() => copyMessage(msg.text)} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-2xs flex items-center gap-1 cursor-pointer hover:bg-glass-w12"><Copy className="w-3 h-3" /> Copy</button>
                                   {!msg.attachmentMime?.startsWith('video/') && msg.attachmentUrl && (
-                                    <button type="button" onClick={() => void copyAttachmentImage(msg)} disabled={copyingImage === msg.id} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-[10px] flex items-center gap-1 cursor-pointer hover:bg-glass-w12 disabled:opacity-50"><ImagePlus className="w-3 h-3" /> {copyingImage === msg.id ? 'Copying…' : 'Copy image'}</button>
+                                    <button type="button" onClick={() => void copyAttachmentImage(msg)} disabled={copyingImage === msg.id} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-2xs flex items-center gap-1 cursor-pointer hover:bg-glass-w12 disabled:opacity-50"><ImagePlus className="w-3 h-3" /> {copyingImage === msg.id ? 'Copying…' : 'Copy image'}</button>
                                   )}
                                   {canEdit && (
                                     <button
                                       type="button"
                                       onClick={() => { setEditingMessage({ id: msg.id, text: msg.text }); setActionFor(null); }}
-                                      className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-[10px] flex items-center gap-1 cursor-pointer hover:bg-glass-w12"
+                                      className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-2xs flex items-center gap-1 cursor-pointer hover:bg-glass-w12"
                                     ><Edit2 className="w-3 h-3" /> Edit</button>
                                   )}
                                   {canDeleteEveryone && (
                                     <button
                                       type="button"
                                       onClick={() => handleDeleteForEveryone(msg)}
-                                      className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-[10px] flex items-center gap-1 cursor-pointer text-rose-400 hover:bg-glass-w12"
+                                      className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-2xs flex items-center gap-1 cursor-pointer text-rose-400 hover:bg-glass-w12"
                                     ><Trash className="w-3 h-3" /> Delete for Everyone</button>
                                   )}
                                   {isOwn && (
                                     <button
                                       type="button"
                                       onClick={() => { onDeleteMessage?.(msg.id, activePmPeer?.orbitId || ''); setActionFor(null); }}
-                                      className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-[10px] flex items-center gap-1 cursor-pointer text-rose-400 hover:bg-glass-w12"
+                                      className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-2xs flex items-center gap-1 cursor-pointer text-rose-400 hover:bg-glass-w12"
                                     ><Trash2 className="w-3 h-3" /> Delete for Me</button>
                                   )}
                                   {!isOwn && onReportMessage && (
-                                    <button type="button" onClick={() => { onReportMessage(msg.id); setActionFor(null); }} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-[10px] flex items-center gap-1 cursor-pointer text-rose-400 hover:bg-glass-w12"><Flag className="w-3 h-3" /> Report</button>
+                                    <button type="button" onClick={() => { onReportMessage(msg.id); setActionFor(null); }} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-2xs flex items-center gap-1 cursor-pointer text-rose-400 hover:bg-glass-w12"><Flag className="w-3 h-3" /> Report</button>
                                   )}
                                   {!isOwn && onReportUser && (
-                                    <button type="button" onClick={() => { onReportUser(msg.senderId); setActionFor(null); }} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-[10px] cursor-pointer text-rose-400 hover:bg-glass-w12">Report user</button>
+                                    <button type="button" onClick={() => { onReportUser(msg.senderId); setActionFor(null); }} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-2xs cursor-pointer text-rose-400 hover:bg-glass-w12">Report user</button>
                                   )}
                                 </div>
                                 );

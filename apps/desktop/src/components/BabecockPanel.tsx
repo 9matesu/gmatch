@@ -634,16 +634,16 @@ export function BabecockPanel({
                       className="bg-retro-bg rounded-xl overflow-hidden w-full flex flex-col"
                       style={{ aspectRatio: `${cols} / ${rows}`, minHeight: 280, maxHeight: 'min(62vh, 560px)' }}
                     >
-                      <div className="text-[10px] uppercase font-bold text-retro-muted tracking-wider p-3 flex items-center justify-between border-b border-border-glass">
+                      <div className="text-2xs uppercase font-bold text-retro-muted tracking-wider p-3 flex items-center justify-between border-b border-border-glass">
                         <span>Grid ({cols}×{rows}, {n} images)</span>
-                        {amHost && <span className="text-retro-muted text-[10px] flex items-center gap-1"><Move className="w-2.5 h-2.5" /> Drag to rearrange</span>}
+                        {amHost && <span className="text-retro-muted text-2xs flex items-center gap-1"><Move className="w-2.5 h-2.5" /> Drag to rearrange</span>}
                       </div>
                       <div
                         className="grid gap-0 flex-1 min-h-0"
                         style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${rows}, 1fr)` }}
                       >
                         {n === 0 ? (
-                          <div className="flex items-center justify-center text-[10px] text-retro-muted uppercase tracking-wider">
+                          <div className="flex items-center justify-center text-2xs text-retro-muted uppercase tracking-wider">
                             No images yet
                           </div>
                         ) : orderedEntries.map((entry, pos) => {
@@ -666,14 +666,14 @@ export function BabecockPanel({
                                 <ObjectImage contentUrl={entry.content_url} identity={identity ?? null} alt="" className="w-full h-full object-cover" />
                               )}
                               {isOp && (
-                                <span className="absolute top-1 left-1 bg-amber-400 text-retro-accent-text text-[10px] font-black px-1.5 py-0.5 rounded shadow-xs flex items-center gap-0.5">
+                                <span className="absolute top-1 left-1 bg-amber-400 text-retro-accent-text text-2xs font-black px-1.5 py-0.5 rounded shadow-xs flex items-center gap-0.5">
                                   <Sparkles className="w-2 h-2" />
                                   <span>OP</span>
                                 </span>
                               )}
                               <span
                                 onClick={() => onOpenProfile?.(entry.user_id)}
-                                className="absolute bottom-1 left-1 right-1 text-[10px] font-bold text-retro-fg bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded truncate cursor-pointer hover:bg-black/80"
+                                className="absolute bottom-1 left-1 right-1 text-2xs font-bold text-retro-fg bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded truncate cursor-pointer hover:bg-black/80"
                               >
                                 {entry.display_name || 'Anonymous'}
                                 {entry.user_id === selfId && ' (you)'}
@@ -697,7 +697,7 @@ export function BabecockPanel({
                               <ObjectImage contentUrl={entry.content_url} identity={identity ?? null} alt="" className="w-full h-full object-cover" />
                             )}
                           </div>
-                          <div className="flex items-center gap-1 text-[10px] font-bold text-retro-muted max-w-full truncate">
+                          <div className="flex items-center gap-1 text-2xs font-bold text-retro-muted max-w-full truncate">
                             {isOp && <Sparkles className="w-3 h-3 text-amber-500" />}
                             <span className="truncate">{entry.display_name || 'Anonymous'}</span>
                           </div>
@@ -819,7 +819,7 @@ export function BabecockPanel({
                       )}
                       <div className="flex items-center justify-between text-xs text-retro-muted px-1">
                         <span className="font-semibold text-retro-fg truncate">{g.host_name || 'Host'}</span>
-                        <span className="text-[10px] text-retro-muted">{g.entries.length} cards</span>
+                        <span className="text-2xs text-retro-muted">{g.entries.length} cards</span>
                       </div>
                     </div>
                   )
@@ -886,7 +886,7 @@ export function BabecockPanel({
               <DropZone onFiles={handleFile} onPasteUrl={handleUrl} compact={false} accept="image/jpeg, image/png, image/webp, image/gif" multiple={modal === 'start'}>
                 <div className="space-y-1 text-center py-2">
                   <p className="text-xs text-retro-fg font-semibold">Drop an image/video or click to browse</p>
-                  <p className="text-[10px] text-retro-muted">JPG, PNG, WebP, GIF, MP4, WebM (up to 50MB)</p>
+                  <p className="text-2xs text-retro-muted">JPG, PNG, WebP, GIF, MP4, WebM (up to 50MB)</p>
                 </div>
               </DropZone>
               {preview && (

@@ -112,12 +112,12 @@ export function WorldRow({
             {server.name}
           </span>
           {state.kind && (
-            <span className="shrink-0 text-[10px] uppercase tracking-wider text-retro-muted">{state.kind}</span>
+            <span className="shrink-0 text-2xs uppercase tracking-wider text-retro-muted">{state.kind}</span>
           )}
           {status && (
             <span
               data-testid={status === 'Connecting' ? `connecting-${server.id}` : undefined}
-              className={`flex shrink-0 items-center gap-1 text-[10px] uppercase tracking-wider ${STATUS_TONE[status]}`}
+              className={`flex shrink-0 items-center gap-1 text-2xs uppercase tracking-wider ${STATUS_TONE[status]}`}
             >
               {status === 'Connecting' && <Loader2 className="w-3 h-3 animate-spin" aria-hidden />}
               {status}
@@ -127,11 +127,11 @@ export function WorldRow({
             <Lock className="w-3 h-3 shrink-0 text-retro-muted" aria-label="password required" />
           )}
           {!!server.is_private && (
-            <span className="shrink-0 text-[10px] uppercase tracking-wider text-retro-muted">private</span>
+            <span className="shrink-0 text-2xs uppercase tracking-wider text-retro-muted">private</span>
           )}
         </span>
         {state.meta ? (
-          <span className="mt-0.5 block truncate text-[10px] text-retro-muted">{state.meta}</span>
+          <span className="mt-0.5 block truncate text-2xs text-retro-muted">{state.meta}</span>
         ) : null}
       </span>
     </>
@@ -181,7 +181,7 @@ export function WorldRow({
       <div className="flex shrink-0 items-center gap-2">
         {/* Fixed slot so the ⋯ column lines up down the list, whether or not a
             row has a figure the server actually reported. */}
-        <span className={`hidden sm:inline-block w-28 text-right text-[10px] ${MONO} text-retro-muted`}>
+        <span className={`hidden sm:inline-block w-28 text-right text-2xs ${MONO} text-retro-muted`}>
           {state.counts ?? ''}
         </span>
 

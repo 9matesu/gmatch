@@ -405,21 +405,21 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
 
         <div className="solid-panel backdrop-blur-md p-3.5">
-          <div className="flex items-center gap-1.5 text-retro-muted text-[10px] font-semibold uppercase tracking-wider">
+          <div className="flex items-center gap-1.5 text-retro-muted text-2xs font-semibold uppercase tracking-wider">
             <Layers className="w-3.5 h-3.5" />
             Portfolio Value
           </div>
           <div className="mt-1 text-lg font-bold font-mono tabular-nums text-retro-fg">{formatGc(portfolioValue)}</div>
-          <div className="text-[10px] text-retro-muted mt-0.5">{portfolio.length} card{portfolio.length === 1 ? '' : 's'}</div>
+          <div className="text-2xs text-retro-muted mt-0.5">{portfolio.length} card{portfolio.length === 1 ? '' : 's'}</div>
         </div>
 
         <div className="solid-panel backdrop-blur-md border border-amber-500/20 p-3.5">
-          <div className="flex items-center gap-1.5 text-amber-400 text-[10px] font-semibold uppercase tracking-wider">
+          <div className="flex items-center gap-1.5 text-amber-400 text-2xs font-semibold uppercase tracking-wider">
             <Sparkles className="w-3.5 h-3.5" />
             Cashout Value
           </div>
           <div className="mt-1 text-lg font-bold font-mono tabular-nums text-amber-300">{formatGc(cashoutEstimate)}</div>
-          <div className="text-[10px] text-retro-muted mt-0.5">{(cashoutRate / 100).toFixed(1)}% rate</div>
+          <div className="text-2xs text-retro-muted mt-0.5">{(cashoutRate / 100).toFixed(1)}% rate</div>
 
           {cashingOutAll && cashoutProgress ? (
             <div className="mt-2.5 flex items-center gap-2 text-xs text-amber-300 font-medium">
@@ -468,7 +468,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
         </div>
 
         <div className="solid-panel backdrop-blur-md p-3.5 col-span-2 lg:col-span-1">
-          <div className="text-retro-muted text-[10px] font-semibold uppercase tracking-wider mb-1.5">Rarity Mix</div>
+          <div className="text-retro-muted text-2xs font-semibold uppercase tracking-wider mb-1.5">Rarity Mix</div>
           <div className="flex flex-wrap gap-1.5">
             {RARITY_ORDER.map((r) => {
               const count = rarityDist[r] || 0;
@@ -477,7 +477,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
               return (
                 <span
                   key={r}
-                  className="text-[10px] font-bold px-1.5 py-0.5 rounded border tabular-nums"
+                  className="text-2xs font-bold px-1.5 py-0.5 rounded border tabular-nums"
                   style={{ color: tier.accentColor, borderColor: `${tier.accentColor}66`, backgroundColor: `${tier.accentColor}14` }}
                 >
                   {tier.label} {count}
@@ -517,7 +517,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                   <span className="text-xs font-mono text-retro-muted tabular-nums w-5 shrink-0">#{i + 1}</span>
                   {tier && (
                     <span
-                      className="text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wide shrink-0"
+                      className="text-2xs font-bold px-1.5 py-0.5 rounded border uppercase tracking-wide shrink-0"
                       style={{ color: tier.accentColor, borderColor: `${tier.accentColor}66`, backgroundColor: `${tier.accentColor}14` }}
                     >
                       {tier.label}
@@ -527,12 +527,12 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                     {c.name || `${c.id.slice(0, 12)}…`}
                   </span>
                   {c.ownerId !== identity?.orbitId && c.ownerName && (
-                    <span className="hidden sm:inline max-w-[8rem] shrink-0 truncate text-[10px] text-retro-muted">
+                    <span className="hidden sm:inline max-w-[8rem] shrink-0 truncate text-2xs text-retro-muted">
                       by {c.ownerName}
                     </span>
                   )}
                   <span className="text-xs font-bold font-mono tabular-nums text-retro-fg shrink-0">{formatGc(c.value)}</span>
-                  <span className="text-[10px] font-mono tabular-nums text-amber-300 shrink-0">→ {formatGc(computeCashoutPayout(c.value, cashoutRate))}</span>
+                  <span className="text-2xs font-mono tabular-nums text-amber-300 shrink-0">→ {formatGc(computeCashoutPayout(c.value, cashoutRate))}</span>
                 </div>
               );
             })}
@@ -563,7 +563,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
       <section className="solid-panel backdrop-blur-md p-4">
         <div className="flex items-center justify-between gap-2 mb-3">
           <h3 className="text-xs font-bold text-retro-fg tracking-wider">Community Market</h3>
-          <span className="text-[10px] text-retro-muted">{marketListings.length} open listing{marketListings.length === 1 ? '' : 's'}</span>
+          <span className="text-2xs text-retro-muted">{marketListings.length} open listing{marketListings.length === 1 ? '' : 's'}</span>
         </div>
         {marketListings.length === 0 ? (
           <p className="text-xs text-retro-muted">Nothing listed.</p>
@@ -590,11 +590,11 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                   </div>
                   <div className="p-2">
                     <div className="text-xs font-bold text-retro-fg truncate">{l.card?.name || 'Unnamed Card'}</div>
-                    <div className="text-[10px] capitalize text-retro-muted">{l.card?.rarity}</div>
+                    <div className="text-2xs capitalize text-retro-muted">{l.card?.rarity}</div>
                     {/* Credit the seller. The name is joined server-side: the
                         local `users` roster is capped at 100 rows and filtered
                         to 24h freshness, so it cannot name a stranger. */}
-                    <div className="mt-0.5 flex items-center gap-1 text-[10px] text-retro-muted min-w-0">
+                    <div className="mt-0.5 flex items-center gap-1 text-2xs text-retro-muted min-w-0">
                       <span className="shrink-0">by</span>
                       {l.sellerId === identity?.orbitId ? (
                         <span className="truncate font-medium text-retro-body">you</span>
@@ -614,13 +614,13 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                 <div className="flex items-center justify-between gap-1.5 px-2 pb-2">
                   <span className="text-xs font-mono font-bold text-cyan-300 tabular-nums">{formatGc(l.price)} g$</span>
                   {l.sellerId === identity?.orbitId ? (
-                    <span className="px-2 py-1 rounded bg-retro-interactive text-retro-muted text-[10px] font-bold" title="This is your own listing. Cancel it from your card page instead">Yours</span>
+                    <span className="px-2 py-1 rounded bg-retro-interactive text-retro-muted text-2xs font-bold" title="This is your own listing. Cancel it from your card page instead">Yours</span>
                   ) : (
                     <button
                       type="button"
                       disabled={buyingCardId !== null}
                       onClick={() => void buyListing(l)}
-                      className="px-2 py-1 rounded bg-cyan-500/20 hover:bg-cyan-500/30 disabled:opacity-40 text-cyan-300 text-[10px] font-bold cursor-pointer transition-colors"
+                      className="px-2 py-1 rounded bg-cyan-500/20 hover:bg-cyan-500/30 disabled:opacity-40 text-cyan-300 text-2xs font-bold cursor-pointer transition-colors"
                     >
                       {buyingCardId === l.cardId ? '…' : 'Buy'}
                     </button>
@@ -655,7 +655,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                   </div>
 
                   {item.badge && (
-                    <span className="text-[10px] font-medium px-2 py-0.5 rounded border bg-rose-500/10 text-rose-400 border-rose-500/20">
+                    <span className="text-2xs font-medium px-2 py-0.5 rounded border bg-rose-500/10 text-rose-400 border-rose-500/20">
                       {item.badge}
                     </span>
                   )}

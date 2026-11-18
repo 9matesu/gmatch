@@ -253,7 +253,7 @@ export function ValuationSummary({
             />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-amber-400">
+            <div className="flex items-center gap-1 text-2xs font-bold uppercase tracking-wider text-amber-400">
               <Award className="w-3.5 h-3.5" />
               <span>Card of the Match</span>
             </div>
@@ -269,7 +269,7 @@ export function ValuationSummary({
 
       {/* Per-Round Valuation Breakdown */}
       <div className="space-y-2">
-        <div className="text-[10px] font-bold uppercase tracking-wider text-retro-muted flex justify-between px-1">
+        <div className="text-2xs font-bold uppercase tracking-wider text-retro-muted flex justify-between px-1">
           <span>Card Valuation Breakdown</span>
           <span>{rounds.length} Rounds Played</span>
         </div>
@@ -285,10 +285,10 @@ export function ValuationSummary({
                 <div key={c.round} className="flex items-center justify-between text-xs py-0.5">
                   <div className="flex items-center gap-1.5">
                     <span className="font-mono text-retro-muted text-xs">R{c.round}:</span>
-                    <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold uppercase tracking-wider ${rarity.badgeClass}`}>{rarity.label}</span>
+                    <span className={`px-1.5 py-0.2 rounded text-2xs font-bold uppercase tracking-wider ${rarity.badgeClass}`}>{rarity.label}</span>
                     <span className="text-retro-muted text-xs flex items-center gap-1">
                       {c.vote === 'boost' ? <><Zap className="w-3 h-3 text-amber-400" /> Boosted</> : c.vote === 'like' ? <><Heart className="w-3 h-3 text-amber-400 fill-rose-400" /> Liked</> : <><X className="w-3 h-3 text-retro-muted" /> Rejected</>}
-                      {c.auto && <span className="text-[10px] font-mono text-retro-muted border border-border-glass rounded px-1">auto · +0</span>}
+                      {c.auto && <span className="text-2xs font-mono text-retro-muted border border-border-glass rounded px-1">auto · +0</span>}
                     </span>
                   </div>
                   <span className={`font-mono font-bold text-xs ${c.delta >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
@@ -310,7 +310,7 @@ export function ValuationSummary({
                   <span className="font-mono text-retro-muted text-xs">R{c.round}:</span>
                   <span className="text-retro-muted text-xs flex items-center gap-1">
                     {c.vote === 'boost' ? <><Zap className="w-3 h-3 text-amber-400" /> You Boosted</> : c.vote === 'like' ? <><Heart className="w-3 h-3 text-amber-400 fill-rose-400" /> You Liked</> : <><X className="w-3 h-3 text-retro-muted" /> You Rejected</>}
-                    {c.auto && <span className="text-[10px] font-mono text-retro-muted border border-border-glass rounded px-1">auto · +0</span>}
+                    {c.auto && <span className="text-2xs font-mono text-retro-muted border border-border-glass rounded px-1">auto · +0</span>}
                   </span>
                 </div>
                 <span className={`font-mono font-bold text-xs ${c.delta >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>

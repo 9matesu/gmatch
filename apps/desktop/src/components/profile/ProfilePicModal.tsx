@@ -187,7 +187,7 @@ export function ProfilePicModal({
                   if (res.file) setRawFile(res.file);
                   setPreview(res.dataUrl);
                 }}
-                className="text-[10px] text-retro-muted hover:text-retro-fg cursor-pointer transition-colors"
+                className="text-2xs text-retro-muted hover:text-retro-fg cursor-pointer transition-colors"
               >
                 Adjust crop
               </button>
@@ -225,7 +225,7 @@ export function ProfilePicModal({
               >
                 <FolderOpen className="w-7 h-7 text-retro-muted group-hover:text-retro-accent transition-colors" />
                 <p className="text-xs font-bold text-retro-body">Choose from your media, upload, or paste a URL</p>
-                <span className="text-[10px] text-retro-muted">JPG, PNG, WebP, GIF — one pick, previewed before it lands</span>
+                <span className="text-2xs text-retro-muted">JPG, PNG, WebP, GIF — one pick, previewed before it lands</span>
               </button>
             </div>
           )}

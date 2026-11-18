@@ -174,7 +174,7 @@ function TagsTab() {
             HENTAI
           </button>
         </div>
-        <span className="text-[10px] font-mono uppercase tracking-wider text-retro-muted">
+        <span className="text-2xs font-mono uppercase tracking-wider text-retro-muted">
           Feed Pool
         </span>
       </div>
@@ -256,7 +256,7 @@ function TagsTab() {
       {/* Market Offers Section */}
       {marketTags.length > 0 && (
         <div className="pt-2 border-t border-border-glass space-y-1.5">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-retro-muted flex items-center justify-between">
+          <span className="text-2xs font-bold uppercase tracking-wider text-retro-muted flex items-center justify-between">
             <span>Market Discoveries ({marketTags.length})</span>
           </span>
           <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto styled-scrollbar pr-0.5">
@@ -280,7 +280,7 @@ function CapsTab() {
         <span className="text-xs font-bold uppercase tracking-wider text-retro-muted">
           Permanent Overclocks
         </span>
-        <span className="text-[10px] font-mono text-retro-muted">
+        <span className="text-2xs font-mono text-retro-muted">
           Stacks compound
         </span>
       </div>
@@ -310,12 +310,12 @@ function CapsTab() {
                       {def.name}
                     </span>
                     {st.count > 0 && (
-                      <span className={`${MONO} text-[10px] font-black text-pink-400 bg-pink-500/15 px-1.5 py-0.2 rounded-full`}>
+                      <span className={`${MONO} text-2xs font-black text-pink-400 bg-pink-500/15 px-1.5 py-0.2 rounded-full`}>
                         x{st.count}
                       </span>
                     )}
                   </div>
-                  <p className="text-[10px] text-retro-muted truncate mt-0.5">
+                  <p className="text-2xs text-retro-muted truncate mt-0.5">
                     {capEffectLabel(id)}
                   </p>
                 </div>
@@ -370,7 +370,7 @@ function PrestigeTab() {
         </p>
 
         {/* Reset vs Keep Rules */}
-        <div className="grid grid-cols-2 gap-2 text-[10px] bg-black/40 rounded-xl p-2 border border-border-glass">
+        <div className="grid grid-cols-2 gap-2 text-2xs bg-black/40 rounded-xl p-2 border border-border-glass">
           <div className="space-y-1">
             <div className="font-bold text-rose-400 flex items-center gap-1">
               <WarningCircle className="w-3 h-3" /> Resets
@@ -406,7 +406,7 @@ function PrestigeTab() {
 
       {/* Achievements Showcase */}
       <div className="space-y-1.5 pt-1">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-retro-muted flex items-center justify-between">
+        <span className="text-2xs font-bold uppercase tracking-wider text-retro-muted flex items-center justify-between">
           <span>Achievements ({achievements.length}/{ACHIEVEMENTS.length})</span>
         </span>
         <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto styled-scrollbar pr-0.5">
@@ -470,7 +470,7 @@ export default function ShopPanel() {
           <TagIcon className="w-3.5 h-3.5" />
           <span>Tags</span>
           {ownedTagsCount > 0 && (
-            <span className="font-mono text-[10px] px-1 rounded-full bg-glass-w10 text-retro-fg">
+            <span className="font-mono text-2xs px-1 rounded-full bg-glass-w10 text-retro-fg">
               {ownedTagsCount}
             </span>
           )}
@@ -490,7 +490,7 @@ export default function ShopPanel() {
           <Lightning className="w-3.5 h-3.5" />
           <span>Caps</span>
           {totalCapsStacks > 0 && (
-            <span className="font-mono text-[10px] px-1 rounded-full bg-pink-500/20 text-pink-400 font-bold">
+            <span className="font-mono text-2xs px-1 rounded-full bg-pink-500/20 text-pink-400 font-bold">
               {totalCapsStacks}
             </span>
           )}
@@ -509,7 +509,7 @@ export default function ShopPanel() {
         >
           <Fire className="w-3.5 h-3.5" />
           <span>Prestige</span>
-          <span className="font-mono text-[10px] px-1 rounded-full bg-purple-500/20 text-purple-300 font-bold">
+          <span className="font-mono text-2xs px-1 rounded-full bg-purple-500/20 text-purple-300 font-bold">
             T{currentTier}
           </span>
         </button>

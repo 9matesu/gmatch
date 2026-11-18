@@ -337,12 +337,12 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
               <Icon className="w-3.5 h-3.5" />
               {tab.label}
               {tab.id === "users" && usersTotal > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 bg-glass-w10 text-retro-muted rounded-full text-[10px]">
+                <span className="ml-1 px-1.5 py-0.2 bg-glass-w10 text-retro-muted rounded-full text-2xs">
                   {usersTotal}
                 </span>
               )}
               {tab.id === "cards_market" && cardsTotal > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 bg-glass-w10 text-retro-muted rounded-full text-[10px]">
+                <span className="ml-1 px-1.5 py-0.2 bg-glass-w10 text-retro-muted rounded-full text-2xs">
                   {cardsTotal}
                 </span>
               )}
@@ -398,7 +398,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                       </div>
                       <div className="min-w-0">
                         <div className="text-xs font-bold text-retro-fg truncate">{row.display_name || "Anonymous"}</div>
-                        <div className="text-[10px] text-retro-muted font-mono truncate">{row.id}</div>
+                        <div className="text-2xs text-retro-muted font-mono truncate">{row.id}</div>
                       </div>
                     </div>
                   ),
@@ -439,7 +439,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                   accessorKey: "last_seen",
                   header: "Last Seen",
                   cell: (_, row) => (
-                    <span className="text-[10px] text-retro-muted font-mono">
+                    <span className="text-2xs text-retro-muted font-mono">
                       {row.last_seen ? formatAbsoluteTime(row.last_seen, { dateStyle: "short" }) : "Never"}
                     </span>
                   ),
@@ -566,7 +566,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                                 <Badge variant="neutral" size="sm">{card.rarity}</Badge>
                                 <StatusBadge status={card.moderation_state} mapping={{ active: "active", hidden: "hidden", banned: "banned" }} size="sm" />
                               </div>
-                              <p className="text-[10px] text-retro-muted truncate">
+                              <p className="text-2xs text-retro-muted truncate">
                                 Value: {card.value} g$ · Likes: {card.like_count} · Creator: {card.creator_id.slice(0, 8)}
                               </p>
                             </div>
@@ -574,7 +574,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                               <select
                                 value={card.moderation_state}
                                 onChange={e => { onAction("moderateCard", card.id, e.target.value); setTimeout(fetchCards, 300); }}
-                                className="bg-surface-canvas border border-border-glass rounded px-2 py-1 text-[10px] outline-none focus:border-retro-accent cursor-pointer"
+                                className="bg-surface-canvas border border-border-glass rounded px-2 py-1 text-2xs outline-none focus:border-retro-accent cursor-pointer"
                               >
                                 <option value="active">Active</option>
                                 <option value="hidden">Hidden</option>
@@ -599,20 +599,20 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                               <div className="flex-1 min-w-0 space-y-2 text-xs">
                                 <div className="grid grid-cols-2 gap-2 bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
                                   <div>
-                                    <span className="text-retro-muted block text-[10px]">Card ID</span>
-                                    <span className="font-mono text-retro-fg text-[10px] break-all">{card.id}</span>
+                                    <span className="text-retro-muted block text-2xs">Card ID</span>
+                                    <span className="font-mono text-retro-fg text-2xs break-all">{card.id}</span>
                                   </div>
                                   <div>
-                                    <span className="text-retro-muted block text-[10px]">Creator ID</span>
-                                    <span className="font-mono text-cyan-300 text-[10px] break-all">{card.creator_id}</span>
+                                    <span className="text-retro-muted block text-2xs">Creator ID</span>
+                                    <span className="font-mono text-cyan-300 text-2xs break-all">{card.creator_id}</span>
                                   </div>
                                   <div>
-                                    <span className="text-retro-muted block text-[10px]">Rarity / Value</span>
+                                    <span className="text-retro-muted block text-2xs">Rarity / Value</span>
                                     <span className="text-retro-fg font-bold uppercase">{card.rarity} · {card.value} g$</span>
                                   </div>
                                   <div>
-                                    <span className="text-retro-muted block text-[10px]">Created At</span>
-                                    <span className="text-retro-fg font-mono text-[10px]">{formatAbsoluteTime(card.created_at)}</span>
+                                    <span className="text-retro-muted block text-2xs">Created At</span>
+                                    <span className="text-retro-fg font-mono text-2xs">{formatAbsoluteTime(card.created_at)}</span>
                                   </div>
                                 </div>
                               </div>
@@ -640,7 +640,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                           <span className="text-xs font-bold text-retro-fg">{m.name || m.card_id.slice(0, 10)}</span>
                           <Badge variant="info" size="sm">{m.status}</Badge>
                         </div>
-                        <p className="text-[10px] text-retro-muted mt-0.5">
+                        <p className="text-2xs text-retro-muted mt-0.5">
                           Seller: {m.seller_name || "Unknown"} · Price: <strong className="text-amber-400 font-mono">{m.price} g$</strong>
                         </p>
                       </div>
@@ -664,7 +664,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                           <span className="text-xs font-bold text-retro-fg">{d.name}</span>
                           <Badge variant="neutral" size="sm">{d.card_count} cards</Badge>
                         </div>
-                        <p className="text-[10px] text-retro-muted mt-0.5">
+                        <p className="text-2xs text-retro-muted mt-0.5">
                           Owner: {d.owner_name || "Player"} · Mode: {d.game_id}
                         </p>
                       </div>
@@ -714,9 +714,9 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-retro-fg">{w.display_name || w.user_id.slice(0, 10)}</span>
-                          <span className="text-[10px] text-retro-muted font-mono">{w.user_id}</span>
+                          <span className="text-2xs text-retro-muted font-mono">{w.user_id}</span>
                         </div>
-                        <p className="text-[10px] text-retro-muted mt-0.5">
+                        <p className="text-2xs text-retro-muted mt-0.5">
                           {w.transaction_count} transaction{w.transaction_count === 1 ? '' : 's'} recorded
                         </p>
                       </div>
@@ -740,14 +740,14 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                         <div className="flex items-center gap-2">
                           <Badge variant="neutral" size="sm">{l.kind}</Badge>
                           <span className="text-xs font-bold text-retro-fg">{l.display_name || l.user_id.slice(0, 8)}</span>
-                          <span className="text-[10px] text-retro-muted">{formatAbsoluteTime(l.created_at)}</span>
+                          <span className="text-2xs text-retro-muted">{formatAbsoluteTime(l.created_at)}</span>
                         </div>
                       </div>
                       <div className="text-right">
                         <span className={cn("font-mono text-xs font-bold", l.delta >= 0 ? "text-emerald-400" : "text-rose-400")}>
                           {l.delta >= 0 ? `+${l.delta}` : l.delta} g$
                         </span>
-                        <div className="text-[10px] text-retro-muted font-mono">Bal: {l.balance_after} g$</div>
+                        <div className="text-2xs text-retro-muted font-mono">Bal: {l.balance_after} g$</div>
                       </div>
                     </div>
                   ))}
@@ -770,7 +770,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
           variant="danger"
         >
           <div className="mt-3 space-y-2 text-left">
-            <label className="text-[10px] font-bold text-retro-muted uppercase block">Reason</label>
+            <label className="text-2xs font-bold text-retro-muted uppercase block">Reason</label>
             <input
               type="text"
               value={banReason}
@@ -803,7 +803,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
         >
           <div className="mt-3 grid grid-cols-2 gap-3 text-left">
             <div>
-              <label className="text-[10px] font-bold text-retro-muted uppercase block">GCoins (g$)</label>
+              <label className="text-2xs font-bold text-retro-muted uppercase block">GCoins (g$)</label>
               <input
                 type="number"
                 value={balanceData.gcoins}
@@ -812,7 +812,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
               />
             </div>
             <div>
-              <label className="text-[10px] font-bold text-retro-muted uppercase block">Score (Points)</label>
+              <label className="text-2xs font-bold text-retro-muted uppercase block">Score (Points)</label>
               <input
                 type="number"
                 value={balanceData.score}
@@ -821,7 +821,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
               />
             </div>
             <div>
-              <label className="text-[10px] font-bold text-retro-muted uppercase block">Likes Received</label>
+              <label className="text-2xs font-bold text-retro-muted uppercase block">Likes Received</label>
               <input
                 type="number"
                 value={balanceData.likes}
@@ -876,7 +876,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
 
             <div className="flex items-end gap-2 flex-wrap">
               <label className="flex flex-col gap-1">
-                <span className="text-[10px] uppercase tracking-wide text-retro-muted">Batch size (optional)</span>
+                <span className="text-2xs uppercase tracking-wide text-retro-muted">Batch size (optional)</span>
                 <input
                   type="number"
                   min={1}
@@ -905,7 +905,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                   )}
                 </div>
                 {purgePreview.sample.length > 0 && (
-                  <ul className="text-[10px] font-mono text-retro-muted space-y-0.5">
+                  <ul className="text-2xs font-mono text-retro-muted space-y-0.5">
                     {purgePreview.sample.map(s => (
                       <li key={s.id} className="truncate">
                         {s.display_name || "User_…"} · {s.id.slice(0, 16)}

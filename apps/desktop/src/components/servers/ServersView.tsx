@@ -1328,7 +1328,7 @@ export function ServersView({
           <div data-testid="create-handle-preview" className="flex items-center gap-2 text-xs font-mono text-retro-muted">
             <span className="truncate max-w-[240px]">{preview.slice(0, 28)}…</span>
             <button type="button" onClick={() => void navigator.clipboard.writeText(preview)}
-              className="glass-action px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer">Copy code</button>
+              className="glass-action px-2 py-0.5 rounded text-2xs font-bold cursor-pointer">Copy code</button>
           </div>
         ) : <p className="text-xs text-retro-muted">Type a name to get your share code.</p>
       })()}
@@ -1385,7 +1385,7 @@ export function ServersView({
           <button
             type="button"
             onClick={() => { try { localStorage.setItem(PIN_SEEN_KEY, '1'); } catch { /* session-only */ } setPinToDismiss(''); }}
-            className="glass-action glass-action-primary px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer"
+            className="glass-action glass-action-primary px-2.5 py-1 rounded-lg text-2xs font-bold cursor-pointer"
           >
             Got it
           </button>
@@ -1401,7 +1401,7 @@ export function ServersView({
               {activeTab === 'hub' ? 'Hub' : 'Servers'}
             </h1>
             {activeTab === 'hub' && (
-              <p className="text-[10px] text-retro-muted truncate">Members, invites and settings</p>
+              <p className="text-2xs text-retro-muted truncate">Members, invites and settings</p>
             )}
           </div>
 
@@ -1460,7 +1460,7 @@ export function ServersView({
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                  <p className="text-[10px] text-retro-muted">
+                  <p className="text-2xs text-retro-muted">
                     Empty means your own node is the directory. Set one only if
                     you want a shared rendezvous point.
                   </p>
@@ -1480,10 +1480,10 @@ export function ServersView({
                       Save
                     </button>
                   </div>
-                  {setupError && <p role="alert" className="text-[10px] text-retro-error">{setupError}</p>}
+                  {setupError && <p role="alert" className="text-2xs text-retro-error">{setupError}</p>}
                   {isDev && (
                     <div className="pt-1 border-t border-border-subtle flex items-center justify-between">
-                      <span className="text-[10px] text-retro-muted font-mono">Dev switch:</span>
+                      <span className="text-2xs text-retro-muted font-mono">Dev switch:</span>
                       <div className="flex items-center gap-1">
                         <button
                           type="button"
@@ -1493,7 +1493,7 @@ export function ServersView({
                             toast('Switched to local 8790', 'info')
                             void refresh()
                           }}
-                          className={`px-1.5 py-0.5 rounded text-[10px] font-mono cursor-pointer ${
+                          className={`px-1.5 py-0.5 rounded text-2xs font-mono cursor-pointer ${
                             central === 'http://127.0.0.1:8790'
                               ? 'bg-retro-accent text-retro-accent-text font-bold'
                               : 'bg-glass-w10 text-retro-muted hover:text-retro-fg'
@@ -1572,13 +1572,13 @@ export function ServersView({
                     <div className="flex items-center gap-2">
                       <h2 className="truncate text-2xl font-black tracking-tighter text-retro-fg">{currentServerTitle || serverName || 'gmatch'}</h2>
                       {serverMode && (
-                        <span className="text-[10px] px-2 py-0.5 rounded font-mono uppercase tracking-wider bg-surface-interactive border border-border-subtle text-retro-muted">
+                        <span className="text-2xs px-2 py-0.5 rounded font-mono uppercase tracking-wider bg-surface-interactive border border-border-subtle text-retro-muted">
                           {serverMode}
                         </span>
                       )}
                       {node?.isAdmin && (
                         <span
-                          className="text-[10px] px-2 py-0.5 rounded font-mono uppercase tracking-wider text-amber-200 border border-amber-400/30 bg-amber-400/10"
+                          className="text-2xs px-2 py-0.5 rounded font-mono uppercase tracking-wider text-amber-200 border border-amber-400/30 bg-amber-400/10"
                           title="You administer this server"
                         >
                           Admin
@@ -1603,7 +1603,7 @@ export function ServersView({
                             toast('Address copied — send it to a friend', 'success')
                           }}
                           title="Copy address"
-                          className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-mono text-retro-muted hover:text-retro-fg transition-colors cursor-pointer"
+                          className="mt-1 inline-flex items-center gap-1.5 text-2xs font-mono text-retro-muted hover:text-retro-fg transition-colors cursor-pointer"
                         >
                           <span className="w-1.5 h-1.5 rounded-full bg-retro-online shrink-0" aria-hidden />
                           <span className="truncate max-w-[280px]">{addr}</span>
@@ -1783,12 +1783,12 @@ export function ServersView({
                               <div className="text-xs font-bold text-retro-fg truncate group-hover:text-retro-accent transition-colors">
                                 {u.display_name || u.id}
                               </div>
-                              <div className="text-[10px] text-retro-online truncate font-mono">
+                              <div className="text-2xs text-retro-online truncate font-mono">
                                 active now
                               </div>
                             </div>
                           </div>
-                          <span className="text-[10px] text-retro-muted opacity-0 group-hover:opacity-100 transition-opacity pr-1">
+                          <span className="text-2xs text-retro-muted opacity-0 group-hover:opacity-100 transition-opacity pr-1">
                             profile →
                           </span>
                         </div>
@@ -1835,12 +1835,12 @@ export function ServersView({
                               <div className="text-xs font-bold text-retro-fg/90 truncate group-hover:text-retro-accent transition-colors">
                                 {u.display_name || u.id}
                               </div>
-                              <div className="text-[10px] text-retro-muted truncate font-mono">
+                              <div className="text-2xs text-retro-muted truncate font-mono">
                                 {formatRelativeTime(u.last_seen)}
                               </div>
                             </div>
                           </div>
-                          <span className="text-[10px] text-retro-muted opacity-0 group-hover:opacity-100 transition-opacity pr-1">
+                          <span className="text-2xs text-retro-muted opacity-0 group-hover:opacity-100 transition-opacity pr-1">
                             profile →
                           </span>
                         </div>
@@ -1877,7 +1877,7 @@ export function ServersView({
                   <p className="text-sm font-bold text-retro-fg">
                     Entering <span className="text-retro-accent">{worldName}</span>…
                   </p>
-                  <div className="flex items-center gap-2 text-[10px] font-mono text-retro-muted">
+                  <div className="flex items-center gap-2 text-2xs font-mono text-retro-muted">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     Connecting to this world's node
                   </div>
@@ -1896,7 +1896,7 @@ export function ServersView({
             <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar px-4 py-2 bg-retro-bg/85 backdrop-blur-md">
               {/* A failed directory request never erases servers we already know. */}
               {dirError && serverRows.length > 0 && (
-                <div role="status" className="mb-2 flex items-center gap-2 px-3 py-2 rounded-lg border border-border-glass bg-glass-w5 text-[10px] text-retro-muted">
+                <div role="status" className="mb-2 flex items-center gap-2 px-3 py-2 rounded-lg border border-border-glass bg-glass-w5 text-2xs text-retro-muted">
                   <span className="min-w-0 flex-1 truncate">
                     Directory unreachable. Showing the last known servers.
                   </span>
@@ -1915,7 +1915,7 @@ export function ServersView({
                   <p className="text-sm font-semibold text-retro-fg">
                     {dirError ? 'Directory unavailable' : query ? 'No servers match' : 'No servers yet'}
                   </p>
-                  <p className="max-w-sm text-[10px] text-retro-muted">
+                  <p className="max-w-sm text-2xs text-retro-muted">
                     {dirError
                       ? `Could not reach ${central || 'the directory'} and nothing is cached for this session.`
                       : query
@@ -1949,11 +1949,11 @@ export function ServersView({
                 <button
                   type="button"
                   onClick={() => { playPress(700); setGroupsOpen(true) }}
-                  className="text-[10px] text-retro-muted hover:text-retro-fg cursor-pointer transition-colors"
+                  className="text-2xs text-retro-muted hover:text-retro-fg cursor-pointer transition-colors"
                 >
                   Local groups{labels.length ? ` (${labels.length})` : ''}
                 </button>
-                <span className="ml-1.5 text-[10px] text-retro-muted/70">· device-only labels, not servers</span>
+                <span className="ml-1.5 text-2xs text-retro-muted/70">· device-only labels, not servers</span>
               </div>
             </div>
 
@@ -1996,7 +1996,7 @@ export function ServersView({
 
               {!mine(deleteTarget) && (
                 <div className="space-y-1.5 pt-1">
-                  <label className="block text-[10px] font-semibold text-retro-fg">
+                  <label className="block text-2xs font-semibold text-retro-fg">
                     Central Admin Passcode
                   </label>
                   <input
@@ -2007,7 +2007,7 @@ export function ServersView({
                     placeholder="Enter central passcode (e.g. 1984)"
                     className="glass-field w-full px-3 py-2 text-xs font-mono"
                   />
-                  <p className="text-[10px] text-retro-muted">
+                  <p className="text-2xs text-retro-muted">
                     Required when deleting a server created by another identity, or while unauthenticated.
                   </p>
                 </div>

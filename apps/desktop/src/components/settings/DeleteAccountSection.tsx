@@ -118,7 +118,7 @@ export function DeleteAccountSection({
             </button>
             {keyShown && (
               <>
-                <code className="break-all flex-1 min-w-[160px] rounded-md bg-black/40 border border-border-glass px-2 py-1 font-mono text-[10px] text-retro-fg">
+                <code className="break-all flex-1 min-w-[160px] rounded-md bg-black/40 border border-border-glass px-2 py-1 font-mono text-2xs text-retro-fg">
                   {identityKeyPayload(identity, displayName)}
                 </code>
                 <button

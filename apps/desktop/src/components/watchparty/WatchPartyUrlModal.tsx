@@ -225,7 +225,7 @@ export function WatchPartyUrlModal({
           }}
           className="glass-field w-full px-3 py-2 text-xs font-mono resize-y"
         />
-        <p className="text-[10px] text-retro-muted">
+        <p className="text-2xs text-retro-muted">
           {hintText}
         </p>
         {!inRoom && (

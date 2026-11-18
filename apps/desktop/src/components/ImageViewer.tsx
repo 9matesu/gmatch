@@ -243,7 +243,7 @@ export function ImageViewer({
         <div className="flex items-center gap-2 sm:gap-3 truncate min-w-0">
           <span className="text-xs sm:text-sm font-bold text-retro-fg truncate">{senderName}</span>
           {items.length > 1 && (
-            <span className="text-[10px] sm:text-xs font-mono glass-inset px-2 py-0.5 rounded-full shrink-0">
+            <span className="text-2xs sm:text-xs font-mono glass-inset px-2 py-0.5 rounded-full shrink-0">
               {navIdx + 1} / {items.length}
             </span>
           )}
@@ -328,7 +328,7 @@ export function ImageViewer({
             <div className="glass-card p-8 text-center space-y-2">
               <span className="text-3xl text-retro-muted block">◈</span>
               <p className="text-xs font-bold text-retro-body">Media unavailable or encrypted</p>
-              <p className="text-[10px] text-retro-muted font-mono">ID: {activeItem?.id}</p>
+              <p className="text-2xs text-retro-muted font-mono">ID: {activeItem?.id}</p>
             </div>
           ) : (
             (() => {
@@ -344,7 +344,7 @@ export function ImageViewer({
                 >
                   {isCard && (
                     <div className="absolute top-3 right-3 z-30 flex items-center gap-1.5 pointer-events-none">
-                      <span className="glass-inset text-[10px] font-mono font-bold px-2 py-0.5 rounded-md">
+                      <span className="glass-inset text-2xs font-mono font-bold px-2 py-0.5 rounded-md">
                         {formatGc(cardVal)}
                       </span>
                     </div>

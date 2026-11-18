@@ -4380,7 +4380,7 @@ export default function Home() {
                       <span className="text-xs font-bold">
                         {pmPeer ? pmPeer.name || 'Direct Message' : 'Direct Messages'}
                       </span>
-                      <span className="text-[10px] text-retro-muted">Tap to reopen</span>
+                      <span className="text-2xs text-retro-muted">Tap to reopen</span>
                     </span>
                     {chatMessages.length > 0 && (
                       <span className="w-2 h-2 rounded-full bg-retro-accent ring-2 ring-retro-fg shrink-0" />

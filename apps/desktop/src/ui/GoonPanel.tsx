@@ -770,7 +770,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               className={`${MONO} inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border border-rose-500/40 bg-rose-500/10 px-2.5 py-1 text-xs font-bold text-rose-300 hover:bg-rose-500/20 transition-colors`}
             >
               <Gift size={14} weight="bold" className="text-rose-400" />
-              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-black text-retro-fg">
+              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-2xs font-black text-retro-fg">
                 {pendingDrops.length}
               </span>
             </button>
@@ -779,7 +779,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                 {pendingDrops.slice(0, 4).map((drop) => (
                   <div key={drop.id} className="rounded-lg border border-border-glass bg-retro-bg/80 p-2">
                     <div className="flex items-center justify-between gap-1">
-                      <span className={`${MONO} truncate text-[10px] font-bold text-retro-muted`}>
+                      <span className={`${MONO} truncate text-2xs font-bold text-retro-muted`}>
                         from {drop.foeTitle}
                       </span>
                       <button
@@ -797,7 +797,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                           type="button"
                           onClick={() => claimDropTag(drop.id)}
                           title={`Adopt +${drop.suggestedTag} into your feed`}
-                          className={`${MONO} cursor-pointer rounded-md border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-300 hover:bg-emerald-500/25 transition-colors`}
+                          className={`${MONO} cursor-pointer rounded-md border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-2xs font-bold text-emerald-300 hover:bg-emerald-500/25 transition-colors`}
                         >
                           + {drop.suggestedTag}
                         </button>
@@ -807,7 +807,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                           type="button"
                           onClick={() => claimDropAntiTag(drop.id)}
                           title={`Ban ${drop.suggestedAntiTag} from your feed`}
-                          className={`${MONO} inline-flex items-center gap-1 cursor-pointer rounded-md border border-rose-500/40 bg-rose-500/10 px-2 py-0.5 text-[10px] font-bold text-rose-300 hover:bg-rose-500/20 transition-colors`}
+                          className={`${MONO} inline-flex items-center gap-1 cursor-pointer rounded-md border border-rose-500/40 bg-rose-500/10 px-2 py-0.5 text-2xs font-bold text-rose-300 hover:bg-rose-500/20 transition-colors`}
                         >
                           <X size={10} weight="bold" className="shrink-0" /> {drop.suggestedAntiTag}
                         </button>
@@ -816,7 +816,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                   </div>
                 ))}
                 {pendingDrops.length > 4 && (
-                  <div className={`${MONO} text-center text-[10px] text-retro-fg/40`}>
+                  <div className={`${MONO} text-center text-2xs text-retro-fg/40`}>
                     +{pendingDrops.length - 4} more…
                   </div>
                 )}
@@ -837,7 +837,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               />
             </div>
             <span className={`${MONO} whitespace-nowrap text-xs font-semibold text-retro-muted`}>
-              {formatNum(Math.ceil(foeHp))}/{formatNum(foeMaxHp)} <span className="text-[10px] text-retro-fg/40">HP</span>
+              {formatNum(Math.ceil(foeHp))}/{formatNum(foeMaxHp)} <span className="text-2xs text-retro-fg/40">HP</span>
             </span>
           </div>
         ) : (

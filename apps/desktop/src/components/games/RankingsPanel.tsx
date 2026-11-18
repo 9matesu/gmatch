@@ -184,7 +184,7 @@ export function RankingsPanel({
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-retro-muted">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-2xs text-retro-muted">
         <span>{boardHint}</span>
         {myRank && (
           <span className="font-mono" data-testid="rankings-my-rank">
@@ -225,7 +225,7 @@ export function RankingsPanel({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-medium text-retro-fg truncate">{displayName(user)}</div>
-                  <div className="text-[10px] text-retro-muted mt-0.5 truncate">{secondaryLine(board, user)}</div>
+                  <div className="text-2xs text-retro-muted mt-0.5 truncate">{secondaryLine(board, user)}</div>
                 </div>
                 <span className="flex-shrink-0 text-xs font-mono text-retro-accent tabular-nums">
                   {scoreLabel(board, value)}

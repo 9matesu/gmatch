@@ -260,7 +260,7 @@ export function ObjectImage({
     return (
       <div
         ref={placeholderRef}
-        className="w-full py-3.5 px-3 flex items-center justify-center gap-1.5 text-[10px] font-mono text-retro-muted bg-surface-canvas/40"
+        className="w-full py-3.5 px-3 flex items-center justify-center gap-1.5 text-2xs font-mono text-retro-muted bg-surface-canvas/40"
       >
         {waiting && !seeding ? (
           <>
@@ -286,7 +286,7 @@ export function ObjectImage({
     return (
       <div
         ref={placeholderRef}
-        className="w-full py-3.5 px-3 flex items-center justify-center gap-1.5 text-[10px] font-mono text-retro-muted bg-surface-canvas/40"
+        className="w-full py-3.5 px-3 flex items-center justify-center gap-1.5 text-2xs font-mono text-retro-muted bg-surface-canvas/40"
       >
         <span>Image unavailable</span>
       </div>

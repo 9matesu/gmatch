@@ -97,7 +97,7 @@ export function PostComments({
       } ${flashId === c.id ? 'ring-2 ring-retro-accent/70 ring-offset-0' : ''}`}
     >
       <div className="flex items-start gap-2.5">
-        <div className="w-7 h-7 rounded-full bg-surface-interactive overflow-hidden shrink-0 flex items-center justify-center text-[10px] font-bold text-retro-fg">
+        <div className="w-7 h-7 rounded-full bg-surface-interactive overflow-hidden shrink-0 flex items-center justify-center text-2xs font-bold text-retro-fg">
           {c.author_avatar ? (
             <img src={resolveMediaUrl(c.author_avatar)} alt="" className="w-full h-full object-cover" />
           ) : (
@@ -123,8 +123,8 @@ export function PostComments({
               }}
               className={`text-xs font-bold text-retro-fg ${onCommentAuthorClick ? 'hover:underline cursor-pointer' : ''}`}
             >{c.author_name}</span>
-            <span className="text-[10px] text-retro-muted">{timeAgo(c.created_at)}</span>
-            {c.pending && <span className="text-[10px] text-retro-muted italic">sending…</span>}
+            <span className="text-2xs text-retro-muted">{timeAgo(c.created_at)}</span>
+            {c.pending && <span className="text-2xs text-retro-muted italic">sending…</span>}
           </div>
           <p className="text-xs text-retro-body mt-0.5 leading-relaxed">
             <Linkify text={c.text} />
@@ -160,7 +160,7 @@ export function PostComments({
         >
           <Heart className={`w-3.5 h-3.5 ${c.is_liked ? 'text-red-500 fill-red-500' : ''}`} />
           {c.like_count > 0 && (
-            <span className="text-[10px] font-bold block text-center mt-0.5 text-retro-muted">{c.like_count}</span>
+            <span className="text-2xs font-bold block text-center mt-0.5 text-retro-muted">{c.like_count}</span>
           )}
         </button>
       </div>
@@ -199,7 +199,7 @@ export function PostComments({
                 </div>
               )}
 
-              <span className="text-[10px] text-retro-muted font-medium block mt-1">
+              <span className="text-2xs text-retro-muted font-medium block mt-1">
                 {formatAbsoluteTime(post.created_at, { dateStyle: 'short' }) || 'Recent'}
               </span>
             </div>
@@ -232,7 +232,7 @@ export function PostComments({
       {/* Comment Input */}
       <div className="border-t border-border-glass">
         {replyTo && (
-          <div className="flex items-center justify-between gap-2 px-3 pt-2 text-[10px] text-retro-muted">
+          <div className="flex items-center justify-between gap-2 px-3 pt-2 text-2xs text-retro-muted">
             <span className="truncate">
               Replying to{' '}
               <strong className="font-semibold text-retro-body">{replyTo.author_name || 'user'}</strong>

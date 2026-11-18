@@ -45,7 +45,7 @@ export function RoomsPreview({ rows, onOpenRow, onOpenAll }: RoomsPreviewProps) 
         <button
           type="button"
           onClick={() => { playPress(720); onOpenAll(); }}
-          className="text-[10px] text-retro-muted hover:text-retro-fg transition-colors cursor-pointer"
+          className="text-2xs text-retro-muted hover:text-retro-fg transition-colors cursor-pointer"
         >
           Open rooms →
         </button>
@@ -70,7 +70,7 @@ export function RoomsPreview({ rows, onOpenRow, onOpenAll }: RoomsPreviewProps) 
               </span>
               <span className="flex-1 min-w-0">
                 <span className="block text-xs font-medium text-retro-body truncate">{r.name}</span>
-                <span className="block text-[10px] text-retro-muted truncate">{r.last || 'No messages yet'}</span>
+                <span className="block text-2xs text-retro-muted truncate">{r.last || 'No messages yet'}</span>
               </span>
               {r.unread && <span className="w-1.5 h-1.5 rounded-full bg-retro-accent shrink-0" aria-label="Unread" />}
             </button>

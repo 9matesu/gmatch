@@ -149,7 +149,7 @@ export function NotificationsPanel({
           <Bell className="w-3.5 h-3.5" />
           Notifications
           {unreadCount > 0 && (
-            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none bg-retro-accent text-retro-accent-text tabular-nums">
+            <span className="px-1.5 py-0.5 rounded-full text-2xs font-bold leading-none bg-retro-accent text-retro-accent-text tabular-nums">
               {unreadCount}
             </span>
           )}
@@ -162,7 +162,7 @@ export function NotificationsPanel({
                 playPress(700);
                 onMarkAllRead();
               }}
-              className="glass-action px-2 py-0.5 rounded text-[10px] cursor-pointer text-retro-muted hover:text-retro-fg"
+              className="glass-action px-2 py-0.5 rounded text-2xs cursor-pointer text-retro-muted hover:text-retro-fg"
             >
               Mark all read
             </button>
@@ -183,7 +183,7 @@ export function NotificationsPanel({
         </div>
       </div>
       {unreadBreakdown && (
-        <div className="px-3 py-1.5 text-[10px] text-retro-muted border-b border-border-glass shrink-0">
+        <div className="px-3 py-1.5 text-2xs text-retro-muted border-b border-border-glass shrink-0">
           {unreadBreakdown}
         </div>
       )}
@@ -217,12 +217,12 @@ export function NotificationsPanel({
                     <p className="text-xs text-retro-muted mt-0.5 truncate">{item.body}</p>
                   )}
                   {typeof item.mentions === 'number' && item.mentions > 0 && (
-                    <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-amber-300">
+                    <span className="mt-1 inline-flex items-center gap-1 text-2xs font-bold text-amber-300">
                       <AtSign className="w-3 h-3" />
                       {item.mentions === 1 ? '1 mention' : `${item.mentions} mentions`}
                     </span>
                   )}
-                  <time className="mt-1 block text-[10px] text-retro-muted" dateTime={item.createdAt}>
+                  <time className="mt-1 block text-2xs text-retro-muted" dateTime={item.createdAt}>
                     {formatAbsoluteTime(item.createdAt, { dateStyle: "short", timeStyle: "short" })}
                   </time>
                 </div>
@@ -367,7 +367,7 @@ export function NotificationsPanel({
                     </div>
                   )}
                   <time
-                    className="mt-1 block text-[10px] text-retro-muted"
+                    className="mt-1 block text-2xs text-retro-muted"
                     dateTime={n.created_at}
                   >
                     {formatAbsoluteTime(n.created_at, {

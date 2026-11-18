@@ -648,7 +648,7 @@ export function GridReveal({
               key={caption}
               layout="position"
               className={cn(
-                "block whitespace-nowrap text-[11px] font-medium leading-6",
+                "block whitespace-nowrap text-2xs font-medium leading-6",
                 reduce ? "text-retro-fg/75" : "bg-clip-text text-transparent",
               )}
               style={reduce ? undefined : SHIMMER}

@@ -325,7 +325,7 @@ export function MediaPickerPanel({
                             <Loader2 className="w-5 h-5 animate-spin text-retro-accent" />
                           </span>
                         ) : unresolvable ? (
-                          <span className="absolute inset-0 flex items-center justify-center text-[10px] text-retro-muted">No local copy</span>
+                          <span className="absolute inset-0 flex items-center justify-center text-2xs text-retro-muted">No local copy</span>
                         ) : video ? (
                           <video src={src} muted preload="metadata" className="w-full h-full object-cover" />
                         ) : (
@@ -345,7 +345,7 @@ export function MediaPickerPanel({
                           </span>
                         )}
                         {raw.startsWith('vault://') && !httpUrlMap[raw] && !unresolvable && (
-                          <span className="absolute inset-x-0 bottom-0 py-0.5 text-center text-[10px] bg-black/60 text-retro-fg/80">…</span>
+                          <span className="absolute inset-x-0 bottom-0 py-0.5 text-center text-2xs bg-black/60 text-retro-fg/80">…</span>
                         )}
                       </button>
                     );
@@ -386,7 +386,7 @@ export function MediaPickerPanel({
             >
               <UploadCloud className="w-7 h-7 text-retro-muted" />
               <p className="text-xs font-bold text-retro-body">Drop a file, click to browse, or paste from the clipboard</p>
-              <span className="text-[10px] text-retro-muted">{accept.join(' or ')}</span>
+              <span className="text-2xs text-retro-muted">{accept.join(' or ')}</span>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -424,7 +424,7 @@ export function MediaPickerPanel({
                   Preview
                 </button>
               </div>
-              <p className="text-[10px] text-retro-muted">The media is previewed before it is attached — broken links are caught here.</p>
+              <p className="text-2xs text-retro-muted">The media is previewed before it is attached — broken links are caught here.</p>
             </div>
           )}
 

@@ -155,7 +155,7 @@ export function NotificationCenter(props: NotificationCenterProps) {
           {messages.length > 0 && (
             <div className="shrink-0 border-b border-border-glass">
               <div className="flex items-center justify-between px-3 py-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wide text-retro-muted">
+                <span className="text-2xs font-bold uppercase tracking-wide text-retro-muted">
                   Recent{overflowCount > 0 && <span className="font-normal"> · +{overflowCount} more</span>}
                 </span>
                 <button type="button" onClick={clearAll} className="text-xs text-retro-muted hover:text-retro-fg cursor-pointer">

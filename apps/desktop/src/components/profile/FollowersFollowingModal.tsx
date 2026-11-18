@@ -173,7 +173,7 @@ export function FollowersFollowingModal({
                 {activeTab}
               </h3>
               {isTargetMode && targetDisplayName && (
-                <p className="text-[10px] text-retro-muted truncate">
+                <p className="text-2xs text-retro-muted truncate">
                   @{targetDisplayName}
                 </p>
               )}

@@ -346,7 +346,7 @@ export function AdminTable<T extends Record<string, unknown>>({
                         value={(columnFilters[col.accessorKey] as string) || ""}
                         onChange={e => handleFilterChange(col.accessorKey as string, e.target.value)}
                         onClick={e => e.stopPropagation()}
-                        className="w-full bg-surface-canvas border border-border-glass rounded px-2 py-1 text-[10px] outline-none focus:border-retro-accent"
+                        className="w-full bg-surface-canvas border border-border-glass rounded px-2 py-1 text-2xs outline-none focus:border-retro-accent"
                       />
                     )}
                   </th>
@@ -419,7 +419,7 @@ export function AdminTable<T extends Record<string, unknown>>({
                   )}
                   disabled={action.disabled?.(data.filter(row => rowSelection[getRowId(row)]))}
                   className={cn(
-                    "px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-colors",
+                    "px-2 py-1 rounded text-2xs font-bold uppercase tracking-wider transition-colors",
                     action.variant === "danger" && "bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30",
                     action.variant === "primary" && "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/30",
                     action.variant !== "danger" && action.variant !== "primary" && "bg-surface-interactive text-retro-fg border border-border-glass hover:bg-glass-w10"

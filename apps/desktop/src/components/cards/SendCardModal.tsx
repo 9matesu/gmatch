@@ -77,14 +77,14 @@ export function SendCardModal({
                     <span className="text-xs font-semibold text-retro-fg truncate">
                       {card.name || 'Untitled Card'}
                     </span>
-                    <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-glass-w12 text-amber-400 border border-border-glass">
+                    <span className="text-2xs uppercase font-mono px-1.5 py-0.5 rounded bg-glass-w12 text-amber-400 border border-border-glass">
                       {card.rarity}
                     </span>
                   </div>
                   {card.tags && card.tags.length > 0 && (
                     <div className="flex items-center gap-1 overflow-hidden">
                       <Tag className="w-2.5 h-2.5 text-retro-muted shrink-0" />
-                      <span className="text-[10px] text-retro-muted truncate">
+                      <span className="text-2xs text-retro-muted truncate">
                         {card.tags.join(', ')}
                       </span>
                     </div>

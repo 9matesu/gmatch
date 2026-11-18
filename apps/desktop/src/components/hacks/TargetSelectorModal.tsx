@@ -94,7 +94,7 @@ export function TargetSelectorModal({
                 </div>
                 <div>
                   <span className="text-xs font-semibold text-retro-fg block truncate max-w-[180px]">@{peerName}</span>
-                  <span className="text-[10px] text-retro-muted font-mono">{peerId.substring(0, 10)}...</span>
+                  <span className="text-2xs text-retro-muted font-mono">{peerId.substring(0, 10)}...</span>
                 </div>
               </div>
 

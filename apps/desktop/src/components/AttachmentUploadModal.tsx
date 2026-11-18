@@ -313,7 +313,7 @@ export function AttachmentUploadModal({
               <DropZone onFiles={handleFile} onPasteUrl={handleUrl} compact={false} accept="image/jpeg, image/png, image/webp, image/avif, image/gif, video/mp4, video/webm, video/quicktime, video/ogg, video/*" multiple={false}>
                 <div className="space-y-1 text-center py-2">
                   <p className="text-xs text-retro-body font-bold">Drop an image/video or click to browse</p>
-                  <p className="text-[10px] text-retro-muted">JPG, PNG, WebP, GIF, MP4, WebM (up to 50MB)</p>
+                  <p className="text-2xs text-retro-muted">JPG, PNG, WebP, GIF, MP4, WebM (up to 50MB)</p>
                 </div>
               </DropZone>
               {preview && (

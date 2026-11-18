@@ -203,7 +203,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
               </div>
             </div>
             <div className="space-y-3">
-              <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider block">Discord Invite URL</label>
+              <label className="text-2xs font-bold text-retro-muted uppercase tracking-wider block">Discord Invite URL</label>
               <div className="flex items-center gap-2">
                 <input
                   type="text"
@@ -232,7 +232,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
               </div>
             </div>
             <div className="space-y-3">
-              <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider block">Cashout Rate (basis points)</label>
+              <label className="text-2xs font-bold text-retro-muted uppercase tracking-wider block">Cashout Rate (basis points)</label>
               <p className="text-xs text-retro-muted">1 bp = 0.01%. Current: {(cashoutRateBps / 100).toFixed(2)}% (12500 = 125%)</p>
               <div className="flex items-center gap-2">
                 <input
@@ -297,13 +297,13 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
                         <div className="flex items-center gap-2">
                           <Badge variant="info" size="sm">{entry.action}</Badge>
                           <span className="text-xs font-bold text-retro-fg">{entry.admin_name || entry.admin_id.slice(0, 8)}</span>
-                          <span className="text-[10px] text-retro-muted">{formatAbsoluteTime(entry.created_at)}</span>
+                          <span className="text-2xs text-retro-muted">{formatAbsoluteTime(entry.created_at)}</span>
                         </div>
                         <p className="text-xs text-retro-body mt-1">
                           Target: <span className="font-mono text-retro-fg">{entry.target_type}:{entry.target_id}</span>
                         </p>
                         {entry.reason && (
-                          <p className="text-[10px] text-retro-muted font-mono mt-0.5 truncate">
+                          <p className="text-2xs text-retro-muted font-mono mt-0.5 truncate">
                             Reason: {entry.reason}
                           </p>
                         )}
@@ -317,25 +317,25 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="p-4 rounded-xl border border-border-glass bg-surface-raised">
-                  <span className="text-[10px] font-bold text-retro-muted uppercase block mb-1">Active Users</span>
+                  <span className="text-2xs font-bold text-retro-muted uppercase block mb-1">Active Users</span>
                   <div className="h-10">
                     <Sparkline data={dailyStats.map(d => d.active_users)} color="#34d399" />
                   </div>
                 </div>
                 <div className="p-4 rounded-xl border border-border-glass bg-surface-raised">
-                  <span className="text-[10px] font-bold text-retro-muted uppercase block mb-1">Matches Played</span>
+                  <span className="text-2xs font-bold text-retro-muted uppercase block mb-1">Matches Played</span>
                   <div className="h-10">
                     <Sparkline data={dailyStats.map(d => d.matches_played)} color="#a855f7" />
                   </div>
                 </div>
                 <div className="p-4 rounded-xl border border-border-glass bg-surface-raised">
-                  <span className="text-[10px] font-bold text-retro-muted uppercase block mb-1">Peak Concurrent</span>
+                  <span className="text-2xs font-bold text-retro-muted uppercase block mb-1">Peak Concurrent</span>
                   <div className="h-10">
                     <Sparkline data={dailyStats.map(d => d.peak_concurrent)} color="#38bdf8" />
                   </div>
                 </div>
                 <div className="p-4 rounded-xl border border-border-glass bg-surface-raised">
-                  <span className="text-[10px] font-bold text-retro-muted uppercase block mb-1">New Signups</span>
+                  <span className="text-2xs font-bold text-retro-muted uppercase block mb-1">New Signups</span>
                   <div className="h-10">
                     <Sparkline data={dailyStats.map(d => d.new_users)} color="#f59e0b" />
                   </div>
@@ -364,7 +364,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-xs font-bold text-red-300 tracking-wider">Run Database Cleanup</h3>
-                  <p className="text-[10px] text-retro-muted mt-1">Expires stale content, sweeps orphan blobs, and resets daily scores.</p>
+                  <p className="text-2xs text-retro-muted mt-1">Expires stale content, sweeps orphan blobs, and resets daily scores.</p>
                 </div>
                 <button
                   type="button"
@@ -380,7 +380,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-xs font-bold text-red-300 tracking-wider">Clean ALL Posts & Reset</h3>
-                  <p className="text-[10px] text-retro-muted mt-1">Purges all user posts, media objects, likes and comments platform-wide.</p>
+                  <p className="text-2xs text-retro-muted mt-1">Purges all user posts, media objects, likes and comments platform-wide.</p>
                 </div>
                 <button
                   type="button"
@@ -396,7 +396,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-xs font-bold text-amber-300 tracking-wider">Migrate Lobby → Posts</h3>
-                  <p className="text-[10px] text-retro-muted mt-1">Transfers all lobby board images into user gMatch profiles under Posts, preserving metadata.</p>
+                  <p className="text-2xs text-retro-muted mt-1">Transfers all lobby board images into user gMatch profiles under Posts, preserving metadata.</p>
                 </div>
                 <button
                   type="button"

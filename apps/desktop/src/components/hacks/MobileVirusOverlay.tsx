@@ -88,7 +88,7 @@ export function MobileVirusOverlay({
         </div>
 
         <div className="text-right shrink-0">
-          <span className="text-[10px] text-red-200/70 block">ENDS IN</span>
+          <span className="text-2xs text-red-200/70 block">ENDS IN</span>
           <span className="text-xl font-bold tabular-nums text-retro-fg">{secondsRemaining}s</span>
         </div>
       </div>

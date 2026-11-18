@@ -144,7 +144,7 @@ export function CentralAdminPanel({ central, identity, toast }: { central: strin
             <button
               type="button"
               onClick={() => setUnlockPin('admin')}
-              className="text-[10px] font-bold underline hover:text-retro-fg cursor-pointer ml-2 shrink-0"
+              className="text-2xs font-bold underline hover:text-retro-fg cursor-pointer ml-2 shrink-0"
             >
               Use admin
             </button>
@@ -202,10 +202,10 @@ export function CentralAdminPanel({ central, identity, toast }: { central: strin
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium text-retro-fg truncate">{row.name}</span>
-                {!!row.hidden && <span className="text-[10px] px-1.5 py-0.5 rounded-full glass-inset text-retro-muted font-mono">HIDDEN</span>}
-                {!!row.blocked && <span className="text-[10px] px-1.5 py-0.5 rounded-full glass-action-danger font-mono">BLOCKED</span>}
+                {!!row.hidden && <span className="text-2xs px-1.5 py-0.5 rounded-full glass-inset text-retro-muted font-mono">HIDDEN</span>}
+                {!!row.blocked && <span className="text-2xs px-1.5 py-0.5 rounded-full glass-action-danger font-mono">BLOCKED</span>}
               </div>
-              <p className="text-[10px] font-mono text-retro-muted mt-0.5 truncate">{row.endpoint_hint || 'no address'} · {row.id.slice(0, 8)}</p>
+              <p className="text-2xs font-mono text-retro-muted mt-0.5 truncate">{row.endpoint_hint || 'no address'} · {row.id.slice(0, 8)}</p>
             </div>
             <div className="flex items-center gap-1 shrink-0">
               <button

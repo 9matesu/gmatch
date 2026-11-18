@@ -39,7 +39,7 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
       title={
         <span className="flex items-center gap-2">
           What&apos;s New
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-retro-accent/20 text-retro-accent border border-retro-accent/30">
+          <span className="px-1.5 py-0.5 rounded text-2xs font-mono font-bold bg-retro-accent/20 text-retro-accent border border-retro-accent/30">
             v{CURRENT_CHANGELOG_VERSION}
           </span>
         </span>

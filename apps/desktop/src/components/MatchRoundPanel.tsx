@@ -287,7 +287,7 @@ export function MatchRoundPanel({
               return (
                 <div
                   key={rNum}
-                  className={`flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium border rounded transition-colors ${isCurrent && !isResult
+                  className={`flex items-center gap-0.5 px-1.5 py-0.5 text-2xs font-medium border rounded transition-colors ${isCurrent && !isResult
                       ? 'border-retro-accent bg-glass-w10 text-retro-accent'
                       : past
                         ? past.matched
@@ -311,7 +311,7 @@ export function MatchRoundPanel({
               style={{ width: `${isResult ? 100 : pct}%` }}
             />
           </div>
-          <div className="flex justify-between text-[10px] text-retro-muted">
+          <div className="flex justify-between text-2xs text-retro-muted">
             <span>
               {phase === 'lobby'
                 ? 'Match starting'
@@ -380,14 +380,14 @@ export function MatchRoundPanel({
                         >
                           <div className="metallic-card flex flex-col h-full">
                             <div className="absolute top-2 left-2 z-20 flex items-center gap-1">
-                              <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border shadow-md ${rarity.badgeClass}`}>
+                              <span className={`text-2xs font-black uppercase tracking-wider px-2 py-0.5 rounded-md border shadow-md ${rarity.badgeClass}`}>
                                 {rarity.label}
                               </span>
-                              <span className="text-[10px] font-mono font-black px-1.5 py-0.5 rounded-md bg-black/80 text-amber-300 border border-amber-400/40 shadow-md backdrop-blur-xs">
+                              <span className="text-2xs font-mono font-black px-1.5 py-0.5 rounded-md bg-black/80 text-amber-300 border border-amber-400/40 shadow-md backdrop-blur-xs">
                                 {formatGc(val)}
                               </span>
                             </div>
-                            <span className="absolute bottom-2 right-2 z-20 text-[10px] bg-retro-accent text-retro-accent-text font-black px-2 py-0.5 rounded-md shadow-md">
+                            <span className="absolute bottom-2 right-2 z-20 text-2xs bg-retro-accent text-retro-accent-text font-black px-2 py-0.5 rounded-md shadow-md">
                               Locked in
                             </span>
                             <div className="relative w-full flex-1 min-h-0 bg-surface-canvas overflow-hidden">
@@ -408,11 +408,11 @@ export function MatchRoundPanel({
                             </div>
                             <div className="p-2 bg-surface-canvas/90 border-t border-border-glass backdrop-blur-md text-left">
                               <div className="text-xs font-semibold text-retro-fg truncate">{name}</div>
-                              <div className="text-[10px] font-mono text-retro-muted truncate">by You</div>
+                              <div className="text-2xs font-mono text-retro-muted truncate">by You</div>
                             </div>
                           </div>
                         </div>
-                        <div className="text-[10px] font-medium text-retro-muted">You</div>
+                        <div className="text-2xs font-medium text-retro-muted">You</div>
                       </div>
                     )
                   })()}
@@ -429,12 +429,12 @@ export function MatchRoundPanel({
                         ) : (
                           <div className="space-y-2 text-retro-muted">
                             <div className="w-12 h-16 border border-dashed border-border-glass rounded-lg mx-auto flex items-center justify-center text-sm opacity-50">?</div>
-                            <div className="text-[10px]">Picking card...</div>
+                            <div className="text-2xs">Picking card...</div>
                           </div>
                         )}
                       </div>
                     </div>
-                    <div className="text-[10px] font-medium text-retro-muted">{opponentName || 'Opponent'}</div>
+                    <div className="text-2xs font-medium text-retro-muted">{opponentName || 'Opponent'}</div>
                   </div>
                 </div>
 
@@ -498,25 +498,25 @@ export function MatchRoundPanel({
                               <div className="w-full h-full bg-retro-border" />
                             )}
                             {isVid && (
-                              <span className="absolute bottom-0.5 left-0.5 text-[10px] bg-black/80 text-retro-fg font-medium px-1 rounded">
+                              <span className="absolute bottom-0.5 left-0.5 text-2xs bg-black/80 text-retro-fg font-medium px-1 rounded">
                                 Video
                               </span>
                             )}
                             <div className="absolute top-0.5 left-0.5 flex items-center gap-0.5 z-10">
-                              <span className={`text-[10px] font-medium px-1 rounded ${rarity.badgeClass}`}>
+                              <span className={`text-2xs font-medium px-1 rounded ${rarity.badgeClass}`}>
                                 {rarity.label}
                               </span>
-                              <span className="text-[10px] font-mono font-bold px-1 rounded bg-black/80 text-amber-300 border border-amber-500/30">
+                              <span className="text-2xs font-mono font-bold px-1 rounded bg-black/80 text-amber-300 border border-amber-500/30">
                                 {formatGc(cardVal)}
                               </span>
                             </div>
                             {isAlreadyPlayed && (
-                              <span className="absolute inset-0 bg-black/70 flex items-center justify-center text-[10px] font-medium text-rose-400 p-1 text-center rounded">
+                              <span className="absolute inset-0 bg-black/70 flex items-center justify-center text-2xs font-medium text-rose-400 p-1 text-center rounded">
                                 Used
                               </span>
                             )}
                             {selectedCard === card.id && !isAlreadyPlayed && (
-                              <span className="absolute top-0.5 right-0.5 text-[10px] bg-retro-fg text-retro-bg font-medium px-1 rounded">Selected</span>
+                              <span className="absolute top-0.5 right-0.5 text-2xs bg-retro-fg text-retro-bg font-medium px-1 rounded">Selected</span>
                             )}
                           </button>
                         )
@@ -597,16 +597,16 @@ export function MatchRoundPanel({
                     <div className="metallic-card flex flex-col h-full">
                       {/* Top Badges */}
                       <div className="absolute top-2 left-2 z-20 flex items-center gap-1">
-                        <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border shadow-md ${myRarity.badgeClass}`}>
+                        <span className={`text-2xs font-black uppercase tracking-wider px-2 py-0.5 rounded-md border shadow-md ${myRarity.badgeClass}`}>
                           {myRarity.label}
                         </span>
-                        <span className="text-[10px] font-mono font-black px-1.5 py-0.5 rounded-md bg-black/80 text-amber-300 border border-amber-400/40 shadow-md backdrop-blur-xs">
+                        <span className="text-2xs font-mono font-black px-1.5 py-0.5 rounded-md bg-black/80 text-amber-300 border border-amber-400/40 shadow-md backdrop-blur-xs">
                           {formatGc(myVal)}
                         </span>
                       </div>
 
                       <div className="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div className="bg-black/80 border border-border-glass text-retro-fg text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1">
+                        <div className="bg-black/80 border border-border-glass text-retro-fg text-2xs px-1.5 py-0.5 rounded flex items-center gap-1">
                           <ZoomIn className="w-3 h-3" />
                           <span>Zoom</span>
                         </div>
@@ -637,7 +637,7 @@ export function MatchRoundPanel({
                           >
                             <LinkIcon className="w-5 h-5 text-purple-400" />
                             <span className="text-xs font-medium">Link card</span>
-                            <span className="text-[10px] font-mono border border-border-glass px-2 py-0.5 rounded">Open ↗</span>
+                            <span className="text-2xs font-mono border border-border-glass px-2 py-0.5 rounded">Open ↗</span>
                           </a>
                         ) : (
                           <CardBack label="Your card" />
@@ -646,7 +646,7 @@ export function MatchRoundPanel({
                         {/* Decision stamp */}
                         {isRoundResult && match.my_decision && (
                           <span
-                            className={`absolute bottom-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shadow-lg ${
+                            className={`absolute bottom-2 left-2 text-2xs font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shadow-lg ${
                               match.my_decision === 'like' ? 'bg-emerald-500 text-retro-accent-text' : 'bg-rose-500 text-retro-fg'
                             }`}
                           >
@@ -658,11 +658,11 @@ export function MatchRoundPanel({
                       {/* Card Info Footer */}
                       <div className="p-2 bg-surface-canvas/90 border-t border-border-glass backdrop-blur-md text-left">
                         <div className="text-xs font-semibold text-retro-fg truncate">{myTitle}</div>
-                        <div className="text-[10px] font-mono text-retro-muted truncate">by You</div>
+                        <div className="text-2xs font-mono text-retro-muted truncate">by You</div>
                       </div>
                     </div>
                   </div>
-                  <div className="text-[10px] font-medium text-retro-muted">You</div>
+                  <div className="text-2xs font-medium text-retro-muted">You</div>
                 </div>
               )
             })()}
@@ -696,11 +696,11 @@ export function MatchRoundPanel({
                       {/* Top Badges */}
                       {(oppUrl || oppCardId) && (
                         <div className="absolute top-2 left-2 z-20 flex items-center gap-1">
-                          <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border shadow-md ${oppRarity.badgeClass}`}>
+                          <span className={`text-2xs font-black uppercase tracking-wider px-2 py-0.5 rounded-md border shadow-md ${oppRarity.badgeClass}`}>
                             {oppRarity.label}
                           </span>
                           {oppKnownValue !== null && (
-                            <span className="text-[10px] font-mono font-black px-1.5 py-0.5 rounded-md bg-black/80 text-amber-300 border border-amber-400/40 shadow-md backdrop-blur-xs">
+                            <span className="text-2xs font-mono font-black px-1.5 py-0.5 rounded-md bg-black/80 text-amber-300 border border-amber-400/40 shadow-md backdrop-blur-xs">
                               {formatGc(oppKnownValue)}
                             </span>
                           )}
@@ -708,7 +708,7 @@ export function MatchRoundPanel({
                       )}
 
                       <div className="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div className="bg-black/80 border border-border-glass text-retro-fg text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1">
+                        <div className="bg-black/80 border border-border-glass text-retro-fg text-2xs px-1.5 py-0.5 rounded flex items-center gap-1">
                           <ZoomIn className="w-3 h-3" />
                           <span>Zoom</span>
                         </div>
@@ -738,7 +738,7 @@ export function MatchRoundPanel({
                           >
                             <LinkIcon className="w-5 h-5 text-purple-400" />
                             <span className="text-xs font-medium">Link card</span>
-                            <span className="text-[10px] font-mono border border-border-glass px-2 py-0.5 rounded">Open ↗</span>
+                            <span className="text-2xs font-mono border border-border-glass px-2 py-0.5 rounded">Open ↗</span>
                           </a>
                         ) : opponentImg.failed ? (
                           <div className="w-full h-full flex items-center justify-center text-retro-muted text-xs">
@@ -751,7 +751,7 @@ export function MatchRoundPanel({
                         {/* Decision stamp */}
                         {isRoundResult && match.opponent_decision && (
                           <span
-                            className={`absolute bottom-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shadow-lg ${
+                            className={`absolute bottom-2 left-2 text-2xs font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shadow-lg ${
                               match.opponent_decision === 'like' ? 'bg-emerald-500 text-retro-accent-text' : 'bg-rose-500 text-retro-fg'
                             }`}
                           >
@@ -763,11 +763,11 @@ export function MatchRoundPanel({
                       {/* Card Info Footer */}
                       <div className="p-2 bg-surface-canvas/90 border-t border-border-glass backdrop-blur-md text-left">
                         <div className="text-xs font-semibold text-retro-fg truncate">{oppTitle}</div>
-                        <div className="text-[10px] font-mono text-retro-muted truncate">by {opponentName}</div>
+                        <div className="text-2xs font-mono text-retro-muted truncate">by {opponentName}</div>
                       </div>
                     </div>
                   </div>
-                  <div className="text-[10px] font-medium text-retro-muted">{opponentName}</div>
+                  <div className="text-2xs font-medium text-retro-muted">{opponentName}</div>
                 </div>
               )
             })()}

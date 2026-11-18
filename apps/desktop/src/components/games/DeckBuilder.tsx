@@ -335,14 +335,14 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
                    <Pencil className="w-3.5 h-3.5" />
                  </button>
                  {activeDeckId === selectedDeck.id ? (
-                   <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-mono text-[10px] font-bold flex items-center gap-1">
+                   <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-mono text-2xs font-bold flex items-center gap-1">
                      <Star className="w-3 h-3 fill-emerald-400 text-emerald-400" /> Active Deck
                    </span>
                  ) : (
                    <button
                      type="button"
                      onClick={() => setActiveDeck(selectedDeck.id)}
-                     className="px-2 py-0.5 rounded-full bg-surface-interactive border border-border-glass hover:border-emerald-500/40 text-retro-muted hover:text-emerald-300 text-[10px] font-bold cursor-pointer transition-colors"
+                     className="px-2 py-0.5 rounded-full bg-surface-interactive border border-border-glass hover:border-emerald-500/40 text-retro-muted hover:text-emerald-300 text-2xs font-bold cursor-pointer transition-colors"
                    >
                      Set as Active
                    </button>
@@ -553,7 +553,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
                       {deck.cards.length}/5 cards
                     </span>
                     {activeDeckId === deck.id && (
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-mono text-[10px] font-bold flex items-center gap-1">
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-mono text-2xs font-bold flex items-center gap-1">
                         <Star className="w-2.5 h-2.5 fill-emerald-400 text-emerald-400" /> Active
                       </span>
                     )}

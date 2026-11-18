@@ -115,7 +115,7 @@ function PlayerTile({
       <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/80 via-black/30 to-transparent pointer-events-none" />
 
       <span
-        className={`absolute top-1.5 left-1.5 z-20 text-[10px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap ${
+        className={`absolute top-1.5 left-1.5 z-20 text-2xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap ${
           isPlaying
             ? 'bg-surface-raised/90 text-retro-accent'
             : player.queueStatus === 'in_queue'
@@ -137,7 +137,7 @@ function PlayerTile({
       </span>
 
       {player.id === selfId && (
-        <span className="absolute top-1.5 right-1.5 z-20 text-[10px] font-semibold text-retro-accent">
+        <span className="absolute top-1.5 right-1.5 z-20 text-2xs font-semibold text-retro-accent">
           You
         </span>
       )}
@@ -160,7 +160,7 @@ function PlayerTile({
           {(() => {
             const tags = parseTags(player.tags)
             return tags.length > 0 ? (
-              <span className="text-[10px] text-retro-muted truncate">
+              <span className="text-2xs text-retro-muted truncate">
                 {tags.slice(0, 2).map((t) => `#${t}`).join(' ')}
               </span>
             ) : null

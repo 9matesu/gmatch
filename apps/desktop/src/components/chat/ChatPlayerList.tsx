@@ -311,12 +311,12 @@ export function ChatPlayerList({
                         {displayName}
                       </span>
                       {isSelf && (
-                        <span className="text-[10px] font-semibold text-retro-accent shrink-0 px-1 py-0.2 rounded bg-glass-w8">
+                        <span className="text-2xs font-semibold text-retro-accent shrink-0 px-1 py-0.2 rounded bg-glass-w8">
                           You
                         </span>
                       )}
                     </div>
-                    <span className="block text-[10px] text-retro-muted truncate">
+                    <span className="block text-2xs text-retro-muted truncate">
                       {player.online ? (
                         <>
                           <span className="text-retro-online font-medium">Active now</span>

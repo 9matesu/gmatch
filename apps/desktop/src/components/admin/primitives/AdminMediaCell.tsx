@@ -79,7 +79,7 @@ export function AdminMediaCell({
           className
         )}
       >
-        <span className="text-[10px] text-retro-muted uppercase tracking-wider font-mono">
+        <span className="text-2xs text-retro-muted uppercase tracking-wider font-mono">
           {obj.failed || loadError ? "N/A" : "…"}
         </span>
       </div>
@@ -98,7 +98,7 @@ export function AdminMediaCell({
       {isVideo ? (
         <>
           <video src={url} muted className="w-full h-full object-cover" />
-          <span className="absolute top-0.5 left-0.5 px-1 py-0.5 bg-black/80 border border-border-glass text-retro-fg font-mono font-bold text-[10px] rounded">
+          <span className="absolute top-0.5 left-0.5 px-1 py-0.5 bg-black/80 border border-border-glass text-retro-fg font-mono font-bold text-2xs rounded">
             VIDEO
           </span>
         </>

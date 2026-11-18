@@ -60,7 +60,7 @@ function LocalEntryTransfer({ partyId, entryId, objectId, hash }: {
     return (
       <span className="flex items-center gap-1" title={`Receiving from peers (${pct}%)`}>
         <Loader2 className="w-3 h-3 animate-spin text-retro-muted" />
-        <span className="font-mono text-[10px] text-retro-muted">{pct}%</span>
+        <span className="font-mono text-2xs text-retro-muted">{pct}%</span>
         <button
           type="button"
           onClick={cancel}
@@ -133,7 +133,7 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
   return (
     <div className="border-t border-border-glass">
       <div className="flex items-center justify-between px-3 pt-2 pb-1">
-        <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-retro-muted">
+        <p className="flex items-center gap-1.5 text-2xs font-bold uppercase tracking-wider text-retro-muted">
           <ListVideo className="w-3.5 h-3.5" />
           Queue {party.queue.length > 0 && `(${party.queue.length})`}
         </p>
@@ -161,13 +161,13 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
             }}
             className="glass-inset w-full px-2.5 py-1.5 text-xs font-mono resize-y"
           />
-          <p className={`text-[10px] ${MUTED}`}>Up to 10 per add, or one pmvhaven playlist link per line. Parsing runs server-side.</p>
-          {error && <p className="text-[10px] text-retro-error">{error}</p>}
+          <p className={`text-2xs ${MUTED}`}>Up to 10 per add, or one pmvhaven playlist link per line. Parsing runs server-side.</p>
+          {error && <p className="text-2xs text-retro-error">{error}</p>}
           <div className="flex gap-2">
-            <button type="button" onClick={() => void submit(true)} disabled={busy} className={`${BTN} flex-1 py-1 text-[10px] uppercase tracking-wider disabled:opacity-40`}>
+            <button type="button" onClick={() => void submit(true)} disabled={busy} className={`${BTN} flex-1 py-1 text-2xs uppercase tracking-wider disabled:opacity-40`}>
               {busy ? 'Parsing...' : 'Add'}
             </button>
-            <button type="button" onClick={() => void submit(false)} disabled={busy} className={`${BTN_PRIMARY} flex-1 py-1 text-[10px] uppercase tracking-wider disabled:opacity-40`}>
+            <button type="button" onClick={() => void submit(false)} disabled={busy} className={`${BTN_PRIMARY} flex-1 py-1 text-2xs uppercase tracking-wider disabled:opacity-40`}>
               Add and play
             </button>
           </div>
@@ -207,17 +207,17 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
                 {q.name || q.url}
               </span>
               {q.status === 'proposed' && (
-                <span className="rounded-full border border-amber-400/40 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wider text-amber-300" title="A participant suggestion — the host approves it before it can play">
+                <span className="rounded-full border border-amber-400/40 px-1.5 py-px text-2xs font-semibold uppercase tracking-wider text-amber-300" title="A participant suggestion — the host approves it before it can play">
                   proposed
                 </span>
               )}
               {q.status === 'unavailable' && (
-                <span className="rounded-full border border-retro-error/40 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wider text-retro-error" title="Flagged as unplayable — skipped by next/previous">
+                <span className="rounded-full border border-retro-error/40 px-1.5 py-px text-2xs font-semibold uppercase tracking-wider text-retro-error" title="Flagged as unplayable — skipped by next/previous">
                   unavailable
                 </span>
               )}
               {q.local && (
-                <span className="font-mono text-[10px] text-retro-muted" title={`Local file · sha256:${(q.hash || '').slice(0, 12)}… · ready ${(party.ready[q.id] || []).length}/${party.members.length}`}>
+                <span className="font-mono text-2xs text-retro-muted" title={`Local file · sha256:${(q.hash || '').slice(0, 12)}… · ready ${(party.ready[q.id] || []).length}/${party.members.length}`}>
                   {(party.ready[q.id] || []).length}/{party.members.length} ready
                 </span>
               )}
@@ -230,7 +230,7 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
                 />
               )}
               {isHost && q.status === 'proposed' && (
-                <button type="button" onClick={() => queueOp(party.id, 'approve', q.id)} aria-label={`Approve ${q.name || 'video'}`} title="Approve suggestion" className="px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 hover:bg-emerald-500/30 cursor-pointer text-[10px] font-bold uppercase tracking-wider">
+                <button type="button" onClick={() => queueOp(party.id, 'approve', q.id)} aria-label={`Approve ${q.name || 'video'}`} title="Approve suggestion" className="px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 hover:bg-emerald-500/30 cursor-pointer text-2xs font-bold uppercase tracking-wider">
                   Approve
                 </button>
               )}
@@ -250,7 +250,7 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
                 </button>
               )}
               {canControl && q.status === 'unavailable' && (
-                <button type="button" onClick={() => queueOp(party.id, 'unflag', q.id)} aria-label="Mark as available" title="Mark as available again" className="px-2 py-0.5 rounded-md hover:bg-glass-w10 text-retro-muted hover:text-retro-fg cursor-pointer text-[10px] font-semibold uppercase tracking-wider">
+                <button type="button" onClick={() => queueOp(party.id, 'unflag', q.id)} aria-label="Mark as available" title="Mark as available again" className="px-2 py-0.5 rounded-md hover:bg-glass-w10 text-retro-muted hover:text-retro-fg cursor-pointer text-2xs font-semibold uppercase tracking-wider">
                   Retry
                 </button>
               )}
@@ -258,10 +258,10 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
           ))}
         </ul>
       )}
-      {party.queue.length === 0 && !adding && <p className="px-3 pb-2 text-[10px] text-retro-muted">Empty.</p>}
+      {party.queue.length === 0 && !adding && <p className="px-3 pb-2 text-2xs text-retro-muted">Empty.</p>}
       {canControl && party.queue.length > 0 && (
         <div className="px-3 pb-2">
-          <button type="button" onClick={() => queueOp(party.id, 'next')} className={`${BTN} px-2 py-1 text-[10px] uppercase tracking-wider`}>
+          <button type="button" onClick={() => queueOp(party.id, 'next')} className={`${BTN} px-2 py-1 text-2xs uppercase tracking-wider`}>
             Play next
           </button>
         </div>

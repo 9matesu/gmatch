@@ -98,7 +98,7 @@ export function IdleOverlay({ items, identity, onExit }: {
             className="max-w-[95vw] max-h-[90vh] object-contain animate-fadeIn"
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
           />
-          <div className="absolute bottom-6 text-[10px] text-retro-muted font-sans">
+          <div className="absolute bottom-6 text-2xs text-retro-muted font-sans">
             Click anywhere or press any key to return
           </div>
         </>
@@ -108,7 +108,7 @@ export function IdleOverlay({ items, identity, onExit }: {
           <p className="text-retro-muted text-xs font-sans">
             {imageItems.length === 0 ? 'No images to display' : 'Loading slideshow...'}
           </p>
-          <p className="text-[10px] text-retro-muted font-sans">
+          <p className="text-2xs text-retro-muted font-sans">
             Click anywhere or press any key to return
           </p>
         </div>

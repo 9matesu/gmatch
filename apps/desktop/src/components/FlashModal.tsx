@@ -95,7 +95,7 @@ export function FlashModal({
           <DropZone onFiles={handleFile} onPasteUrl={handleUrl} compact={false} accept="image/jpeg, image/png, image/webp, image/avif, image/gif" multiple={false}>
             <div className="space-y-1.5">
               <p className="text-sm text-retro-muted">Drop an image, click to browse, or paste a link</p>
-              <p className="text-[10px] text-retro-muted/60">JPG, PNG, WebP, GIF</p>
+              <p className="text-2xs text-retro-muted/60">JPG, PNG, WebP, GIF</p>
             </div>
           </DropZone>
           {preview && (
