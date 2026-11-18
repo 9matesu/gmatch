@@ -123,7 +123,10 @@ export function outboxStatesByGroup(): Record<string, OutboxState> {
 
 /** Drop replicated entries past the grace window (server rows authoritative).
  *  Default grace keeps the stub visible until reconciliation refreshes. */
-export function pruneOutbox(graceMs = 5 * 60_000, now = Date.now()): void {
+/** Drop replicated entries past the grace window. The server row is authoritative,
+ *  but the local mirror is what re-registers the post if the node loses it, so
+ *  the window is a day (the entry is a few hundred bytes) instead of 5 min. */
+export function pruneOutbox(graceMs = 24 * 60 * 60_000, now = Date.now()): void {
   writeAll(readAll().filter((e) => !(e.state === 'replicated' && now - e.updatedAt > graceMs)));
 }
 
