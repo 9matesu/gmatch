@@ -153,7 +153,7 @@ export function CropModal({
 
   const modalContent = (
     <div className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-retro-fg" style={{ zIndex: 'calc(var(--z-system) + 10)' }} onClick={onCancel} onMouseDown={(e) => e.stopPropagation()}>
-      <div className="w-full max-w-sm bg-retro-bg border border-border-glass rounded-xl p-4 space-y-3 animate-orbit-pop" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-sm bg-retro-bg border border-edge rounded-xl p-4 space-y-3 animate-orbit-pop" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold">{title}</h3>
           <button type="button" onClick={onCancel} aria-label="Cancel crop" className="p-1.5 rounded-lg text-retro-muted hover:text-retro-fg hover:bg-retro-panel cursor-pointer transition-colors">
@@ -164,7 +164,7 @@ export function CropModal({
           {loadError ? (
             <div className="text-xs text-retro-muted text-center">Could not load this image. It will be used uncropped.</div>
           ) : (
-            <div className="relative overflow-hidden rounded-lg border border-border-glass bg-retro-bg touch-none select-none" style={{ width: fw || 'auto', height: fh || 'auto' }}>
+            <div className="relative overflow-hidden rounded-lg border border-edge bg-retro-bg touch-none select-none" style={{ width: fw || 'auto', height: fh || 'auto' }}>
               {img && (
                 <img
                   src={src}
@@ -200,7 +200,7 @@ export function CropModal({
               key={a.id}
               type="button"
               onClick={() => { playPress(720); setAspect(a.id); setPan({ x: 0, y: 0 }); }}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-colors border ${aspect === a.id ? 'bg-retro-fg text-retro-bg border-border-glass' : 'text-retro-muted border-border-glass hover:text-retro-fg hover:bg-retro-panel'}`}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-colors border ${aspect === a.id ? 'bg-retro-fg text-retro-bg border-edge' : 'text-retro-muted border-edge hover:text-retro-fg hover:bg-retro-panel'}`}
             >
               {a.label}
             </button>

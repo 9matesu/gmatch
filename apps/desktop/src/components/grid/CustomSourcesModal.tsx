@@ -69,7 +69,7 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
           <p className="text-xs text-retro-muted italic py-2">No custom sources yet. Paste links or add a folder below.</p>
         )}
         {sources.map((s) => (
-          <div key={s.id} className="flex items-center gap-3 rounded-lg border border-border-glass bg-glass-w8 px-3.5 py-2.5">
+          <div key={s.id} className="flex items-center gap-3 rounded-lg border border-edge bg-glass-w8 px-3.5 py-2.5">
             <button
               type="button"
               role="switch"
@@ -114,7 +114,7 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
           </div>
         ))}
 
-        <div className="space-y-2.5 rounded-lg border border-border-glass bg-glass-w8 p-3.5">
+        <div className="space-y-2.5 rounded-lg border border-edge bg-glass-w8 p-3.5">
           <div className="text-xs font-semibold text-retro-fg flex items-center gap-1.5">
             <Globe size={13} weight="bold" className="text-retro-accent" />
             Add direct media links
@@ -124,7 +124,7 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
             onChange={(e) => setLabel(e.target.value)}
             placeholder="Label (e.g. My collection)"
             aria-label="Source label"
-            className="w-full rounded-lg border border-border-glass bg-glass-w5 px-3 py-2 text-xs text-retro-fg outline-none placeholder:text-retro-muted focus:border-retro-accent transition-colors"
+            className="w-full rounded-lg border border-edge bg-glass-w5 px-3 py-2 text-xs text-retro-fg outline-none placeholder:text-retro-muted focus:border-retro-accent transition-colors"
           />
           <textarea
             value={urlsText}
@@ -132,7 +132,7 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
             placeholder={'Paste direct image/video links, one per line\nhttps://…/a.jpg\nhttps://…/b.mp4'}
             aria-label="Media links"
             rows={3}
-            className="w-full rounded-lg border border-border-glass bg-glass-w5 px-3 py-2 text-xs text-retro-fg outline-none placeholder:text-retro-muted focus:border-retro-accent transition-colors"
+            className="w-full rounded-lg border border-edge bg-glass-w5 px-3 py-2 text-xs text-retro-fg outline-none placeholder:text-retro-muted focus:border-retro-accent transition-colors"
           />
           <div className="flex items-center justify-between gap-2 pt-1">
             <span className={`${MONO} text-xs text-retro-muted`}>{usable.length} of {pasted.length} usable</span>
@@ -143,7 +143,7 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
           </div>
         </div>
 
-        <div className="space-y-2.5 rounded-lg border border-border-glass bg-glass-w8 p-3.5">
+        <div className="space-y-2.5 rounded-lg border border-edge bg-glass-w8 p-3.5">
           <div className="text-xs font-semibold text-retro-fg flex items-center gap-1.5">
             <FolderSimple size={13} weight="bold" className="text-retro-accent" />
             Add a local folder

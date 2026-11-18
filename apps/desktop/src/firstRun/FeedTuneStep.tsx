@@ -195,7 +195,7 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
             {Array.from({ length: SETUP_TAG_COUNT - picks.length }, (_, i) => (
               <span
                 key={`empty-${i}`}
-                className="inline-flex items-center rounded-full border border-dashed border-border-glass px-4 py-2 text-sm text-retro-muted"
+                className="inline-flex items-center rounded-full border border-dashed border-edge px-4 py-2 text-sm text-retro-muted"
               >
                 pick {picks.length + i + 1}
               </span>
@@ -216,7 +216,7 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
                 onClick={() => togglePill(t)}
                 disabled={picks.length >= SETUP_TAG_COUNT}
                 aria-pressed={false}
-                className="rounded-full border border-border-glass bg-surface-raised px-4 py-2 text-sm text-retro-muted cursor-pointer transition-colors hover:text-retro-fg hover:border-retro-accent/50 disabled:opacity-30 disabled:cursor-default"
+                className="rounded-full border border-edge bg-surface-raised px-4 py-2 text-sm text-retro-muted cursor-pointer transition-colors hover:text-retro-fg hover:border-retro-accent/50 disabled:opacity-30 disabled:cursor-default"
               >
                 + {t}
               </button>
@@ -249,7 +249,7 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
                 type="button"
                 disabled={excludes.length >= 100}
                 onClick={() => setExcludes((prev) => [...prev, x].slice(0, 100))}
-                className="rounded-full border border-border-subtle px-3 py-1.5 text-xs font-mono text-retro-muted disabled:opacity-30 cursor-pointer hover:text-retro-fg hover:border-border-strong"
+                className="rounded-full border border-edge-subtle px-3 py-1.5 text-xs font-mono text-retro-muted disabled:opacity-30 cursor-pointer hover:text-retro-fg hover:border-edge-strong"
               >
                 + {x}
               </button>

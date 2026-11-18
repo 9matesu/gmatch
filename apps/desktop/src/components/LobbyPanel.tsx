@@ -476,7 +476,7 @@ const selfId = identity?.orbitId || ''
           <button
             type="button"
             onClick={() => setDismissedExpired(true)}
-            className="text-xs font-medium text-retro-muted hover:text-retro-fg border border-border-glass px-2 py-1 cursor-pointer rounded transition-colors"
+            className="text-xs font-medium text-retro-muted hover:text-retro-fg border border-edge px-2 py-1 cursor-pointer rounded transition-colors"
           >
             Dismiss
           </button>
@@ -547,7 +547,7 @@ const selfId = identity?.orbitId || ''
                 <button
                   type="button"
                   onClick={onOpenDeckBuilder}
-                  className="border border-border-glass px-2.5 py-1.5 text-xs font-medium text-retro-fg hover:bg-surface-interactive cursor-pointer rounded-lg transition-colors"
+                  className="border border-edge px-2.5 py-1.5 text-xs font-medium text-retro-fg hover:bg-surface-interactive cursor-pointer rounded-lg transition-colors"
                 >
                   Open collection
                 </button>

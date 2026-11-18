@@ -280,7 +280,7 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0,
             <button
               type="button"
               onClick={() => void openMediaPicker().then((sel) => { if (sel) void takePickerSelection(sel); })}
-              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-border-glass text-xs font-semibold text-retro-muted hover:text-retro-fg hover:border-retro-accent hover:bg-glass-w8 cursor-pointer transition-all"
+              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-edge text-xs font-semibold text-retro-muted hover:text-retro-fg hover:border-retro-accent hover:bg-glass-w8 cursor-pointer transition-all"
             >
               <Plus className="w-3.5 h-3.5" />
               Pick from your media, this device, or a link

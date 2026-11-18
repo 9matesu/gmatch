@@ -81,7 +81,7 @@ export function GroupMembersPopover({
     <div className="p-2 space-y-1" role="list" aria-label="Group members">
       {members.map((m) => (
         <div key={m.id} role="listitem" className="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs">
-          <span className="w-6 h-6 rounded-full bg-surface-raised border border-border-glass flex items-center justify-center text-2xs font-bold text-retro-muted shrink-0">
+          <span className="w-6 h-6 rounded-full bg-surface-raised border border-edge flex items-center justify-center text-2xs font-bold text-retro-muted shrink-0">
             {m.display_name.charAt(0).toUpperCase()}
           </span>
           <span className="truncate text-retro-body">
@@ -97,7 +97,7 @@ export function GroupMembersPopover({
       ))}
 
       {isOwner && nonMemberPeers.length > 0 && (
-        <div className="pt-2 border-t border-border-glass mt-2 space-y-1">
+        <div className="pt-2 border-t border-edge mt-2 space-y-1">
           <div className="text-2xs uppercase tracking-wider text-retro-muted px-2">Add people</div>
           {nonMemberPeers.map((p) => (
             <button

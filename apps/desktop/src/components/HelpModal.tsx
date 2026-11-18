@@ -86,14 +86,14 @@ function TopicBody({ topicId }: { topicId: string }) {
       </div>
 
       {shot && (
-        <div className="border border-border-glass rounded-lg overflow-hidden bg-black/40">
+        <div className="border border-edge rounded-lg overflow-hidden bg-black/40">
           <img
             src={shot.src}
             alt={shot.caption}
             className="w-full max-h-56 object-cover object-top block"
             loading="lazy"
           />
-          <div className="px-3 py-1 bg-surface-canvas/90 text-2xs text-retro-muted font-mono border-t border-border-glass">
+          <div className="px-3 py-1 bg-surface-canvas/90 text-2xs text-retro-muted font-mono border-t border-edge">
             {shot.caption}
           </div>
         </div>
@@ -111,7 +111,7 @@ function TopicBody({ topicId }: { topicId: string }) {
             </ul>
           )}
           {s.callout && (
-            <p className="text-xs text-retro-fg leading-relaxed bg-surface-interactive border border-border-glass rounded-lg p-3">
+            <p className="text-xs text-retro-fg leading-relaxed bg-surface-interactive border border-edge rounded-lg p-3">
               {s.callout}
             </p>
           )}
@@ -156,11 +156,11 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
         role="dialog"
         aria-modal="true"
         aria-label="Help"
-        className="bg-surface-raised border border-border-glass rounded-xl max-w-4xl w-full h-[80vh] max-h-[620px] flex flex-col shadow-2xl overflow-hidden text-retro-fg my-auto"
+        className="bg-surface-raised border border-edge rounded-xl max-w-4xl w-full h-[80vh] max-h-[620px] flex flex-col shadow-2xl overflow-hidden text-retro-fg my-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border-glass shrink-0 bg-surface-raised">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-edge shrink-0 bg-surface-raised">
           <div className="flex items-center gap-2">
             <h2 className="text-sm font-bold tracking-wide text-retro-fg ">Help &amp; Guide</h2>
             {currentTabDef && (
@@ -186,7 +186,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
               buttons are gone (Swiss reduction). */}
           <nav
             aria-label="Help topics"
-            className="w-full sm:w-56 shrink-0 border-b sm:border-b-0 sm:border-r border-border-glass bg-surface-canvas/50 p-3 overflow-y-auto styled-scrollbar"
+            className="w-full sm:w-56 shrink-0 border-b sm:border-b-0 sm:border-r border-edge bg-surface-canvas/50 p-3 overflow-y-auto styled-scrollbar"
           >
             <BounceSidebar
               items={helpNavItems}
@@ -208,7 +208,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
             <button
               type="button"
               onClick={() => openCommunityInvite(communityUrl)}
-              className="w-full flex items-center gap-2 rounded-lg border border-border-glass bg-glass-w5 hover:bg-glass-w8 px-3 py-2 text-left transition-colors cursor-pointer"
+              className="w-full flex items-center gap-2 rounded-lg border border-edge bg-glass-w5 hover:bg-glass-w8 px-3 py-2 text-left transition-colors cursor-pointer"
             >
               <Users className="w-4 h-4 shrink-0 text-retro-fg" />
               <span className="flex-1 min-w-0">
@@ -229,14 +229,14 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                 </div>
 
                 {quickstartShot && (
-                  <div className="border border-border-glass rounded-lg overflow-hidden bg-black/40">
+                  <div className="border border-edge rounded-lg overflow-hidden bg-black/40">
                     <img
                       src={quickstartShot.src}
                       alt={quickstartShot.caption}
                       className="w-full max-h-56 object-cover object-top block"
                       loading="lazy"
                     />
-                    <div className="px-3 py-1 bg-surface-canvas/90 text-2xs text-retro-muted font-mono border-t border-border-glass">
+                    <div className="px-3 py-1 bg-surface-canvas/90 text-2xs text-retro-muted font-mono border-t border-edge">
                       {quickstartShot.caption}
                     </div>
                   </div>
@@ -245,25 +245,25 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                 <section className="space-y-2">
                   <h4 className="text-xs font-bold text-retro-fg tracking-wider">How it works</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                    <div className="p-3 bg-surface-interactive/60 border border-border-glass rounded-lg space-y-1">
+                    <div className="p-3 bg-surface-interactive/60 border border-edge rounded-lg space-y-1">
                       <span className="font-bold text-retro-fg">1. Keys stay on your device</span>
                       <p className="text-retro-muted leading-relaxed">
                         Your account is a cryptographic keypair generated locally. No email, phone number, or password is sent to any server.
                       </p>
                     </div>
-                    <div className="p-3 bg-surface-interactive/60 border border-border-glass rounded-lg space-y-1">
+                    <div className="p-3 bg-surface-interactive/60 border border-edge rounded-lg space-y-1">
                       <span className="font-bold text-retro-fg">2. Zero central storage</span>
                       <p className="text-retro-muted leading-relaxed">
                         Media is addressed by content hashes. A post you view is fetched from peers in encrypted chunks and cached locally; a full community node keeps its own community's copy.
                       </p>
                     </div>
-                    <div className="p-3 bg-surface-interactive/60 border border-border-glass rounded-lg space-y-1">
+                    <div className="p-3 bg-surface-interactive/60 border border-edge rounded-lg space-y-1">
                       <span className="font-bold text-retro-fg">3. Build your 5-card deck</span>
                       <p className="text-retro-muted leading-relaxed">
                         You get 5 starter cards. Equip them in Deck Builder and press Set as Active to enter Quick Play duels.
                       </p>
                     </div>
-                    <div className="p-3 bg-surface-interactive/60 border border-border-glass rounded-lg space-y-1">
+                    <div className="p-3 bg-surface-interactive/60 border border-edge rounded-lg space-y-1">
                       <span className="font-bold text-retro-fg">4. Rooms and watch parties</span>
                       <p className="text-retro-muted leading-relaxed">
                         Stream videos in sync, chat with online players, and challenge peers directly in the Arena.
@@ -272,7 +272,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                   </div>
                 </section>
 
-                <section className="space-y-2 pt-2 border-t border-border-glass">
+                <section className="space-y-2 pt-2 border-t border-edge">
                   <h4 className="text-xs font-bold text-retro-fg tracking-wider">Troubleshooting &amp; Logs</h4>
                   <p className="text-retro-muted leading-relaxed">
                     If an action fails or a peer appears offline, diagnostic events are logged locally to help identify network and storage issues.
@@ -310,13 +310,13 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                 <section className="space-y-2">
                   <h4 className="text-xs font-bold text-retro-fg tracking-wider">Transmission Options</h4>
                   <div className="space-y-2">
-                    <div className="bg-surface-interactive/60 p-3 border border-border-glass rounded-lg">
+                    <div className="bg-surface-interactive/60 p-3 border border-edge rounded-lg">
                       <span className="text-retro-fg font-medium">Encrypted Media</span>: Sealed directly to the recipient public encryption key.
                     </div>
-                    <div className="bg-surface-interactive/60 p-3 border border-border-glass rounded-lg">
+                    <div className="bg-surface-interactive/60 p-3 border border-edge rounded-lg">
                       <span className="text-retro-fg font-medium">Remote Wallpaper</span>: Applies the media as background wallpaper for the recipient.
                     </div>
-                    <div className="bg-surface-interactive/60 p-3 border border-border-glass rounded-lg">
+                    <div className="bg-surface-interactive/60 p-3 border border-edge rounded-lg">
                       <span className="text-retro-fg font-medium">Timebomb</span>: Automatically removes the payload after the configured duration expires.
                     </div>
                   </div>
@@ -332,14 +332,14 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                 </div>
 
                 {networkShot && (
-                  <div className="border border-border-glass rounded-lg overflow-hidden bg-black/40">
+                  <div className="border border-edge rounded-lg overflow-hidden bg-black/40">
                     <img
                       src={networkShot.src}
                       alt={networkShot.caption}
                       className="w-full max-h-56 object-cover object-top block"
                       loading="lazy"
                     />
-                    <div className="px-3 py-1 bg-surface-canvas/90 text-2xs text-retro-muted font-mono border-t border-border-glass">
+                    <div className="px-3 py-1 bg-surface-canvas/90 text-2xs text-retro-muted font-mono border-t border-edge">
                       {networkShot.caption}
                     </div>
                   </div>
@@ -396,7 +396,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                   </p>
                 </div>
                 <section className="space-y-2">
-                  <div className="divide-y divide-border-glass/40 text-xs">
+                  <div className="divide-y divide-edge/40 text-xs">
                     {[
                       ['?', 'Open or close this help guide'],
                       ['Ctrl+H', 'Toggle help modal'],
@@ -409,7 +409,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                     ].map(([key, desc]) => (
                       <div key={key} className="flex items-center justify-between py-2">
                         <span className="text-retro-muted">{desc}</span>
-                        <kbd className="bg-surface-interactive border border-border-glass px-2 py-0.5 text-xs font-mono text-retro-fg rounded font-bold">
+                        <kbd className="bg-surface-interactive border border-edge px-2 py-0.5 text-xs font-mono text-retro-fg rounded font-bold">
                           {key}
                         </kbd>
                       </div>

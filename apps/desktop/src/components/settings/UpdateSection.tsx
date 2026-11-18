@@ -105,7 +105,7 @@ export function UpdateSection({ toast }: {
   const hasUpdateFallback = Boolean(installed && latest && isNewer(latest.version, installed));
 
   return (
-    <div className="p-4 bg-surface-interactive border border-border-glass rounded-lg space-y-3">
+    <div className="p-4 bg-surface-interactive border border-edge rounded-lg space-y-3">
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
           <h4 className="text-xs font-medium text-retro-fg">Updates</h4>
@@ -152,7 +152,7 @@ export function UpdateSection({ toast }: {
             type="button"
             disabled={busy}
             onClick={() => { playPress(700); void (updater ? check() : checkFallback()); }}
-            className="px-3 py-1.5 rounded-lg border border-border-glass text-xs text-retro-muted hover:text-retro-fg disabled:opacity-40 cursor-pointer flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-lg border border-edge text-xs text-retro-muted hover:text-retro-fg disabled:opacity-40 cursor-pointer flex items-center gap-1.5"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${busy ? 'animate-spin' : ''}`} /> {busy ? 'Checking…' : 'Check for updates'}
           </button>
@@ -162,7 +162,7 @@ export function UpdateSection({ toast }: {
               playPress(700);
               window.dispatchEvent(new CustomEvent('gmatch-open-changelog'));
             }}
-            className="px-3 py-1.5 rounded-lg border border-border-glass text-xs text-retro-muted hover:text-retro-fg cursor-pointer flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-lg border border-edge text-xs text-retro-muted hover:text-retro-fg cursor-pointer flex items-center gap-1.5"
           >
             <Sparkles className="w-3.5 h-3.5 text-retro-accent" /> What&apos;s New
           </button>

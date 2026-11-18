@@ -38,7 +38,7 @@ export function CoffeeModal({ open, reason, onDismiss }: Props) {
         </li>
       </ul>
 
-      <div className="pt-3 border-t border-border-glass space-y-2">
+      <div className="pt-3 border-t border-edge space-y-2">
         <a
           href={COFFEE_URL}
           target="_blank"

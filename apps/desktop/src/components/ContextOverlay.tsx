@@ -136,7 +136,7 @@ export function ContextOverlay({
         role="menu"
         aria-label="Context menu"
         data-testid="context-menu"
-        className="fixed bg-retro-panel/95 backdrop-blur-md border border-border-glass rounded-xl shadow-2xl p-1.5 w-56 text-xs z-[var(--z-system)] space-y-0.5 animate-orbit-fade-in text-retro-fg"
+        className="fixed bg-retro-panel/95 backdrop-blur-md border border-edge rounded-xl shadow-2xl p-1.5 w-56 text-xs z-[var(--z-system)] space-y-0.5 animate-orbit-fade-in text-retro-fg"
         style={{ top, left }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -146,7 +146,7 @@ export function ContextOverlay({
 
           return (
             <>
-              <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-border-glass/40 mb-1">
+              <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-edge/40 mb-1">
                 Edit
               </div>
 
@@ -232,7 +232,7 @@ export function ContextOverlay({
                 <span className="text-2xs text-retro-muted font-mono">Ctrl+V</span>
               </button>
 
-              <div className="my-1 border-t border-border-glass/50" />
+              <div className="my-1 border-t border-edge/50" />
 
               {/* Select All */}
               <button
@@ -280,7 +280,7 @@ export function ContextOverlay({
 
           return (
             <>
-              <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-border-glass/40 mb-1 truncate">
+              <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-edge/40 mb-1 truncate">
                 &ldquo;{text.slice(0, 18)}&rdquo;
               </div>
 
@@ -343,7 +343,7 @@ export function ContextOverlay({
 
           return (
             <>
-              <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-border-glass/40 mb-1 truncate">
+              <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-edge/40 mb-1 truncate">
                 Link
               </div>
 
@@ -382,7 +382,7 @@ export function ContextOverlay({
         {/* ─── GENERAL / BACKGROUND CONTEXT MENU ─── */}
         {contextMenu.type === 'general' && (
           <>
-            <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-border-glass/40 mb-1">
+            <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-edge/40 mb-1">
               gMatch
             </div>
 
@@ -437,7 +437,7 @@ export function ContextOverlay({
         {/* ─── USER CONTEXT MENU ─── */}
         {contextMenu.type === 'user' && (
           <>
-            <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-border-glass/40 mb-1">
+            <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-edge/40 mb-1">
               User: {contextMenu.data.display_name || 'Peer'}
             </div>
 
@@ -538,7 +538,7 @@ export function ContextOverlay({
         {/* ─── ITEM CONTEXT MENU ─── */}
         {contextMenu.type === 'item' && (
           <>
-            <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-border-glass/40 mb-1">
+            <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-edge/40 mb-1">
               Keepsake
             </div>
 
@@ -743,7 +743,7 @@ export function ReportModal({
               className={`px-3 py-1 border font-bold uppercase tracking-wider transition-colors ${
                 reportCategory === cat
                   ? 'bg-retro-accent text-retro-accent-text border-retro-accent'
-                  : 'bg-retro-bg text-retro-muted border-border-glass hover:text-retro-fg'
+                  : 'bg-retro-bg text-retro-muted border-edge hover:text-retro-fg'
               }`}
             >
               {cat}
@@ -755,7 +755,7 @@ export function ReportModal({
           value={reportReason}
           onChange={e => setReportReason(e.target.value)}
           placeholder="Describe the issue (optional)..."
-          className="w-full p-2.5 bg-retro-bg border border-border-glass text-xs text-retro-fg placeholder:text-retro-muted focus:outline-none"
+          className="w-full p-2.5 bg-retro-bg border border-edge text-xs text-retro-fg placeholder:text-retro-muted focus:outline-none"
           maxLength={200}
         />
         <div className="flex gap-2 pt-1">

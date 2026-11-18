@@ -155,7 +155,7 @@ export function WatchLocalFile({
           void pick(e.dataTransfer.files?.[0] || null)
         }}
         className={`flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed px-3 py-4 text-center transition-colors ${
-          dragOver ? 'border-retro-fg bg-glass-w10' : 'border-border-glass hover:border-retro-fg/50'
+          dragOver ? 'border-retro-fg bg-glass-w10' : 'border-edge hover:border-retro-fg/50'
         }`}
       >
         <FileVideo className="h-5 w-5 text-retro-muted" />
@@ -164,7 +164,7 @@ export function WatchLocalFile({
       </div>
 
       {meta && file && (
-        <div className="rounded-lg border border-border-glass bg-glass-w5 px-3 py-2 text-xs">
+        <div className="rounded-lg border border-edge bg-glass-w5 px-3 py-2 text-xs">
           <p className="truncate font-semibold text-retro-fg">{meta.name}</p>
           <p className={`mt-0.5 font-mono text-2xs ${MUTED}`}>
             {formatBytes(meta.size)}

@@ -39,16 +39,16 @@ export function AgeGateModal() {
       className="fixed inset-0 z-[var(--z-toast)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in"
     >
       <div
-        className="bg-retro-bg border border-border-glass rounded-xl max-w-md w-full p-6 sm:p-7 shadow-2xl space-y-5 text-center flex flex-col items-center animate-orbit-slide-up text-retro-fg"
+        className="bg-retro-bg border border-edge rounded-xl max-w-md w-full p-6 sm:p-7 shadow-2xl space-y-5 text-center flex flex-col items-center animate-orbit-slide-up text-retro-fg"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Icon & Brand */}
-        <div className="w-12 h-12 rounded-xl bg-retro-panel border border-border-glass text-retro-fg flex items-center justify-center">
+        <div className="w-12 h-12 rounded-xl bg-retro-panel border border-edge text-retro-fg flex items-center justify-center">
           <ShieldAlert className="w-6 h-6 text-retro-fg" />
         </div>
 
         <div className="space-y-1.5">
-          <span className="text-2xs font-semibold uppercase tracking-wider text-retro-body bg-retro-panel px-2.5 py-1 rounded-md border border-border-glass">
+          <span className="text-2xs font-semibold uppercase tracking-wider text-retro-body bg-retro-panel px-2.5 py-1 rounded-md border border-edge">
             Age Verification
           </span>
           <h2 id="age-gate-title" className="text-2xl font-black tracking-tighter text-retro-fg">Are you 18 or older?</h2>
@@ -72,7 +72,7 @@ export function AgeGateModal() {
           <button
             type="button"
             onClick={handleRejectAge}
-            className="w-full py-2 px-4 rounded-lg bg-retro-panel hover:bg-glass-w12 active:scale-[0.99] text-retro-fg font-medium text-xs border border-border-glass transition-all cursor-pointer flex items-center justify-center gap-2"
+            className="w-full py-2 px-4 rounded-lg bg-retro-panel hover:bg-glass-w12 active:scale-[0.99] text-retro-fg font-medium text-xs border border-edge transition-all cursor-pointer flex items-center justify-center gap-2"
           >
             <XCircle className="w-4 h-4 text-retro-muted" />
             <span>Under 18. Exit</span>

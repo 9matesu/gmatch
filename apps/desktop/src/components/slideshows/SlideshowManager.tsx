@@ -166,7 +166,7 @@ export function SlideshowManager({
   };
 
   return (
-    <div className="bg-surface-raised border border-border-glass rounded-xl p-4 space-y-4">
+    <div className="bg-surface-raised border border-edge rounded-xl p-4 space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Film className="w-4 h-4 text-retro-muted" />
@@ -176,7 +176,7 @@ export function SlideshowManager({
           <button
             type="button"
             onClick={() => { setCreating((v) => !v); setSelected(new Set()); }}
-            className="px-3 py-1.5 text-xs font-semibold text-retro-body bg-surface-interactive border border-border-glass rounded-lg hover:border-border-glass cursor-pointer flex items-center gap-1.5 transition-colors"
+            className="px-3 py-1.5 text-xs font-semibold text-retro-body bg-surface-interactive border border-edge rounded-lg hover:border-edge cursor-pointer flex items-center gap-1.5 transition-colors"
           >
             {creating ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
             {creating ? 'Cancel' : 'New'}
@@ -190,13 +190,13 @@ export function SlideshowManager({
       </div>
 
       {creating && (
-        <div className="space-y-3 border-t border-border-glass pt-3">
+        <div className="space-y-3 border-t border-edge pt-3">
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Slideshow title (optional)"
-            className="w-full bg-retro-bg border border-border-glass px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted rounded-lg outline-none focus:border-retro-accent"
+            className="w-full bg-retro-bg border border-edge px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted rounded-lg outline-none focus:border-retro-accent"
           />
 
           <div className="flex flex-wrap items-center gap-1">
@@ -206,7 +206,7 @@ export function SlideshowManager({
                 type="button"
                 onClick={() => { setSource(s); setSelected(new Set()); }}
                 className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer border ${
-                  source === s ? 'bg-surface-interactive text-retro-fg border-border-glass' : 'text-retro-muted hover:text-retro-body border-transparent'
+                  source === s ? 'bg-surface-interactive text-retro-fg border-edge' : 'text-retro-muted hover:text-retro-body border-transparent'
                 }`}
               >
                 {sourceLabel[s]}
@@ -227,7 +227,7 @@ export function SlideshowManager({
                     type="button"
                     onClick={() => toggleSelect(c.id)}
                     className={`flex items-center gap-2 px-2 py-2 rounded-lg border text-left cursor-pointer transition-colors ${
-                      isSelected ? 'bg-surface-interactive border-retro-accent text-retro-fg' : 'bg-surface-interactive/40 border-border-glass text-retro-muted hover:text-retro-body border-transparent'
+                      isSelected ? 'bg-surface-interactive border-retro-accent text-retro-fg' : 'bg-surface-interactive/40 border-edge text-retro-muted hover:text-retro-body border-transparent'
                     }`}
                   >
                     {c.kind === 'post' ? <ImageIcon className="w-3.5 h-3.5 shrink-0" /> : <Film className="w-3.5 h-3.5 shrink-0" />}
@@ -247,7 +247,7 @@ export function SlideshowManager({
               <select
                 value={intervalMs}
                 onChange={(e) => setIntervalMs(Number(e.target.value))}
-                className="bg-surface-interactive border border-border-glass text-retro-body text-xs rounded-lg px-2 py-1 outline-none cursor-pointer"
+                className="bg-surface-interactive border border-edge text-retro-body text-xs rounded-lg px-2 py-1 outline-none cursor-pointer"
               >
                 <option value={2000}>2s</option>
                 <option value={5000}>5s</option>
@@ -267,14 +267,14 @@ export function SlideshowManager({
         </div>
       )}
 
-      <div className="space-y-2 border-t border-border-glass pt-3">
+      <div className="space-y-2 border-t border-edge pt-3">
         {loading ? (
           <p className="text-xs text-retro-muted">Loading…</p>
         ) : list.length === 0 ? (
           <p className="text-xs text-retro-muted">No slideshows yet. Create one from your gallery cards or posts.</p>
         ) : (
           list.map((s) => (
-            <div key={s.id} className="flex items-center justify-between gap-2 bg-surface-interactive/40 border border-border-glass rounded-lg px-3 py-2">
+            <div key={s.id} className="flex items-center justify-between gap-2 bg-surface-interactive/40 border border-edge rounded-lg px-3 py-2">
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-retro-fg truncate">{s.title || 'Untitled slideshow'}</p>
                 <p className="text-xs text-retro-muted">

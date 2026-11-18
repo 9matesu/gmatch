@@ -143,7 +143,7 @@ export function CardTile({
           ? `perspective(1000px) rotateX(${tilt.rotateX.toFixed(2)}deg) rotateY(${tilt.rotateY.toFixed(2)}deg) scale3d(1.02, 1.02, 1.02)`
           : undefined,
       } as React.CSSProperties}
-      className={`holo-card group relative select-none cursor-pointer transition-transform duration-150 ease-out active:scale-[0.96] rounded-xl border border-border-glass bg-retro-bg overflow-hidden shadow-xs hover:border-border-strong ${
+      className={`holo-card group relative select-none cursor-pointer transition-transform duration-150 ease-out active:scale-[0.96] rounded-xl border border-edge bg-retro-bg overflow-hidden shadow-xs hover:border-edge-strong ${
         selected ? 'ring-2 ring-retro-accent shadow-xl z-10' : ''
       }`}
       onMouseMove={handleMouseMove}
@@ -175,10 +175,10 @@ export function CardTile({
               frameType === 'holo'
                 ? 'bg-chrome-lav/0 text-chrome-lav-fg border-chrome-lav/0'
                 : frameType === 'carbon'
-                ? 'bg-retro-bg/90 text-retro-fg border-border-glass'
+                ? 'bg-retro-bg/90 text-retro-fg border-edge'
                 : frameType === 'neon'
                 ? 'bg-info/0 text-info-fg border-info/0'
-                : 'bg-black/80 text-retro-fg border-border-glass'
+                : 'bg-black/80 text-retro-fg border-edge'
             }`}>
               {frameType}
             </span>
@@ -207,8 +207,8 @@ export function CardTile({
             }}
             className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
               selected
-                ? 'bg-surface-interactive border-border-glass text-retro-fg shadow-md'
-                : 'bg-black/60 border-border-glass opacity-0 group-hover:opacity-100 text-transparent hover:border-border-glass'
+                ? 'bg-surface-interactive border-edge text-retro-fg shadow-md'
+                : 'bg-black/60 border-edge opacity-0 group-hover:opacity-100 text-transparent hover:border-edge'
             }`}
           >
             <Check className="w-3 h-3 stroke-[3]" />
@@ -233,7 +233,7 @@ export function CardTile({
         </div>
 
         {/* Card Info Footer */}
-        <div className="p-2.5 bg-retro-bg border-t border-border-glass flex flex-col gap-1">
+        <div className="p-2.5 bg-retro-bg border-t border-edge flex flex-col gap-1">
           <div className="flex items-center justify-between gap-1.5">
             <div className="min-w-0 flex-1 text-xs font-semibold text-retro-fg truncate" title={cardTitle}>
               {cardTitle}
@@ -277,7 +277,7 @@ export function CardTile({
               {itemTags.map((tag) => (
                 <span
                   key={tag}
-                  className="text-2xs font-mono font-medium px-1.5 py-0.5 rounded bg-retro-panel border border-border-glass text-retro-muted truncate max-w-[90px]"
+                  className="text-2xs font-mono font-medium px-1.5 py-0.5 rounded bg-retro-panel border border-edge text-retro-muted truncate max-w-[90px]"
                   style={{ color: accent }}
                 >
                   #{tag}

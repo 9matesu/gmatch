@@ -127,7 +127,7 @@ export default function GridWorkspace({
                   onClick={() => { playPress(750); setGalleryOpen(true); }}
                   title="Keepsakes Gallery (drained foes)"
                   aria-label="Keepsakes Gallery"
-                  className="h-7 px-2 rounded-md border border-border-glass bg-glass-w8 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-border-strong transition-all cursor-pointer flex items-center gap-1.5 text-xs font-medium"
+                  className="h-7 px-2 rounded-md border border-edge bg-glass-w8 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong transition-all cursor-pointer flex items-center gap-1.5 text-xs font-medium"
                 >
                   <Images size={14} weight="bold" className="text-retro-accent" />
                   <span className="hidden sm:inline">Gallery</span>
@@ -137,7 +137,7 @@ export default function GridWorkspace({
                   onClick={() => { playPress(720); setBrowserOpen(true); }}
                   title="Browse images by owned tag"
                   aria-label="Browse by tag"
-                  className="h-7 px-2 rounded-md border border-border-glass bg-glass-w8 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-border-strong transition-all cursor-pointer flex items-center gap-1.5 text-xs font-medium"
+                  className="h-7 px-2 rounded-md border border-edge bg-glass-w8 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong transition-all cursor-pointer flex items-center gap-1.5 text-xs font-medium"
                 >
                   <MagnifyingGlass size={14} weight="bold" className="text-retro-accent" />
                   <span className="hidden sm:inline">Browse</span>
@@ -148,7 +148,7 @@ export default function GridWorkspace({
                     onClick={() => { playPress(700); onOpenSources(); }}
                     title="Custom image sources: add your own URLs or folders"
                     aria-label="Custom image sources"
-                    className="h-7 px-2 rounded-md border border-border-glass bg-glass-w8 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-border-strong transition-all cursor-pointer flex items-center gap-1.5 text-xs font-medium"
+                    className="h-7 px-2 rounded-md border border-edge bg-glass-w8 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong transition-all cursor-pointer flex items-center gap-1.5 text-xs font-medium"
                   >
                     <FolderOpen size={14} weight="bold" />
                     <span className="hidden sm:inline">Sources</span>
@@ -163,7 +163,7 @@ export default function GridWorkspace({
                     aria-pressed={idleFullscreen}
                     className={`h-7 w-7 rounded-md border transition-all cursor-pointer flex items-center justify-center ${idleFullscreen
                       ? 'border-retro-accent/60 bg-retro-accent/20 text-retro-accent'
-                      : 'border-border-glass bg-glass-w8 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-border-strong'
+                      : 'border-edge bg-glass-w8 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong'
                       }`}
                   >
                     {idleFullscreen ? <ArrowsIn size={14} weight="bold" /> : <ArrowsOut size={14} weight="bold" />}
@@ -177,7 +177,7 @@ export default function GridWorkspace({
                   aria-pressed={collapsed}
                   className={`h-7 w-7 rounded-md border transition-all cursor-pointer flex items-center justify-center ${collapsed
                     ? 'border-retro-accent/60 bg-retro-accent/20 text-retro-accent'
-                    : 'border-border-glass bg-glass-w8 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-border-strong'
+                    : 'border-edge bg-glass-w8 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong'
                     }`}
                 >
                   <SidebarSimple size={14} weight={collapsed ? 'fill' : 'bold'} />
@@ -218,10 +218,10 @@ export default function GridWorkspace({
           onClick={() => setGalleryOpen(false)}
         >
           <div
-            className="relative flex h-full max-h-[90dvh] w-full max-w-4xl flex-col rounded-xl border border-border-glass bg-retro-panel p-5 shadow-xl overflow-hidden"
+            className="relative flex h-full max-h-[90dvh] w-full max-w-4xl flex-col rounded-xl border border-edge bg-retro-panel p-5 shadow-xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between pb-3 border-b border-border-glass">
+            <div className="flex items-center justify-between pb-3 border-b border-edge">
               <div className="flex items-center gap-2.5">
                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-retro-accent/15 text-retro-accent border border-retro-accent/30">
                   <Images size={16} weight="bold" />
@@ -236,7 +236,7 @@ export default function GridWorkspace({
               <button
                 type="button"
                 onClick={() => setGalleryOpen(false)}
-                className="flex h-7 w-7 items-center justify-center rounded-lg border border-border-glass bg-glass-w5 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-border-strong transition-all cursor-pointer"
+                className="flex h-7 w-7 items-center justify-center rounded-lg border border-edge bg-glass-w5 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong transition-all cursor-pointer"
                 aria-label="Close gallery"
               >
                 <X size={14} weight="bold" />
@@ -264,10 +264,10 @@ export default function GridWorkspace({
           onClick={() => setBrowserOpen(false)}
         >
           <div
-            className="relative flex h-full max-h-[90dvh] w-full max-w-4xl flex-col rounded-xl border border-border-glass bg-retro-panel p-5 shadow-xl overflow-hidden"
+            className="relative flex h-full max-h-[90dvh] w-full max-w-4xl flex-col rounded-xl border border-edge bg-retro-panel p-5 shadow-xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between pb-3 border-b border-border-glass">
+            <div className="flex items-center justify-between pb-3 border-b border-edge">
               <div className="flex items-center gap-2.5">
                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-retro-accent/15 text-retro-accent border border-retro-accent/30">
                   <MagnifyingGlass size={16} weight="bold" />
@@ -282,7 +282,7 @@ export default function GridWorkspace({
               <button
                 type="button"
                 onClick={() => setBrowserOpen(false)}
-                className="flex h-7 w-7 items-center justify-center rounded-lg border border-border-glass bg-glass-w5 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-border-strong transition-all cursor-pointer"
+                className="flex h-7 w-7 items-center justify-center rounded-lg border border-edge bg-glass-w5 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong transition-all cursor-pointer"
                 aria-label="Close tag browser"
               >
                 <X size={14} weight="bold" />

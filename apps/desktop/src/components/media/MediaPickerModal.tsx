@@ -253,9 +253,9 @@ export function MediaPickerPanel({
   return (
     <div
       aria-label={options.title ?? 'Pick media'}
-      className={`bg-surface-raised border border-border-glass rounded-xl w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl overflow-hidden text-retro-fg ${compact ? 'max-h-[70vh] text-xs' : ''}`}
+      className={`bg-surface-raised border border-edge rounded-xl w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl overflow-hidden text-retro-fg ${compact ? 'max-h-[70vh] text-xs' : ''}`}
     >
-      <div className={`flex items-center justify-between ${compact ? 'px-3 py-2' : 'px-4 py-2.5'} border-b border-border-glass`}>
+      <div className={`flex items-center justify-between ${compact ? 'px-3 py-2' : 'px-4 py-2.5'} border-b border-edge`}>
         <h2 className="text-base font-black tracking-tight">{options.title ?? 'Pick media'}</h2>
         <button
           type="button"
@@ -267,7 +267,7 @@ export function MediaPickerPanel({
         </button>
       </div>
 
-      <div className={`flex items-center gap-1.5 ${compact ? 'px-3 py-1.5' : 'px-4 py-2'} border-b border-border-glass`}>
+      <div className={`flex items-center gap-1.5 ${compact ? 'px-3 py-1.5' : 'px-4 py-2'} border-b border-edge`}>
         {sources.includes('browse') && tabBtn('browse', 'Your media', FolderOpen)}
         {sources.includes('upload') && tabBtn('upload', 'Upload', UploadCloud)}
         {sources.includes('url') && tabBtn('url', 'Paste URL', LinkIcon)}
@@ -295,7 +295,7 @@ export function MediaPickerPanel({
                   setVisibleCount(PAGE);
                 }}
                 placeholder="Filter by tag…"
-                className="w-full px-3 py-1.5 rounded-lg bg-glass-w8 border border-border-glass text-xs text-retro-fg placeholder:text-retro-muted focus:outline-none focus:border-retro-accent"
+                className="w-full px-3 py-1.5 rounded-lg bg-glass-w8 border border-edge text-xs text-retro-fg placeholder:text-retro-muted focus:outline-none focus:border-retro-accent"
               />
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                 {shownGallery.map((g: GalleryImage) => {
@@ -312,10 +312,10 @@ export function MediaPickerPanel({
                         onClick={() => void pickKeep(g)}
                         className={`relative aspect-square rounded-lg overflow-hidden border transition-all bg-glass-w8 ${
                           unresolvable
-                            ? 'border-border-glass opacity-50 cursor-not-allowed'
+                            ? 'border-edge opacity-50 cursor-not-allowed'
                             : busyKeepId === g.id
                               ? 'border-retro-accent cursor-progress'
-                              : 'border-border-glass hover:border-retro-accent/60 cursor-pointer'
+                              : 'border-edge hover:border-retro-accent/60 cursor-pointer'
                         }`}
                         title={unresolvable ? 'No local copy yet' : g.tags?.join(', ')}
                         disabled={unresolvable || busyKeepId === g.id}
@@ -355,7 +355,7 @@ export function MediaPickerPanel({
                   <button
                     type="button"
                     onClick={() => setVisibleCount((c) => c + PAGE)}
-                    className="w-full py-2 rounded-lg bg-glass-w8 border border-border-glass text-xs font-bold text-retro-muted hover:text-retro-fg hover:bg-glass-w12 transition-colors cursor-pointer"
+                    className="w-full py-2 rounded-lg bg-glass-w8 border border-edge text-xs font-bold text-retro-muted hover:text-retro-fg hover:bg-glass-w12 transition-colors cursor-pointer"
                   >
                     Load more ({filteredGallery.length - shownGallery.length} left)
                   </button>
@@ -381,7 +381,7 @@ export function MediaPickerPanel({
                 takeFile(e.dataTransfer.files?.[0], 'upload');
               }}
               className={`border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer text-center transition-all ${
-                dragOver ? 'border-retro-accent bg-glass-w10' : 'border-border-glass hover:border-retro-accent bg-surface-interactive'
+                dragOver ? 'border-retro-accent bg-glass-w10' : 'border-edge hover:border-retro-accent bg-surface-interactive'
               }`}
             >
               <UploadCloud className="w-7 h-7 text-retro-muted" />
@@ -414,7 +414,7 @@ export function MediaPickerPanel({
                     }
                   }}
                   placeholder="https://…"
-                  className="flex-1 px-3 py-1.5 rounded-lg bg-glass-w8 border border-border-glass text-xs text-retro-fg placeholder:text-retro-muted focus:outline-none focus:border-retro-accent"
+                  className="flex-1 px-3 py-1.5 rounded-lg bg-glass-w8 border border-edge text-xs text-retro-fg placeholder:text-retro-muted focus:outline-none focus:border-retro-accent"
                 />
                 <button
                   type="button"
@@ -430,7 +430,7 @@ export function MediaPickerPanel({
 
           {pending && (
             <div className="space-y-2 pt-1">
-              <div className="flex justify-center border border-border-glass rounded-xl bg-glass-w5 p-2">
+              <div className="flex justify-center border border-edge rounded-xl bg-glass-w5 p-2">
                 <Preview url={pending.kind === 'file' ? pending.previewUrl : pending.url} isVideo={pending.kind === 'file' ? fileAccepted(pending.file, ['video']) && !fileAccepted(pending.file, ['image']) : /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(pending.url)} />
               </div>
               <div className="flex justify-end gap-2">

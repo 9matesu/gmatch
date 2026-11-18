@@ -4254,12 +4254,12 @@ export default function Home() {
                       <img
                         src={lobbyLightboxUrl}
                         alt="Lobby image"
-                        className="max-w-full max-h-[85vh] object-contain rounded-lg border-2 border-border-glass shadow-2xl"
+                        className="max-w-full max-h-[85vh] object-contain rounded-lg border-2 border-edge shadow-2xl"
                       />
                       <button
                         type="button"
                         onClick={() => setLobbyLightboxUrl(null)}
-                        className="absolute top-2 right-2 bg-retro-panel border border-border-glass text-retro-muted hover:text-retro-fg p-1.5 transition-colors cursor-pointer"
+                        className="absolute top-2 right-2 bg-retro-panel border border-edge text-retro-muted hover:text-retro-fg p-1.5 transition-colors cursor-pointer"
                         aria-label="Close image"
                       >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
@@ -4361,7 +4361,7 @@ export default function Home() {
                     onClick={() => { playPress(900); setDmMinimized(false); }}
                     title="Expand Direct Messages"
                     aria-label="Expand Direct Messages"
-                    className="pointer-events-auto flex items-center gap-2.5 bg-retro-bg text-retro-fg pl-2 pr-4 py-2 rounded-full shadow-2xl border border-border-strong hover:bg-surface-canvas transition-colors cursor-pointer active:scale-95"
+                    className="pointer-events-auto flex items-center gap-2.5 bg-retro-bg text-retro-fg pl-2 pr-4 py-2 rounded-full shadow-2xl border border-edge-strong hover:bg-surface-canvas transition-colors cursor-pointer active:scale-95"
                   >
                     <span className="w-8 h-8 rounded-full bg-glass-w20 p-[2px] shrink-0">
                       <span className="w-full h-full rounded-full bg-retro-bg overflow-hidden flex items-center justify-center text-xs font-bold text-retro-fg">
@@ -4503,8 +4503,8 @@ export default function Home() {
               />
               {groupPickerOpen && chatGroups.length > 0 && (
                 <div className="fixed inset-0 z-[var(--z-lightbox)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-                  <div className="bg-surface-raised border border-border-glass rounded-xl max-w-md w-full shadow-2xl overflow-hidden">
-                    <div className="p-4 border-b border-border-glass flex items-center justify-between">
+                  <div className="bg-surface-raised border border-edge rounded-xl max-w-md w-full shadow-2xl overflow-hidden">
+                    <div className="p-4 border-b border-edge flex items-center justify-between">
                       <h3 className="text-sm font-bold text-retro-fg">Select group chat</h3>
                       <button onClick={() => setGroupPickerOpen(false)} className="text-retro-muted hover:text-retro-body p-1">
                         <X className="w-5 h-5" />
@@ -4516,7 +4516,7 @@ export default function Home() {
                           key={group.id}
                           type="button"
                           onClick={() => handleGroupPickerSelect(group.id)}
-                          className="w-full p-3 hover:bg-glass-w5 transition-colors text-left border-b border-border-glass last:border-0 flex items-center gap-3"
+                          className="w-full p-3 hover:bg-glass-w5 transition-colors text-left border-b border-edge last:border-0 flex items-center gap-3"
                         >
                           <div className="w-10 h-10 rounded-full bg-glass-w20 flex items-center justify-center text-retro-fg font-bold text-sm">
                             {group.name.charAt(0).toUpperCase()}
@@ -4612,8 +4612,8 @@ export default function Home() {
 
        {adminModalOpen && (
          <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 p-2 sm:p-6" role="dialog" aria-modal="true" aria-label="Admin control panel" onMouseDown={(e) => { if (e.target === e.currentTarget) setAdminModalOpen(false) }}>
-           <div className="relative flex h-[92vh] w-full max-w-[1500px] min-h-0 flex-col overflow-hidden rounded-xl border border-border-glass bg-retro-bg shadow-2xl">
-             <button type="button" aria-label="Close admin control panel" onClick={() => setAdminModalOpen(false)} className="absolute right-3 top-3 z-20 rounded-md border border-border-glass bg-surface-raised px-2 py-1 text-xs text-retro-muted hover:text-retro-fg cursor-pointer">Close</button>
+           <div className="relative flex h-[92vh] w-full max-w-[1500px] min-h-0 flex-col overflow-hidden rounded-xl border border-edge bg-retro-bg shadow-2xl">
+             <button type="button" aria-label="Close admin control panel" onClick={() => setAdminModalOpen(false)} className="absolute right-3 top-3 z-20 rounded-md border border-edge bg-surface-raised px-2 py-1 text-xs text-retro-muted hover:text-retro-fg cursor-pointer">Close</button>
                <Suspense fallback={<PageSkeleton />}>
              <div className="min-h-0 flex-1 overflow-y-auto"><AdminApp identity={identity} /></div>
                </Suspense>

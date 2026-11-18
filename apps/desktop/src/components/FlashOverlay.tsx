@@ -34,9 +34,9 @@ export function FlashOverlay({
         <div className="absolute top-0 inset-x-0 bg-gradient-to-b from-black/80 to-transparent p-3 z-10 flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
             {flash.pfp_url ? (
-              <img src={resolveMediaUrl(flash.pfp_url)} alt="" className="w-7 h-7 rounded-full border border-border-glass shrink-0" />
+              <img src={resolveMediaUrl(flash.pfp_url)} alt="" className="w-7 h-7 rounded-full border border-edge shrink-0" />
             ) : (
-              <div className="w-7 h-7 rounded-full bg-retro-panel border border-border-glass flex items-center justify-center text-xs shrink-0"><Zap className="w-3.5 h-3.5 fill-current" /></div>
+              <div className="w-7 h-7 rounded-full bg-retro-panel border border-edge flex items-center justify-center text-xs shrink-0"><Zap className="w-3.5 h-3.5 fill-current" /></div>
             )}
             <div className="min-w-0">
               <div className="text-xs font-black text-warning-fg uppercase tracking-widest">Flash Drop</div>

@@ -70,7 +70,7 @@ export function GroupsDialog({
         {labels.length === 0 ? (
           <p className="text-2xs text-retro-muted">None yet.</p>
         ) : (
-          <ul className="rounded-lg border border-border-glass divide-y divide-border-subtle overflow-hidden">
+          <ul className="rounded-lg border border-edge divide-y divide-edge-subtle overflow-hidden">
             {labels.map((l) => (
               <li key={l.id} className="flex items-center justify-between gap-2 px-3 py-2 text-xs">
                 <span className="truncate text-retro-fg">

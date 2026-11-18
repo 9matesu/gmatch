@@ -169,7 +169,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
       </div>
 
       {/* Subtab Navigation */}
-      <div className="flex flex-wrap gap-1 bg-surface-raised border border-border-glass rounded-xl p-1">
+      <div className="flex flex-wrap gap-1 bg-surface-raised border border-edge rounded-xl p-1">
         {subTabs.map(section => {
           const Icon = section.icon;
           const active = activeSubTab === section.id;
@@ -195,8 +195,8 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
       {/* Subtab 1: Platform Settings */}
       {activeSubTab === "platform" && (
         <div className="space-y-6">
-          <div className="rounded-xl border border-border-glass bg-surface-raised p-5 space-y-6">
-            <div className="flex items-center justify-between border-b border-border-glass pb-3">
+          <div className="rounded-xl border border-edge bg-surface-raised p-5 space-y-6">
+            <div className="flex items-center justify-between border-b border-edge pb-3">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-retro-fg">
                 <Globe className="w-4 h-4 text-info-fg" />
                 <span>Discord Community Invite</span>
@@ -210,7 +210,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
                   value={discordLink}
                   onChange={e => setDiscordLink(e.target.value)}
                   placeholder="https://discord.gg/..."
-                  className="flex-1 bg-glass-w8 border border-border-glass rounded-lg px-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent"
+                  className="flex-1 bg-glass-w8 border border-edge rounded-lg px-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent"
                 />
                 <button
                   type="button"
@@ -224,8 +224,8 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
             </div>
           </div>
 
-          <div className="rounded-xl border border-border-glass bg-surface-raised p-5 space-y-6">
-            <div className="flex items-center justify-between border-b border-border-glass pb-3">
+          <div className="rounded-xl border border-edge bg-surface-raised p-5 space-y-6">
+            <div className="flex items-center justify-between border-b border-edge pb-3">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-retro-fg">
                 <ZapIcon className="w-4 h-4 text-warning-fg" />
                 <span>Economy Cashout Rate</span>
@@ -241,7 +241,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
                   onChange={e => setCashoutRateBps(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
                   min={0}
                   max={100000}
-                  className="flex-1 bg-glass-w8 border border-border-glass rounded-lg px-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent font-mono"
+                  className="flex-1 bg-glass-w8 border border-edge rounded-lg px-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent font-mono"
                 />
                 <button
                   type="button"
@@ -260,7 +260,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
       {/* Subtab 2: Audit Log & Daily Stats */}
       {activeSubTab === "audit" && (
         <div className="space-y-4">
-          <div className="flex items-center gap-2 border-b border-border-glass pb-3">
+          <div className="flex items-center gap-2 border-b border-edge pb-3">
             <button
               type="button"
               onClick={() => setAuditSubTab("log")}
@@ -284,13 +284,13 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
           </div>
 
           {auditSubTab === "log" ? (
-            <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
+            <div className="rounded-xl border border-edge bg-surface-raised overflow-hidden">
               {isLoadingAudit ? (
                 <AdminLoadingState rows={6} columns={4} />
               ) : auditLog.length === 0 ? (
                 <AdminEmptyState title="No audit entries" description="Zero administrative actions logged" illustration="folder" />
               ) : (
-                <div className="divide-y divide-border-subtle">
+                <div className="divide-y divide-edge-subtle">
                   {auditLog.map(entry => (
                     <div key={entry.id} className="p-3 flex items-center justify-between gap-3 hover:bg-glass-w5 transition-colors">
                       <div className="min-w-0 flex-1">
@@ -316,25 +316,25 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
           ) : (
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                <div className="p-4 rounded-xl border border-border-glass bg-surface-raised">
+                <div className="p-4 rounded-xl border border-edge bg-surface-raised">
                   <span className="text-2xs font-bold text-retro-muted uppercase block mb-1">Active Users</span>
                   <div className="h-10">
                     <Sparkline data={dailyStats.map(d => d.active_users)} color="#34d399" />
                   </div>
                 </div>
-                <div className="p-4 rounded-xl border border-border-glass bg-surface-raised">
+                <div className="p-4 rounded-xl border border-edge bg-surface-raised">
                   <span className="text-2xs font-bold text-retro-muted uppercase block mb-1">Matches Played</span>
                   <div className="h-10">
                     <Sparkline data={dailyStats.map(d => d.matches_played)} color="#a855f7" />
                   </div>
                 </div>
-                <div className="p-4 rounded-xl border border-border-glass bg-surface-raised">
+                <div className="p-4 rounded-xl border border-edge bg-surface-raised">
                   <span className="text-2xs font-bold text-retro-muted uppercase block mb-1">Peak Concurrent</span>
                   <div className="h-10">
                     <Sparkline data={dailyStats.map(d => d.peak_concurrent)} color="#38bdf8" />
                   </div>
                 </div>
-                <div className="p-4 rounded-xl border border-border-glass bg-surface-raised">
+                <div className="p-4 rounded-xl border border-edge bg-surface-raised">
                   <span className="text-2xs font-bold text-retro-muted uppercase block mb-1">New Signups</span>
                   <div className="h-10">
                     <Sparkline data={dailyStats.map(d => d.new_users)} color="#f59e0b" />

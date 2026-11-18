@@ -219,7 +219,7 @@ export function ChatPlayerList({
   return (
     <div className="h-full min-h-0 flex flex-col select-none overflow-hidden" data-testid="chat-player-list">
       {/* Header */}
-      <div className="p-3 sm:p-4 border-b border-border-glass flex items-center justify-between shrink-0">
+      <div className="p-3 sm:p-4 border-b border-edge flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <Users className="w-4 h-4 text-retro-muted shrink-0" />
           <h2 className="font-semibold text-sm text-retro-fg truncate">
@@ -239,8 +239,8 @@ export function ChatPlayerList({
       </div>
 
       {/* Quick Search */}
-      <div className="p-2.5 border-b border-border-glass shrink-0">
-        <div className="flex items-center gap-2 bg-surface-raised border border-border-glass rounded-md px-2.5 py-1.5 text-xs text-retro-body">
+      <div className="p-2.5 border-b border-edge shrink-0">
+        <div className="flex items-center gap-2 bg-surface-raised border border-edge rounded-md px-2.5 py-1.5 text-xs text-retro-body">
           <Search className="w-3.5 h-3.5 text-retro-muted shrink-0" />
           <input
             type="text"

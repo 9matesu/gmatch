@@ -149,11 +149,11 @@ export function ProfilePicModal({
       className="fixed inset-0 z-[var(--z-lightbox)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-retro-fg"
     >
       <div
-        className="w-full max-w-md bg-surface-raised border border-border-glass rounded-lg shadow-xl overflow-hidden flex flex-col max-h-[85vh] animate-orbit-pop"
+        className="w-full max-w-md bg-surface-raised border border-edge rounded-lg shadow-xl overflow-hidden flex flex-col max-h-[85vh] animate-orbit-pop"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border-glass">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-edge">
           <h3 className="text-sm font-medium text-retro-fg">Profile photo</h3>
           <button
             type="button"
@@ -170,7 +170,7 @@ export function ProfilePicModal({
         <div className="p-5 space-y-4 overflow-y-auto flex-1 styled-scrollbar">
           {/* Avatar Preview */}
           <div className="flex flex-col items-center gap-1.5 py-2">
-            <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-border-glass bg-surface-interactive flex items-center justify-center">
+            <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-edge bg-surface-interactive flex items-center justify-center">
               {preview ? (
                 <img src={preview} alt="Preview" className="w-full h-full object-cover" />
               ) : (
@@ -195,7 +195,7 @@ export function ProfilePicModal({
           </div>
 
           {/* Mode Tabs */}
-          <div className="flex bg-surface-interactive border border-border-glass p-0.5 rounded-md text-xs">
+          <div className="flex bg-surface-interactive border border-edge p-0.5 rounded-md text-xs">
             {tabs.map((t) => {
               const Icon = t.icon;
               const isActive = tab === t.id;
@@ -221,7 +221,7 @@ export function ProfilePicModal({
               <button
                 type="button"
                 onClick={() => void pickMedia()}
-                className="w-full border-2 border-dashed border-border-glass hover:border-retro-accent rounded-xl bg-surface-interactive hover:bg-glass-w10 p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all text-center group"
+                className="w-full border-2 border-dashed border-edge hover:border-retro-accent rounded-xl bg-surface-interactive hover:bg-glass-w10 p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all text-center group"
               >
                 <FolderOpen className="w-7 h-7 text-retro-muted group-hover:text-retro-accent transition-colors" />
                 <p className="text-xs font-bold text-retro-body">Choose from your media, upload, or paste a URL</p>
@@ -236,7 +236,7 @@ export function ProfilePicModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border-glass">
+        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-edge">
           <button
             type="button"
             onClick={onClose}

@@ -150,11 +150,11 @@ export function ProfileEditorModal({
       className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-retro-fg"
     >
       <div
-        className="w-full max-w-md bg-surface-raised border border-border-glass rounded-lg shadow-xl overflow-hidden flex flex-col max-h-[85vh] animate-orbit-pop"
+        className="w-full max-w-md bg-surface-raised border border-edge rounded-lg shadow-xl overflow-hidden flex flex-col max-h-[85vh] animate-orbit-pop"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border-glass">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-edge">
           <button
             type="button"
             onClick={onClose}
@@ -178,7 +178,7 @@ export function ProfileEditorModal({
           {/* Avatar */}
           <div className="flex flex-col items-center gap-2 pb-2">
             <div
-              className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-border-glass cursor-pointer group"
+              className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-edge cursor-pointer group"
               onClick={() => setShowPicModal(true)}
             >
               {pfpUrl ? (
@@ -212,7 +212,7 @@ export function ProfileEditorModal({
                 placeholder="Name"
                 maxLength={40}
                 required
-                className="w-full bg-surface-interactive border border-border-glass rounded-lg px-3 py-2 text-sm text-retro-fg focus:outline-none focus:border-retro-accent transition-colors placeholder:text-retro-muted"
+                className="w-full bg-surface-interactive border border-edge rounded-lg px-3 py-2 text-sm text-retro-fg focus:outline-none focus:border-retro-accent transition-colors placeholder:text-retro-muted"
               />
             </div>
 
@@ -224,7 +224,7 @@ export function ProfileEditorModal({
                 placeholder="Write a pornified bio... What do you like?"
                 rows={3}
                 maxLength={150}
-                className="w-full bg-surface-interactive border border-border-glass rounded-lg p-3 text-sm text-retro-fg focus:outline-none focus:border-retro-accent transition-colors resize-none placeholder:text-retro-muted"
+                className="w-full bg-surface-interactive border border-edge rounded-lg p-3 text-sm text-retro-fg focus:outline-none focus:border-retro-accent transition-colors resize-none placeholder:text-retro-muted"
               />
               <div className="text-right text-xs text-retro-muted mt-0.5">
                 {bio.length}/150
@@ -233,7 +233,7 @@ export function ProfileEditorModal({
 
             <div>
               <label className="text-xs font-medium text-retro-body block mb-1.5">Favorite Website</label>
-              <div className="flex items-center gap-2 bg-surface-interactive border border-border-glass rounded-lg px-3 py-2">
+              <div className="flex items-center gap-2 bg-surface-interactive border border-edge rounded-lg px-3 py-2">
                 <Globe className="w-4 h-4 text-retro-muted shrink-0" />
                 <input
                   type="url"
@@ -254,7 +254,7 @@ export function ProfileEditorModal({
                   {tags.map((t) => (
                     <span
                       key={t}
-                      className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full bg-glass-w12 border border-border-glass text-xs font-semibold text-retro-fg"
+                      className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full bg-glass-w12 border border-edge text-xs font-semibold text-retro-fg"
                     >
                       #{t}
                       <button
@@ -283,14 +283,14 @@ export function ProfileEditorModal({
                   placeholder={tags.length >= MAX_TAGS ? `Tag limit reached (${MAX_TAGS})` : 'Add a tag...'}
                   disabled={tags.length >= MAX_TAGS}
                   maxLength={20}
-                  className="flex-1 bg-surface-interactive border border-border-glass rounded-lg px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent transition-colors disabled:opacity-40"
+                  className="flex-1 bg-surface-interactive border border-edge rounded-lg px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent transition-colors disabled:opacity-40"
                 />
                 <button
                   type="button"
                   onClick={commitTagDraft}
                   disabled={tags.length >= MAX_TAGS || !tagDraft.trim()}
                   aria-label="Add tag"
-                  className="p-2 bg-surface-interactive hover:bg-glass-w12 border border-border-glass rounded-lg text-retro-muted hover:text-retro-fg transition-colors cursor-pointer shrink-0 disabled:opacity-40"
+                  className="p-2 bg-surface-interactive hover:bg-glass-w12 border border-edge rounded-lg text-retro-muted hover:text-retro-fg transition-colors cursor-pointer shrink-0 disabled:opacity-40"
                 >
                   <Plus className="w-4 h-4" />
                 </button>

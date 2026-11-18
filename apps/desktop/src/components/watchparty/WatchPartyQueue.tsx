@@ -131,7 +131,7 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
   }
 
   return (
-    <div className="border-t border-border-glass">
+    <div className="border-t border-edge">
       <div className="flex items-center justify-between px-3 pt-2 pb-1">
         <p className="flex items-center gap-1.5 text-2xs font-bold uppercase tracking-wider text-retro-muted">
           <ListVideo className="w-3.5 h-3.5" />

@@ -335,7 +335,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
   return (
     <div className="space-y-6 animate-orbit-fade-in">
       {/* Header card */}
-      <div className="p-4 bg-surface-interactive border border-border-glass rounded-xl space-y-3">
+      <div className="p-4 bg-surface-interactive border border-edge rounded-xl space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-danger/0 border border-danger/0 flex items-center justify-center text-danger-fg">
@@ -361,7 +361,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
           </div>
 
           {/* Mode Switcher */}
-          <div className="flex bg-surface-raised border border-border-glass rounded-xl p-1 text-xs font-bold shrink-0 self-start sm:self-auto">
+          <div className="flex bg-surface-raised border border-edge rounded-xl p-1 text-xs font-bold shrink-0 self-start sm:self-auto">
             <button
               type="button"
               onClick={switchToVisual}
@@ -411,7 +411,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
                   className={`p-3 rounded-xl border text-left transition-all cursor-pointer space-y-1 ${
                     isSelected
                       ? 'bg-surface-interactive border-retro-accent shadow-xs'
-                      : 'bg-surface-raised border-border-glass hover:bg-surface-interactive'
+                      : 'bg-surface-raised border-edge hover:bg-surface-interactive'
                   }`}
                 >
                   <div className="flex items-center justify-between">
@@ -427,8 +427,8 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
           </div>
 
           {/* Active Category Editor */}
-          <div className="p-4 bg-surface-raised border border-border-glass rounded-xl space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-border-glass">
+          <div className="p-4 bg-surface-raised border border-edge rounded-xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-edge">
               <div>
                 <h4 className="text-xs font-semibold text-retro-fg">{CATEGORY_META[activeCategory].label}</h4>
                 <p className="text-xs text-retro-muted">{CATEGORY_META[activeCategory].desc}</p>
@@ -459,7 +459,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
                     }
                   }}
                   placeholder={`Add tag(s) to ${activeCategory}...`}
-                  className="flex-1 bg-surface-interactive border border-border-glass rounded-xl px-3 py-1.5 text-xs text-retro-fg outline-none focus:border-retro-accent placeholder:text-retro-muted/60"
+                  className="flex-1 bg-surface-interactive border border-edge rounded-xl px-3 py-1.5 text-xs text-retro-fg outline-none focus:border-retro-accent placeholder:text-retro-muted/60"
                 />
                 <button
                   type="button"
@@ -480,7 +480,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
                   value={searchFilter}
                   onChange={(e) => setSearchFilter(e.target.value)}
                   placeholder={`Search ${currentCategoryTags.length} tags...`}
-                  className="w-full bg-surface-interactive border border-border-glass rounded-xl pl-8 pr-3 py-1.5 text-xs text-retro-fg outline-none focus:border-retro-accent placeholder:text-retro-muted/60"
+                  className="w-full bg-surface-interactive border border-edge rounded-xl pl-8 pr-3 py-1.5 text-xs text-retro-fg outline-none focus:border-retro-accent placeholder:text-retro-muted/60"
                 />
                 {searchFilter && (
                   <button
@@ -504,7 +504,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
                 {filteredTags.map((tag) => (
                   <span
                     key={tag}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-border-glass bg-glass-w5 px-2.5 py-1 text-xs font-mono text-retro-fg transition-colors hover:border-retro-accent/40"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-edge bg-glass-w5 px-2.5 py-1 text-xs font-mono text-retro-fg transition-colors hover:border-retro-accent/40"
                   >
                     <span>{tag}</span>
                     <button
@@ -545,14 +545,14 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
               <button
                 type="button"
                 onClick={formatJson}
-                className="px-2.5 py-1 rounded-lg border border-border-glass text-xs font-bold text-retro-fg hover:bg-surface-interactive cursor-pointer"
+                className="px-2.5 py-1 rounded-lg border border-edge text-xs font-bold text-retro-fg hover:bg-surface-interactive cursor-pointer"
               >
                 Prettify
               </button>
               <button
                 type="button"
                 onClick={copyJson}
-                className="px-2.5 py-1 rounded-lg border border-border-glass text-xs font-bold text-retro-fg hover:bg-surface-interactive flex items-center gap-1 cursor-pointer"
+                className="px-2.5 py-1 rounded-lg border border-edge text-xs font-bold text-retro-fg hover:bg-surface-interactive flex items-center gap-1 cursor-pointer"
               >
                 {isCopied ? <Check className="w-3 h-3 text-success-fg" /> : <Copy className="w-3 h-3" />}
                 <span>{isCopied ? 'Copied' : 'Copy'}</span>
@@ -568,14 +568,14 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
             className={`w-full font-mono text-xs p-3 rounded-xl bg-surface-interactive border outline-none leading-relaxed resize-y styled-scrollbar ${
               jsonError
                 ? 'border-danger/0 focus:border-danger text-danger-fg'
-                : 'border-border-glass focus:border-retro-accent text-retro-fg'
+                : 'border-edge focus:border-retro-accent text-retro-fg'
             }`}
           />
         </div>
       )}
 
       {/* Action Buttons Bar */}
-      <div className="p-4 bg-surface-interactive border border-border-glass rounded-xl flex flex-wrap items-center justify-between gap-3">
+      <div className="p-4 bg-surface-interactive border border-edge rounded-xl flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           {/* Save Button */}
           <button
@@ -592,7 +592,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
           <button
             type="button"
             onClick={handleReset}
-            className="px-3 py-2 bg-surface-raised border border-border-glass hover:border-danger/0 text-retro-muted hover:text-danger-fg rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
+            className="px-3 py-2 bg-surface-raised border border-edge hover:border-danger/0 text-retro-muted hover:text-danger-fg rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Reset to Defaults</span>
@@ -604,7 +604,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="px-3 py-2 bg-surface-raised border border-border-glass hover:bg-surface-elevated text-retro-fg rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
+            className="px-3 py-2 bg-surface-raised border border-edge hover:bg-surface-elevated text-retro-fg rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
           >
             <Upload className="w-3.5 h-3.5 text-retro-muted" />
             <span>Import JSON</span>
@@ -621,7 +621,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
           <button
             type="button"
             onClick={handleExport}
-            className="px-3 py-2 bg-surface-raised border border-border-glass hover:bg-surface-elevated text-retro-fg rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
+            className="px-3 py-2 bg-surface-raised border border-edge hover:bg-surface-elevated text-retro-fg rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
           >
             <Download className="w-3.5 h-3.5 text-retro-muted" />
             <span>Export</span>

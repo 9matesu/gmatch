@@ -2,7 +2,7 @@
  * Shared Tailwind class recipes for the idle-game UI (was goongrid.css).
  * All chrome now speaks the Orbit shell design system: shell tokens
  * (bg-retro-panel/bg-retro-bg, text-retro-fg, text-retro-muted,
- * border-border-glass) plus the shell's own .glass-button / .glass-tab /
+ * border-edge) plus the shell's own .glass-button / .glass-tab /
  * .accent-control classes from globals.css. Literal pink remains ONLY where
  * it is game semantics: HP fill, crit flash, +pts float, cap-active glow,
  * rarity badges (see HP_FILL / FLOAT_GC / RARITY below).
@@ -20,14 +20,14 @@ export const MUTED = 'text-xs text-retro-muted'
 export const DISPLAY = 'font-sans'
 
 /** Panel surface — unified solid-panel glass card. */
-export const PLATE = 'rounded-lg border border-border-glass solid-panel'
+export const PLATE = 'rounded-lg border border-edge solid-panel'
 
 /** Scrollable panel body. */
 export const PANEL = 'min-h-0 overflow-y-auto p-3.5 sm:p-4'
 
 /** Contract button: flat glass fill, 1px border, press = 0.98 scale. */
 export const BTN =
-  'cursor-pointer rounded-lg border border-border-glass bg-glass-w8 hover:bg-glass-w12 active:scale-[0.98] px-3.5 py-2 text-xs font-semibold text-retro-fg transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100'
+  'cursor-pointer rounded-lg border border-edge bg-glass-w8 hover:bg-glass-w12 active:scale-[0.98] px-3.5 py-2 text-xs font-semibold text-retro-fg transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100'
 
 export const BTN_SMALL = 'rounded-lg px-2.5 py-1 text-xs'
 
@@ -49,11 +49,11 @@ export const SKIN =
 
 /** Feed stage frame: canvas well with hairline border. */
 export const STAGE_FRAME =
-  'overflow-hidden rounded-lg border border-border-glass bg-surface-canvas/60 backdrop-blur-md shadow-xl select-none'
+  'overflow-hidden rounded-lg border border-edge bg-surface-canvas/60 backdrop-blur-md shadow-xl select-none'
 
 /** HP bar track + fill. Modern precision gauge. */
 export const HP_BAR =
-  'h-1.5 overflow-hidden rounded-full border border-border-glass bg-surface-canvas/80 shadow-inner'
+  'h-1.5 overflow-hidden rounded-full border border-edge bg-surface-canvas/80 shadow-inner'
 export const HP_FILL =
   'h-full rounded-full bg-gradient-to-r from-pink-500 to-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)] transition-[width] duration-[120ms] ease-linear'
 export const HP_FILL_LOW =

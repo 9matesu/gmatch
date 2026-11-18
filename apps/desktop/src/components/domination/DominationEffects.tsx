@@ -506,7 +506,7 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
           <div className="absolute inset-0 bg-black/40 pointer-events-none" />
           <button
             type="button"
-            className="pointer-events-auto absolute top-4 left-4 text-2xs font-mono font-bold px-2 py-1 bg-black/75 border border-border-glass text-retro-fg rounded hover:bg-retro-bg transition-colors cursor-pointer"
+            className="pointer-events-auto absolute top-4 left-4 text-2xs font-mono font-bold px-2 py-1 bg-black/75 border border-edge text-retro-fg rounded hover:bg-retro-bg transition-colors cursor-pointer"
             onClick={() => removeEffect(gameBgEffect.id)}
           >
             Clear background
@@ -536,7 +536,7 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
           </button>
           <button
             type="button"
-            className="absolute bottom-6 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg bg-retro-panel/80 border border-border-glass text-retro-fg text-xs font-bold cursor-pointer"
+            className="absolute bottom-6 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg bg-retro-panel/80 border border-edge text-retro-fg text-xs font-bold cursor-pointer"
             onClick={(e) => {
               e.stopPropagation();
               setVideoUnmuted((v) => {
@@ -553,7 +553,7 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
 
       {messageEffect && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 max-w-md animate-domination-toast-up" onClick={() => removeEffect(messageEffect.id)}>
-          <div className="glass-panel p-6 rounded-xl border border-border-glass text-center shadow-2xl">
+          <div className="glass-panel p-6 rounded-xl border border-edge text-center shadow-2xl">
             <p className="text-retro-fg text-lg">{messageEffect.data.text}</p>
             <p className="text-xs text-retro-muted mt-2">Click to dismiss</p>
           </div>
@@ -572,7 +572,7 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
           }}
         >
           <div
-            className="pointer-events-auto bg-black/70 px-6 py-4 rounded-xl border border-border-glass shadow-2xl animate-orbit-fade-in cursor-pointer"
+            className="pointer-events-auto bg-black/70 px-6 py-4 rounded-xl border border-edge shadow-2xl animate-orbit-fade-in cursor-pointer"
             style={{
               fontSize: textOverlayEffect.data.size === 'small' ? '1.5rem'
                 : textOverlayEffect.data.size === 'medium' ? '3rem' : '5rem',
@@ -592,7 +592,7 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
 
       {cameraAsk && (
         <div className="fixed inset-0 z-[var(--z-lightbox)] flex items-center justify-center bg-black/70 p-4">
-          <div className="max-w-sm w-full glass-surface rounded-xl border border-border-glass bg-retro-bg p-6 space-y-4 text-center">
+          <div className="max-w-sm w-full glass-surface rounded-xl border border-edge bg-retro-bg p-6 space-y-4 text-center">
             <div className="w-12 h-12 mx-auto rounded-xl bg-surface-interactive flex items-center justify-center">
               <Camera className="w-6 h-6 text-retro-fg" />
             </div>
@@ -621,7 +621,7 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
                     }, identity).catch(() => { });
                   }
                 }}
-                className="flex-1 px-4 py-2 rounded-lg border border-border-glass text-xs font-bold text-retro-muted hover:text-retro-fg cursor-pointer"
+                className="flex-1 px-4 py-2 rounded-lg border border-edge text-xs font-bold text-retro-muted hover:text-retro-fg cursor-pointer"
               >
                 Decline
               </button>

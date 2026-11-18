@@ -400,7 +400,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
 
   const koPopEl = koPop && (
     <div className="pointer-events-none absolute inset-0 z-[11] flex items-center justify-center">
-      <div className="animate-orbit-pop flex items-center gap-2 rounded-2xl border border-border-glass bg-black/85 px-8 py-3 font-mono text-3xl font-black tracking-widest text-retro-fg shadow-[0_0_50px_rgba(244,63,94,0.5)]">
+      <div className="animate-orbit-pop flex items-center gap-2 rounded-2xl border border-edge bg-black/85 px-8 py-3 font-mono text-3xl font-black tracking-widest text-retro-fg shadow-[0_0_50px_rgba(244,63,94,0.5)]">
         <Skull className="h-7 w-7 text-danger-fg" weight="fill" />
         KO
       </div>
@@ -418,7 +418,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
       {/* Layout selector on top of the game header */}
       <div className="flex flex-none items-center justify-between gap-2 px-1 pt-0.5">
         <div
-          className="inline-flex flex-none overflow-hidden rounded-lg border border-border-glass"
+          className="inline-flex flex-none overflow-hidden rounded-lg border border-edge"
           role="group"
           aria-label="Feed layout"
         >
@@ -499,7 +499,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                   setDragFrom(null)
                   setDragOver(null)
                 }}
-                className={`relative min-h-0 cursor-grab overflow-hidden rounded-lg border bg-retro-bg p-0 text-left font-[inherit] text-[color:inherit] active:cursor-grabbing ${dragOver === i ? 'border-retro-accent ring-2 ring-retro-accent/60' : 'border-border-glass'
+                className={`relative min-h-0 cursor-grab overflow-hidden rounded-lg border bg-retro-bg p-0 text-left font-[inherit] text-[color:inherit] active:cursor-grabbing ${dragOver === i ? 'border-retro-accent ring-2 ring-retro-accent/60' : 'border-edge'
                   } ${dragFrom === i ? 'opacity-50' : ''}`}
                 onClick={(e) => handleCellClick(i, e)}
                 onAuxClick={handleAuxClick}
@@ -571,7 +571,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           {Array.from({ length: Math.max(0, gridTarget - grid.length) }, (_, k) => (
             <div
               key={`empty-${k}`}
-              className="relative flex min-h-0 cursor-default items-center justify-center overflow-hidden rounded-lg border border-dashed border-border-glass bg-retro-bg"
+              className="relative flex min-h-0 cursor-default items-center justify-center overflow-hidden rounded-lg border border-dashed border-edge bg-retro-bg"
             >
               {fetching ? (
                 <Skeleton className="h-full w-full" />
@@ -592,7 +592,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
             <>
               <button
                 type="button"
-                className="icon-btn absolute left-2 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-retro-fg/80 border border-border-glass backdrop-blur-md hover:bg-retro-accent/15 hover:text-retro-fg hover:border-border-glass transition-all duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
+                className="icon-btn absolute left-2 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-retro-fg/80 border border-edge backdrop-blur-md hover:bg-retro-accent/15 hover:text-retro-fg hover:border-edge transition-all duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
                 aria-label="Previous image"
                 title={canGridBack ? 'Back to the previous board' : 'Nothing behind you yet'}
                 disabled={!canGridBack}
@@ -602,7 +602,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               </button>
               <button
                 type="button"
-                className="icon-btn absolute right-2 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-retro-fg/80 border border-border-glass backdrop-blur-md hover:bg-retro-accent/15 hover:text-retro-fg hover:border-border-glass transition-all duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
+                className="icon-btn absolute right-2 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-retro-fg/80 border border-edge backdrop-blur-md hover:bg-retro-accent/15 hover:text-retro-fg hover:border-edge transition-all duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
                 aria-label="Next image"
                 title="Skip this round. No reward"
                 onClick={() => skipGrid()}
@@ -708,7 +708,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           )}
           <button
             type="button"
-            className="icon-btn absolute left-3 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-retro-fg/80 border border-border-glass backdrop-blur-md hover:bg-retro-accent/15 hover:text-retro-fg hover:border-border-glass transition-all duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
+            className="icon-btn absolute left-3 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-retro-fg/80 border border-edge backdrop-blur-md hover:bg-retro-accent/15 hover:text-retro-fg hover:border-edge transition-all duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
             aria-label="Previous image"
             title={canGoBack ? 'Back to the skipped foe' : 'Nothing behind you yet'}
             disabled={!canGoBack}
@@ -721,7 +721,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           </button>
           <button
             type="button"
-            className="icon-btn absolute right-3 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-retro-fg/80 border border-border-glass backdrop-blur-md hover:bg-retro-accent/15 hover:text-retro-fg hover:border-border-glass transition-all duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
+            className="icon-btn absolute right-3 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-retro-fg/80 border border-edge backdrop-blur-md hover:bg-retro-accent/15 hover:text-retro-fg hover:border-edge transition-all duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
             aria-label="Next image"
             title="Skip this foe. No reward"
             onClick={(e) => {
@@ -733,7 +733,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           </button>
           <button
             type="button"
-            className="icon-btn absolute right-3 top-3 z-[6] flex h-8 w-8 items-center justify-center rounded-xl bg-black/60 text-retro-fg/70 border border-border-glass backdrop-blur-md hover:bg-danger/0 hover:text-retro-fg hover:border-danger/0 transition-all duration-150 active:scale-95 cursor-pointer"
+            className="icon-btn absolute right-3 top-3 z-[6] flex h-8 w-8 items-center justify-center rounded-xl bg-black/60 text-retro-fg/70 border border-edge backdrop-blur-md hover:bg-danger/0 hover:text-retro-fg hover:border-danger/0 transition-all duration-150 active:scale-95 cursor-pointer"
             aria-label="Never show this again"
             title="Purge. This image and its rarest tags never return"
             hidden={!current}
@@ -775,9 +775,9 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               </span>
             </button>
             {dropsOpen && (
-              <div className="absolute bottom-full left-0 z-30 mb-1.5 w-64 space-y-1.5 rounded-xl border border-border-glass bg-retro-panel p-2.5 shadow-2xl backdrop-blur-md">
+              <div className="absolute bottom-full left-0 z-30 mb-1.5 w-64 space-y-1.5 rounded-xl border border-edge bg-retro-panel p-2.5 shadow-2xl backdrop-blur-md">
                 {pendingDrops.slice(0, 4).map((drop) => (
-                  <div key={drop.id} className="rounded-lg border border-border-glass bg-retro-bg/80 p-2">
+                  <div key={drop.id} className="rounded-lg border border-edge bg-retro-bg/80 p-2">
                     <div className="flex items-center justify-between gap-1">
                       <span className={`${MONO} truncate text-2xs font-bold text-retro-muted`}>
                         from {drop.foeTitle}
@@ -830,7 +830,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           </span>
         ) : inBattle ? (
           <div className="flex min-w-0 flex-1 items-center gap-2.5" title={`${Math.ceil(foeHp)} / ${foeMaxHp} HP`}>
-            <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-black/60 border border-border-glass">
+            <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-black/60 border border-edge">
               <div
                 className={`h-full rounded-full transition-all duration-150 ${hpPct <= 30 ? 'bg-gradient-to-r from-rose-500 to-amber-500' : 'bg-gradient-to-r from-emerald-500 to-teal-400'}`}
                 style={{ width: `${hpPct}%` }}
@@ -867,7 +867,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           </button>
         )}
         <span
-          className={`${MONO} inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-border-glass bg-glass-w8 px-2.5 py-1 text-xs font-bold text-retro-body shadow-sm`}
+          className={`${MONO} inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-edge bg-glass-w8 px-2.5 py-1 text-xs font-bold text-retro-body shadow-sm`}
           title="Lifetime KOs. Each foe hits harder"
         >
           <Skull size={13} weight="bold" className="text-danger-fg" />

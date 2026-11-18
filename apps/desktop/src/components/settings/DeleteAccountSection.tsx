@@ -112,19 +112,19 @@ export function DeleteAccountSection({
             <button
               type="button"
               onClick={() => setKeyShown((v) => !v)}
-              className="px-2.5 py-1 rounded-md border border-border-glass text-retro-muted hover:text-retro-fg cursor-pointer"
+              className="px-2.5 py-1 rounded-md border border-edge text-retro-muted hover:text-retro-fg cursor-pointer"
             >
               {keyShown ? 'Hide secret key' : 'Reveal secret key first (recommended)'}
             </button>
             {keyShown && (
               <>
-                <code className="break-all flex-1 min-w-[160px] rounded-md bg-black/40 border border-border-glass px-2 py-1 font-mono text-2xs text-retro-fg">
+                <code className="break-all flex-1 min-w-[160px] rounded-md bg-black/40 border border-edge px-2 py-1 font-mono text-2xs text-retro-fg">
                   {identityKeyPayload(identity, displayName)}
                 </code>
                 <button
                   type="button"
                   onClick={copyKey}
-                  className="p-1.5 rounded-md border border-border-glass text-retro-muted hover:text-retro-fg cursor-pointer"
+                  className="p-1.5 rounded-md border border-edge text-retro-muted hover:text-retro-fg cursor-pointer"
                   aria-label="Copy secret key"
                 >
                   <Copy className="w-3.5 h-3.5" />
@@ -169,7 +169,7 @@ export function DeleteAccountSection({
               type="button"
               onClick={() => { setPhase('idle'); setTyped(''); setAck(false); setError(''); }}
               disabled={phase === 'erasing'}
-              className="px-3 py-1.5 rounded-lg border border-border-glass text-xs text-retro-muted hover:text-retro-fg disabled:opacity-40 cursor-pointer"
+              className="px-3 py-1.5 rounded-lg border border-edge text-xs text-retro-muted hover:text-retro-fg disabled:opacity-40 cursor-pointer"
             >
               Cancel
             </button>

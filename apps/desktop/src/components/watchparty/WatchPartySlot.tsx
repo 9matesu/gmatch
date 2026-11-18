@@ -244,7 +244,7 @@ export function WatchPartySlot({
       <button
         type="button"
         onClick={onEmptyClick}
-        className="relative aspect-video border border-dashed border-border-glass bg-glass-w5 hover:bg-glass-w10 flex flex-col items-center justify-center gap-2 text-retro-muted transition-colors cursor-pointer"
+        className="relative aspect-video border border-dashed border-edge bg-glass-w5 hover:bg-glass-w10 flex flex-col items-center justify-center gap-2 text-retro-muted transition-colors cursor-pointer"
       >
         <Plus className="w-6 h-6" />
         <span className="text-2xs font-bold uppercase tracking-wider">Start playing</span>
@@ -284,7 +284,7 @@ export function WatchPartySlot({
       data-active={active ? 'true' : 'false'}
       onClick={onSelect}
       className={`watch-party-slot relative ${fill ? 'w-full h-full' : 'aspect-video'} bg-retro-bg cursor-pointer overflow-hidden flex items-center justify-center ${
-        active ? '' : 'border border-border-glass'
+        active ? '' : 'border border-edge'
       }`}
     >
       {videoSrc ? (
@@ -342,7 +342,7 @@ export function WatchPartySlot({
                   e.stopPropagation()
                   togglePlayback()
                 }}
-                className="pointer-events-auto w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-black/60 hover:bg-black/80 border border-border-glass text-retro-fg flex items-center justify-center shadow-lg transition-transform duration-150 active:scale-95 cursor-pointer"
+                className="pointer-events-auto w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-black/60 hover:bg-black/80 border border-edge text-retro-fg flex items-center justify-center shadow-lg transition-transform duration-150 active:scale-95 cursor-pointer"
               >
                 <Play className="w-7 h-7 sm:w-8 sm:h-8 fill-white text-retro-fg translate-x-0.5" />
               </button>
@@ -403,7 +403,7 @@ export function WatchPartySlot({
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); void transfer.receive() }}
-                className="mt-1 rounded-md border border-border-glass bg-glass-w10 px-2 py-1 text-2xs font-bold uppercase tracking-wider text-retro-fg hover:bg-glass-w10/80 cursor-pointer"
+                className="mt-1 rounded-md border border-edge bg-glass-w10 px-2 py-1 text-2xs font-bold uppercase tracking-wider text-retro-fg hover:bg-glass-w10/80 cursor-pointer"
               >
                 Retry transfer
               </button>

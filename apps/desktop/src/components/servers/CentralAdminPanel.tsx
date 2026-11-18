@@ -156,7 +156,7 @@ export function CentralAdminPanel({ central, identity, toast }: { central: strin
             value={unlockPin}
             onChange={(e) => setUnlockPin(e.target.value)}
             placeholder="Central admin passcode"
-            className="flex-1 bg-surface-raised border border-border-glass focus:border-retro-accent/60 px-2.5 py-1.5 text-xs text-retro-fg placeholder:text-retro-muted rounded-md outline-none font-mono"
+            className="flex-1 bg-surface-raised border border-edge focus:border-retro-accent/60 px-2.5 py-1.5 text-xs text-retro-fg placeholder:text-retro-muted rounded-md outline-none font-mono"
           />
           <button
             type="submit"

@@ -262,7 +262,7 @@ export function WatchPartyTimeline({
 
         {hoverTime !== null && (
           <div
-            className="absolute -top-7 -translate-x-1/2 px-2 py-0.5 rounded-md bg-black/90 border border-border-glass text-2xs font-mono font-bold text-retro-fg shadow-lg pointer-events-none whitespace-nowrap"
+            className="absolute -top-7 -translate-x-1/2 px-2 py-0.5 rounded-md bg-black/90 border border-edge text-2xs font-mono font-bold text-retro-fg shadow-lg pointer-events-none whitespace-nowrap"
             style={{ left: `${hoverPosition}%` }}
           >
             {formatVideoTime(hoverTime)}

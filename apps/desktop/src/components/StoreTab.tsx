@@ -394,7 +394,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
         title="Store"
         meta={arsenalOnly ? 'Deploy cyber hacks.' : undefined}
         action={
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-interactive border border-border-glass rounded-lg">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-interactive border border-edge rounded-lg">
             <Coins className="w-3.5 h-3.5 text-retro-accent" />
             <span className="text-sm font-medium font-mono text-retro-fg tabular-nums">g$ {formatCount(points)}</span>
           </div>
@@ -445,7 +445,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                 <button
                   type="button"
                   onClick={() => setConfirmCashoutAll(false)}
-                  className="px-2.5 py-1.5 rounded bg-surface-interactive border border-border-glass text-retro-body text-xs font-medium cursor-pointer transition-colors hover:text-retro-fg"
+                  className="px-2.5 py-1.5 rounded bg-surface-interactive border border-edge text-retro-body text-xs font-medium cursor-pointer transition-colors hover:text-retro-fg"
                 >
                   Cancel
                 </button>
@@ -500,7 +500,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
             <button
               type="button"
               onClick={onOpenCardCollection}
-              className="px-2.5 py-1.5 text-xs font-medium border border-border-glass text-retro-fg hover:bg-surface-interactive cursor-pointer rounded-lg transition-colors whitespace-nowrap"
+              className="px-2.5 py-1.5 text-xs font-medium border border-edge text-retro-fg hover:bg-surface-interactive cursor-pointer rounded-lg transition-colors whitespace-nowrap"
             >
               View collection
             </button>
@@ -513,7 +513,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
             {[...portfolio].sort((a, b) => b.value - a.value).slice(0, 8).map((c, i) => {
               const tier = RARITY_TIERS[c.rarity as keyof typeof RARITY_TIERS];
               return (
-                <div key={c.id} className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg bg-surface-interactive border border-border-glass">
+                <div key={c.id} className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg bg-surface-interactive border border-edge">
                   <span className="text-xs font-mono text-retro-muted tabular-nums w-5 shrink-0">#{i + 1}</span>
                   {tier && (
                     <span
@@ -549,7 +549,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
           return (
             <div className="space-y-1.5">
               {owned.map((item) => (
-                <div key={item.id} className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg bg-surface-interactive border border-border-glass">
+                <div key={item.id} className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg bg-surface-interactive border border-edge">
                   <span className="min-w-0 flex-1 truncate text-xs text-retro-body">{item.name}</span>
                   <span className="text-xs font-mono tabular-nums text-retro-muted shrink-0">×{inventory[item.id]}</span>
                 </div>
@@ -570,7 +570,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {marketListings.map((l) => (
-              <div key={l.listingId} className="rounded-lg border border-border-glass bg-surface-interactive overflow-hidden flex flex-col">
+              <div key={l.listingId} className="rounded-lg border border-edge bg-surface-interactive overflow-hidden flex flex-col">
                 <button
                   type="button"
                   onClick={() => setMarketCardId(l.cardId)}
@@ -667,7 +667,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-border-glass mt-3 flex items-center justify-between gap-2">
+              <div className="pt-3 border-t border-edge mt-3 flex items-center justify-between gap-2">
                 <span className="text-sm font-medium font-mono tabular-nums text-danger-fg">
                   g$ {formatCount(item.cost)}
                 </span>

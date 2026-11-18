@@ -69,7 +69,7 @@ export function AdminFilterBar({
               value={(value as string) || ""}
               onChange={e => handleFilterChange(config.key, e.target.value)}
               placeholder={config.placeholder}
-              className="w-full bg-surface-canvas border border-border-glass rounded px-2 py-1.5 text-xs outline-none focus:border-retro-accent"
+              className="w-full bg-surface-canvas border border-edge rounded px-2 py-1.5 text-xs outline-none focus:border-retro-accent"
             />
           </div>
         );
@@ -81,7 +81,7 @@ export function AdminFilterBar({
             <select
               value={(value as string) || ""}
               onChange={e => handleFilterChange(config.key, e.target.value || undefined)}
-              className="w-full bg-surface-canvas border border-border-glass rounded px-2 py-1.5 text-xs outline-none focus:border-retro-accent"
+              className="w-full bg-surface-canvas border border-edge rounded px-2 py-1.5 text-xs outline-none focus:border-retro-accent"
             >
               <option value="">All</option>
               {config.options?.map(opt => (
@@ -124,7 +124,7 @@ export function AdminFilterBar({
               value={(value as string) || ""}
               onChange={e => handleFilterChange(config.key, e.target.value ? Number(e.target.value) : undefined)}
               placeholder={config.placeholder}
-              className="w-full bg-surface-canvas border border-border-glass rounded px-2 py-1.5 text-xs outline-none focus:border-retro-accent"
+              className="w-full bg-surface-canvas border border-edge rounded px-2 py-1.5 text-xs outline-none focus:border-retro-accent"
             />
           </div>
         );
@@ -137,7 +137,7 @@ export function AdminFilterBar({
                 type="checkbox"
                 checked={value === true}
                 onChange={e => handleFilterChange(config.key, e.target.checked || undefined)}
-                className="w-4 h-4 accent-info rounded border border-border-glass bg-surface-canvas cursor-pointer"
+                className="w-4 h-4 accent-info rounded border border-edge bg-surface-canvas cursor-pointer"
               />
               <span className="text-2xs font-bold text-retro-muted uppercase tracking-wider">{config.label}</span>
             </label>
@@ -150,7 +150,7 @@ export function AdminFilterBar({
   }, [localFilters, handleFilterChange]);
 
   return (
-    <div className={cn("space-y-3 p-4 bg-surface-raised border border-border-glass rounded-xl", className)}>
+    <div className={cn("space-y-3 p-4 bg-surface-raised border border-edge rounded-xl", className)}>
       {showSearch && (
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-retro-muted" />
@@ -159,7 +159,7 @@ export function AdminFilterBar({
             value={searchValue}
             onChange={e => onSearchChange?.(e.target.value)}
             placeholder={searchPlaceholder}
-            className="w-full bg-surface-canvas border border-border-glass rounded-xl pl-10 pr-4 py-2 text-xs outline-none focus:border-retro-accent"
+            className="w-full bg-surface-canvas border border-edge rounded-xl pl-10 pr-4 py-2 text-xs outline-none focus:border-retro-accent"
           />
         </div>
       )}
@@ -193,7 +193,7 @@ export function AdminFilterBar({
               "px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded border transition-colors flex items-center gap-1.5",
               expanded
                 ? "bg-info/0 text-info-fg border-info/0"
-                : "bg-surface-interactive text-retro-fg border-border-glass hover:bg-glass-w10"
+                : "bg-surface-interactive text-retro-fg border-edge hover:bg-glass-w10"
             )}
           >
             {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -236,7 +236,7 @@ function MultiSelect({ value, options, onChange, placeholder }: {
         type="button"
         onClick={() => setOpen(!open)}
         className={cn(
-          "w-full bg-surface-canvas border border-border-glass rounded px-2 py-1.5 text-xs outline-none focus:border-retro-accent flex items-center justify-between",
+          "w-full bg-surface-canvas border border-edge rounded px-2 py-1.5 text-xs outline-none focus:border-retro-accent flex items-center justify-between",
           open && "border-retro-accent"
         )}
       >
@@ -252,7 +252,7 @@ function MultiSelect({ value, options, onChange, placeholder }: {
         <ChevronDown className={cn("w-3.5 h-3.5 text-retro-muted transition-transform", open && "rotate-180")} />
       </button>
       {open && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-surface-elevated border border-border-glass rounded-lg shadow-lg max-h-48 overflow-auto z-50 animate-orbit-pop">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-surface-elevated border border-edge rounded-lg shadow-lg max-h-48 overflow-auto z-50 animate-orbit-pop">
           {options.map(opt => (
             <label
               key={opt.value}
@@ -267,7 +267,7 @@ function MultiSelect({ value, options, onChange, placeholder }: {
                     : value.filter(v => v !== opt.value);
                   onChange(newValue);
                 }}
-                className="w-3.5 h-3.5 accent-info rounded border border-border-glass bg-surface-canvas cursor-pointer"
+                className="w-3.5 h-3.5 accent-info rounded border border-edge bg-surface-canvas cursor-pointer"
               />
               <span className="text-retro-fg">{opt.label}</span>
             </label>
@@ -290,7 +290,7 @@ function DateRangePicker({ value, onChange }: {
           type="date"
           value={value.from || ""}
           onChange={e => onChange({ ...value, from: e.target.value || undefined })}
-          className="w-full bg-surface-canvas border border-border-glass rounded px-2 py-1.5 text-xs outline-none focus:border-retro-accent"
+          className="w-full bg-surface-canvas border border-edge rounded px-2 py-1.5 text-xs outline-none focus:border-retro-accent"
         />
       </div>
       <div className="flex-1">
@@ -299,7 +299,7 @@ function DateRangePicker({ value, onChange }: {
           type="date"
           value={value.to || ""}
           onChange={e => onChange({ ...value, to: e.target.value || undefined })}
-          className="w-full bg-surface-canvas border border-border-glass rounded px-2 py-1.5 text-xs outline-none focus:border-retro-accent"
+          className="w-full bg-surface-canvas border border-edge rounded px-2 py-1.5 text-xs outline-none focus:border-retro-accent"
         />
       </div>
     </div>

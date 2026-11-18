@@ -229,8 +229,8 @@ export function AttachmentUploadModal({
 
   return (
     <div className="fixed inset-0 z-[var(--z-lightbox)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-surface-raised border border-border-glass rounded-xl max-w-lg w-full overflow-hidden shadow-2xl space-y-4 p-5">
-        <div className="flex items-center justify-between border-b border-border-glass pb-3">
+      <div className="bg-surface-raised border border-edge rounded-xl max-w-lg w-full overflow-hidden shadow-2xl space-y-4 p-5">
+        <div className="flex items-center justify-between border-b border-edge pb-3">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-xl bg-orange-100 border border-orange-200 flex items-center justify-center text-orange-600">
               <ImagePlus className="w-4 h-4" />
@@ -249,7 +249,7 @@ export function AttachmentUploadModal({
         </div>
 
         {/* Mode Selectors */}
-        <div className="flex bg-surface-interactive p-1 rounded-xl border border-border-glass text-xs font-bold">
+        <div className="flex bg-surface-interactive p-1 rounded-xl border border-edge text-xs font-bold">
           {(['upload', 'url', 'camera'] as const).map((m) => (
             <button
               key={m}
@@ -298,11 +298,11 @@ export function AttachmentUploadModal({
                   value={urlInput}
                   onChange={(e) => handleUrl(e.target.value)}
                   placeholder="Paste image or video link (e.g. https://...)"
-                  className="flex-1 bg-surface-interactive border border-border-glass rounded-xl px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-black"
+                  className="flex-1 bg-surface-interactive border border-edge rounded-xl px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-black"
                 />
               </div>
               {urlInput && (
-                <div className="p-3 rounded-xl border border-border-glass bg-surface-raised text-xs text-retro-body flex items-center gap-2">
+                <div className="p-3 rounded-xl border border-edge bg-surface-raised text-xs text-retro-body flex items-center gap-2">
                   <LinkIcon className="w-4 h-4 text-info-fg shrink-0" />
                   <span className="truncate">URL ready. Will be fetched and stored on submit</span>
                 </div>
@@ -318,14 +318,14 @@ export function AttachmentUploadModal({
               </DropZone>
               {preview && (
                 preview.startsWith('data:video') || preview.startsWith('blob:') ? (
-                  <video src={preview} controls className="w-full max-h-52 object-contain rounded-xl border border-border-glass bg-retro-bg" />
+                  <video src={preview} controls className="w-full max-h-52 object-contain rounded-xl border border-edge bg-retro-bg" />
                 ) : preview.startsWith('http://') || preview.startsWith('https://') ? (
-                  <div className="w-full text-center py-3 rounded-xl border border-border-glass bg-surface-raised text-xs text-retro-body flex items-center justify-center gap-2">
+                  <div className="w-full text-center py-3 rounded-xl border border-edge bg-surface-raised text-xs text-retro-body flex items-center justify-center gap-2">
                     <LinkIcon className="w-3.5 h-3.5 text-info-fg" />
                     <span>Link ready to submit</span>
                   </div>
                 ) : (
-                  <img src={preview} alt="Preview" className="w-full max-h-52 object-contain rounded-xl border border-border-glass bg-retro-bg" />
+                  <img src={preview} alt="Preview" className="w-full max-h-52 object-contain rounded-xl border border-edge bg-retro-bg" />
                 )
               )}
             </>
@@ -339,11 +339,11 @@ export function AttachmentUploadModal({
         )}
 
         {/* Actions */}
-        <div className="pt-2 border-t border-border-glass flex justify-end gap-2">
+        <div className="pt-2 border-t border-edge flex justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-xs font-bold text-retro-muted hover:text-retro-fg border border-border-glass rounded-xl cursor-pointer transition-colors"
+            className="px-4 py-2 text-xs font-bold text-retro-muted hover:text-retro-fg border border-edge rounded-xl cursor-pointer transition-colors"
           >
             Cancel
           </button>

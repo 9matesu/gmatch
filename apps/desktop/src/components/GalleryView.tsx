@@ -296,7 +296,7 @@ export function GalleryView({
           </div>
         )}
 
-        <div className="p-4 border-b border-border-glass bg-glass-w5 space-y-2">
+        <div className="p-4 border-b border-edge bg-glass-w5 space-y-2">
           <div className="flex items-center justify-between text-xs font-bold text-retro-body">
             <span className="flex items-center gap-1.5 text-retro-fg">
               <Layers className="w-4 h-4 text-retro-muted" />
@@ -337,7 +337,7 @@ export function GalleryView({
                   type="button"
                   onClick={() => toggleTag(t)}
                   aria-pressed={activeTags.has(t)}
-                  className={`px-2 py-0.5 rounded-full text-2xs font-semibold border cursor-pointer transition-colors ${activeTags.has(t) ? 'bg-glass-w20 border-retro-fg/70' : 'border-border-glass text-retro-muted hover:text-retro-body'}`}
+                  className={`px-2 py-0.5 rounded-full text-2xs font-semibold border cursor-pointer transition-colors ${activeTags.has(t) ? 'bg-glass-w20 border-retro-fg/70' : 'border-edge text-retro-muted hover:text-retro-body'}`}
                 >
                   {t} <span className="opacity-60">{n}</span>
                 </button>
@@ -420,7 +420,7 @@ export function GalleryView({
                 ))}
               </div>
 
-              <div className="flex items-center justify-between pt-3 border-t border-border-glass/80 mt-4 text-xs">
+              <div className="flex items-center justify-between pt-3 border-t border-edge/80 mt-4 text-xs">
                 <button
                   type="button"
                   onClick={() => {

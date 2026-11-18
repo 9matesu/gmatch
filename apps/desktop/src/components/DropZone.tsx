@@ -133,10 +133,10 @@ export function DropZone({
          compact ? 'p-3' : 'p-6'
        } ${
          disabled
-           ? 'border-border-glass/30 opacity-40 cursor-not-allowed'
+           ? 'border-edge/30 opacity-40 cursor-not-allowed'
            : dragOver
            ? 'border-retro-accent bg-retro-bg'
-           : 'border-border-glass hover:border-retro-muted hover:bg-retro-panel'
+           : 'border-edge hover:border-retro-muted hover:bg-retro-panel'
        }`}
     >
       <input

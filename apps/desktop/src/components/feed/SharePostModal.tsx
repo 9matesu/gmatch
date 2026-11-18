@@ -165,11 +165,11 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
       className={`fixed inset-0 ${zIndexClass} bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 pb-[var(--island-clearance)] sm:p-4 animate-orbit-fade-in`}
     >
       <div
-        className="bg-glass backdrop-blur-2xl w-full max-w-lg rounded-xl border border-border-glass shadow-2xl overflow-hidden flex flex-col max-h-[calc(88vh-var(--island-clearance))] mb-[var(--island-clearance)] sm:mb-0 animate-orbit-slide-up"
+        className="bg-glass backdrop-blur-2xl w-full max-w-lg rounded-xl border border-edge shadow-2xl overflow-hidden flex flex-col max-h-[calc(88vh-var(--island-clearance))] mb-[var(--island-clearance)] sm:mb-0 animate-orbit-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="p-4 border-b border-border-glass flex items-center justify-between">
+        <div className="p-4 border-b border-edge flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Send className="w-5 h-5 text-retro-fg" />
             <h3 className="text-sm font-extrabold text-retro-fg">Share post</h3>
@@ -184,13 +184,13 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
         </div>
 
         {/* Post Mini Preview */}
-        <div className="p-3 bg-surface-interactive border-b border-border-glass flex items-center gap-3">
+        <div className="p-3 bg-surface-interactive border-b border-edge flex items-center gap-3">
           <ObjectImage
             contentUrl={post.url}
             identity={identity}
             mimeType={post.mime_type}
             alt=""
-            className="w-20 h-20 rounded-xl object-cover border border-border-glass shrink-0"
+            className="w-20 h-20 rounded-xl object-cover border border-edge shrink-0"
           />
           <div className="min-w-0">
             <span className="text-xs font-bold text-retro-fg block truncate">{post.author_name}</span>
@@ -199,13 +199,13 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
         </div>
 
         {/* Message Attachment Input */}
-        <div className="p-3 border-b border-border-glass">
+        <div className="p-3 border-b border-edge">
           <input
             type="text"
             value={shareMessage}
             onChange={(e) => setShareMessage(e.target.value)}
             placeholder="Write a message to attach..."
-            className="w-full bg-surface-interactive border border-border-glass rounded-xl px-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent"
+            className="w-full bg-surface-interactive border border-edge rounded-xl px-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent"
           />
         </div>
 
@@ -218,7 +218,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
                 type="button"
                 onClick={() => (r.kind === 'user' ? void handleSendDirectShare(r.id, r.name) : void handleSendGroupShare(r.id, r.name))}
                 disabled={!!sentTargets[r.id] || !!pendingTargets[r.id]}
-                className="shrink-0 flex items-center gap-1.5 px-2 py-1 rounded-full border border-border-glass text-xs text-retro-body hover:bg-glass-w5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                className="shrink-0 flex items-center gap-1.5 px-2 py-1 rounded-full border border-edge text-xs text-retro-body hover:bg-glass-w5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {profilePics[r.id] ? (
                   <img src={resolveMediaUrl(profilePics[r.id])} alt="" className="w-4 h-4 rounded-full object-cover" />
@@ -232,7 +232,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
         )}
 
         {/* Search Filter */}
-        <div className="p-3 border-b border-border-glass">
+        <div className="p-3 border-b border-edge">
           <div className="relative">
             <Search className="w-4 h-4 text-retro-muted absolute left-3 top-2.5" />
             <input
@@ -240,7 +240,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
               value={shareSearch}
               onChange={(e) => setShareSearch(e.target.value)}
               placeholder="Search friends or groups..."
-              className="w-full bg-surface-interactive border border-border-glass rounded-xl pl-9 pr-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent"
+              className="w-full bg-surface-interactive border border-edge rounded-xl pl-9 pr-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent"
             />
           </div>
         </div>
@@ -271,10 +271,10 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
               return (
                 <div
                   key={fId}
-                  className="p-2.5 rounded-xl hover:bg-glass-w5 flex items-center justify-between border border-transparent hover:border-border-glass transition-colors"
+                  className="p-2.5 rounded-xl hover:bg-glass-w5 flex items-center justify-between border border-transparent hover:border-edge transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-glass-w20 overflow-hidden border border-border-glass flex items-center justify-center text-xs font-bold">
+                    <div className="w-10 h-10 rounded-full bg-glass-w20 overflow-hidden border border-edge flex items-center justify-center text-xs font-bold">
                       {profilePics[fId] ? (
                         <img src={resolveMediaUrl(profilePics[fId])} alt="" className="w-full h-full object-cover" />
                       ) : (
@@ -294,7 +294,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
                     title={!identity ? 'Log in to share' : undefined}
                     className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all disabled:cursor-not-allowed ${
                       isSent
-                        ? 'bg-surface-interactive text-retro-muted border border-border-glass'
+                        ? 'bg-surface-interactive text-retro-muted border border-edge'
                         : 'bg-retro-bg hover:bg-surface-elevated text-retro-fg disabled:opacity-40'
                     }`}
                   >
@@ -316,10 +316,10 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
                   return (
                     <div
                       key={g.id}
-                      className="p-2.5 rounded-xl hover:bg-glass-w5 flex items-center justify-between border border-transparent hover:border-border-glass transition-colors"
+                      className="p-2.5 rounded-xl hover:bg-glass-w5 flex items-center justify-between border border-transparent hover:border-edge transition-colors"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-glass-w20 overflow-hidden border border-border-glass flex items-center justify-center text-xs font-bold">
+                        <div className="w-10 h-10 rounded-xl bg-glass-w20 overflow-hidden border border-edge flex items-center justify-center text-xs font-bold">
                           {g.name.slice(0, 1).toUpperCase()}
                         </div>
                         <div>
@@ -334,7 +334,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
                         title={!identity ? 'Log in to share' : undefined}
                         className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all disabled:cursor-not-allowed ${
                           isSent
-                            ? 'bg-surface-interactive text-retro-muted border border-border-glass'
+                            ? 'bg-surface-interactive text-retro-muted border border-edge'
                             : 'bg-retro-bg hover:bg-surface-elevated text-retro-fg disabled:opacity-40'
                         }`}
                       >
@@ -348,11 +348,11 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
         </div>
 
         {/* Modal Bottom Actions */}
-        <div className="p-3 border-t border-border-glass bg-surface-interactive flex items-center gap-2">
+        <div className="p-3 border-t border-edge bg-surface-interactive flex items-center gap-2">
           <button
             type="button"
             onClick={handleCopyLink}
-            className="flex-1 py-2 bg-surface-raised hover:bg-surface-elevated text-retro-fg border border-border-glass rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+            className="flex-1 py-2 bg-surface-raised hover:bg-surface-elevated text-retro-fg border border-edge rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <Link2 className="w-4 h-4" />
             <span>Copy Link</span>
@@ -369,7 +369,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
                 handleCopyLink();
               }
             }}
-            className="flex-1 py-2 bg-surface-raised hover:bg-surface-elevated text-retro-fg border border-border-glass rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+            className="flex-1 py-2 bg-surface-raised hover:bg-surface-elevated text-retro-fg border border-edge rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <Share2 className="w-4 h-4" />
             <span>More Options</span>

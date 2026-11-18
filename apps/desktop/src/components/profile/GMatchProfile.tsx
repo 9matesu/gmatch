@@ -270,9 +270,9 @@ export function GMatchProfile({
   ];
 
   return (
-    <div className="w-full bg-surface-canvas font-sans select-none border border-border-glass rounded-xl overflow-hidden text-retro-fg animate-orbit-fade-in shadow-xl">
+    <div className="w-full bg-surface-canvas font-sans select-none border border-edge rounded-xl overflow-hidden text-retro-fg animate-orbit-fade-in shadow-xl">
       {/* Profile Header */}
-      <div className="bg-surface-raised border-b border-border-glass p-4 sm:p-6 flex flex-col gap-4">
+      <div className="bg-surface-raised border-b border-edge p-4 sm:p-6 flex flex-col gap-4">
         {/* Avatar & Stats */}
         <div className="flex items-center gap-5 sm:gap-6">
           {/* Avatar */}
@@ -289,7 +289,7 @@ export function GMatchProfile({
             className={`relative w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden shrink-0 group border-2 p-0 text-left ${
               isSelf ? 'cursor-pointer' : 'cursor-default'
             } ${
-              isFlashing ? 'border-retro-accent' : 'border-border-glass'
+              isFlashing ? 'border-retro-accent' : 'border-edge'
             }`}
           >
             {pfp ? (
@@ -364,7 +364,7 @@ export function GMatchProfile({
           <button
             type="button"
             onClick={() => { playPress(800); setShowEditor(true); }}
-            className="flex-1 py-2 px-3 rounded-lg bg-surface-interactive border border-border-glass hover:border-border-glass text-retro-body font-medium text-xs transition-colors cursor-pointer"
+            className="flex-1 py-2 px-3 rounded-lg bg-surface-interactive border border-edge hover:border-edge text-retro-body font-medium text-xs transition-colors cursor-pointer"
           >
             Edit profile
           </button>
@@ -372,7 +372,7 @@ export function GMatchProfile({
           <button
             type="button"
             onClick={handleShareProfile}
-            className="flex-1 py-2 px-3 rounded-lg bg-surface-interactive border border-border-glass hover:border-border-glass text-retro-body font-medium text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+            className="flex-1 py-2 px-3 rounded-lg bg-surface-interactive border border-edge hover:border-edge text-retro-body font-medium text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
           >
             <Share2 className="w-3.5 h-3.5" />
             <span>Share</span>
@@ -387,7 +387,7 @@ export function GMatchProfile({
             // on one screen are indistinguishable to a screen reader, so this
             // one names its surface. Behaviour is unchanged.
             aria-label="Profile settings"
-            className="p-2 rounded-lg bg-surface-interactive border border-border-glass hover:border-border-glass text-retro-body cursor-pointer transition-colors"
+            className="p-2 rounded-lg bg-surface-interactive border border-edge hover:border-edge text-retro-body cursor-pointer transition-colors"
           >
             <Settings className="w-4 h-4" />
           </button>
@@ -395,7 +395,7 @@ export function GMatchProfile({
       </div>
 
       {/* Tabs */}
-      <div className="bg-surface-raised border-b border-border-glass flex items-center gap-1 px-2 py-2">
+      <div className="bg-surface-raised border-b border-edge flex items-center gap-1 px-2 py-2">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = profileTab === tab.id;

@@ -1395,7 +1395,7 @@ export function ServersView({
       {/* One narrow column on the page background: no card wrapping the list. */}
       <div className="flex flex-col h-full min-h-0 flex-1 w-full max-w-[720px] overflow-hidden">
         {/* One page header: one title, one primary action, a quiet search. */}
-        <div className="glass-toolbar border-0 border-b border-border-glass rounded-none px-4 py-2.5 flex items-center gap-2 shrink-0">
+        <div className="glass-toolbar border-0 border-b border-edge rounded-none px-4 py-2.5 flex items-center gap-2 shrink-0">
           <div className="min-w-0 shrink-0">
             <h1 className="text-sm font-bold text-retro-fg leading-tight truncate">
               {activeTab === 'hub' ? 'Hub' : 'Servers'}
@@ -1447,9 +1447,9 @@ export function ServersView({
               {showCentralPopover && (
                 <div
                   data-menu-content
-                  className="absolute right-0 top-full mt-2 w-72 bg-surface-raised border border-border-glass rounded-lg p-3 shadow-xl z-[var(--z-dropdown)] space-y-2.5 animate-orbit-fade-in"
+                  className="absolute right-0 top-full mt-2 w-72 bg-surface-raised border border-edge rounded-lg p-3 shadow-xl z-[var(--z-dropdown)] space-y-2.5 animate-orbit-fade-in"
                 >
-                  <div className="flex items-center justify-between border-b border-border-subtle pb-1.5">
+                  <div className="flex items-center justify-between border-b border-edge-subtle pb-1.5">
                     <span className="text-xs font-bold text-retro-fg">Directory</span>
                     <button
                       type="button"
@@ -1482,7 +1482,7 @@ export function ServersView({
                   </div>
                   {setupError && <p role="alert" className="text-2xs text-retro-error">{setupError}</p>}
                   {isDev && (
-                    <div className="pt-1 border-t border-border-subtle flex items-center justify-between">
+                    <div className="pt-1 border-t border-edge-subtle flex items-center justify-between">
                       <span className="text-2xs text-retro-muted font-mono">Dev switch:</span>
                       <div className="flex items-center gap-1">
                         <button
@@ -1509,7 +1509,7 @@ export function ServersView({
                       type="button"
                       onClick={() => { setShowCentralPopover(false); playPress(760); setShowAdmin((v) => !v) }}
                       aria-label="Central admin panel"
-                      className="w-full pt-2 border-t border-border-subtle flex items-center gap-2 text-xs text-retro-muted hover:text-retro-fg cursor-pointer transition-colors text-left"
+                      className="w-full pt-2 border-t border-edge-subtle flex items-center gap-2 text-xs text-retro-muted hover:text-retro-fg cursor-pointer transition-colors text-left"
                     >
                       <ShieldCheck className="w-3.5 h-3.5" /> Central admin panel
                     </button>
@@ -1545,7 +1545,7 @@ export function ServersView({
         {activeTab === 'hub' && identity ? (
           <aside className="flex flex-col min-h-0 h-full overflow-y-auto styled-scrollbar p-4 sm:p-6 space-y-4 max-w-4xl w-full mx-auto" aria-label="Current server hub">
             {/* Top Navigation */}
-            <div className="flex items-center justify-between pb-2 border-b border-border-glass">
+            <div className="flex items-center justify-between pb-2 border-b border-edge">
               <button
                 type="button"
                 onClick={() => { playPress(700); setActiveTab('browse'); }}
@@ -1572,7 +1572,7 @@ export function ServersView({
                     <div className="flex items-center gap-2">
                       <h2 className="truncate text-2xl font-black tracking-tighter text-retro-fg">{currentServerTitle || serverName || 'gmatch'}</h2>
                       {serverMode && (
-                        <span className="text-2xs px-2 py-0.5 rounded font-mono uppercase tracking-wider bg-surface-interactive border border-border-subtle text-retro-muted">
+                        <span className="text-2xs px-2 py-0.5 rounded font-mono uppercase tracking-wider bg-surface-interactive border border-edge-subtle text-retro-muted">
                           {serverMode}
                         </span>
                       )}
@@ -1654,7 +1654,7 @@ export function ServersView({
 
               {/* Inline Editor */}
               {editingServer && (
-                <div className="bg-surface-interactive/60 border border-border-glass space-y-2 p-3 rounded-xl">
+                <div className="bg-surface-interactive/60 border border-edge space-y-2 p-3 rounded-xl">
                   <label className="block text-xs text-retro-muted">
                     Server name
                     <input
@@ -1744,7 +1744,7 @@ export function ServersView({
             <section className="glass-inset p-4 space-y-4 overflow-y-auto max-h-[60vh]" aria-label="Server members">
               {/* Online Section */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between pb-1.5 border-b border-border-glass">
+                <div className="flex items-center justify-between pb-1.5 border-b border-edge">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-retro-online shrink-0" />
                     <span className="text-xs font-bold text-retro-fg uppercase tracking-wider font-mono">
@@ -1765,10 +1765,10 @@ export function ServersView({
                         <div
                           key={u.id}
                           onClick={() => handleUserClick(u)}
-                          className="group flex items-center justify-between gap-2 p-2.5 rounded-xl bg-surface-interactive/40 border border-border-subtle hover:border-border-strong hover:bg-surface-interactive transition-colors cursor-pointer"
+                          className="group flex items-center justify-between gap-2 p-2.5 rounded-xl bg-surface-interactive/40 border border-edge-subtle hover:border-edge-strong hover:bg-surface-interactive transition-colors cursor-pointer"
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="relative w-8 h-8 rounded-full overflow-hidden bg-surface-raised border border-border-subtle shrink-0 flex items-center justify-center text-xs font-bold text-retro-muted">
+                            <div className="relative w-8 h-8 rounded-full overflow-hidden bg-surface-raised border border-edge-subtle shrink-0 flex items-center justify-center text-xs font-bold text-retro-muted">
                               {u.pfp_url ? (
                                 <img src={resolveMediaUrl(u.pfp_url)} alt="" className="w-full h-full object-cover" />
                               ) : (
@@ -1800,7 +1800,7 @@ export function ServersView({
 
               {/* Offline Section */}
               <div className="space-y-2 pt-2">
-                <div className="flex items-center justify-between pb-1.5 border-b border-border-glass">
+                <div className="flex items-center justify-between pb-1.5 border-b border-edge">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-retro-muted/40 shrink-0" />
                     <span className="text-xs font-bold text-retro-muted uppercase tracking-wider font-mono">
@@ -1821,10 +1821,10 @@ export function ServersView({
                         <div
                           key={u.id}
                           onClick={() => handleUserClick(u)}
-                          className="group flex items-center justify-between gap-2 p-2.5 rounded-xl bg-surface-interactive/20 border border-border-subtle/50 hover:border-border-strong hover:bg-surface-interactive/60 transition-colors cursor-pointer opacity-85 hover:opacity-100"
+                          className="group flex items-center justify-between gap-2 p-2.5 rounded-xl bg-surface-interactive/20 border border-edge-subtle/50 hover:border-edge-strong hover:bg-surface-interactive/60 transition-colors cursor-pointer opacity-85 hover:opacity-100"
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="relative w-8 h-8 rounded-full overflow-hidden bg-surface-raised border border-border-subtle shrink-0 flex items-center justify-center text-xs font-bold text-retro-muted opacity-75">
+                            <div className="relative w-8 h-8 rounded-full overflow-hidden bg-surface-raised border border-edge-subtle shrink-0 flex items-center justify-center text-xs font-bold text-retro-muted opacity-75">
                               {u.pfp_url ? (
                                 <img src={resolveMediaUrl(u.pfp_url)} alt="" className="w-full h-full object-cover" />
                               ) : (
@@ -1885,7 +1885,7 @@ export function ServersView({
               )
             })()}
             {!identity && (
-              <div className="px-3 py-1.5 bg-surface-interactive/60 border-b border-border-subtle text-xs text-retro-muted shrink-0">
+              <div className="px-3 py-1.5 bg-surface-interactive/60 border-b border-edge-subtle text-xs text-retro-muted shrink-0">
                 No account yet. One is created for you on the server you pick.
               </div>
             )}
@@ -1896,7 +1896,7 @@ export function ServersView({
             <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar px-4 py-2 bg-retro-bg/85 backdrop-blur-md">
               {/* A failed directory request never erases servers we already know. */}
               {dirError && serverRows.length > 0 && (
-                <div role="status" className="mb-2 flex items-center gap-2 px-3 py-2 rounded-lg border border-border-glass bg-glass-w5 text-2xs text-retro-muted">
+                <div role="status" className="mb-2 flex items-center gap-2 px-3 py-2 rounded-lg border border-edge bg-glass-w5 text-2xs text-retro-muted">
                   <span className="min-w-0 flex-1 truncate">
                     Directory unreachable. Showing the last known servers.
                   </span>
@@ -1938,14 +1938,14 @@ export function ServersView({
               )}
 
               {serverRows.length > 0 && (
-                <ul className="divide-y divide-border-subtle" aria-label="Servers" onKeyDown={onRowListKeyDown}>
+                <ul className="divide-y divide-edge-subtle" aria-label="Servers" onKeyDown={onRowListKeyDown}>
                   {serverRows.map((s) => renderRow(s))}
                 </ul>
               )}
 
               {/* Device-local labels are not servers and never join the list;
                   they stay behind one quiet, secondary door. */}
-              <div className="mt-3 border-t border-border-subtle pt-2 pb-1">
+              <div className="mt-3 border-t border-edge-subtle pt-2 pb-1">
                 <button
                   type="button"
                   onClick={() => { playPress(700); setGroupsOpen(true) }}
@@ -2020,7 +2020,7 @@ export function ServersView({
               )}
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border-subtle">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-edge-subtle">
               <button
                 type="button"
                 onClick={() => forgetLocalServer(deleteTarget)}

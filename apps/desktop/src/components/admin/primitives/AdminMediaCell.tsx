@@ -75,7 +75,7 @@ export function AdminMediaCell({
       <div
         className={cn(
           sizeClasses[size],
-          "rounded overflow-hidden bg-surface-interactive border border-border-glass flex items-center justify-center",
+          "rounded overflow-hidden bg-surface-interactive border border-edge flex items-center justify-center",
           className
         )}
       >
@@ -90,7 +90,7 @@ export function AdminMediaCell({
     <div
       className={cn(
         sizeClasses[size],
-        "rounded overflow-hidden bg-retro-bg border border-border-glass cursor-pointer shrink-0 relative group",
+        "rounded overflow-hidden bg-retro-bg border border-edge cursor-pointer shrink-0 relative group",
         className
       )}
       onClick={handleClick}
@@ -98,7 +98,7 @@ export function AdminMediaCell({
       {isVideo ? (
         <>
           <video src={url} muted className="w-full h-full object-cover" />
-          <span className="absolute top-0.5 left-0.5 px-1 py-0.5 bg-black/80 border border-border-glass text-retro-fg font-mono font-bold text-2xs rounded">
+          <span className="absolute top-0.5 left-0.5 px-1 py-0.5 bg-black/80 border border-edge text-retro-fg font-mono font-bold text-2xs rounded">
             VIDEO
           </span>
         </>
@@ -115,7 +115,7 @@ export function AdminMediaCell({
           <button
             type="button"
             onClick={e => { e.stopPropagation(); handleClick(); }}
-            className="p-1.5 bg-surface-elevated border border-border-glass rounded text-retro-fg hover:bg-glass-w10 transition-colors"
+            className="p-1.5 bg-surface-elevated border border-edge rounded text-retro-fg hover:bg-glass-w10 transition-colors"
             aria-label="Zoom"
           >
             <ZoomIn className="w-4 h-4" />

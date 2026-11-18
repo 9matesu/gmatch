@@ -35,7 +35,7 @@ export function QueueControls({ state, match, matchRoundInfo, autoQueueEnabled, 
       <button
         type="button"
         onClick={onOpenCardChat}
-        className="border border-border-glass px-2.5 py-1.5 text-xs font-medium text-retro-fg hover:bg-surface-interactive cursor-pointer rounded-lg transition-colors flex items-center gap-1.5"
+        className="border border-edge px-2.5 py-1.5 text-xs font-medium text-retro-fg hover:bg-surface-interactive cursor-pointer rounded-lg transition-colors flex items-center gap-1.5"
       >
         <MessageSquare className="w-3.5 h-3.5" />
         Card Chat
@@ -55,14 +55,14 @@ export function QueueControls({ state, match, matchRoundInfo, autoQueueEnabled, 
         <button
           type="button"
           onClick={() => { void onToggleAutoQueue(false); }}
-          className="px-3 py-1.5 text-xs font-medium border transition-colors cursor-pointer rounded-lg whitespace-nowrap bg-surface-interactive text-retro-muted border-border-glass hover:border-retro-fg hover:text-retro-fg flex items-center gap-1.5"
+          className="px-3 py-1.5 text-xs font-medium border transition-colors cursor-pointer rounded-lg whitespace-nowrap bg-surface-interactive text-retro-muted border-edge hover:border-retro-fg hover:text-retro-fg flex items-center gap-1.5"
         >
           <Pause className="w-3.5 h-3.5" />
           Leave Queue
         </button>
       ) : !hasActiveDeck ? (
         <div
-          className="flex items-stretch rounded-lg border border-border-glass overflow-hidden whitespace-nowrap"
+          className="flex items-stretch rounded-lg border border-edge overflow-hidden whitespace-nowrap"
           title={myCardsCount < MIN_GAME_CARDS
             ? `Quick Play needs ${MIN_GAME_CARDS} cards in your active deck. You have ${myCardsCount}. Build one to continue.`
             : `Pick your ${MIN_GAME_CARDS}-card deck in Deck Builder before queueing.`}
@@ -79,7 +79,7 @@ export function QueueControls({ state, match, matchRoundInfo, autoQueueEnabled, 
           <button
             type="button"
             onClick={() => onOpenDeckBuilder ? onOpenDeckBuilder() : onOpenCreateCard?.()}
-            className="px-4 py-1.5 text-xs font-bold bg-glass-w8 text-retro-accent border-l border-border-glass hover:bg-glass-w12 cursor-pointer transition-colors flex items-center gap-1.5"
+            className="px-4 py-1.5 text-xs font-bold bg-glass-w8 text-retro-accent border-l border-edge hover:bg-glass-w12 cursor-pointer transition-colors flex items-center gap-1.5"
           >
             <LayoutGrid className="w-3.5 h-3.5" />
             {myCardsCount < MIN_GAME_CARDS ? `Build Deck (${myCardsCount}/${MIN_GAME_CARDS})` : 'Choose Deck'}
@@ -101,7 +101,7 @@ export function QueueControls({ state, match, matchRoundInfo, autoQueueEnabled, 
         onClick={() => onShowLeagueTab(!showLeagueTab)}
         aria-pressed={showLeagueTab}
         title={showLeagueTab ? 'Back to player roster' : 'View league standings'}
-        className={`px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap border border-border-glass rounded-lg ${showLeagueTab
+        className={`px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap border border-edge rounded-lg ${showLeagueTab
           ? 'bg-surface-interactive text-retro-fg'
           : 'bg-transparent text-retro-muted hover:text-retro-fg'
           }`}

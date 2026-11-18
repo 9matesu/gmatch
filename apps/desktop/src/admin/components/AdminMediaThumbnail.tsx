@@ -44,7 +44,7 @@ export function AdminMediaThumbnail({
 
   return (
     <div
-      className={cn("rounded border border-border-glass bg-retro-bg overflow-hidden relative group shrink-0", className)}
+      className={cn("rounded border border-edge bg-retro-bg overflow-hidden relative group shrink-0", className)}
       onClick={() => canOpen && onZoom?.(url, isVideo, title, subtitle || "Media")}
     >
       {objectImage.isLink ? (

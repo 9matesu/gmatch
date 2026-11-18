@@ -113,7 +113,7 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
       </div>
 
       {state.packaged && (
-        <div className="p-4 bg-surface-interactive border border-border-glass rounded-lg space-y-3">
+        <div className="p-4 bg-surface-interactive border border-edge rounded-lg space-y-3">
           <div className="text-xs font-medium text-retro-fg">Connect to a friend instead</div>
           <div className="flex gap-2">
             <input
@@ -169,7 +169,7 @@ export function ServerTab({ toast }: { toast?: (msg: string, type?: string) => v
           <button
             type="button"
             onClick={() => setRestartPending(false)}
-            className="rounded-lg border border-border-glass px-3 py-1.5 text-xs text-retro-muted hover:text-retro-fg cursor-pointer"
+            className="rounded-lg border border-edge px-3 py-1.5 text-xs text-retro-muted hover:text-retro-fg cursor-pointer"
           >
             Later
           </button>

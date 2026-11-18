@@ -77,7 +77,7 @@ export function OnboardingFlow(props: Props) {
 
   return (
     <div className="fixed inset-0 z-[var(--z-lightbox)] overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-retro-fg">
-      <div className="w-full max-w-2xl bg-retro-bg border border-border-glass rounded-xl p-6 sm:p-8 shadow-2xl space-y-5 animate-orbit-slide-up">
+      <div className="w-full max-w-2xl bg-retro-bg border border-edge rounded-xl p-6 sm:p-8 shadow-2xl space-y-5 animate-orbit-slide-up">
         <ProfileStep
           {...props}
           onDone={finish}
@@ -151,7 +151,7 @@ function ProfileStep(props: Props & { onDone: () => void }) {
               value={secretKey}
               onChange={(e) => setSecretKey(e.target.value)}
               placeholder="Paste your exported secret key"
-              className="w-full bg-retro-panel border border-border-glass rounded-lg px-3 py-2 text-xs font-mono text-retro-fg placeholder:text-retro-muted outline-none focus:border-border-glass transition-colors"
+              className="w-full bg-retro-panel border border-edge rounded-lg px-3 py-2 text-xs font-mono text-retro-fg placeholder:text-retro-muted outline-none focus:border-edge transition-colors"
             />
           </div>
           <div className="space-y-1.5">
@@ -163,7 +163,7 @@ function ProfileStep(props: Props & { onDone: () => void }) {
               onChange={(e) => setName(e.target.value)}
               placeholder="Leave blank to use existing name"
               maxLength={30}
-              className="w-full bg-retro-panel border border-border-glass rounded-lg px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-border-glass transition-colors"
+              className="w-full bg-retro-panel border border-edge rounded-lg px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-edge transition-colors"
             />
           </div>
         </div>
@@ -181,13 +181,13 @@ function ProfileStep(props: Props & { onDone: () => void }) {
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. AnonGooner"
               maxLength={30}
-              className="flex-1 bg-retro-panel border border-border-glass rounded-lg px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-border-glass transition-colors"
+              className="flex-1 bg-retro-panel border border-edge rounded-lg px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-edge transition-colors"
             />
             <button
               type="button"
               onClick={() => { playPress(500); setName(generateRandomHandle()); }}
               title="Generate random anonymous handle"
-              className="p-2 bg-retro-panel hover:bg-glass-w12 border border-border-glass rounded-lg text-retro-muted hover:text-retro-fg transition-colors cursor-pointer shrink-0"
+              className="p-2 bg-retro-panel hover:bg-glass-w12 border border-edge rounded-lg text-retro-muted hover:text-retro-fg transition-colors cursor-pointer shrink-0"
             >
               <Dices className="w-4 h-4" />
             </button>

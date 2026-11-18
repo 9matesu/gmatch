@@ -148,12 +148,12 @@ export function NotificationCenter(props: NotificationCenterProps) {
         <div
           role="region"
           aria-label="Notification centre"
-          className="absolute left-1/2 -translate-x-1/2 top-full mt-1 w-[min(420px,92vw)] max-h-[70vh] flex flex-col bg-retro-bg/95 border border-border-glass rounded-lg shadow-2xl backdrop-blur-md z-[var(--z-dropdown)] overflow-hidden"
+          className="absolute left-1/2 -translate-x-1/2 top-full mt-1 w-[min(420px,92vw)] max-h-[70vh] flex flex-col bg-retro-bg/95 border border-edge rounded-lg shadow-2xl backdrop-blur-md z-[var(--z-dropdown)] overflow-hidden"
         >
           {/* Transient toasts: an error stays until dismissed, so it needs a
               home inside the same surface rather than a floating overlay. */}
           {messages.length > 0 && (
-            <div className="shrink-0 border-b border-border-glass">
+            <div className="shrink-0 border-b border-edge">
               <div className="flex items-center justify-between px-3 py-1.5">
                 <span className="text-2xs font-bold uppercase tracking-wide text-retro-muted">
                   Recent{overflowCount > 0 && <span className="font-normal"> · +{overflowCount} more</span>}
@@ -162,7 +162,7 @@ export function NotificationCenter(props: NotificationCenterProps) {
                   Clear
                 </button>
               </div>
-              <ul className="max-h-28 overflow-y-auto styled-scrollbar divide-y divide-border-subtle">
+              <ul className="max-h-28 overflow-y-auto styled-scrollbar divide-y divide-edge-subtle">
                 {[...messages].reverse().map((m) => (
                   <li key={m.id} className="flex items-start gap-2 px-3 py-2">
                     <IconFor type={m.type} />

@@ -61,7 +61,7 @@ export default function StatsPanel() {
       {/* Modern 2x2 Telemetry Grid */}
       <div className="grid grid-cols-2 gap-1.5">
         {/* What a crit is worth: the only number the click game has. */}
-        <div className="rounded-xl border border-border-glass bg-glass-w5 p-2 flex flex-col justify-between">
+        <div className="rounded-xl border border-edge bg-glass-w5 p-2 flex flex-col justify-between">
           <div className="flex items-center gap-1 text-2xs font-medium text-retro-muted truncate">
             <Coins className="w-3.5 h-3.5 text-warning-fg shrink-0" weight="fill" />
             <span>Per crit</span>
@@ -71,7 +71,7 @@ export default function StatsPanel() {
           </div>
         </div>
         {/* Click Power */}
-        <div className="rounded-xl border border-border-glass bg-glass-w5 p-2 flex flex-col justify-between">
+        <div className="rounded-xl border border-edge bg-glass-w5 p-2 flex flex-col justify-between">
           <div className="flex items-center gap-1 text-2xs font-medium text-retro-muted truncate">
             <Lightning className="w-3.5 h-3.5 text-info-fg shrink-0" weight="fill" />
             <span>Click Power</span>
@@ -82,7 +82,7 @@ export default function StatsPanel() {
         </div>
 
         {/* Clicks & Crits */}
-        <div className="rounded-xl border border-border-glass bg-glass-w5 p-2 flex flex-col justify-between">
+        <div className="rounded-xl border border-edge bg-glass-w5 p-2 flex flex-col justify-between">
           <div className="flex items-center gap-1 text-2xs font-medium text-retro-muted truncate">
             <CursorClick className="w-3.5 h-3.5 text-success-fg shrink-0" weight="fill" />
             <span>Clicks / Crits</span>
@@ -93,7 +93,7 @@ export default function StatsPanel() {
         </div>
 
         {/* Corruption Shards */}
-        <div className="rounded-xl border border-border-glass bg-glass-w5 p-2 flex flex-col justify-between">
+        <div className="rounded-xl border border-edge bg-glass-w5 p-2 flex flex-col justify-between">
           <div className="flex items-center gap-1 text-2xs font-medium text-retro-muted truncate">
             <Sparkle className="w-3.5 h-3.5 text-chrome-lav-fg shrink-0" weight="fill" />
             <span>Shards</span>
@@ -105,7 +105,7 @@ export default function StatsPanel() {
       </div>
 
       {/* Cache Telemetry Bar */}
-      <div className="flex items-center justify-between gap-2 pt-1 border-t border-border-glass text-xs text-retro-muted">
+      <div className="flex items-center justify-between gap-2 pt-1 border-t border-edge text-xs text-retro-muted">
         <div className="flex items-center gap-1.5 truncate">
           <Images className="w-3.5 h-3.5 text-retro-muted shrink-0" />
           <span className="font-mono text-2xs">
@@ -117,7 +117,7 @@ export default function StatsPanel() {
             type="button"
             onClick={handleClearCache}
             disabled={clearing}
-            className="flex items-center gap-1 px-2 py-0.5 rounded-lg border border-border-glass bg-glass-w5 hover:bg-glass-w10 hover:text-danger-fg text-2xs font-medium text-retro-muted transition-colors cursor-pointer disabled:opacity-40"
+            className="flex items-center gap-1 px-2 py-0.5 rounded-lg border border-edge bg-glass-w5 hover:bg-glass-w10 hover:text-danger-fg text-2xs font-medium text-retro-muted transition-colors cursor-pointer disabled:opacity-40"
             title="Clean local cached picture files"
           >
             <Trash className="w-3 h-3" />

@@ -56,7 +56,7 @@ export function WatchRoomHeader({ party, identity, profilePics: _profilePics }: 
 
   return (
     <>
-      <div className="px-3 py-2 border-b border-border-glass space-y-1.5">
+      <div className="px-3 py-2 border-b border-edge space-y-1.5">
         <div className="flex items-center gap-1.5">
           {editing && isHost ? (
             <input
@@ -148,7 +148,7 @@ export function WatchRoomHeader({ party, identity, profilePics: _profilePics }: 
               </div>
               <Switch checked={party.requireApproval} onChange={() => setPartySettings(party.id, { requireApproval: !party.requireApproval })} />
             </div>
-            <ul className="border-t border-border-glass pt-2 space-y-1 max-h-52 overflow-y-auto styled-scrollbar">
+            <ul className="border-t border-edge pt-2 space-y-1 max-h-52 overflow-y-auto styled-scrollbar">
               <li className="text-2xs uppercase tracking-wider text-retro-muted">Members</li>
               {party.members.map((m) => (
                 <li key={m.id} className="flex items-center gap-2">

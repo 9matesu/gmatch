@@ -65,8 +65,8 @@ function RoomThumbnail({
   }
 
   return (
-    <div className="relative w-full h-full bg-surface-canvas flex flex-col items-center justify-center overflow-hidden border-b border-border-subtle group-hover:border-retro-fg/20 transition-colors">
-      <div className="p-3 rounded-xl bg-surface-raised/80 border border-border-glass shadow-lg group-hover:scale-110 group-hover:border-retro-fg/30 transition-all duration-150">
+    <div className="relative w-full h-full bg-surface-canvas flex flex-col items-center justify-center overflow-hidden border-b border-edge-subtle group-hover:border-retro-fg/20 transition-colors">
+      <div className="p-3 rounded-xl bg-surface-raised/80 border border-edge shadow-lg group-hover:scale-110 group-hover:border-retro-fg/30 transition-all duration-150">
         <Film className="w-6 h-6 text-retro-muted group-hover:text-retro-fg transition-colors" />
       </div>
       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
@@ -194,7 +194,7 @@ export function WatchPartyRoomList({
                 type="button"
                 onClick={() => void joinPartyById(identity, r.id)}
                 aria-label={`Reopen room ${r.name}`}
-                className="px-3 py-1.5 rounded-full border border-border-glass bg-surface-canvas/60 hover:bg-surface-raised text-xs text-retro-fg hover:text-retro-fg transition-colors cursor-pointer active:scale-[0.98]"
+                className="px-3 py-1.5 rounded-full border border-edge bg-surface-canvas/60 hover:bg-surface-raised text-xs text-retro-fg hover:text-retro-fg transition-colors cursor-pointer active:scale-[0.98]"
               >
                 <History className="w-3 h-3 inline mr-1.5 -mt-0.5" />
                 {r.name}
@@ -211,9 +211,9 @@ export function WatchPartyRoomList({
           type="button"
           onClick={onNewParty}
           aria-label="Create a new room"
-          className="group relative flex flex-col aspect-video sm:aspect-auto sm:min-h-[220px] rounded-xl border border-dashed border-border-glass hover:border-retro-fg bg-surface-canvas/40 hover:bg-glass-w8 p-5 items-center justify-center text-center transition-all duration-150 cursor-pointer active:scale-[0.98] shadow-sm"
+          className="group relative flex flex-col aspect-video sm:aspect-auto sm:min-h-[220px] rounded-xl border border-dashed border-edge hover:border-retro-fg bg-surface-canvas/40 hover:bg-glass-w8 p-5 items-center justify-center text-center transition-all duration-150 cursor-pointer active:scale-[0.98] shadow-sm"
         >
-          <div className="w-12 h-12 rounded-full border border-border-glass bg-surface-raised flex items-center justify-center text-retro-muted group-hover:text-retro-fg group-hover:border-retro-fg/50 group-hover:scale-110 transition-all duration-150 mb-3 shadow-md">
+          <div className="w-12 h-12 rounded-full border border-edge bg-surface-raised flex items-center justify-center text-retro-muted group-hover:text-retro-fg group-hover:border-retro-fg/50 group-hover:scale-110 transition-all duration-150 mb-3 shadow-md">
             <Plus className="w-6 h-6 stroke-[2.5]" />
           </div>
           <span className="text-xs font-bold text-retro-fg group-hover:text-retro-fg transition-colors">
@@ -231,14 +231,14 @@ export function WatchPartyRoomList({
             type="button"
             onClick={() => void joinPartyById(identity, r.id)}
             aria-label={`Join room ${r.name}`}
-            className="group relative flex flex-col rounded-xl border border-border-glass hover:border-retro-fg/60 bg-surface-canvas/60 hover:bg-surface-raised/80 overflow-hidden text-left transition-all duration-150 cursor-pointer active:scale-[0.98] shadow-md hover:shadow-xl"
+            className="group relative flex flex-col rounded-xl border border-edge hover:border-retro-fg/60 bg-surface-canvas/60 hover:bg-surface-raised/80 overflow-hidden text-left transition-all duration-150 cursor-pointer active:scale-[0.98] shadow-md hover:shadow-xl"
           >
             {/* 16:9 Thumbnail Area */}
             <div className="relative aspect-video w-full overflow-hidden bg-retro-bg">
               <RoomThumbnail mediaUrl={r.mediaUrl} name={r.name} identity={identity} />
 
               {/* Top-Right Member Badge */}
-              <div className="absolute top-2 right-2 flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs font-mono font-bold bg-black/80 backdrop-blur-md text-retro-fg border border-border-glass shadow-sm z-10">
+              <div className="absolute top-2 right-2 flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs font-mono font-bold bg-black/80 backdrop-blur-md text-retro-fg border border-edge shadow-sm z-10">
                 <Users className="w-3 h-3 text-retro-muted" />
                 <span>{r.members}</span>
               </div>
@@ -252,7 +252,7 @@ export function WatchPartyRoomList({
             </div>
 
             {/* Room Info Bottom Area */}
-            <div className="p-3 flex flex-col flex-1 justify-between gap-1 border-t border-border-glass/40">
+            <div className="p-3 flex flex-col flex-1 justify-between gap-1 border-t border-edge/40">
               <div className="space-y-0.5 min-w-0">
                 <h4 className="text-xs font-bold text-retro-fg truncate group-hover:text-retro-fg transition-colors">
                   {r.name}
@@ -262,7 +262,7 @@ export function WatchPartyRoomList({
                 </p>
               </div>
 
-              <div className="flex items-center justify-between pt-1.5 border-t border-border-subtle/40 text-2xs text-retro-muted">
+              <div className="flex items-center justify-between pt-1.5 border-t border-edge-subtle/40 text-2xs text-retro-muted">
                 <span className="flex items-center gap-1.5">
                   <span className={`w-1.5 h-1.5 rounded-full ${r.members > 0 ? 'bg-success animate-pulse' : 'bg-retro-muted/40'}`} />
                   {r.members > 0 ? 'Active' : 'Persistent'}

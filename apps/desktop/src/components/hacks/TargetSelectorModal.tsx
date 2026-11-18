@@ -62,7 +62,7 @@ export function TargetSelectorModal({
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search players..."
           aria-label="Search players"
-          className="w-full bg-glass-w5 border border-border-glass rounded-lg pl-9 pr-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent transition-colors placeholder:text-retro-muted"
+          className="w-full bg-glass-w5 border border-edge rounded-lg pl-9 pr-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent transition-colors placeholder:text-retro-muted"
         />
       </div>
 
@@ -81,11 +81,11 @@ export function TargetSelectorModal({
               className={`p-3 rounded-lg flex items-center justify-between border transition-colors cursor-pointer ${
                 isSelected
                   ? 'bg-retro-error/10 border-retro-error/40'
-                  : 'bg-glass-w5 border-border-glass hover:border-border-strong'
+                  : 'bg-glass-w5 border-edge hover:border-edge-strong'
               }`}
             >
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-glass-w12 overflow-hidden border border-border-glass flex items-center justify-center text-xs font-bold text-retro-fg">
+                <div className="w-9 h-9 rounded-full bg-glass-w12 overflow-hidden border border-edge flex items-center justify-center text-xs font-bold text-retro-fg">
                   {pfp ? (
                     <img src={resolveMediaUrl(pfp)} alt="" className="w-full h-full object-cover" />
                   ) : (
@@ -99,7 +99,7 @@ export function TargetSelectorModal({
               </div>
 
               <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                isSelected ? 'border-retro-error bg-retro-error text-retro-fg' : 'border-border-glass'
+                isSelected ? 'border-retro-error bg-retro-error text-retro-fg' : 'border-edge'
               }`}>
                 {isSelected && <Crosshair className="w-3 h-3" />}
               </div>
@@ -115,7 +115,7 @@ export function TargetSelectorModal({
       </div>
 
       {/* Footer Action */}
-      <div className="pt-3 border-t border-border-glass flex items-center gap-3">
+      <div className="pt-3 border-t border-edge flex items-center gap-3">
         <Button className="flex-1" onClick={onClose}>
           Cancel
         </Button>

@@ -26,7 +26,7 @@ export function FeedHeader({
   onPingAttention,
 }: FeedHeaderProps) {
   return (
-    <header className="sticky top-0 z-30 w-full glass-toolbar border-0 border-b border-border-glass rounded-none px-3 sm:px-6 py-1.5 flex items-center justify-between gap-2">
+    <header className="sticky top-0 z-30 w-full glass-toolbar border-0 border-b border-edge rounded-none px-3 sm:px-6 py-1.5 flex items-center justify-between gap-2">
       <div className="flex items-center gap-2 shrink-0">
         {sortTabs}
       </div>

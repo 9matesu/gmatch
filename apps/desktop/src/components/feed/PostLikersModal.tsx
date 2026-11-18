@@ -98,16 +98,16 @@ export function PostLikersModal({
       aria-label="Post likes"
     >
       <div
-        className="bg-surface-raised w-full max-w-sm rounded-t-xl sm:rounded-xl border border-border-glass shadow-2xl overflow-hidden flex flex-col max-h-[80vh] sm:max-h-[500px] animate-orbit-slide-up"
+        className="bg-surface-raised w-full max-w-sm rounded-t-xl sm:rounded-xl border border-edge shadow-2xl overflow-hidden flex flex-col max-h-[80vh] sm:max-h-[500px] animate-orbit-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-4 border-b border-border-glass flex items-center justify-between">
+        <div className="p-4 border-b border-edge flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Heart className="w-4 h-4 text-danger-fg fill-danger" />
             <h3 className="text-sm font-extrabold text-retro-fg">Likes</h3>
             {!loading && (
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-glass-w12 text-retro-muted border border-border-glass">
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-glass-w12 text-retro-muted border border-edge">
                 {likers.length}
               </span>
             )}
@@ -149,7 +149,7 @@ export function PostLikersModal({
                     .catch(() => setError('Failed to load likes'))
                     .finally(() => setLoading(false));
                 }}
-                className="px-3 py-1 bg-glass-w12 border border-border-glass rounded text-retro-fg hover:bg-glass-w20 cursor-pointer"
+                className="px-3 py-1 bg-glass-w12 border border-edge rounded text-retro-fg hover:bg-glass-w20 cursor-pointer"
               >
                 Retry
               </button>
@@ -170,7 +170,7 @@ export function PostLikersModal({
                   className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-glass-w12 transition-colors cursor-pointer group"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-full bg-glass-w20 border border-border-glass overflow-hidden shrink-0 flex items-center justify-center">
+                    <div className="w-9 h-9 rounded-full bg-glass-w20 border border-edge overflow-hidden shrink-0 flex items-center justify-center">
                       {avatar ? (
                         <img
                           src={resolveMediaUrl(avatar)}

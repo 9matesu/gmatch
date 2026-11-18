@@ -79,7 +79,7 @@ export default function TagBrowser({ onClose }: { onClose?: () => void }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Tag picker */}
-      <div className="shrink-0 border-b border-border-glass p-3">
+      <div className="shrink-0 border-b border-edge p-3">
         <div className="flex items-center gap-2 pb-2 text-xs text-retro-muted">
           <Tag className="h-3.5 w-3.5" />
           <span className="font-semibold uppercase tracking-wider">Browse by tag</span>
@@ -109,7 +109,7 @@ export default function TagBrowser({ onClose }: { onClose?: () => void }) {
                   className={`cursor-pointer rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors ${
                     on
                       ? 'border-retro-accent/70 bg-retro-accent/20 text-retro-fg'
-                      : 'border-border-glass text-retro-muted hover:text-retro-body'
+                      : 'border-edge text-retro-muted hover:text-retro-body'
                   }`}
                 >
                   {t.name} <span className="opacity-50">L{t.level}</span>
@@ -152,7 +152,7 @@ export default function TagBrowser({ onClose }: { onClose?: () => void }) {
                 onClick={() => setViewerId(p.id)}
                 title={p.tags.slice(0, 6).join(' ')}
                 aria-label={`View image tagged ${p.tags.slice(0, 3).join(' ') || 'booru post'}`}
-                className="group relative aspect-square cursor-pointer overflow-hidden rounded-[10px] border border-border-glass bg-retro-bg"
+                className="group relative aspect-square cursor-pointer overflow-hidden rounded-[10px] border border-edge bg-retro-bg"
               >
                 {p.kind === 'video' ? (
                   <video
@@ -209,7 +209,7 @@ export default function TagBrowser({ onClose }: { onClose?: () => void }) {
       )}
 
       {onClose && (
-        <div className="shrink-0 border-t border-border-glass p-2 text-center">
+        <div className="shrink-0 border-t border-edge p-2 text-center">
           <button
             type="button"
             onClick={onClose}

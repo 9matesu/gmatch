@@ -64,7 +64,7 @@ export function GamesHub({
       {/* Sleek Arena Mode Pills */}
       {subTab !== 'idle' && (
         <div className="flex items-center justify-between gap-2 px-3 sm:px-4 pt-3 pb-1">
-          <div className="flex items-center gap-1 p-1 rounded-full bg-surface-raised/60 backdrop-blur-md border border-border-glass" role="tablist" aria-label="Arena Modes">
+          <div className="flex items-center gap-1 p-1 rounded-full bg-surface-raised/60 backdrop-blur-md border border-edge" role="tablist" aria-label="Arena Modes">
             {[
               { id: 'duel' as const, label: '1v1 Arena' },
               { id: 'ranks' as const, label: 'Rankings' },

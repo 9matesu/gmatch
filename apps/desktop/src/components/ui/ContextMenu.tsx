@@ -116,12 +116,12 @@ export function ContextMenu({ x, y, title, subtitle, actions, onDismiss, width =
         role="menu"
         aria-label="Context menu"
         data-testid="context-menu"
-        className="fixed bg-retro-panel/95 backdrop-blur-md border border-border-glass rounded-xl shadow-2xl p-1.5 text-xs animate-orbit-fade-in text-retro-fg max-h-[min(70vh,32rem)] overflow-y-auto styled-scrollbar"
+        className="fixed bg-retro-panel/95 backdrop-blur-md border border-edge rounded-xl shadow-2xl p-1.5 text-xs animate-orbit-fade-in text-retro-fg max-h-[min(70vh,32rem)] overflow-y-auto styled-scrollbar"
         style={{ top: pos.top, left: pos.left, width }}
         onClick={(e) => e.stopPropagation()}
       >
         {(title || subtitle) && (
-          <div className="px-2.5 py-1 mb-1 border-b border-border-glass/40">
+          <div className="px-2.5 py-1 mb-1 border-b border-edge/40">
             {title && <div className="flex items-center gap-1.5 text-2xs font-semibold tracking-wider text-retro-muted uppercase">{title}</div>}
             {subtitle && <div className="text-2xs font-mono text-retro-faint truncate" title={String(subtitle)}>{subtitle}</div>}
           </div>
@@ -131,7 +131,7 @@ export function ContextMenu({ x, y, title, subtitle, actions, onDismiss, width =
           const expanded = openId === a.id;
           return (
             <React.Fragment key={a.id}>
-              {a.separatorBefore && <div className="my-1 border-t border-border-glass/50" />}
+              {a.separatorBefore && <div className="my-1 border-t border-edge/50" />}
               <button
                 type="button"
                 role="menuitem"
@@ -154,7 +154,7 @@ export function ContextMenu({ x, y, title, subtitle, actions, onDismiss, width =
               </button>
 
               {expanded && a.params && (
-                <div className="mx-1 mb-1 mt-0.5 p-2 rounded-lg bg-surface-canvas/60 border border-border-glass/60 space-y-1.5">
+                <div className="mx-1 mb-1 mt-0.5 p-2 rounded-lg bg-surface-canvas/60 border border-edge/60 space-y-1.5">
                   {a.params.map((p) => {
                     const v = values[a.id]?.[p.id];
                     if (p.type === 'select') {
@@ -164,7 +164,7 @@ export function ContextMenu({ x, y, title, subtitle, actions, onDismiss, width =
                           <select
                             value={String(v ?? '')}
                             onChange={(e) => setValue(a.id, p.id, e.target.value)}
-                            className="w-full bg-retro-panel border border-border-glass rounded-md px-2 py-1 text-xs text-retro-fg outline-none"
+                            className="w-full bg-retro-panel border border-edge rounded-md px-2 py-1 text-xs text-retro-fg outline-none"
                           >
                             {p.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                           </select>
@@ -192,7 +192,7 @@ export function ContextMenu({ x, y, title, subtitle, actions, onDismiss, width =
                           value={String(v ?? '')}
                           placeholder={p.placeholder}
                           onChange={(e) => setValue(a.id, p.id, e.target.value)}
-                          className="w-full bg-retro-panel border border-border-glass rounded-md px-2 py-1 text-xs text-retro-fg outline-none"
+                          className="w-full bg-retro-panel border border-edge rounded-md px-2 py-1 text-xs text-retro-fg outline-none"
                         />
                       </label>
                     );

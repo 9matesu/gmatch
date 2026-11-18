@@ -67,7 +67,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
       {pending && (
         <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-orbit-fade-in">
           <div
-            className="bg-retro-panel border border-border-glass rounded-lg p-5 w-[380px] max-w-[90vw] shadow-2xl animate-orbit-pop"
+            className="bg-retro-panel border border-edge rounded-lg p-5 w-[380px] max-w-[90vw] shadow-2xl animate-orbit-pop"
             role="dialog"
             aria-modal="true"
             aria-labelledby="confirm-title"
@@ -85,7 +85,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                 type="button"
                 autoFocus
                 onClick={() => settle(false)}
-                className="px-3 py-1.5 text-xs font-medium border border-border-glass rounded-md text-retro-fg hover:bg-glass-w12 hover:text-retro-fg transition-all duration-150 active:scale-[0.96] cursor-pointer"
+                className="px-3 py-1.5 text-xs font-medium border border-edge rounded-md text-retro-fg hover:bg-glass-w12 hover:text-retro-fg transition-all duration-150 active:scale-[0.96] cursor-pointer"
               >
                 {pending.options.cancelLabel}
               </button>

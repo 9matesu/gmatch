@@ -53,7 +53,7 @@ export function AdminActionMenu<T>({
     <div className={cn("relative inline-block", className)} ref={ref}>
       {trigger || defaultTrigger}
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 min-w-[160px] bg-surface-elevated border border-border-glass rounded-lg shadow-lg overflow-hidden animate-orbit-pop">
+        <div className="absolute right-0 top-full mt-1 z-50 min-w-[160px] bg-surface-elevated border border-edge rounded-lg shadow-lg overflow-hidden animate-orbit-pop">
           {visibleActions.map((action, _index) => {
               const actionIcon = action.icon;
               const isIconFunction = typeof actionIcon === 'function';
@@ -103,7 +103,7 @@ export function BulkActionBar<T>({
 }: BulkActionBarProps<T>) {
   return (
     <div className={cn(
-      "fixed bottom-0 left-0 right-0 z-50 bg-surface-elevated border-t border-border-glass p-3 shadow-xl animate-orbit-slide-up md:static md:shadow-none md:border-0 md:bg-transparent md:p-0",
+      "fixed bottom-0 left-0 right-0 z-50 bg-surface-elevated border-t border-edge p-3 shadow-xl animate-orbit-slide-up md:static md:shadow-none md:border-0 md:bg-transparent md:p-0",
       className
     )}>
       <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
@@ -135,7 +135,7 @@ export function BulkActionBar<T>({
                 "px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded transition-colors flex items-center gap-1.5",
                 action.variant === "danger" && "bg-danger/0 text-danger-fg border border-danger/0 hover:bg-danger/0",
                 action.variant === "primary" && "bg-info/0 text-info-fg border border-info/0 hover:bg-info/0",
-                action.variant !== "danger" && action.variant !== "primary" && "bg-surface-interactive text-retro-fg border border-border-glass hover:bg-glass-w10",
+                action.variant !== "danger" && action.variant !== "primary" && "bg-surface-interactive text-retro-fg border border-edge hover:bg-glass-w10",
                 "disabled:opacity-40 disabled:cursor-not-allowed"
               )}
             >
@@ -178,7 +178,7 @@ export function ConfirmDialog({
 
   return (
     <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4 bg-black/70 animate-orbit-fade-in">
-      <div className="w-full max-w-md bg-surface-elevated border border-border-glass rounded-xl shadow-2xl overflow-hidden animate-orbit-pop">
+      <div className="w-full max-w-md bg-surface-elevated border border-edge rounded-xl shadow-2xl overflow-hidden animate-orbit-pop">
         <div className="p-5 space-y-4">
           <div className="flex items-start justify-between">
             <div>
@@ -197,12 +197,12 @@ export function ConfirmDialog({
           </div>
           {children}
         </div>
-        <div className="flex items-center justify-end gap-2 px-5 pb-5 border-t border-border-glass">
+        <div className="flex items-center justify-end gap-2 px-5 pb-5 border-t border-edge">
           <button
             type="button"
             onClick={onClose}
             disabled={isLoading}
-            className="px-3 py-1.5 text-xs font-bold rounded border border-border-glass text-retro-fg hover:bg-glass-w10 transition-colors disabled:opacity-40"
+            className="px-3 py-1.5 text-xs font-bold rounded border border-edge text-retro-fg hover:bg-glass-w10 transition-colors disabled:opacity-40"
           >
             {cancelLabel}
           </button>
@@ -217,7 +217,7 @@ export function ConfirmDialog({
               "px-3 py-1.5 text-xs font-bold rounded flex items-center gap-1.5 transition-colors disabled:opacity-40",
               variant === "danger" && "bg-danger/0 text-danger-fg border border-danger/0 hover:bg-danger/0",
               variant === "primary" && "bg-info text-retro-accent-text border border-info hover:bg-info",
-              variant === "default" && "bg-surface-interactive text-retro-fg border border-border-glass hover:bg-glass-w10"
+              variant === "default" && "bg-surface-interactive text-retro-fg border border-edge hover:bg-glass-w10"
             )}
           >
             {isLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
@@ -316,10 +316,10 @@ export function FormModal<T extends Record<string, unknown>>({
   return (
     <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4 bg-black/70 animate-orbit-fade-in">
       <div className={cn(
-        "w-full max-w-lg bg-surface-elevated border border-border-glass rounded-xl shadow-2xl overflow-hidden animate-orbit-pop max-h-[90vh] flex flex-col",
+        "w-full max-w-lg bg-surface-elevated border border-edge rounded-xl shadow-2xl overflow-hidden animate-orbit-pop max-h-[90vh] flex flex-col",
         className
       )}>
-        <div className="p-5 border-b border-border-glass flex items-start justify-between">
+        <div className="p-5 border-b border-edge flex items-start justify-between">
           <div>
             <h3 className="text-sm font-bold text-retro-fg">{title}</h3>
             {description && <p className="text-xs text-retro-muted mt-1">{description}</p>}
@@ -350,7 +350,7 @@ export function FormModal<T extends Record<string, unknown>>({
                       onBlur={() => handleBlur(String(field.key))}
                       placeholder={field.placeholder}
                       rows={3}
-                      className="w-full bg-surface-canvas border border-border-glass rounded px-3 py-2 text-xs outline-none focus:border-retro-accent resize-y"
+                      className="w-full bg-surface-canvas border border-edge rounded px-3 py-2 text-xs outline-none focus:border-retro-accent resize-y"
                       required={field.required}
                     />
                   ) : field.type === "select" ? (
@@ -358,7 +358,7 @@ export function FormModal<T extends Record<string, unknown>>({
                       value={(formData[field.key] as string) || ""}
                       onChange={e => handleChange(String(field.key), e.target.value || undefined)}
                       onBlur={() => handleBlur(String(field.key))}
-                      className="w-full bg-surface-canvas border border-border-glass rounded px-3 py-2 text-xs outline-none focus:border-retro-accent"
+                      className="w-full bg-surface-canvas border border-edge rounded px-3 py-2 text-xs outline-none focus:border-retro-accent"
                       required={field.required}
                     >
                       <option value="">Select...</option>
@@ -372,7 +372,7 @@ export function FormModal<T extends Record<string, unknown>>({
                         type="checkbox"
                         checked={formData[field.key] === true}
                         onChange={e => handleChange(String(field.key), e.target.checked)}
-                        className="w-4 h-4 accent-info rounded border border-border-glass bg-surface-canvas cursor-pointer"
+                        className="w-4 h-4 accent-info rounded border border-edge bg-surface-canvas cursor-pointer"
                       />
                       <span className="text-xs text-retro-fg">{field.placeholder || "Enable"}</span>
                     </label>
@@ -389,7 +389,7 @@ export function FormModal<T extends Record<string, unknown>>({
                       onChange={e => handleChange(String(field.key), field.type === "number" ? (e.target.value ? Number(e.target.value) : undefined) : e.target.value)}
                       onBlur={() => handleBlur(String(field.key))}
                       placeholder={field.placeholder}
-                      className="w-full bg-surface-canvas border border-border-glass rounded px-3 py-2 text-xs outline-none focus:border-retro-accent"
+                      className="w-full bg-surface-canvas border border-edge rounded px-3 py-2 text-xs outline-none focus:border-retro-accent"
                       required={field.required}
                     />
                   )}
@@ -401,12 +401,12 @@ export function FormModal<T extends Record<string, unknown>>({
             </div>
           ))}
         </form>
-        <div className="flex items-center justify-end gap-2 px-5 pb-5 border-t border-border-glass">
+        <div className="flex items-center justify-end gap-2 px-5 pb-5 border-t border-edge">
           <button
             type="button"
             onClick={onClose}
             disabled={isLoading}
-            className="px-3 py-1.5 text-xs font-bold rounded border border-border-glass text-retro-fg hover:bg-glass-w10 transition-colors disabled:opacity-40"
+            className="px-3 py-1.5 text-xs font-bold rounded border border-edge text-retro-fg hover:bg-glass-w10 transition-colors disabled:opacity-40"
           >
             Cancel
           </button>
@@ -461,13 +461,13 @@ function TagsInput({ value, onChange, placeholder }: {
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className="w-full bg-surface-canvas border border-border-glass rounded px-3 py-2 text-xs outline-none focus:border-retro-accent"
+          className="w-full bg-surface-canvas border border-edge rounded px-3 py-2 text-xs outline-none focus:border-retro-accent"
         />
       </div>
       {value.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {value.map(tag => (
-            <span key={tag} className="px-2 py-1 bg-surface-interactive border border-border-glass rounded text-xs font-mono text-retro-fg flex items-center gap-1">
+            <span key={tag} className="px-2 py-1 bg-surface-interactive border border-edge rounded text-xs font-mono text-retro-fg flex items-center gap-1">
               #{tag}
               <button
                 type="button"
@@ -509,10 +509,10 @@ export function DetailModal({ isOpen, onClose, title, subtitle, children, data, 
   return (
     <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4 bg-black/70 animate-orbit-fade-in">
       <div className={cn(
-        "w-full bg-surface-elevated border border-border-glass rounded-xl shadow-2xl overflow-hidden animate-orbit-pop max-h-[90vh] flex flex-col",
+        "w-full bg-surface-elevated border border-edge rounded-xl shadow-2xl overflow-hidden animate-orbit-pop max-h-[90vh] flex flex-col",
         sizeClasses[size]
       )}>
-        <div className="p-5 border-b border-border-glass flex items-start justify-between">
+        <div className="p-5 border-b border-edge flex items-start justify-between">
           <div>
             <h3 className="text-sm font-bold text-retro-fg">{title}</h3>
             {subtitle && <p className="text-xs text-retro-muted mt-1">{subtitle}</p>}
@@ -528,7 +528,7 @@ export function DetailModal({ isOpen, onClose, title, subtitle, children, data, 
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {children}
           {data && (
-            <div className="divide-y divide-border-glass">
+            <div className="divide-y divide-edge">
               {Object.entries(data).map(([key, val]) => (
                 <div key={key} className="py-2 flex items-center justify-between text-xs gap-3">
                   <span className="text-retro-muted uppercase text-2xs font-mono shrink-0">{key}</span>

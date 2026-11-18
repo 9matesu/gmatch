@@ -347,7 +347,7 @@ export function CommandIsland({
                 : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
             }`}
           >
-            <div className="w-5 h-5 rounded-full overflow-hidden border border-border-glass bg-black/40 flex items-center justify-center shrink-0">
+            <div className="w-5 h-5 rounded-full overflow-hidden border border-edge bg-black/40 flex items-center justify-center shrink-0">
               {profilePic ? (
                 <img src={resolveMediaUrl(profilePic)} alt="" className="w-full h-full object-cover" />
               ) : (

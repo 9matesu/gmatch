@@ -99,12 +99,12 @@ export function FlashModal({
             </div>
           </DropZone>
           {preview && (
-            <img src={preview} alt="Preview" className="w-full max-h-56 object-contain rounded-lg border border-border-glass bg-retro-bg" />
+            <img src={preview} alt="Preview" className="w-full max-h-56 object-contain rounded-lg border border-edge bg-retro-bg" />
           )}
         </>
       )}
 
-      <div className="pt-2 border-t border-border-glass">
+      <div className="pt-2 border-t border-edge">
         <Button
           variant="primary"
           className="w-full"

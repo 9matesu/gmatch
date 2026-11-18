@@ -202,7 +202,7 @@ export function WorldRow({
               data-menu-content
               role="menu"
               aria-label={`Actions for ${server.name}`}
-              className="absolute right-0 top-full mt-1 w-52 bg-surface-raised border border-border-glass rounded-lg py-1 shadow-lg z-[var(--z-dropdown)] space-y-0.5 animate-orbit-fade-in"
+              className="absolute right-0 top-full mt-1 w-52 bg-surface-raised border border-edge rounded-lg py-1 shadow-lg z-[var(--z-dropdown)] space-y-0.5 animate-orbit-fade-in"
             >
               {menuItems}
             </div>

@@ -39,7 +39,7 @@ export function ReportPostModal({ post, onClose, onReport, toast }: ReportPostMo
             key={reason}
             type="button"
             onClick={() => handleReportSubmit(reason)}
-            className="w-full p-2.5 text-left text-xs font-semibold text-retro-fg bg-glass-w5 hover:bg-glass-w12 rounded-lg border border-border-glass transition-colors cursor-pointer"
+            className="w-full p-2.5 text-left text-xs font-semibold text-retro-fg bg-glass-w5 hover:bg-glass-w12 rounded-lg border border-edge transition-colors cursor-pointer"
           >
             {reason}
           </button>

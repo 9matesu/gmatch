@@ -40,14 +40,14 @@ export function AdminSidebar({
   return (
     <aside
       className={cn(
-        "glass-panel border-r border-border-glass flex flex-col h-full overflow-hidden",
+        "glass-panel border-r border-edge flex flex-col h-full overflow-hidden",
         "desktop-sidebar",
         className
       )}
       role="navigation"
       aria-label="Admin navigation"
     >
-      <div className="p-4 border-b border-border-glass flex items-center justify-between">
+      <div className="p-4 border-b border-edge flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-retro-accent" />
           <div className="min-w-0">
@@ -112,7 +112,7 @@ export function AdminSidebar({
         ))}
       </nav>
 
-      <div className="p-4 border-t border-border-glass space-y-2">
+      <div className="p-4 border-t border-edge space-y-2">
         <div className="flex items-center justify-between text-2xs font-mono text-retro-muted">
           <span>Admin Status:</span>
           <span className="text-success-fg font-bold uppercase tracking-wider">Active</span>

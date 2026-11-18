@@ -90,13 +90,13 @@ export function LegalCenter({
       aria-label="Legal Center"
     >
       <div
-        className="bg-retro-bg border border-border-glass rounded-xl max-w-3xl w-full max-h-[88vh] shadow-2xl flex flex-col animate-orbit-slide-up text-retro-fg"
+        className="bg-retro-bg border border-edge rounded-xl max-w-3xl w-full max-h-[88vh] shadow-2xl flex flex-col animate-orbit-slide-up text-retro-fg"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-border-glass flex items-center justify-between gap-2">
+        <div className="p-4 sm:p-5 border-b border-edge flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 shrink-0 rounded-lg bg-retro-panel border border-border-glass text-retro-fg flex items-center justify-center">
+            <div className="w-8 h-8 shrink-0 rounded-lg bg-retro-panel border border-edge text-retro-fg flex items-center justify-center">
               <Scale className="w-4 h-4" />
             </div>
             <div className="min-w-0">
@@ -122,14 +122,14 @@ export function LegalCenter({
 
         <div className="flex flex-1 min-h-0">
           {/* Doc nav */}
-          <nav className="w-44 sm:w-52 shrink-0 border-r border-border-glass overflow-y-auto p-2 space-y-1 hidden sm:block">
+          <nav className="w-44 sm:w-52 shrink-0 border-r border-edge overflow-y-auto p-2 space-y-1 hidden sm:block">
             {LEGAL_IDS.map((id) => (
               <button
                 key={id}
                 type="button"
                 onClick={() => { playPress(650); setActive(id) }}
                 className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                  active === id ? 'bg-retro-panel text-retro-fg border border-border-glass' : 'text-retro-muted hover:text-retro-fg hover:bg-retro-panel/50 border border-transparent'
+                  active === id ? 'bg-retro-panel text-retro-fg border border-edge' : 'text-retro-muted hover:text-retro-fg hover:bg-retro-panel/50 border border-transparent'
                 }`}
               >
                 {NAV_LABELS[id]}
@@ -147,7 +147,7 @@ export function LegalCenter({
                   type="button"
                   onClick={() => setActive(id)}
                   className={`shrink-0 px-2.5 py-1 rounded-full text-2xs border cursor-pointer ${
-                    active === id ? 'bg-retro-panel text-retro-fg border-border-glass' : 'text-retro-muted border-border-glass'
+                    active === id ? 'bg-retro-panel text-retro-fg border-edge' : 'text-retro-muted border-edge'
                   }`}
                 >
                   {NAV_LABELS[id]}
@@ -155,7 +155,7 @@ export function LegalCenter({
               ))}
             </div>
 
-            <p className="text-xs text-retro-muted border border-border-glass rounded-lg px-3 py-2 flex items-start gap-2">
+            <p className="text-xs text-retro-muted border border-edge rounded-lg px-3 py-2 flex items-start gap-2">
               <FileText className="w-3.5 h-3.5 mt-0.5 shrink-0" />
               <span>
                 Binding English text. Last updated: {doc.updated} · {doc.jurisdiction}.
@@ -187,11 +187,11 @@ export function LegalCenter({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-border-glass bg-retro-panel/30 flex items-center justify-between gap-2">
+        <div className="p-4 border-t border-edge bg-retro-panel/30 flex items-center justify-between gap-2">
           <button
             type="button"
             onClick={() => { playPress(720); download() }}
-            className="px-3 py-2 rounded-lg border border-border-glass text-retro-fg hover:text-retro-fg hover:bg-retro-panel text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
+            className="px-3 py-2 rounded-lg border border-edge text-retro-fg hover:text-retro-fg hover:bg-retro-panel text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
           >
             <Download className="w-3.5 h-3.5" /> Download Markdown
           </button>

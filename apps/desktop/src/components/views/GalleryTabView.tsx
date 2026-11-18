@@ -107,7 +107,7 @@ export function GalleryTabView({
       onClick={() => setSubTab(id)}
       className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
         subTab === id
-          ? 'bg-surface-interactive text-retro-fg border-border-glass'
+          ? 'bg-surface-interactive text-retro-fg border-edge'
           : 'bg-transparent text-retro-muted border-transparent hover:text-retro-fg'
       }`}
     >
@@ -165,7 +165,7 @@ export function GalleryTabView({
           />
         </div>
       ) : (
-        <div role="tabpanel" id="gallery-panel-deck" aria-labelledby="gallery-tab-deck" className="solid-panel border border-border-glass rounded-xl p-4">
+        <div role="tabpanel" id="gallery-panel-deck" aria-labelledby="gallery-tab-deck" className="solid-panel border border-edge rounded-xl p-4">
           <DeckBuilder
             identity={identity}
             cards={allOwnedCards as any}

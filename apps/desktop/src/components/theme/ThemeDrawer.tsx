@@ -144,10 +144,10 @@ export function ThemeDrawer({ isOpen, onClose, settings, updateSettings, toast }
       ref={drawerRef}
       role="dialog"
       aria-label="Theme quick settings"
-      className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[var(--z-modal)] w-[94vw] max-w-lg bg-surface-raised/95 border border-border-glass rounded-xl shadow-2xl backdrop-blur-2xl p-4 sm:p-5 space-y-4 animate-sheet-up text-retro-fg"
+      className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[var(--z-modal)] w-[94vw] max-w-lg bg-surface-raised/95 border border-edge rounded-xl shadow-2xl backdrop-blur-2xl p-4 sm:p-5 space-y-4 animate-sheet-up text-retro-fg"
     >
       {/* Header */}
-      <div className="flex items-center justify-between pb-2 border-b border-border-glass">
+      <div className="flex items-center justify-between pb-2 border-b border-edge">
         <div className="flex items-center gap-2">
           <PaintBrush className="w-4 h-4 text-retro-accent" />
           <h3 className="text-xs font-bold tracking-wide text-retro-fg">Theme &amp; Appearance</h3>
@@ -163,7 +163,7 @@ export function ThemeDrawer({ isOpen, onClose, settings, updateSettings, toast }
       </div>
 
       {/* Sliders: Blur & Opacity */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-surface-interactive/60 border border-border-subtle rounded-xl">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-surface-interactive/60 border border-edge-subtle rounded-xl">
         {/* Panel Opacity */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
@@ -206,7 +206,7 @@ export function ThemeDrawer({ isOpen, onClose, settings, updateSettings, toast }
       </div>
 
       {/* Wallpaper */}
-      <div className="space-y-2 pt-1 border-t border-border-glass">
+      <div className="space-y-2 pt-1 border-t border-edge">
         <div className="flex items-center justify-between">
           <span className="text-2xs font-semibold text-retro-muted uppercase tracking-wider">Wallpaper</span>
           {settings.wallpaperUrl && (
@@ -222,9 +222,9 @@ export function ThemeDrawer({ isOpen, onClose, settings, updateSettings, toast }
       </div>
 
       {/* Custom Upload & Direct URL */}
-      <div className="space-y-2 pt-1 border-t border-border-glass">
+      <div className="space-y-2 pt-1 border-t border-edge">
         <div className="flex items-center gap-2">
-          <label className="flex-1 border border-border-glass hover:border-retro-muted rounded-xl bg-surface-interactive/40 hover:bg-surface-interactive px-3 py-2 flex items-center justify-center gap-2 cursor-pointer transition-all">
+          <label className="flex-1 border border-edge hover:border-retro-muted rounded-xl bg-surface-interactive/40 hover:bg-surface-interactive px-3 py-2 flex items-center justify-center gap-2 cursor-pointer transition-all">
             <Upload className="w-3.5 h-3.5 text-retro-muted" />
             <span className="text-xs font-medium text-retro-body">Upload Image / Video</span>
             <input type="file" accept="image/*,video/*" onChange={handleWallpaperFile} className="hidden" />
@@ -237,7 +237,7 @@ export function ThemeDrawer({ isOpen, onClose, settings, updateSettings, toast }
             value={customUrlInput}
             onChange={(e) => setCustomUrlInput(e.target.value)}
             placeholder="Paste media URL (https://...)"
-            className="flex-1 bg-surface-interactive/60 border border-border-subtle rounded-xl px-3 py-1.5 text-xs text-retro-fg outline-none focus:border-retro-muted font-mono placeholder:text-retro-faint"
+            className="flex-1 bg-surface-interactive/60 border border-edge-subtle rounded-xl px-3 py-1.5 text-xs text-retro-fg outline-none focus:border-retro-muted font-mono placeholder:text-retro-faint"
           />
           <button
             type="button"
@@ -279,7 +279,7 @@ export function ThemeDrawer({ isOpen, onClose, settings, updateSettings, toast }
           className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-2xs font-medium transition-all cursor-pointer ${
             settings.wallpaperSlideshow
               ? 'bg-retro-accent text-retro-accent-text border-transparent font-bold'
-              : 'bg-surface-interactive/40 border-border-subtle text-retro-muted hover:text-retro-fg'
+              : 'bg-surface-interactive/40 border-edge-subtle text-retro-muted hover:text-retro-fg'
           }`}
         >
           <Clock className="w-3 h-3" />

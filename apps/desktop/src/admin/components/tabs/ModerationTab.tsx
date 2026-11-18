@@ -175,7 +175,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
     const directUrl = report.content_url && !report.content_url.startsWith("/api/objects/") ? report.content_url : null;
 
     return (
-      <div key={report.id} className="border-b border-border-subtle last:border-0 hover:bg-glass-w5 transition-colors">
+      <div key={report.id} className="border-b border-edge-subtle last:border-0 hover:bg-glass-w5 transition-colors">
         <div className="p-3 flex items-start gap-3">
           <button
             type="button"
@@ -245,7 +245,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
         </div>
 
         {isExpanded && (
-          <div className="px-4 pb-4 pt-1 bg-surface-elevated/40 border-t border-border-subtle/50 flex flex-col md:flex-row gap-4 items-start animate-orbit-fade-in">
+          <div className="px-4 pb-4 pt-1 bg-surface-elevated/40 border-t border-edge-subtle/50 flex flex-col md:flex-row gap-4 items-start animate-orbit-fade-in">
             {report.content_url && (
               <div className="relative group shrink-0">
                 <AdminMediaThumbnail
@@ -264,7 +264,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                     const fullUrl = directUrl || (objectId ? resolveMediaUrl(objectId) : "");
                     onZoom(fullUrl, false, `Report: ${report.target_type}`, report.target_id);
                   }}
-                  className="absolute bottom-2 right-2 p-1.5 bg-black/70 hover:bg-retro-bg text-retro-fg text-xs rounded-lg border border-border-glass opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                  className="absolute bottom-2 right-2 p-1.5 bg-black/70 hover:bg-retro-bg text-retro-fg text-xs rounded-lg border border-edge opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                   title="Expand Full Evidence Media"
                 >
                   <Maximize2 className="w-3.5 h-3.5" />
@@ -279,20 +279,20 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                 <span className="font-mono text-retro-fg">{report.target_type}:{report.target_id}</span>
               </div>
               {caseDetail[report.id]?.reported_user && (
-                <div className="p-2 rounded bg-surface-canvas border border-border-glass text-xs">
+                <div className="p-2 rounded bg-surface-canvas border border-edge text-xs">
                   <span className="text-retro-muted uppercase tracking-wider font-bold">Reported Account:</span>{" "}
                   <span className="text-retro-fg font-semibold">{caseDetail[report.id].reported_user.display_name}</span>{" "}
                   <span className="text-retro-muted font-mono">({caseDetail[report.id].reported_user.id.slice(0, 10)})</span>
                 </div>
               )}
               {report.reason && (
-                <div className="p-2 rounded bg-surface-canvas border border-border-glass text-xs">
+                <div className="p-2 rounded bg-surface-canvas border border-edge text-xs">
                   <span className="text-retro-muted uppercase tracking-wider font-bold">Reason:</span>{" "}
                   <span className="text-retro-fg">{report.reason}</span>
                 </div>
               )}
               {caseDetail[report.id]?.target?.caption && (
-                <div className="p-2 rounded bg-surface-canvas border border-border-glass text-xs">
+                <div className="p-2 rounded bg-surface-canvas border border-edge text-xs">
                   <span className="text-retro-muted uppercase tracking-wider font-bold">Content Text:</span>{" "}
                   <span className="text-retro-fg">{caseDetail[report.id].target.caption}</span>
                 </div>
@@ -314,7 +314,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
       </div>
 
       {/* Subtab Navigation */}
-      <div className="flex flex-wrap gap-1 bg-surface-raised border border-border-glass rounded-xl p-1">
+      <div className="flex flex-wrap gap-1 bg-surface-raised border border-edge rounded-xl p-1">
         {subTabs.map(tab => {
           const Icon = tab.icon;
           const active = activeSubTab === tab.id;
@@ -371,7 +371,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
             ]}
           />
 
-          <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
+          <div className="rounded-xl border border-edge bg-surface-raised overflow-hidden">
             {isLoading ? (
               <AdminLoadingState rows={6} columns={4} />
             ) : reports.length === 0 ? (
@@ -390,7 +390,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
       {/* Subtab 2: Chat & Comments */}
       {activeSubTab === "chat_comments" && (
         <div className="space-y-4">
-          <div className="flex items-center gap-2 border-b border-border-glass pb-3">
+          <div className="flex items-center gap-2 border-b border-edge pb-3">
             <button
               type="button"
               onClick={() => setCommType("comments")}
@@ -413,12 +413,12 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
             </button>
           </div>
 
-          <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
+          <div className="rounded-xl border border-edge bg-surface-raised overflow-hidden">
             {commType === "comments" ? (
               comments.length === 0 ? (
                 <AdminEmptyState title="No comments" description="No lobby comments recorded" illustration="inbox" />
               ) : (
-                <div className="divide-y divide-border-subtle">
+                <div className="divide-y divide-edge-subtle">
                   {comments.map(c => (
                     <div key={c.id} className="p-3 flex items-center justify-between gap-3 hover:bg-glass-w5 transition-colors">
                       <div className="min-w-0 flex-1">
@@ -434,7 +434,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                           <button
                             type="button"
                             onClick={() => { onAction("unhideComment", c.id); setTimeout(fetchComments, 300); }}
-                            className="px-2 py-1 text-2xs font-semibold rounded border border-border-glass text-retro-muted hover:text-retro-fg cursor-pointer"
+                            className="px-2 py-1 text-2xs font-semibold rounded border border-edge text-retro-muted hover:text-retro-fg cursor-pointer"
                           >
                             Unhide
                           </button>
@@ -463,7 +463,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
               chatMessages.length === 0 ? (
                 <AdminEmptyState title="No chat messages" description="No messages recorded" illustration="inbox" />
               ) : (
-                <div className="divide-y divide-border-subtle">
+                <div className="divide-y divide-edge-subtle">
                   {chatMessages.map(m => (
                     <div key={m.id} className="p-3 flex items-center justify-between gap-3 hover:bg-glass-w5 transition-colors">
                       <div className="min-w-0 flex-1">
@@ -493,7 +493,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
       {/* Subtab 3: Bans & Penalties */}
       {activeSubTab === "bans" && (
         <div className="space-y-4">
-          <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
+          <div className="rounded-xl border border-edge bg-surface-raised overflow-hidden">
             {isLoading ? (
               <AdminLoadingState rows={4} columns={3} />
             ) : bannedUsers.length === 0 ? (
@@ -503,7 +503,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                 <p className="text-2xs text-retro-muted mt-0.5">There are currently no active account bans or suspensions</p>
               </div>
             ) : (
-              <div className="divide-y divide-border-subtle">
+              <div className="divide-y divide-edge-subtle">
                 {bannedUsers.map(user => (
                   <div key={user.id} className="p-3 flex items-center justify-between gap-3 hover:bg-glass-w5 transition-colors">
                     <div className="min-w-0 flex-1">

@@ -363,7 +363,7 @@ export default function AdminPageClient({ identity: appIdentity }: { identity?: 
           <div className="absolute top-1/4 left-1/4 w-48 h-48 rounded-full bg-retro-accent/3 blur-3xl" />
         </div>
         <div className="relative z-10 w-full max-w-sm glass-panel p-6 space-y-4">
-          <div className="flex items-center justify-between border-b border-border-glass pb-3">
+          <div className="flex items-center justify-between border-b border-edge pb-3">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-retro-accent" />
               <h1 className="text-sm font-bold text-retro-fg tracking-wider">Admin Operations</h1>
@@ -396,7 +396,7 @@ export default function AdminPageClient({ identity: appIdentity }: { identity?: 
                 onChange={(e) => setPin(e.target.value)}
                 placeholder="Secret Passcode"
                 autoFocus
-                className="w-full bg-surface-raised border border-border-glass focus:border-retro-accent/60 px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted rounded-md outline-none font-mono"
+                className="w-full bg-surface-raised border border-edge focus:border-retro-accent/60 px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted rounded-md outline-none font-mono"
               />
             </div>
 

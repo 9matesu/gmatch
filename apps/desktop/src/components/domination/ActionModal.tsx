@@ -155,7 +155,7 @@ export function ActionModal({
         aria-label={`${actionTitle} settings`}
       >
         {/* Header */}
-        <div className="px-5 py-3.5 border-b border-border-subtle flex items-center justify-between">
+        <div className="px-5 py-3.5 border-b border-edge-subtle flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-md glass-inset flex items-center justify-center">
               <Sparkles className="w-3.5 h-3.5 text-retro-muted" />
@@ -187,7 +187,7 @@ export function ActionModal({
                 type="button"
                 onClick={() => void openMediaPicker().then((sel) => { if (sel) void takeSelection(sel); })}
                 className={`w-full flex items-center gap-2 px-3 py-2 rounded-md border text-left transition-colors cursor-pointer ${
-                  formError ? 'border-retro-error' : 'border-border-glass hover:border-retro-accent'
+                  formError ? 'border-retro-error' : 'border-edge hover:border-retro-accent'
                 } bg-surface-interactive`}
               >
                 <FolderOpen className="w-3.5 h-3.5 text-retro-muted shrink-0" />

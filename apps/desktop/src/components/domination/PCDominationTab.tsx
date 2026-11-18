@@ -485,7 +485,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
   }
 
   const statusChip = (t: DominationTarget) => {
-    if (!t.enabled) return { text: 'blocked', cls: 'text-retro-muted border-border-glass' };
+    if (!t.enabled) return { text: 'blocked', cls: 'text-retro-muted border-edge' };
     if (t.online) return { text: 'online', cls: 'text-success-fg border-success/0' };
     return { text: `seen ${timeAgo(t.last_seen)}`, cls: 'text-warning-fg80 border-warning/0' };
   };
@@ -539,7 +539,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
               type="button"
               onClick={togglePause}
               className={`ml-1 px-2 py-1 rounded-md text-xs font-medium border cursor-pointer transition-colors ${
-                paused ? 'border-success/0 text-success-fg' : 'border-border-glass text-retro-muted hover:text-retro-fg'
+                paused ? 'border-success/0 text-success-fg' : 'border-edge text-retro-muted hover:text-retro-fg'
               }`}
             >
               {paused ? 'Resume' : 'Pause 15m'}
@@ -549,7 +549,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
       </div>
 
       {/* Subtabs Bar */}
-      <div className="px-4 py-2.5 border-b border-border-subtle flex items-center justify-between gap-2 shrink-0">
+      <div className="px-4 py-2.5 border-b border-edge-subtle flex items-center justify-between gap-2 shrink-0">
         <div className="flex items-center gap-1.5" role="tablist" aria-label="Domination categories">
           {DOMINATION_SUBTABS.map((tab) => {
             const isSel = subtab === tab;
@@ -577,7 +577,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
           {/* Target column */}
           <div className="lg:col-span-2 rounded-xl glass-panel flex flex-col overflow-hidden">
-            <div className="px-4 py-3 border-b border-border-subtle flex items-center justify-between gap-2">
+            <div className="px-4 py-3 border-b border-edge-subtle flex items-center justify-between gap-2">
               <div className="text-xs font-medium flex items-center gap-1.5 text-retro-fg">
                 <Target className="w-3.5 h-3.5 text-retro-muted" /> Target
               </div>
@@ -593,7 +593,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                 </button>
               </div>
             </div>
-            <div className="p-3 border-b border-border-subtle">
+            <div className="p-3 border-b border-edge-subtle">
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -645,12 +645,12 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                     key={t.id}
                     type="button"
                     onClick={() => setSelectedTarget(t)}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-left border-b border-border-subtle transition-colors cursor-pointer ${
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-left border-b border-edge-subtle transition-colors cursor-pointer ${
                       isSel ? 'glass-nav-active' : 'hover:bg-glass-w10'
                     }`}
                   >
                     {t.pfpUrl ? (
-                      <img src={resolveMediaUrl(t.pfpUrl)} alt="" className="w-7 h-7 rounded-md object-cover border border-border-glass" />
+                      <img src={resolveMediaUrl(t.pfpUrl)} alt="" className="w-7 h-7 rounded-md object-cover border border-edge" />
                     ) : (
                       <div className="w-7 h-7 rounded-md glass-inset flex items-center justify-center text-xs font-semibold text-retro-fg">
                         {t.displayName.charAt(0).toUpperCase()}
@@ -670,7 +670,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
           {/* Effects column */}
           <div className="lg:col-span-3 space-y-3">
             {!selectedTarget ? (
-              <div className="rounded-xl border border-dashed border-border-glass p-10 text-center text-sm text-retro-muted">
+              <div className="rounded-xl border border-dashed border-edge p-10 text-center text-sm text-retro-muted">
                 Pick a target on the left to start.
               </div>
             ) : (
@@ -727,8 +727,8 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                           sending === action
                             ? 'border-retro-accent cursor-wait'
                             : sendable
-                              ? 'border-border-glass hover:border-retro-accent/60 cursor-pointer'
-                              : 'border-border-subtle opacity-45 cursor-not-allowed'
+                              ? 'border-edge hover:border-retro-accent/60 cursor-pointer'
+                              : 'border-edge-subtle opacity-45 cursor-not-allowed'
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">
@@ -793,12 +793,12 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
           </div>
 
           <div className="rounded-xl glass-panel overflow-hidden">
-            <div className="px-4 py-3 border-b border-border-subtle flex items-center gap-1.5">
+            <div className="px-4 py-3 border-b border-edge-subtle flex items-center gap-1.5">
               <Shield className="w-3.5 h-3.5 text-retro-muted" />
               <span className="text-xs font-medium text-retro-fg">What others may send you</span>
               {!receiving && <span className="text-2xs text-retro-muted ml-2">(saved. Inactive while Receiving is off)</span>}
             </div>
-            <div className="divide-y divide-border-subtle">
+            <div className="divide-y divide-edge-subtle">
               {CONSENT_ROWS.map(({ key, label, desc }) => {
                 const value = Boolean((settings as any)[key]);
                 return (
@@ -883,7 +883,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
             </div>
           )}
           {historyState === 'ready' && (historyPane === 'outgoing' ? outgoingAll : history).length === 0 && (
-            <div className="py-12 text-center space-y-2 rounded-xl border border-dashed border-border-glass">
+            <div className="py-12 text-center space-y-2 rounded-xl border border-dashed border-edge">
               <Inbox className="w-5 h-5 mx-auto text-retro-muted" />
               <p className="text-xs text-retro-muted">
                 {historyPane === 'outgoing' ? 'You have not sent anything yet.' : 'Nothing has landed on your screen yet.'}
@@ -915,7 +915,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                       st === 'executed' || st === 'completed'
                         ? 'text-success-fg border-success/0'
                         : st === 'sent' || st === 'landed'
-                          ? 'text-retro-muted border-border-glass'
+                          ? 'text-retro-muted border-edge'
                           : st === 'expired'
                             ? 'text-warning-fg border-warning/0'
                             : 'text-danger-fg border-danger/0'

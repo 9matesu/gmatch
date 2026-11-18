@@ -258,14 +258,14 @@ export function UserProfileModal({
         onClick={onClose}
       >
         <div
-          className="bg-retro-panel border border-border-glass w-full max-w-4xl overflow-hidden shadow-2xl rounded-t-2xl sm:rounded-xl animate-orbit-pop text-retro-fg max-h-[calc(100dvh-var(--island-clearance))] sm:max-h-[calc(100vh-var(--island-clearance)-2rem)] flex flex-col"
+          className="bg-retro-panel border border-edge w-full max-w-4xl overflow-hidden shadow-2xl rounded-t-2xl sm:rounded-xl animate-orbit-pop text-retro-fg max-h-[calc(100dvh-var(--island-clearance))] sm:max-h-[calc(100vh-var(--island-clearance)-2rem)] flex flex-col"
           role="dialog"
           aria-modal="true"
           aria-label={`${displayName} profile`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border-glass shrink-0">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-edge shrink-0">
             <div className="flex items-center gap-2">
               <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-success' : 'bg-glass-w20'}`} />
               <span className="text-xs font-medium text-retro-muted">
@@ -299,8 +299,8 @@ export function UserProfileModal({
                   title={hasStories ? 'Watch story' : 'View picture'}
                   className={`w-18 h-18 sm:w-20 sm:h-20 rounded-full overflow-hidden cursor-pointer group transition-transform hover:scale-105 border-2 ${
                     hasStories
-                      ? 'border-border-glass'
-                      : 'border-border-glass'
+                      ? 'border-edge'
+                      : 'border-edge'
                   }`}
                 >
                   {profilePic ? (
@@ -367,7 +367,7 @@ export function UserProfileModal({
                 <button
                   type="button"
                   onClick={handleCopy}
-                  className="text-2xs text-retro-muted hover:text-retro-fg px-2 py-0.5 border border-border-glass bg-retro-bg rounded-md cursor-pointer flex items-center gap-1 shrink-0 transition-colors"
+                  className="text-2xs text-retro-muted hover:text-retro-fg px-2 py-0.5 border border-edge bg-retro-bg rounded-md cursor-pointer flex items-center gap-1 shrink-0 transition-colors"
                   title="Copy ID"
                 >
                   {copied ? <Check className="w-2.5 h-2.5 text-success-fg" /> : <Copy className="w-2.5 h-2.5" />}
@@ -382,7 +382,7 @@ export function UserProfileModal({
                 {tags.map((tag) => (
                   <span
                     key={tag}
-                    className="text-2xs font-mono font-medium px-2 py-0.5 rounded-md bg-retro-bg border border-border-glass text-retro-muted"
+                    className="text-2xs font-mono font-medium px-2 py-0.5 rounded-md bg-retro-bg border border-edge text-retro-muted"
                   >
                     #{tag}
                   </span>
@@ -415,7 +415,7 @@ export function UserProfileModal({
                     onStartPm({ id: user.id, display_name: displayName });
                     onClose();
                   }}
-                  className="py-2 px-3 bg-glass-w12 hover:bg-glass-w20 border border-border-glass text-retro-fg font-semibold text-xs rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5"
+                  className="py-2 px-3 bg-glass-w12 hover:bg-glass-w20 border border-edge text-retro-fg font-semibold text-xs rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <MessageCircle className="w-3.5 h-3.5 stroke-[1.75]" />
                   <span>Message</span>
@@ -426,7 +426,7 @@ export function UserProfileModal({
                 <button
                   type="button"
                   onClick={() => onInviteToGame(user.id)}
-                  className="py-2 px-3 bg-glass-w12 hover:bg-glass-w12 border border-border-glass text-retro-fg font-semibold text-xs rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5"
+                  className="py-2 px-3 bg-glass-w12 hover:bg-glass-w12 border border-edge text-retro-fg font-semibold text-xs rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <Swords className="w-3.5 h-3.5 stroke-[1.75]" />
                   <span>Invite to Game</span>
@@ -438,7 +438,7 @@ export function UserProfileModal({
                   type="button"
                   onClick={onPingAttention}
                   title="Float your profile to the top of the roster for 30 seconds"
-                  className="py-2 px-3 bg-glass-w12 hover:bg-glass-w20 border border-border-glass text-retro-fg font-semibold text-xs rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5"
+                  className="py-2 px-3 bg-glass-w12 hover:bg-glass-w20 border border-edge text-retro-fg font-semibold text-xs rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <Bell className="w-3.5 h-3.5 stroke-[1.75]" />
                   <span>Ping</span>
@@ -447,7 +447,7 @@ export function UserProfileModal({
             </div>
 
             {/* Secondary Actions */}
-            <div className="flex items-center gap-2 border-t border-border-glass pt-3">
+            <div className="flex items-center gap-2 border-t border-edge pt-3">
               {followHandler && (
                 <button
                   type="button"
@@ -455,7 +455,7 @@ export function UserProfileModal({
                   className={`flex-1 py-2 px-3 border text-xs font-semibold rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5 ${
                      following
                        ? 'border-warning/0 bg-warning/0 text-warning-fg'
-                      : 'border-border-glass bg-retro-bg text-retro-fg hover:border-border-glass hover:bg-retro-panel'
+                      : 'border-edge bg-retro-bg text-retro-fg hover:border-edge hover:bg-retro-panel'
                   }`}
                 >
                    <Star className={`w-3.5 h-3.5 ${following ? 'fill-warning text-warning-fg' : ''}`} />
@@ -494,7 +494,7 @@ export function UserProfileModal({
 
             {/* Posts Gallery: public posts are the primary profile content. */}
             {userPosts.length > 0 && (
-              <div className="space-y-2 border-t border-border-glass pt-3">
+              <div className="space-y-2 border-t border-edge pt-3">
                 <span className="text-xs font-medium text-retro-body flex items-center gap-1.5">
                   <Grid className="w-3.5 h-3.5" />
                   <span>Posts ({userPosts.length})</span>
@@ -511,7 +511,7 @@ export function UserProfileModal({
                         setActivePostId(post.id);
                         openPost(post);
                       }}
-                      className={`aspect-square bg-surface-interactive rounded-lg overflow-hidden border cursor-pointer group hover:opacity-90 transition-opacity ${activePostId === post.id ? 'border-retro-accent/70' : 'border-border-glass'}`}
+                      className={`aspect-square bg-surface-interactive rounded-lg overflow-hidden border cursor-pointer group hover:opacity-90 transition-opacity ${activePostId === post.id ? 'border-retro-accent/70' : 'border-edge'}`}
                     >
                       <ObjectImage
                         contentUrl={post.url}
@@ -529,7 +529,7 @@ export function UserProfileModal({
 
             {/* Cards Gallery */}
             {userCards.length > 0 && (
-              <div className="space-y-2 border-t border-border-glass pt-3">
+              <div className="space-y-2 border-t border-edge pt-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-retro-body flex items-center gap-1.5">
                     <Grid className="w-3.5 h-3.5" />
@@ -542,7 +542,7 @@ export function UserProfileModal({
                     <div
                       key={card.id}
                       onClick={() => setSelectedCardImage(card.content_url || (card as any).data || (card as any).url || `/api/objects/${card.id}`)}
-                      className="aspect-square bg-surface-interactive rounded-lg overflow-hidden border border-border-glass cursor-pointer group hover:opacity-90 transition-opacity"
+                      className="aspect-square bg-surface-interactive rounded-lg overflow-hidden border border-edge cursor-pointer group hover:opacity-90 transition-opacity"
                     >
                       <ObjectImage
                         contentUrl={card.content_url || (card as any).data || (card as any).url || `/api/objects/${card.id}`}
@@ -561,7 +561,7 @@ export function UserProfileModal({
 
               {/* Right pane: the post opened from the grid, kept mounted while
                   presence and feed updates land. */}
-              <div data-testid="profile-post-pane" className="border-t md:border-t-0 md:border-l border-border-glass px-4 py-3 sm:p-4 md:h-full md:overflow-y-auto styled-scrollbar">
+              <div data-testid="profile-post-pane" className="border-t md:border-t-0 md:border-l border-edge px-4 py-3 sm:p-4 md:h-full md:overflow-y-auto styled-scrollbar">
                 {activePostId ? (
                   expandedNode
                 ) : (
@@ -585,7 +585,7 @@ export function UserProfileModal({
           onClick={() => setShowPic(false)}
         >
           <div className="relative max-w-sm max-h-[80vh]" onClick={(e) => e.stopPropagation()}>
-            <img src={resolveMediaUrl(profilePic)} alt={displayName} className="max-w-full max-h-[80vh] rounded-lg border border-border-glass shadow-xl object-contain" />
+            <img src={resolveMediaUrl(profilePic)} alt={displayName} className="max-w-full max-h-[80vh] rounded-lg border border-edge shadow-xl object-contain" />
             <button
               type="button"
               onClick={() => setShowPic(false)}
@@ -608,7 +608,7 @@ export function UserProfileModal({
               contentUrl={selectedCardImage}
               identity={null}
               alt="Card preview"
-              className="max-w-full max-h-[85vh] rounded-lg border border-border-glass shadow-xl object-contain"
+              className="max-w-full max-h-[85vh] rounded-lg border border-edge shadow-xl object-contain"
               controls
               autoPlay
             />

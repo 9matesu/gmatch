@@ -80,7 +80,7 @@ export function SnapshotSection({
   }
 
   return (
-    <div className="p-4 bg-surface-interactive border border-border-glass rounded-lg space-y-2">
+    <div className="p-4 bg-surface-interactive border border-edge rounded-lg space-y-2">
       <div className="text-xs font-medium text-retro-fg">Server snapshot (admin)</div>
       <p className="text-xs text-retro-muted">
         Back up or hand over this server's world (posts, economy, chats) as a single JSON file.
@@ -91,11 +91,11 @@ export function SnapshotSection({
           type="button"
           disabled={busy}
           onClick={() => { playPress(880); void exportSnapshot() }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-raised border border-border-glass text-xs text-retro-fg hover:border-retro-accent/60 disabled:opacity-40 cursor-pointer"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-raised border border-edge text-xs text-retro-fg hover:border-retro-accent/60 disabled:opacity-40 cursor-pointer"
         >
           <Download className="w-3.5 h-3.5" /> Export snapshot
         </button>
-        <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-raised border border-border-glass text-xs text-retro-fg hover:border-retro-accent/60 cursor-pointer">
+        <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-raised border border-edge text-xs text-retro-fg hover:border-retro-accent/60 cursor-pointer">
           <Upload className="w-3.5 h-3.5" /> Import…
           <input
             type="file"

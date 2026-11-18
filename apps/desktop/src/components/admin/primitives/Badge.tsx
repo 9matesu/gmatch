@@ -23,24 +23,24 @@ type BadgeVariant =
   | "offline";
 
 const variantClasses: Record<BadgeVariant, string> = {
-  default: "bg-surface-interactive text-retro-muted border border-border-glass",
+  default: "bg-surface-interactive text-retro-muted border border-edge",
   success: "bg-success/5 text-success-fg border border-success/0",
   warning: "bg-warning/5 text-warning-fg border border-warning/0",
   danger: "bg-danger/5 text-danger-fg border border-danger/0",
   info: "bg-info/5 text-info-fg border border-info/0",
   primary: "bg-info/0 text-info-fg border border-info/0",
-  neutral: "bg-glass-w20 text-retro-muted border border-border-glass",
+  neutral: "bg-glass-w20 text-retro-muted border border-edge",
   active: "bg-success/5 text-success-fg border border-success/0",
-  inactive: "bg-glass-w20 text-retro-muted border border-border-glass",
+  inactive: "bg-glass-w20 text-retro-muted border border-edge",
   pending: "bg-warning/5 text-warning-fg border border-warning/0",
   completed: "bg-success/5 text-success-fg border border-success/0",
-  draft: "bg-glass-w20 text-retro-muted border border-border-glass",
+  draft: "bg-glass-w20 text-retro-muted border border-edge",
   released: "bg-success/5 text-success-fg border border-success/0",
   archived: "bg-warning/5 text-warning-fg border border-warning/0",
   banned: "bg-danger/5 text-danger-fg border border-danger/0",
   hidden: "bg-warning/5 text-warning-fg border border-warning/0",
   online: "bg-success/5 text-success-fg border border-success/0",
-  offline: "bg-glass-w20 text-retro-muted border border-border-glass",
+  offline: "bg-glass-w20 text-retro-muted border border-edge",
 };
 
 interface BadgeProps {

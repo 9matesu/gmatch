@@ -8,12 +8,12 @@ export function Badge({
   className?: string
 }) {
   const variants = {
-    default: 'bg-retro-panel text-retro-muted border-border-glass',
-    success: 'bg-surface-raised text-retro-fg border-border-glass font-extrabold',
-    warning: 'bg-retro-panel text-retro-fg border-border-glass font-bold',
-    danger: 'bg-retro-bg text-retro-muted border-border-glass',
-    info: 'bg-retro-panel text-retro-fg border-border-glass',
-    accent: 'bg-surface-raised text-retro-fg border-border-glass font-bold',
+    default: 'bg-retro-panel text-retro-muted border-edge',
+    success: 'bg-surface-raised text-retro-fg border-edge font-extrabold',
+    warning: 'bg-retro-panel text-retro-fg border-edge font-bold',
+    danger: 'bg-retro-bg text-retro-muted border-edge',
+    info: 'bg-retro-panel text-retro-fg border-edge',
+    accent: 'bg-surface-raised text-retro-fg border-edge font-bold',
   }
 
   return (

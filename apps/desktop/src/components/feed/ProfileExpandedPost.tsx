@@ -133,17 +133,17 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
   return (
     <article
       data-expanded-post={post.id}
-      className="mt-2 rounded-xl border border-border-glass bg-retro-panel text-retro-fg overflow-hidden animate-orbit-slide-up"
+      className="mt-2 rounded-xl border border-edge bg-retro-panel text-retro-fg overflow-hidden animate-orbit-slide-up"
     >
       {/* Header: author + options + collapse */}
-      <div className="p-3 border-b border-border-glass flex items-center justify-between">
+      <div className="p-3 border-b border-edge flex items-center justify-between">
         <button
           type="button"
           onClick={handleAuthorClick}
           aria-label={`View profile of ${post.author_name}`}
           className="flex items-center gap-3 text-left cursor-pointer"
         >
-          <div className="w-8 h-8 rounded-full bg-glass-w12 border border-border-glass p-[1px] flex-shrink-0">
+          <div className="w-8 h-8 rounded-full bg-glass-w12 border border-edge p-[1px] flex-shrink-0">
             <div className="w-full h-full rounded-full bg-retro-panel overflow-hidden flex items-center justify-center text-xs font-semibold text-retro-fg">
               {authorAvatar ? (
                 <img src={resolvedAuthorAvatar} alt="" className="w-full h-full object-cover" />
@@ -307,7 +307,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
         )}
 
         {/* Zoom controls pill */}
-        <div className="absolute top-3 left-3 flex items-center gap-1 bg-black/60 backdrop-blur-md rounded-full px-2.5 py-1 text-retro-fg text-2xs font-medium border border-border-glass">
+        <div className="absolute top-3 left-3 flex items-center gap-1 bg-black/60 backdrop-blur-md rounded-full px-2.5 py-1 text-retro-fg text-2xs font-medium border border-edge">
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); handleZoomToggle(); }}

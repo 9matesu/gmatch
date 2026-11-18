@@ -543,7 +543,7 @@ export function BabecockPanel({
           <Title>Invites ({invites.length})</Title>
           <div className="space-y-1.5">
             {invites.map((inv) => (
-              <div key={inv.id} className="flex items-center justify-between gap-2 p-2.5 bg-glass-w5 border border-border-glass rounded-lg text-xs">
+              <div key={inv.id} className="flex items-center justify-between gap-2 p-2.5 bg-glass-w5 border border-edge rounded-lg text-xs">
                 <span className="text-retro-fg truncate">
                   <strong className="font-medium">{inv.host_name || 'Someone'}</strong> invited you to their round
                 </span>
@@ -579,7 +579,7 @@ export function BabecockPanel({
           right={
             <>
               {round && (
-                <span className={`px-2.5 py-1 text-xs font-mono font-semibold rounded-md border flex items-center gap-1 ${secsLeft > 0 ? 'bg-danger/0 text-danger-fg border-danger/0' : 'text-retro-muted border-border-glass'
+                <span className={`px-2.5 py-1 text-xs font-mono font-semibold rounded-md border flex items-center gap-1 ${secsLeft > 0 ? 'bg-danger/0 text-danger-fg border-danger/0' : 'text-retro-muted border-edge'
                   }`}>
                   <Clock className="w-3.5 h-3.5" />
                   <span>{secsLeft > 0 ? fmt(secsLeft) : 'CLOSED'}</span>
@@ -634,7 +634,7 @@ export function BabecockPanel({
                       className="bg-retro-bg rounded-xl overflow-hidden w-full flex flex-col"
                       style={{ aspectRatio: `${cols} / ${rows}`, minHeight: 280, maxHeight: 'min(62vh, 560px)' }}
                     >
-                      <div className="text-2xs uppercase font-bold text-retro-muted tracking-wider p-3 flex items-center justify-between border-b border-border-glass">
+                      <div className="text-2xs uppercase font-bold text-retro-muted tracking-wider p-3 flex items-center justify-between border-b border-edge">
                         <span>Grid ({cols}×{rows}, {n} images)</span>
                         {amHost && <span className="text-retro-muted text-2xs flex items-center gap-1"><Move className="w-2.5 h-2.5" /> Drag to rearrange</span>}
                       </div>
@@ -690,7 +690,7 @@ export function BabecockPanel({
                       const isOp = entry.user_id === round.host_id
                       return (
                         <div key={entry.id} className="flex flex-col items-center gap-1.5 shrink-0">
-                          <div className={`rounded-xl overflow-hidden border-2 bg-retro-bg ${isOp ? 'border-warning w-44 h-60 shadow-xl' : 'border-border-glass w-32 h-44'}`}>
+                          <div className={`rounded-xl overflow-hidden border-2 bg-retro-bg ${isOp ? 'border-warning w-44 h-60 shadow-xl' : 'border-edge w-32 h-44'}`}>
                             {entry.mime_type.startsWith('video') ? (
                               <video src={resolveMediaUrl(entry.content_url)} muted loop playsInline autoPlay className="w-full h-full object-cover" />
                             ) : (
@@ -725,7 +725,7 @@ export function BabecockPanel({
                       Join the round
                     </Button>
                   ) : (
-                    <span className="px-3 py-1.5 text-xs font-semibold text-retro-muted border border-border-glass rounded-lg">Round finished</span>
+                    <span className="px-3 py-1.5 text-xs font-semibold text-retro-muted border border-edge rounded-lg">Round finished</span>
                   )}
 
                   {amHost && secsLeft > 0 && (
@@ -748,7 +748,7 @@ export function BabecockPanel({
                                 onClick={() => sendInvite(u.id)}
                                 className="w-full flex items-center gap-2 p-1.5 rounded-lg hover:bg-glass-w12 disabled:opacity-40 text-left cursor-pointer transition-colors"
                               >
-                                <div className="w-7 h-7 rounded-full bg-glass-w12 border border-border-glass flex items-center justify-center text-xs font-bold text-retro-fg shrink-0">
+                                <div className="w-7 h-7 rounded-full bg-glass-w12 border border-edge flex items-center justify-center text-xs font-bold text-retro-fg shrink-0">
                                   {(u.display_name?.trim() || 'Unknown User').slice(0, 1).toUpperCase()}
                                 </div>
                                 <div className="flex-1 min-w-0">
@@ -803,7 +803,7 @@ export function BabecockPanel({
                     <div
                       key={g.id}
                       onClick={() => setExpandedRound(g)}
-                      className="bg-glass-w5 border border-border-glass rounded-lg overflow-hidden space-y-1.5 p-2 cursor-pointer group hover:bg-glass-w8 transition-colors"
+                      className="bg-glass-w5 border border-edge rounded-lg overflow-hidden space-y-1.5 p-2 cursor-pointer group hover:bg-glass-w8 transition-colors"
                     >
                       {op && (
                         <div className="w-full aspect-square rounded-md overflow-hidden bg-retro-bg relative">
@@ -871,11 +871,11 @@ export function BabecockPanel({
                   value={urlInput}
                   onChange={(e) => handleUrl(e.target.value)}
                   placeholder="Paste an image or video link"
-                  className="flex-1 bg-glass-w5 border border-border-glass rounded-lg px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent"
+                  className="flex-1 bg-glass-w5 border border-edge rounded-lg px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent"
                 />
               </div>
               {urlInput && (
-                <div className="p-3 rounded-lg border border-border-glass bg-glass-w5 text-xs text-retro-fg flex items-center gap-2">
+                <div className="p-3 rounded-lg border border-edge bg-glass-w5 text-xs text-retro-fg flex items-center gap-2">
                   <LinkIcon className="w-4 h-4 text-retro-muted shrink-0" />
                   <span className="truncate">Will be fetched and stored on submit</span>
                 </div>
@@ -891,21 +891,21 @@ export function BabecockPanel({
               </DropZone>
               {preview && (
                 preview.startsWith('data:video') || preview.startsWith('blob:') ? (
-                  <video src={preview} controls className="w-full max-h-52 object-contain rounded-lg border border-border-glass bg-retro-bg" />
+                  <video src={preview} controls className="w-full max-h-52 object-contain rounded-lg border border-edge bg-retro-bg" />
                 ) : preview.startsWith('http://') || preview.startsWith('https://') ? (
-                  <div className="w-full text-center py-3 rounded-lg border border-border-glass bg-glass-w5 text-xs text-retro-fg flex items-center justify-center gap-2">
+                  <div className="w-full text-center py-3 rounded-lg border border-edge bg-glass-w5 text-xs text-retro-fg flex items-center justify-center gap-2">
                     <LinkIcon className="w-3.5 h-3.5 text-retro-muted" />
                     <span>Link ready to submit</span>
                   </div>
                 ) : (
-                  <img src={preview} alt="Preview" className="w-full max-h-52 object-contain rounded-lg border border-border-glass bg-retro-bg" />
+                  <img src={preview} alt="Preview" className="w-full max-h-52 object-contain rounded-lg border border-edge bg-retro-bg" />
                 )
               )}
             </>
           )}
         </div>
 
-        <div className="pt-2 border-t border-border-glass flex justify-end gap-2">
+        <div className="pt-2 border-t border-edge flex justify-end gap-2">
           <Button variant="ghost" onClick={() => setModal(null)}>
             Cancel
           </Button>
@@ -931,7 +931,7 @@ export function BabecockPanel({
             className="max-w-3xl w-full max-h-[90vh] overflow-y-auto styled-scrollbar p-4 space-y-3"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between gap-2 pb-2 border-b border-border-glass">
+            <div className="flex items-center justify-between gap-2 pb-2 border-b border-edge">
               <div className="flex items-center gap-2 min-w-0">
                 <Flame className="w-4 h-4 text-orange-500 shrink-0" />
                 <Title className="truncate">Round by {expandedRound.host_name || 'Anonymous'}</Title>
@@ -963,7 +963,7 @@ export function BabecockPanel({
             </div>
 
             {selfId === expandedRound.host_id && (
-              <div className="flex justify-end pt-2 border-t border-border-glass">
+              <div className="flex justify-end pt-2 border-t border-edge">
                 <Button
                   variant="primary"
                   disabled={postingToFeed}

@@ -60,7 +60,7 @@ export function ServerPasswordSection({
   }
 
   return (
-    <div className="p-4 bg-surface-interactive border border-border-glass rounded-lg space-y-2">
+    <div className="p-4 bg-surface-interactive border border-edge rounded-lg space-y-2">
       <div className="flex items-center gap-2">
         {enabled ? <Lock className="w-4 h-4 text-warning-fg" /> : <Unlock className="w-4 h-4 text-retro-muted" />}
         <span className="text-xs font-medium text-retro-fg">
@@ -79,7 +79,7 @@ export function ServerPasswordSection({
           placeholder={enabled ? 'New password…' : 'Choose a password…'}
           minLength={4}
           maxLength={128}
-          className="flex-1 min-w-0 bg-surface-raised border border-border-glass px-3 py-2 text-xs text-retro-fg rounded-lg outline-none focus:border-retro-accent/60"
+          className="flex-1 min-w-0 bg-surface-raised border border-edge px-3 py-2 text-xs text-retro-fg rounded-lg outline-none focus:border-retro-accent/60"
         />
         <button
           type="button"
@@ -94,7 +94,7 @@ export function ServerPasswordSection({
             type="button"
             disabled={busy}
             onClick={() => { playPress(600); void submit(true) }}
-            className="px-3 py-2 rounded-lg text-xs text-retro-muted hover:text-danger-fg border border-border-glass cursor-pointer"
+            className="px-3 py-2 rounded-lg text-xs text-retro-muted hover:text-danger-fg border border-edge cursor-pointer"
           >
             Remove
           </button>

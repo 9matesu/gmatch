@@ -215,7 +215,7 @@ export function SpectateModal({
       >
         <div
           onMouseDown={handleMouseDown}
-          className="flex items-center justify-between px-3 py-2 bg-surface-canvas border-b border-border-glass cursor-grab active:cursor-grabbing"
+          className="flex items-center justify-between px-3 py-2 bg-surface-canvas border-b border-edge cursor-grab active:cursor-grabbing"
         >
           <div className="flex items-center gap-2 min-w-0">
             <span className="w-2 h-2 rounded-full bg-info animate-pulse" />
@@ -331,11 +331,11 @@ export function SpectateModal({
       >
         <div
           className={`relative w-full ${isExpanded ? 'max-w-6xl h-[92vh]' : 'max-w-3xl max-h-[88vh]'
-            } bg-surface-raised border border-border-glass rounded-xl shadow-2xl overflow-hidden flex flex-col transition-all duration-300`}
+            } bg-surface-raised border border-edge rounded-xl shadow-2xl overflow-hidden flex flex-col transition-all duration-300`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header Bar */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border-glass bg-surface-raised shrink-0">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-edge bg-surface-raised shrink-0">
             <div className="flex items-center gap-2.5">
               <span className="w-2.5 h-2.5 rounded-full bg-info animate-pulse shadow-xs" />
               <span className="text-xs font-black tracking-widest text-retro-fg uppercase">
@@ -381,7 +381,7 @@ export function SpectateModal({
           </div>
 
           {/* Round Progress Indicator */}
-          <div className="flex items-center gap-1.5 p-2 bg-surface-raised border-b border-border-glass justify-center">
+          <div className="flex items-center gap-1.5 p-2 bg-surface-raised border-b border-edge justify-center">
             {Array.from({ length: maxRounds }).map((_, idx) => {
               const rNum = idx + 1
               const pastRound = history.find((h) => h.round === rNum)
@@ -394,8 +394,8 @@ export function SpectateModal({
                       : pastRound
                         ? pastRound.matched
                           ? 'border-success/30 bg-success/10 text-success-fg'
-                          : 'border-border-glass bg-surface-raised text-retro-muted'
-                        : 'border-border-glass bg-transparent text-retro-muted'
+                          : 'border-edge bg-surface-raised text-retro-muted'
+                        : 'border-edge bg-transparent text-retro-muted'
                     }`}
                 >
                   <span>R{rNum}</span>
@@ -415,12 +415,12 @@ export function SpectateModal({
               {/* Left Column: Live Arena & Cards */}
               <div className="space-y-4 flex flex-col">
                 {/* Scoreboard Players Card Header */}
-                <div className="grid grid-cols-2 gap-3 items-center bg-surface-raised p-3.5 border border-border-glass rounded-xl shadow-xs">
+                <div className="grid grid-cols-2 gap-3 items-center bg-surface-raised p-3.5 border border-edge rounded-xl shadow-xs">
                   {/* Player A */}
                   <div className="flex items-center gap-3">
                     <div className="relative">
                       <Avatar id={pA.id} imageUrl={pA.pfp_url || undefined} size={42} />
-                      <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-info border-2 border-border-glass" />
+                      <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-info border-2 border-edge" />
                     </div>
                     <div className="min-w-0">
                       <div className="text-xs font-bold truncate text-retro-fg">
@@ -432,7 +432,7 @@ export function SpectateModal({
                           {pA.score ?? 0}
                         </span>
                         {pATags.slice(0, 2).map((t, idx) => (
-                          <span key={idx} className="text-2xs bg-surface-raised text-retro-muted px-1.5 py-0.5 rounded border border-border-glass">
+                          <span key={idx} className="text-2xs bg-surface-raised text-retro-muted px-1.5 py-0.5 rounded border border-edge">
                             #{t}
                           </span>
                         ))}
@@ -448,7 +448,7 @@ export function SpectateModal({
                       </div>
                       <div className="flex items-center justify-end gap-1.5 flex-wrap mt-0.5">
                         {pBTags.slice(0, 2).map((t, idx) => (
-                          <span key={idx} className="text-2xs bg-surface-raised text-retro-muted px-1.5 py-0.5 rounded border border-border-glass">
+                          <span key={idx} className="text-2xs bg-surface-raised text-retro-muted px-1.5 py-0.5 rounded border border-edge">
                             #{t}
                           </span>
                         ))}
@@ -460,7 +460,7 @@ export function SpectateModal({
                     </div>
                     <div className="relative">
                       <Avatar id={pB.id} imageUrl={pB.pfp_url || undefined} size={42} />
-                      <span className="absolute -bottom-1 -left-1 w-3.5 h-3.5 rounded-full bg-warning border-2 border-border-glass" />
+                      <span className="absolute -bottom-1 -left-1 w-3.5 h-3.5 rounded-full bg-warning border-2 border-edge" />
                     </div>
                   </div>
                 </div>
@@ -468,7 +468,7 @@ export function SpectateModal({
                 {/* Duel Cards Display */}
                 <div className="grid grid-cols-2 gap-3 sm:gap-4">
                   {/* Card A */}
-                  <div className="flex flex-col items-center gap-2.5 bg-surface-raised p-3 sm:p-4 border border-border-glass rounded-xl shadow-xs">
+                  <div className="flex flex-col items-center gap-2.5 bg-surface-raised p-3 sm:p-4 border border-edge rounded-xl shadow-xs">
                     <div className="text-2xs font-bold tracking-wider text-info-fg uppercase flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-info" />
                       <span>{pA.display_name || 'Player 1'}&apos;s Card</span>
@@ -499,12 +499,12 @@ export function SpectateModal({
                                 muted
                                 playsInline
                               />
-                              <span className="absolute bottom-2 right-2 bg-black/70 border border-border-glass text-2xs font-bold text-retro-fg px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                              <span className="absolute bottom-2 right-2 bg-black/70 border border-edge text-2xs font-bold text-retro-fg px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
                                 <ZoomIn className="w-3 h-3" />
                                 <span>ZOOM</span>
                               </span>
                             </div>
-                            <div className="p-2 bg-surface-canvas/90 border-t border-border-glass backdrop-blur-md text-left">
+                            <div className="p-2 bg-surface-canvas/90 border-t border-edge backdrop-blur-md text-left">
                               <div className="text-xs font-semibold text-retro-fg truncate">{pA.display_name || 'Player 1'}</div>
                             </div>
                           </button>
@@ -512,7 +512,7 @@ export function SpectateModal({
                           <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-surface-canvas relative overflow-hidden text-retro-muted">
                             <div className={`absolute inset-0 bg-glass-w5 transition-all duration-300`} />
                             <div className="relative z-10 flex flex-col items-center gap-2 text-center">
-                              <div className="w-10 h-14 rounded-xl border border-border-strong bg-surface-raised/10 backdrop-blur-md flex items-center justify-center shadow-lg animate-bounce">
+                              <div className="w-10 h-14 rounded-xl border border-edge-strong bg-surface-raised/10 backdrop-blur-md flex items-center justify-center shadow-lg animate-bounce">
                                 <Sparkles className="w-4 h-4 text-info-fg animate-spin" />
                               </div>
                               <span className="text-2xs font-mono font-black text-chrome-lav-fg uppercase tracking-wider">
@@ -529,7 +529,7 @@ export function SpectateModal({
                   </div>
 
                   {/* Card B */}
-                  <div className="flex flex-col items-center gap-2.5 bg-surface-raised p-3 sm:p-4 border border-border-glass rounded-xl shadow-xs">
+                  <div className="flex flex-col items-center gap-2.5 bg-surface-raised p-3 sm:p-4 border border-edge rounded-xl shadow-xs">
                     <div className="text-2xs font-bold tracking-wider text-warning-fg uppercase flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-warning" />
                       <span>{pB.display_name || 'Player 2'}&apos;s Card</span>
@@ -560,12 +560,12 @@ export function SpectateModal({
                                 muted
                                 playsInline
                               />
-                              <span className="absolute bottom-2 right-2 bg-black/70 border border-border-glass text-2xs font-bold text-retro-fg px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                              <span className="absolute bottom-2 right-2 bg-black/70 border border-edge text-2xs font-bold text-retro-fg px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
                                 <ZoomIn className="w-3 h-3" />
                                 <span>ZOOM</span>
                               </span>
                             </div>
-                            <div className="p-2 bg-surface-canvas/90 border-t border-border-glass backdrop-blur-md text-left">
+                            <div className="p-2 bg-surface-canvas/90 border-t border-edge backdrop-blur-md text-left">
                               <div className="text-xs font-semibold text-retro-fg truncate">{pB.display_name || 'Player 2'}</div>
                             </div>
                           </button>
@@ -573,7 +573,7 @@ export function SpectateModal({
                           <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-surface-canvas relative overflow-hidden text-retro-muted">
                             <div className={`absolute inset-0 bg-glass-w5 transition-all duration-300`} />
                             <div className="relative z-10 flex flex-col items-center gap-2 text-center">
-                              <div className="w-10 h-14 rounded-xl border border-border-strong bg-surface-raised/10 backdrop-blur-md flex items-center justify-center shadow-lg animate-bounce">
+                              <div className="w-10 h-14 rounded-xl border border-edge-strong bg-surface-raised/10 backdrop-blur-md flex items-center justify-center shadow-lg animate-bounce">
                                 <Sparkles className="w-4 h-4 text-warning-fg animate-spin" />
                               </div>
                               <span className="text-2xs font-mono font-black text-warning-fg uppercase tracking-wider">
@@ -593,7 +593,7 @@ export function SpectateModal({
 
               {/* Right Column: Rounds History */}
               {history.length > 0 && (
-                <div className="border border-border-glass bg-surface-raised p-3.5 rounded-xl flex flex-col min-h-0 lg:h-full shadow-xs">
+                <div className="border border-edge bg-surface-raised p-3.5 rounded-xl flex flex-col min-h-0 lg:h-full shadow-xs">
                   <div className="text-xs font-black text-retro-body uppercase tracking-widest shrink-0 mb-3 flex items-center gap-2">
                     <Award className="w-3.5 h-3.5 text-warning-fg" />
                     <span>Duel Round History</span>
@@ -604,7 +604,7 @@ export function SpectateModal({
                       const mediaThumb = (id: string | null | undefined, url: string | null | undefined) => {
                         if (!url) {
                           return (
-                            <span className="w-14 h-14 shrink-0 flex items-center justify-center text-2xs text-retro-muted bg-surface-interactive border border-border-glass rounded-xl">
+                            <span className="w-14 h-14 shrink-0 flex items-center justify-center text-2xs text-retro-muted bg-surface-interactive border border-edge rounded-xl">
                               —
                             </span>
                           )
@@ -613,7 +613,7 @@ export function SpectateModal({
                           <button
                             type="button"
                             onClick={() => openInBoard(id ?? url, url)}
-                            className="w-14 h-14 shrink-0 overflow-hidden border border-border-glass bg-retro-bg group relative cursor-zoom-in rounded-xl shadow-xs"
+                            className="w-14 h-14 shrink-0 overflow-hidden border border-edge bg-retro-bg group relative cursor-zoom-in rounded-xl shadow-xs"
                           >
                             <ObjectImage
                               contentUrl={url}
@@ -633,7 +633,7 @@ export function SpectateModal({
                       return (
                         <div
                           key={h.round}
-                          className="flex items-center gap-2 p-2 bg-surface-raised border border-border-glass rounded-xl shadow-xs"
+                          className="flex items-center gap-2 p-2 bg-surface-raised border border-edge rounded-xl shadow-xs"
                         >
                           <span className="font-mono font-bold text-retro-muted text-xs shrink-0">R{h.round}</span>
                           <div className="flex items-center gap-1.5 flex-1 min-w-0">
@@ -644,7 +644,7 @@ export function SpectateModal({
                           <span
                             className={`font-bold px-2 py-0.5 text-2xs rounded-lg shrink-0 border ${h.matched
                                 ? 'bg-success/10 text-success-fg border-success/30 shadow-xs'
-                                : 'bg-surface-interactive text-retro-muted border-border-glass'
+                                : 'bg-surface-interactive text-retro-muted border-edge'
                               }`}
                           >
                             {h.matched ? 'MUTUAL' : 'MISSED'}

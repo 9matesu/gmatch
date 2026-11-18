@@ -307,7 +307,7 @@ function KeepsakeErrorState({
   return (
     <div
       role="alert"
-      className="flex max-h-[70vh] min-h-[240px] w-[320px] max-w-full flex-col items-center justify-center gap-2 rounded-lg border border-border-glass bg-black/60 p-6 text-center"
+      className="flex max-h-[70vh] min-h-[240px] w-[320px] max-w-full flex-col items-center justify-center gap-2 rounded-lg border border-edge bg-black/60 p-6 text-center"
     >
       <span className="text-xs font-semibold text-retro-fg">{title}</span>
       {state !== 'pending' && (
@@ -758,7 +758,7 @@ export default function IdleGalleryView({
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       {/* Header Toolbar */}
-      <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-3 border-b border-border-glass">
+      <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-3 border-b border-edge">
         <Title>
           Gallery ({gallery.length})
         </Title>
@@ -771,7 +771,7 @@ export default function IdleGalleryView({
               setPage(0)
             }}
             aria-label="Sort gallery"
-            className="bg-glass-w5 border border-border-glass rounded-lg px-2 py-1.5 text-xs text-retro-fg outline-none cursor-pointer"
+            className="bg-glass-w5 border border-edge rounded-lg px-2 py-1.5 text-xs text-retro-fg outline-none cursor-pointer"
           >
             <option value="newest">Newest</option>
             <option value="oldest">Oldest</option>
@@ -779,7 +779,7 @@ export default function IdleGalleryView({
             <option value="clicks">Clicks</option>
           </select>
 
-          <div className="flex items-center gap-1.5 bg-glass-w5 border border-border-glass rounded-lg px-2 py-1.5">
+          <div className="flex items-center gap-1.5 bg-glass-w5 border border-edge rounded-lg px-2 py-1.5">
             <Search className="w-3.5 h-3.5 text-retro-muted" />
             <input
               type="text"
@@ -830,7 +830,7 @@ export default function IdleGalleryView({
 
       {/* Batch Action Bar */}
       {selectedIds.size > 0 && (
-        <div className="px-4 py-2.5 flex items-center justify-between gap-3 text-xs animate-orbit-fade-in border-t border-border-glass">
+        <div className="px-4 py-2.5 flex items-center justify-between gap-3 text-xs animate-orbit-fade-in border-t border-edge">
           <div className="flex items-center gap-2 text-retro-fg font-semibold">
             <CheckSquare className="w-4 h-4 text-success-fg" />
             <span>{selectedIds.size} selected</span>
@@ -896,7 +896,7 @@ export default function IdleGalleryView({
               className={`px-2 py-0.5 rounded-full text-2xs font-semibold border cursor-pointer transition-colors ${
                 activeTags.has(t)
                   ? 'bg-glass-w20 border-retro-fg/70 text-retro-fg'
-                  : 'border-border-glass text-retro-muted hover:text-retro-body'
+                  : 'border-edge text-retro-muted hover:text-retro-body'
               }`}
             >
               {t} <span className="opacity-60">{n}</span>
@@ -918,7 +918,7 @@ export default function IdleGalleryView({
       )}
 
       {backgroundUrl && (
-        <div className="mx-4 my-2 flex items-center gap-2.5 rounded-[10px] border border-border-glass bg-retro-bg px-3 py-1.5 text-xs text-retro-muted">
+        <div className="mx-4 my-2 flex items-center gap-2.5 rounded-[10px] border border-edge bg-retro-bg px-3 py-1.5 text-xs text-retro-muted">
           <span>App backdrop is active</span>
           <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setBackground(null)} title="Remove the app backdrop">
             <IconX size={12} /> Clear
@@ -986,7 +986,7 @@ export default function IdleGalleryView({
                       ? 'border-success ring-2 ring-success/0'
                       : isBackdrop
                       ? 'border-retro-accent'
-                      : 'border-border-glass'
+                      : 'border-edge'
                   }`}
                 >
                   {/* Top-left Select Checkbox */}
@@ -1085,7 +1085,7 @@ export default function IdleGalleryView({
           </div>
 
           {/* Pagination and Select All on Page Footer */}
-          <div className="flex items-center justify-between pt-3 border-t border-border-glass/80 mt-4 text-xs">
+          <div className="flex items-center justify-between pt-3 border-t border-edge/80 mt-4 text-xs">
             <Button
               size="sm"
               variant="ghost"

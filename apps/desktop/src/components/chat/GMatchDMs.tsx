@@ -758,8 +758,8 @@ export function GMatchDMs({
   return (
     <div className="flex-1 min-h-0 h-full w-full overflow-hidden flex flex-row font-sans text-retro-fg animate-orbit-fade-in bg-transparent">
       {/* 1. Left Column: Channels, Rooms & DMs */}
-      <div className="w-60 lg:w-64 border-r border-border-glass flex flex-col bg-glass-w5 shrink-0 min-h-0 select-none">
-        <div className="p-3 sm:p-4 border-b border-border-glass flex items-center justify-between shrink-0">
+      <div className="w-60 lg:w-64 border-r border-edge flex flex-col bg-glass-w5 shrink-0 min-h-0 select-none">
+        <div className="p-3 sm:p-4 border-b border-edge flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <h2 className="font-semibold text-sm text-retro-fg truncate">
               {myDisplayName || 'Messages'}
@@ -779,13 +779,13 @@ export function GMatchDMs({
         </div>
 
         {showNewGroup && (
-          <div className="p-3 border-b border-border-glass space-y-2 shrink-0">
+          <div className="p-3 border-b border-edge space-y-2 shrink-0">
             <input
               type="text"
               value={newGroupName}
               onChange={(e) => setNewGroupName(e.target.value)}
               placeholder="Group name"
-              className="w-full bg-surface-raised border border-border-glass rounded-md px-3 py-1.5 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent/60"
+              className="w-full bg-surface-raised border border-edge rounded-md px-3 py-1.5 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent/60"
             />
             <div className="max-h-32 overflow-y-auto styled-scrollbar space-y-1">
               {peers.filter((p) => p.orbitId !== identity?.orbitId).map((p) => (
@@ -805,13 +805,13 @@ export function GMatchDMs({
             </div>
             <div className="flex gap-2">
               <button type="button" onClick={submitNewGroup} className="px-3 py-1.5 bg-retro-accent text-retro-accent-text rounded-md text-xs font-bold cursor-pointer hover:bg-retro-accent-hover">Create</button>
-              <button type="button" onClick={() => { setShowNewGroup(false); setNewGroupMembers(new Set()); }} className="px-3 py-1.5 bg-glass-w8 border border-border-glass rounded-md text-xs cursor-pointer hover:bg-glass-w12">Cancel</button>
+              <button type="button" onClick={() => { setShowNewGroup(false); setNewGroupMembers(new Set()); }} className="px-3 py-1.5 bg-glass-w8 border border-edge rounded-md text-xs cursor-pointer hover:bg-glass-w12">Cancel</button>
             </div>
           </div>
         )}
 
-        <div className="p-2.5 border-b border-border-glass shrink-0">
-          <div className="flex items-center gap-2 bg-surface-raised border border-border-glass rounded-md px-3 py-1.5 text-xs text-retro-body">
+        <div className="p-2.5 border-b border-edge shrink-0">
+          <div className="flex items-center gap-2 bg-surface-raised border border-edge rounded-md px-3 py-1.5 text-xs text-retro-body">
             <Search className="w-3.5 h-3.5 text-retro-muted shrink-0" />
             <input
               type="text"
@@ -828,9 +828,9 @@ export function GMatchDMs({
           <button
             type="button"
             onClick={() => { playPress(800); setListMode(false); setSidebarOpen(false); onSelectGroup?.(null); onSelectRoom?.(null); onSelectPeer({ orbitId: 'global_lobby', name: 'Lobby Lounge (Everyone)' }); }}
-            className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors border-b border-border-glass text-left cursor-pointer ${openTarget === 'lobby' ? 'bg-glass-w8 border-border-glass' : ''}`}
+            className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors border-b border-edge text-left cursor-pointer ${openTarget === 'lobby' ? 'bg-glass-w8 border-edge' : ''}`}
           >
-            <div className="relative w-10 h-10 rounded-full bg-surface-raised border border-border-glass text-retro-muted shrink-0 overflow-hidden flex items-center justify-center">
+            <div className="relative w-10 h-10 rounded-full bg-surface-raised border border-edge text-retro-muted shrink-0 overflow-hidden flex items-center justify-center">
               <Globe className="w-4 h-4" />
             </div>
             <div className="flex-1 min-w-0">
@@ -845,9 +845,9 @@ export function GMatchDMs({
           <button
             type="button"
             onClick={() => { playPress(800); setListMode(false); setSidebarOpen(false); onSelectGroup?.(null); onSelectRoom?.(null); onSelectPeer({ orbitId: 'card_queue', name: 'Card Game Queue' }); }}
-            className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors border-b border-border-glass text-left cursor-pointer ${openTarget === 'queue' ? 'bg-glass-w8 border-border-glass' : ''}`}
+            className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors border-b border-edge text-left cursor-pointer ${openTarget === 'queue' ? 'bg-glass-w8 border-edge' : ''}`}
           >
-            <div className="relative w-10 h-10 rounded-full bg-surface-raised border border-border-glass text-retro-muted shrink-0 overflow-hidden flex items-center justify-center">
+            <div className="relative w-10 h-10 rounded-full bg-surface-raised border border-edge text-retro-muted shrink-0 overflow-hidden flex items-center justify-center">
               <Gamepad2 className="w-4 h-4" />
             </div>
             <div className="flex-1 min-w-0">
@@ -861,15 +861,15 @@ export function GMatchDMs({
 
           {groups.length > 0 && (
             <>
-              <div className="px-3 py-1.5 border-b border-border-glass text-xs text-retro-muted flex items-center gap-1.5"><Users className="w-3 h-3" /> Groups</div>
+              <div className="px-3 py-1.5 border-b border-edge text-xs text-retro-muted flex items-center gap-1.5"><Users className="w-3 h-3" /> Groups</div>
               {groups.map((g) => (
                 <button
                   key={g.id}
                   type="button"
                   onClick={() => openGroup(g)}
-                  className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors border-b border-border-glass text-left cursor-pointer ${activeGroupId === g.id && openTarget === 'group' ? 'bg-glass-w8 border-border-glass' : ''}`}
+                  className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors border-b border-edge text-left cursor-pointer ${activeGroupId === g.id && openTarget === 'group' ? 'bg-glass-w8 border-edge' : ''}`}
                 >
-                  <div className="w-10 h-10 rounded-full bg-surface-raised border border-border-glass text-retro-muted shrink-0 overflow-hidden flex items-center justify-center"><Users className="w-4 h-4" /></div>
+                  <div className="w-10 h-10 rounded-full bg-surface-raised border border-edge text-retro-muted shrink-0 overflow-hidden flex items-center justify-center"><Users className="w-4 h-4" /></div>
                   <div className="flex-1 min-w-0">
                     <span className="text-xs font-medium text-retro-body truncate block">{g.name}</span>
                     <p className="text-xs truncate mt-0.5 text-retro-muted">
@@ -883,7 +883,7 @@ export function GMatchDMs({
 
           {showRooms && (
             <>
-              <div className="px-3 py-1.5 border-b border-border-glass text-xs text-retro-muted flex items-center justify-between gap-1.5">
+              <div className="px-3 py-1.5 border-b border-edge text-xs text-retro-muted flex items-center justify-between gap-1.5">
                 <span className="flex items-center gap-1.5"><Lock className="w-3 h-3" /> Rooms</span>
                 <button
                   type="button"
@@ -896,14 +896,14 @@ export function GMatchDMs({
                 </button>
               </div>
               {showNewRoom && (
-                <div className="p-2.5 border-b border-border-glass flex gap-1.5 shrink-0">
+                <div className="p-2.5 border-b border-edge flex gap-1.5 shrink-0">
                   <input
                     value={newRoomName}
                     onChange={(e) => setNewRoomName(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') submitNewRoom(); }}
                     placeholder="room name"
                     aria-label="New room name"
-                    className="flex-1 min-w-0 bg-surface-raised border border-border-glass rounded-md px-2 py-1.5 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent/60"
+                    className="flex-1 min-w-0 bg-surface-raised border border-edge rounded-md px-2 py-1.5 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent/60"
                   />
                   <button type="button" onClick={submitNewRoom} className="px-2.5 py-1.5 bg-retro-accent text-retro-accent-text rounded-md text-xs font-bold cursor-pointer hover:bg-retro-accent-hover">Create</button>
                 </div>
@@ -916,9 +916,9 @@ export function GMatchDMs({
                     key={r.id}
                     type="button"
                     onClick={() => openRoom(r.id)}
-                    className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors border-b border-border-glass text-left cursor-pointer ${isRoomSelected ? 'bg-glass-w8 border-border-glass' : ''}`}
+                    className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors border-b border-edge text-left cursor-pointer ${isRoomSelected ? 'bg-glass-w8 border-edge' : ''}`}
                   >
-                    <div className="w-10 h-10 rounded-full bg-surface-raised border border-border-glass text-retro-muted shrink-0 overflow-hidden flex items-center justify-center"><Lock className="w-4 h-4" /></div>
+                    <div className="w-10 h-10 rounded-full bg-surface-raised border border-edge text-retro-muted shrink-0 overflow-hidden flex items-center justify-center"><Lock className="w-4 h-4" /></div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1">
                         <span className="text-xs font-medium text-retro-body truncate block">{r.name}</span>
@@ -933,7 +933,7 @@ export function GMatchDMs({
             </>
           )}
 
-          <div className="px-3 py-1.5 border-b border-border-glass text-xs text-retro-muted"><span>Direct Messages</span></div>
+          <div className="px-3 py-1.5 border-b border-edge text-xs text-retro-muted"><span>Direct Messages</span></div>
 
           {isSearching ? (
             <div className="p-2 space-y-1">
@@ -950,7 +950,7 @@ export function GMatchDMs({
                       onClick={() => { playPress(800); setListMode(false); setSidebarOpen(false); onSelectGroup?.(null); onSelectRoom?.(null); onSelectPeer(p); setSearchQuery(''); }}
                       className="w-full p-2.5 rounded-md flex items-center gap-3 hover:bg-glass-w5 transition-colors text-left cursor-pointer"
                     >
-                      <div className="w-9 h-9 rounded-full bg-surface-raised border border-border-glass text-retro-muted font-medium text-xs flex items-center justify-center overflow-hidden shrink-0">
+                      <div className="w-9 h-9 rounded-full bg-surface-raised border border-edge text-retro-muted font-medium text-xs flex items-center justify-center overflow-hidden shrink-0">
                         {pfp ? <img src={resolveMediaUrl(pfp)} alt="" className="w-full h-full object-cover" /> : name.charAt(0).toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -1001,9 +1001,9 @@ export function GMatchDMs({
                   <button
                     type="button"
                     onClick={() => { playPress(800); setListMode(false); setSidebarOpen(false); onSelectGroup?.(null); onSelectRoom?.(null); onSelectPeer({ orbitId: peerId, name, pfp }); setDeleteThreadPeerId(null); }}
-                    className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors border-b border-border-glass text-left cursor-pointer ${isSelected ? 'bg-glass-w8 border-border-glass' : ''}`}
+                    className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors border-b border-edge text-left cursor-pointer ${isSelected ? 'bg-glass-w8 border-edge' : ''}`}
                   >
-                    <div className="relative w-10 h-10 rounded-full bg-surface-raised border border-border-glass text-retro-muted shrink-0 overflow-hidden flex items-center justify-center font-medium text-xs">
+                    <div className="relative w-10 h-10 rounded-full bg-surface-raised border border-edge text-retro-muted shrink-0 overflow-hidden flex items-center justify-center font-medium text-xs">
                       {pfp ? <img src={resolveMediaUrl(pfp)} alt="" className="w-full h-full object-cover" /> : name.charAt(0).toUpperCase()}
                       {isUnread && <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-retro-accent" />}
                     </div>
@@ -1034,7 +1034,7 @@ export function GMatchDMs({
                     </div>
                   </button>
                   {showThreadActions && (
-                    <div className="absolute left-full top-0 ml-2 mt-1 z-10 bg-surface-raised border border-border-glass rounded-md shadow-lg py-1 min-w-[140px] animate-orbit-pop">
+                    <div className="absolute left-full top-0 ml-2 mt-1 z-10 bg-surface-raised border border-edge rounded-md shadow-lg py-1 min-w-[140px] animate-orbit-pop">
                       <button
                         type="button"
                         onClick={() => { handleDeleteThread(peerId); setDeleteThreadPeerId(null); }}
@@ -1056,7 +1056,7 @@ export function GMatchDMs({
       <div className="flex-1 min-h-0 flex flex-col bg-transparent min-w-0 overflow-hidden">
         {openTarget ? (
           <>
-            <div className="p-3 sm:p-3.5 px-4 border-b border-border-glass bg-glass-w5 flex items-center justify-between shrink-0 select-none">
+            <div className="p-3 sm:p-3.5 px-4 border-b border-edge bg-glass-w5 flex items-center justify-between shrink-0 select-none">
               <div className="flex items-center gap-3 min-w-0">
                 <button
                   type="button"
@@ -1066,7 +1066,7 @@ export function GMatchDMs({
                   <ChevronLeft className="w-5 h-5" />
                 </button>
 
-                <div className="w-8 h-8 rounded-full bg-surface-raised border border-border-glass shrink-0 overflow-hidden flex items-center justify-center text-xs font-medium text-retro-muted">
+                <div className="w-8 h-8 rounded-full bg-surface-raised border border-edge shrink-0 overflow-hidden flex items-center justify-center text-xs font-medium text-retro-muted">
                   {openTarget === 'room' ? (
                     <Lock className="w-4 h-4" />
                   ) : openTarget === 'group' ? (
@@ -1167,7 +1167,7 @@ export function GMatchDMs({
              </div>
 
              {searchOpen && openTarget === 'peer' && (
-               <div className="border-b border-border-glass bg-glass-w5 px-3 py-2 shrink-0 space-y-1">
+               <div className="border-b border-edge bg-glass-w5 px-3 py-2 shrink-0 space-y-1">
                  <input
                    autoFocus
                    value={conversationSearch}
@@ -1175,7 +1175,7 @@ export function GMatchDMs({
                    onKeyDown={(e) => { if (e.key === 'Escape') { setSearchOpen(false); setConversationSearch(''); } }}
                    placeholder="Search this conversation…"
                    aria-label="Search this conversation"
-                   className="w-full bg-glass-w10 border border-border-glass rounded-md px-3 py-1.5 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent/50"
+                   className="w-full bg-glass-w10 border border-edge rounded-md px-3 py-1.5 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent/50"
                  />
                  {conversationSearch.trim().length >= 2 && (
                    <div className="max-h-44 overflow-y-auto styled-scrollbar" role="listbox" aria-label="Conversation search results">
@@ -1202,7 +1202,7 @@ export function GMatchDMs({
              )}
 
              {canShowMembers && showMembers && (
-               <div className="border-b border-border-glass max-h-72 overflow-y-auto styled-scrollbar bg-glass-w8 shrink-0">
+               <div className="border-b border-edge max-h-72 overflow-y-auto styled-scrollbar bg-glass-w8 shrink-0">
                  <GroupMembersPopover
                    groupId={activeGroupId as string}
                    loadMembers={onLoadGroupMembers}
@@ -1243,7 +1243,7 @@ export function GMatchDMs({
                       type="button"
                       onClick={handleLoadHistory}
                       disabled={loadingHistory}
-                      className="px-3 py-1.5 rounded-md bg-glass-w8 border border-border-glass text-2xs text-retro-muted hover:text-retro-fg hover:bg-glass-w12 transition-colors cursor-pointer disabled:opacity-40"
+                      className="px-3 py-1.5 rounded-md bg-glass-w8 border border-edge text-2xs text-retro-muted hover:text-retro-fg hover:bg-glass-w12 transition-colors cursor-pointer disabled:opacity-40"
                     >
                       {loadingHistory ? 'Loading…' : 'Load earlier messages'}
                     </button>
@@ -1259,11 +1259,11 @@ export function GMatchDMs({
                         role="separator"
                         aria-label={`Messages from ${row.label}`}
                       >
-                        <span className="h-px flex-1 bg-border-glass" />
+                        <span className="h-px flex-1 bg-edge" />
                         <span className="text-2xs font-medium uppercase tracking-wider text-retro-muted">
                           {row.label}
                         </span>
-                        <span className="h-px flex-1 bg-border-glass" />
+                        <span className="h-px flex-1 bg-edge" />
                       </div>
                     );
                   }
@@ -1286,7 +1286,7 @@ export function GMatchDMs({
                     <div key={row.key} className={`flex items-end gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}>
                       {!isOwn && (
                         <div
-                          className="w-7 h-7 rounded-full bg-surface-raised border border-border-glass text-retro-muted overflow-hidden flex items-center justify-center text-2xs font-medium shrink-0 mb-1 select-none cursor-pointer hover:ring-1 hover:ring-retro-accent/50 transition-shadow"
+                          className="w-7 h-7 rounded-full bg-surface-raised border border-edge text-retro-muted overflow-hidden flex items-center justify-center text-2xs font-medium shrink-0 mb-1 select-none cursor-pointer hover:ring-1 hover:ring-retro-accent/50 transition-shadow"
                           onClick={() => onOpenProfile?.(first.senderId)}
                           title={senderName}
                         >
@@ -1323,10 +1323,10 @@ export function GMatchDMs({
                                   highlightedMessage === msg.id ? 'ring-2 ring-retro-accent/70' : ''
                                 } ${
                                   msg.deletedAt
-                                    ? 'bg-glass-w5 border border-dashed border-border-glass text-retro-muted italic rounded-br-sm'
+                                    ? 'bg-glass-w5 border border-dashed border-edge text-retro-muted italic rounded-br-sm'
                                     : isOwn
                                       ? 'bg-retro-accent/25 border border-retro-accent/30 text-retro-fg rounded-br-sm backdrop-blur-sm'
-                                      : 'bg-glass-w10 border border-border-glass text-retro-body rounded-bl-sm backdrop-blur-sm'
+                                      : 'bg-glass-w10 border border-edge text-retro-body rounded-bl-sm backdrop-blur-sm'
                                 }`}
                               >
                                 {msg.deletedAt ? (
@@ -1359,11 +1359,11 @@ export function GMatchDMs({
                                       type="text"
                                       value={editingMessage.text}
                                       onChange={(e) => setEditingMessage({ ...editingMessage!, text: e.target.value })}
-                                      className="bg-glass-w10 border border-border-glass rounded px-2 py-1 text-xs text-retro-fg outline-none focus:border-retro-accent w-64"
+                                      className="bg-glass-w10 border border-edge rounded px-2 py-1 text-xs text-retro-fg outline-none focus:border-retro-accent w-64"
                                       autoFocus
                                     />
                                     <button type="button" onClick={() => handleEditMessage(msg)} className="px-2 py-1 bg-retro-accent text-retro-accent-text text-2xs rounded cursor-pointer">Save</button>
-                                    <button type="button" onClick={() => setEditingMessage(null)} className="px-2 py-1 bg-glass-w8 border border-border-glass text-2xs rounded cursor-pointer">Cancel</button>
+                                    <button type="button" onClick={() => setEditingMessage(null)} className="px-2 py-1 bg-glass-w8 border border-edge text-2xs rounded cursor-pointer">Cancel</button>
                                   </div>
                                 ) : (
                                   <Linkify text={msg.text} />
@@ -1411,7 +1411,7 @@ export function GMatchDMs({
                                         onClick={() => onReactMessage?.(activePmPeer?.orbitId || '', msg.id, emoji, !mine)}
                                         title={`${actors.length} reaction${actors.length === 1 ? '' : 's'}`}
                                         aria-pressed={mine}
-                                        className={`px-1.5 py-0.5 rounded-full border text-2xs cursor-pointer transition-colors ${mine ? 'border-retro-accent/60 bg-retro-accent/15 text-retro-fg' : 'border-border-glass bg-glass-w8 text-retro-muted hover:bg-glass-w12'}`}
+                                        className={`px-1.5 py-0.5 rounded-full border text-2xs cursor-pointer transition-colors ${mine ? 'border-retro-accent/60 bg-retro-accent/15 text-retro-fg' : 'border-edge bg-glass-w8 text-retro-muted hover:bg-glass-w12'}`}
                                       >
                                         {emoji} {actors.length}
                                       </button>
@@ -1426,9 +1426,9 @@ export function GMatchDMs({
                                 if (openTarget === 'room') {
                                   return (
                                     <div className={`flex flex-wrap items-center gap-1 mt-1 ${isOwn ? 'justify-end' : ''}`}>
-                                      <button type="button" onClick={() => copyMessage(msg.text)} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-2xs flex items-center gap-1 cursor-pointer hover:bg-glass-w12"><Copy className="w-3 h-3" /> Copy</button>
+                                      <button type="button" onClick={() => copyMessage(msg.text)} className="px-2 py-1 rounded-md bg-glass-w8 border border-edge text-2xs flex items-center gap-1 cursor-pointer hover:bg-glass-w12"><Copy className="w-3 h-3" /> Copy</button>
                                       {!msg.attachmentMime?.startsWith('video/') && msg.attachmentUrl && (
-                                        <button type="button" onClick={() => void copyAttachmentImage(msg)} disabled={copyingImage === msg.id} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-2xs flex items-center gap-1 cursor-pointer hover:bg-glass-w12 disabled:opacity-50"><ImagePlus className="w-3 h-3" /> {copyingImage === msg.id ? 'Copying…' : 'Copy image'}</button>
+                                        <button type="button" onClick={() => void copyAttachmentImage(msg)} disabled={copyingImage === msg.id} className="px-2 py-1 rounded-md bg-glass-w8 border border-edge text-2xs flex items-center gap-1 cursor-pointer hover:bg-glass-w12 disabled:opacity-50"><ImagePlus className="w-3 h-3" /> {copyingImage === msg.id ? 'Copying…' : 'Copy image'}</button>
                                       )}
                                     </div>
                                   );
@@ -1453,7 +1453,7 @@ export function GMatchDMs({
                                             aria-label={mine ? `Remove reaction ${emoji}` : `React with ${emoji}`}
                                             aria-pressed={mine}
                                             onClick={() => { onReactMessage?.(activePmPeer?.orbitId || '', msg.id, emoji, !mine); setActionFor(null); }}
-                                            className={`w-6 h-6 rounded-md text-xs cursor-pointer transition-colors ${mine ? 'bg-retro-accent/25 text-retro-fg' : 'bg-glass-w8 border border-border-glass text-retro-muted hover:bg-glass-w12'}`}
+                                            className={`w-6 h-6 rounded-md text-xs cursor-pointer transition-colors ${mine ? 'bg-retro-accent/25 text-retro-fg' : 'bg-glass-w8 border border-edge text-retro-muted hover:bg-glass-w12'}`}
                                           >
                                             {emoji}
                                           </button>
@@ -1461,37 +1461,37 @@ export function GMatchDMs({
                                       })}
                                     </div>
                                   )}
-                                  <button type="button" onClick={() => { setReplyingTo(msg); setActionFor(null); }} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-2xs flex items-center gap-1 cursor-pointer hover:bg-glass-w12"><Reply className="w-3 h-3" /> Reply</button>
-                                  <button type="button" onClick={() => copyMessage(msg.text)} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-2xs flex items-center gap-1 cursor-pointer hover:bg-glass-w12"><Copy className="w-3 h-3" /> Copy</button>
+                                  <button type="button" onClick={() => { setReplyingTo(msg); setActionFor(null); }} className="px-2 py-1 rounded-md bg-glass-w8 border border-edge text-2xs flex items-center gap-1 cursor-pointer hover:bg-glass-w12"><Reply className="w-3 h-3" /> Reply</button>
+                                  <button type="button" onClick={() => copyMessage(msg.text)} className="px-2 py-1 rounded-md bg-glass-w8 border border-edge text-2xs flex items-center gap-1 cursor-pointer hover:bg-glass-w12"><Copy className="w-3 h-3" /> Copy</button>
                                   {!msg.attachmentMime?.startsWith('video/') && msg.attachmentUrl && (
-                                    <button type="button" onClick={() => void copyAttachmentImage(msg)} disabled={copyingImage === msg.id} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-2xs flex items-center gap-1 cursor-pointer hover:bg-glass-w12 disabled:opacity-50"><ImagePlus className="w-3 h-3" /> {copyingImage === msg.id ? 'Copying…' : 'Copy image'}</button>
+                                    <button type="button" onClick={() => void copyAttachmentImage(msg)} disabled={copyingImage === msg.id} className="px-2 py-1 rounded-md bg-glass-w8 border border-edge text-2xs flex items-center gap-1 cursor-pointer hover:bg-glass-w12 disabled:opacity-50"><ImagePlus className="w-3 h-3" /> {copyingImage === msg.id ? 'Copying…' : 'Copy image'}</button>
                                   )}
                                   {canEdit && (
                                     <button
                                       type="button"
                                       onClick={() => { setEditingMessage({ id: msg.id, text: msg.text }); setActionFor(null); }}
-                                      className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-2xs flex items-center gap-1 cursor-pointer hover:bg-glass-w12"
+                                      className="px-2 py-1 rounded-md bg-glass-w8 border border-edge text-2xs flex items-center gap-1 cursor-pointer hover:bg-glass-w12"
                                     ><Edit2 className="w-3 h-3" /> Edit</button>
                                   )}
                                   {canDeleteEveryone && (
                                     <button
                                       type="button"
                                       onClick={() => handleDeleteForEveryone(msg)}
-                                      className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-2xs flex items-center gap-1 cursor-pointer text-danger-fg hover:bg-glass-w12"
+                                      className="px-2 py-1 rounded-md bg-glass-w8 border border-edge text-2xs flex items-center gap-1 cursor-pointer text-danger-fg hover:bg-glass-w12"
                                     ><Trash className="w-3 h-3" /> Delete for Everyone</button>
                                   )}
                                   {isOwn && (
                                     <button
                                       type="button"
                                       onClick={() => { onDeleteMessage?.(msg.id, activePmPeer?.orbitId || ''); setActionFor(null); }}
-                                      className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-2xs flex items-center gap-1 cursor-pointer text-danger-fg hover:bg-glass-w12"
+                                      className="px-2 py-1 rounded-md bg-glass-w8 border border-edge text-2xs flex items-center gap-1 cursor-pointer text-danger-fg hover:bg-glass-w12"
                                     ><Trash2 className="w-3 h-3" /> Delete for Me</button>
                                   )}
                                   {!isOwn && onReportMessage && (
-                                    <button type="button" onClick={() => { onReportMessage(msg.id); setActionFor(null); }} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-2xs flex items-center gap-1 cursor-pointer text-danger-fg hover:bg-glass-w12"><Flag className="w-3 h-3" /> Report</button>
+                                    <button type="button" onClick={() => { onReportMessage(msg.id); setActionFor(null); }} className="px-2 py-1 rounded-md bg-glass-w8 border border-edge text-2xs flex items-center gap-1 cursor-pointer text-danger-fg hover:bg-glass-w12"><Flag className="w-3 h-3" /> Report</button>
                                   )}
                                   {!isOwn && onReportUser && (
-                                    <button type="button" onClick={() => { onReportUser(msg.senderId); setActionFor(null); }} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-2xs cursor-pointer text-danger-fg hover:bg-glass-w12">Report user</button>
+                                    <button type="button" onClick={() => { onReportUser(msg.senderId); setActionFor(null); }} className="px-2 py-1 rounded-md bg-glass-w8 border border-edge text-2xs cursor-pointer text-danger-fg hover:bg-glass-w12">Report user</button>
                                   )}
                                 </div>
                                 );
@@ -1510,7 +1510,7 @@ export function GMatchDMs({
                </DropZone>
 
              {openTarget === 'room' && activeRoom && (
-              <div className="px-3 pt-2 flex items-center gap-2 shrink-0 border-t border-border-glass">
+              <div className="px-3 pt-2 flex items-center gap-2 shrink-0 border-t border-edge">
                 <input
                   value={roomInvitePeer}
                   onChange={(e) => setRoomInvitePeer(e.target.value)}
@@ -1518,7 +1518,7 @@ export function GMatchDMs({
                   placeholder="invite a contact by name…"
                   aria-label="Invite contact to room"
                   list="room-invite-peers"
-                  className="flex-1 min-w-0 bg-glass-w10 border border-border-glass rounded-md px-3 py-1.5 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent/50"
+                  className="flex-1 min-w-0 bg-glass-w10 border border-edge rounded-md px-3 py-1.5 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent/50"
                 />
                 <datalist id="room-invite-peers">
                   {peers.filter((p) => !activeRoom.members.includes(p.orbitId)).map((p) => (
@@ -1530,7 +1530,7 @@ export function GMatchDMs({
             )}
 
             {replyingTo && (
-              <div className="px-3 pt-2 flex items-center gap-2 text-xs text-retro-muted shrink-0 border-t border-border-glass">
+              <div className="px-3 pt-2 flex items-center gap-2 text-xs text-retro-muted shrink-0 border-t border-edge">
                 <CornerUpLeft className="w-3.5 h-3.5" />
                 <span className="truncate">Replying to {replyingTo.senderId === identity?.orbitId ? 'you' : displayNameFor(replyingTo.senderId)}: {replyingTo.text}</span>
                 <button type="button" onClick={() => setReplyingTo(null)} className="ml-auto text-retro-muted hover:text-retro-fg cursor-pointer"><X className="w-3.5 h-3.5" /></button>
@@ -1538,7 +1538,7 @@ export function GMatchDMs({
             )}
 
             {pendingAttachment && (
-              <div className="px-3 pt-2 flex items-center gap-2 text-xs text-retro-muted shrink-0 border-t border-border-glass">
+              <div className="px-3 pt-2 flex items-center gap-2 text-xs text-retro-muted shrink-0 border-t border-edge">
                 <ImagePlus className="w-3.5 h-3.5" />
                 <span className="truncate">Attachment ready to send</span>
                 <button type="button" onClick={() => setPendingAttachment(null)} className="ml-auto text-retro-muted hover:text-retro-fg cursor-pointer"><X className="w-3.5 h-3.5" /></button>
@@ -1546,16 +1546,16 @@ export function GMatchDMs({
             )}
 
             {pasteNotice && (
-              <div role="status" className="px-3 pt-2 text-xs text-retro-muted shrink-0 border-t border-border-glass">
+              <div role="status" className="px-3 pt-2 text-xs text-retro-muted shrink-0 border-t border-edge">
                 {pasteNotice}
               </div>
             )}
 
-            <form onSubmit={handleSend} className="p-3 border-t border-border-glass bg-glass-w5 flex items-center gap-2 shrink-0">
+            <form onSubmit={handleSend} className="p-3 border-t border-edge bg-glass-w5 flex items-center gap-2 shrink-0">
               {laneUnavailableReason ? (
                 <div
                   role="status"
-                  className="flex-1 flex items-center gap-2 text-xs text-retro-muted bg-glass-w8 border border-border-glass rounded-md px-3 py-2"
+                  className="flex-1 flex items-center gap-2 text-xs text-retro-muted bg-glass-w8 border border-edge rounded-md px-3 py-2"
                 >
                   <Globe className="w-3.5 h-3.5 shrink-0" />
                   <span>{laneUnavailableReason}</span>
@@ -1576,12 +1576,12 @@ export function GMatchDMs({
                     }
                   }}
                   title="Attach an image or video — or just paste one"
-                  className="p-2 rounded-md bg-glass-w10 border border-border-glass text-retro-muted hover:text-retro-accent cursor-pointer transition-colors"
+                  className="p-2 rounded-md bg-glass-w10 border border-edge text-retro-muted hover:text-retro-accent cursor-pointer transition-colors"
                 >
                   <ImagePlus className="w-4 h-4" />
                 </button>
               ) : null}
-              <div className="flex-1 flex items-center gap-2 bg-glass-w10 border border-border-glass rounded-md px-3 py-2 text-xs focus-within:border-retro-accent/50 transition-colors">
+              <div className="flex-1 flex items-center gap-2 bg-glass-w10 border border-edge rounded-md px-3 py-2 text-xs focus-within:border-retro-accent/50 transition-colors">
                 <textarea
                   ref={textareaRef}
                   rows={1}
@@ -1648,7 +1648,7 @@ export function GMatchDMs({
       </div>
 
       {/* 3. Right Column: Expanded Player List */}
-      <div className="w-60 lg:w-64 border-l border-border-glass flex flex-col bg-glass-w5 shrink-0 min-h-0 select-none">
+      <div className="w-60 lg:w-64 border-l border-edge flex flex-col bg-glass-w5 shrink-0 min-h-0 select-none">
         <ChatPlayerList
           identity={identity}
           users={users}

@@ -318,7 +318,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
       </div>
 
       {/* Subtab Navigation */}
-      <div className="flex flex-wrap gap-1 bg-surface-raised border border-border-glass rounded-xl p-1">
+      <div className="flex flex-wrap gap-1 bg-surface-raised border border-edge rounded-xl p-1">
         {subTabs.map(tab => {
           const Icon = tab.icon;
           const active = activeSubTab === tab.id;
@@ -393,7 +393,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                   header: "User",
                   cell: (_, row) => (
                     <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-full bg-surface-canvas border border-border-glass flex items-center justify-center text-xs font-bold text-retro-fg uppercase overflow-hidden shrink-0">
+                      <div className="w-8 h-8 rounded-full bg-surface-canvas border border-edge flex items-center justify-center text-xs font-bold text-retro-fg uppercase overflow-hidden shrink-0">
                         {row.pfp_url ? <img src={resolveMediaUrl(row.pfp_url)} alt="" className="w-full h-full object-cover" /> : (row.display_name?.[0] || "?")}
                       </div>
                       <div className="min-w-0">
@@ -475,7 +475,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
       {/* Subtab 2: Cards & Marketplace */}
       {activeSubTab === "cards_market" && (
         <div className="space-y-4">
-          <div className="flex items-center gap-2 border-b border-border-glass pb-3">
+          <div className="flex items-center gap-2 border-b border-edge pb-3">
             <button
               type="button"
               onClick={() => setCardSection("cards")}
@@ -531,17 +531,17 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                 ]}
               />
 
-              <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
+              <div className="rounded-xl border border-edge bg-surface-raised overflow-hidden">
                 {cards.length === 0 ? (
                   <AdminEmptyState title="No cards found" description="No cards match criteria" illustration="folder" />
                 ) : (
-                  <div className="divide-y divide-border-subtle">
+                  <div className="divide-y divide-edge-subtle">
                     {cards.map(card => {
                       const isExpanded = expandedCardId === card.id;
                       const directUrl = card.content_url && !card.content_url.startsWith("/api/objects/") ? card.content_url : null;
 
                       return (
-                        <div key={card.id} className="border-b border-border-subtle last:border-0 hover:bg-glass-w5 transition-colors">
+                        <div key={card.id} className="border-b border-edge-subtle last:border-0 hover:bg-glass-w5 transition-colors">
                           <div className="p-3 flex items-center gap-3">
                             <button
                               type="button"
@@ -574,7 +574,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                               <select
                                 value={card.moderation_state}
                                 onChange={e => { onAction("moderateCard", card.id, e.target.value); setTimeout(fetchCards, 300); }}
-                                className="bg-surface-canvas border border-border-glass rounded px-2 py-1 text-2xs outline-none focus:border-retro-accent cursor-pointer"
+                                className="bg-surface-canvas border border-edge rounded px-2 py-1 text-2xs outline-none focus:border-retro-accent cursor-pointer"
                               >
                                 <option value="active">Active</option>
                                 <option value="hidden">Hidden</option>
@@ -583,7 +583,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                             </div>
                           </div>
                           {isExpanded && (
-                            <div className="px-4 pb-4 pt-1 bg-surface-elevated/40 border-t border-border-subtle/50 flex flex-col md:flex-row gap-4 items-start animate-orbit-fade-in">
+                            <div className="px-4 pb-4 pt-1 bg-surface-elevated/40 border-t border-edge-subtle/50 flex flex-col md:flex-row gap-4 items-start animate-orbit-fade-in">
                               <div className="relative group shrink-0">
                                 <AdminMediaThumbnail
                                   objectId={card.media_object_id}
@@ -597,7 +597,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                                 />
                               </div>
                               <div className="flex-1 min-w-0 space-y-2 text-xs">
-                                <div className="grid grid-cols-2 gap-2 bg-surface-canvas/60 p-2.5 rounded-lg border border-border-glass">
+                                <div className="grid grid-cols-2 gap-2 bg-surface-canvas/60 p-2.5 rounded-lg border border-edge">
                                   <div>
                                     <span className="text-retro-muted block text-2xs">Card ID</span>
                                     <span className="font-mono text-retro-fg text-2xs break-all">{card.id}</span>
@@ -628,11 +628,11 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
           )}
 
           {cardSection === "market" && (
-            <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
+            <div className="rounded-xl border border-edge bg-surface-raised overflow-hidden">
               {marketplace.length === 0 ? (
                 <AdminEmptyState title="No active listings" description="Marketplace is currently clear" illustration="folder" />
               ) : (
-                <div className="divide-y divide-border-subtle">
+                <div className="divide-y divide-edge-subtle">
                   {marketplace.map(m => (
                     <div key={m.id} className="p-3 flex items-center justify-between gap-3 hover:bg-glass-w5 transition-colors">
                       <div className="min-w-0 flex-1">
@@ -652,11 +652,11 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
           )}
 
           {cardSection === "decks" && (
-            <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
+            <div className="rounded-xl border border-edge bg-surface-raised overflow-hidden">
               {decks.length === 0 ? (
                 <AdminEmptyState title="No decks found" description="No user decks constructed" illustration="folder" />
               ) : (
-                <div className="divide-y divide-border-subtle">
+                <div className="divide-y divide-edge-subtle">
                   {decks.map(d => (
                     <div key={d.id} className="p-3 flex items-center justify-between gap-3 hover:bg-glass-w5 transition-colors">
                       <div className="min-w-0 flex-1">
@@ -680,7 +680,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
       {/* Subtab 3: Wallets & Ledger */}
       {activeSubTab === "wallets_ledger" && (
         <div className="space-y-4">
-          <div className="flex items-center gap-2 border-b border-border-glass pb-3">
+          <div className="flex items-center gap-2 border-b border-edge pb-3">
             <button
               type="button"
               onClick={() => setWalletSection("wallets")}
@@ -704,11 +704,11 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
           </div>
 
           {walletSection === "wallets" ? (
-            <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
+            <div className="rounded-xl border border-edge bg-surface-raised overflow-hidden">
               {wallets.length === 0 ? (
                 <AdminEmptyState title="No wallets found" description="No wallet data available" illustration="folder" />
               ) : (
-                <div className="divide-y divide-border-subtle">
+                <div className="divide-y divide-edge-subtle">
                   {wallets.map(w => (
                     <div key={w.user_id} className="p-3 flex items-center justify-between gap-3 hover:bg-glass-w5 transition-colors">
                       <div className="min-w-0 flex-1">
@@ -729,11 +729,11 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
               )}
             </div>
           ) : (
-            <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
+            <div className="rounded-xl border border-edge bg-surface-raised overflow-hidden">
               {ledger.length === 0 ? (
                 <AdminEmptyState title="No transactions" description="Ledger is currently empty" illustration="folder" />
               ) : (
-                <div className="divide-y divide-border-subtle">
+                <div className="divide-y divide-edge-subtle">
                   {ledger.map(l => (
                     <div key={l.id} className="p-3 flex items-center justify-between gap-3 hover:bg-glass-w5 transition-colors">
                       <div className="min-w-0 flex-1">
@@ -776,14 +776,14 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
               value={banReason}
               onChange={e => setBanReason(e.target.value)}
               placeholder="e.g. Terms violation, inappropriate content..."
-              className="w-full bg-surface-canvas border border-border-glass rounded px-3 py-1.5 text-xs text-retro-fg outline-none focus:border-danger"
+              className="w-full bg-surface-canvas border border-edge rounded px-3 py-1.5 text-xs text-retro-fg outline-none focus:border-danger"
             />
             <label className="flex items-center gap-2 text-xs text-retro-muted cursor-pointer mt-2">
               <input
                 type="checkbox"
                 checked={banWipe}
                 onChange={e => setBanWipe(e.target.checked)}
-                className="rounded border-border-glass"
+                className="rounded border-edge"
               />
               <span>Purge active public posts and lobby images</span>
             </label>
@@ -808,7 +808,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                 type="number"
                 value={balanceData.gcoins}
                 onChange={e => setBalanceData(p => ({ ...p, gcoins: Number(e.target.value) || 0 }))}
-                className="w-full bg-surface-canvas border border-border-glass rounded px-3 py-1.5 text-xs text-retro-fg font-mono outline-none"
+                className="w-full bg-surface-canvas border border-edge rounded px-3 py-1.5 text-xs text-retro-fg font-mono outline-none"
               />
             </div>
             <div>
@@ -817,7 +817,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                 type="number"
                 value={balanceData.score}
                 onChange={e => setBalanceData(p => ({ ...p, score: Number(e.target.value) || 0 }))}
-                className="w-full bg-surface-canvas border border-border-glass rounded px-3 py-1.5 text-xs text-retro-fg font-mono outline-none"
+                className="w-full bg-surface-canvas border border-edge rounded px-3 py-1.5 text-xs text-retro-fg font-mono outline-none"
               />
             </div>
             <div>
@@ -826,7 +826,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                 type="number"
                 value={balanceData.likes}
                 onChange={e => setBalanceData(p => ({ ...p, likes: Number(e.target.value) || 0 }))}
-                className="w-full bg-surface-canvas border border-border-glass rounded px-3 py-1.5 text-xs text-retro-fg font-mono outline-none"
+                className="w-full bg-surface-canvas border border-edge rounded px-3 py-1.5 text-xs text-retro-fg font-mono outline-none"
               />
             </div>
           </div>
@@ -849,7 +849,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
               value={tagsInput}
               onChange={e => setTagsInput(e.target.value)}
               placeholder="e.g. anime, gaming, art..."
-              className="w-full bg-surface-canvas border border-border-glass rounded px-3 py-1.5 text-xs text-retro-fg outline-none"
+              className="w-full bg-surface-canvas border border-edge rounded px-3 py-1.5 text-xs text-retro-fg outline-none"
             />
           </div>
         </ConfirmDialog>
@@ -857,7 +857,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
 
       {activeSubTab === "test_cleanup" && (
         <div className="space-y-4">
-          <div className="bg-surface-canvas border border-border-glass rounded-lg p-4 space-y-3">
+          <div className="bg-surface-canvas border border-edge rounded-lg p-4 space-y-3">
             <div className="flex items-center gap-2">
               <FlaskConical className="w-4 h-4 text-warning-fg" />
               <h3 className="text-sm font-medium text-retro-fg">Purge E2E test accounts</h3>
@@ -883,21 +883,21 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                   value={purgeLimit}
                   onChange={e => setPurgeLimit(e.target.value)}
                   placeholder="all"
-                  className="w-32 bg-surface-raised border border-border-glass rounded px-2.5 py-1.5 text-xs text-retro-fg outline-none"
+                  className="w-32 bg-surface-raised border border-edge rounded px-2.5 py-1.5 text-xs text-retro-fg outline-none"
                 />
               </label>
               <button
                 type="button"
                 onClick={() => void runPurgePreview()}
                 disabled={purgeBusy}
-                className="px-3 py-1.5 rounded-md text-xs font-bold bg-surface-raised border border-border-glass text-retro-fg hover:border-retro-accent/60 disabled:opacity-40 cursor-pointer"
+                className="px-3 py-1.5 rounded-md text-xs font-bold bg-surface-raised border border-edge text-retro-fg hover:border-retro-accent/60 disabled:opacity-40 cursor-pointer"
               >
                 {purgeBusy ? "Working…" : "Preview"}
               </button>
             </div>
 
             {purgePreview && (
-              <div className="rounded-md border border-border-glass bg-surface-raised/50 p-3 space-y-2">
+              <div className="rounded-md border border-edge bg-surface-raised/50 p-3 space-y-2">
                 <div className="text-xs text-retro-fg font-mono">
                   {purgePreview.matched} account(s) tagged “{purgePreview.tag}”
                   {purgePreview.wouldDelete !== purgePreview.matched && (

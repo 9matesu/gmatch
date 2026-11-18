@@ -32,19 +32,17 @@ exactly one interactive accent; `hud-accent` is an alias, not a second
 palette. Focus ring = `--ring`.
 
 ## Borders
-`border-border-glass`, 1px. `border-retro-border` is deprecated (exception line
-allowed per file if a dense admin table washes out — flagged in code, never forked).
+`border-edge`, 1px. Two quieter steps for dense tables and disabled rows:
+`border-edge-subtle` and `border-edge-strong`. The token was `--color-border-glass`
+until 2026-11: the utility it compiled to (`border-border-glass`) read its property
+word twice, in 920 call sites. The role is EDGE, so it now reads once.
 
 ## Type scale (6 steps, floor 10px)
-caption `text-[10px]` (meta/counters/uppercase labels) · body `text-xs` ·
-field `text-[13px]` (inputs) · sub `text-sm` (modal titles) · title `text-lg` ·
-display `text-xl`/`text-2xl` (hero/rank-up only).
-Numbers: `MONO` (sans + tabular-nums — mono was retired 2026-10-17, no surface
-ships a monospace family). `font-black` only on display.
-tracking: `tracking-wider` on uppercase micro-labels, else default.
-The timeline (feed) speaks exactly two steps: body `text-xs` for the caption and
-the author name, caption `text-[10px]` for meta. `text-sm` is modal titles — it
-never appears on the timeline (sponsored-ad hero keeps its display size).
+caption `text-2xs` (10px: meta, counters, uppercase labels) -> body `text-xs` ->
+field `text-sm` -> sub `text-lg` -> title `text-xl` -> display `text-2xl` (hero only).
+`text-2xs` is a named step since 2026-11: 585 `text-[10px]` arbitrary values and 15
+`text-[11px]` collapsed into it, line-height 1.5 so nothing moved. Instructional copy
+(a sentence a person must read, not a label) is `text-xs` or larger, never 10px.
 
 ## Radius (4 steps)
 `rounded-md` chips/icon-buttons · `rounded-lg` cards/buttons/inputs ·
@@ -106,6 +104,22 @@ control, which shares the strip.
 `title=` tooltip); group settings rows under one caption header. Never merge
 distinct features into menus.
 
+## Status colours (4 roles, 2 values each)
+`danger`, `warning`, `success`, `info`. The base (`--color-danger`) carries tints
+and borders (`bg-danger/10`, `border-danger/30`); the `-fg` value is what text
+wears. The pair flips per theme, so one class reads in both:
+
+| role | dark fg | on #09090b | light fg | on #f2f2f4 |
+|---|---|---|---|---|
+| danger | #fca5a5 | 10.48 | #b91c1c | 5.79 |
+| warning | #fcd34d | 13.80 | #92400e | 6.34 |
+| success | #34d399 | 10.35 | #047857 | 4.90 |
+| info | #67e8f9 | 13.73 | #155e75 | 6.50 |
+
+Before this, 869 palette classes (`text-rose-400`, `bg-amber-500/10`, ...) did the
+job with no name and no light-theme answer; 806 now read a role. Gradients
+(`from-*` / `via-*` / `to-*`) are decoration and stay literal.
+
 ## Exemptions (game semantics — do not tokenize)
 HP fill, crit flash, +g$ float, rarity badge colors (shared card-valuation),
 GAME_AD_TEMPLATES gradients, NSFW media itself, `gg-*` grid keyframes,
@@ -117,7 +131,7 @@ Instagram-brand story-add badge.
 
 ## Acceptance greps (must read 0)
 ```
-grep -rc "border-retro-border" src --include=*.tsx | grep -v ':0'
+grep -rc "border-border-" src --include=*.tsx | grep -v ':0'
 grep -rhoE "z-\[[0-9]{3,}\]" src --include=*.tsx
 grep -rhoE "text-\[(6|7|8|9|11)px\]" src --include=*.tsx
 grep -rho "rounded-3xl" src --include=*.tsx

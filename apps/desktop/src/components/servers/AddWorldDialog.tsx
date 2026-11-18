@@ -65,7 +65,7 @@ export function AddWorldDialog({
           <button
             type="button"
             onClick={() => setStep('join')}
-            className="w-full rounded-lg border border-border-glass bg-glass-w5 hover:bg-glass-w10 px-3 py-2.5 text-left cursor-pointer transition-colors duration-150"
+            className="w-full rounded-lg border border-edge bg-glass-w5 hover:bg-glass-w10 px-3 py-2.5 text-left cursor-pointer transition-colors duration-150"
           >
             <span className="block text-xs font-bold text-retro-fg">Join with code</span>
             <span className="mt-0.5 block text-2xs text-retro-muted">
@@ -76,7 +76,7 @@ export function AddWorldDialog({
             <button
               type="button"
               onClick={() => setStep('host')}
-              className="w-full rounded-lg border border-border-glass bg-glass-w5 hover:bg-glass-w10 px-3 py-2.5 text-left cursor-pointer transition-colors duration-150"
+              className="w-full rounded-lg border border-edge bg-glass-w5 hover:bg-glass-w10 px-3 py-2.5 text-left cursor-pointer transition-colors duration-150"
             >
               <span className="block text-xs font-bold text-retro-fg">Host a server</span>
               <span className="mt-0.5 block text-2xs text-retro-muted">

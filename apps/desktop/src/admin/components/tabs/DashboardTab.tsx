@@ -168,7 +168,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
       {/* Primary 6 KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {/* 1. Online Users */}
-        <div className="p-4 rounded-xl border border-border-glass bg-surface-raised">
+        <div className="p-4 rounded-xl border border-edge bg-surface-raised">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-2xs font-bold uppercase tracking-wider text-retro-muted">Online Users</p>
@@ -183,7 +183,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
         {/* 2. Open Reports */}
         <div className={cn(
           "p-4 rounded-xl border",
-          pendingReports > 0 ? "border-danger/0 bg-danger/0" : "border-border-glass bg-surface-raised"
+          pendingReports > 0 ? "border-danger/0 bg-danger/0" : "border-edge bg-surface-raised"
         )}>
           <div className="flex items-start justify-between">
             <div>
@@ -202,7 +202,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
         </div>
 
         {/* 3. Live Matches */}
-        <div className="p-4 rounded-xl border border-border-glass bg-surface-raised">
+        <div className="p-4 rounded-xl border border-edge bg-surface-raised">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-2xs font-bold uppercase tracking-wider text-retro-muted">Active Duels</p>
@@ -215,7 +215,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
         </div>
 
         {/* 4. Total Users */}
-        <div className="p-4 rounded-xl border border-border-glass bg-surface-raised">
+        <div className="p-4 rounded-xl border border-edge bg-surface-raised">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-2xs font-bold uppercase tracking-wider text-retro-muted">Total Accounts</p>
@@ -228,7 +228,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
         </div>
 
         {/* 5. Queue Waiting */}
-        <div className="p-4 rounded-xl border border-border-glass bg-surface-raised">
+        <div className="p-4 rounded-xl border border-edge bg-surface-raised">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-2xs font-bold uppercase tracking-wider text-retro-muted">In Match Queue</p>
@@ -241,7 +241,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
         </div>
 
         {/* 6. Public Content */}
-        <div className="p-4 rounded-xl border border-border-glass bg-surface-raised">
+        <div className="p-4 rounded-xl border border-edge bg-surface-raised">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-2xs font-bold uppercase tracking-wider text-retro-muted">Public Media</p>
@@ -255,8 +255,8 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
       </div>
 
       {/* Quick Operational Triggers */}
-      <div className="rounded-xl border border-border-glass bg-surface-raised p-4">
-        <div className="flex items-center justify-between pb-3 border-b border-border-glass mb-3">
+      <div className="rounded-xl border border-edge bg-surface-raised p-4">
+        <div className="flex items-center justify-between pb-3 border-b border-edge mb-3">
           <h2 className="text-xs font-bold tracking-wider text-retro-fg">Admin Quick Actions</h2>
           <span className="text-2xs text-retro-muted">Safe operational triggers</span>
         </div>
@@ -264,7 +264,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
           <button
             type="button"
             onClick={() => onAction?.("forceMatchup")}
-            className="p-3 rounded-lg border border-border-glass bg-surface-canvas hover:bg-glass-w5 transition-all text-left group cursor-pointer"
+            className="p-3 rounded-lg border border-edge bg-surface-canvas hover:bg-glass-w5 transition-all text-left group cursor-pointer"
           >
             <div className="flex items-center gap-2 mb-1">
               <GitCompare className="w-4 h-4 text-chrome-lav-fg group-hover:scale-110 transition-transform" />
@@ -276,7 +276,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
           <button
             type="button"
             onClick={() => onNavigate?.("content")}
-            className="p-3 rounded-lg border border-border-glass bg-surface-canvas hover:bg-glass-w5 transition-all text-left group cursor-pointer"
+            className="p-3 rounded-lg border border-edge bg-surface-canvas hover:bg-glass-w5 transition-all text-left group cursor-pointer"
           >
             <div className="flex items-center gap-2 mb-1">
               <Megaphone className="w-4 h-4 text-info-fg group-hover:scale-110 transition-transform" />
@@ -288,7 +288,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
           <button
             type="button"
             onClick={() => onNavigate?.("settings")}
-            className="p-3 rounded-lg border border-border-glass bg-surface-canvas hover:bg-glass-w5 transition-all text-left group cursor-pointer"
+            className="p-3 rounded-lg border border-edge bg-surface-canvas hover:bg-glass-w5 transition-all text-left group cursor-pointer"
           >
             <div className="flex items-center gap-2 mb-1">
               <TrendingUp className="w-4 h-4 text-warning-fg group-hover:scale-110 transition-transform" />
@@ -300,7 +300,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
           <button
             type="button"
             onClick={() => onNavigate?.("settings")}
-            className="p-3 rounded-lg border border-border-glass bg-surface-canvas hover:bg-glass-w5 transition-all text-left group cursor-pointer"
+            className="p-3 rounded-lg border border-edge bg-surface-canvas hover:bg-glass-w5 transition-all text-left group cursor-pointer"
           >
             <div className="flex items-center gap-2 mb-1">
               <BarChart2 className="w-4 h-4 text-success-fg group-hover:scale-110 transition-transform" />
@@ -314,8 +314,8 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
       {/* 2-Column Section: Recent Public Posts & Active Duels (NO Private Content!) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Recent Public Posts */}
-        <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
-          <div className="px-4 py-3 border-b border-border-glass flex items-center justify-between">
+        <div className="rounded-xl border border-edge bg-surface-raised overflow-hidden">
+          <div className="px-4 py-3 border-b border-edge flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Globe className="w-4 h-4 text-info-fg" />
               <h2 className="text-xs font-bold tracking-wider text-retro-fg">Recent Public Posts</h2>
@@ -331,7 +331,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
           {recentPosts.length === 0 ? (
             <AdminEmptyState title="No public posts" description="Recent feed posts will appear here" illustration="folder" />
           ) : (
-            <div className="divide-y divide-border-subtle">
+            <div className="divide-y divide-edge-subtle">
               {recentPosts.map((post) => (
                 <div key={post.id} className="flex items-center gap-3 p-3 hover:bg-glass-w5 transition-colors">
                   <AdminMediaThumbnail
@@ -360,8 +360,8 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
         </div>
 
         {/* Live Matches & Duels */}
-        <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
-          <div className="px-4 py-3 border-b border-border-glass flex items-center justify-between">
+        <div className="rounded-xl border border-edge bg-surface-raised overflow-hidden">
+          <div className="px-4 py-3 border-b border-edge flex items-center justify-between">
             <div className="flex items-center gap-2">
               <GitCompare className="w-4 h-4 text-chrome-lav-fg" />
               <h2 className="text-xs font-bold tracking-wider text-retro-fg">Active Duels ({liveMatches.length})</h2>
@@ -381,7 +381,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
               <p className="text-2xs text-retro-muted mt-0.5">Players in queue will automatically pair into new matches</p>
             </div>
           ) : (
-            <div className="divide-y divide-border-subtle">
+            <div className="divide-y divide-edge-subtle">
               {liveMatches.slice(0, 6).map((match) => (
                 <div key={match.id} className="flex items-center justify-between p-3 hover:bg-glass-w5 transition-colors">
                   <div className="min-w-0 flex-1">

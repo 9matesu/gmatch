@@ -208,7 +208,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
       </div>
 
       {/* Subtab Navigation */}
-      <div className="flex flex-wrap gap-1 bg-surface-raised border border-border-glass rounded-xl p-1">
+      <div className="flex flex-wrap gap-1 bg-surface-raised border border-edge rounded-xl p-1">
         {subTabs.map(tab => {
           const Icon = tab.icon;
           const active = activeSubTab === tab.id;
@@ -239,7 +239,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
       {/* Subtab 1: Public Posts & Lobby Board (NO Private Content) */}
       {activeSubTab === "posts_lobby" && (
         <div className="space-y-4">
-          <div className="flex items-center gap-2 border-b border-border-glass pb-3">
+          <div className="flex items-center gap-2 border-b border-edge pb-3">
             <button
               type="button"
               onClick={() => setContentSection("posts")}
@@ -284,13 +284,13 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                 ]}
               />
 
-              <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
+              <div className="rounded-xl border border-edge bg-surface-raised overflow-hidden">
                 {isLoading ? (
                   <AdminLoadingState rows={6} columns={4} />
                 ) : posts.length === 0 ? (
                   <AdminEmptyState title="No posts found" description="No public feed posts match filter" illustration="folder" />
                 ) : (
-                  <div className="divide-y divide-border-subtle">
+                  <div className="divide-y divide-edge-subtle">
                     {posts.map(post => {
                       const isHidden = Boolean(post.hidden_at);
                       return (
@@ -321,7 +321,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                             <button
                               type="button"
                               onClick={() => { onAction("togglePostVisibility", post); setTimeout(fetchPosts, 300); }}
-                              className="px-2.5 py-1 text-xs font-semibold rounded border border-border-glass text-retro-muted hover:text-retro-fg cursor-pointer"
+                              className="px-2.5 py-1 text-xs font-semibold rounded border border-edge text-retro-muted hover:text-retro-fg cursor-pointer"
                             >
                               {isHidden ? "Unhide" : "Hide"}
                             </button>
@@ -343,11 +343,11 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
           )}
 
           {contentSection === "lobby" && (
-            <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
+            <div className="rounded-xl border border-edge bg-surface-raised overflow-hidden">
               {lobbyImages.length === 0 ? (
                 <AdminEmptyState title="No lobby images" description="Lobby board is clear" illustration="folder" />
               ) : (
-                <div className="divide-y divide-border-subtle">
+                <div className="divide-y divide-edge-subtle">
                   {lobbyImages.map(img => (
                     <div key={img.id} className="p-3 flex items-center justify-between gap-3 hover:bg-glass-w5 transition-colors">
                       <AdminMediaThumbnail
@@ -385,7 +385,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
       {/* Subtab 2: Matches & Duels */}
       {activeSubTab === "matches" && (
         <div className="space-y-4">
-          <div className="flex items-center gap-2 border-b border-border-glass pb-3">
+          <div className="flex items-center gap-2 border-b border-edge pb-3">
             <button
               type="button"
               onClick={() => setMatchSection("live")}
@@ -419,11 +419,11 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
           </div>
 
           {matchSection === "live" && (
-            <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
+            <div className="rounded-xl border border-edge bg-surface-raised overflow-hidden">
               {matches.length === 0 ? (
                 <AdminEmptyState title="No live matches" description="No duels in progress" illustration="chart" />
               ) : (
-                <div className="divide-y divide-border-subtle">
+                <div className="divide-y divide-edge-subtle">
                   {matches.map(m => (
                     <div key={m.id} className="p-4 flex flex-wrap items-center justify-between gap-3 hover:bg-glass-w5 transition-colors">
                       <div className="min-w-0 flex-1">
@@ -454,11 +454,11 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
           )}
 
           {matchSection === "archive" && (
-            <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
+            <div className="rounded-xl border border-edge bg-surface-raised overflow-hidden">
               {archivedMatches.length === 0 ? (
                 <AdminEmptyState title="No archived matches" description="Match history is clear" illustration="chart" />
               ) : (
-                <div className="divide-y divide-border-subtle">
+                <div className="divide-y divide-edge-subtle">
                   {archivedMatches.map(m => (
                     <div key={m.id} className="p-3 flex items-center justify-between gap-3 hover:bg-glass-w5 transition-colors">
                       <div className="min-w-0 flex-1">
@@ -478,11 +478,11 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
           )}
 
           {matchSection === "tiers" && (
-            <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
+            <div className="rounded-xl border border-edge bg-surface-raised overflow-hidden">
               {specialMatches.length === 0 ? (
                 <AdminEmptyState title="No tier matches" description="No special tier matches active" illustration="chart" />
               ) : (
-                <div className="divide-y divide-border-subtle">
+                <div className="divide-y divide-edge-subtle">
                   {specialMatches.map(t => (
                     <div key={t.id} className="p-3 flex items-center justify-between gap-3 hover:bg-glass-w5 transition-colors">
                       <div className="min-w-0 flex-1">
@@ -515,14 +515,14 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Custom Rooms */}
-            <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
-              <div className="px-4 py-3 border-b border-border-glass flex items-center justify-between">
+            <div className="rounded-xl border border-edge bg-surface-raised overflow-hidden">
+              <div className="px-4 py-3 border-b border-edge flex items-center justify-between">
                 <h2 className="text-xs font-bold tracking-wider text-retro-fg">Multiplayer Rooms ({rooms.length})</h2>
               </div>
               {rooms.length === 0 ? (
                 <AdminEmptyState title="No active rooms" description="Zero custom rooms running" illustration="folder" />
               ) : (
-                <div className="divide-y divide-border-subtle">
+                <div className="divide-y divide-edge-subtle">
                   {rooms.map(r => (
                     <div key={r.id} className="p-3 flex items-center justify-between gap-3 hover:bg-glass-w5 transition-colors">
                       <div className="min-w-0 flex-1">
@@ -546,14 +546,14 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
             </div>
 
             {/* Babecock Sessions */}
-            <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
-              <div className="px-4 py-3 border-b border-border-glass flex items-center justify-between">
+            <div className="rounded-xl border border-edge bg-surface-raised overflow-hidden">
+              <div className="px-4 py-3 border-b border-edge flex items-center justify-between">
                 <h2 className="text-xs font-bold tracking-wider text-retro-fg">Babecock Rounds ({babecockRounds.length})</h2>
               </div>
               {babecockRounds.length === 0 ? (
                 <AdminEmptyState title="No active rounds" description="Zero babecock rounds running" illustration="folder" />
               ) : (
-                <div className="divide-y divide-border-subtle">
+                <div className="divide-y divide-edge-subtle">
                   {babecockRounds.map(b => (
                     <div key={b.id} className="p-3 flex items-center justify-between gap-3 hover:bg-glass-w5 transition-colors">
                       <div className="min-w-0 flex-1">
@@ -583,7 +583,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
       {activeSubTab === "announcements" && (
         <div className="space-y-6">
           {/* Announcements Header */}
-          <div className="rounded-xl border border-border-glass bg-surface-raised p-4 space-y-4">
+          <div className="rounded-xl border border-edge bg-surface-raised p-4 space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xs font-bold tracking-wider text-retro-fg">Broadcast Banner Notices</h2>
@@ -602,7 +602,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
             {announcements.length === 0 ? (
               <AdminEmptyState title="No announcements" description="No broadcast notices published" illustration="folder" />
             ) : (
-              <div className="divide-y divide-border-subtle">
+              <div className="divide-y divide-edge-subtle">
                 {announcements.map(ann => (
                   <div key={ann.id} className="p-3 flex items-center justify-between gap-3 hover:bg-glass-w5 transition-colors">
                     <div className="min-w-0 flex-1">
@@ -618,7 +618,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                       <button
                         type="button"
                         onClick={() => { onAction("toggleAnnouncement", ann.id, !ann.is_active); setTimeout(fetchAnnouncements, 300); }}
-                        className="px-2 py-1 text-2xs font-semibold rounded border border-border-glass text-retro-muted hover:text-retro-fg cursor-pointer"
+                        className="px-2 py-1 text-2xs font-semibold rounded border border-edge text-retro-muted hover:text-retro-fg cursor-pointer"
                       >
                         {ann.is_active ? "Deactivate" : "Activate"}
                       </button>
@@ -637,7 +637,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
           </div>
 
           {/* Feedback & Recommendations */}
-          <div className="rounded-xl border border-border-glass bg-surface-raised p-4 space-y-4">
+          <div className="rounded-xl border border-edge bg-surface-raised p-4 space-y-4">
             <div>
               <h2 className="text-xs font-bold tracking-wider text-retro-fg">Community Feedback & Suggestions</h2>
               <p className="text-xs text-retro-muted mt-0.5">Submissions from player in-app recommendation forms</p>
@@ -646,7 +646,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
             {recommendations.length === 0 ? (
               <AdminEmptyState title="No feedback received" description="Player suggestions will appear here" illustration="folder" />
             ) : (
-              <div className="divide-y divide-border-subtle">
+              <div className="divide-y divide-edge-subtle">
                 {recommendations.map(rec => (
                   <div key={rec.id} className="p-3 flex items-center justify-between gap-3 hover:bg-glass-w5 transition-colors">
                     <div className="min-w-0 flex-1">
@@ -698,13 +698,13 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
               onChange={e => setNewAnnouncementText(e.target.value)}
               placeholder="Type notification text..."
               rows={3}
-              className="w-full bg-surface-canvas border border-border-glass rounded-lg px-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent resize-none"
+              className="w-full bg-surface-canvas border border-edge rounded-lg px-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent resize-none"
             />
             <div className="flex justify-end gap-2 pt-2">
               <button
                 type="button"
                 onClick={() => setShowCreateAnnModal(false)}
-                className="px-3 py-1.5 rounded text-xs border border-border-glass text-retro-muted hover:text-retro-fg cursor-pointer"
+                className="px-3 py-1.5 rounded text-xs border border-edge text-retro-muted hover:text-retro-fg cursor-pointer"
               >
                 Cancel
               </button>

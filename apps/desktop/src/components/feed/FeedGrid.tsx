@@ -124,7 +124,7 @@ export function FeedGrid({ posts, identity, onOpen, likedPosts, likeCounts, onTo
                 onClick={() => onOpen(post)}
                 title={post.caption || undefined}
                 aria-label={post.caption ? `Open post: ${post.caption.slice(0, 60)}` : 'Open post'}
-                className="cv-row group relative min-w-0 overflow-hidden bg-surface-raised border border-border-glass rounded-[10px] cursor-pointer"
+                className="cv-row group relative min-w-0 overflow-hidden bg-surface-raised border border-edge rounded-[10px] cursor-pointer"
                 style={{ flexGrow: ratioOf(post) || 1, flexBasis: 0 }}
               >
                 {hasMedia(post) ? (

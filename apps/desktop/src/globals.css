@@ -95,9 +95,9 @@
   --color-info-fg: #67e8f9;
 
   /* Hairline borders and highlights */
-  --color-border-glass: #27272a;
-  --color-border-subtle: #1f1f23;
-  --color-border-strong: #3f3f46;
+  --color-edge: #27272a;
+  --color-edge-subtle: #1f1f23;
+  --color-edge-strong: #3f3f46;
 
   /* Z scale (V1): arbitrary 3+ digit z-index banned — see docs/DESIGN.md */
   --z-dropdown: 40;
@@ -281,7 +281,7 @@
     font-family: inherit;
     border-radius: var(--radius-md);
     background: var(--color-surface-raised);
-    border: 1px solid var(--color-border-glass);
+    border: 1px solid var(--color-edge);
     color: var(--color-retro-fg);
   }
 
@@ -358,7 +358,7 @@
 /* Glass panel: translucent navigation, overlays, toolbars */
 .glass-panel {
   background: var(--color-glass);
-  border: 1px solid var(--color-border-glass);
+  border: 1px solid var(--color-edge);
   border-radius: var(--radius-lg);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.38);
 }
@@ -369,7 +369,7 @@
    panel surfaces (cards, dialogs, sheets over the dark canvas). */
 .glass-toolbar {
   background: var(--color-surface-raised);
-  border: 1px solid var(--color-border-glass);
+  border: 1px solid var(--color-edge);
   border-radius: var(--radius-lg);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
 }
@@ -378,7 +378,7 @@
    the central app surfaces. Same panel slate + opacity as every other panel. */
 .glass-surface {
   background: var(--color-glass);
-  border: 1px solid var(--color-border-glass);
+  border: 1px solid var(--color-edge);
   box-shadow:
     0 20px 48px rgba(0, 0, 0, 0.34),
     inset 0 1px 0 rgba(255, 255, 255, 0.14),
@@ -391,7 +391,7 @@
   position: relative;
   isolation: isolate;
   background: var(--color-surface-raised);
-  border: 1px solid var(--color-border-glass);
+  border: 1px solid var(--color-edge);
   color: var(--color-retro-muted);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
   transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1),
@@ -493,7 +493,7 @@
    ────────────────────────────────────────────────────────────── */
 .command-island {
   background: var(--color-glass-strong);
-  border: 1px solid var(--color-border-glass);
+  border: 1px solid var(--color-edge);
   border-radius: 9999px;
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65);
   transition: border-color 150ms ease-out;
@@ -745,19 +745,19 @@
 .app-glass .bg-surface-interactive,
 .app-glass .bg-surface-elevated {
   background: var(--color-glass) !important;
-  border-color: var(--color-border-glass) !important;
+  border-color: var(--color-edge) !important;
   box-shadow:
     0 12px 30px rgba(0, 0, 0, 0.26),
-    inset 0 1px 0 var(--color-border-glass),
+    inset 0 1px 0 var(--color-edge),
     inset 0 -1px 0 rgba(0, 0, 0, 0.18) !important;
 }
 
 .app-glass .bg-surface-elevated\/50 {
   background: var(--color-glass) !important;
-  border-color: var(--color-border-glass) !important;
+  border-color: var(--color-edge) !important;
   box-shadow:
     0 10px 24px rgba(0, 0, 0, 0.24),
-    inset 0 1px 0 var(--color-border-glass) !important;
+    inset 0 1px 0 var(--color-edge) !important;
 }
 
 .app-glass .bg-surface-canvas {
@@ -795,7 +795,7 @@
 .edge-lit {
   position: relative;
   isolation: isolate;
-  border: 1px solid var(--color-border-glass);
+  border: 1px solid var(--color-edge);
   border-radius: var(--radius-lg);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.12),
@@ -885,7 +885,7 @@
 /* Solid panel: content-heavy cards, tables */
 .solid-panel {
   background: var(--color-glass);
-  border: 1px solid var(--color-border-glass);
+  border: 1px solid var(--color-edge);
   border-radius: var(--radius-lg);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
 }
@@ -989,7 +989,7 @@
      state sits inside a panel body rather than owning a whole view. */
   padding: var(--empty-state-padding, 3rem 1.5rem);
   background: var(--color-surface-raised);
-  border: 1px solid var(--color-border-glass);
+  border: 1px solid var(--color-edge);
   border-radius: var(--radius-lg);
 }
 
@@ -1370,7 +1370,7 @@ html[data-motion="on"] {
 
 .btn-skeuo {
   background: var(--color-surface-raised);
-  border: 1px solid var(--color-border-glass);
+  border: 1px solid var(--color-edge);
   box-shadow:
     0 4px 14px rgba(0, 0, 0, 0.38),
     inset 0 1px 0 rgba(255, 255, 255, 0.12),
@@ -1382,7 +1382,7 @@ html[data-motion="on"] {
 
 .btn-skeuo:hover {
   background: var(--color-surface-elevated);
-  border-color: var(--color-border-strong);
+  border-color: var(--color-edge-strong);
   box-shadow:
     0 6px 18px rgba(0, 0, 0, 0.48),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
@@ -1543,9 +1543,9 @@ html.theme-light body {
   --color-glass-w12: rgba(9, 9, 11, calc(0.12 * var(--panel-alpha) + 0.03));
   --color-glass-w20: rgba(9, 9, 11, calc(0.20 * var(--panel-alpha) + 0.04));
 
-  --color-border-glass: rgba(9, 9, 11, 0.12);
-  --color-border-subtle: rgba(9, 9, 11, 0.08);
-  --color-border-strong: rgba(9, 9, 11, 0.22);
+  --color-edge: rgba(9, 9, 11, 0.12);
+  --color-edge-subtle: rgba(9, 9, 11, 0.08);
+  --color-edge-strong: rgba(9, 9, 11, 0.22);
 
   /* Type: the same hierarchy, dark on light. */
   --color-retro-fg: #18181b;
@@ -1616,7 +1616,7 @@ html.theme-light .bg-glass-w10 { background-color: var(--color-glass-w10); }
 html.theme-light .bg-glass-w12 { background-color: var(--color-glass-w12); }
 html.theme-light .bg-glass-w20 { background-color: var(--color-glass-w20); }
 
-html.theme-light .border-border-glass { border-color: var(--color-border-glass); }
+html.theme-light .border-edge { border-color: var(--color-edge); }
 
 /* A scrim is black in both themes, so anything sitting on one is always
    light text — the theme token would be dark and unreadable there. */

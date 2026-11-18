@@ -44,7 +44,7 @@ export function WatchPartyChat({ party, profilePics, myId, isHost }: {
   const chat = party?.chat || []
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col border-t border-border-glass">
+    <div className="flex-1 min-h-0 flex flex-col border-t border-edge">
       <p className={`px-3 pt-2 pb-1 uppercase tracking-wider ${MUTED}`}>Chat</p>
       <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto px-3 pb-2 space-y-1.5 styled-scrollbar">
         {chat.map((m, i) => m.sys ? (
@@ -75,7 +75,7 @@ export function WatchPartyChat({ party, profilePics, myId, isHost }: {
         )}
       </div>
       {party && (
-        <div className="p-2 border-t border-border-glass">
+        <div className="p-2 border-t border-edge">
           <textarea
             ref={textareaRef}
             rows={1}

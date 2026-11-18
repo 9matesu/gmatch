@@ -123,7 +123,7 @@ export function NativeHeaderBar({
         </button>
 
         {window.gmatch?.winClose && (
-          <div className="flex items-center gap-0.5 ml-1 border-l border-border-glass pl-1.5">
+          <div className="flex items-center gap-0.5 ml-1 border-l border-edge pl-1.5">
             <button
               type="button"
               onClick={window.gmatch.winMinimize}

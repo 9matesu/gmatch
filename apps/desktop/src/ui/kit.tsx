@@ -5,7 +5,7 @@
  *
  * One Button, one Card surface, one Modal shell, one Tab bar, one Title.
  * Surfaces speak the shell's own tokens (solid-panel, glass-w8/w12,
- * border-border-glass, retro accent). Transparency rule: one glass layer per
+ * border-edge, retro accent). Transparency rule: one glass layer per
  * surface, backdrops always bg-black/60. Radius: lg (cards/controls) and full
  * (pills). Colors: fg/muted + one accent + one danger + the frozen game set
  * (HP/rarity/crit, in ui/styles.ts).
@@ -23,7 +23,7 @@ const BTN_BASE =
 
 const BTN_VARIANT: Record<ButtonVariant, string> = {
   primary: 'bg-retro-accent text-retro-accent-text! hover:bg-retro-accent-hover border border-transparent font-bold',
-  secondary: 'border border-border-glass bg-glass-w8 hover:bg-glass-w12 text-retro-fg',
+  secondary: 'border border-edge bg-glass-w8 hover:bg-glass-w12 text-retro-fg',
   danger: 'bg-retro-error/15 border border-retro-error/40 text-retro-error hover:bg-retro-error/25',
   ghost: 'text-retro-muted hover:text-retro-fg border border-transparent hover:bg-glass-w8',
 }
@@ -78,7 +78,7 @@ export type CardTone = 'surface' | 'raised'
 
 const CARD_TONE: Record<CardTone, string> = {
   surface: 'solid-panel',
-  raised: 'bg-glass-w12 border border-border-glass',
+  raised: 'bg-glass-w12 border border-edge',
 }
 
 /** ONE card: solid panel + hairline border + rounded-lg. */
@@ -89,7 +89,7 @@ export function Card({
   ...rest
 }: React.HTMLAttributes<HTMLDivElement> & { tone?: CardTone }) {
   return (
-    <div className={`rounded-lg border border-border-glass ${CARD_TONE[tone]} ${className}`} {...rest}>
+    <div className={`rounded-lg border border-edge ${CARD_TONE[tone]} ${className}`} {...rest}>
       {children}
     </div>
   )
@@ -110,7 +110,7 @@ export function CardHeader({
   className?: string
 }) {
   return (
-    <div className={`flex items-center justify-between gap-2 px-4 py-3 bg-glass-w8 border-b border-border-glass ${className}`}>
+    <div className={`flex items-center justify-between gap-2 px-4 py-3 bg-glass-w8 border-b border-edge ${className}`}>
       <div className="flex items-center gap-2 min-w-0">
         {icon && <span className="shrink-0 text-retro-muted">{icon}</span>}
         <div className="min-w-0">
@@ -206,7 +206,7 @@ export function Modal({
         onClick={(e) => e.stopPropagation()}
         className={`w-full ${maxWidth} glass-panel shadow-xl animate-orbit-pop`}
       >
-        <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-border-glass">
+        <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-edge">
           <h2 id={titleId} className="text-base font-black tracking-tight text-retro-fg truncate">
             {title}
           </h2>
@@ -260,9 +260,9 @@ export function SideSheet({
         role="complementary"
         aria-label={typeof title === 'string' ? title : undefined}
         onClick={(e) => e.stopPropagation()}
-        className={`pointer-events-auto ${width} h-full bg-[var(--color-glass)] backdrop-blur-xl border-l border-border-glass shadow-2xl flex flex-col animate-orbit-slide-left`}
+        className={`pointer-events-auto ${width} h-full bg-[var(--color-glass)] backdrop-blur-xl border-l border-edge shadow-2xl flex flex-col animate-orbit-slide-left`}
       >
-        <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-border-glass shrink-0">
+        <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-edge shrink-0">
           <h2 className="text-base font-black tracking-tight text-retro-fg truncate">{title}</h2>
           <Button variant="ghost" size="sm" aria-label="Close" onClick={onClose} className="px-1.5">
             <X className="w-4 h-4" />
@@ -288,7 +288,7 @@ export function Tabs<T extends string>({
   className?: string
 }) {
   return (
-    <div role="tablist" className={`flex bg-glass-w5 p-0.5 rounded-lg border border-border-glass ${className}`}>
+    <div role="tablist" className={`flex bg-glass-w5 p-0.5 rounded-lg border border-edge ${className}`}>
       {tabs.map((t) => (
         <button
           key={t.id}

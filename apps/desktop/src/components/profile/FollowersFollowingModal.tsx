@@ -161,11 +161,11 @@ export function FollowersFollowingModal({
       onClick={onClose}
     >
       <div
-        className="bg-glass backdrop-blur-2xl border border-border-glass w-full max-w-md rounded-xl overflow-hidden shadow-2xl flex flex-col text-retro-fg max-h-[88vh] animate-orbit-slide-up"
+        className="bg-glass backdrop-blur-2xl border border-edge w-full max-w-md rounded-xl overflow-hidden shadow-2xl flex flex-col text-retro-fg max-h-[88vh] animate-orbit-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header Bar */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border-glass shrink-0">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-edge shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <Users className="w-4 h-4 text-retro-muted shrink-0" />
             <div className="min-w-0">
@@ -191,7 +191,7 @@ export function FollowersFollowingModal({
         </div>
 
         {/* Tab Selector */}
-        <div className="flex border-b border-border-glass shrink-0">
+        <div className="flex border-b border-edge shrink-0">
           <button
             type="button"
             onClick={() => {
@@ -222,8 +222,8 @@ export function FollowersFollowingModal({
         </div>
 
         {/* Search Bar Input */}
-        <div className="px-3 py-2 border-b border-border-glass shrink-0">
-          <div className="flex items-center gap-2 bg-surface-interactive rounded-lg px-3 py-1.5 text-xs text-retro-fg focus-within:border-border-glass border border-border-glass transition-colors">
+        <div className="px-3 py-2 border-b border-edge shrink-0">
+          <div className="flex items-center gap-2 bg-surface-interactive rounded-lg px-3 py-1.5 text-xs text-retro-fg focus-within:border-edge border border-edge transition-colors">
             <Search className="w-3.5 h-3.5 text-retro-muted shrink-0" />
             <input
               type="text"
@@ -282,7 +282,7 @@ export function FollowersFollowingModal({
                         : 'bg-glass-w20'
                       }`}
                   >
-                    <div className="w-full h-full rounded-full bg-surface-raised overflow-hidden border border-border-glass flex items-center justify-center text-xs font-black text-retro-fg">
+                    <div className="w-full h-full rounded-full bg-surface-raised overflow-hidden border border-edge flex items-center justify-center text-xs font-black text-retro-fg">
                       {userPfp ? (
                         <img src={resolveMediaUrl(userPfp)} alt="" className="w-full h-full object-cover" />
                       ) : (
@@ -355,7 +355,7 @@ export function FollowersFollowingModal({
                       type="button"
                       onClick={() => handleToggleFollow(user)}
                       className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1 ${isFollowing
-                          ? 'bg-surface-interactive hover:bg-danger/10 text-retro-fg hover:text-danger-fg border border-border-glass'
+                          ? 'bg-surface-interactive hover:bg-danger/10 text-retro-fg hover:text-danger-fg border border-edge'
                           : 'bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text shadow-xs'
                         }`}
                     >

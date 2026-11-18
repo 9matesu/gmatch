@@ -205,9 +205,9 @@ export function ValuationSummary({
   const spotlightCard = summary.cardOfTheMatch;
 
   return (
-    <div className="space-y-4 animate-orbit-slide-up bg-surface-canvas/70 border border-border-glass rounded-xl p-4 font-sans text-retro-fg backdrop-blur-md">
+    <div className="space-y-4 animate-orbit-slide-up bg-surface-canvas/70 border border-edge rounded-xl p-4 font-sans text-retro-fg backdrop-blur-md">
       {/* Header: Social Valuation Summary banner */}
-      <div className="p-4 bg-surface-canvas/60 border border-border-glass rounded-xl text-center space-y-2">
+      <div className="p-4 bg-surface-canvas/60 border border-edge rounded-xl text-center space-y-2">
         <div className="flex items-center justify-center gap-1.5 text-xs font-bold uppercase tracking-wider text-retro-body">
           <Trophy className="w-4 h-4 text-warning-fg" />
           <span>Match Valuation Complete</span>
@@ -243,8 +243,8 @@ export function ValuationSummary({
 
       {/* Card of the Match Spotlight */}
       {spotlightCard && spotlightCard.delta > 0 && (
-        <div className="flex items-center gap-3 p-3 bg-surface-canvas/50 border border-border-glass rounded-xl">
-          <div className="w-14 h-14 rounded-lg border border-border-glass overflow-hidden shrink-0 bg-retro-bg">
+        <div className="flex items-center gap-3 p-3 bg-surface-canvas/50 border border-edge rounded-xl">
+          <div className="w-14 h-14 rounded-lg border border-edge overflow-hidden shrink-0 bg-retro-bg">
             <ObjectImage
               contentUrl={spotlightCard.url}
               objectId={spotlightCard.id}
@@ -275,8 +275,8 @@ export function ValuationSummary({
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {/* My Played Cards */}
-          <div className="p-3 bg-surface-canvas/50 border border-border-glass rounded-xl space-y-2">
-            <div className="text-xs font-bold text-retro-body border-b border-border-glass pb-1.5">
+          <div className="p-3 bg-surface-canvas/50 border border-edge rounded-xl space-y-2">
+            <div className="text-xs font-bold text-retro-body border-b border-edge pb-1.5">
               Your Cards Valuation:
             </div>
             {summary.myCardDeltas.map((c) => {
@@ -288,7 +288,7 @@ export function ValuationSummary({
                     <span className={`px-1.5 py-0.2 rounded text-2xs font-bold uppercase tracking-wider ${rarity.badgeClass}`}>{rarity.label}</span>
                     <span className="text-retro-muted text-xs flex items-center gap-1">
                       {c.vote === 'boost' ? <><Zap className="w-3 h-3 text-warning-fg" /> Boosted</> : c.vote === 'like' ? <><Heart className="w-3 h-3 text-warning-fg fill-danger" /> Liked</> : <><X className="w-3 h-3 text-retro-muted" /> Rejected</>}
-                      {c.auto && <span className="text-2xs font-mono text-retro-muted border border-border-glass rounded px-1">auto · +0</span>}
+                      {c.auto && <span className="text-2xs font-mono text-retro-muted border border-edge rounded px-1">auto · +0</span>}
                     </span>
                   </div>
                   <span className={`font-mono font-bold text-xs ${c.delta >= 0 ? 'text-success-fg' : 'text-danger-fg'}`}>
@@ -300,8 +300,8 @@ export function ValuationSummary({
           </div>
 
           {/* Opponent Cards */}
-          <div className="p-3 bg-surface-canvas/50 border border-border-glass rounded-xl space-y-2">
-            <div className="text-xs font-bold text-retro-muted border-b border-border-glass pb-1.5">
+          <div className="p-3 bg-surface-canvas/50 border border-edge rounded-xl space-y-2">
+            <div className="text-xs font-bold text-retro-muted border-b border-edge pb-1.5">
               {opponentName}&apos;s Cards:
             </div>
             {summary.oppCardDeltas.map((c) => (
@@ -310,7 +310,7 @@ export function ValuationSummary({
                   <span className="font-mono text-retro-muted text-xs">R{c.round}:</span>
                   <span className="text-retro-muted text-xs flex items-center gap-1">
                     {c.vote === 'boost' ? <><Zap className="w-3 h-3 text-warning-fg" /> You Boosted</> : c.vote === 'like' ? <><Heart className="w-3 h-3 text-warning-fg fill-danger" /> You Liked</> : <><X className="w-3 h-3 text-retro-muted" /> You Rejected</>}
-                    {c.auto && <span className="text-2xs font-mono text-retro-muted border border-border-glass rounded px-1">auto · +0</span>}
+                    {c.auto && <span className="text-2xs font-mono text-retro-muted border border-edge rounded px-1">auto · +0</span>}
                   </span>
                 </div>
                 <span className={`font-mono font-bold text-xs ${c.delta >= 0 ? 'text-success-fg' : 'text-danger-fg'}`}>
@@ -328,7 +328,7 @@ export function ValuationSummary({
           type="button"
           onClick={onReturnToLobby}
           disabled={submitting}
-          className="flex-1 py-2.5 text-xs font-semibold uppercase tracking-wider bg-surface-canvas hover:bg-surface-elevated text-retro-body border border-border-glass rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+          className="flex-1 py-2.5 text-xs font-semibold uppercase tracking-wider bg-surface-canvas hover:bg-surface-elevated text-retro-body border border-edge rounded-lg transition-colors cursor-pointer disabled:opacity-50"
         >
           Return to Lobby
         </button>

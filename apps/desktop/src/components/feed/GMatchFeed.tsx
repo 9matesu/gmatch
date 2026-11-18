@@ -937,7 +937,7 @@ function GMatchFeedImpl({
                 type="button"
                 onClick={() => { playPress(720); onFeedSortChange?.(mode); }}
                 className={`px-3 py-1.5 rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer font-medium ${feedSort === mode
-                    ? 'bg-glass-w12 text-retro-fg shadow-xs border border-border-glass'
+                    ? 'bg-glass-w12 text-retro-fg shadow-xs border border-edge'
                     : 'text-retro-muted hover:text-retro-fg'
                   }`}
               >
@@ -950,7 +950,7 @@ function GMatchFeedImpl({
           <div
             role="group"
             aria-label="Feed layout"
-            className="flex items-center rounded-md bg-glass-w5 border border-border-glass p-0.5"
+            className="flex items-center rounded-md bg-glass-w5 border border-edge p-0.5"
           >
             {(['list', 'grid'] as const).map((layout) => (
               <button
@@ -991,7 +991,7 @@ function GMatchFeedImpl({
       {syncCounts.pending > 0 || syncCounts.local > 0 ? (
         <div
           role="status"
-          className="w-full py-1 px-3 flex items-center gap-1.5 text-2xs font-mono text-retro-muted border-b border-border-glass bg-glass-w5 select-none"
+          className="w-full py-1 px-3 flex items-center gap-1.5 text-2xs font-mono text-retro-muted border-b border-edge bg-glass-w5 select-none"
         >
           {syncCounts.pending > 0 ? (
             <>
@@ -1012,14 +1012,14 @@ function GMatchFeedImpl({
 
       {/* Discreet grey loading label when stories/content are loading */}
       {storiesLoading && (
-        <div className="w-full py-1.5 px-3 flex items-center justify-center gap-1.5 text-2xs font-mono text-retro-muted border-b border-border-glass bg-glass-w5 select-none">
+        <div className="w-full py-1.5 px-3 flex items-center justify-center gap-1.5 text-2xs font-mono text-retro-muted border-b border-edge bg-glass-w5 select-none">
           <Loader2 className="w-3 h-3 animate-spin text-retro-muted shrink-0" />
           <span>Loading content...</span>
         </div>
       )}
 
       {/* Stories Tray Carousel — below the header */}
-      <div className="bg-transparent border-b border-border-glass py-3 px-1">
+      <div className="bg-transparent border-b border-edge py-3 px-1">
         <GMatchStories
           stories={stories}
           loading={storiesLoading}
@@ -1086,10 +1086,10 @@ function GMatchFeedImpl({
             return post.is_sponsored ? (
               <article
                 key={post.id}
-                className={`bg-retro-panel border border-border-glass rounded-lg overflow-hidden flex flex-col shadow-xs mb-3 break-inside-avoid ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
+                className={`bg-retro-panel border border-edge rounded-lg overflow-hidden flex flex-col shadow-xs mb-3 break-inside-avoid ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
               >
                 {/* Sponsored Banner */}
-                <div className="bg-retro-bg px-4 py-2 flex items-center gap-2 text-xs text-retro-muted border-b border-border-glass">
+                <div className="bg-retro-bg px-4 py-2 flex items-center gap-2 text-xs text-retro-muted border-b border-edge">
                   <Sparkles className="w-3.5 h-3.5 text-retro-fg" />
                   <span>Sponsored</span>
                   <span className="ml-auto text-retro-muted">
@@ -1137,7 +1137,7 @@ function GMatchFeedImpl({
                 key={post.id}
                 data-post-id={post.id}
                 onContextMenu={(e) => { e.preventDefault(); setOptionsPost(post) }}
-                className={`cv-row relative bg-surface-raised border border-border-glass rounded-[10px] overflow-hidden flex flex-col mb-3 break-inside-avoid ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
+                className={`cv-row relative bg-surface-raised border border-edge rounded-[10px] overflow-hidden flex flex-col mb-3 break-inside-avoid ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
               >
                 {/* Repost attribution: a quiet line, not a filled band, so the
                     post reads as one media-first tile, Instagram-style. */}
@@ -1571,7 +1571,7 @@ function GMatchFeedImpl({
            )}
 
           {displayPosts.length === 0 && (
-            <div className="border border-border-glass rounded-lg p-10 text-center space-y-5 my-4 max-w-md mx-auto">
+            <div className="border border-edge rounded-lg p-10 text-center space-y-5 my-4 max-w-md mx-auto">
               <div>
                 <h2 className="text-2xl font-black tracking-tighter text-retro-fg">{emptyCopy.title}</h2>
                 <p className="text-xs text-retro-muted mt-2 leading-relaxed">
@@ -1582,7 +1582,7 @@ function GMatchFeedImpl({
                 <button
                   type="button"
                   onClick={() => { playPress(800); onForceRefresh(); }}
-                  className="px-4 py-2 text-xs font-semibold rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer inline-flex items-center gap-1.5 border border-border-glass text-retro-body hover:text-retro-fg hover:bg-glass-w10"
+                  className="px-4 py-2 text-xs font-semibold rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer inline-flex items-center gap-1.5 border border-edge text-retro-body hover:text-retro-fg hover:bg-glass-w10"
                 >
                   <RefreshCw className="w-4 h-4 stroke-[2]" />
                   <span>Reload feed</span>
@@ -1600,7 +1600,7 @@ function GMatchFeedImpl({
                 <span>Upload your first post</span>
               </button>
               {followSuggestions.length > 0 && (
-                <div className="pt-2 border-t border-border-glass">
+                <div className="pt-2 border-t border-edge">
                   <p className="text-2xs uppercase tracking-wider text-retro-muted mb-2">Or follow someone</p>
                   <div className="flex items-center justify-center gap-3">
                     {followSuggestions.map((s) => (
@@ -1611,11 +1611,11 @@ function GMatchFeedImpl({
                         className="flex flex-col items-center gap-1 cursor-pointer group"
                         aria-label={`Follow ${s.display_name || s.id}`}
                       >
-                        <span className="relative w-10 h-10 rounded-full overflow-hidden border border-border-glass flex items-center justify-center text-xs text-retro-fg bg-glass-w5">
+                        <span className="relative w-10 h-10 rounded-full overflow-hidden border border-edge flex items-center justify-center text-xs text-retro-fg bg-glass-w5">
                           <Avatar id={s.id} size={40} imageUrl={profilePics?.[s.id]} fill={true} />
                         </span>
                         <span className="text-2xs text-retro-muted truncate max-w-[72px] group-hover:text-retro-fg">{s.display_name}</span>
-                        <span className="text-2xs text-retro-fg border border-border-glass rounded-md px-1.5 py-0.5 group-hover:bg-glass-w10">Follow</span>
+                        <span className="text-2xs text-retro-fg border border-edge rounded-md px-1.5 py-0.5 group-hover:bg-glass-w10">Follow</span>
                       </button>
                     ))}
                   </div>
@@ -1628,8 +1628,8 @@ function GMatchFeedImpl({
           {displayPosts.length > 0 && hasMore !== false && (
             <div ref={sentinelRef} className="py-6 flex flex-col items-center justify-center gap-2">
               {(internalLoadingMore || isLoadingMore) ? (
-                <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-retro-panel border border-border-glass shadow-xs text-xs font-medium text-retro-fg">
-                  <span className="w-3.5 h-3.5 border-2 border-border-glass border-t-retro-fg rounded-full animate-spin" />
+                <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-retro-panel border border-edge shadow-xs text-xs font-medium text-retro-fg">
+                  <span className="w-3.5 h-3.5 border-2 border-edge border-t-retro-fg rounded-full animate-spin" />
                   <span>Loading more moments…</span>
                 </div>
               ) : (

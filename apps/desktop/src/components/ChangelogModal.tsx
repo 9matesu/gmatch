@@ -54,7 +54,7 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
         ))}
       </ul>
 
-      <div className="pt-3 border-t border-border-glass flex justify-end">
+      <div className="pt-3 border-t border-edge flex justify-end">
         <Button variant="primary" onClick={onClose}>
           Got it
         </Button>

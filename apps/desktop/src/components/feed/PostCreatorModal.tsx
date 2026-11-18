@@ -105,11 +105,11 @@ export function PostCreatorModal({
       className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 select-none animate-orbit-fade-in"
     >
       <div
-        className="bg-glass backdrop-blur-2xl text-retro-fg w-full max-w-lg rounded-xl border border-border-glass shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-orbit-slide-up"
+        className="bg-glass backdrop-blur-2xl text-retro-fg w-full max-w-lg rounded-xl border border-edge shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-orbit-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-4 border-b border-border-glass flex items-center justify-between">
+        <div className="p-4 border-b border-edge flex items-center justify-between">
           <div className="flex items-center gap-2">
             <PlusSquare className="w-5 h-5 text-retro-fg" />
             <h3 className="text-sm font-extrabold text-retro-fg">Create new post</h3>
@@ -136,7 +136,7 @@ export function PostCreatorModal({
 
             <div className="grid grid-cols-5 gap-2">
               {media.map((m, idx) => (
-                <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-border-glass bg-surface-interactive group">
+                <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-edge bg-surface-interactive group">
                   <img src={m} alt="" className="w-full h-full object-cover" />
                   <button
                     type="button"
@@ -154,7 +154,7 @@ export function PostCreatorModal({
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="aspect-square rounded-xl border-2 border-dashed border-border-glass hover:border-retro-accent text-retro-muted hover:text-retro-fg flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors"
+                    className="aspect-square rounded-xl border-2 border-dashed border-edge hover:border-retro-accent text-retro-muted hover:text-retro-fg flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors"
                     title="Upload from device"
                   >
                     <Upload className="w-4 h-4" />
@@ -168,7 +168,7 @@ export function PostCreatorModal({
                       playPress(800);
                       onOpenCamera?.();
                     }}
-                    className="aspect-square rounded-xl border border-border-glass hover:border-retro-accent bg-surface-interactive hover:bg-surface-elevated text-retro-muted hover:text-retro-fg flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors"
+                    className="aspect-square rounded-xl border border-edge hover:border-retro-accent bg-surface-interactive hover:bg-surface-elevated text-retro-muted hover:text-retro-fg flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors"
                     title="Take live photo"
                   >
                     <Camera className="w-4 h-4 text-retro-warning" />
@@ -251,17 +251,17 @@ export function PostCreatorModal({
               onChange={(e) => setCaption(e.target.value)}
               placeholder="Write a caption for your post or art piece..."
               rows={3}
-              className="w-full bg-surface-interactive border border-border-glass rounded-xl p-3 text-xs text-retro-fg outline-none focus:border-retro-accent transition-colors resize-none"
+              className="w-full bg-surface-interactive border border-edge rounded-xl p-3 text-xs text-retro-fg outline-none focus:border-retro-accent transition-colors resize-none"
             />
           </div>
         </div>
 
         {/* Footer Action */}
-        <div className="p-4 border-t border-border-glass bg-surface-interactive flex items-center justify-between gap-3">
+        <div className="p-4 border-t border-edge bg-surface-interactive flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={onClose}
-            className="py-2.5 px-4 bg-surface-raised hover:bg-surface-elevated text-retro-body border border-border-glass rounded-xl text-xs font-bold cursor-pointer"
+            className="py-2.5 px-4 bg-surface-raised hover:bg-surface-elevated text-retro-body border border-edge rounded-xl text-xs font-bold cursor-pointer"
           >
             Cancel
           </button>

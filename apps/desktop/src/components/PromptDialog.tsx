@@ -34,7 +34,7 @@ export function PromptDialog({
         onKeyDown={(e) => {
           if (e.key === 'Enter' && value.trim()) onSubmit(value.trim())
         }}
-        className="w-full bg-glass-w5 border border-border-glass rounded-lg px-3 py-2 text-xs font-mono text-retro-fg outline-none focus:border-retro-accent"
+        className="w-full bg-glass-w5 border border-edge rounded-lg px-3 py-2 text-xs font-mono text-retro-fg outline-none focus:border-retro-accent"
       />
       <div className="flex justify-end gap-2">
         <Button variant="ghost" onClick={onCancel}>

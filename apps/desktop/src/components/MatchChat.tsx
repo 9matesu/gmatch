@@ -61,7 +61,7 @@ export function MatchChat({ matchId, selfId, messages, onSend, onLoad, soundEnab
   const list = messages || []
 
   return (
-    <div className="border border-border-glass rounded-xl overflow-hidden bg-surface-raised shadow-xs font-sans">
+    <div className="border border-edge rounded-xl overflow-hidden bg-surface-raised shadow-xs font-sans">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -78,7 +78,7 @@ export function MatchChat({ matchId, selfId, messages, onSend, onLoad, soundEnab
       </button>
 
       {open && (
-        <div className="border-t border-border-glass">
+        <div className="border-t border-edge">
           <div ref={scrollRef} className="max-h-40 overflow-y-auto styled-scrollbar p-2.5 space-y-2 bg-surface-raised select-text">
             {list.length === 0 ? (
               <div className="text-center text-xs text-retro-muted py-3 select-none">
@@ -93,7 +93,7 @@ export function MatchChat({ matchId, selfId, messages, onSend, onLoad, soundEnab
                       className={`max-w-[85%] px-3 py-1.5 rounded-xl text-xs shadow-xs select-text ${
                         mine
                           ? 'bg-retro-accent text-retro-accent-text rounded-br-xs'
-                          : 'bg-surface-interactive text-retro-fg border border-border-glass rounded-bl-xs'
+                          : 'bg-surface-interactive text-retro-fg border border-edge rounded-bl-xs'
                       }`}
                     >
                       {!mine && (
@@ -111,7 +111,7 @@ export function MatchChat({ matchId, selfId, messages, onSend, onLoad, soundEnab
               })
             )}
           </div>
-          <div className="flex gap-1.5 p-2 border-t border-border-glass bg-surface-raised">
+          <div className="flex gap-1.5 p-2 border-t border-edge bg-surface-raised">
             <input
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
@@ -122,7 +122,7 @@ export function MatchChat({ matchId, selfId, messages, onSend, onLoad, soundEnab
                 }
               }}
               placeholder="Send a message to your opponent..."
-              className="flex-1 bg-surface-interactive border border-border-glass text-retro-fg placeholder:text-retro-muted text-xs px-3 py-1.5 rounded-xl outline-none focus:border-chrome-lav transition-colors"
+              className="flex-1 bg-surface-interactive border border-edge text-retro-fg placeholder:text-retro-muted text-xs px-3 py-1.5 rounded-xl outline-none focus:border-chrome-lav transition-colors"
             />
             <button
               type="button"

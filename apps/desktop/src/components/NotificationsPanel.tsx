@@ -144,7 +144,7 @@ export function NotificationsPanel({
 
   return (
     <div className={`flex flex-col h-full min-h-0 overflow-hidden ${embedded ? 'bg-transparent' : 'solid-panel'}`}>
-      <div className="px-3 py-2 border-b border-border-glass flex items-center justify-between shrink-0 bg-glass-w5">
+      <div className="px-3 py-2 border-b border-edge flex items-center justify-between shrink-0 bg-glass-w5">
         <span className="flex items-center gap-1.5 text-xs font-medium text-retro-fg">
           <Bell className="w-3.5 h-3.5" />
           Notifications
@@ -183,7 +183,7 @@ export function NotificationsPanel({
         </div>
       </div>
       {unreadBreakdown && (
-        <div className="px-3 py-1.5 text-2xs text-retro-muted border-b border-border-glass shrink-0">
+        <div className="px-3 py-1.5 text-2xs text-retro-muted border-b border-edge shrink-0">
           {unreadBreakdown}
         </div>
       )}
@@ -320,8 +320,8 @@ export function NotificationsPanel({
                 } : undefined}
                 className={`p-3 rounded-lg flex items-start gap-3 border ${
                   g.unread === 0
-                    ? "border-border-glass bg-glass-w5"
-                    : "glass-inset border-border-glass"
+                    ? "border-edge bg-glass-w5"
+                    : "glass-inset border-edge"
                 }${actionable ? ' cursor-pointer hover:bg-glass-w8 transition-colors' : ''}`}
               >
                 <div className="w-8 h-8 rounded-full glass-inset flex items-center justify-center shrink-0">
@@ -360,7 +360,7 @@ export function NotificationsPanel({
                       <button
                         type="button"
                         onClick={() => { onRespondBabecock?.(inviteId, false); }}
-                        className="px-2.5 py-1.5 rounded bg-surface-interactive border border-border-glass text-retro-body text-xs font-medium cursor-pointer"
+                        className="px-2.5 py-1.5 rounded bg-surface-interactive border border-edge text-retro-body text-xs font-medium cursor-pointer"
                       >
                         Decline
                       </button>
