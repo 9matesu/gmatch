@@ -1,6 +1,7 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { Modal } from '../ui/kit'
 
 type ConfirmOptions = {
   title?: string
@@ -33,8 +34,14 @@ const DEFAULTS: Required<ConfirmOptions> = {
   tone: 'default',
 }
 
+/**
+ * The promise confirm. The shell is the shared `Modal` (ui/kit), so this keeps
+ * the focus trap, Escape and the focus restore instead of re-implementing them:
+ * the old backdrop was a hand-rolled div with its own `role="dialog"`.
+ */
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
   const [pending, setPending] = useState<Pending | null>(null)
+  const cancelRef = useRef<HTMLButtonElement>(null)
 
   const confirm = useCallback<ConfirmContextValue>((opts) => {
     const id = Date.now()
@@ -50,12 +57,11 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
     })
   }, [])
 
-  // Keyboard: Enter confirms, Escape cancels.
+  // Enter confirms; Escape is the Modal's (it closes via onClose -> settle(false)).
   useEffect(() => {
     if (!pending) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Enter') { e.preventDefault(); settle(true) }
-      else if (e.key === 'Escape') { e.preventDefault(); settle(false) }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -65,46 +71,39 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
     <Ctx.Provider value={confirm}>
       {children}
       {pending && (
-        <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-orbit-fade-in">
-          <div
-            className="bg-retro-panel border border-edge rounded-lg p-5 w-[380px] max-w-[90vw] shadow-2xl animate-orbit-pop"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="confirm-title"
-          >
-            <h2 id="confirm-title" className="font-semibold text-sm text-retro-fg mb-1.5">
-              {pending.options.title}
-            </h2>
-            {pending.options.description && (
-              <p className="text-xs text-retro-body leading-relaxed mb-4">
-                {pending.options.description}
-              </p>
-            )}
-            <div className="flex items-center justify-end gap-2 mt-5">
-              <button
-                type="button"
-                autoFocus
-                onClick={() => settle(false)}
-                className="px-3 py-1.5 text-xs font-medium border border-edge rounded-md text-retro-fg hover:bg-glass-w12 hover:text-retro-fg transition duration-150 active:scale-(--scale-press-sm) cursor-pointer"
-              >
-                {pending.options.cancelLabel}
-              </button>
-              <button
-                type="button"
-                onClick={() => settle(true)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition duration-150 active:scale-(--scale-press-sm) shadow-xs cursor-pointer ${
-                  pending.options.tone === 'danger'
-                    ? 'border border-danger/30 text-danger-fg bg-danger/15 hover:bg-danger/25'
-                    : pending.options.tone === 'accent'
-                      ? 'bg-retro-accent text-retro-bg hover:bg-retro-fg'
-                      : 'bg-retro-accent text-retro-bg hover:bg-retro-fg'
-                }`}
-              >
-                {pending.options.confirmLabel}
-              </button>
-            </div>
+        <Modal
+          title={pending.options.title}
+          onClose={() => settle(false)}
+          maxWidth="max-w-[380px]"
+          initialFocusRef={cancelRef}
+        >
+          {pending.options.description && (
+            <p className="text-xs text-retro-body leading-relaxed">
+              {pending.options.description}
+            </p>
+          )}
+          <div className="flex items-center justify-end gap-2 pt-1">
+            <button
+              ref={cancelRef}
+              type="button"
+              onClick={() => settle(false)}
+              className="px-3 py-1.5 text-xs font-medium border border-edge rounded-md text-retro-fg hover:bg-glass-w12 transition duration-150 active:scale-(--scale-press-sm) cursor-pointer"
+            >
+              {pending.options.cancelLabel}
+            </button>
+            <button
+              type="button"
+              onClick={() => settle(true)}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition duration-150 active:scale-(--scale-press-sm) cursor-pointer ${
+                pending.options.tone === 'danger'
+                  ? 'border border-danger/30 text-danger-fg bg-danger/15 hover:bg-danger/25'
+                  : 'bg-retro-accent text-retro-bg hover:bg-retro-fg'
+              }`}
+            >
+              {pending.options.confirmLabel}
+            </button>
           </div>
-        </div>
+        </Modal>
       )}
     </Ctx.Provider>
   )
