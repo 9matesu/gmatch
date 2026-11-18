@@ -387,7 +387,7 @@ heat streak). Each +5% click power. Persist across prestige.
 - Symmetric-NAT pairs (which STUN cannot traverse) fall back to the sealed
   WS-relay swarm; the UI reports the real path.
 - Wave 2 (masks): peers address each other ONLY through delivery tokens
-  rendered as `handle.gmatch.com/<token>` (`utils/maskAdapter.ts`); tokens
+  rendered as `gmatch://node/...` codes (`utils/nodeMask.ts`); tokens
   rotate per boot (`utils/handleRotation.ts`, epoch travels sealed inside
   dm/ack bodies). Node coordinates share as `gmatch://node/...` codes
   (`utils/nodeMask.ts`) and the directory gossips through the node you are
