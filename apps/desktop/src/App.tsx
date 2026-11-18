@@ -1,4 +1,5 @@
 
+import { useCardForge } from "./hooks/useCardForge";
 import { useBatchDownload } from "./hooks/useBatchDownload";
 import { useStories } from "./hooks/useStories";
 import { useIdentity } from "./hooks/useIdentity";
@@ -565,17 +566,9 @@ export default function Home() {
     // mount-once handler: handleSetMainView identity is stable enough here
   }, [handleSetMainView]);
 
-  const openCreateCardModal = () => {
-    setCreateCardNeeded(Math.max(0, MIN_GAME_CARDS - myCards.length))
-    setCardPrefill(null)
-    setShowCreateCardModal(true)
-  }
+  const openCreateCardModal = () => openForge({ needed: Math.max(0, MIN_GAME_CARDS - myCards.length) })
 
-  const openCreateCardWithMedia = (media: { url: string; tags: string[]; name: string }) => {
-    setCreateCardNeeded(0)
-    setCardPrefill(media)
-    setShowCreateCardModal(true)
-  }
+  const openCreateCardWithMedia = (media: { url: string; tags: string[]; name: string }) => openForge({ prefill: media })
 
   // Resolve a gallery object to its canonical card id so card detail (and
   // cashout) opens for the user's own cards.
@@ -1168,10 +1161,7 @@ export default function Home() {
   const [gallerySort, setGallerySort] = useState<'newest' | 'oldest' | 'likes' | 'score'>('newest');
   const [transferProgress, setTransferProgress] = useState<string | null>(null);
   const [showStoryModal, setShowStoryModal] = useState(false)
-  const [showCreateCardModal, setShowCreateCardModal] = useState(false)
-  const [createCardNeeded, setCreateCardNeeded] = useState(0)
-  const [cardPrefill, setCardPrefill] = useState<{ url: string; tags: string[]; name: string } | null>(null)
-  const [forgeFile, setForgeFile] = useState<File | null>(null)
+  const { isOpen: showCreateCardModal, needed: createCardNeeded, prefill: cardPrefill, file: forgeFile, openForge, closeForge, updateForge } = useCardForge()
   const [dragAnchorId, setDragAnchorId] = useState<string | null>(null)
   const [dragActive, setDragActive] = useState(false)
   // Root card-detail host (plan §12): any view dispatches 'gmatch:open-card'
@@ -1197,9 +1187,7 @@ export default function Home() {
       const f = e.dataTransfer?.files?.[0]
       if (!f || !(/^image\//.test(f.type) || /^video\//.test(f.type))) return
       e.preventDefault()
-      setForgeFile(f)
-      setCardPrefill(null)
-      setShowCreateCardModal(true)
+      openForge({ file: f })
       playPress(820)
     }
     window.addEventListener('dragover', allow)
@@ -4041,7 +4029,7 @@ export default function Home() {
                       setDragActive={setDragActive}
                       dragAnchorId={dragAnchorId}
                       setDragAnchorId={setDragAnchorId}
-                      onOpenCreateCard={() => setShowCreateCardModal(true)}
+                      onOpenCreateCard={openCreateCardModal}
                       onCreateCardFromMedia={openCreateCardWithMedia}
                       onItemContextMenu={(e, item) => openContextMenu('item', item)(e)}
                       onSetWallpaper={handleSetWallpaper}
@@ -4586,10 +4574,9 @@ export default function Home() {
           cardsNeeded={createCardNeeded}
           initialMedia={cardPrefill}
           initialFile={forgeFile}
-          onClose={() => { setShowCreateCardModal(false); setCardPrefill(null); setForgeFile(null); }}
+          onClose={closeForge}
           onCreated={() => {
-            setCreateCardNeeded(Math.max(0, MIN_GAME_CARDS - (myCards.length + 1)))
-            setForgeFile(null)
+            updateForge({ needed: Math.max(0, MIN_GAME_CARDS - (myCards.length + 1)), file: null })
             toast('Card created.', 'success')
           }}
         />
