@@ -224,7 +224,7 @@ export function ThemeDrawer({ isOpen, onClose, settings, updateSettings, toast }
       {/* Custom Upload & Direct URL */}
       <div className="space-y-2 pt-1 border-t border-edge">
         <div className="flex items-center gap-2">
-          <label className="flex-1 border border-edge hover:border-retro-muted rounded-xl bg-surface-interactive/40 hover:bg-surface-interactive px-3 py-2 flex items-center justify-center gap-2 cursor-pointer transition-all">
+          <label className="flex-1 border border-edge hover:border-retro-muted rounded-xl bg-surface-interactive/40 hover:bg-surface-interactive px-3 py-2 flex items-center justify-center gap-2 cursor-pointer transition">
             <Upload className="w-3.5 h-3.5 text-retro-muted" />
             <span className="text-xs font-medium text-retro-body">Upload Image / Video</span>
             <input type="file" accept="image/*,video/*" onChange={handleWallpaperFile} className="hidden" />
@@ -259,7 +259,7 @@ export function ThemeDrawer({ isOpen, onClose, settings, updateSettings, toast }
               key={fit}
               type="button"
               onClick={() => { playPress(750); updateSettings('wallpaperFit', fit); }}
-              className={`px-2 py-0.5 rounded capitalize text-2xs font-medium transition-all cursor-pointer ${
+              className={`px-2 py-0.5 rounded capitalize text-2xs font-medium transition cursor-pointer ${
                 settings.wallpaperFit === fit
                   ? 'bg-retro-accent text-retro-accent-text font-bold'
                   : 'text-retro-muted hover:text-retro-fg'
@@ -276,7 +276,7 @@ export function ThemeDrawer({ isOpen, onClose, settings, updateSettings, toast }
             playPress(800);
             updateSettings('wallpaperSlideshow', !settings.wallpaperSlideshow);
           }}
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-2xs font-medium transition-all cursor-pointer ${
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-2xs font-medium transition cursor-pointer ${
             settings.wallpaperSlideshow
               ? 'bg-retro-accent text-retro-accent-text border-transparent font-bold'
               : 'bg-surface-interactive/40 border-edge-subtle text-retro-muted hover:text-retro-fg'

@@ -307,7 +307,7 @@ export function MatchRoundPanel({
         <div className="flex flex-col gap-1">
           <div className="h-1 w-full bg-surface-interactive border border-edge rounded-full overflow-hidden">
             <div
-              className={`h-full transition-all duration-700 ease-linear ${isResult ? 'bg-retro-muted' : msLeft <= 10000 ? 'bg-danger' : 'bg-retro-accent'}`}
+              className={`h-full transition duration-700 ease-linear ${isResult ? 'bg-retro-muted' : msLeft <= 10000 ? 'bg-danger' : 'bg-retro-accent'}`}
               style={{ width: `${isResult ? 100 : pct}%` }}
             />
           </div>
@@ -478,7 +478,7 @@ export function MatchRoundPanel({
                             key={card.id}
                             disabled={isAlreadyPlayed}
                             onClick={() => !isAlreadyPlayed && setSelectedCard(card.id)}
-                            className={`relative aspect-square overflow-hidden border-2 transition-all rounded ${rarity.borderClass} ${isAlreadyPlayed
+                            className={`relative aspect-square overflow-hidden border-2 transition rounded ${rarity.borderClass} ${isAlreadyPlayed
                                 ? 'opacity-30 grayscale cursor-not-allowed border-edge'
                                 : selectedCard === card.id
                                   ? 'border-retro-fg ring-2 ring-retro-fg/30'
@@ -578,7 +578,7 @@ export function MatchRoundPanel({
               return (
                 <div className="space-y-1 text-center">
                   <div
-                    className={`metallic-card-border w-full aspect-[3/4.2] mx-auto select-none transition-all ${
+                    className={`metallic-card-border w-full aspect-[3/4.2] mx-auto select-none transition ${
                       isRoundResult && match.matched ? 'ring-2 ring-success shadow-2xl' : ''
                     } ${myPlayedImg.url ? 'cursor-pointer' : ''}`}
                     data-rarity={myRarity.rarity}
@@ -675,7 +675,7 @@ export function MatchRoundPanel({
               return (
                 <div className="space-y-1 text-center">
                   <div
-                    className={`metallic-card-border w-full aspect-[3/4.2] mx-auto select-none transition-all ${
+                    className={`metallic-card-border w-full aspect-[3/4.2] mx-auto select-none transition ${
                       isRoundResult && match.matched ? 'ring-2 ring-success shadow-2xl' : ''
                     } ${oppUrl || oppCardId ? 'cursor-pointer hover:opacity-80' : ''}`}
                     data-rarity={oppRarity.rarity}

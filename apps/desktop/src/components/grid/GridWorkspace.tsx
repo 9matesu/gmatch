@@ -127,7 +127,7 @@ export default function GridWorkspace({
                   onClick={() => { playPress(750); setGalleryOpen(true); }}
                   title="Keepsakes Gallery (drained foes)"
                   aria-label="Keepsakes Gallery"
-                  className="h-7 px-2 rounded-md border border-edge bg-glass-w8 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong transition-all cursor-pointer flex items-center gap-1.5 text-xs font-medium"
+                  className="h-7 px-2 rounded-md border border-edge bg-glass-w8 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong transition cursor-pointer flex items-center gap-1.5 text-xs font-medium"
                 >
                   <Images size={14} weight="bold" className="text-retro-accent" />
                   <span className="hidden sm:inline">Gallery</span>
@@ -137,7 +137,7 @@ export default function GridWorkspace({
                   onClick={() => { playPress(720); setBrowserOpen(true); }}
                   title="Browse images by owned tag"
                   aria-label="Browse by tag"
-                  className="h-7 px-2 rounded-md border border-edge bg-glass-w8 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong transition-all cursor-pointer flex items-center gap-1.5 text-xs font-medium"
+                  className="h-7 px-2 rounded-md border border-edge bg-glass-w8 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong transition cursor-pointer flex items-center gap-1.5 text-xs font-medium"
                 >
                   <MagnifyingGlass size={14} weight="bold" className="text-retro-accent" />
                   <span className="hidden sm:inline">Browse</span>
@@ -148,7 +148,7 @@ export default function GridWorkspace({
                     onClick={() => { playPress(700); onOpenSources(); }}
                     title="Custom image sources: add your own URLs or folders"
                     aria-label="Custom image sources"
-                    className="h-7 px-2 rounded-md border border-edge bg-glass-w8 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong transition-all cursor-pointer flex items-center gap-1.5 text-xs font-medium"
+                    className="h-7 px-2 rounded-md border border-edge bg-glass-w8 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong transition cursor-pointer flex items-center gap-1.5 text-xs font-medium"
                   >
                     <FolderOpen size={14} weight="bold" />
                     <span className="hidden sm:inline">Sources</span>
@@ -161,7 +161,7 @@ export default function GridWorkspace({
                     title={idleFullscreen ? 'Exit fullscreen' : 'Play fullscreen'}
                     aria-label={idleFullscreen ? 'Exit fullscreen' : 'Play fullscreen'}
                     aria-pressed={idleFullscreen}
-                    className={`h-7 w-7 rounded-md border transition-all cursor-pointer flex items-center justify-center ${idleFullscreen
+                    className={`h-7 w-7 rounded-md border transition cursor-pointer flex items-center justify-center ${idleFullscreen
                       ? 'border-retro-accent/60 bg-retro-accent/20 text-retro-accent'
                       : 'border-edge bg-glass-w8 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong'
                       }`}
@@ -175,7 +175,7 @@ export default function GridWorkspace({
                   title={collapsed ? 'Show tags & shop' : 'Maximize game stage (hide side column)'}
                   aria-label={collapsed ? 'Show tags & shop' : 'Maximize game stage'}
                   aria-pressed={collapsed}
-                  className={`h-7 w-7 rounded-md border transition-all cursor-pointer flex items-center justify-center ${collapsed
+                  className={`h-7 w-7 rounded-md border transition cursor-pointer flex items-center justify-center ${collapsed
                     ? 'border-retro-accent/60 bg-retro-accent/20 text-retro-accent'
                     : 'border-edge bg-glass-w8 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong'
                     }`}
@@ -236,7 +236,7 @@ export default function GridWorkspace({
               <button
                 type="button"
                 onClick={() => setGalleryOpen(false)}
-                className="flex h-7 w-7 items-center justify-center rounded-lg border border-edge bg-glass-w5 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong transition-all cursor-pointer"
+                className="flex h-7 w-7 items-center justify-center rounded-lg border border-edge bg-glass-w5 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong transition cursor-pointer"
                 aria-label="Close gallery"
               >
                 <X size={14} weight="bold" />
@@ -282,7 +282,7 @@ export default function GridWorkspace({
               <button
                 type="button"
                 onClick={() => setBrowserOpen(false)}
-                className="flex h-7 w-7 items-center justify-center rounded-lg border border-edge bg-glass-w5 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong transition-all cursor-pointer"
+                className="flex h-7 w-7 items-center justify-center rounded-lg border border-edge bg-glass-w5 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong transition cursor-pointer"
                 aria-label="Close tag browser"
               >
                 <X size={14} weight="bold" />

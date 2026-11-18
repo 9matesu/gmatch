@@ -100,7 +100,7 @@ function PlayerTile({
     <div
       onClick={handleClick}
       title={`View ${player.display_name || 'player'}'s profile`}
-      className={`relative aspect-[5/4] overflow-hidden rounded-lg border cursor-pointer group transition-all bg-surface-canvas ${
+      className={`relative aspect-[5/4] overflow-hidden rounded-lg border cursor-pointer group transition bg-surface-canvas ${
         isPlaying
           ? 'border-retro-accent/60'
           : player.queueStatus === 'in_queue'

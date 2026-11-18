@@ -218,7 +218,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
               type="button"
               onClick={() => setActiveSubTab(tab.id)}
               className={cn(
-                "px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer",
+                "px-3 py-1.5 text-xs font-bold rounded-lg transition flex items-center gap-1.5 cursor-pointer",
                 active
                   ? "bg-retro-accent text-retro-accent-text shadow-sm"
                   : "text-retro-muted hover:text-retro-fg"

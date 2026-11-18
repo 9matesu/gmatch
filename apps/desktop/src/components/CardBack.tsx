@@ -27,7 +27,7 @@ export function CardBack({ label, className = '', ticking = false }: CardBackPro
       />
 
       {/* Pulsing Border Glow during ticking / picking */}
-      <div className={`absolute inset-1.5 border-2 rounded-xl pointer-events-none transition-all duration-700 ${
+      <div className={`absolute inset-1.5 border-2 rounded-xl pointer-events-none transition duration-700 ${
         isTicking
           ? 'border-chrome-lav/0 animate-pulse'
           : 'border-edge'

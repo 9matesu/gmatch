@@ -198,7 +198,7 @@ export function LegalCenter({
           <button
             type="button"
             onClick={() => { playPress(750); markLegalAccepted(); onAccept?.(); if (!onAccept) onClose() }}
-            className="px-4 py-2 bg-retro-accent hover:bg-retro-fg text-retro-accent-text font-semibold text-xs rounded-lg transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
+            className="px-4 py-2 bg-retro-accent hover:bg-retro-fg text-retro-accent-text font-semibold text-xs rounded-lg transition cursor-pointer shadow-sm flex items-center gap-1.5"
           >
             <Check className="w-3.5 h-3.5" /> I Accept the Terms
           </button>

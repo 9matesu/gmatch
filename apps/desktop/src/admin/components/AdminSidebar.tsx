@@ -84,7 +84,7 @@ export function AdminSidebar({
                     type="button"
                     onClick={() => onTabChange(tab.id)}
                     className={cn(
-                      "w-full flex items-center justify-between px-3 py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer",
+                      "w-full flex items-center justify-between px-3 py-2.5 text-xs font-bold rounded-lg transition cursor-pointer",
                       active
                         ? "bg-retro-accent/15 text-retro-accent border border-retro-accent/30"
                         : "text-retro-muted hover:text-retro-fg hover:bg-glass-w5 border border-transparent"

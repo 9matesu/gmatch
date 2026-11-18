@@ -107,7 +107,7 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
               type="button"
               onClick={() => removeCustomSource(s.id)}
               aria-label={`Remove ${s.label}`}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-transparent text-retro-muted hover:text-retro-error hover:border-retro-error/30 hover:bg-retro-error/10 transition-all cursor-pointer"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-transparent text-retro-muted hover:text-retro-error hover:border-retro-error/30 hover:bg-retro-error/10 transition cursor-pointer"
             >
               <Trash size={14} weight="bold" />
             </button>

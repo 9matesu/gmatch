@@ -592,7 +592,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
             <>
               <button
                 type="button"
-                className="icon-btn absolute left-2 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-retro-fg/80 border border-edge backdrop-blur-md hover:bg-retro-accent/15 hover:text-retro-fg hover:border-edge transition-all duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
+                className="icon-btn absolute left-2 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-retro-fg/80 border border-edge backdrop-blur-md hover:bg-retro-accent/15 hover:text-retro-fg hover:border-edge transition duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
                 aria-label="Previous image"
                 title={canGridBack ? 'Back to the previous board' : 'Nothing behind you yet'}
                 disabled={!canGridBack}
@@ -602,7 +602,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               </button>
               <button
                 type="button"
-                className="icon-btn absolute right-2 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-retro-fg/80 border border-edge backdrop-blur-md hover:bg-retro-accent/15 hover:text-retro-fg hover:border-edge transition-all duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
+                className="icon-btn absolute right-2 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-retro-fg/80 border border-edge backdrop-blur-md hover:bg-retro-accent/15 hover:text-retro-fg hover:border-edge transition duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
                 aria-label="Next image"
                 title="Skip this round. No reward"
                 onClick={() => skipGrid()}
@@ -708,7 +708,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           )}
           <button
             type="button"
-            className="icon-btn absolute left-3 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-retro-fg/80 border border-edge backdrop-blur-md hover:bg-retro-accent/15 hover:text-retro-fg hover:border-edge transition-all duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
+            className="icon-btn absolute left-3 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-retro-fg/80 border border-edge backdrop-blur-md hover:bg-retro-accent/15 hover:text-retro-fg hover:border-edge transition duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
             aria-label="Previous image"
             title={canGoBack ? 'Back to the skipped foe' : 'Nothing behind you yet'}
             disabled={!canGoBack}
@@ -721,7 +721,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           </button>
           <button
             type="button"
-            className="icon-btn absolute right-3 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-retro-fg/80 border border-edge backdrop-blur-md hover:bg-retro-accent/15 hover:text-retro-fg hover:border-edge transition-all duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
+            className="icon-btn absolute right-3 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-retro-fg/80 border border-edge backdrop-blur-md hover:bg-retro-accent/15 hover:text-retro-fg hover:border-edge transition duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
             aria-label="Next image"
             title="Skip this foe. No reward"
             onClick={(e) => {
@@ -733,7 +733,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           </button>
           <button
             type="button"
-            className="icon-btn absolute right-3 top-3 z-[6] flex h-8 w-8 items-center justify-center rounded-xl bg-black/60 text-retro-fg/70 border border-edge backdrop-blur-md hover:bg-danger/0 hover:text-retro-fg hover:border-danger/0 transition-all duration-150 active:scale-95 cursor-pointer"
+            className="icon-btn absolute right-3 top-3 z-[6] flex h-8 w-8 items-center justify-center rounded-xl bg-black/60 text-retro-fg/70 border border-edge backdrop-blur-md hover:bg-danger/0 hover:text-retro-fg hover:border-danger/0 transition duration-150 active:scale-95 cursor-pointer"
             aria-label="Never show this again"
             title="Purge. This image and its rarest tags never return"
             hidden={!current}
@@ -832,7 +832,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           <div className="flex min-w-0 flex-1 items-center gap-2.5" title={`${Math.ceil(foeHp)} / ${foeMaxHp} HP`}>
             <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-black/60 border border-edge">
               <div
-                className={`h-full rounded-full transition-all duration-150 ${hpPct <= 30 ? 'bg-gradient-to-r from-rose-500 to-amber-500' : 'bg-gradient-to-r from-emerald-500 to-teal-400'}`}
+                className={`h-full rounded-full transition duration-150 ${hpPct <= 30 ? 'bg-gradient-to-r from-rose-500 to-amber-500' : 'bg-gradient-to-r from-emerald-500 to-teal-400'}`}
                 style={{ width: `${hpPct}%` }}
               />
             </div>

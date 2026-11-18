@@ -221,7 +221,7 @@ export function ProfilePicModal({
               <button
                 type="button"
                 onClick={() => void pickMedia()}
-                className="w-full border-2 border-dashed border-edge hover:border-retro-accent rounded-xl bg-surface-interactive hover:bg-glass-w10 p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all text-center group"
+                className="w-full border-2 border-dashed border-edge hover:border-retro-accent rounded-xl bg-surface-interactive hover:bg-glass-w10 p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition text-center group"
               >
                 <FolderOpen className="w-7 h-7 text-retro-muted group-hover:text-retro-accent transition-colors" />
                 <p className="text-xs font-bold text-retro-body">Choose from your media, upload, or paste a URL</p>

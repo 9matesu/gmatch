@@ -292,7 +292,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
                      onClick={() => void handleSendDirectShare(fId, name)}
                     disabled={isSent || isPending || !identity}
                     title={!identity ? 'Log in to share' : undefined}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all disabled:cursor-not-allowed ${
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition disabled:cursor-not-allowed ${
                       isSent
                         ? 'bg-surface-interactive text-retro-muted border border-edge'
                         : 'bg-retro-bg hover:bg-surface-elevated text-retro-fg disabled:opacity-40'
@@ -332,7 +332,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
                         onClick={() => void handleSendGroupShare(g.id, g.name)}
                         disabled={isSent || isPending || !identity}
                         title={!identity ? 'Log in to share' : undefined}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all disabled:cursor-not-allowed ${
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition disabled:cursor-not-allowed ${
                           isSent
                             ? 'bg-surface-interactive text-retro-muted border border-edge'
                             : 'bg-retro-bg hover:bg-surface-elevated text-retro-fg disabled:opacity-40'

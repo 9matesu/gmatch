@@ -129,7 +129,7 @@ export function DropZone({
       onPaste={handlePasteEvent}
        onClick={() => clickToBrowse && !disabled && inputRef.current?.click()}
 
-        className={bare ? `${className || ''} relative outline-none ${dragOver ? 'bg-retro-accent/5 ring-1 ring-inset ring-retro-accent/50' : ''}` : `${className || ''} relative border-2 border-dashed text-center transition-all cursor-pointer outline-none focus:border-retro-accent ${
+        className={bare ? `${className || ''} relative outline-none ${dragOver ? 'bg-retro-accent/5 ring-1 ring-inset ring-retro-accent/50' : ''}` : `${className || ''} relative border-2 border-dashed text-center transition cursor-pointer outline-none focus:border-retro-accent ${
          compact ? 'p-3' : 'p-6'
        } ${
          disabled

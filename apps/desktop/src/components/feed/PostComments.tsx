@@ -271,7 +271,7 @@ export function PostComments({
             type="button"
             onClick={handleSendComment}
             disabled={!commentInput.trim()}
-            className="px-4 py-2 bg-retro-accent text-retro-bg hover:bg-retro-fg disabled:opacity-40 rounded-md text-xs font-semibold cursor-pointer transition-all duration-150 active:scale-[0.96] shadow-xs"
+            className="px-4 py-2 bg-retro-accent text-retro-bg hover:bg-retro-fg disabled:opacity-40 rounded-md text-xs font-semibold cursor-pointer transition duration-150 active:scale-[0.96] shadow-xs"
           >
             {replyTo ? 'Reply' : 'Post'}
           </button>

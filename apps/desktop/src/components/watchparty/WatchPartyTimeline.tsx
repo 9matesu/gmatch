@@ -243,15 +243,15 @@ export function WatchPartyTimeline({
         onMouseLeave={() => setHoverTime(null)}
         className="relative w-full h-4 flex items-center cursor-pointer group/scrub"
       >
-        <div className="w-full h-1 group-hover/scrub:h-1.5 rounded-full bg-glass-w20 overflow-hidden transition-all duration-150">
+        <div className="w-full h-1 group-hover/scrub:h-1.5 rounded-full bg-glass-w20 overflow-hidden transition duration-150">
           <div
-            className="h-full bg-glass-w20 rounded-full transition-all duration-150"
+            className="h-full bg-glass-w20 rounded-full transition duration-150"
             style={{ width: `${bufferedPct}%` }}
           />
         </div>
 
         <div
-          className="absolute left-0 top-1/2 -translate-y-1/2 h-1 group-hover/scrub:h-1.5 rounded-full bg-retro-accent pointer-events-none transition-all duration-150"
+          className="absolute left-0 top-1/2 -translate-y-1/2 h-1 group-hover/scrub:h-1.5 rounded-full bg-retro-accent pointer-events-none transition duration-150"
           style={{ width: `${progressPct}%` }}
         />
 

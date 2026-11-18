@@ -252,7 +252,7 @@ export function LiveCameraModal({
               <button
                 type="button"
                 onClick={handleConfirmPhoto}
-                className="flex-1 py-3 bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text rounded-xl text-xs font-black flex items-center justify-center gap-2 cursor-pointer transition-all shadow-md"
+                className="flex-1 py-3 bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text rounded-xl text-xs font-black flex items-center justify-center gap-2 cursor-pointer transition shadow-md"
               >
                 <Check className="w-4 h-4" />
                 <span>Attach to Post</span>

@@ -563,7 +563,7 @@ export function NativeVideoPlayer({
             type="button"
             onClick={togglePlay}
             aria-label="Play video"
-            className="pointer-events-auto w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-black/60 hover:bg-black/85 backdrop-blur-md border border-edge text-retro-fg flex items-center justify-center shadow-2xl transition-all duration-150 hover:scale-110 active:scale-95 group/btn cursor-pointer"
+            className="pointer-events-auto w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-black/60 hover:bg-black/85 backdrop-blur-md border border-edge text-retro-fg flex items-center justify-center shadow-2xl transition duration-150 hover:scale-110 active:scale-95 group/btn cursor-pointer"
           >
             <Play className="w-7 h-7 sm:w-8 sm:h-8 fill-white text-retro-fg translate-x-0.5 group-hover/btn:text-retro-accent group-hover/btn:fill-retro-accent transition-colors" />
           </button>
@@ -617,15 +617,15 @@ export function NativeVideoPlayer({
             onMouseLeave={() => setHoverTime(null)}
             className="relative w-full h-4 flex items-center cursor-pointer group/scrub"
           >
-            <div className="w-full h-1 group-hover/scrub:h-2 rounded-full bg-glass-w20 overflow-hidden transition-all duration-150">
+            <div className="w-full h-1 group-hover/scrub:h-2 rounded-full bg-glass-w20 overflow-hidden transition duration-150">
               <div
-                className="h-full bg-glass-w20 rounded-full transition-all duration-150"
+                className="h-full bg-glass-w20 rounded-full transition duration-150"
                 style={{ width: `${bufferedPct}%` }}
               />
             </div>
 
             <div
-              className="absolute left-0 top-1/2 -translate-y-1/2 h-1 group-hover/scrub:h-2 rounded-full bg-retro-accent pointer-events-none transition-all duration-150"
+              className="absolute left-0 top-1/2 -translate-y-1/2 h-1 group-hover/scrub:h-2 rounded-full bg-retro-accent pointer-events-none transition duration-150"
               style={{ width: `${progressPct}%` }}
             />
 

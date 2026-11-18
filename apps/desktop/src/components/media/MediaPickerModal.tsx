@@ -241,7 +241,7 @@ export function MediaPickerPanel({
         setPane(p);
         setError(null);
       }}
-      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
+      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition cursor-pointer ${
         pane === p ? 'bg-glass-w12 text-retro-fg' : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8'
       }`}
     >
@@ -310,7 +310,7 @@ export function MediaPickerPanel({
                         key={g.id}
                         type="button"
                         onClick={() => void pickKeep(g)}
-                        className={`relative aspect-square rounded-lg overflow-hidden border transition-all bg-glass-w8 ${
+                        className={`relative aspect-square rounded-lg overflow-hidden border transition bg-glass-w8 ${
                           unresolvable
                             ? 'border-edge opacity-50 cursor-not-allowed'
                             : busyKeepId === g.id
@@ -380,7 +380,7 @@ export function MediaPickerPanel({
                 setDragOver(false);
                 takeFile(e.dataTransfer.files?.[0], 'upload');
               }}
-              className={`border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer text-center transition-all ${
+              className={`border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer text-center transition ${
                 dragOver ? 'border-retro-accent bg-glass-w10' : 'border-edge hover:border-retro-accent bg-surface-interactive'
               }`}
             >

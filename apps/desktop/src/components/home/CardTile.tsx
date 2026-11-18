@@ -205,7 +205,7 @@ export function CardTile({
               e.stopPropagation()
               onSelect?.(item.id)
             }}
-            className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
+            className={`w-5 h-5 rounded-md border flex items-center justify-center transition ${
               selected
                 ? 'bg-surface-interactive border-edge text-retro-fg shadow-md'
                 : 'bg-black/60 border-edge opacity-0 group-hover:opacity-100 text-transparent hover:border-edge'

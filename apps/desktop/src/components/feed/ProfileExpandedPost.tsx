@@ -298,7 +298,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
               {mediaItems.map((_, idx) => (
                 <span
                   key={idx}
-                  className={`w-1.5 h-1.5 rounded-full transition-all ${idx === activeMediaIndex ? 'bg-retro-accent w-3' : 'bg-glass-w20'
+                  className={`w-1.5 h-1.5 rounded-full transition ${idx === activeMediaIndex ? 'bg-retro-accent w-3' : 'bg-glass-w20'
                     }`}
                 />
               ))}

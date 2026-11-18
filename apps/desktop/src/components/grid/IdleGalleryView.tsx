@@ -997,7 +997,7 @@ export default function IdleGalleryView({
                       toggleSelect(img.id)
                     }}
                     aria-label={isSelected ? 'Deselect image' : 'Select image'}
-                    className={`absolute left-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-md backdrop-blur-md transition-all cursor-pointer ${
+                    className={`absolute left-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-md backdrop-blur-md transition cursor-pointer ${
                       isSelected
                         ? 'bg-success/0 text-retro-fg opacity-100 shadow-md ring-1 ring-white/30'
                         : 'bg-black/60 text-retro-fg/70 opacity-0 group-hover:opacity-100 focus-visible:opacity-100'

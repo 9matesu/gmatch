@@ -365,7 +365,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
             <button
               type="button"
               onClick={switchToVisual}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition cursor-pointer ${
                 mode === 'visual'
                   ? 'bg-retro-bg text-retro-fg shadow-xs'
                   : 'text-retro-muted hover:text-retro-fg'
@@ -377,7 +377,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
             <button
               type="button"
               onClick={switchToJson}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition cursor-pointer ${
                 mode === 'json'
                   ? 'bg-retro-bg text-retro-fg shadow-xs'
                   : 'text-retro-muted hover:text-retro-fg'
@@ -408,7 +408,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
                     setActiveCategory(cat)
                     setSearchFilter('')
                   }}
-                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer space-y-1 ${
+                  className={`p-3 rounded-xl border text-left transition cursor-pointer space-y-1 ${
                     isSelected
                       ? 'bg-surface-interactive border-retro-accent shadow-xs'
                       : 'bg-surface-raised border-edge hover:bg-surface-interactive'

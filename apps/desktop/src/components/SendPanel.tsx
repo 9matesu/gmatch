@@ -651,7 +651,7 @@ export const SendPanel = forwardRef<SendPanelHandle, {
           type="button"
           onClick={handleUpload}
           disabled={!canSend}
-          className={`w-full chrome-accent text-retro-accent-text font-bold py-3 px-6 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-xs uppercase tracking-wider ${
+          className={`w-full chrome-accent text-retro-accent-text font-bold py-3 px-6 transition disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-xs uppercase tracking-wider ${
             buttonClicked ? 'scale-[0.97] brightness-125' : ''
           }`}
         >
@@ -669,7 +669,7 @@ export const SendPanel = forwardRef<SendPanelHandle, {
             {mode === 'file' && (
               <div className="w-full bg-retro-bg h-1.5 border border-edge">
                 <div
-                  className="bg-retro-accent h-1.5 transition-all duration-300"
+                  className="bg-retro-accent h-1.5 transition duration-300"
                   style={{ width: `${progress}%` }}
                 />
               </div>

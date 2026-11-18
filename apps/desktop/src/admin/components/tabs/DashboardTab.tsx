@@ -264,7 +264,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
           <button
             type="button"
             onClick={() => onAction?.("forceMatchup")}
-            className="p-3 rounded-lg border border-edge bg-surface-canvas hover:bg-glass-w5 transition-all text-left group cursor-pointer"
+            className="p-3 rounded-lg border border-edge bg-surface-canvas hover:bg-glass-w5 transition text-left group cursor-pointer"
           >
             <div className="flex items-center gap-2 mb-1">
               <GitCompare className="w-4 h-4 text-chrome-lav-fg group-hover:scale-110 transition-transform" />
@@ -276,7 +276,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
           <button
             type="button"
             onClick={() => onNavigate?.("content")}
-            className="p-3 rounded-lg border border-edge bg-surface-canvas hover:bg-glass-w5 transition-all text-left group cursor-pointer"
+            className="p-3 rounded-lg border border-edge bg-surface-canvas hover:bg-glass-w5 transition text-left group cursor-pointer"
           >
             <div className="flex items-center gap-2 mb-1">
               <Megaphone className="w-4 h-4 text-info-fg group-hover:scale-110 transition-transform" />
@@ -288,7 +288,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
           <button
             type="button"
             onClick={() => onNavigate?.("settings")}
-            className="p-3 rounded-lg border border-edge bg-surface-canvas hover:bg-glass-w5 transition-all text-left group cursor-pointer"
+            className="p-3 rounded-lg border border-edge bg-surface-canvas hover:bg-glass-w5 transition text-left group cursor-pointer"
           >
             <div className="flex items-center gap-2 mb-1">
               <TrendingUp className="w-4 h-4 text-warning-fg group-hover:scale-110 transition-transform" />
@@ -300,7 +300,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
           <button
             type="button"
             onClick={() => onNavigate?.("settings")}
-            className="p-3 rounded-lg border border-edge bg-surface-canvas hover:bg-glass-w5 transition-all text-left group cursor-pointer"
+            className="p-3 rounded-lg border border-edge bg-surface-canvas hover:bg-glass-w5 transition text-left group cursor-pointer"
           >
             <div className="flex items-center gap-2 mb-1">
               <BarChart2 className="w-4 h-4 text-success-fg group-hover:scale-110 transition-transform" />

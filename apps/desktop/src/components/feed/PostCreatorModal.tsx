@@ -270,7 +270,7 @@ export function PostCreatorModal({
             type="button"
             onClick={handlePublish}
             disabled={tags.length === 0 || media.length === 0}
-            className="flex-1 py-2.5 chrome-accent disabled:opacity-40 text-retro-accent-text rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md"
+            className="flex-1 py-2.5 chrome-accent disabled:opacity-40 text-retro-accent-text rounded-xl text-xs font-black uppercase tracking-wider transition cursor-pointer shadow-md"
           >
             Share Post
           </button>

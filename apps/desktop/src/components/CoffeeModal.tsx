@@ -44,7 +44,7 @@ export function CoffeeModal({ open, reason, onDismiss }: Props) {
           target="_blank"
           rel="noopener noreferrer"
           onClick={() => onDismiss('later')}
-          className="w-full text-center py-2.5 text-xs font-bold tracking-wide bg-warning hover:bg-warning text-retro-fg rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
+          className="w-full text-center py-2.5 text-xs font-bold tracking-wide bg-warning hover:bg-warning text-retro-fg rounded-lg transition flex items-center justify-center gap-2 cursor-pointer"
         >
           <Coffee className="w-4 h-4" />
           <span>Buy me a coffee</span>

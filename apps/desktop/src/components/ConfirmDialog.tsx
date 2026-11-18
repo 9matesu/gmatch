@@ -85,14 +85,14 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                 type="button"
                 autoFocus
                 onClick={() => settle(false)}
-                className="px-3 py-1.5 text-xs font-medium border border-edge rounded-md text-retro-fg hover:bg-glass-w12 hover:text-retro-fg transition-all duration-150 active:scale-[0.96] cursor-pointer"
+                className="px-3 py-1.5 text-xs font-medium border border-edge rounded-md text-retro-fg hover:bg-glass-w12 hover:text-retro-fg transition duration-150 active:scale-[0.96] cursor-pointer"
               >
                 {pending.options.cancelLabel}
               </button>
               <button
                 type="button"
                 onClick={() => settle(true)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all duration-150 active:scale-[0.96] shadow-xs cursor-pointer ${
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition duration-150 active:scale-[0.96] shadow-xs cursor-pointer ${
                   pending.options.tone === 'danger'
                     ? 'border border-danger/0 text-danger-fg bg-danger/5 hover:bg-danger/5'
                     : pending.options.tone === 'accent'

@@ -230,7 +230,7 @@ export function SpectateModal({
             <button
               type="button"
               onClick={() => { playPress(720); setIsMinimized(false) }}
-              className="px-2 py-0.5 text-2xs font-bold bg-info hover:bg-info text-retro-fg rounded-lg cursor-pointer transition-all active:scale-95 shadow"
+              className="px-2 py-0.5 text-2xs font-bold bg-info hover:bg-info text-retro-fg rounded-lg cursor-pointer transition active:scale-95 shadow"
             >
               EXPAND
             </button>
@@ -331,7 +331,7 @@ export function SpectateModal({
       >
         <div
           className={`relative w-full ${isExpanded ? 'max-w-6xl h-[92vh]' : 'max-w-3xl max-h-[88vh]'
-            } bg-surface-raised border border-edge rounded-xl shadow-2xl overflow-hidden flex flex-col transition-all duration-300`}
+            } bg-surface-raised border border-edge rounded-xl shadow-2xl overflow-hidden flex flex-col transition duration-300`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header Bar */}
@@ -357,7 +357,7 @@ export function SpectateModal({
                 type="button"
                 onClick={() => { playPress(720); setIsExpanded((v) => !v) }}
                 title={isExpanded ? 'Restore View' : 'Maximize View'}
-                className="w-8 h-8 rounded-xl text-retro-muted hover:text-retro-fg hover:bg-glass-w10 flex items-center justify-center transition-all cursor-pointer"
+                className="w-8 h-8 rounded-xl text-retro-muted hover:text-retro-fg hover:bg-glass-w10 flex items-center justify-center transition cursor-pointer"
               >
                 {isExpanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
               </button>
@@ -365,7 +365,7 @@ export function SpectateModal({
                 type="button"
                 onClick={() => { playPress(720); setIsMinimized(true) }}
                 title="Picture-in-Picture Mini View"
-                className="w-8 h-8 rounded-xl text-retro-muted hover:text-retro-fg hover:bg-glass-w10 flex items-center justify-center transition-all cursor-pointer"
+                className="w-8 h-8 rounded-xl text-retro-muted hover:text-retro-fg hover:bg-glass-w10 flex items-center justify-center transition cursor-pointer"
               >
                 <Minimize2 className="w-3.5 h-3.5" />
               </button>
@@ -373,7 +373,7 @@ export function SpectateModal({
                 type="button"
                 onClick={() => { playPress(680); onClose() }}
                 title="Close Spectator"
-                className="w-8 h-8 rounded-xl text-retro-muted hover:text-danger-fg hover:bg-glass-w10 flex items-center justify-center transition-all cursor-pointer"
+                className="w-8 h-8 rounded-xl text-retro-muted hover:text-danger-fg hover:bg-glass-w10 flex items-center justify-center transition cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -389,7 +389,7 @@ export function SpectateModal({
               return (
                 <div
                   key={rNum}
-                  className={`flex items-center gap-1.5 px-3 py-1 text-2xs font-bold rounded-xl border transition-all ${isCurrent
+                  className={`flex items-center gap-1.5 px-3 py-1 text-2xs font-bold rounded-xl border transition ${isCurrent
                       ? 'border-chrome-lav bg-info/0 text-info-fg shadow-xs animate-pulse'
                       : pastRound
                         ? pastRound.matched
@@ -510,7 +510,7 @@ export function SpectateModal({
                           </button>
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-surface-canvas relative overflow-hidden text-retro-muted">
-                            <div className={`absolute inset-0 bg-glass-w5 transition-all duration-300`} />
+                            <div className={`absolute inset-0 bg-glass-w5 transition duration-300`} />
                             <div className="relative z-10 flex flex-col items-center gap-2 text-center">
                               <div className="w-10 h-14 rounded-xl border border-edge-strong bg-surface-raised/10 backdrop-blur-md flex items-center justify-center shadow-lg animate-bounce">
                                 <Sparkles className="w-4 h-4 text-info-fg animate-spin" />
@@ -571,7 +571,7 @@ export function SpectateModal({
                           </button>
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-surface-canvas relative overflow-hidden text-retro-muted">
-                            <div className={`absolute inset-0 bg-glass-w5 transition-all duration-300`} />
+                            <div className={`absolute inset-0 bg-glass-w5 transition duration-300`} />
                             <div className="relative z-10 flex flex-col items-center gap-2 text-center">
                               <div className="w-10 h-14 rounded-xl border border-edge-strong bg-surface-raised/10 backdrop-blur-md flex items-center justify-center shadow-lg animate-bounce">
                                 <Sparkles className="w-4 h-4 text-warning-fg animate-spin" />

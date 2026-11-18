@@ -3761,7 +3761,7 @@ export default function Home() {
                           <span>Your images are blurred &mdash; someone paid for a vision jam. It expires shortly.</span>
                         </div>
                       )}
-                      <div className={isVisionJammed ? "blur-md select-none pointer-events-none transition-all duration-300" : ""}>
+                      <div className={isVisionJammed ? "blur-md select-none pointer-events-none transition duration-300" : ""}>
                         <div className="w-full max-w-6xl mx-auto px-3 sm:px-4 pt-3 sm:pt-4 flex flex-col gap-4 pb-[calc(var(--island-clearance)+1.25rem)]">
                           <AnnouncementBanner announcement={announcement} />
 

@@ -344,7 +344,7 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
         type="button"
         onClick={() => scrollStories('left')}
         aria-label="Previous Stories"
-        className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-surface-raised/90 shadow-md border border-edge text-retro-body hover:text-retro-fg flex items-center justify-center cursor-pointer transition-all opacity-0 group-hover/tray:opacity-100 disabled:opacity-0"
+        className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-surface-raised/90 shadow-md border border-edge text-retro-body hover:text-retro-fg flex items-center justify-center cursor-pointer transition opacity-0 group-hover/tray:opacity-100 disabled:opacity-0"
       >
         <ChevronLeft className="w-4 h-4" />
       </button>
@@ -354,7 +354,7 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
         type="button"
         onClick={() => scrollStories('right')}
         aria-label="Next Stories"
-        className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-surface-raised/90 shadow-md border border-edge text-retro-body hover:text-retro-fg flex items-center justify-center cursor-pointer transition-all opacity-0 group-hover/tray:opacity-100 disabled:opacity-0"
+        className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-surface-raised/90 shadow-md border border-edge text-retro-body hover:text-retro-fg flex items-center justify-center cursor-pointer transition opacity-0 group-hover/tray:opacity-100 disabled:opacity-0"
       >
         <ChevronRight className="w-4 h-4" />
       </button>
@@ -468,7 +468,7 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
                   >
                     <div
                       data-testid={`seg-fill-${sIdx}`}
-                      className="h-full bg-retro-accent transition-all duration-150"
+                      className="h-full bg-retro-accent transition duration-150"
                       style={{ width: `${fillPercent}%` }}
                     />
                   </div>
@@ -583,7 +583,7 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
                 <button
                   type="button"
                   onClick={handleLike}
-                  className={`w-10 h-10 rounded-full border flex items-center justify-center transition-all cursor-pointer active:scale-80 shadow-md ${
+                  className={`w-10 h-10 rounded-full border flex items-center justify-center transition cursor-pointer active:scale-80 shadow-md ${
                     likedStories.has(currentStory.id)
                       ? 'bg-info border-info text-retro-fg'
                       : 'bg-surface-raised/10 hover:bg-surface-raised/20 border-edge-strong text-retro-fg'
@@ -600,7 +600,7 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
                     playPress(880);
                     if (onStartPm) onStartPm({ id: activeGroup.userId, display_name: activeGroup.displayName });
                   }}
-                  className="h-10 px-5 rounded-full bg-surface-raised/10 hover:bg-surface-raised/20 border border-edge-strong flex items-center justify-center gap-2 text-retro-fg transition-all cursor-pointer active:scale-95 shadow-md"
+                  className="h-10 px-5 rounded-full bg-surface-raised/10 hover:bg-surface-raised/20 border border-edge-strong flex items-center justify-center gap-2 text-retro-fg transition cursor-pointer active:scale-95 shadow-md"
                   aria-label={`Message ${activeGroup.displayName}`}
                 >
                   <MessageCircle className="w-4 h-4" />

@@ -78,7 +78,7 @@ export function GamesHub({
                   playPress(780);
                   onSubTabChange?.(mode.id);
                 }}
-                className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                className={`px-3 py-1 rounded-full text-xs font-semibold transition cursor-pointer ${
                   subTab === mode.id
                     ? 'bg-retro-accent text-retro-accent-text '
                     : 'text-retro-muted hover:text-retro-fg'

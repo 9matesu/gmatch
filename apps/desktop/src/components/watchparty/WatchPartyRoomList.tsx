@@ -46,7 +46,7 @@ function RoomThumbnail({
             muted
             preload="metadata"
             playsInline
-            className="w-full h-full object-cover pointer-events-none opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-300"
+            className="w-full h-full object-cover pointer-events-none opacity-80 group-hover:opacity-100 group-hover:scale-105 transition duration-300"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
         </div>
@@ -57,7 +57,7 @@ function RoomThumbnail({
         <img
           src={media.url}
           alt={name}
-          className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-300"
+          className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition duration-300"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
       </div>
@@ -66,7 +66,7 @@ function RoomThumbnail({
 
   return (
     <div className="relative w-full h-full bg-surface-canvas flex flex-col items-center justify-center overflow-hidden border-b border-edge-subtle group-hover:border-retro-fg/20 transition-colors">
-      <div className="p-3 rounded-xl bg-surface-raised/80 border border-edge shadow-lg group-hover:scale-110 group-hover:border-retro-fg/30 transition-all duration-150">
+      <div className="p-3 rounded-xl bg-surface-raised/80 border border-edge shadow-lg group-hover:scale-110 group-hover:border-retro-fg/30 transition duration-150">
         <Film className="w-6 h-6 text-retro-muted group-hover:text-retro-fg transition-colors" />
       </div>
       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
@@ -211,9 +211,9 @@ export function WatchPartyRoomList({
           type="button"
           onClick={onNewParty}
           aria-label="Create a new room"
-          className="group relative flex flex-col aspect-video sm:aspect-auto sm:min-h-[220px] rounded-xl border border-dashed border-edge hover:border-retro-fg bg-surface-canvas/40 hover:bg-glass-w8 p-5 items-center justify-center text-center transition-all duration-150 cursor-pointer active:scale-[0.98] shadow-sm"
+          className="group relative flex flex-col aspect-video sm:aspect-auto sm:min-h-[220px] rounded-xl border border-dashed border-edge hover:border-retro-fg bg-surface-canvas/40 hover:bg-glass-w8 p-5 items-center justify-center text-center transition duration-150 cursor-pointer active:scale-[0.98] shadow-sm"
         >
-          <div className="w-12 h-12 rounded-full border border-edge bg-surface-raised flex items-center justify-center text-retro-muted group-hover:text-retro-fg group-hover:border-retro-fg/50 group-hover:scale-110 transition-all duration-150 mb-3 shadow-md">
+          <div className="w-12 h-12 rounded-full border border-edge bg-surface-raised flex items-center justify-center text-retro-muted group-hover:text-retro-fg group-hover:border-retro-fg/50 group-hover:scale-110 transition duration-150 mb-3 shadow-md">
             <Plus className="w-6 h-6 stroke-[2.5]" />
           </div>
           <span className="text-xs font-bold text-retro-fg group-hover:text-retro-fg transition-colors">
@@ -231,7 +231,7 @@ export function WatchPartyRoomList({
             type="button"
             onClick={() => void joinPartyById(identity, r.id)}
             aria-label={`Join room ${r.name}`}
-            className="group relative flex flex-col rounded-xl border border-edge hover:border-retro-fg/60 bg-surface-canvas/60 hover:bg-surface-raised/80 overflow-hidden text-left transition-all duration-150 cursor-pointer active:scale-[0.98] shadow-md hover:shadow-xl"
+            className="group relative flex flex-col rounded-xl border border-edge hover:border-retro-fg/60 bg-surface-canvas/60 hover:bg-surface-raised/80 overflow-hidden text-left transition duration-150 cursor-pointer active:scale-[0.98] shadow-md hover:shadow-xl"
           >
             {/* 16:9 Thumbnail Area */}
             <div className="relative aspect-video w-full overflow-hidden bg-retro-bg">

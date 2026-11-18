@@ -179,7 +179,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
               type="button"
               onClick={() => setActiveSubTab(section.id)}
               className={cn(
-                "px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer",
+                "px-3 py-1.5 text-xs font-bold rounded-lg transition flex items-center gap-1.5 cursor-pointer",
                 active
                   ? "bg-retro-accent text-retro-accent-text shadow-sm"
                   : "text-retro-muted hover:text-retro-fg"
@@ -215,7 +215,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
                 <button
                   type="button"
                   onClick={handleSaveDiscord}
-                  className="px-4 py-2 bg-retro-accent text-retro-accent-text rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                  className="px-4 py-2 bg-retro-accent text-retro-accent-text rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
                 >
                   <Save className="w-3.5 h-3.5" />
                   Save
@@ -246,7 +246,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
                 <button
                   type="button"
                   onClick={handleSaveCashout}
-                  className="px-4 py-2 bg-retro-accent text-retro-accent-text rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                  className="px-4 py-2 bg-retro-accent text-retro-accent-text rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
                 >
                   <Save className="w-3.5 h-3.5" />
                   Save Rate
@@ -369,7 +369,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
                 <button
                   type="button"
                   onClick={() => setShowCleanupConfirm(true)}
-                  className="px-3 py-2 bg-danger/0 hover:bg-danger/0 text-danger-fg border border-danger/0 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shrink-0 cursor-pointer"
+                  className="px-3 py-2 bg-danger/0 hover:bg-danger/0 text-danger-fg border border-danger/0 rounded-xl text-xs font-bold uppercase tracking-wider transition shrink-0 cursor-pointer"
                 >
                   Run Cleanup
                 </button>
@@ -385,7 +385,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
                 <button
                   type="button"
                   onClick={() => setShowCleanPostsConfirm(true)}
-                  className="px-3 py-2 bg-danger/0 hover:bg-danger/0 text-danger-fg border border-danger/0 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shrink-0 cursor-pointer"
+                  className="px-3 py-2 bg-danger/0 hover:bg-danger/0 text-danger-fg border border-danger/0 rounded-xl text-xs font-bold uppercase tracking-wider transition shrink-0 cursor-pointer"
                 >
                   Clean All
                 </button>
@@ -401,7 +401,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
                 <button
                   type="button"
                   onClick={() => setShowMigrateConfirm(true)}
-                  className="px-3 py-2 bg-warning/0 hover:bg-warning/0 text-warning-fg border border-warning/0 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shrink-0 cursor-pointer"
+                  className="px-3 py-2 bg-warning/0 hover:bg-warning/0 text-warning-fg border border-warning/0 rounded-xl text-xs font-bold uppercase tracking-wider transition shrink-0 cursor-pointer"
                 >
                   Migrate Now
                 </button>

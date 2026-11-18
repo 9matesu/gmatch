@@ -244,7 +244,7 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0,
 
         <div className="grid lg:grid-cols-[minmax(220px,0.7fr)_minmax(0,1.3fr)] gap-5">
           <div className="flex flex-col items-center gap-3">
-            <div className="w-full max-w-[270px] aspect-[3/4.2] rounded-xl p-1.5 transition-all" style={{ background: `linear-gradient(135deg, #9FE3FF, rgba(255,255,255,.55), #9FE3FF)`, boxShadow: '0 18px 50px #9FE3FF44' }}>
+            <div className="w-full max-w-[270px] aspect-[3/4.2] rounded-xl p-1.5 transition" style={{ background: `linear-gradient(135deg, #9FE3FF, rgba(255,255,255,.55), #9FE3FF)`, boxShadow: '0 18px 50px #9FE3FF44' }}>
               <div className="relative w-full h-full overflow-hidden rounded-xl bg-surface-canvas flex flex-col">
                 <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-white/20 via-transparent to-transparent z-10" />
                 <div className="aspect-[3/3.1] bg-black/30 overflow-hidden flex items-center justify-center">
@@ -280,7 +280,7 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0,
             <button
               type="button"
               onClick={() => void openMediaPicker().then((sel) => { if (sel) void takePickerSelection(sel); })}
-              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-edge text-xs font-semibold text-retro-muted hover:text-retro-fg hover:border-retro-accent hover:bg-glass-w8 cursor-pointer transition-all"
+              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-edge text-xs font-semibold text-retro-muted hover:text-retro-fg hover:border-retro-accent hover:bg-glass-w8 cursor-pointer transition"
             >
               <Plus className="w-3.5 h-3.5" />
               Pick from your media, this device, or a link
@@ -305,7 +305,7 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0,
               </div>
             </div>
 
-            {creating && <div className="space-y-1"><div className="flex justify-between text-2xs text-retro-muted"><span>Forging card...</span><span>{progress}%</span></div><div className="h-1.5 rounded-full bg-black/30 overflow-hidden"><div className="h-full bg-retro-accent transition-all" style={{ width: `${progress}%` }} /></div></div>}
+            {creating && <div className="space-y-1"><div className="flex justify-between text-2xs text-retro-muted"><span>Forging card...</span><span>{progress}%</span></div><div className="h-1.5 rounded-full bg-black/30 overflow-hidden"><div className="h-full bg-retro-accent transition" style={{ width: `${progress}%` }} /></div></div>}
             {error && <div className="rounded-xl border border-retro-error/30 bg-retro-error/10 px-3 py-2 text-xs text-retro-error">{error}</div>}
             <div className="flex justify-end gap-2 pt-1">
               <button type="button" onClick={onClose} className="glass-button px-4 py-2.5 rounded-xl text-xs font-bold">Cancel</button>

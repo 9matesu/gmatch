@@ -107,7 +107,7 @@ function TagsTab() {
               ? `${t.name} · Lv${t.level} · Lv${t.level} owned · click ${on ? 'OFF' : 'ON'} · right-click = solo · double-click = pick for merge`
               : `${t.name} · buy for ${formatNum(cost)} pts`
           }
-          className={`inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-all duration-150 ${
+          className={`inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition duration-150 ${
             on
               ? 'border-retro-accent/50 bg-retro-accent/15 text-retro-fg'
               : isOwned
@@ -152,7 +152,7 @@ function TagsTab() {
           <button
             type="button"
             onClick={() => { playPress(760); toggleFeedCategory('real'); }}
-            className={`px-3 py-1 rounded-full text-xs font-mono font-bold tracking-wider transition-all duration-150 cursor-pointer border ${
+            className={`px-3 py-1 rounded-full text-xs font-mono font-bold tracking-wider transition duration-150 cursor-pointer border ${
               allowReal
                 ? 'border-retro-accent/60 bg-retro-accent/20 text-retro-fg'
                 : 'border-edge bg-glass-w5 text-retro-muted hover:text-retro-fg hover:border-edge-strong'
@@ -164,7 +164,7 @@ function TagsTab() {
           <button
             type="button"
             onClick={() => { playPress(760); toggleFeedCategory('hentai'); }}
-            className={`px-3 py-1 rounded-full text-xs font-mono font-bold tracking-wider transition-all duration-150 cursor-pointer border ${
+            className={`px-3 py-1 rounded-full text-xs font-mono font-bold tracking-wider transition duration-150 cursor-pointer border ${
               allowHentai
                 ? 'border-retro-accent/60 bg-retro-accent/20 text-retro-fg'
                 : 'border-edge bg-glass-w5 text-retro-muted hover:text-retro-fg hover:border-edge-strong'
@@ -294,7 +294,7 @@ function CapsTab() {
           return (
             <div
               key={id}
-              className={`flex items-center justify-between gap-3 rounded-xl border p-2.5 transition-all duration-150 ${
+              className={`flex items-center justify-between gap-3 rounded-xl border p-2.5 transition duration-150 ${
                 st.count > 0
                   ? 'border-chrome-pink/0 bg-chrome-pink/[0.04]'
                   : 'border-edge bg-glass-w5 hover:border-edge-strong'
@@ -323,7 +323,7 @@ function CapsTab() {
 
               <button
                 type="button"
-                className={`px-3 py-1.5 rounded-lg border text-xs font-mono font-bold transition-all cursor-pointer shrink-0 ${
+                className={`px-3 py-1.5 rounded-lg border text-xs font-mono font-bold transition cursor-pointer shrink-0 ${
                   afford
                     ? 'border-retro-accent/50 bg-retro-accent/20 text-retro-fg hover:bg-retro-accent/30'
                     : 'border-edge bg-glass-w5 text-retro-muted opacity-40 cursor-not-allowed'
@@ -391,7 +391,7 @@ function PrestigeTab() {
 
         <button
           type="button"
-          className={`w-full py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold tracking-wider uppercase transition-all cursor-pointer ${
+          className={`w-full py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold tracking-wider uppercase transition cursor-pointer ${
             ready
               ? 'bg-danger hover:bg-danger text-retro-fg'
               : 'border border-edge bg-glass-w5 text-retro-muted opacity-40 cursor-not-allowed'
@@ -461,7 +461,7 @@ export default function ShopPanel() {
           role="tab"
           aria-selected={tab === 'tags'}
           onClick={() => handleTab('tags')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition cursor-pointer ${
             tab === 'tags'
               ? 'bg-glass-w10 text-retro-fg shadow-sm'
               : 'text-retro-muted hover:text-retro-fg'
@@ -481,7 +481,7 @@ export default function ShopPanel() {
           role="tab"
           aria-selected={tab === 'caps'}
           onClick={() => handleTab('caps')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition cursor-pointer ${
             tab === 'caps'
               ? 'bg-glass-w10 text-retro-fg shadow-sm'
               : 'text-retro-muted hover:text-retro-fg'
@@ -501,7 +501,7 @@ export default function ShopPanel() {
           role="tab"
           aria-selected={tab === 'prestige'}
           onClick={() => handleTab('prestige')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition cursor-pointer ${
             tab === 'prestige'
               ? 'bg-glass-w10 text-retro-fg shadow-sm'
               : 'text-retro-muted hover:text-retro-fg'

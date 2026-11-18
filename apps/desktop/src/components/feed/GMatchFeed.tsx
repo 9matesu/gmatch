@@ -936,7 +936,7 @@ function GMatchFeedImpl({
                 key={mode}
                 type="button"
                 onClick={() => { playPress(720); onFeedSortChange?.(mode); }}
-                className={`px-3 py-1.5 rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer font-medium ${feedSort === mode
+                className={`px-3 py-1.5 rounded-md transition duration-150 active:scale-[0.96] cursor-pointer font-medium ${feedSort === mode
                     ? 'bg-glass-w12 text-retro-fg shadow-xs border border-edge'
                     : 'text-retro-muted hover:text-retro-fg'
                   }`}
@@ -1582,7 +1582,7 @@ function GMatchFeedImpl({
                 <button
                   type="button"
                   onClick={() => { playPress(800); onForceRefresh(); }}
-                  className="px-4 py-2 text-xs font-semibold rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer inline-flex items-center gap-1.5 border border-edge text-retro-body hover:text-retro-fg hover:bg-glass-w10"
+                  className="px-4 py-2 text-xs font-semibold rounded-md transition duration-150 active:scale-[0.96] cursor-pointer inline-flex items-center gap-1.5 border border-edge text-retro-body hover:text-retro-fg hover:bg-glass-w10"
                 >
                   <RefreshCw className="w-4 h-4 stroke-[2]" />
                   <span>Reload feed</span>
@@ -1594,7 +1594,7 @@ function GMatchFeedImpl({
                   if (onOpenPostCreator) onOpenPostCreator();
                   else setShowCustomPostCreator(true);
                 }}
-                className="create-action px-4 py-2 text-xs font-semibold rounded-md transition-all duration-150 active:scale-[0.96] shadow-xs cursor-pointer inline-flex items-center gap-1.5"
+                className="create-action px-4 py-2 text-xs font-semibold rounded-md transition duration-150 active:scale-[0.96] shadow-xs cursor-pointer inline-flex items-center gap-1.5"
               >
                 <PlusSquare className="w-4 h-4 stroke-[2]" />
                 <span>Upload your first post</span>

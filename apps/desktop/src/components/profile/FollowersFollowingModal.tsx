@@ -354,7 +354,7 @@ export function FollowersFollowingModal({
                     <button
                       type="button"
                       onClick={() => handleToggleFollow(user)}
-                      className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1 ${isFollowing
+                      className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1 ${isFollowing
                           ? 'bg-surface-interactive hover:bg-danger/10 text-retro-fg hover:text-danger-fg border border-edge'
                           : 'bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text shadow-xs'
                         }`}

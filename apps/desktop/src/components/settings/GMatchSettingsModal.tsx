@@ -1003,7 +1003,7 @@ export function GMatchSettingsModal({
                   <button
                     type="button"
                     onClick={() => onOpenIdentityModal?.('export')}
-                    className="p-4 bg-glass-w5 border border-edge hover:bg-glass-w10 hover:border-retro-accent rounded-lg text-left space-y-2 transition-all cursor-pointer group active:scale-[0.98]"
+                    className="p-4 bg-glass-w5 border border-edge hover:bg-glass-w10 hover:border-retro-accent rounded-lg text-left space-y-2 transition cursor-pointer group active:scale-[0.98]"
                   >
                     <div className="w-8 h-8 rounded-lg bg-glass-w10 border border-edge text-retro-fg flex items-center justify-center">
                       <Download className="w-4 h-4" />
@@ -1017,7 +1017,7 @@ export function GMatchSettingsModal({
                   <button
                     type="button"
                     onClick={() => onOpenIdentityModal?.('login')}
-                    className="p-4 bg-glass-w5 border border-edge hover:bg-glass-w10 hover:border-retro-accent rounded-lg text-left space-y-2 transition-all cursor-pointer group active:scale-[0.98]"
+                    className="p-4 bg-glass-w5 border border-edge hover:bg-glass-w10 hover:border-retro-accent rounded-lg text-left space-y-2 transition cursor-pointer group active:scale-[0.98]"
                   >
                     <div className="w-8 h-8 rounded-lg bg-glass-w10 border border-edge text-retro-fg flex items-center justify-center">
                       <LogIn className="w-4 h-4" />
