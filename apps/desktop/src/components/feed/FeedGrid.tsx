@@ -151,7 +151,7 @@ export function FeedGrid({ posts, identity, onOpen, likedPosts, likeCounts, onTo
                 {!hasMedia(post) ? (
                   // Text-only post: the words are the tile, not a hole.
                   <span className="flex h-full w-full flex-col justify-between gap-2 p-3 text-left">
-                    <span className="line-clamp-6 text-[13px] leading-snug text-retro-body">
+                    <span className="line-clamp-6 text-field leading-snug text-retro-body">
                       {post.caption?.trim() || '(no caption)'}
                     </span>
                     <span className="text-2xs text-retro-faint">{post.author_name}</span>

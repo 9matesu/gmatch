@@ -1319,7 +1319,7 @@ export function GMatchDMs({
                                 id={`chat-msg-${msg.id}`}
                                 data-message-id={msg.id}
                                 onClick={() => setActionFor(showActions ? null : msg.id)}
-                                className={`w-fit max-w-full px-3.5 py-2.5 rounded-2xl text-[13px] sm:text-sm leading-relaxed select-text cursor-pointer break-words whitespace-pre-wrap motion-safe:animate-orbit-fade-in hover: ${block.length > 1 ? 'mt-0.5' : ''} ${
+                                className={`w-fit max-w-full px-3.5 py-2.5 rounded-2xl text-field sm:text-sm leading-relaxed select-text cursor-pointer break-words whitespace-pre-wrap motion-safe:animate-orbit-fade-in hover: ${block.length > 1 ? 'mt-0.5' : ''} ${
                                   highlightedMessage === msg.id ? 'ring-2 ring-retro-accent/70' : ''
                                 } ${
                                   msg.deletedAt

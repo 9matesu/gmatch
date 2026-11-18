@@ -77,7 +77,7 @@ export function NativeHeaderBar({
           </button>
         </div>
 
-        <span className="text-[13px] font-bold tracking-wide text-retro-fg select-none ml-1">gMatch</span>
+        <span className="text-field font-bold tracking-wide text-retro-fg select-none ml-1">gMatch</span>
       </div>
 
       {/* Centre: the notification centre. One bell and its badge  the

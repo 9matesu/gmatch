@@ -43,7 +43,7 @@ export default function OfflineCard({ fetching, feedOffline, emptyFresh = false,
         className={`h-3 w-3 flex-none rounded-full ${DOT_COLOR[state]}`}
         aria-hidden="true"
       />
-      <span className="whitespace-nowrap text-[13px] text-retro-fg">{label}</span>
+      <span className="whitespace-nowrap text-field text-retro-fg">{label}</span>
       <button type="button" className={`${BTN} ${BTN_SMALL}`} disabled={fetching} onClick={onRetry}>
         {fetching ? 'Retrying…' : 'Retry'}
       </button>

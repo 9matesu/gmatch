@@ -62,7 +62,7 @@ Posture: measure first, change only what the data justifies (ponytail).
   test-blobs-* dirs at I:/ root. site/releases keeps ONLY the published
   gMatch exe (it ships in the fly image).
 
-## Re-measure (post-change)
+## Measured baseline (production bundle, 2026-11),,Method: `vite build` served with a static dist server that proxies `/api` to the,local sidecar (so the origin matches), Chromium headless at 1366x860, CDP,`Performance.getMetrics`, a rAF frame probe and a `longtask` observer installed,before any app code, sampled over 5 s after load. The dev server is NOT,comparable: StrictMode double-renders and the bundle is unminified (a 50-post,feed measured 59.7 MB and 34 fps there).,,| surface | load | DOM | heap | resources | frames p50 / p95 | worst long task |,|---|---|---|---|---|---|---|,| clicker (`#/grid`, 9 live tiles) | 323 ms | 606 | 7.3 MB | 916 KB | 16.7 / 16.8 ms | 882 ms (boot) |,| feed (`#/feed`, node rows) | 391 ms | 59 | 9.6 MB | 2.4 MB | 16.7 / 16.8 ms | 203 ms |,,Reading: steady state is 60 fps in both views; the only long tasks are boot and,the first media decode. The next lever is the number of tiles reconciled per,interaction (a like re-renders the list), not the frame budget.,,## Re-measure (post-change)
 
 Run: `cd apps/desktop && npx playwright test perf --reporter=line`
 Expected: same flat ~40MiB (renderer changes were revoke-timing only).
