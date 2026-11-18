@@ -100,7 +100,7 @@ import { hasStatefulRoutes } from './utils/nodeCapabilities';
 import { usePendingJoinVerify } from './hooks/usePendingJoinVerify';
 import { usePendingServerHost } from './hooks/usePendingServerHost';
 import { dataUrlToBlob, localObjectBlobUrl } from "./utils/mediaData";
-import { recoverDescriptorRow } from "./utils/objectDescriptor";
+import { mergeGalleryRows } from './features/gallery/galleryMerge';
 import { mediaUrlToCachedFile } from "./utils/cacheMedia";
 import { fresherPresence } from './utils/presence';
 import { nameRoster as nameRosterFromDirectory, nameFor, rememberNames } from './game/nameDirectory';
@@ -2372,57 +2372,21 @@ export default function Home() {
       orbitFetch('/api/inbox', {}, identity).then(r => r.ok ? r.json() : []).catch(() => []),
       getAllObjects().catch(() => []),
     ]).then(([inboxItems, dbObjects]) => {
-      if (!Array.isArray(inboxItems)) inboxItems = [];
-      const itemMap = new Map<string, OrbitObject>();
-
-      // 1. Add server inbox items
-      for (const item of inboxItems) {
-        itemMap.set(item.id, item);
-      }
-
-      // 2. Add IndexedDB objects (blob URLs recovered from the raw bytes).
-      // Flag discipline: mirror rows may predate flag storage, so rebuild via
-      // buildMirrorRow — server (inbox) flags win, explicit mirror flags apply,
-      // and unknown rows stay flag-less so card surfaces exclude them instead
-      // of phantom-minting uploads into cards.
-      for (const dbObj of dbObjects) {
-        if (dbObj.id.startsWith('p2p-obj-') && !canonicalCards.some(c => c.mediaObjectId === dbObj.id)) {
-          void deleteObject(dbObj.id);
-          continue;
-        }
-        // A row whose `data` is a URL is a DESCRIPTOR, not media: legacy builds
-        // wrote the provider link into the bytes field. Recover it idempotently
-        // (nothing deleted, the bytes field is left alone) and render from the
-        // link instead of minting a blob of the URL text.
-        const recovered = recoverDescriptorRow(dbObj)
-        const contentUrl = recovered.descriptorOnly
-          ? (recovered.sourceUrl || `/api/objects/${dbObj.id}`)
-          : localObjectBlobUrl(dbObj.id, dbObj.data, dbObj.mime_type)
-        if (recovered.changed) void saveObject(recovered.row).catch(() => { })
-        const prev = itemMap.get(dbObj.id)
-        itemMap.set(dbObj.id, buildMirrorRow(dbObj, prev, contentUrl,
-          dbObj.owner_id === identity.orbitId
-            ? (myProfile.displayName || 'You')
-            : (prev?.display_name || usersRef.current.find((u) => u.id === dbObj.owner_id)?.display_name?.trim() || generateFallbackName(dbObj.owner_id))))
-      }
-
-      // 3. Add p2pItems from memory safely
-      if (currentP2pItems.length > 0) {
-        for (const item of currentP2pItems) {
-          const existing = itemMap.get(item.id);
-          if (!existing) {
-            itemMap.set(item.id, item);
-          } else if (item.content_url && !existing.content_url) {
-            itemMap.set(item.id, { ...existing, content_url: item.content_url });
-          }
-        }
-      }
-
-      const payloadList = Array.from(itemMap.values()).sort((a, b) => {
-        const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
-        const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
-        return bTime - aTime;
-      });
+      const currentSettings = settingsRef.current
+      const merged = mergeGalleryRows({
+        inbox: Array.isArray(inboxItems) ? inboxItems : [],
+        dbObjects,
+        p2pItems: p2pItemsRef.current || [],
+        canonicalCardMediaIds: new Set(canonicalCards.map((c) => c.mediaObjectId)),
+        selfId: identity.orbitId,
+        selfDisplayName: myProfile.displayName,
+        directory: usersRef.current,
+      })
+      // Orphans (a p2p-obj- row no card references) are removed from IndexedDB;
+      // legacy descriptor rows are re-saved so the recovered link persists.
+      for (const id of merged.orphanIds) void deleteObject(id)
+      for (const row of merged.recoveredRows) void saveObject(row).catch(() => { })
+      const payloadList = merged.items
 
       setItems(prev => areItemsStructurallyEqual(prev, payloadList) ? prev : payloadList);
       setItemsLoading(false);
