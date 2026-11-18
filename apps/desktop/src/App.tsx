@@ -1383,7 +1383,16 @@ export default function Home() {
       (p) => !deletedPostIds.has(p.id) && !seenServerIds.has(p.id),
     );
 
-    return [...optimisticVisible, ...localPending, ...pinnedVisible, ...peerVisible, ...serverVisible, ...repostedPosts, ...localPublicPosts, ...myProfileVisible];
+    // One row per post: the local (durable) copy and the session optimistic
+    // copy describe the same id, and without this a fresh publish rendered twice
+    // (once from the outbox, once from the optimistic tile).
+    const merged = [...optimisticVisible, ...localPending, ...pinnedVisible, ...peerVisible, ...serverVisible, ...repostedPosts, ...localPublicPosts, ...myProfileVisible];
+    const seen = new Set<string>();
+    return merged.filter((p) => {
+      if (seen.has(p.id)) return false;
+      seen.add(p.id);
+      return true;
+    });
   }, [items, profilePics, identity, myProfile, repostedPosts, archivedPostIds, deletedPostIds, serverPosts, normalizeFeedPost, users, optimisticPosts, outboxTick, pinnedPosts, peerFeedPosts, myProfilePosts]);
 
   const feedPostsRef = useRef<FeedPost[]>(feedPosts)
