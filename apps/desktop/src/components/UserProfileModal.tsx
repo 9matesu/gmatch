@@ -258,7 +258,7 @@ export function UserProfileModal({
         onClick={onClose}
       >
         <div
-          className="bg-retro-panel border border-edge w-full max-w-4xl overflow-hidden shadow-2xl rounded-t-2xl sm:rounded-xl animate-orbit-pop text-retro-fg max-h-[calc(100dvh-var(--island-clearance))] sm:max-h-[calc(100vh-var(--island-clearance)-2rem)] flex flex-col"
+          className="bg-retro-panel border border-edge w-full max-w-4xl overflow-hidden shadow-2xl rounded-t-2xl sm:rounded-xl animate-orbit-pop text-retro-fg max-h-[calc(100dvh-var(--island-clearance))] sm:max-h-[calc(100dvh-var(--island-clearance)-2rem)] flex flex-col"
           role="dialog"
           aria-modal="true"
           aria-label={`${displayName} profile`}

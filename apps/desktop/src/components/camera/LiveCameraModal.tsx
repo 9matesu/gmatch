@@ -163,7 +163,7 @@ export function LiveCameraModal({
       onClick={onClose}
     >
       <div
-        className="bg-surface-raised text-retro-fg w-full max-w-lg rounded-none sm:rounded-xl border border-edge shadow-2xl overflow-hidden flex flex-col h-full sm:h-auto max-h-screen sm:max-h-(--max-h-dialog)"
+        className="bg-surface-raised text-retro-fg w-full max-w-lg rounded-none sm:rounded-xl border border-edge shadow-2xl overflow-hidden flex flex-col h-full sm:h-auto max-h-dvh sm:max-h-(--max-h-dialog)"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

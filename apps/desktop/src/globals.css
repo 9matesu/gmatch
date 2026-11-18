@@ -469,8 +469,10 @@
   transition: opacity 200ms ease;
 }
 
-.holo-card:hover .holo-sheen {
-  opacity: 1;
+@media (hover: hover) {
+  .holo-card:hover .holo-sheen {
+    opacity: 1;
+  }
 }
 
 .holo-foil-rare {
