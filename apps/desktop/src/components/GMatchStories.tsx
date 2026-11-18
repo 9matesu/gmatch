@@ -437,7 +437,7 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
       {/* ── 2. Fullscreen Instagram Story Viewer Lightbox ── */}
       {openUserId && activeGroup && currentStory && createPortal(
         <div
-          className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-0 animate-orbit-fade-in"
+          className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-0 animate-orbit-fade-in"
           onClick={closeStoryViewer}
           onMouseDown={() => setIsPaused(true)}
           onMouseUp={() => setIsPaused(false)}

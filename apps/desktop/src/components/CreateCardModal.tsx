@@ -222,7 +222,7 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0,
   };
 
   return (
-    <div className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6">
+    <div className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6">
       <div className="glass-surface w-full max-w-5xl max-h-[92dvh] overflow-y-auto rounded-xl p-4 sm:p-6 text-retro-fg">
         <div className="flex items-start justify-between gap-4 mb-5">
           <div>

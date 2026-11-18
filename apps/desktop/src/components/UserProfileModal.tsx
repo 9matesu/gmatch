@@ -254,7 +254,7 @@ export function UserProfileModal({
         role="dialog"
         aria-modal="true"
         aria-label={`Profile of ${user.display_name?.trim() || 'user'}`}
-        className="fixed inset-0 z-[var(--z-system)] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 pb-[var(--island-clearance)] sm:p-4 sm:pb-[calc(1rem+var(--island-clearance))] animate-orbit-fade-in select-none font-sans"
+        className="fixed inset-0 z-[var(--z-modal)] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 pb-[var(--island-clearance)] sm:p-4 sm:pb-[calc(1rem+var(--island-clearance))] animate-orbit-fade-in select-none font-sans"
         onClick={onClose}
       >
         <div
@@ -584,7 +584,7 @@ export function UserProfileModal({
       {/* Full Picture Modal */}
       {showPic && profilePic && (
         <div
-          className="fixed inset-0 z-[var(--z-system)] flex items-center justify-center bg-black/70 p-4 cursor-pointer"
+          className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 p-4 cursor-pointer"
           onClick={() => setShowPic(false)}
         >
           <div className="relative max-w-sm max-h-(--max-h-panel)" onClick={(e) => e.stopPropagation()}>
@@ -603,7 +603,7 @@ export function UserProfileModal({
       {/* Card Image Lightbox */}
       {selectedCardImage && (
         <div
-          className="fixed inset-0 z-[var(--z-system)] flex items-center justify-center bg-black/70 p-4 cursor-pointer"
+          className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 p-4 cursor-pointer"
           onClick={() => setSelectedCardImage(null)}
         >
           <div className="relative max-w-md max-h-(--max-h-dialog-sm)" onClick={(e) => e.stopPropagation()}>

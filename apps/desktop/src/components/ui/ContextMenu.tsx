@@ -107,7 +107,7 @@ export function ContextMenu({ x, y, title, subtitle, actions, onDismiss, width =
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-system)]"
+      className="fixed inset-0 z-[var(--z-lightbox)]"
       onClick={onDismiss}
       onContextMenu={(e) => { e.preventDefault(); onDismiss(); }}
     >

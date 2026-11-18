@@ -152,7 +152,7 @@ export function CropModal({
   };
 
   const modalContent = (
-    <div className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-retro-fg" style={{ zIndex: 'calc(var(--z-system) + 10)' }} onClick={onCancel} onMouseDown={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-retro-fg" style={{ zIndex: 'calc(var(--z-system) + 10)' }} onClick={onCancel} onMouseDown={(e) => e.stopPropagation()}>
       <div className="w-full max-w-sm bg-retro-bg border border-edge rounded-xl p-4 space-y-3 animate-orbit-pop" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold">{title}</h3>

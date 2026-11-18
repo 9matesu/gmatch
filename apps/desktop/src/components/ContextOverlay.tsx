@@ -123,7 +123,7 @@ export function ContextOverlay({
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-system)] bg-black/10 select-none"
+      className="fixed inset-0 z-[var(--z-lightbox)] bg-black/10 select-none"
       onClick={onDismiss}
       onContextMenu={(e) => {
         e.preventDefault();
@@ -136,7 +136,7 @@ export function ContextOverlay({
         role="menu"
         aria-label="Context menu"
         data-testid="context-menu"
-        className="fixed bg-retro-panel/95 backdrop-blur-md border border-edge rounded-xl shadow-2xl p-1.5 w-56 text-xs z-[var(--z-system)] space-y-0.5 animate-orbit-fade-in text-retro-fg"
+        className="fixed bg-retro-panel/95 backdrop-blur-md border border-edge rounded-xl shadow-2xl p-1.5 w-56 text-xs z-[var(--z-lightbox)] space-y-0.5 animate-orbit-fade-in text-retro-fg"
         style={{ top, left }}
         onClick={(e) => e.stopPropagation()}
       >
