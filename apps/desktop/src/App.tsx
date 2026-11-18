@@ -1,4 +1,5 @@
 
+import { useBatchDownload } from "./hooks/useBatchDownload";
 import { useStories } from "./hooks/useStories";
 import { useIdentity } from "./hooks/useIdentity";
 import { getSecureItem, setSecureItem } from './utils/secure-storage'
@@ -1105,6 +1106,7 @@ export default function Home() {
   const [selectedProfileUser, setSelectedProfileUser] = useState<User | null>(null)
 
   const { stories, setStories, storiesLoading, loadStories } = useStories(identity);
+  const { batchDownloading, downloadAll } = useBatchDownload(identity, toast);
 
   // One overlay at a time: a profile opened from a post lightbox dismisses
   // the lightbox, so the two never stack (and the profile can sit on the
@@ -1164,7 +1166,6 @@ export default function Home() {
 
   const [galleryPage, setGalleryPage] = useState(0);
   const [gallerySort, setGallerySort] = useState<'newest' | 'oldest' | 'likes' | 'score'>('newest');
-  const [batchDownloading, setBatchDownloading] = useState(false);
   const [transferProgress, setTransferProgress] = useState<string | null>(null);
   const [showStoryModal, setShowStoryModal] = useState(false)
   const [showCreateCardModal, setShowCreateCardModal] = useState(false)
@@ -3406,32 +3407,6 @@ export default function Home() {
     }
   }
 
-  const handleDownloadAll = async () => {
-    if (filteredItems.length === 0 || !identity) return
-    setBatchDownloading(true)
-    toast(`Starting download of ${filteredItems.length} cards…`, 'info')
-    let count = 0
-    for (const item of filteredItems) {
-      try {
-        const res = await orbitFetch(`/api/objects/${item.id}`, {}, identity)
-        if (res.ok) {
-          const blob = await res.blob()
-          const url = URL.createObjectURL(blob)
-          const a = document.createElement('a')
-          a.href = url
-          a.download = `card_${item.id.substring(0, 8)}.jpg`
-          a.click()
-          URL.revokeObjectURL(url)
-          count++
-        }
-      } catch (err) {
-        logger.warn('[App] GET /api/objects/:id failed', err)
-      }
-    }
-    setBatchDownloading(false)
-    toast(`Downloaded ${count} cards.`, 'success')
-  }
-
   const toggleFavorite = useCallback(async (item: OrbitObject) => {
     if (!identity) return false
     const res = await orbitFetch(`/api/inbox/${item.id}/favorite`, { method: 'POST' }, identity)
@@ -4059,7 +4034,7 @@ export default function Home() {
                       totalPages={totalPages}
                       paginatedItems={paginatedItems}
                       batchDownloading={batchDownloading}
-                      handleDownloadAll={handleDownloadAll}
+                      handleDownloadAll={() => downloadAll(filteredItems)}
                       handleBatchDownload={handleBatchDownload}
                       handleBatchDelete={handleBatchDelete}
                       dragActive={dragActive}
