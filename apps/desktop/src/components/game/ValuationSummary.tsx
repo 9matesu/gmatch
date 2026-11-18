@@ -217,7 +217,7 @@ export function ValuationSummary({
           <span className="font-mono text-retro-body">{summary.prevDeckValue.toLocaleString()}</span>
           <ArrowRight className="w-4 h-4 text-retro-muted" />
           <span className="font-mono text-retro-fg">{(summary.prevDeckValue + summary.myDelta).toLocaleString()}</span>
-          <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full border ${summary.myDelta >= 0 ? 'bg-success/0 text-success-fg border-success/0' : 'bg-danger/0 text-danger-fg border-danger/0'}`}>
+          <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full border ${summary.myDelta >= 0 ? 'bg-success/40 text-success-fg border-success/40' : 'bg-danger/40 text-danger-fg border-danger/40'}`}>
             {summary.myDelta >= 0 ? `+${summary.myDelta}` : summary.myDelta} PTS
           </span>
         </div>
@@ -228,7 +228,7 @@ export function ValuationSummary({
 
       {/* Rarity Promotions Fanfare */}
       {summary.promotions.length > 0 && (
-        <div className="p-3 bg-warning/0 border border-warning/0 rounded-xl text-center space-y-1">
+        <div className="p-3 bg-warning/10 border border-warning/30 rounded-xl text-center space-y-1">
           <div className="flex items-center justify-center gap-1.5 text-xs font-bold uppercase text-warning-fg tracking-wider">
             <Sparkles className="w-4 h-4 text-warning-fg" />
             <span>Rarity Promotion Unlocked</span>

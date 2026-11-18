@@ -149,7 +149,7 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
         </div>
 
         <div className={`flex items-center gap-2 px-3 py-1 rounded-xl border text-xs font-mono font-bold tabular-nums ${
-          secondsRemaining < 30 ? 'bg-danger/0 border-danger/0 text-danger-fg' : 'bg-surface-interactive border-edge text-retro-fg'
+          secondsRemaining < 30 ? 'bg-danger/40 border-danger/40 text-danger-fg' : 'bg-surface-interactive border-edge text-retro-fg'
         }`}>
           <Clock className="w-3.5 h-3.5" />
           <span>{formatTimer(secondsRemaining)}</span>
@@ -167,7 +167,7 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
             <span className={`px-3 py-1 rounded-full font-mono text-2xs font-bold tracking-wider border ${
               feedError
                 ? 'bg-glass-w5 border-edge text-retro-muted'
-                : 'bg-success/0 border-success/0 text-success-fg'
+                : 'bg-success/10 border-success/30 text-success-fg'
             }`}>
               {feedError ? 'OFFLINE' : 'LIVE'}
             </span>

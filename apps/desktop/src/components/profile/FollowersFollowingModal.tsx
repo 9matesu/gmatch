@@ -343,7 +343,7 @@ export function FollowersFollowingModal({
                         onSendCard(user.id);
                       }}
                       title="Send Duel Card"
-                      className="p-2 text-retro-muted hover:text-info-fg rounded-xl hover:bg-warning/0 transition-colors cursor-pointer"
+                      className="p-2 text-retro-muted hover:text-info-fg rounded-xl hover:bg-warning/20 transition-colors cursor-pointer"
                     >
                       <Send className="w-4 h-4" />
                     </button>
@@ -355,7 +355,7 @@ export function FollowersFollowingModal({
                       type="button"
                       onClick={() => handleToggleFollow(user)}
                       className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1 ${isFollowing
-                          ? 'bg-surface-interactive hover:bg-danger/10 text-retro-fg hover:text-danger-fg border border-edge'
+                          ? 'bg-surface-interactive hover:bg-danger text-retro-fg hover:text-danger-fg border border-edge'
                           : 'bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text shadow-xs'
                         }`}
                     >

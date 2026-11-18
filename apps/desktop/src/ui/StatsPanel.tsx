@@ -95,10 +95,10 @@ export default function StatsPanel() {
         {/* Corruption Shards */}
         <div className="rounded-xl border border-edge bg-glass-w5 p-2 flex flex-col justify-between">
           <div className="flex items-center gap-1 text-2xs font-medium text-retro-muted truncate">
-            <Sparkle className="w-3.5 h-3.5 text-chrome-lav-fg shrink-0" weight="fill" />
+            <Sparkle className="w-3.5 h-3.5 text-chrome-lav shrink-0" weight="fill" />
             <span>Shards</span>
           </div>
-          <div className={`${MONO} text-xs font-bold text-chrome-lav-fg mt-1`}>
+          <div className={`${MONO} text-xs font-bold text-chrome-lav mt-1`}>
             {s.shards} <span className="text-2xs text-retro-muted font-normal">(+{s.shards * 10}%)</span>
           </div>
         </div>

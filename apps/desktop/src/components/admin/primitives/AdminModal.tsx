@@ -69,8 +69,8 @@ export function AdminActionMenu<T>({
                   disabled={action.disabled?.(row)}
                   className={cn(
                     "w-full px-3 py-2 text-left text-xs flex items-center gap-2 transition-colors",
-                    action.variant === "danger" && "text-danger-fg hover:bg-danger/0",
-                    action.variant === "primary" && "text-info-fg hover:bg-info/0",
+                    action.variant === "danger" && "text-danger-fg hover:bg-danger/10",
+                    action.variant === "primary" && "text-info-fg hover:bg-info/10",
                     action.variant === "ghost" && "text-retro-muted hover:text-retro-fg hover:bg-glass-w5",
                     (!action.variant || action.variant === "default") && "text-retro-fg hover:bg-glass-w10",
                     "disabled:opacity-40 disabled:cursor-not-allowed"
@@ -133,8 +133,8 @@ export function BulkActionBar<T>({
               disabled={action.disabled?.(selectedRows)}
               className={cn(
                 "px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded transition-colors flex items-center gap-1.5",
-                action.variant === "danger" && "bg-danger/0 text-danger-fg border border-danger/0 hover:bg-danger/0",
-                action.variant === "primary" && "bg-info/0 text-info-fg border border-info/0 hover:bg-info/0",
+                action.variant === "danger" && "bg-danger/20 text-danger-fg border border-danger/30 hover:bg-danger/30",
+                action.variant === "primary" && "bg-info/20 text-info-fg border border-info/30 hover:bg-info/30",
                 action.variant !== "danger" && action.variant !== "primary" && "bg-surface-interactive text-retro-fg border border-edge hover:bg-glass-w10",
                 "disabled:opacity-40 disabled:cursor-not-allowed"
               )}
@@ -215,7 +215,7 @@ export function ConfirmDialog({
             disabled={isLoading}
             className={cn(
               "px-3 py-1.5 text-xs font-bold rounded flex items-center gap-1.5 transition-colors disabled:opacity-40",
-              variant === "danger" && "bg-danger/0 text-danger-fg border border-danger/0 hover:bg-danger/0",
+              variant === "danger" && "bg-danger/20 text-danger-fg border border-danger/30 hover:bg-danger/30",
               variant === "primary" && "bg-info text-retro-accent-text border border-info hover:bg-info",
               variant === "default" && "bg-surface-interactive text-retro-fg border border-edge hover:bg-glass-w10"
             )}

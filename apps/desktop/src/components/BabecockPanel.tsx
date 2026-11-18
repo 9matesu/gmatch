@@ -579,7 +579,7 @@ export function BabecockPanel({
           right={
             <>
               {round && (
-                <span className={`px-2.5 py-1 text-xs font-mono font-semibold rounded-md border flex items-center gap-1 ${secsLeft > 0 ? 'bg-danger/0 text-danger-fg border-danger/0' : 'text-retro-muted border-edge'
+                <span className={`px-2.5 py-1 text-xs font-mono font-semibold rounded-md border flex items-center gap-1 ${secsLeft > 0 ? 'bg-danger/10 text-danger-fg border-danger/30' : 'text-retro-muted border-edge'
                   }`}>
                   <Clock className="w-3.5 h-3.5" />
                   <span>{secsLeft > 0 ? fmt(secsLeft) : 'CLOSED'}</span>
@@ -716,7 +716,7 @@ export function BabecockPanel({
                     </Button>
                   )}
                   {round.my_entry ? (
-                    <span className="px-3 py-1.5 text-xs font-semibold text-success-fg bg-success/10 border border-success/30 rounded-lg flex items-center gap-1.5">
+                    <span className="px-3 py-1.5 text-xs font-semibold text-success-fg bg-success border border-success rounded-lg flex items-center gap-1.5">
                       <Check className="w-3.5 h-3.5" />
                       <span>You are in the round</span>
                     </span>
@@ -854,7 +854,7 @@ export function BabecockPanel({
             <>
               <CameraCapture onCapture={handleCameraFile} onCancel={() => setMode('upload')} />
               {hasFile && (
-                <div className="flex items-center gap-2 px-3 py-2 bg-success/10 border border-success/30 rounded-lg text-xs font-semibold text-success-fg">
+                <div className="flex items-center gap-2 px-3 py-2 bg-success border border-success rounded-lg text-xs font-semibold text-success-fg">
                   <Check className="w-4 h-4" />
                   <span>Snapshot captured and ready.</span>
                   <Button variant="ghost" size="sm" className="ml-auto" onClick={() => { fileRef.current = null; setHasFile(false); setPreview(null) }}>

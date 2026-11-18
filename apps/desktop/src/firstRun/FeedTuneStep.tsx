@@ -237,7 +237,7 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
                 onClick={() => setExcludes((prev) => prev.filter((t) => t !== x))}
                 aria-label={`Remove exclude ${x}`}
                 title={`${x}. Tap to remove`}
-                className="inline-flex items-center gap-1.5 rounded-full border border-danger/0 bg-danger/0 px-3 py-1.5 text-xs font-mono text-danger-fg cursor-pointer hover:bg-danger/5"
+                className="inline-flex items-center gap-1.5 rounded-full border border-danger/40 bg-danger/10 px-3 py-1.5 text-xs font-mono text-danger-fg cursor-pointer hover:bg-danger/25"
               >
                 {x}
                 <span aria-hidden="true">×</span>

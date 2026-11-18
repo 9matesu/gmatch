@@ -314,7 +314,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
           </button>
           <button
             onClick={validateDeck}
-            className="text-xs bg-info/0 hover:bg-info/0 text-info-fg px-3 py-1.5 rounded-lg flex items-center gap-1.5"
+            className="text-xs bg-info/20 hover:bg-info/30 text-info-fg px-3 py-1.5 rounded-lg flex items-center gap-1.5"
           >
             <Check className="w-3 h-3" />
             Validate Deck
@@ -335,14 +335,14 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
                    <Pencil className="w-3.5 h-3.5" />
                  </button>
                  {activeDeckId === selectedDeck.id ? (
-                   <span className="px-2 py-0.5 rounded-full bg-success/0 border border-success/0 text-success-fg font-mono text-2xs font-bold flex items-center gap-1">
+                   <span className="px-2 py-0.5 rounded-full bg-success/20 border border-success/40 text-success-fg font-mono text-2xs font-bold flex items-center gap-1">
                      <Star className="w-3 h-3 fill-success text-success-fg" /> Active Deck
                    </span>
                  ) : (
                    <button
                      type="button"
                      onClick={() => setActiveDeck(selectedDeck.id)}
-                     className="px-2 py-0.5 rounded-full bg-surface-interactive border border-edge hover:border-success/0 text-retro-muted hover:text-success-fg text-2xs font-bold cursor-pointer transition-colors"
+                     className="px-2 py-0.5 rounded-full bg-surface-interactive border border-edge hover:border-success/40 text-retro-muted hover:text-success-fg text-2xs font-bold cursor-pointer transition-colors"
                    >
                      Set as Active
                    </button>
@@ -356,7 +356,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
              <div className="flex items-center gap-2">
               <button
                 onClick={() => setAddingCards(!addingCards)}
-                className="text-xs bg-info/0 hover:bg-info/0 text-info-fg px-3 py-1.5 rounded-lg flex items-center gap-1.5 cursor-pointer font-semibold"
+                className="text-xs bg-info/20 hover:bg-info/30 text-info-fg px-3 py-1.5 rounded-lg flex items-center gap-1.5 cursor-pointer font-semibold"
               >
                 <Plus className="w-3 h-3" />
                 {addingCards ? 'Done' : 'Add Cards'}
@@ -393,7 +393,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
            )}
 
            {validation && (
-            <div className={`mb-4 p-3 rounded-lg ${validation.valid ? 'bg-success/0 border border-success/0' : 'bg-danger/0 border border-danger/0'}`}>
+            <div className={`mb-4 p-3 rounded-lg ${validation.valid ? 'bg-success/20 border border-success/30' : 'bg-danger/20 border border-danger/30'}`}>
               <div className="flex items-center gap-2 mb-2">
                 {validation.valid ? (
                   <Check className="w-4 h-4 text-success-fg" />
@@ -431,7 +431,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
                 if (payload.cardId) void addCardToDeck(payload.cardId);
               } catch { /* malformed */ }
             }}
-            className={`rounded-xl border-2 border-dashed transition-colors p-2 -m-2 ${deckDropOver ? 'border-info/0 bg-info/0' : 'border-transparent'}`}
+            className={`rounded-xl border-2 border-dashed transition-colors p-2 -m-2 ${deckDropOver ? 'border-info/70 bg-info/10' : 'border-transparent'}`}
           >
             <h3 className="text-sm font-bold text-retro-body mb-2">Cards in Deck{deckDropOver && <span className="ml-2 text-xs font-semibold text-info-fg animate-pulse">Drop to add</span>}</h3>
             {getCardsInDeck().length === 0 ? (
@@ -445,7 +445,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
                     <CardTile item={card} identity={identity} onClick={() => openCardDetail(card)} />
                     <button
                       onClick={() => removeCardFromDeck(canonicalId(card))}
-                      className="absolute top-2 right-2 bg-danger/0 hover:bg-danger text-retro-fg p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute top-2 right-2 bg-danger/80 hover:bg-danger text-retro-fg p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
                       title="Remove from deck"
                     >
                       <Trash2 className="w-3 h-3" />
@@ -488,7 +488,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
                       <CardTile item={card} identity={identity} onClick={() => openCardDetail(card)} />
                       <button
                         onClick={() => addCardToDeck(canonicalId(card))}
-                        className="absolute top-2 right-2 bg-info/0 hover:bg-info text-retro-fg p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute top-2 right-2 bg-info/80 hover:bg-info text-retro-fg p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
                         title="Add to deck (or drag into the deck above)"
                       >
                         <Plus className="w-3 h-3" />
@@ -553,7 +553,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
                       {deck.cards.length}/5 cards
                     </span>
                     {activeDeckId === deck.id && (
-                      <span className="px-2 py-0.5 rounded-full bg-success/0 border border-success/0 text-success-fg font-mono text-2xs font-bold flex items-center gap-1">
+                      <span className="px-2 py-0.5 rounded-full bg-success/20 border border-success/40 text-success-fg font-mono text-2xs font-bold flex items-center gap-1">
                         <Star className="w-2.5 h-2.5 fill-success text-success-fg" /> Active
                       </span>
                     )}
@@ -564,7 +564,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
                 </button>
                 <button
                   onClick={() => deleteDeck(deck.id)}
-                  className="text-danger-fg hover:text-danger-fg p-2 rounded-lg hover:bg-danger/0 transition-colors"
+                  className="text-danger-fg hover:text-danger-fg p-2 rounded-lg hover:bg-danger/10 transition-colors"
                   title="Delete deck"
                 >
                   <Trash2 className="w-4 h-4" />

@@ -33,7 +33,7 @@ import { requestGalleryAction, type GalleryActionId } from '../utils/galleryActi
 const GALLERY_ACTIONS: Array<{ id: GalleryActionId; label: string; icon: React.ReactNode; danger?: boolean }> = [
   { id: 'repost', label: 'Repost to feed', icon: <Repeat className="w-3.5 h-3.5 text-info-fg" /> },
   { id: 'story', label: 'Add to story', icon: <Sparkles className="w-3.5 h-3.5 text-warning-fg" /> },
-  { id: 'card', label: 'Create card', icon: <ImageIcon className="w-3.5 h-3.5 text-chrome-lav-fg" /> },
+  { id: 'card', label: 'Create card', icon: <ImageIcon className="w-3.5 h-3.5 text-chrome-lav" /> },
   { id: 'feature', label: 'Re-feature in the panel', icon: <RefreshCw className="w-3.5 h-3.5 text-success-fg" /> },
   { id: 'backdrop', label: 'Set as backdrop', icon: <Monitor className="w-3.5 h-3.5 text-info-fg" /> },
   { id: 'delete', label: 'Delete keepsake', icon: <Trash2 className="w-3.5 h-3.5" />, danger: true },

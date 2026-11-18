@@ -36,7 +36,7 @@ export function FeedStatusPills() {
     <div className="px-3 sm:px-6 pt-2">
       <div
         role="status"
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-warning/0 text-warning-fg border border-warning/0"
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-warning/10 text-warning-fg border border-warning/30"
       >
         <WifiOff className="w-3.5 h-3.5" />
         <span>Offline — showing cached posts, may be stale</span>

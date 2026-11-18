@@ -241,12 +241,12 @@ export function YourMatchTab({
 
         {/* No match */}
         {!celebrate && st.phase === 'ended' && st.lastResult === 'ended' && (
-          <div className="border border-danger/0 bg-danger/ p-4 text-center space-y-2 animate-orbit-slide-up rounded-lg">
+          <div className="border border-danger/30 bg-danger/ p-4 text-center space-y-2 animate-orbit-slide-up rounded-lg">
             <div className="text-sm font-medium text-danger-fg">{matchEndSummary(st.lastResult, lastPayout, false)}</div>
             <div className="text-xs text-retro-muted">Cards revealed below.</div>
             <div className="grid grid-cols-2 gap-2">
-              {cardSlot('You', revealMineImg, 'Your card', 'border-danger/0', false)}
-              {cardSlot(opponentName, revealTheirsImg, 'Their card', 'border-danger/0', false, false, opponentUser)}
+              {cardSlot('You', revealMineImg, 'Your card', 'border-danger/30', false)}
+              {cardSlot(opponentName, revealTheirsImg, 'Their card', 'border-danger/30', false, false, opponentUser)}
             </div>
           </div>
         )}
@@ -337,7 +337,7 @@ export function YourMatchTab({
             <button
               disabled={submitting}
               onClick={() => void decideAndCapture('reject')}
-              className="py-2.5 text-xs font-medium border border-edge text-retro-muted hover:text-danger-fg hover:border-danger/0 bg-surface-interactive hover:bg-danger/ rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              className="py-2.5 text-xs font-medium border border-edge text-retro-muted hover:text-danger-fg hover:border-danger/30 bg-surface-interactive hover:bg-danger/ rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
               <span>Reject</span>

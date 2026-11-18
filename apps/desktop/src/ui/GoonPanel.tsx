@@ -374,8 +374,8 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
     viewMode === '2x2' || viewMode === '1x2' ? 'grid-cols-2' : 'grid-cols-3'
 
   const critFlashEl = critFlash && (
-    <div className="pointer-events-none absolute inset-0 z-[10] flex items-center justify-center bg-danger/5 backdrop-blur-[1px] animate-[gg-crit_0.35s_ease-out_forwards]">
-      <div className="flex items-center gap-2 rounded-xl border border-danger/0 bg-retro-bg/90 px-6 py-2.5 font-mono text-xl font-black tracking-widest text-danger-fg">
+    <div className="pointer-events-none absolute inset-0 z-[10] flex items-center justify-center bg-danger/15 backdrop-blur-[1px] animate-[gg-crit_0.35s_ease-out_forwards]">
+      <div className="flex items-center gap-2 rounded-xl border border-danger/60 bg-retro-bg/90 px-6 py-2.5 font-mono text-xl font-black tracking-widest text-danger-fg">
         <Lightning className="h-5 w-5 text-danger-fg" weight="fill" />
         CRITICAL HIT!
       </div>
@@ -733,7 +733,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           </button>
           <button
             type="button"
-            className="icon-btn absolute right-3 top-3 z-[6] flex h-8 w-8 items-center justify-center rounded-xl bg-black/60 text-retro-fg/70 border border-edge backdrop-blur-md hover:bg-danger/0 hover:text-retro-fg hover:border-danger/0 transition duration-150 active:scale-95 cursor-pointer"
+            className="icon-btn absolute right-3 top-3 z-[6] flex h-8 w-8 items-center justify-center rounded-xl bg-black/60 text-retro-fg/70 border border-edge backdrop-blur-md hover:bg-danger/80 hover:text-retro-fg hover:border-danger/60 transition duration-150 active:scale-95 cursor-pointer"
             aria-label="Never show this again"
             title="Purge. This image and its rarest tags never return"
             hidden={!current}
@@ -767,7 +767,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               aria-expanded={dropsOpen}
               aria-label={`${pendingDrops.length} novelty drops waiting`}
               title="KO drops. Adopt a tag, ban an anti-tag, one click each"
-              className={`${MONO} inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border border-danger/0 bg-danger/0 px-2.5 py-1 text-xs font-bold text-danger-fg hover:bg-danger/0 transition-colors`}
+              className={`${MONO} inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border border-danger/40 bg-danger/10 px-2.5 py-1 text-xs font-bold text-danger-fg hover:bg-danger/20 transition-colors`}
             >
               <Gift size={14} weight="bold" className="text-danger-fg" />
               <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-2xs font-black text-retro-fg">
@@ -797,7 +797,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                           type="button"
                           onClick={() => claimDropTag(drop.id)}
                           title={`Adopt +${drop.suggestedTag} into your feed`}
-                          className={`${MONO} cursor-pointer rounded-md border border-success/0 bg-success/5 px-2 py-0.5 text-2xs font-bold text-success-fg hover:bg-success/5 transition-colors`}
+                          className={`${MONO} cursor-pointer rounded-md border border-success/40 bg-success/15 px-2 py-0.5 text-2xs font-bold text-success-fg hover:bg-success/25 transition-colors`}
                         >
                           + {drop.suggestedTag}
                         </button>
@@ -807,7 +807,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                           type="button"
                           onClick={() => claimDropAntiTag(drop.id)}
                           title={`Ban ${drop.suggestedAntiTag} from your feed`}
-                          className={`${MONO} inline-flex items-center gap-1 cursor-pointer rounded-md border border-danger/0 bg-danger/0 px-2 py-0.5 text-2xs font-bold text-danger-fg hover:bg-danger/0 transition-colors`}
+                          className={`${MONO} inline-flex items-center gap-1 cursor-pointer rounded-md border border-danger/40 bg-danger/10 px-2 py-0.5 text-2xs font-bold text-danger-fg hover:bg-danger/20 transition-colors`}
                         >
                           <X size={10} weight="bold" className="shrink-0" /> {drop.suggestedAntiTag}
                         </button>
@@ -845,7 +845,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
         )}
         {heatLive && (
           <span
-            className={`${MONO} inline-flex min-w-0 shrink items-center gap-1.5 whitespace-nowrap rounded-lg border border-warning/0 bg-warning/5 px-2.5 py-1 text-xs font-black text-warning-fg${reduceMotion ? '' : ' animate-pulse'}`}
+            className={`${MONO} inline-flex min-w-0 shrink items-center gap-1.5 whitespace-nowrap rounded-lg border border-warning/40 bg-warning/15 px-2.5 py-1 text-xs font-black text-warning-fg${reduceMotion ? '' : ' animate-pulse'}`}
             title={`Heat combo: ${heatStreak} rapid clicks. X${heat} click power`}
             aria-label={`Heat combo x${heat}`}
           >

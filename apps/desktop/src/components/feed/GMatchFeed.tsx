@@ -1000,7 +1000,7 @@ function GMatchFeedImpl({
             </>
           ) : (
             <>
-              <span className="w-1.5 h-1.5 rounded-full bg-warning/0 shrink-0" aria-hidden="true" />
+              <span className="w-1.5 h-1.5 rounded-full bg-warning/90 shrink-0" aria-hidden="true" />
               <span>
                 {syncCounts.local} post{syncCounts.local === 1 ? '' : 's'} saved on this device — they upload when the network is back.
               </span>

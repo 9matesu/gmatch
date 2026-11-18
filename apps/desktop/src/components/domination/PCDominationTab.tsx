@@ -486,8 +486,8 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
 
   const statusChip = (t: DominationTarget) => {
     if (!t.enabled) return { text: 'blocked', cls: 'text-retro-muted border-edge' };
-    if (t.online) return { text: 'online', cls: 'text-success-fg border-success/0' };
-    return { text: `seen ${timeAgo(t.last_seen)}`, cls: 'text-warning-fg80 border-warning/0' };
+    if (t.online) return { text: 'online', cls: 'text-success-fg border-success/30' };
+    return { text: `seen ${timeAgo(t.last_seen)}`, cls: 'text-warning-fg/80 border-warning/20' };
   };
 
   const SUBTAB_LABELS: Record<DominationSubtab, string> = {
@@ -527,7 +527,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
           >
             <span
               aria-hidden="true"
-              className={`absolute inset-x-0 h-1 rounded-full transition-colors ${receiving ? 'bg-success/0' : 'bg-surface-raised'}`}
+              className={`absolute inset-x-0 h-1 rounded-full transition-colors ${receiving ? 'bg-success/50' : 'bg-surface-raised'}`}
             />
             <span
               aria-hidden="true"
@@ -539,7 +539,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
               type="button"
               onClick={togglePause}
               className={`ml-1 px-2 py-1 rounded-md text-xs font-medium border cursor-pointer transition-colors ${
-                paused ? 'border-success/0 text-success-fg' : 'border-edge text-retro-muted hover:text-retro-fg'
+                paused ? 'border-success/30 text-success-fg' : 'border-edge text-retro-muted hover:text-retro-fg'
               }`}
             >
               {paused ? 'Resume' : 'Pause 15m'}
@@ -679,7 +679,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                   <div className="text-xs text-retro-fg">
                     Effects for <span className="font-semibold">{selectedTarget.displayName}</span>
                     {selectedTarget.enabled && !selectedTarget.online && (
-                      <span className="text-warning-fg80"> · offline, sends will be refused (free)</span>
+                      <span className="text-warning-fg/80"> · offline, sends will be refused (free)</span>
                     )}
                   </div>
                   <div className="text-xs font-mono text-retro-muted">{formatCount(points)} g$</div>
@@ -698,7 +698,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-retro-muted -mt-1">
                       {noneAllowed && <span>No consent yet — ask in the Consent tab.</span>}
                       {!noneAllowed && !allAllowed && <span>Some effects are not consented.</span>}
-                      {allFree && <span className="text-success-fg80">Free via mesh.</span>}
+                      {allFree && <span className="text-success-fg/80">Free via mesh.</span>}
                     </div>
                   )
                 })()}
@@ -734,7 +734,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <Icon className="w-4 h-4 text-retro-muted" />
                           {meshable ? (
-                            <span className="text-xs font-mono text-success-fg80">Free</span>
+                            <span className="text-xs font-mono text-success-fg/80">Free</span>
                           ) : price != null ? (
                             <span className="text-xs font-mono text-retro-muted">{price} g$</span>
                           ) : (
@@ -745,7 +745,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                         {/* Consented is the default and lives in the group line; the card
                             only states what is different. */}
                         {!allowed || sending === action ? (
-                          <div className={`mt-2 text-2xs font-mono ${allowed ? 'text-success-fg80' : 'text-danger-fg80'}`}>
+                          <div className={`mt-2 text-2xs font-mono ${allowed ? 'text-success-fg/80' : 'text-danger-fg/80'}`}>
                             {sending === action ? 'sending…' : 'no consent'}
                           </div>
                         ) : null}
@@ -816,7 +816,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                       >
                         <span
                           aria-hidden="true"
-                          className={`absolute inset-x-0 h-1 rounded-full transition-colors ${value ? 'bg-success/0' : 'bg-surface-raised'}`}
+                          className={`absolute inset-x-0 h-1 rounded-full transition-colors ${value ? 'bg-success/50' : 'bg-surface-raised'}`}
                         />
                         <span
                           aria-hidden="true"
@@ -913,12 +913,12 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                   <span
                     className={`shrink-0 text-2xs font-mono px-1.5 py-0.5 rounded border ${
                       st === 'executed' || st === 'completed'
-                        ? 'text-success-fg border-success/0'
+                        ? 'text-success-fg border-success/30'
                         : st === 'sent' || st === 'landed'
                           ? 'text-retro-muted border-edge'
                           : st === 'expired'
-                            ? 'text-warning-fg border-warning/0'
-                            : 'text-danger-fg border-danger/0'
+                            ? 'text-warning-fg border-warning/30'
+                            : 'text-danger-fg border-danger/30'
                     }`}
                     title={
                       st === 'sent' ? 'Accepted by the server, waiting for their screen to confirm'
@@ -946,8 +946,8 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
           {historyPane === 'outgoing' && historyState === 'ready' && outgoingAll.length > 0 && (
             <p className="text-xs text-retro-muted px-1">
               <span className="font-mono">awaiting</span> = charged and relayed; it flips to{' '}
-              <span className="font-mono text-success-fg80">landed</span> once their client confirms, or to{' '}
-              <span className="font-mono text-warning-fg80">fizzled</span> after 30 min if it never rendered.
+              <span className="font-mono text-success-fg/80">landed</span> once their client confirms, or to{' '}
+              <span className="font-mono text-warning-fg/80">fizzled</span> after 30 min if it never rendered.
               Camera requests stay <span className="font-mono">awaiting</span> until they approve the photo.
             </p>
           )}

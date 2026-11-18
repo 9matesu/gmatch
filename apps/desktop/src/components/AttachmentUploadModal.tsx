@@ -277,7 +277,7 @@ export function AttachmentUploadModal({
             <>
               <CameraCapture onCapture={handleCameraFile} onCancel={() => setMode('upload')} />
               {hasFile && (
-                <div className="flex items-center gap-2 px-3 py-2 bg-success/10 border border-success/30 rounded-xl text-xs font-bold text-success-fg">
+                <div className="flex items-center gap-2 px-3 py-2 bg-success border border-success rounded-xl text-xs font-bold text-success-fg">
                   <Check className="w-4 h-4" />
                   <span>Snapshot captured & ready to attach.</span>
                   <button
@@ -333,7 +333,7 @@ export function AttachmentUploadModal({
         </div>
 
         {error && (
-          <p role="alert" className="text-xs font-bold text-danger-fg bg-danger/10 border border-danger/30 rounded-xl px-3 py-2">
+          <p role="alert" className="text-xs font-bold text-danger-fg bg-danger border border-danger rounded-xl px-3 py-2">
             {error}
           </p>
         )}

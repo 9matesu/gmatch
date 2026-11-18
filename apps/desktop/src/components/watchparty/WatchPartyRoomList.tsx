@@ -277,7 +277,7 @@ export function WatchPartyRoomList({
       </div>
 
       {failed && (
-        <div className="mt-8 p-4 rounded-xl border border-danger/0 bg-danger/0 text-center max-w-md mx-auto text-xs text-danger-fg">
+        <div className="mt-8 p-4 rounded-xl border border-danger/20 bg-danger/10 text-center max-w-md mx-auto text-xs text-danger-fg">
           Could not load watch rooms. Please check your network connection.
         </div>
       )}

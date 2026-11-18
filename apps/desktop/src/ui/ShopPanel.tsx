@@ -296,7 +296,7 @@ function CapsTab() {
               key={id}
               className={`flex items-center justify-between gap-3 rounded-xl border p-2.5 transition duration-150 ${
                 st.count > 0
-                  ? 'border-chrome-pink/0 bg-chrome-pink/[0.04]'
+                  ? 'border-chrome-pink/30 bg-chrome-pink/[0.04]'
                   : 'border-edge bg-glass-w5 hover:border-edge-strong'
               }`}
             >
@@ -310,7 +310,7 @@ function CapsTab() {
                       {def.name}
                     </span>
                     {st.count > 0 && (
-                      <span className={`${MONO} text-2xs font-black text-chrome-pink-fg bg-chrome-pink/5 px-1.5 py-0.2 rounded-full`}>
+                      <span className={`${MONO} text-2xs font-black text-chrome-pink bg-chrome-pink/15 px-1.5 py-0.2 rounded-full`}>
                         x{st.count}
                       </span>
                     )}
@@ -356,11 +356,11 @@ function PrestigeTab() {
       {/* Brainmelt Terminal Card */}
       <div className="rounded-lg border border-edge bg-glass-w5 p-3.5 space-y-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-chrome-lav-fg font-bold text-xs">
-            <Sparkle className="w-4 h-4 text-chrome-lav-fg" weight="fill" />
+          <div className="flex items-center gap-1.5 text-chrome-lav font-bold text-xs">
+            <Sparkle className="w-4 h-4 text-chrome-lav" weight="fill" />
             <span>Corruption Shards</span>
           </div>
-          <span className={`${MONO} text-xs font-bold text-chrome-lav-fg bg-chrome-lav/0 px-2 py-0.5 rounded-full border border-chrome-lav/0`}>
+          <span className={`${MONO} text-xs font-bold text-chrome-lav bg-chrome-lav/20 px-2 py-0.5 rounded-full border border-chrome-lav/30`}>
             Held: {shards}
           </span>
         </div>
@@ -385,7 +385,7 @@ function PrestigeTab() {
           </div>
         </div>
 
-        <div className={`${MONO} text-center text-xs font-bold text-warning-fg bg-warning/0 py-1 rounded-lg border border-warning/0`}>
+        <div className={`${MONO} text-center text-xs font-bold text-warning-fg bg-warning/10 py-1 rounded-lg border border-warning/20`}>
           +{preview} shards on melt
         </div>
 
@@ -417,7 +417,7 @@ function PrestigeTab() {
                 key={a.id}
                 className={`flex items-center gap-2 rounded-xl border p-2 text-xs transition-colors ${
                   got
-                    ? 'border-warning/0 bg-warning/[0.05] text-warning-fg'
+                    ? 'border-warning/30 bg-warning/[0.05] text-warning-fg'
                     : 'border-edge bg-glass-w5 text-retro-muted opacity-50'
                 }`}
                 title={got ? 'Unlocked Trophy' : 'Locked Trophy'}
@@ -490,7 +490,7 @@ export default function ShopPanel() {
           <Lightning className="w-3.5 h-3.5" />
           <span>Caps</span>
           {totalCapsStacks > 0 && (
-            <span className="font-mono text-2xs px-1 rounded-full bg-chrome-pink/0 text-chrome-pink-fg font-bold">
+            <span className="font-mono text-2xs px-1 rounded-full bg-chrome-pink/20 text-chrome-pink font-bold">
               {totalCapsStacks}
             </span>
           )}
@@ -509,7 +509,7 @@ export default function ShopPanel() {
         >
           <Fire className="w-3.5 h-3.5" />
           <span>Prestige</span>
-          <span className="font-mono text-2xs px-1 rounded-full bg-chrome-lav/0 text-chrome-lav-fg font-bold">
+          <span className="font-mono text-2xs px-1 rounded-full bg-chrome-lav/20 text-chrome-lav font-bold">
             T{currentTier}
           </span>
         </button>

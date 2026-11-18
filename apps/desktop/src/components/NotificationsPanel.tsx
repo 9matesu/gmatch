@@ -74,7 +74,7 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
   babecock_start: <Flame className="w-4 h-4 text-danger-fg" />,
   like: <Heart className="w-4 h-4 text-danger-fg fill-danger" />,
   comment: <MessageSquare className="w-4 h-4 text-info-fg" />,
-  follow: <UserPlus className="w-4 h-4 text-chrome-lav-fg" />,
+  follow: <UserPlus className="w-4 h-4 text-chrome-lav" />,
   card_received: <Sparkles className="w-4 h-4 text-warning-fg" />,
   // Was missing: the group fold still folded these, but the row fell back to a
   // generic bell, so "bought your card" had no icon.
@@ -83,7 +83,7 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
   comment_like: <Heart className="w-4 h-4 text-danger-fg" />,
   mention: <AtSign className="w-4 h-4 text-warning-fg" />,
   dm: <MessageSquare className="w-4 h-4 text-info-fg" />,
-  room: <Users className="w-4 h-4 text-chrome-lav-fg" />,
+  room: <Users className="w-4 h-4 text-chrome-lav" />,
   system: <Bell className="w-4 h-4 text-retro-muted" />,
 };
 

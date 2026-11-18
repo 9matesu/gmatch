@@ -71,7 +71,7 @@ export function FlashOverlay({
             type="button"
             onClick={() => onLike(flash.id)}
             disabled={flash.liked_by_me}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-warning/0 border border-warning/0 text-warning-fg text-xs font-bold cursor-pointer disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-warning/20 border border-warning/40 text-warning-fg text-xs font-bold cursor-pointer disabled:opacity-50"
           >
             <Heart className={`w-3.5 h-3.5 ${flash.liked_by_me ? 'fill-current' : ''}`} />
             <span>{flash.likes_count}</span>

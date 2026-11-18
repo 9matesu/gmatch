@@ -173,19 +173,19 @@ export function CardTile({
           {frameType !== 'chrome' && (
             <span className={`text-2xs font-medium uppercase tracking-wider px-1.5 py-0.5 rounded-md border font-mono backdrop-blur-xs ${
               frameType === 'holo'
-                ? 'bg-chrome-lav/0 text-chrome-lav-fg border-chrome-lav/0'
+                ? 'bg-chrome-lav/90 text-chrome-lav border-chrome-lav/60'
                 : frameType === 'carbon'
                 ? 'bg-retro-bg/90 text-retro-fg border-edge'
                 : frameType === 'neon'
-                ? 'bg-info/0 text-info-fg border-info/0'
+                ? 'bg-info/90 text-info-fg border-info/80'
                 : 'bg-black/80 text-retro-fg border-edge'
             }`}>
               {frameType}
             </span>
           )}
           {isReceived && (
-            <span className="text-2xs font-medium px-1.5 py-0.5 bg-black/75 text-chrome-lav-fg rounded-md border border-chrome-lav/0 flex items-center gap-1 backdrop-blur-xs">
-              <Gift className="w-2.5 h-2.5 text-chrome-lav-fg" />
+            <span className="text-2xs font-medium px-1.5 py-0.5 bg-black/75 text-chrome-lav rounded-md border border-chrome-lav/30 flex items-center gap-1 backdrop-blur-xs">
+              <Gift className="w-2.5 h-2.5 text-chrome-lav" />
               <span>RECEIVED</span>
             </span>
           )}
@@ -194,7 +194,7 @@ export function CardTile({
         {/* Top-Right Badges: Expiry Timer & Select Checkbox */}
         <div className="absolute top-2 right-2 z-20 flex items-center gap-1">
           {minsLeft !== null && minsLeft > 0 && (
-            <span className="text-2xs font-mono font-medium px-1.5 py-0.5 bg-black/75 text-warning-fg rounded-md border border-warning/0 backdrop-blur-xs flex items-center gap-1">
+            <span className="text-2xs font-mono font-medium px-1.5 py-0.5 bg-black/75 text-warning-fg rounded-md border border-warning/30 backdrop-blur-xs flex items-center gap-1">
               <Clock className="w-2.5 h-2.5" />
               <span>{minsLeft > 60 ? `${Math.floor(minsLeft / 60)}h` : `${minsLeft}m`}</span>
             </span>

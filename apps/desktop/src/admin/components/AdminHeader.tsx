@@ -122,7 +122,7 @@ export function AdminHeader({
             aria-expanded={userMenuOpen}
             aria-haspopup="true"
           >
-            <div className="w-7 h-7 rounded-full bg-info/0 border border-info/0 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-full bg-info/20 border border-info/30 flex items-center justify-center">
               {user?.avatar ? (
                 <img src={resolveMediaUrl(user.avatar)} alt="" className="w-full h-full rounded-full object-cover" />
               ) : (
@@ -158,7 +158,7 @@ export function AdminHeader({
                   setUserMenuOpen(false);
                   onSignOut?.();
                 }}
-                className="w-full px-3 py-2 text-left text-xs text-danger-fg hover:bg-danger/0 transition-colors flex items-center gap-2"
+                className="w-full px-3 py-2 text-left text-xs text-danger-fg hover:bg-danger/10 transition-colors flex items-center gap-2"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 Sign Out

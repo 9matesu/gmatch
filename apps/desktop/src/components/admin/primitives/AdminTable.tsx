@@ -106,8 +106,8 @@ function AdminActionMenu<T>({ actions, row }: { actions: RowAction<T>[]; row: T 
                   disabled={action.disabled?.(row)}
                   className={cn(
                     "w-full px-3 py-2 text-left text-xs flex items-center gap-2 transition-colors",
-                    actionVariant === "danger" && "text-danger-fg hover:bg-danger/0",
-                    actionVariant === "primary" && "text-info-fg hover:bg-info/0",
+                    actionVariant === "danger" && "text-danger-fg hover:bg-danger/10",
+                    actionVariant === "primary" && "text-info-fg hover:bg-info/10",
                     actionVariant === "ghost" && "text-retro-muted hover:text-retro-fg hover:bg-glass-w5",
                     (!actionVariant || actionVariant === "default") && "text-retro-fg hover:bg-glass-w10",
                     "disabled:opacity-40 disabled:cursor-not-allowed"
@@ -420,8 +420,8 @@ export function AdminTable<T extends Record<string, unknown>>({
                   disabled={action.disabled?.(data.filter(row => rowSelection[getRowId(row)]))}
                   className={cn(
                     "px-2 py-1 rounded text-2xs font-bold uppercase tracking-wider transition-colors",
-                    action.variant === "danger" && "bg-danger/0 text-danger-fg border border-danger/0 hover:bg-danger/0",
-                    action.variant === "primary" && "bg-info/0 text-info-fg border border-info/0 hover:bg-info/0",
+                    action.variant === "danger" && "bg-danger/20 text-danger-fg border border-danger/30 hover:bg-danger/30",
+                    action.variant === "primary" && "bg-info/20 text-info-fg border border-info/30 hover:bg-info/30",
                     action.variant !== "danger" && action.variant !== "primary" && "bg-surface-interactive text-retro-fg border border-edge hover:bg-glass-w10"
                   )}
                 >

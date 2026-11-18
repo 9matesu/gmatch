@@ -81,7 +81,7 @@ export function DeleteAccountSection({
   };
 
   return (
-    <div className="rounded-xl border border-danger/0 bg-danger/0 p-4 space-y-3">
+    <div className="rounded-xl border border-danger/60 bg-danger/20 p-4 space-y-3">
       <div className="flex items-center gap-2">
         <AlertTriangle className="w-4 h-4 text-danger-fg shrink-0" />
         <h4 className="text-xs font-semibold text-danger-fg">Delete account &amp; erase this device</h4>
@@ -99,7 +99,7 @@ export function DeleteAccountSection({
         <button
           type="button"
           onClick={start}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-danger text-danger-fg text-xs font-bold hover:bg-danger/0 cursor-pointer"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-danger text-danger-fg text-xs font-bold hover:bg-danger/50 cursor-pointer"
         >
           <Trash2 className="w-3.5 h-3.5" />
           Delete my account
@@ -154,12 +154,12 @@ export function DeleteAccountSection({
               value={typed}
               onChange={(e) => setTyped(e.target.value)}
               autoComplete="off"
-              className="w-full bg-surface-interactive border border-danger/0 rounded-lg px-3 py-2 text-xs text-retro-fg outline-none focus:border-danger"
+              className="w-full bg-surface-interactive border border-danger/60 rounded-lg px-3 py-2 text-xs text-retro-fg outline-none focus:border-danger"
             />
           </div>
 
           {error && (
-            <div role="alert" className="rounded-lg border border-danger bg-danger/0 p-2.5 text-xs text-danger-fg">
+            <div role="alert" className="rounded-lg border border-danger bg-danger/40 p-2.5 text-xs text-danger-fg">
               {error}
             </div>
           )}

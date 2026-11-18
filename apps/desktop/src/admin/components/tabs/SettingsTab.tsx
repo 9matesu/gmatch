@@ -349,7 +349,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
       {/* Subtab 3: Maintenance & Danger Zone */}
       {activeSubTab === "danger" && (
         <div className="space-y-4">
-          <div className="bg-danger/0 border border-danger/0 rounded-xl p-5 space-y-2">
+          <div className="bg-danger/10 border border-danger/30 rounded-xl p-5 space-y-2">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-danger-fg">
               <AlertTriangle className="w-4 h-4" />
               <span>Danger Zone & Server Maintenance</span>
@@ -360,7 +360,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="rounded-xl border border-danger/0 bg-danger/ p-5 space-y-3">
+            <div className="rounded-xl border border-danger/30 bg-danger/ p-5 space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-xs font-bold text-danger-fg tracking-wider">Run Database Cleanup</h3>
@@ -369,14 +369,14 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
                 <button
                   type="button"
                   onClick={() => setShowCleanupConfirm(true)}
-                  className="px-3 py-2 bg-danger/0 hover:bg-danger/0 text-danger-fg border border-danger/0 rounded-xl text-xs font-bold uppercase tracking-wider transition shrink-0 cursor-pointer"
+                  className="px-3 py-2 bg-danger/20 hover:bg-danger/30 text-danger-fg border border-danger/30 rounded-xl text-xs font-bold uppercase tracking-wider transition shrink-0 cursor-pointer"
                 >
                   Run Cleanup
                 </button>
               </div>
             </div>
 
-            <div className="rounded-xl border border-danger/0 bg-danger/ p-5 space-y-3">
+            <div className="rounded-xl border border-danger/30 bg-danger/ p-5 space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-xs font-bold text-danger-fg tracking-wider">Clean ALL Posts & Reset</h3>
@@ -385,14 +385,14 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
                 <button
                   type="button"
                   onClick={() => setShowCleanPostsConfirm(true)}
-                  className="px-3 py-2 bg-danger/0 hover:bg-danger/0 text-danger-fg border border-danger/0 rounded-xl text-xs font-bold uppercase tracking-wider transition shrink-0 cursor-pointer"
+                  className="px-3 py-2 bg-danger/20 hover:bg-danger/30 text-danger-fg border border-danger/30 rounded-xl text-xs font-bold uppercase tracking-wider transition shrink-0 cursor-pointer"
                 >
                   Clean All
                 </button>
               </div>
             </div>
 
-            <div className="rounded-xl border border-warning/0 bg-warning/ p-5 space-y-3 md:col-span-2">
+            <div className="rounded-xl border border-warning/30 bg-warning/ p-5 space-y-3 md:col-span-2">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-xs font-bold text-warning-fg tracking-wider">Migrate Lobby → Posts</h3>
@@ -401,7 +401,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
                 <button
                   type="button"
                   onClick={() => setShowMigrateConfirm(true)}
-                  className="px-3 py-2 bg-warning/0 hover:bg-warning/0 text-warning-fg border border-warning/0 rounded-xl text-xs font-bold uppercase tracking-wider transition shrink-0 cursor-pointer"
+                  className="px-3 py-2 bg-warning/20 hover:bg-warning/30 text-warning-fg border border-warning/30 rounded-xl text-xs font-bold uppercase tracking-wider transition shrink-0 cursor-pointer"
                 >
                   Migrate Now
                 </button>

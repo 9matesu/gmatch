@@ -80,7 +80,7 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
             >
               <span
                 aria-hidden="true"
-                className={`absolute inset-0 rounded-full transition-colors ${s.enabled ? 'bg-success/0' : 'bg-glass-w10'}`}
+                className={`absolute inset-0 rounded-full transition-colors ${s.enabled ? 'bg-success/40' : 'bg-glass-w10'}`}
               />
               <span
                 aria-hidden="true"

@@ -127,9 +127,9 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
 
       {/* Needs Attention / Security Alert Banner */}
       {pendingReports > 0 ? (
-        <div className="rounded-xl border border-danger/0 bg-danger/0 p-4 flex flex-wrap items-center justify-between gap-4 animate-orbit-fade-in">
+        <div className="rounded-xl border border-danger/40 bg-danger/10 p-4 flex flex-wrap items-center justify-between gap-4 animate-orbit-fade-in">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-danger/0 text-danger-fg flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-lg bg-danger/20 text-danger-fg flex items-center justify-center shrink-0">
               <ShieldAlert className="w-5 h-5" />
             </div>
             <div>
@@ -150,7 +150,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
           </button>
         </div>
       ) : (
-        <div className="rounded-xl border border-success/0 bg-success/ px-4 py-3 flex items-center justify-between text-xs">
+        <div className="rounded-xl border border-success/20 bg-success/ px-4 py-3 flex items-center justify-between text-xs">
           <div className="flex items-center gap-2 text-success-fg font-semibold">
             <ShieldCheck className="w-4 h-4 text-success-fg" />
             <span>All Clear: Zero pending reports in moderation queue</span>
@@ -174,7 +174,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
               <p className="text-2xs font-bold uppercase tracking-wider text-retro-muted">Online Users</p>
               <p className="text-2xl font-black text-success-fg mt-1">{onlineUsers.toLocaleString()}</p>
             </div>
-            <div className="w-8 h-8 rounded-lg bg-success/0 text-success-fg flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-success/10 text-success-fg flex items-center justify-center">
               <Activity className="w-4 h-4" />
             </div>
           </div>
@@ -183,7 +183,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
         {/* 2. Open Reports */}
         <div className={cn(
           "p-4 rounded-xl border",
-          pendingReports > 0 ? "border-danger/0 bg-danger/0" : "border-edge bg-surface-raised"
+          pendingReports > 0 ? "border-danger/40 bg-danger/10" : "border-edge bg-surface-raised"
         )}>
           <div className="flex items-start justify-between">
             <div>
@@ -194,7 +194,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
             </div>
             <div className={cn(
               "w-8 h-8 rounded-lg flex items-center justify-center",
-              pendingReports > 0 ? "bg-danger/0 text-danger-fg" : "bg-glass-w10 text-retro-muted"
+              pendingReports > 0 ? "bg-danger/20 text-danger-fg" : "bg-glass-w10 text-retro-muted"
             )}>
               <Flag className="w-4 h-4" />
             </div>
@@ -206,9 +206,9 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
           <div className="flex items-start justify-between">
             <div>
               <p className="text-2xs font-bold uppercase tracking-wider text-retro-muted">Active Duels</p>
-              <p className="text-2xl font-black text-chrome-lav-fg mt-1">{activeDuels.toLocaleString()}</p>
+              <p className="text-2xl font-black text-chrome-lav mt-1">{activeDuels.toLocaleString()}</p>
             </div>
-            <div className="w-8 h-8 rounded-lg bg-chrome-lav/0 text-chrome-lav-fg flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-chrome-lav/10 text-chrome-lav flex items-center justify-center">
               <GitCompare className="w-4 h-4" />
             </div>
           </div>
@@ -221,7 +221,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
               <p className="text-2xs font-bold uppercase tracking-wider text-retro-muted">Total Accounts</p>
               <p className="text-2xl font-black text-info-fg mt-1">{totalUsers.toLocaleString()}</p>
             </div>
-            <div className="w-8 h-8 rounded-lg bg-info/0 text-info-fg flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-info/10 text-info-fg flex items-center justify-center">
               <Users className="w-4 h-4" />
             </div>
           </div>
@@ -234,7 +234,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
               <p className="text-2xs font-bold uppercase tracking-wider text-retro-muted">In Match Queue</p>
               <p className="text-2xl font-black text-info-fg mt-1">{queueWaiting.toLocaleString()}</p>
             </div>
-            <div className="w-8 h-8 rounded-lg bg-info/0 text-info-fg flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-info/10 text-info-fg flex items-center justify-center">
               <Clock className="w-4 h-4" />
             </div>
           </div>
@@ -247,7 +247,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
               <p className="text-2xs font-bold uppercase tracking-wider text-retro-muted">Public Media</p>
               <p className="text-2xl font-black text-warning-fg mt-1">{totalPosts.toLocaleString()}</p>
             </div>
-            <div className="w-8 h-8 rounded-lg bg-warning/0 text-warning-fg flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-warning/10 text-warning-fg flex items-center justify-center">
               <Globe className="w-4 h-4" />
             </div>
           </div>
@@ -267,7 +267,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
             className="p-3 rounded-lg border border-edge bg-surface-canvas hover:bg-glass-w5 transition text-left group cursor-pointer"
           >
             <div className="flex items-center gap-2 mb-1">
-              <GitCompare className="w-4 h-4 text-chrome-lav-fg group-hover:scale-110 transition-transform" />
+              <GitCompare className="w-4 h-4 text-chrome-lav group-hover:scale-110 transition-transform" />
               <span className="text-xs font-bold text-retro-fg">Force Matchup</span>
             </div>
             <p className="text-2xs text-retro-muted">Pair all waiting players in the duel queue</p>
@@ -363,7 +363,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
         <div className="rounded-xl border border-edge bg-surface-raised overflow-hidden">
           <div className="px-4 py-3 border-b border-edge flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <GitCompare className="w-4 h-4 text-chrome-lav-fg" />
+              <GitCompare className="w-4 h-4 text-chrome-lav" />
               <h2 className="text-xs font-bold tracking-wider text-retro-fg">Active Duels ({liveMatches.length})</h2>
             </div>
             <button
@@ -376,7 +376,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
           </div>
           {liveMatches.length === 0 ? (
             <div className="p-8 text-center text-xs text-retro-muted">
-              <CheckCircle2 className="w-8 h-8 text-success-fg60 mx-auto mb-2" />
+              <CheckCircle2 className="w-8 h-8 text-success-fg/60 mx-auto mb-2" />
               <p className="font-semibold text-retro-fg">No Active Duels Right Now</p>
               <p className="text-2xs text-retro-muted mt-0.5">Players in queue will automatically pair into new matches</p>
             </div>

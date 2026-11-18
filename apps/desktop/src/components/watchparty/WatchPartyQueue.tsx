@@ -207,7 +207,7 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
                 {q.name || q.url}
               </span>
               {q.status === 'proposed' && (
-                <span className="rounded-full border border-warning/0 px-1.5 py-px text-2xs font-semibold uppercase tracking-wider text-warning-fg" title="A participant suggestion — the host approves it before it can play">
+                <span className="rounded-full border border-warning/40 px-1.5 py-px text-2xs font-semibold uppercase tracking-wider text-warning-fg" title="A participant suggestion — the host approves it before it can play">
                   proposed
                 </span>
               )}
@@ -230,7 +230,7 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
                 />
               )}
               {isHost && q.status === 'proposed' && (
-                <button type="button" onClick={() => queueOp(party.id, 'approve', q.id)} aria-label={`Approve ${q.name || 'video'}`} title="Approve suggestion" className="px-2 py-0.5 rounded-md bg-success/0 border border-success/0 text-success-fg hover:bg-success/0 cursor-pointer text-2xs font-bold uppercase tracking-wider">
+                <button type="button" onClick={() => queueOp(party.id, 'approve', q.id)} aria-label={`Approve ${q.name || 'video'}`} title="Approve suggestion" className="px-2 py-0.5 rounded-md bg-success/20 border border-success/40 text-success-fg hover:bg-success/30 cursor-pointer text-2xs font-bold uppercase tracking-wider">
                   Approve
                 </button>
               )}

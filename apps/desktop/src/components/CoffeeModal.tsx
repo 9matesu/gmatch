@@ -33,7 +33,7 @@ export function CoffeeModal({ open, reason, onDismiss }: Props) {
           <span>Local-first storage: posts, cards and media live on your machine, not a rented volume</span>
         </li>
         <li className="flex items-center gap-2">
-          <MessageSquare className="w-3.5 h-3.5 text-chrome-lav-fg shrink-0" />
+          <MessageSquare className="w-3.5 h-3.5 text-chrome-lav shrink-0" />
           <span>Lobby chat, WebSocket bus, PMs & server-side reports escalation</span>
         </li>
       </ul>

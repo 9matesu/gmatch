@@ -1559,6 +1559,12 @@ html.theme-light body {
   --color-retro-warning: #8a5a00;
   --color-retro-error: #cf222e;
 
+  /* Chrome accents are text colours too (icons, labels): the dark values
+     are 2.4:1 on a light page. Same hues, darker: 6.35 / 5.40 / 4.54. */
+  --color-chrome-lav: #6d28d9;
+  --color-chrome-pink: #be185d;
+  --color-chrome-mint: #1a7f37;
+
   /* The accent inverts: black pill, white text (it was white-on-black). */
   --color-retro-accent: #18181b;
   --color-retro-accent-hover: #000000;

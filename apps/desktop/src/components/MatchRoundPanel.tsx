@@ -383,7 +383,7 @@ export function MatchRoundPanel({
                               <span className={`text-2xs font-black uppercase tracking-wider px-2 py-0.5 rounded-md border shadow-md ${rarity.badgeClass}`}>
                                 {rarity.label}
                               </span>
-                              <span className="text-2xs font-mono font-black px-1.5 py-0.5 rounded-md bg-black/80 text-warning-fg border border-warning/0 shadow-md backdrop-blur-xs">
+                              <span className="text-2xs font-mono font-black px-1.5 py-0.5 rounded-md bg-black/80 text-warning-fg border border-warning/40 shadow-md backdrop-blur-xs">
                                 {formatGc(val)}
                               </span>
                             </div>
@@ -506,7 +506,7 @@ export function MatchRoundPanel({
                               <span className={`text-2xs font-medium px-1 rounded ${rarity.badgeClass}`}>
                                 {rarity.label}
                               </span>
-                              <span className="text-2xs font-mono font-bold px-1 rounded bg-black/80 text-warning-fg border border-warning/0">
+                              <span className="text-2xs font-mono font-bold px-1 rounded bg-black/80 text-warning-fg border border-warning/30">
                                 {formatGc(cardVal)}
                               </span>
                             </div>
@@ -600,7 +600,7 @@ export function MatchRoundPanel({
                         <span className={`text-2xs font-black uppercase tracking-wider px-2 py-0.5 rounded-md border shadow-md ${myRarity.badgeClass}`}>
                           {myRarity.label}
                         </span>
-                        <span className="text-2xs font-mono font-black px-1.5 py-0.5 rounded-md bg-black/80 text-warning-fg border border-warning/0 shadow-md backdrop-blur-xs">
+                        <span className="text-2xs font-mono font-black px-1.5 py-0.5 rounded-md bg-black/80 text-warning-fg border border-warning/40 shadow-md backdrop-blur-xs">
                           {formatGc(myVal)}
                         </span>
                       </div>
@@ -635,7 +635,7 @@ export function MatchRoundPanel({
                             className="w-full h-full flex flex-col items-center justify-center gap-2 text-retro-muted hover:text-retro-fg transition-colors"
                             title={myPlayedImg.linkUrl || undefined}
                           >
-                            <LinkIcon className="w-5 h-5 text-chrome-lav-fg" />
+                            <LinkIcon className="w-5 h-5 text-chrome-lav" />
                             <span className="text-xs font-medium">Link card</span>
                             <span className="text-2xs font-mono border border-edge px-2 py-0.5 rounded">Open ↗</span>
                           </a>
@@ -700,7 +700,7 @@ export function MatchRoundPanel({
                             {oppRarity.label}
                           </span>
                           {oppKnownValue !== null && (
-                            <span className="text-2xs font-mono font-black px-1.5 py-0.5 rounded-md bg-black/80 text-warning-fg border border-warning/0 shadow-md backdrop-blur-xs">
+                            <span className="text-2xs font-mono font-black px-1.5 py-0.5 rounded-md bg-black/80 text-warning-fg border border-warning/40 shadow-md backdrop-blur-xs">
                               {formatGc(oppKnownValue)}
                             </span>
                           )}
@@ -736,7 +736,7 @@ export function MatchRoundPanel({
                             className="w-full h-full flex flex-col items-center justify-center gap-2 text-retro-muted hover:text-retro-fg transition-colors"
                             title={opponentImg.linkUrl || undefined}
                           >
-                            <LinkIcon className="w-5 h-5 text-chrome-lav-fg" />
+                            <LinkIcon className="w-5 h-5 text-chrome-lav" />
                             <span className="text-xs font-medium">Link card</span>
                             <span className="text-2xs font-mono border border-edge px-2 py-0.5 rounded">Open ↗</span>
                           </a>
@@ -796,7 +796,7 @@ export function MatchRoundPanel({
               <button
                 disabled={submitting}
                 onClick={() => handleDecide('reject')}
-                className="py-2.5 px-2 text-xs font-medium border border-edge text-retro-muted hover:text-danger-fg hover:border-danger/0 cursor-pointer rounded-lg bg-surface-interactive hover:bg-danger/ transition-colors flex items-center justify-center gap-1.5"
+                className="py-2.5 px-2 text-xs font-medium border border-edge text-retro-muted hover:text-danger-fg hover:border-danger/30 cursor-pointer rounded-lg bg-surface-interactive hover:bg-danger/ transition-colors flex items-center justify-center gap-1.5"
                 title="Reject (-5 pts)"
               >
                 <X className="w-3.5 h-3.5" />

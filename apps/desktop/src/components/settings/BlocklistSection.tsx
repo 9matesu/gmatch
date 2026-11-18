@@ -39,21 +39,21 @@ const CATEGORY_META: Record<
     label: 'Hard Blocklist (blocklist)',
     desc: 'Tags dropped at query origin and rejected by clicker feed filters.',
     color: 'text-danger-fg',
-    badgeBg: 'bg-danger/0 text-danger-fg border-danger/0',
+    badgeBg: 'bg-danger/10 text-danger-fg border-danger/30',
     commentKey: '_comment_hard',
   },
   suggested: {
     label: 'Suggested Excludes (suggested)',
     desc: 'Polarising tags offered as one-tap excludes on setup and in Feed options.',
     color: 'text-warning-fg',
-    badgeBg: 'bg-warning/0 text-warning-fg border-warning/0',
+    badgeBg: 'bg-warning/10 text-warning-fg border-warning/30',
     commentKey: '_comment_suggested',
   },
   noise: {
     label: 'Noise Tags (noise)',
     desc: 'Quality, meta, and watermarking tags excluded from tag rankings and card stats.',
     color: 'text-info-fg',
-    badgeBg: 'bg-info/0 text-info-fg border-info/0',
+    badgeBg: 'bg-info/10 text-info-fg border-info/30',
     commentKey: '_comment_noise',
   },
 }
@@ -338,7 +338,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
       <div className="p-4 bg-surface-interactive border border-edge rounded-xl space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-danger/0 border border-danger/0 flex items-center justify-center text-danger-fg">
+            <div className="w-8 h-8 rounded-xl bg-danger/10 border border-danger/20 flex items-center justify-center text-danger-fg">
               <ShieldAlert className="w-4 h-4" />
             </div>
             <div>
@@ -347,8 +347,8 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
                 <span
                   className={`text-2xs px-2 py-0.5 rounded-full font-mono font-medium border ${
                     isModified
-                      ? 'bg-warning/0 text-warning-fg border-warning/0'
-                      : 'bg-success/0 text-success-fg border-success/0'
+                      ? 'bg-warning/10 text-warning-fg border-warning/30'
+                      : 'bg-success/10 text-success-fg border-success/30'
                   }`}
                 >
                   {isModified ? 'Customized' : 'Factory Default'}
@@ -567,7 +567,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
             spellCheck={false}
             className={`w-full font-mono text-xs p-3 rounded-xl bg-surface-interactive border outline-none leading-relaxed resize-y styled-scrollbar ${
               jsonError
-                ? 'border-danger/0 focus:border-danger text-danger-fg'
+                ? 'border-danger/60 focus:border-danger text-danger-fg'
                 : 'border-edge focus:border-retro-accent text-retro-fg'
             }`}
           />
@@ -592,7 +592,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
           <button
             type="button"
             onClick={handleReset}
-            className="px-3 py-2 bg-surface-raised border border-edge hover:border-danger/0 text-retro-muted hover:text-danger-fg rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
+            className="px-3 py-2 bg-surface-raised border border-edge hover:border-danger/40 text-retro-muted hover:text-danger-fg rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Reset to Defaults</span>

@@ -413,7 +413,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
           <div className="text-2xs text-retro-muted mt-0.5">{portfolio.length} card{portfolio.length === 1 ? '' : 's'}</div>
         </div>
 
-        <div className="solid-panel backdrop-blur-md border border-warning/0 p-3.5">
+        <div className="solid-panel backdrop-blur-md border border-warning/20 p-3.5">
           <div className="flex items-center gap-1.5 text-warning-fg text-2xs font-semibold uppercase tracking-wider">
             <Sparkles className="w-3.5 h-3.5" />
             Cashout Value
@@ -459,7 +459,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                 setConfirmCashoutAll(true);
               }}
               disabled={cashableCount === 0}
-              className="mt-2.5 w-full px-2.5 py-1.5 rounded bg-warning/5 hover:bg-warning/5 disabled:opacity-40 text-warning-fg text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+              className="mt-2.5 w-full px-2.5 py-1.5 rounded bg-warning/15 hover:bg-warning/25 disabled:opacity-40 text-warning-fg text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
             >
               <Coins className="w-3 h-3" />
               Cash Out All
@@ -620,7 +620,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                       type="button"
                       disabled={buyingCardId !== null}
                       onClick={() => void buyListing(l)}
-                      className="px-2 py-1 rounded bg-info/0 hover:bg-info/0 disabled:opacity-40 text-info-fg text-2xs font-bold cursor-pointer transition-colors"
+                      className="px-2 py-1 rounded bg-info/20 hover:bg-info/30 disabled:opacity-40 text-info-fg text-2xs font-bold cursor-pointer transition-colors"
                     >
                       {buyingCardId === l.cardId ? '…' : 'Buy'}
                     </button>
@@ -644,18 +644,18 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
           return (
             <div
               key={item.id}
-              className="relative solid-panel backdrop-blur-md p-4 flex flex-col justify-between transition-colors border-danger/0"
+              className="relative solid-panel backdrop-blur-md p-4 flex flex-col justify-between transition-colors border-danger/30"
             >
               <div className="space-y-2">
                 <div className="flex items-start justify-between">
-                  <div className="p-2.5 rounded-lg border bg-danger/0 border-danger/0 text-danger-fg">
+                  <div className="p-2.5 rounded-lg border bg-danger/10 border-danger/20 text-danger-fg">
                     {item.id === 'item-hack-deny' && <EyeOff className="w-5 h-5" />}
                     {item.id === 'item-hack-mobile' && <Flame className="w-5 h-5" />}
                     {item.id === 'item-flash-drop' && <Zap className="w-5 h-5 text-retro-warning" />}
                   </div>
 
                   {item.badge && (
-                    <span className="text-2xs font-medium px-2 py-0.5 rounded border bg-danger/0 text-danger-fg border-danger/0">
+                    <span className="text-2xs font-medium px-2 py-0.5 rounded border bg-danger/10 text-danger-fg border-danger/20">
                       {item.badge}
                     </span>
                   )}
@@ -676,7 +676,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                   type="button"
                   onClick={() => handleBuy(item)}
                   disabled={!canAfford || buying === item.id}
-                  className="px-3 py-1.5 bg-danger/5 hover:bg-danger/0 disabled:opacity-40 text-danger-fg text-xs font-medium rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
+                  className="px-3 py-1.5 bg-danger/15 hover:bg-danger/20 disabled:opacity-40 text-danger-fg text-xs font-medium rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
                 >
                   <ShieldAlert className="w-3.5 h-3.5" />
                   <span>{buying === item.id ? 'Deploying...' : (item.id === 'item-flash-drop' && count > 0 ? 'Fire' : 'Deploy')}</span>

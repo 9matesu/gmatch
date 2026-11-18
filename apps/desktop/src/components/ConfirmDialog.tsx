@@ -94,7 +94,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                 onClick={() => settle(true)}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-md transition duration-150 active:scale-[0.96] shadow-xs cursor-pointer ${
                   pending.options.tone === 'danger'
-                    ? 'border border-danger/0 text-danger-fg bg-danger/5 hover:bg-danger/5'
+                    ? 'border border-danger/30 text-danger-fg bg-danger/15 hover:bg-danger/25'
                     : pending.options.tone === 'accent'
                       ? 'bg-retro-accent text-retro-bg hover:bg-retro-fg'
                       : 'bg-retro-accent text-retro-bg hover:bg-retro-fg'

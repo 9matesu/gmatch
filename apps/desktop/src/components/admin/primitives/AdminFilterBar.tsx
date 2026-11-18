@@ -169,7 +169,7 @@ export function AdminFilterBar({
           <Filter className="w-4 h-4 text-retro-muted" />
           <span className="text-xs font-bold uppercase tracking-wider text-retro-fg">Filters</span>
           {activeFilterCount > 0 && (
-            <span className="px-2 py-0.5 bg-info/0 text-info-fg text-2xs font-bold rounded-full">
+            <span className="px-2 py-0.5 bg-info/20 text-info-fg text-2xs font-bold rounded-full">
               {activeFilterCount}
             </span>
           )}
@@ -180,7 +180,7 @@ export function AdminFilterBar({
             <button
               type="button"
               onClick={handleClearAll}
-              className="px-2.5 py-1 text-2xs font-bold uppercase tracking-wider rounded border border-danger/0 text-danger-fg hover:bg-danger/0 transition-colors"
+              className="px-2.5 py-1 text-2xs font-bold uppercase tracking-wider rounded border border-danger/30 text-danger-fg hover:bg-danger/10 transition-colors"
             >
               <X className="w-3 h-3 mr-1" />
               Clear All
@@ -192,7 +192,7 @@ export function AdminFilterBar({
             className={cn(
               "px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded border transition-colors flex items-center gap-1.5",
               expanded
-                ? "bg-info/0 text-info-fg border-info/0"
+                ? "bg-info/20 text-info-fg border-info/30"
                 : "bg-surface-interactive text-retro-fg border-edge hover:bg-glass-w10"
             )}
           >

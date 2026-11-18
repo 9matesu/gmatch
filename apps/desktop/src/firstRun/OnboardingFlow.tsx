@@ -205,7 +205,7 @@ function ProfileStep(props: Props & { onDone: () => void }) {
       </button>
 
       {error && (
-        <div role="alert" className="rounded-lg border border-danger/0 bg-danger/0 p-3 text-xs text-danger-fg">{error}</div>
+        <div role="alert" className="rounded-lg border border-danger/30 bg-danger/10 p-3 text-xs text-danger-fg">{error}</div>
       )}
 
       <button

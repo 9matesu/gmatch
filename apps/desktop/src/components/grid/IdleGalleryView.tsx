@@ -983,7 +983,7 @@ export default function IdleGalleryView({
                     openMenuId === img.id ? 'z-30' : 'overflow-hidden'
                   } ${
                     isSelected
-                      ? 'border-success ring-2 ring-success/0'
+                      ? 'border-success ring-2 ring-success/40'
                       : isBackdrop
                       ? 'border-retro-accent'
                       : 'border-edge'
@@ -999,7 +999,7 @@ export default function IdleGalleryView({
                     aria-label={isSelected ? 'Deselect image' : 'Select image'}
                     className={`absolute left-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-md backdrop-blur-md transition cursor-pointer ${
                       isSelected
-                        ? 'bg-success/0 text-retro-fg opacity-100 shadow-md ring-1 ring-white/30'
+                        ? 'bg-success/90 text-retro-fg opacity-100 shadow-md ring-1 ring-white/30'
                         : 'bg-black/60 text-retro-fg/70 opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
                     }`}
                   >
@@ -1061,7 +1061,7 @@ export default function IdleGalleryView({
                         await retryKeepsake(img)
                       }}
                       title="Could not cache this keep locally. The source link is kept for a retry."
-                      className="absolute bottom-1.5 left-1.5 z-20 rounded-md border border-danger/0 bg-black/75 px-1.5 py-0.5 text-2xs font-mono text-danger-fg backdrop-blur-md cursor-pointer hover:bg-black/90"
+                      className="absolute bottom-1.5 left-1.5 z-20 rounded-md border border-danger/40 bg-black/75 px-1.5 py-0.5 text-2xs font-mono text-danger-fg backdrop-blur-md cursor-pointer hover:bg-black/90"
                     >
                       Not cached · Retry
                     </button>
@@ -1074,7 +1074,7 @@ export default function IdleGalleryView({
                         await retryKeepsake(img)
                       }}
                       title="This keep was saved but its local bytes are no longer readable. Retry to fetch them again."
-                      className="absolute bottom-1.5 left-1.5 z-20 rounded-md border border-warning/0 bg-black/75 px-1.5 py-0.5 text-2xs font-mono text-warning-fg backdrop-blur-md cursor-pointer hover:bg-black/90"
+                      className="absolute bottom-1.5 left-1.5 z-20 rounded-md border border-warning/40 bg-black/75 px-1.5 py-0.5 text-2xs font-mono text-warning-fg backdrop-blur-md cursor-pointer hover:bg-black/90"
                     >
                       Missing locally · Retry
                     </button>

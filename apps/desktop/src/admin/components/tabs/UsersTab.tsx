@@ -869,7 +869,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
               profile tag, since the suite mints anonymous keypairs. This removes every matching account and
               everything it created (objects, messages, cards, groups).
             </p>
-            <p className="text-xs text-warning-fg80 leading-relaxed">
+            <p className="text-xs text-warning-fg/80 leading-relaxed">
               Always preview first. The server refuses to delete anything unless deletion is explicitly
               requested, and refuses outright if an admin account matches.
             </p>
@@ -923,7 +923,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                     void runPurge();
                   }}
                   disabled={purgeBusy || purgePreview.wouldDelete === 0}
-                  className="px-3 py-1.5 rounded-md text-xs font-bold bg-danger/0 hover:bg-danger text-retro-fg disabled:opacity-40 cursor-pointer"
+                  className="px-3 py-1.5 rounded-md text-xs font-bold bg-danger/80 hover:bg-danger text-retro-fg disabled:opacity-40 cursor-pointer"
                 >
                   {purgeBusy ? "Deleting…" : `Delete ${purgePreview.wouldDelete} account(s)`}
                 </button>
