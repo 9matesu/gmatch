@@ -1,7 +1,7 @@
 // gMatch Electron main process.
 // All booru HTTP happens HERE (renderer never touches the network directly).
 // Endpoints per docs/SPEC.md §6. 10s timeout, browser UA, round-robin health.
-const { app, BrowserWindow, ipcMain, protocol, net, dialog, safeStorage, session, shell, Notification, screen } = require('electron')
+const { app, BrowserWindow, ipcMain, protocol, net, dialog, safeStorage, session, screen } = require('electron')
 const https = require('https')
 const fs = require('node:fs')
 const path = require('node:path')
@@ -1024,6 +1024,7 @@ const registerVaultHandlers = require("./ipc/vault.cjs")
 const registerWindowHandlers = require("./ipc/window.cjs")
 const registerServerHandlers = require("./ipc/server.cjs")
 const registerNotifyHandlers = require("./ipc/notify.cjs")
+const registerAppHandlers = require("./ipc/app.cjs")
 const notify = registerNotifyHandlers({
   ipcMain, app, mainLog,
   getTray: () => appTray,
@@ -1302,58 +1303,18 @@ app.whenReady().then(async () => {
   registerCacheHandlers({ ipcMain, imageCache })
   registerVaultHandlers({ ipcMain, vault, vaultServer })
   // Update check (Settings): installed version + open the download in the OS browser.
-  ipcMain.handle('app:version', () => app.getVersion())
-  ipcMain.handle('app:open-log', () => shell.openPath(app.getPath('userData')))
-  ipcMain.handle('shell:open', (_event, url) => {
-    if (typeof url === 'string' && /^https?:\/\//i.test(url)) return shell.openExternal(url)
-    return Promise.reject(new Error('only http(s) URLs'))
-  })
-  // Dynamic blocklist control (Settings -> Blocklist): full edit/reset.
-  ipcMain.handle('blocklist:get', () => {
-    const userPath = userBlocklistPath()
-    return {
-      current: currentBlocklistData || loadBlocklistData(),
-      defaults: getDefaultBlocklistData(),
-      isCustom: Boolean(userPath && fs.existsSync(userPath)),
-    }
-  })
-  ipcMain.handle('blocklist:set', (_event, payload) => {
-    try {
-      let data = payload
-      if (typeof data === 'string') data = JSON.parse(data)
-      if (!data || typeof data !== 'object') {
-        return { ok: false, error: 'Payload must be a JSON object' }
-      }
-      if (!Array.isArray(data.blocklist)) {
-        return { ok: false, error: 'Payload must contain a "blocklist" array' }
-      }
-      // Single source of truth: shared/blocklist.json is the factory
-      // default (read-only); Settings edits land ONLY in the userData copy,
-      // which takes precedence on load.
-      const userPath = userBlocklistPath()
-      if (userPath) {
-        fs.mkdirSync(path.dirname(userPath), { recursive: true })
-        fs.writeFileSync(userPath, JSON.stringify(data, null, 2), 'utf8')
-      }
-      currentBlocklistData = data
-      currentBlocklist = data.blocklist
-      return { ok: true, data: currentBlocklistData }
-    } catch (err) {
-      return { ok: false, error: err?.message || String(err) }
-    }
-  })
-  ipcMain.handle('blocklist:reset', () => {
-    try {
-      const userPath = userBlocklistPath()
-      if (userPath && fs.existsSync(userPath)) {
-        fs.unlinkSync(userPath)
-      }
-      currentBlocklistData = getDefaultBlocklistData()
-      currentBlocklist = Array.isArray(currentBlocklistData.blocklist) ? currentBlocklistData.blocklist : []
-      return { ok: true, data: currentBlocklistData }
-    } catch (err) {
-      return { ok: false, error: err?.message || String(err) }
-    }
+  registerAppHandlers({
+    ipcMain, app,
+    blocklist: {
+      userPath: userBlocklistPath,
+      get: () => currentBlocklistData,
+      load: loadBlocklistData,
+      defaults: getDefaultBlocklistData,
+      apply: (data) => {
+        currentBlocklistData = data
+        currentBlocklist = Array.isArray(data?.blocklist) ? data.blocklist : []
+      },
+    },
   })
   // OS wallpaper swap for consented domination effects (Windows; no-op else).
   ipcMain.handle('wallpaper:set-data', (_event, buf, mime) => wallpaperWin.setWallpaperFromBuffer(Buffer.from(buf), String(mime || '')))
@@ -1378,23 +1339,6 @@ app.on('before-quit', () => { if (domVideoWin) { try { domVideoWin.destroy() } c
   // Camera stays denied by default; the renderer consumes a one-shot grant
   // only AFTER the victim clicks "Allow once" on the in-app prompt.
   ipcMain.handle('camera:grant-once', () => { cameraGrantOnce = true; return { ok: true } })
-  // Native OS notification for consented domination message/banner effects.
-  // Works while the window is minimized or unfocused (Windows Action Center);
-  // best-effort — the in-app overlay always renders regardless. Title/body
-  // are plain strings and Chromium escapes them; no shell, no URL, no exec.
-  ipcMain.handle('notify:native', (_event, title, body) => {
-    try {
-      const t = String(title || 'gMatch').slice(0, 120)
-      const b = String(body || '').slice(0, 280)
-      if (!Notification.isSupported()) return { ok: false, reason: 'unsupported' }
-      const n = new Notification({ title: t, body: b, silent: false })
-      n.on('failed', (_e, error) => { console.warn('[domination] native notification failed:', error) })
-      n.show()
-      return { ok: true }
-    } catch (err) {
-      return { ok: false, reason: err?.message || String(err) }
-    }
-  })
   // Dedicated player window for consented popup_video effects: a real OS
   // window (works while gMatch is minimized), sandboxed, muted, auto-closing
   // at the effect duration. The window lifecycle IS the execution outcome the
