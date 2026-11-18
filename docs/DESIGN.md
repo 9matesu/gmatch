@@ -51,6 +51,10 @@ field `text-sm` -> sub `text-lg` -> title `text-xl` -> display `text-2xl` (hero 
 ## Z scale (CSS vars in globals.css; arbitrary 3+ digits banned)
 `--z-dropdown:40 --z-modal:50 --z-lightbox:60 --z-toast:70 --z-system:80`
 use `z-[var(--z-toast)]` etc. Coexistence order: modal < lightbox < toast < system
+A dialog uses `z-[var(--z-modal)]` — never `z-system`: 18 of them sat on the
+  system layer (80) and covered toasts (70), so a toast was invisible while any
+  dialog was open (fixed 2026-11). Context menus and floating panels use
+  `z-lightbox`; the age gate and the virus overlay alone stay on `z-system`.
 (flash overlay is system; card-detail vs create-card: create-card on top).
 
 ## Motion (3 durations, 1 easing per direction, loop = UA)
