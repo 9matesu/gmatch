@@ -43,7 +43,9 @@ export function AdminMediaThumbnail({
   const canOpen = Boolean(url && !objectImage.failed);
 
   return (
-    <div
+    <button
+      type="button"
+      disabled={!canOpen}
       className={cn("rounded border border-edge bg-retro-bg overflow-hidden relative group shrink-0", className)}
       onClick={() => canOpen && onZoom?.(url, isVideo, title, subtitle || "Media")}
     >
@@ -61,6 +63,6 @@ export function AdminMediaThumbnail({
         <img src={url} alt="" className={cn("w-full h-full object-cover", imageClassName)} />
       )}
       {badge}
-    </div>
+    </button>
   );
 }

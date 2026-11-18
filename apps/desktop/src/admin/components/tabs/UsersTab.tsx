@@ -560,7 +560,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                               className="w-10 h-10 shrink-0"
                               onZoom={onZoom}
                             />
-                            <div className="min-w-0 flex-1 cursor-pointer" onClick={() => setExpandedCardId(isExpanded ? null : card.id)}>
+                            <button type="button" className="min-w-0 flex-1 text-left cursor-pointer" aria-expanded={isExpanded} onClick={() => setExpandedCardId(isExpanded ? null : card.id)}>
                               <div className="flex items-center gap-2">
                                 <span className="text-xs font-bold text-retro-fg truncate">{card.name || card.id.slice(0, 12)}</span>
                                 <Badge variant="neutral" size="sm">{card.rarity}</Badge>
@@ -569,7 +569,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                               <p className="text-2xs text-retro-muted truncate">
                                 Value: {card.value} g$ · Likes: {card.like_count} · Creator: {card.creator_id.slice(0, 8)}
                               </p>
-                            </div>
+                            </button>
                             <div className="flex items-center gap-2 shrink-0">
                               <select
                                 value={card.moderation_state}

@@ -87,8 +87,11 @@ export function Badge({
     offline: "bg-retro-muted",
   };
 
+  const Tag = onClick ? "button" : "span";
+
   return (
-    <span
+    <Tag
+      type={onClick ? "button" : undefined}
       className={cn(
         "inline-flex items-center gap-1 font-mono font-bold uppercase tracking-wider rounded-full border",
         sizeClasses[size],
@@ -100,7 +103,7 @@ export function Badge({
     >
       {dot && <span className={cn("w-1.5 h-1.5 rounded-full", dotColors[variant])} />}
       {children}
-    </span>
+    </Tag>
   );
 }
 

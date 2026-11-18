@@ -196,7 +196,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
               onZoom={onZoom}
             />
           )}
-          <div className="flex-1 min-w-0 cursor-pointer" onClick={() => toggleExpand(report.id)}>
+          <button type="button" className="flex-1 min-w-0 text-left cursor-pointer" aria-expanded={isExpanded} onClick={() => toggleExpand(report.id)}>
             <div className="flex items-center gap-2 flex-wrap">
               <Badge variant="info" size="sm">{targetTypeLabels[report.target_type] || report.target_type}</Badge>
               <StatusBadge status={report.status} mapping={{ open: "pending", reviewed: "info", resolved: "success", dismissed: "neutral" }} size="sm" />
@@ -209,7 +209,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
               Reported by {report.reporter_name || report.reporter_id.slice(0, 8)} · {formatAbsoluteTime(report.created_at)}
               {report.reason && ` · Reason: ${report.reason}`}
             </p>
-          </div>
+          </button>
           <div className="flex flex-col gap-1.5 shrink-0">
             {report.status === "open" ? (
               <div className="flex items-center gap-1">

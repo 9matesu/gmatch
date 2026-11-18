@@ -300,14 +300,15 @@ export function AdminTable<T extends Record<string, unknown>>({
               {config.columns.map(col => (
                 <th
                   key={col.accessorKey}
-                  className={cn(
-                    "px-3 py-2 text-left font-bold uppercase tracking-wider text-retro-muted bg-surface-raised border-b border-edge",
-                    col.enableSorting !== false && "cursor-pointer hover:text-retro-fg select-none"
-                  )}
-                  onClick={col.enableSorting !== false ? () => handleSort(col.accessorKey as string) : undefined}
+                  className="px-3 py-2 text-left font-bold uppercase tracking-wider text-retro-muted bg-surface-raised border-b border-edge"
                   style={{ width: col.size, minWidth: col.minSize, maxWidth: col.maxSize }}
                 >
-                  <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={col.enableSorting === false}
+                    onClick={() => handleSort(col.accessorKey as string)}
+                    className="flex items-center gap-1.5 uppercase tracking-wider text-left enabled:cursor-pointer enabled:hover:text-retro-fg select-none"
+                  >
                     {col.header}
                     {sorting?.column === col.accessorKey && (
                       sorting.direction === 'asc' ? (
@@ -316,7 +317,7 @@ export function AdminTable<T extends Record<string, unknown>>({
                         <ChevronDown className="w-3.5 h-3.5 text-retro-accent" />
                       )
                     )}
-                  </div>
+                  </button>
                 </th>
               ))}
               {config.enableRowSelection && (
