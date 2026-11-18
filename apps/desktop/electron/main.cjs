@@ -62,42 +62,7 @@ function mainLog(line) {
 // restart may end the process; every path sets this first.
 let isQuitting = false
 let appTray = null
-let unreadCount = 0
-/** Icons are generated once per userData dir and reused. */
-function overlayIconFor(count) {
-  const paths = ensureOverlayIcons(path.join(app.getPath('userData'), 'badges'))
-  if (!paths.length) return null
-  return paths[Math.min(count, 10) - 1] || null
-}
-/** The one place the window is told what the badge says. */
-  /** Focus changes what the OS shows: a focused window is not an alert. */
-  function wireWindowNotifications(target) {
-    target.on('focus', () => { applyUnread(unreadCount) })
-    target.on('minimize', () => { applyUnread(unreadCount) })
-    target.on('restore', () => { applyUnread(unreadCount) })
-  }
-function applyUnread(count) {
-  const next = Math.max(0, Math.floor(Number(count) || 0))
-  const grew = next > unreadCount
-  unreadCount = next
-  const win = BrowserWindow.getAllWindows()[0]
-  const focused = !!win && !win.isMinimized() && win.isFocused()
-  if (!win) return
-  try {
-    if (unreadCount === 0 || focused) {
-      win.setOverlayIcon(null, '')
-      win.flashFrame(false)
-    } else {
-      const icon = overlayIconFor(unreadCount)
-      if (icon) win.setOverlayIcon(icon, `${unreadCount} unread`)
-      win.flashFrame(true)
-    }
-  } catch { /* overlay is an enhancement, never a crash */ }
-  appTray?.setTooltip(
-    unreadCount > 0 ? `gMatch \u2014 ${unreadCount} unread` : 'gMatch',
-  )
-  return grew
-}
+// Notification state (badge/overlay/flash/native toasts) lives in ./ipc/notify.cjs.
 function quitApp() {
   isQuitting = true
   app.quit()
@@ -118,7 +83,6 @@ let cameraGrantOnce = false
 const { createSecureStore } = require('./secureStore.cjs')
 const apiSidecar = require('./apiSidecar.cjs')
 const { createTray } = require('./tray.cjs')
-const { ensureOverlayIcons } = require('./overlay-icons.cjs')
 const serverMode = require('./server-mode.cjs')
 
 // Secure KV (security plan B.3): renderer's sensitive localStorage keys are
@@ -1054,6 +1018,17 @@ async function expandPostViews(entries, viewBase, parseView) {
 
 // imhentai source (parser lives in ./imhentai.cjs; deps injected here).
 const { createImhentaiSource } = require("./imhentai.cjs")
+const registerSecureHandlers = require("./ipc/secure.cjs")
+const registerCacheHandlers = require("./ipc/cache.cjs")
+const registerVaultHandlers = require("./ipc/vault.cjs")
+const registerWindowHandlers = require("./ipc/window.cjs")
+const registerServerHandlers = require("./ipc/server.cjs")
+const registerNotifyHandlers = require("./ipc/notify.cjs")
+const notify = registerNotifyHandlers({
+  ipcMain, app, mainLog,
+  getTray: () => appTray,
+  trayStatus: (text) => appTray?.setTooltip(text),
+})
 const imhentai = createImhentaiSource({
   net, httpGet, ua: UA, htmlTimeoutMs: HTML_TIMEOUT_MS, galleryCap: GALLERY_CAP,
   galleryLanes: GALLERY_LANES, floorPx: FLOOR_PX, redgifsWords, normRedgifsTag,
@@ -1225,7 +1200,7 @@ function createWindow() {
     bootMetrics?.mark('did-finish-load')
   })
   win.once('ready-to-show', () => bootMetrics?.mark('ready-to-show'))
-  wireWindowNotifications(win)
+  notify.wireWindowNotifications(win)
   // unload just cancels the window close). Surface the page's message as a
   // Ctrl/Cmd+R = plain refresh (frameless window, no menu accelerators).
   win.webContents.on('before-input-event', (event, input) => {
@@ -1280,23 +1255,7 @@ app.whenReady().then(async () => {
   // dev has no preload -> no buttons). close() routes through the same
   // will-prevent-unload key-save gate as the native titlebar.
 
-  ipcMain.on('window:minimize', (e) => BrowserWindow.fromWebContents(e.sender)?.minimize())
-  ipcMain.on('window:toggle-maximize', (e) => {
-    const w = BrowserWindow.fromWebContents(e.sender)
-    if (!w) return
-    if (w.isMaximized()) w.unmaximize(); else w.maximize()
-  })
-  // The X (and Alt+F4, and the taskbar's "Close window"  one event on Windows,
-  // indistinguishable from the X) minimizes: the button stays in the taskbar so
-  // the orange flash can find it. Quitting is a tray action only.
-  ipcMain.on('window:close', (e) => BrowserWindow.fromWebContents(e.sender)?.minimize())
-  // Reload = refresh, never the stay/leave dialog: the beforeunload handlers
-  // (key save + idle save) run synchronously before the reload lands.
-  ipcMain.on('window:reload', (e) => {
-    const w = BrowserWindow.fromWebContents(e.sender)
-    if (!w) return
-    w.webContents.reload()
-  })
+  registerWindowHandlers({ ipcMain })
   const storageKeyPath = path.join(app.getPath('userData'), 'storage.key')
   let diskKey = null
   try { diskKey = fs.readFileSync(storageKeyPath, 'utf8').trim() } catch {}
@@ -1338,36 +1297,10 @@ app.whenReady().then(async () => {
       return null
     }
   })
-  // Secure KV bridge (B.3): renderer proxies designated localStorage keys here.
-  ipcMain.handle('secure:available', () => secureAvailable)
-  ipcMain.handle('secure:get', (_event, key) => secureKV.get(String(key)))
-  ipcMain.handle('secure:set', (_event, key, value) => secureKV.set(String(key), String(value)))
-  ipcMain.handle('secure:delete', (_event, key) => secureKV.delete(String(key)))
-  ipcMain.handle('cache:image', (_event, url) => imageCache.cacheImage(url).then((local) => ({ local })))
-  ipcMain.handle('cache:stats', () => imageCache.cacheStats())
-  ipcMain.handle('cache:clear', () => imageCache.clearCache())
-  ipcMain.handle('cache:clear-feed', () => imageCache.clearFeedCache())
-  ipcMain.handle('cache:evict', (_event, url) => ({ ok: imageCache.evict(String(url ?? '')) }))
-  // probe (not get) so a row whose bytes cannot be read is reported as
-  // unreadable rather than a miss, and is never dropped from the manifest.
-  ipcMain.handle('vault:get', (_event, url) => vault.probe(String(url ?? '')))
-  ipcMain.handle('vault:pin', (_event, url) => vault.pin(String(url ?? '')).then((local) => ({ local })))
-  ipcMain.handle('vault:pin-stream', (event, url) => vault.pinStream(String(url ?? ''), {
-    onProgress: ({ bytes, total }) => {
-      try { event.sender.send('vault:pin-stream-progress', { url: String(url ?? ''), bytes, total }) } catch {}
-    },
-  }))
-  ipcMain.handle('vault:unpin', (_event, url) => ({ ok: vault.unpin(String(url ?? '')) }))
-  ipcMain.handle('vault:remove', (_event, url) => ({ ok: vault.remove(String(url ?? '')) }))
-  // Disco-first: bytes the renderer already holds (verified swarm assembly,
-  // forged upload) are written straight to the encrypted store, re-checked
-  // against their content hash in the main process.
-  ipcMain.handle('vault:put-bytes', (_event, hash, mime, data, alias) =>
-    vault.putBytes(String(hash ?? ''), String(mime ?? ''), data, alias == null ? null : String(alias)))
-  ipcMain.handle('vault:list', () => vault.list())
-  ipcMain.handle('vault:stats', () => vault.stats())
-  ipcMain.handle('vault:clear', () => vault.clear())
-  ipcMain.handle('vault:http-url', (_event, url) => ({ local: vaultServer.httpUrl(String(url ?? '')) }))
+  // Secure KV + encrypted picture cache: handlers live in ./ipc/*.cjs (deps injected).
+  registerSecureHandlers({ ipcMain, secureKV, secureAvailable })
+  registerCacheHandlers({ ipcMain, imageCache })
+  registerVaultHandlers({ ipcMain, vault, vaultServer })
   // Update check (Settings): installed version + open the download in the OS browser.
   ipcMain.handle('app:version', () => app.getVersion())
   ipcMain.handle('app:open-log', () => shell.openPath(app.getPath('userData')))
@@ -1513,44 +1446,7 @@ app.on('before-quit', () => { if (domVideoWin) { try { domVideoWin.destroy() } c
     callback(false)
   })
   // Server-mode bridge for the Settings UI (packaged topology control).
-  ipcMain.handle('server:state', () => ({
-    packaged: app.isPackaged,
-    // Hosts own their node: the PIN is shown in Settings so the developer
-    // (and any self-hoster) can unlock the bundled admin console. See
-    // electron/admin-pin.cjs header for the trust argument.
-    adminPin: require('./admin-pin.cjs').adminPin(app.getPath('userData')),
-    ...(app.isPackaged
-      ? { ...serverMode.readServerMode(), lanUrls: serverMode.lanUrls() }
-      : { mode: 'host', url: apiSidecar.API_BASE, lanUrls: serverMode.lanUrls() }),
-  }))
-  // Persist host/client choice + hand the renderer the fresh state. Switching
-  // takes effect on next launch (relaunch button in Settings does that).
-  ipcMain.handle('server:set', (_event, payload) => {
-    const mode = payload?.mode === 'client' ? 'client' : 'host'
-    try {
-      serverMode.writeServerMode(mode, String(payload?.url || ''))
-    } catch (err) {
-      return { ok: false, error: err.message }
-    }
-    return { ok: true }
-  })
-  ipcMain.handle('server:probe', async (_event, url) => {
-    try {
-      // Health, not TCP: a live host that 404s is not a node. The same rule
-      // the launch check uses, so Reconnect and boot agree.
-      return await serverMode.probeServer(url)
-    } catch (err) {
-      return { ok: false, error: err?.message || String(err) }
-    }
-  })
-  // Apply the new mode NOW: relaunch the app (used by the Settings button).
-  ipcMain.handle('server:relaunch', () => {
-    apiSidecar.stopApi()
-    try { if (secureKV) secureKV.flush() } catch { /* best effort */ }
-    const execPath = process.env.PORTABLE_EXECUTABLE_FILE || process.execPath
-    app.relaunch({ execPath })
-    app.exit(0)
-  })
+  registerServerHandlers({ ipcMain, app, serverMode, apiSidecar, secureKV })
   // Portable self-update (GitHub Releases): check + auto-download in main,
   // the renderer's "Install & Restart" triggers the exe swap + relaunch.
   let updater = null
@@ -1653,37 +1549,6 @@ app.on('before-quit', () => { if (domVideoWin) { try { domVideoWin.destroy() } c
   } catch (err) {
     mainLog(`tray unavailable: ${err?.message || err}`)
   }
-  ipcMain.on('tray:status', (_e, text) => appTray?.setTooltip(text))
-  // The merged unread count is the renderer's (one store feeds the badge,
-  // the overlay, the tray and the centre). The main process only decides what
-  // the OS shows with it.
-  ipcMain.on('notify:read', () => applyUnread(0))
-  ipcMain.on('notify:sync', (_e, payload) => {
-    try {
-      const { count = 0, title = '', body = '', hideContent = false } = payload || {}
-      const grew = applyUnread(count)
-      const win = BrowserWindow.getAllWindows()[0]
-      const focused = !!win && !win.isMinimized() && win.isFocused()
-      // Alert only when nobody is looking, and only for a real increase: a
-      // burst of 50 becomes ONE flash, never 50.
-      if (!grew || focused || !win || !Notification.isSupported()) return
-      const n = new Notification({
-        title: hideContent || !title ? 'gMatch' : String(title).slice(0, 120),
-        body: hideContent
-          ? `${count} new notification${count === 1 ? '' : 's'}`
-          : String(body || '').slice(0, 240),
-        silent: false,
-      })
-      n.on('click', () => {
-        if (win.isMinimized()) win.restore()
-        win.show()
-        win.focus()
-        win.webContents.send('notify:opened')
-      })
-    } catch (err) {
-      mainLog(`notify:sync failed: ${err?.message || err}`)
-    }
-  })
   updater?.schedule()
   // Start the bundled server in the background (host mode only). Failures
   // surface as dialogs + log lines; they can never take the window with them.
