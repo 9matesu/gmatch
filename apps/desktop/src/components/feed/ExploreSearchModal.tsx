@@ -148,7 +148,8 @@ export function ExploreSearchModal({
                     key={id}
                     className="flex items-center justify-between p-2 rounded-xl hover:bg-glass-w5 transition-colors group"
                   >
-                    <div
+                    <button
+                      type="button"
                       className="flex items-center gap-3 cursor-pointer min-w-0 flex-1"
                       onClick={() => {
                         playPress(750);
@@ -171,7 +172,7 @@ export function ExploreSearchModal({
                           {id.slice(0, 14)}...
                         </span>
                       </div>
-                    </div>
+                    </button>
                     {!isSelf && onStartPm && (
                       <button
                         type="button"
@@ -199,7 +200,8 @@ export function ExploreSearchModal({
                 Posts
               </span>
               {matchedPosts.slice(0, 8).map((p) => (
-                <div
+                <button
+                  type="button"
                   key={p.id}
                   className="flex items-center gap-3 p-2 rounded-xl hover:bg-glass-w5 transition-colors cursor-pointer"
                   onClick={() => {
@@ -233,7 +235,7 @@ export function ExploreSearchModal({
                     </div>
                     {p.caption && <p className="text-xs text-retro-muted truncate">{p.caption}</p>}
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}

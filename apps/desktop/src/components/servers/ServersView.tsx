@@ -1762,7 +1762,8 @@ export function ServersView({
                     {onlineUsers.map((u) => {
                       const initial = (u.display_name || u.id || '?').charAt(0).toUpperCase()
                       return (
-                        <div
+                        <button
+                          type="button"
                           key={u.id}
                           onClick={() => handleUserClick(u)}
                           className="group flex items-center justify-between gap-2 p-2.5 rounded-xl bg-surface-interactive/40 border border-edge-subtle hover:border-edge-strong hover:bg-surface-interactive transition-colors cursor-pointer"
@@ -1791,7 +1792,7 @@ export function ServersView({
                           <span className="text-2xs text-retro-muted opacity-0 group-hover:opacity-100 transition-opacity pr-1">
                             profile →
                           </span>
-                        </div>
+                        </button>
                       )
                     })}
                   </div>
@@ -1818,7 +1819,8 @@ export function ServersView({
                     {offlineUsers.map((u) => {
                       const initial = (u.display_name || u.id || '?').charAt(0).toUpperCase()
                       return (
-                        <div
+                        <button
+                          type="button"
                           key={u.id}
                           onClick={() => handleUserClick(u)}
                           className="group flex items-center justify-between gap-2 p-2.5 rounded-xl bg-surface-interactive/20 border border-edge-subtle/50 hover:border-edge-strong hover:bg-surface-interactive/60 transition-colors cursor-pointer opacity-85 hover:opacity-100"
@@ -1843,7 +1845,7 @@ export function ServersView({
                           <span className="text-2xs text-retro-muted opacity-0 group-hover:opacity-100 transition-opacity pr-1">
                             profile →
                           </span>
-                        </div>
+                        </button>
                       )
                     })}
                   </div>

@@ -75,7 +75,8 @@ export function TargetSelectorModal({
           const pfp = profilePics[peerId];
 
           return (
-            <div
+            <button
+              type="button"
               key={peerId}
               onClick={() => { playPress(750); setSelectedTarget(peer); }}
               className={`p-3 rounded-lg flex items-center justify-between border transition-colors cursor-pointer ${
@@ -103,7 +104,7 @@ export function TargetSelectorModal({
               }`}>
                 {isSelected && <Crosshair className="w-3 h-3" />}
               </div>
-            </div>
+            </button>
           );
         })}
 

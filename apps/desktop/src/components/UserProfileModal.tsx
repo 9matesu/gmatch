@@ -313,13 +313,14 @@ export function UserProfileModal({
                 </button>
 
                 {hasStories && (
-                  <div
+                  <button
+                    type="button"
                     onClick={handleStoryBadgeClick}
                     className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-retro-accent text-retro-bg text-2xs font-semibold flex items-center gap-0.5 cursor-pointer shadow-xs"
                   >
                     <Play className="w-2 h-2 fill-current" />
                     <span>Story</span>
-                  </div>
+                  </button>
                 )}
               </div>
 
@@ -329,7 +330,8 @@ export function UserProfileModal({
                   <span className="text-2xs text-retro-muted">posts</span>
                 </div>
 
-                <div
+                <button
+                  type="button"
                   className="flex flex-col cursor-pointer"
                   onClick={() => {
                     playPress(700);
@@ -341,9 +343,10 @@ export function UserProfileModal({
                     {followersCount !== null ? followersCount : (user.likes_received ?? 0)}
                   </span>
                   <span className="text-2xs text-retro-muted">followers</span>
-                </div>
+                </button>
 
-                <div
+                <button
+                  type="button"
                   className="flex flex-col cursor-pointer"
                   onClick={() => {
                     playPress(700);
@@ -355,7 +358,7 @@ export function UserProfileModal({
                     {followingCount !== null ? followingCount : (user.following_count ?? 0)}
                   </span>
                   <span className="text-2xs text-retro-muted">following</span>
-                </div>
+                </button>
               </div>
             </div>
 

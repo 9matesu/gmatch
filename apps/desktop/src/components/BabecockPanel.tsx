@@ -671,13 +671,14 @@ export function BabecockPanel({
                                   <span>OP</span>
                                 </span>
                               )}
-                              <span
+                              <button
+                                type="button"
                                 onClick={() => onOpenProfile?.(entry.user_id)}
                                 className="absolute bottom-1 left-1 right-1 text-2xs font-bold text-retro-fg bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded truncate cursor-pointer hover:bg-black/80"
                               >
                                 {entry.display_name || 'Anonymous'}
                                 {entry.user_id === selfId && ' (you)'}
-                              </span>
+                              </button>
                             </div>
                           )
                         })}
@@ -800,7 +801,8 @@ export function BabecockPanel({
                 {gallery.map((g) => {
                   const op = g.entries.find((e) => e.user_id === g.host_id) || g.entries[0]
                   return (
-                    <div
+                    <button
+                      type="button"
                       key={g.id}
                       onClick={() => setExpandedRound(g)}
                       className="bg-glass-w5 border border-edge rounded-lg overflow-hidden space-y-1.5 p-2 cursor-pointer group hover:bg-glass-w8 transition-colors"
@@ -821,7 +823,7 @@ export function BabecockPanel({
                         <span className="font-semibold text-retro-fg truncate">{g.host_name || 'Host'}</span>
                         <span className="text-2xs text-retro-muted">{g.entries.length} cards</span>
                       </div>
-                    </div>
+                    </button>
                   )
                 })}
               </div>
