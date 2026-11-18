@@ -1,7 +1,7 @@
 // gMatch Electron main process.
 // All booru HTTP happens HERE (renderer never touches the network directly).
 // Endpoints per docs/SPEC.md §6. 10s timeout, browser UA, round-robin health.
-const { app, BrowserWindow, ipcMain, protocol, net, dialog, safeStorage, session, screen } = require('electron')
+const { app, BrowserWindow, ipcMain, protocol, net, dialog, safeStorage, session } = require('electron')
 const https = require('https')
 const fs = require('node:fs')
 const path = require('node:path')
@@ -1025,6 +1025,7 @@ const registerWindowHandlers = require("./ipc/window.cjs")
 const registerServerHandlers = require("./ipc/server.cjs")
 const registerNotifyHandlers = require("./ipc/notify.cjs")
 const registerAppHandlers = require("./ipc/app.cjs")
+const registerDominationMediaHandlers = require("./ipc/domination-media.cjs")
 const notify = registerNotifyHandlers({
   ipcMain, app, mainLog,
   getTray: () => appTray,
@@ -1316,63 +1317,14 @@ app.whenReady().then(async () => {
       },
     },
   })
-  // OS wallpaper swap for consented domination effects (Windows; no-op else).
-  ipcMain.handle('wallpaper:set-data', (_event, buf, mime) => wallpaperWin.setWallpaperFromBuffer(Buffer.from(buf), String(mime || '')))
-  ipcMain.handle('wallpaper:restore', () => wallpaperWin.restoreWallpaper())
-  ipcMain.handle('wallpaper:cleanup-files', () => { wallpaperWin.cleanupWallpaperFiles(); return { ok: true } })
-  // A domination wallpaper that outlives the app is the worst failure mode of
-  // this feature: the victim closes gMatch and their desktop is still
-  // somebody else's picture, with the only copy of the original living in this
-  // process. Nothing called restore on the way out (cleanup-files only deletes
-  // temp files, it does not put the wallpaper back), so close it here.
-  for (const evt of ['before-quit', 'will-quit']) {
-    app.on(evt, () => { if (wallpaperWin.hasPendingSwap()) void wallpaperWin.restoreWallpaper() })
-  }
-  // A stray domination video window must not outlive the app either.
-  app.on('session-end', () => {
-  // Logoff/shutdown: no prompt, no tray, just go (and save what we have).
-  mainLog('session-end: quitting')
-  isQuitting = true
-})
-
-app.on('before-quit', () => { if (domVideoWin) { try { domVideoWin.destroy() } catch { /* gone */ } domVideoWin = null } })
-  // Camera stays denied by default; the renderer consumes a one-shot grant
-  // only AFTER the victim clicks "Allow once" on the in-app prompt.
+  // Consented domination media (wallpaper + popup_video window) + one-shot
+  // camera grant: handlers live in ./ipc/domination-media.cjs.
+  registerDominationMediaHandlers({ ipcMain, app, wallpaperWin, domVideo, mainLog })
   ipcMain.handle('camera:grant-once', () => { cameraGrantOnce = true; return { ok: true } })
-  // Dedicated player window for consented popup_video effects: a real OS
-  // window (works while gMatch is minimized), sandboxed, muted, auto-closing
-  // at the effect duration. The window lifecycle IS the execution outcome the
-  // renderer reports back. URL is https-validated here on the privileged side.
-  let domVideoWin = null
-  ipcMain.handle('dom-video:open', (_event, url, durationMs) => {
-    return new Promise((resolve) => {
-      const valid = domVideo.validVideoUrl(url)
-      if (!valid) return resolve({ ok: false, reason: 'invalid-url' })
-      let settled = false
-      const finish = (ok, reason) => { if (!settled) { settled = true; resolve({ ok, reason }) } }
-      try {
-        if (domVideoWin) { try { domVideoWin.destroy() } catch { /* already gone */ } domVideoWin = null }
-        const geo = domVideo.windowGeometry(screen.getPrimaryDisplay()?.workArea)
-        domVideoWin = new BrowserWindow({
-          ...geo,
-          title: 'gMatch',
-          backgroundColor: '#000000',
-          autoHideMenuBar: true,
-          webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
-        })
-        let timer = null
-        domVideoWin.on('closed', () => {
-          domVideoWin = null
-          if (timer) clearTimeout(timer)
-          finish(true)
-        })
-        domVideoWin.webContents.on('did-fail-load', () => { try { domVideoWin?.close() } catch { /* gone */ } })
-        timer = setTimeout(() => { try { domVideoWin?.close() } catch { /* gone */ } }, domVideo.clampDurationMs(durationMs))
-        domVideoWin.loadURL(domVideo.playerPageUrl(valid)).catch(() => { try { domVideoWin?.close() } catch { /* gone */ } })
-      } catch (err) {
-        finish(false, err?.message || 'error')
-      }
-    })
+  app.on('session-end', () => {
+    // Logoff/shutdown: no prompt, no tray, just go (and save what we have).
+    mainLog('session-end: quitting')
+    isQuitting = true
   })
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
     if (permission === 'media' && cameraGrantOnce) {
