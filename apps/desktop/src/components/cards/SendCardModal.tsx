@@ -77,7 +77,7 @@ export function SendCardModal({
                     <span className="text-xs font-semibold text-retro-fg truncate">
                       {card.name || 'Untitled Card'}
                     </span>
-                    <span className="text-2xs uppercase font-mono px-1.5 py-0.5 rounded bg-glass-w12 text-amber-400 border border-border-glass">
+                    <span className="text-2xs uppercase font-mono px-1.5 py-0.5 rounded bg-glass-w12 text-warning-fg border border-border-glass">
                       {card.rarity}
                     </span>
                   </div>

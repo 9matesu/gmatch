@@ -374,9 +374,9 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
     viewMode === '2x2' || viewMode === '1x2' ? 'grid-cols-2' : 'grid-cols-3'
 
   const critFlashEl = critFlash && (
-    <div className="pointer-events-none absolute inset-0 z-[10] flex items-center justify-center bg-rose-500/15 backdrop-blur-[1px] animate-[gg-crit_0.35s_ease-out_forwards]">
-      <div className="flex items-center gap-2 rounded-xl border border-rose-500/60 bg-retro-bg/90 px-6 py-2.5 font-mono text-xl font-black tracking-widest text-rose-400 shadow-[0_0_40px_rgba(244,63,94,0.4)]">
-        <Lightning className="h-5 w-5 text-rose-400" weight="fill" />
+    <div className="pointer-events-none absolute inset-0 z-[10] flex items-center justify-center bg-danger/5 backdrop-blur-[1px] animate-[gg-crit_0.35s_ease-out_forwards]">
+      <div className="flex items-center gap-2 rounded-xl border border-danger/0 bg-retro-bg/90 px-6 py-2.5 font-mono text-xl font-black tracking-widest text-danger-fg shadow-[0_0_40px_rgba(244,63,94,0.4)]">
+        <Lightning className="h-5 w-5 text-danger-fg" weight="fill" />
         CRITICAL HIT!
       </div>
     </div>
@@ -401,7 +401,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
   const koPopEl = koPop && (
     <div className="pointer-events-none absolute inset-0 z-[11] flex items-center justify-center">
       <div className="animate-orbit-pop flex items-center gap-2 rounded-2xl border border-border-glass bg-black/85 px-8 py-3 font-mono text-3xl font-black tracking-widest text-retro-fg shadow-[0_0_50px_rgba(244,63,94,0.5)]">
-        <Skull className="h-7 w-7 text-rose-400" weight="fill" />
+        <Skull className="h-7 w-7 text-danger-fg" weight="fill" />
         KO
       </div>
     </div>
@@ -733,7 +733,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           </button>
           <button
             type="button"
-            className="icon-btn absolute right-3 top-3 z-[6] flex h-8 w-8 items-center justify-center rounded-xl bg-black/60 text-retro-fg/70 border border-border-glass backdrop-blur-md hover:bg-rose-600/80 hover:text-retro-fg hover:border-rose-500/60 transition-all duration-150 active:scale-95 cursor-pointer"
+            className="icon-btn absolute right-3 top-3 z-[6] flex h-8 w-8 items-center justify-center rounded-xl bg-black/60 text-retro-fg/70 border border-border-glass backdrop-blur-md hover:bg-danger/0 hover:text-retro-fg hover:border-danger/0 transition-all duration-150 active:scale-95 cursor-pointer"
             aria-label="Never show this again"
             title="Purge. This image and its rarest tags never return"
             hidden={!current}
@@ -767,10 +767,10 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               aria-expanded={dropsOpen}
               aria-label={`${pendingDrops.length} novelty drops waiting`}
               title="KO drops. Adopt a tag, ban an anti-tag, one click each"
-              className={`${MONO} inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border border-rose-500/40 bg-rose-500/10 px-2.5 py-1 text-xs font-bold text-rose-300 hover:bg-rose-500/20 transition-colors`}
+              className={`${MONO} inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border border-danger/0 bg-danger/0 px-2.5 py-1 text-xs font-bold text-danger-fg hover:bg-danger/0 transition-colors`}
             >
-              <Gift size={14} weight="bold" className="text-rose-400" />
-              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-2xs font-black text-retro-fg">
+              <Gift size={14} weight="bold" className="text-danger-fg" />
+              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-2xs font-black text-retro-fg">
                 {pendingDrops.length}
               </span>
             </button>
@@ -797,7 +797,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                           type="button"
                           onClick={() => claimDropTag(drop.id)}
                           title={`Adopt +${drop.suggestedTag} into your feed`}
-                          className={`${MONO} cursor-pointer rounded-md border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-2xs font-bold text-emerald-300 hover:bg-emerald-500/25 transition-colors`}
+                          className={`${MONO} cursor-pointer rounded-md border border-success/0 bg-success/5 px-2 py-0.5 text-2xs font-bold text-success-fg hover:bg-success/5 transition-colors`}
                         >
                           + {drop.suggestedTag}
                         </button>
@@ -807,7 +807,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                           type="button"
                           onClick={() => claimDropAntiTag(drop.id)}
                           title={`Ban ${drop.suggestedAntiTag} from your feed`}
-                          className={`${MONO} inline-flex items-center gap-1 cursor-pointer rounded-md border border-rose-500/40 bg-rose-500/10 px-2 py-0.5 text-2xs font-bold text-rose-300 hover:bg-rose-500/20 transition-colors`}
+                          className={`${MONO} inline-flex items-center gap-1 cursor-pointer rounded-md border border-danger/0 bg-danger/0 px-2 py-0.5 text-2xs font-bold text-danger-fg hover:bg-danger/0 transition-colors`}
                         >
                           <X size={10} weight="bold" className="shrink-0" /> {drop.suggestedAntiTag}
                         </button>
@@ -845,11 +845,11 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
         )}
         {heatLive && (
           <span
-            className={`${MONO} inline-flex min-w-0 shrink items-center gap-1.5 whitespace-nowrap rounded-lg border border-amber-500/40 bg-amber-500/15 px-2.5 py-1 text-xs font-black text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.2)]${reduceMotion ? '' : ' animate-pulse'}`}
+            className={`${MONO} inline-flex min-w-0 shrink items-center gap-1.5 whitespace-nowrap rounded-lg border border-warning/0 bg-warning/5 px-2.5 py-1 text-xs font-black text-warning-fg shadow-[0_0_12px_rgba(245,158,11,0.2)]${reduceMotion ? '' : ' animate-pulse'}`}
             title={`Heat combo: ${heatStreak} rapid clicks. X${heat} click power`}
             aria-label={`Heat combo x${heat}`}
           >
-            <Fire size={14} weight="fill" className="text-amber-400" />
+            <Fire size={14} weight="fill" className="text-warning-fg" />
             x{heat}
           </span>
         )}
@@ -870,7 +870,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           className={`${MONO} inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-border-glass bg-glass-w8 px-2.5 py-1 text-xs font-bold text-retro-body shadow-sm`}
           title="Lifetime KOs. Each foe hits harder"
         >
-          <Skull size={13} weight="bold" className="text-rose-400" />
+          <Skull size={13} weight="bold" className="text-danger-fg" />
           {formatNum(defeated)}
         </span>
       </div>

@@ -171,7 +171,7 @@ export function UpdateSection({ toast }: {
       {updater && phase === 'error' && (
         <div className="flex items-start justify-between gap-3 text-2xs text-retro-muted">
           <p className="flex items-start gap-1.5 min-w-0">
-            <ShieldAlert className="w-3 h-3 shrink-0 mt-px text-amber-400" />
+            <ShieldAlert className="w-3 h-3 shrink-0 mt-px text-warning-fg" />
             <span className="break-words">{status?.error || 'Update failed'}. You can grab the .exe manually.</span>
           </p>
           <button type="button" onClick={openReleases} className="shrink-0 underline hover:text-retro-fg cursor-pointer">
@@ -181,7 +181,7 @@ export function UpdateSection({ toast }: {
       )}
       {updater && phase === 'ready' && (
         <p className="text-2xs text-retro-muted flex items-start gap-1.5">
-          {status?.verified ? <ShieldCheck className="w-3 h-3 shrink-0 mt-px text-emerald-400" /> : <ShieldCheck className="w-3 h-3 shrink-0 mt-px text-amber-400" />}
+          {status?.verified ? <ShieldCheck className="w-3 h-3 shrink-0 mt-px text-success-fg" /> : <ShieldCheck className="w-3 h-3 shrink-0 mt-px text-warning-fg" />}
           {status?.verified
             ? 'Download verified (SHA-256 matches the release digest).'
             : 'SHA-256 digest was not published on this release. The file comes straight from the repo, unverified.'}

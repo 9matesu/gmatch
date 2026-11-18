@@ -740,7 +740,7 @@ function extForMime(mime: string): string {
                 <button
                   type="button"
                   onClick={() => removeMedia(activeMediaIndex)}
-                  className="absolute top-3 right-3 p-1.5 rounded-xl bg-black/75 hover:bg-red-600 text-retro-fg transition-colors cursor-pointer"
+                  className="absolute top-3 right-3 p-1.5 rounded-xl bg-black/75 hover:bg-danger text-retro-fg transition-colors cursor-pointer"
                   title="Remove this photo"
                 >
                   <Trash2 className="w-4 h-4" />

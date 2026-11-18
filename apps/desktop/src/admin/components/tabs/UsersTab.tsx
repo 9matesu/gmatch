@@ -417,7 +417,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                 {
                   accessorKey: "balance",
                   header: "G$",
-                  cell: (_, row) => <span className="font-mono text-xs text-amber-400">{(row.balance || 0).toLocaleString()}</span>,
+                  cell: (_, row) => <span className="font-mono text-xs text-warning-fg">{(row.balance || 0).toLocaleString()}</span>,
                 },
                 {
                   accessorKey: "score",
@@ -548,7 +548,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                               onClick={() => setExpandedCardId(isExpanded ? null : card.id)}
                               className="text-retro-muted hover:text-retro-fg transition-transform shrink-0 cursor-pointer"
                             >
-                              {isExpanded ? <ChevronUp className="w-4 h-4 text-cyan-300" /> : <ChevronDown className="w-4 h-4" />}
+                              {isExpanded ? <ChevronUp className="w-4 h-4 text-info-fg" /> : <ChevronDown className="w-4 h-4" />}
                             </button>
                             <AdminMediaThumbnail
                               objectId={card.media_object_id}
@@ -604,7 +604,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                                   </div>
                                   <div>
                                     <span className="text-retro-muted block text-2xs">Creator ID</span>
-                                    <span className="font-mono text-cyan-300 text-2xs break-all">{card.creator_id}</span>
+                                    <span className="font-mono text-info-fg text-2xs break-all">{card.creator_id}</span>
                                   </div>
                                   <div>
                                     <span className="text-retro-muted block text-2xs">Rarity / Value</span>
@@ -641,7 +641,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                           <Badge variant="info" size="sm">{m.status}</Badge>
                         </div>
                         <p className="text-2xs text-retro-muted mt-0.5">
-                          Seller: {m.seller_name || "Unknown"} · Price: <strong className="text-amber-400 font-mono">{m.price} g$</strong>
+                          Seller: {m.seller_name || "Unknown"} · Price: <strong className="text-warning-fg font-mono">{m.price} g$</strong>
                         </p>
                       </div>
                     </div>
@@ -721,7 +721,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                         </p>
                       </div>
                       <div className="text-right">
-                        <span className="font-mono text-sm font-bold text-amber-400">{w.balance.toLocaleString()} g$</span>
+                        <span className="font-mono text-sm font-bold text-warning-fg">{w.balance.toLocaleString()} g$</span>
                       </div>
                     </div>
                   ))}
@@ -744,7 +744,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                         </div>
                       </div>
                       <div className="text-right">
-                        <span className={cn("font-mono text-xs font-bold", l.delta >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                        <span className={cn("font-mono text-xs font-bold", l.delta >= 0 ? "text-success-fg" : "text-danger-fg")}>
                           {l.delta >= 0 ? `+${l.delta}` : l.delta} g$
                         </span>
                         <div className="text-2xs text-retro-muted font-mono">Bal: {l.balance_after} g$</div>
@@ -776,7 +776,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
               value={banReason}
               onChange={e => setBanReason(e.target.value)}
               placeholder="e.g. Terms violation, inappropriate content..."
-              className="w-full bg-surface-canvas border border-border-glass rounded px-3 py-1.5 text-xs text-retro-fg outline-none focus:border-red-500"
+              className="w-full bg-surface-canvas border border-border-glass rounded px-3 py-1.5 text-xs text-retro-fg outline-none focus:border-danger"
             />
             <label className="flex items-center gap-2 text-xs text-retro-muted cursor-pointer mt-2">
               <input
@@ -859,7 +859,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
         <div className="space-y-4">
           <div className="bg-surface-canvas border border-border-glass rounded-lg p-4 space-y-3">
             <div className="flex items-center gap-2">
-              <FlaskConical className="w-4 h-4 text-amber-400" />
+              <FlaskConical className="w-4 h-4 text-warning-fg" />
               <h3 className="text-sm font-medium text-retro-fg">Purge E2E test accounts</h3>
             </div>
             <p className="text-xs text-retro-muted leading-relaxed">
@@ -869,7 +869,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
               profile tag, since the suite mints anonymous keypairs. This removes every matching account and
               everything it created (objects, messages, cards, groups).
             </p>
-            <p className="text-xs text-amber-300/80 leading-relaxed">
+            <p className="text-xs text-warning-fg80 leading-relaxed">
               Always preview first. The server refuses to delete anything unless deletion is explicitly
               requested, and refuses outright if an admin account matches.
             </p>
@@ -923,7 +923,7 @@ export function UsersTab({ identity, pinVerified, onZoom, onAction }: UsersTabPr
                     void runPurge();
                   }}
                   disabled={purgeBusy || purgePreview.wouldDelete === 0}
-                  className="px-3 py-1.5 rounded-md text-xs font-bold bg-red-600/80 hover:bg-red-600 text-retro-fg disabled:opacity-40 cursor-pointer"
+                  className="px-3 py-1.5 rounded-md text-xs font-bold bg-danger/0 hover:bg-danger text-retro-fg disabled:opacity-40 cursor-pointer"
                 >
                   {purgeBusy ? "Deleting…" : `Delete ${purgePreview.wouldDelete} account(s)`}
                 </button>

@@ -445,7 +445,7 @@ export function ImageViewer({
             }}
             className="glass-action glass-action-danger h-9 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
           >
-            <Trash2 className="w-3.5 h-3.5 text-red-400" />
+            <Trash2 className="w-3.5 h-3.5 text-danger-fg" />
             <span>Delete</span>
           </button>
         )}

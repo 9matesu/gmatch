@@ -288,7 +288,7 @@ export function Tabs<T extends string>({
   className?: string
 }) {
   return (
-    <div role="tablist" className={`flex bg-glass-w4 p-0.5 rounded-lg border border-border-glass ${className}`}>
+    <div role="tablist" className={`flex bg-glass-w5 p-0.5 rounded-lg border border-border-glass ${className}`}>
       {tabs.map((t) => (
         <button
           key={t.id}

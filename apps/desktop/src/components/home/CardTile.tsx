@@ -173,19 +173,19 @@ export function CardTile({
           {frameType !== 'chrome' && (
             <span className={`text-2xs font-medium uppercase tracking-wider px-1.5 py-0.5 rounded-md border font-mono backdrop-blur-xs ${
               frameType === 'holo'
-                ? 'bg-purple-950/90 text-purple-200 border-purple-400/60'
+                ? 'bg-chrome-lav/0 text-chrome-lav-fg border-chrome-lav/0'
                 : frameType === 'carbon'
                 ? 'bg-retro-bg/90 text-retro-fg border-border-glass'
                 : frameType === 'neon'
-                ? 'bg-cyan-950/90 text-cyan-300 border-cyan-400/80'
+                ? 'bg-info/0 text-info-fg border-info/0'
                 : 'bg-black/80 text-retro-fg border-border-glass'
             }`}>
               {frameType}
             </span>
           )}
           {isReceived && (
-            <span className="text-2xs font-medium px-1.5 py-0.5 bg-black/75 text-purple-300 rounded-md border border-purple-400/30 flex items-center gap-1 backdrop-blur-xs">
-              <Gift className="w-2.5 h-2.5 text-purple-400" />
+            <span className="text-2xs font-medium px-1.5 py-0.5 bg-black/75 text-chrome-lav-fg rounded-md border border-chrome-lav/0 flex items-center gap-1 backdrop-blur-xs">
+              <Gift className="w-2.5 h-2.5 text-chrome-lav-fg" />
               <span>RECEIVED</span>
             </span>
           )}
@@ -194,7 +194,7 @@ export function CardTile({
         {/* Top-Right Badges: Expiry Timer & Select Checkbox */}
         <div className="absolute top-2 right-2 z-20 flex items-center gap-1">
           {minsLeft !== null && minsLeft > 0 && (
-            <span className="text-2xs font-mono font-medium px-1.5 py-0.5 bg-black/75 text-amber-300 rounded-md border border-amber-400/30 backdrop-blur-xs flex items-center gap-1">
+            <span className="text-2xs font-mono font-medium px-1.5 py-0.5 bg-black/75 text-warning-fg rounded-md border border-warning/0 backdrop-blur-xs flex items-center gap-1">
               <Clock className="w-2.5 h-2.5" />
               <span>{minsLeft > 60 ? `${Math.floor(minsLeft / 60)}h` : `${minsLeft}m`}</span>
             </span>
@@ -267,7 +267,7 @@ export function CardTile({
               </span>
             )}
             <span className="shrink-0 flex items-center gap-1 font-bold text-retro-fg">
-              <Heart className="w-2.5 h-2.5 fill-rose-500 text-rose-400" />
+              <Heart className="w-2.5 h-2.5 fill-danger text-danger-fg" />
               <span>{likes}</span>
             </span>
           </div>

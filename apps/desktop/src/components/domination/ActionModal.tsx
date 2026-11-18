@@ -331,7 +331,7 @@ export function ActionModal({
           )}
 
           {formError && (
-            <p className="text-xs text-rose-400" role="alert">{formError}</p>
+            <p className="text-xs text-danger-fg" role="alert">{formError}</p>
           )}
 
           {/* Footer: honest cost line */}

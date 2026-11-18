@@ -322,11 +322,11 @@ export function WatchPartyTimeline({
               className={BTN_ICON}
             >
               {isMuted || volume === 0 ? (
-                <VolumeX className="w-4 h-4 text-zinc-400" />
+                <VolumeX className="w-4 h-4 text-retro-muted" />
               ) : volume < 0.5 ? (
-                <Volume1 className="w-4 h-4 text-zinc-200" />
+                <Volume1 className="w-4 h-4 text-retro-body" />
               ) : (
-                <Volume2 className="w-4 h-4 text-zinc-200" />
+                <Volume2 className="w-4 h-4 text-retro-body" />
               )}
             </button>
 
@@ -343,7 +343,7 @@ export function WatchPartyTimeline({
           </div>
 
           {/* Time Readout: Current / Duration grouped together */}
-          <div className="text-2xs font-mono tabular-nums text-zinc-300 ml-1.5 select-none">
+          <div className="text-2xs font-mono tabular-nums text-retro-body ml-1.5 select-none">
             <span>{formatVideoTime(target)}</span>
             <span className="opacity-40 mx-1">/</span>
             <span className="opacity-75">{duration > 0 ? formatVideoTime(duration) : '--:--'}</span>

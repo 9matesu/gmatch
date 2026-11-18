@@ -1370,13 +1370,13 @@ export function ServersView({
     <div className="h-full min-h-0 flex-1 overflow-hidden p-2 animate-orbit-fade-in flex flex-col items-center">
       {/* First-login admin passcode */}
       {serverMode === 'host' && node?.isAdmin && pinToDismiss && (
-        <div role="alert" data-testid="admin-pin-banner" className="mb-2 bg-surface-interactive/90 border border-amber-400/40 p-3 rounded-lg space-y-1.5 shrink-0 shadow-lg">
+        <div role="alert" data-testid="admin-pin-banner" className="mb-2 bg-surface-interactive/90 border border-warning/0 p-3 rounded-lg space-y-1.5 shrink-0 shadow-lg">
           <p className="text-xs text-retro-fg font-bold">You are the admin of this server</p>
           <p className="text-xs text-retro-muted">
             Your admin passcode (unlocks the console. Store it somewhere safe):{' '}
             <button
               type="button"
-              className="font-mono text-amber-200 hover:text-amber-100 cursor-pointer"
+              className="font-mono text-warning-fg hover:text-warning-fg cursor-pointer"
               onClick={() => { void navigator.clipboard.writeText(pinToDismiss); toast('Passcode copied', 'success'); }}
             >
               {pinToDismiss}
@@ -1578,7 +1578,7 @@ export function ServersView({
                       )}
                       {node?.isAdmin && (
                         <span
-                          className="text-2xs px-2 py-0.5 rounded font-mono uppercase tracking-wider text-amber-200 border border-amber-400/30 bg-amber-400/10"
+                          className="text-2xs px-2 py-0.5 rounded font-mono uppercase tracking-wider text-warning-fg border border-warning/0 bg-warning/0"
                           title="You administer this server"
                         >
                           Admin

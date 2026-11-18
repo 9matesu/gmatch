@@ -65,7 +65,7 @@ export function AgeGateModal() {
             onClick={handleConfirmAge}
             className="w-full py-2.5 px-4 rounded-lg bg-retro-accent hover:bg-retro-fg active:scale-[0.99] text-retro-accent-text font-semibold text-xs shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2"
           >
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <CheckCircle2 className="w-4 h-4 text-success-fg" />
             <span>I am 18 or Older. Enter</span>
           </button>
 

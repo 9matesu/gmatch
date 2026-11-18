@@ -69,8 +69,19 @@ test('navigation round-trip preserves idle state', async ({ page }) => {
   const stage = page.getByRole('button', { name: /attack the current foe/i })
   await expect(stage).toBeVisible({ timeout: 20_000 })
   await seedPlayableFoe(page)
-  await stage.click()
-  await expect.poll(() => idlePoints(page), { timeout: 15_000 }).toBeGreaterThan(0)
+  // A click is dead by design while a feed fetch is swapping the picture
+  // (`imageReady` false): the store refuses to score a foe the player cannot
+  // see. Seeded foe, then click until one lands, exactly like a player would.
+  await expect.poll(() => idlePoints(page), { timeout: 2_000 }).toBe(0)
+  await expect
+    .poll(
+      async () => {
+        await stage.click()
+        return idlePoints(page)
+      },
+      { timeout: 15_000, intervals: [100, 250, 500] },
+    )
+    .toBeGreaterThan(0)
   const afterClick = await idlePoints(page)
   await page.goto('/#/games')
   await page.goto('/#/grid')

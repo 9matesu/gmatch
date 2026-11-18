@@ -38,22 +38,22 @@ const CATEGORY_META: Record<
   blocklist: {
     label: 'Hard Blocklist (blocklist)',
     desc: 'Tags dropped at query origin and rejected by clicker feed filters.',
-    color: 'text-red-400',
-    badgeBg: 'bg-red-500/10 text-red-300 border-red-500/30',
+    color: 'text-danger-fg',
+    badgeBg: 'bg-danger/0 text-danger-fg border-danger/0',
     commentKey: '_comment_hard',
   },
   suggested: {
     label: 'Suggested Excludes (suggested)',
     desc: 'Polarising tags offered as one-tap excludes on setup and in Feed options.',
-    color: 'text-amber-400',
-    badgeBg: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
+    color: 'text-warning-fg',
+    badgeBg: 'bg-warning/0 text-warning-fg border-warning/0',
     commentKey: '_comment_suggested',
   },
   noise: {
     label: 'Noise Tags (noise)',
     desc: 'Quality, meta, and watermarking tags excluded from tag rankings and card stats.',
-    color: 'text-blue-400',
-    badgeBg: 'bg-blue-500/10 text-blue-300 border-blue-500/30',
+    color: 'text-info-fg',
+    badgeBg: 'bg-info/0 text-info-fg border-info/0',
     commentKey: '_comment_noise',
   },
 }
@@ -338,7 +338,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
       <div className="p-4 bg-surface-interactive border border-border-glass rounded-xl space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
+            <div className="w-8 h-8 rounded-xl bg-danger/0 border border-danger/0 flex items-center justify-center text-danger-fg">
               <ShieldAlert className="w-4 h-4" />
             </div>
             <div>
@@ -347,8 +347,8 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
                 <span
                   className={`text-2xs px-2 py-0.5 rounded-full font-mono font-medium border ${
                     isModified
-                      ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-                      : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                      ? 'bg-warning/0 text-warning-fg border-warning/0'
+                      : 'bg-success/0 text-success-fg border-success/0'
                   }`}
                 >
                   {isModified ? 'Customized' : 'Factory Default'}
@@ -437,7 +437,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
                 <button
                   type="button"
                   onClick={clearCategory}
-                  className="text-xs text-red-400 hover:text-red-300 font-medium cursor-pointer self-start sm:self-auto"
+                  className="text-xs text-danger-fg hover:text-danger-fg font-medium cursor-pointer self-start sm:self-auto"
                 >
                   Clear All ({currentCategoryTags.length})
                 </button>
@@ -512,7 +512,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
                       aria-label={`Remove ${tag}`}
                       title={`Remove ${tag}`}
                       onClick={() => removeTag(tag)}
-                      className="text-retro-muted hover:text-red-400 cursor-pointer text-xs"
+                      className="text-retro-muted hover:text-danger-fg cursor-pointer text-xs"
                     >
                       <X className="w-3 h-3" />
                     </button>
@@ -529,12 +529,12 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
             <div className="flex items-center gap-2">
               <span className="text-xs font-mono text-retro-muted">shared/blocklist.json</span>
               {jsonError ? (
-                <span className="text-2xs text-red-400 flex items-center gap-1 font-mono">
+                <span className="text-2xs text-danger-fg flex items-center gap-1 font-mono">
                   <AlertCircle className="w-3 h-3" />
                   {jsonError}
                 </span>
               ) : (
-                <span className="text-2xs text-emerald-400 flex items-center gap-1 font-mono">
+                <span className="text-2xs text-success-fg flex items-center gap-1 font-mono">
                   <Check className="w-3 h-3" />
                   Valid JSON
                 </span>
@@ -554,7 +554,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
                 onClick={copyJson}
                 className="px-2.5 py-1 rounded-lg border border-border-glass text-xs font-bold text-retro-fg hover:bg-surface-interactive flex items-center gap-1 cursor-pointer"
               >
-                {isCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                {isCopied ? <Check className="w-3 h-3 text-success-fg" /> : <Copy className="w-3 h-3" />}
                 <span>{isCopied ? 'Copied' : 'Copy'}</span>
               </button>
             </div>
@@ -567,7 +567,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
             spellCheck={false}
             className={`w-full font-mono text-xs p-3 rounded-xl bg-surface-interactive border outline-none leading-relaxed resize-y styled-scrollbar ${
               jsonError
-                ? 'border-red-500/60 focus:border-red-500 text-red-100'
+                ? 'border-danger/0 focus:border-danger text-danger-fg'
                 : 'border-border-glass focus:border-retro-accent text-retro-fg'
             }`}
           />
@@ -592,7 +592,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
           <button
             type="button"
             onClick={handleReset}
-            className="px-3 py-2 bg-surface-raised border border-border-glass hover:border-red-500/40 text-retro-muted hover:text-red-400 rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
+            className="px-3 py-2 bg-surface-raised border border-border-glass hover:border-danger/0 text-retro-muted hover:text-danger-fg rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Reset to Defaults</span>

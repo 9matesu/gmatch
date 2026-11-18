@@ -501,7 +501,7 @@ export function ContextOverlay({
                   onSendPm(contextMenu.data);
                   onDismiss();
                 }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg text-purple-300 font-bold transition-colors cursor-pointer"
+                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg text-chrome-lav-fg font-bold transition-colors cursor-pointer"
               >
                 Send PM
               </button>

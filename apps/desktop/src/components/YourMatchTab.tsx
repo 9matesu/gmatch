@@ -241,12 +241,12 @@ export function YourMatchTab({
 
         {/* No match */}
         {!celebrate && st.phase === 'ended' && st.lastResult === 'ended' && (
-          <div className="border border-rose-500/30 bg-rose-500/5 p-4 text-center space-y-2 animate-orbit-slide-up rounded-lg">
-            <div className="text-sm font-medium text-rose-400">{matchEndSummary(st.lastResult, lastPayout, false)}</div>
+          <div className="border border-danger/0 bg-danger/ p-4 text-center space-y-2 animate-orbit-slide-up rounded-lg">
+            <div className="text-sm font-medium text-danger-fg">{matchEndSummary(st.lastResult, lastPayout, false)}</div>
             <div className="text-xs text-retro-muted">Cards revealed below.</div>
             <div className="grid grid-cols-2 gap-2">
-              {cardSlot('You', revealMineImg, 'Your card', 'border-rose-500/30', false)}
-              {cardSlot(opponentName, revealTheirsImg, 'Their card', 'border-rose-500/30', false, false, opponentUser)}
+              {cardSlot('You', revealMineImg, 'Your card', 'border-danger/0', false)}
+              {cardSlot(opponentName, revealTheirsImg, 'Their card', 'border-danger/0', false, false, opponentUser)}
             </div>
           </div>
         )}
@@ -337,7 +337,7 @@ export function YourMatchTab({
             <button
               disabled={submitting}
               onClick={() => void decideAndCapture('reject')}
-              className="py-2.5 text-xs font-medium border border-border-glass text-retro-muted hover:text-rose-400 hover:border-rose-500/30 bg-surface-interactive hover:bg-rose-500/5 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              className="py-2.5 text-xs font-medium border border-border-glass text-retro-muted hover:text-danger-fg hover:border-danger/0 bg-surface-interactive hover:bg-danger/ rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
               <span>Reject</span>
@@ -347,7 +347,7 @@ export function YourMatchTab({
               onClick={() => void decideAndCapture('like')}
               className="py-2.5 text-xs font-medium bg-retro-fg text-retro-bg hover:bg-retro-fg/90 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
             >
-              <Heart className="w-3.5 h-3.5 fill-current text-rose-400" />
+              <Heart className="w-3.5 h-3.5 fill-current text-danger-fg" />
               <span>Like</span>
             </button>
           </div>

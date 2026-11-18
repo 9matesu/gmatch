@@ -104,7 +104,7 @@ export function PostLikersModal({
         {/* Header */}
         <div className="p-4 border-b border-border-glass flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Heart className="w-4 h-4 text-rose-500 fill-rose-500" />
+            <Heart className="w-4 h-4 text-danger-fg fill-danger" />
             <h3 className="text-sm font-extrabold text-retro-fg">Likes</h3>
             {!loading && (
               <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-glass-w12 text-retro-muted border border-border-glass">
@@ -133,7 +133,7 @@ export function PostLikersModal({
               <span className="text-xs">Loading likes...</span>
             </div>
           ) : error ? (
-            <div className="py-10 text-center text-xs text-rose-400 space-y-2">
+            <div className="py-10 text-center text-xs text-danger-fg space-y-2">
               <p>{error}</p>
               <button
                 type="button"

@@ -227,7 +227,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
               <Icon className="w-3.5 h-3.5" />
               {tab.label}
               {tab.id === "matches" && matches.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 bg-purple-500/20 text-purple-300 rounded-full text-2xs">
+                <span className="ml-1 px-1.5 py-0.2 bg-chrome-lav/0 text-chrome-lav-fg rounded-full text-2xs">
                   {matches.length} live
                 </span>
               )}
@@ -328,7 +328,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                             <button
                               type="button"
                               onClick={() => { onAction("deletePost", post.id); setTimeout(fetchPosts, 300); }}
-                              className="px-2.5 py-1 text-xs font-semibold rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 cursor-pointer"
+                              className="px-2.5 py-1 text-xs font-semibold rounded border border-danger/0 text-danger-fg hover:bg-danger/0 cursor-pointer"
                             >
                               Delete
                             </button>
@@ -369,7 +369,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                       <button
                         type="button"
                         onClick={() => { onAction("deleteLobbyImage", img.id); setTimeout(fetchLobbyImages, 300); }}
-                        className="px-2.5 py-1 text-xs font-semibold rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 cursor-pointer"
+                        className="px-2.5 py-1 text-xs font-semibold rounded border border-danger/0 text-danger-fg hover:bg-danger/0 cursor-pointer"
                       >
                         Delete
                       </button>
@@ -441,7 +441,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                         <button
                           type="button"
                           onClick={() => { onAction("forceEnd", m.id); setTimeout(fetchMatches, 300); }}
-                          className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                          className="px-3 py-1.5 bg-danger/0 hover:bg-danger/0 text-danger-fg border border-danger/0 rounded-lg text-xs font-bold transition-colors cursor-pointer"
                         >
                           Force End
                         </button>
@@ -497,7 +497,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                       <button
                         type="button"
                         onClick={() => { onAction("endTier", t.id); setTimeout(fetchMatches, 300); }}
-                        className="px-2.5 py-1 text-xs font-semibold rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 cursor-pointer"
+                        className="px-2.5 py-1 text-xs font-semibold rounded border border-danger/0 text-danger-fg hover:bg-danger/0 cursor-pointer"
                       >
                         End Tier
                       </button>
@@ -535,7 +535,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                       <button
                         type="button"
                         onClick={() => { onAction("closeRoom", r.id); setTimeout(fetchRooms, 300); }}
-                        className="px-2 py-1 text-2xs font-semibold rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 cursor-pointer"
+                        className="px-2 py-1 text-2xs font-semibold rounded border border-danger/0 text-danger-fg hover:bg-danger/0 cursor-pointer"
                       >
                         Close
                       </button>
@@ -566,7 +566,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                       <button
                         type="button"
                         onClick={() => { onAction("closeBabecock", b.id); setTimeout(fetchRooms, 300); }}
-                        className="px-2 py-1 text-2xs font-semibold rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 cursor-pointer"
+                        className="px-2 py-1 text-2xs font-semibold rounded border border-danger/0 text-danger-fg hover:bg-danger/0 cursor-pointer"
                       >
                         Close
                       </button>
@@ -625,7 +625,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                       <button
                         type="button"
                         onClick={() => { onAction("deleteAnnouncement", ann.id); setTimeout(fetchAnnouncements, 300); }}
-                        className="px-2 py-1 text-2xs font-semibold rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 cursor-pointer"
+                        className="px-2 py-1 text-2xs font-semibold rounded border border-danger/0 text-danger-fg hover:bg-danger/0 cursor-pointer"
                       >
                         Delete
                       </button>
@@ -664,7 +664,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                         <button
                           type="button"
                           onClick={() => { adminApi.updateRecommendation(identity!, rec.id, "resolved"); setTimeout(fetchAnnouncements, 300); }}
-                          className="px-2 py-1 text-2xs font-semibold rounded border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 cursor-pointer"
+                          className="px-2 py-1 text-2xs font-semibold rounded border border-success/0 text-success-fg hover:bg-success/0 cursor-pointer"
                         >
                           Resolve
                         </button>
@@ -672,7 +672,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                       <button
                         type="button"
                         onClick={() => { adminApi.deleteRecommendation(identity!, rec.id); setTimeout(fetchAnnouncements, 300); }}
-                        className="px-2 py-1 text-2xs font-semibold rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 cursor-pointer"
+                        className="px-2 py-1 text-2xs font-semibold rounded border border-danger/0 text-danger-fg hover:bg-danger/0 cursor-pointer"
                       >
                         Delete
                       </button>

@@ -31,7 +31,7 @@ export function LeagueBoard({ league, users, onOpenProfile }: LeagueBoardProps) 
         >
           <div className="flex items-center gap-3 min-w-0">
             <span className={`text-xs font-black font-mono w-6 text-center ${
-              rank === 0 ? 'text-yellow-400' : rank === 1 ? 'text-retro-body' : rank === 2 ? 'text-amber-600' : 'text-retro-muted'
+              rank === 0 ? 'text-warning-fg' : rank === 1 ? 'text-retro-body' : rank === 2 ? 'text-warning-fg' : 'text-retro-muted'
             }`}>
               {rank === 0 ? '①' : rank === 1 ? '②' : rank === 2 ? '③' : `#${rank + 1}`}
             </span>

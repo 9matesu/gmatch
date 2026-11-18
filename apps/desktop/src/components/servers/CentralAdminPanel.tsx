@@ -132,14 +132,14 @@ export function CentralAdminPanel({ central, identity, toast }: { central: strin
     return (
       <div className="glass-card p-3 space-y-2.5" aria-label="Central admin login">
         <div className="flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-amber-400" />
+          <ShieldCheck className="w-4 h-4 text-warning-fg" />
           <span className="text-xs font-medium text-retro-fg">Central Node Authentication</span>
         </div>
         <p className="text-xs text-retro-muted leading-relaxed">
           Authenticate with the central node passcode to manage the directory.
         </p>
         {isDev && (
-          <div className="flex items-center justify-between text-xs bg-amber-500/10 border border-amber-500/20 text-amber-300 px-2.5 py-1.5 rounded">
+          <div className="flex items-center justify-between text-xs bg-warning/0 border border-warning/0 text-warning-fg px-2.5 py-1.5 rounded">
             <span>Dev mode: default passcode is <code className="font-mono font-bold bg-black/30 px-1 py-0.5 rounded">admin</code></span>
             <button
               type="button"
@@ -173,7 +173,7 @@ export function CentralAdminPanel({ central, identity, toast }: { central: strin
   return (
     <section className="space-y-2" aria-label="Central admin">
       <div className="flex items-center gap-2">
-        <ShieldCheck className="w-4 h-4 text-amber-400" />
+        <ShieldCheck className="w-4 h-4 text-warning-fg" />
         <span className="text-xs font-medium text-retro-fg">Central admin</span>
         <button
           type="button"

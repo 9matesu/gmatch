@@ -29,7 +29,7 @@ export function CardBack({ label, className = '', ticking = false }: CardBackPro
       {/* Pulsing Border Glow during ticking / picking */}
       <div className={`absolute inset-1.5 border-2 rounded-xl pointer-events-none transition-all duration-700 ${
         isTicking
-          ? 'border-purple-500/60 shadow-[0_0_15px_rgba(168,85,247,0.3)] animate-pulse'
+          ? 'border-chrome-lav/0 shadow-[0_0_15px_rgba(168,85,247,0.3)] animate-pulse'
           : 'border-border-glass'
       }`} />
       
@@ -43,14 +43,14 @@ export function CardBack({ label, className = '', ticking = false }: CardBackPro
       {/* Center Icon & Holographic Symbol */}
       <div className="relative flex flex-col items-center justify-center gap-1.5 z-10">
         <div className={`w-10 h-10 rounded-xl bg-surface-canvas border border-border-glass flex items-center justify-center shadow-lg transition-transform ${
-          isTicking ? 'scale-105 border-purple-500/50 text-cyan-300 animate-bounce' : 'text-retro-muted'
+          isTicking ? 'scale-105 border-chrome-lav/0 text-info-fg animate-bounce' : 'text-retro-muted'
         }`}>
           {isTicking ? <Clock className="w-5 h-5 animate-spin" style={{ animationDuration: '4s' }} /> : <Sparkles className="w-5 h-5" />}
         </div>
 
         {label && (
           <span className={`text-2xs font-bold tracking-wider uppercase text-center px-2 py-0.5 rounded-md ${
-            isTicking ? 'text-cyan-300 bg-purple-950/60 border border-purple-500/30 animate-pulse' : 'text-retro-muted'
+            isTicking ? 'text-info-fg bg-chrome-lav/0 border border-chrome-lav/0 animate-pulse' : 'text-retro-muted'
           }`}>
             {label}
           </span>

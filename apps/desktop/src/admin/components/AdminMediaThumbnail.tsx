@@ -49,7 +49,7 @@ export function AdminMediaThumbnail({
     >
       {objectImage.isLink ? (
         <div className="w-full h-full flex items-center justify-center">
-          <LinkIcon className="w-5 h-5 text-cyan-300" />
+          <LinkIcon className="w-5 h-5 text-info-fg" />
         </div>
       ) : !canOpen ? (
         <div className="w-full h-full flex items-center justify-center text-2xs font-mono text-retro-muted">

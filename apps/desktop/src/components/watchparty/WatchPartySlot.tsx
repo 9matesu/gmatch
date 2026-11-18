@@ -397,7 +397,7 @@ export function WatchPartySlot({
               </span>
             )}
             {transfer.status === 'failed' && (
-              <span className="text-2xs text-rose-300">{transfer.error || 'No peer answered.'}</span>
+              <span className="text-2xs text-danger-fg">{transfer.error || 'No peer answered.'}</span>
             )}
             {(transfer.status === 'failed' || transfer.status === 'cancelled' || transfer.status === 'idle') && (
               <button

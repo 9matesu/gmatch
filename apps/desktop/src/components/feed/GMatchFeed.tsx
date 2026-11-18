@@ -991,7 +991,7 @@ function GMatchFeedImpl({
       {syncCounts.pending > 0 || syncCounts.local > 0 ? (
         <div
           role="status"
-          className="w-full py-1 px-3 flex items-center gap-1.5 text-2xs font-mono text-retro-muted border-b border-border-glass bg-glass-w4 select-none"
+          className="w-full py-1 px-3 flex items-center gap-1.5 text-2xs font-mono text-retro-muted border-b border-border-glass bg-glass-w5 select-none"
         >
           {syncCounts.pending > 0 ? (
             <>
@@ -1000,7 +1000,7 @@ function GMatchFeedImpl({
             </>
           ) : (
             <>
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400/90 shrink-0" aria-hidden="true" />
+              <span className="w-1.5 h-1.5 rounded-full bg-warning/0 shrink-0" aria-hidden="true" />
               <span>
                 {syncCounts.local} post{syncCounts.local === 1 ? '' : 's'} saved on this device — they upload when the network is back.
               </span>
@@ -1012,7 +1012,7 @@ function GMatchFeedImpl({
 
       {/* Discreet grey loading label when stories/content are loading */}
       {storiesLoading && (
-        <div className="w-full py-1.5 px-3 flex items-center justify-center gap-1.5 text-2xs font-mono text-retro-muted border-b border-border-glass bg-glass-w4 select-none">
+        <div className="w-full py-1.5 px-3 flex items-center justify-center gap-1.5 text-2xs font-mono text-retro-muted border-b border-border-glass bg-glass-w5 select-none">
           <Loader2 className="w-3 h-3 animate-spin text-retro-muted shrink-0" />
           <span>Loading content...</span>
         </div>
@@ -1447,7 +1447,7 @@ function GMatchFeedImpl({
                         className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-[0.98]"
                       >
                         <Heart
-                          className={`w-4 h-4 transition-colors stroke-[1.75] ${isLiked ? 'text-rose-500 fill-rose-500' : 'text-retro-muted hover:text-retro-fg'
+                          className={`w-4 h-4 transition-colors stroke-[1.75] ${isLiked ? 'text-danger-fg fill-danger' : 'text-retro-muted hover:text-retro-fg'
                             }`}
                         />
                       </button>
@@ -1496,7 +1496,7 @@ function GMatchFeedImpl({
                         className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-[0.98]"
                       >
                         <FolderPlus
-                          className={`w-4 h-4 stroke-[1.75] transition-colors ${vaultSaved.has(post.url) ? 'text-emerald-400' : 'text-retro-muted hover:text-retro-fg'}`}
+                          className={`w-4 h-4 stroke-[1.75] transition-colors ${vaultSaved.has(post.url) ? 'text-success-fg' : 'text-retro-muted hover:text-retro-fg'}`}
                         />
                       </button>
                     )}

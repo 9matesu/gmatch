@@ -297,17 +297,17 @@ export function FollowersFollowingModal({
                         @{user.display_name?.trim() || 'Unknown User'}
                       </span>
                       {user.online && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-success shrink-0" />
                       )}
                       {(user as any).matches_won > 5 && (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-blue-500 fill-blue-500 shrink-0" />
+                        <CheckCircle2 className="w-3.5 h-3.5 text-info-fg fill-info shrink-0" />
                       )}
                     </div>
 
                     <div className="flex items-center gap-2 text-xs text-retro-muted truncate font-mono">
                       <span>{user.id.slice(0, 12)}...</span>
                       {(user as any).score ? (
-                        <span className="text-amber-600 font-bold font-sans">
+                        <span className="text-warning-fg font-bold font-sans">
                           g$ {(user as any).score}
                         </span>
                       ) : null}
@@ -343,7 +343,7 @@ export function FollowersFollowingModal({
                         onSendCard(user.id);
                       }}
                       title="Send Duel Card"
-                      className="p-2 text-retro-muted hover:text-cyan-400 rounded-xl hover:bg-amber-500/20 transition-colors cursor-pointer"
+                      className="p-2 text-retro-muted hover:text-info-fg rounded-xl hover:bg-warning/0 transition-colors cursor-pointer"
                     >
                       <Send className="w-4 h-4" />
                     </button>
@@ -355,7 +355,7 @@ export function FollowersFollowingModal({
                       type="button"
                       onClick={() => handleToggleFollow(user)}
                       className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1 ${isFollowing
-                          ? 'bg-surface-interactive hover:bg-rose-50 text-retro-fg hover:text-rose-600 border border-border-glass'
+                          ? 'bg-surface-interactive hover:bg-danger/10 text-retro-fg hover:text-danger-fg border border-border-glass'
                           : 'bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text shadow-xs'
                         }`}
                     >

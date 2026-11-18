@@ -68,7 +68,7 @@ export function MatchChat({ matchId, selfId, messages, onSend, onLoad, soundEnab
         className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-bold text-retro-body hover:text-retro-fg hover:bg-glass-w5 cursor-pointer transition-colors"
       >
         <span className="flex items-center gap-1.5">
-          <MessageSquare className="w-3.5 h-3.5 text-cyan-300" />
+          <MessageSquare className="w-3.5 h-3.5 text-info-fg" />
           <span>Match Chat {open ? '' : `(${list.length})`}</span>
         </span>
         <span className="text-retro-muted flex items-center gap-1 text-xs">
@@ -122,13 +122,13 @@ export function MatchChat({ matchId, selfId, messages, onSend, onLoad, soundEnab
                 }
               }}
               placeholder="Send a message to your opponent..."
-              className="flex-1 bg-surface-interactive border border-border-glass text-retro-fg placeholder:text-retro-muted text-xs px-3 py-1.5 rounded-xl outline-none focus:border-purple-500 transition-colors"
+              className="flex-1 bg-surface-interactive border border-border-glass text-retro-fg placeholder:text-retro-muted text-xs px-3 py-1.5 rounded-xl outline-none focus:border-chrome-lav transition-colors"
             />
             <button
               type="button"
               disabled={!draft.trim() || sending}
               onClick={() => void handleSend()}
-              className="px-3 py-1.5 text-xs font-bold bg-cyan-500 text-retro-fg hover:bg-cyan-600 disabled:opacity-40 rounded-xl transition-colors cursor-pointer flex items-center gap-1 shrink-0 shadow-xs"
+              className="px-3 py-1.5 text-xs font-bold bg-info text-retro-fg hover:bg-info disabled:opacity-40 rounded-xl transition-colors cursor-pointer flex items-center gap-1 shrink-0 shadow-xs"
             >
               <Send className="w-3 h-3" />
               <span>Send</span>

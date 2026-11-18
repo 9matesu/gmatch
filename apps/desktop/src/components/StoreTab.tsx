@@ -413,17 +413,17 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
           <div className="text-2xs text-retro-muted mt-0.5">{portfolio.length} card{portfolio.length === 1 ? '' : 's'}</div>
         </div>
 
-        <div className="solid-panel backdrop-blur-md border border-amber-500/20 p-3.5">
-          <div className="flex items-center gap-1.5 text-amber-400 text-2xs font-semibold uppercase tracking-wider">
+        <div className="solid-panel backdrop-blur-md border border-warning/0 p-3.5">
+          <div className="flex items-center gap-1.5 text-warning-fg text-2xs font-semibold uppercase tracking-wider">
             <Sparkles className="w-3.5 h-3.5" />
             Cashout Value
           </div>
-          <div className="mt-1 text-lg font-bold font-mono tabular-nums text-amber-300">{formatGc(cashoutEstimate)}</div>
+          <div className="mt-1 text-lg font-bold font-mono tabular-nums text-warning-fg">{formatGc(cashoutEstimate)}</div>
           <div className="text-2xs text-retro-muted mt-0.5">{(cashoutRate / 100).toFixed(1)}% rate</div>
 
           {cashingOutAll && cashoutProgress ? (
-            <div className="mt-2.5 flex items-center gap-2 text-xs text-amber-300 font-medium">
-              <span className="w-3 h-3 border border-amber-400 border-t-transparent rounded-full animate-spin" />
+            <div className="mt-2.5 flex items-center gap-2 text-xs text-warning-fg font-medium">
+              <span className="w-3 h-3 border border-warning border-t-transparent rounded-full animate-spin" />
               Cashing out {cashoutProgress.done}/{cashoutProgress.total}…
             </div>
           ) : confirmCashoutAll ? (
@@ -438,7 +438,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                 <button
                   type="button"
                   onClick={() => void handleCashOutAll()}
-                  className="px-2.5 py-1.5 rounded bg-amber-500 text-retro-accent-text text-xs font-bold cursor-pointer transition-colors hover:bg-amber-400"
+                  className="px-2.5 py-1.5 rounded bg-warning text-retro-accent-text text-xs font-bold cursor-pointer transition-colors hover:bg-warning"
                 >
                   Confirm
                 </button>
@@ -459,7 +459,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                 setConfirmCashoutAll(true);
               }}
               disabled={cashableCount === 0}
-              className="mt-2.5 w-full px-2.5 py-1.5 rounded bg-amber-500/15 hover:bg-amber-500/25 disabled:opacity-40 text-amber-300 text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+              className="mt-2.5 w-full px-2.5 py-1.5 rounded bg-warning/5 hover:bg-warning/5 disabled:opacity-40 text-warning-fg text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
             >
               <Coins className="w-3 h-3" />
               Cash Out All
@@ -532,7 +532,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                     </span>
                   )}
                   <span className="text-xs font-bold font-mono tabular-nums text-retro-fg shrink-0">{formatGc(c.value)}</span>
-                  <span className="text-2xs font-mono tabular-nums text-amber-300 shrink-0">→ {formatGc(computeCashoutPayout(c.value, cashoutRate))}</span>
+                  <span className="text-2xs font-mono tabular-nums text-warning-fg shrink-0">→ {formatGc(computeCashoutPayout(c.value, cashoutRate))}</span>
                 </div>
               );
             })}
@@ -612,7 +612,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                   </div>
                 </button>
                 <div className="flex items-center justify-between gap-1.5 px-2 pb-2">
-                  <span className="text-xs font-mono font-bold text-cyan-300 tabular-nums">{formatGc(l.price)} g$</span>
+                  <span className="text-xs font-mono font-bold text-info-fg tabular-nums">{formatGc(l.price)} g$</span>
                   {l.sellerId === identity?.orbitId ? (
                     <span className="px-2 py-1 rounded bg-retro-interactive text-retro-muted text-2xs font-bold" title="This is your own listing. Cancel it from your card page instead">Yours</span>
                   ) : (
@@ -620,7 +620,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                       type="button"
                       disabled={buyingCardId !== null}
                       onClick={() => void buyListing(l)}
-                      className="px-2 py-1 rounded bg-cyan-500/20 hover:bg-cyan-500/30 disabled:opacity-40 text-cyan-300 text-2xs font-bold cursor-pointer transition-colors"
+                      className="px-2 py-1 rounded bg-info/0 hover:bg-info/0 disabled:opacity-40 text-info-fg text-2xs font-bold cursor-pointer transition-colors"
                     >
                       {buyingCardId === l.cardId ? '…' : 'Buy'}
                     </button>
@@ -644,18 +644,18 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
           return (
             <div
               key={item.id}
-              className="relative solid-panel backdrop-blur-md p-4 flex flex-col justify-between transition-colors border-rose-500/30"
+              className="relative solid-panel backdrop-blur-md p-4 flex flex-col justify-between transition-colors border-danger/0"
             >
               <div className="space-y-2">
                 <div className="flex items-start justify-between">
-                  <div className="p-2.5 rounded-lg border bg-rose-500/10 border-rose-500/20 text-rose-400">
+                  <div className="p-2.5 rounded-lg border bg-danger/0 border-danger/0 text-danger-fg">
                     {item.id === 'item-hack-deny' && <EyeOff className="w-5 h-5" />}
                     {item.id === 'item-hack-mobile' && <Flame className="w-5 h-5" />}
                     {item.id === 'item-flash-drop' && <Zap className="w-5 h-5 text-retro-warning" />}
                   </div>
 
                   {item.badge && (
-                    <span className="text-2xs font-medium px-2 py-0.5 rounded border bg-rose-500/10 text-rose-400 border-rose-500/20">
+                    <span className="text-2xs font-medium px-2 py-0.5 rounded border bg-danger/0 text-danger-fg border-danger/0">
                       {item.badge}
                     </span>
                   )}
@@ -668,7 +668,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
               </div>
 
               <div className="pt-3 border-t border-border-glass mt-3 flex items-center justify-between gap-2">
-                <span className="text-sm font-medium font-mono tabular-nums text-rose-400">
+                <span className="text-sm font-medium font-mono tabular-nums text-danger-fg">
                   g$ {formatCount(item.cost)}
                 </span>
 
@@ -676,7 +676,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                   type="button"
                   onClick={() => handleBuy(item)}
                   disabled={!canAfford || buying === item.id}
-                  className="px-3 py-1.5 bg-rose-500/15 hover:bg-rose-500/20 disabled:opacity-40 text-rose-400 text-xs font-medium rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
+                  className="px-3 py-1.5 bg-danger/5 hover:bg-danger/0 disabled:opacity-40 text-danger-fg text-xs font-medium rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
                 >
                   <ShieldAlert className="w-3.5 h-3.5" />
                   <span>{buying === item.id ? 'Deploying...' : (item.id === 'item-flash-drop' && count > 0 ? 'Fire' : 'Deploy')}</span>

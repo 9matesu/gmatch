@@ -118,7 +118,7 @@ function TagsTab() {
           <span
             className={`h-1.5 w-1.5 shrink-0 rounded-full transition-colors ${
               on
-                ? 'bg-emerald-400'
+                ? 'bg-success'
                 : isOwned
                   ? 'bg-glass-w20'
                   : afford
@@ -134,7 +134,7 @@ function TagsTab() {
               tabIndex={-1}
               aria-label={`Delete ${t.name}`}
               onClick={(e) => { e.stopPropagation(); deleteTag(t.name) }}
-              className="-mr-1 hidden shrink-0 rounded p-0.5 text-retro-muted hover:text-rose-400 group-hover:inline-flex"
+              className="-mr-1 hidden shrink-0 rounded p-0.5 text-retro-muted hover:text-danger-fg group-hover:inline-flex"
             >
               <X className="h-3 w-3" />
             </span>
@@ -296,7 +296,7 @@ function CapsTab() {
               key={id}
               className={`flex items-center justify-between gap-3 rounded-xl border p-2.5 transition-all duration-150 ${
                 st.count > 0
-                  ? 'border-pink-500/30 bg-pink-500/[0.04]'
+                  ? 'border-chrome-pink/0 bg-chrome-pink/[0.04]'
                   : 'border-border-glass bg-glass-w5 hover:border-border-strong'
               }`}
             >
@@ -310,7 +310,7 @@ function CapsTab() {
                       {def.name}
                     </span>
                     {st.count > 0 && (
-                      <span className={`${MONO} text-2xs font-black text-pink-400 bg-pink-500/15 px-1.5 py-0.2 rounded-full`}>
+                      <span className={`${MONO} text-2xs font-black text-chrome-pink-fg bg-chrome-pink/5 px-1.5 py-0.2 rounded-full`}>
                         x{st.count}
                       </span>
                     )}
@@ -356,11 +356,11 @@ function PrestigeTab() {
       {/* Brainmelt Terminal Card */}
       <div className="rounded-lg border border-border-glass bg-glass-w5 p-3.5 space-y-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-purple-300 font-bold text-xs">
-            <Sparkle className="w-4 h-4 text-purple-400" weight="fill" />
+          <div className="flex items-center gap-1.5 text-chrome-lav-fg font-bold text-xs">
+            <Sparkle className="w-4 h-4 text-chrome-lav-fg" weight="fill" />
             <span>Corruption Shards</span>
           </div>
-          <span className={`${MONO} text-xs font-bold text-purple-300 bg-purple-500/20 px-2 py-0.5 rounded-full border border-purple-500/30`}>
+          <span className={`${MONO} text-xs font-bold text-chrome-lav-fg bg-chrome-lav/0 px-2 py-0.5 rounded-full border border-chrome-lav/0`}>
             Held: {shards}
           </span>
         </div>
@@ -372,20 +372,20 @@ function PrestigeTab() {
         {/* Reset vs Keep Rules */}
         <div className="grid grid-cols-2 gap-2 text-2xs bg-black/40 rounded-xl p-2 border border-border-glass">
           <div className="space-y-1">
-            <div className="font-bold text-rose-400 flex items-center gap-1">
+            <div className="font-bold text-danger-fg flex items-center gap-1">
               <WarningCircle className="w-3 h-3" /> Resets
             </div>
             <div className="text-retro-muted">Points, XP, Tags, Caps</div>
           </div>
           <div className="space-y-1">
-            <div className="font-bold text-emerald-400 flex items-center gap-1">
+            <div className="font-bold text-success-fg flex items-center gap-1">
               <CheckCircle className="w-3 h-3" /> Keeps
             </div>
             <div className="text-retro-muted">Keepsakes, Shards, Trophies</div>
           </div>
         </div>
 
-        <div className={`${MONO} text-center text-xs font-bold text-amber-300 bg-amber-500/10 py-1 rounded-lg border border-amber-500/20`}>
+        <div className={`${MONO} text-center text-xs font-bold text-warning-fg bg-warning/0 py-1 rounded-lg border border-warning/0`}>
           +{preview} shards on melt
         </div>
 
@@ -393,7 +393,7 @@ function PrestigeTab() {
           type="button"
           className={`w-full py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold tracking-wider uppercase transition-all cursor-pointer ${
             ready
-              ? 'bg-rose-600 hover:bg-rose-500 text-retro-fg'
+              ? 'bg-danger hover:bg-danger text-retro-fg'
               : 'border border-border-glass bg-glass-w5 text-retro-muted opacity-40 cursor-not-allowed'
           }`}
           disabled={!ready}
@@ -417,12 +417,12 @@ function PrestigeTab() {
                 key={a.id}
                 className={`flex items-center gap-2 rounded-xl border p-2 text-xs transition-colors ${
                   got
-                    ? 'border-amber-500/30 bg-amber-500/[0.05] text-amber-200'
+                    ? 'border-warning/0 bg-warning/[0.05] text-warning-fg'
                     : 'border-border-glass bg-glass-w5 text-retro-muted opacity-50'
                 }`}
                 title={got ? 'Unlocked Trophy' : 'Locked Trophy'}
               >
-                <Trophy className={`w-3.5 h-3.5 shrink-0 ${got ? 'text-amber-400' : 'text-retro-muted'}`} weight={got ? 'fill' : 'regular'} />
+                <Trophy className={`w-3.5 h-3.5 shrink-0 ${got ? 'text-warning-fg' : 'text-retro-muted'}`} weight={got ? 'fill' : 'regular'} />
                 <span className="truncate text-xs font-medium">{a.name}</span>
               </div>
             )
@@ -490,7 +490,7 @@ export default function ShopPanel() {
           <Lightning className="w-3.5 h-3.5" />
           <span>Caps</span>
           {totalCapsStacks > 0 && (
-            <span className="font-mono text-2xs px-1 rounded-full bg-pink-500/20 text-pink-400 font-bold">
+            <span className="font-mono text-2xs px-1 rounded-full bg-chrome-pink/0 text-chrome-pink-fg font-bold">
               {totalCapsStacks}
             </span>
           )}
@@ -509,7 +509,7 @@ export default function ShopPanel() {
         >
           <Fire className="w-3.5 h-3.5" />
           <span>Prestige</span>
-          <span className="font-mono text-2xs px-1 rounded-full bg-purple-500/20 text-purple-300 font-bold">
+          <span className="font-mono text-2xs px-1 rounded-full bg-chrome-lav/0 text-chrome-lav-fg font-bold">
             T{currentTier}
           </span>
         </button>

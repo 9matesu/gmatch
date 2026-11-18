@@ -11,9 +11,9 @@ import type { AppNotification, NotificationTarget } from '../../utils/notificati
 
 function IconFor({ type }: { type: ToastMessage['type'] }) {
   const cls = 'w-3.5 h-3.5 shrink-0';
-  if (type === 'success') return <CheckCircle2 className={`${cls} text-emerald-400`} />;
-  if (type === 'error') return <AlertCircle className={`${cls} text-red-400`} />;
-  if (type === 'warning') return <AlertTriangle className={`${cls} text-amber-400`} />;
+  if (type === 'success') return <CheckCircle2 className={`${cls} text-success-fg`} />;
+  if (type === 'error') return <AlertCircle className={`${cls} text-danger-fg`} />;
+  if (type === 'warning') return <AlertTriangle className={`${cls} text-warning-fg`} />;
   return <Info className={`${cls} text-retro-body`} />;
 }
 

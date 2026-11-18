@@ -376,7 +376,7 @@ export default function AdminPageClient({ identity: appIdentity }: { identity?: 
           </p>
 
           {(Boolean(import.meta.env.DEV) || (typeof window !== 'undefined' && (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1'))) && (
-            <div className="flex items-center justify-between text-xs bg-amber-500/10 border border-amber-500/20 text-amber-300 px-2.5 py-1.5 rounded">
+            <div className="flex items-center justify-between text-xs bg-warning/0 border border-warning/0 text-warning-fg px-2.5 py-1.5 rounded">
               <span>Dev mode: default passcode is <code className="font-mono font-bold bg-black/30 px-1 py-0.5 rounded">admin</code></span>
               <button
                 type="button"

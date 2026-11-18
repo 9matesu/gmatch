@@ -156,9 +156,9 @@ export function PostComments({
           aria-label={c.is_liked ? 'Comment liked' : 'Like comment'}
           aria-pressed={!!c.is_liked}
           disabled={c.pending}
-          className="p-1 text-retro-muted hover:text-red-500 cursor-pointer disabled:cursor-default"
+          className="p-1 text-retro-muted hover:text-danger-fg cursor-pointer disabled:cursor-default"
         >
-          <Heart className={`w-3.5 h-3.5 ${c.is_liked ? 'text-red-500 fill-red-500' : ''}`} />
+          <Heart className={`w-3.5 h-3.5 ${c.is_liked ? 'text-danger-fg fill-danger' : ''}`} />
           {c.like_count > 0 && (
             <span className="text-2xs font-bold block text-center mt-0.5 text-retro-muted">{c.like_count}</span>
           )}

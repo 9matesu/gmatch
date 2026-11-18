@@ -141,7 +141,7 @@ export function PostCreatorModal({
                   <button
                     type="button"
                     onClick={() => setMedia(media.filter((_, i) => i !== idx))}
-                    className="absolute top-1 right-1 p-0.5 bg-black/70 text-retro-fg rounded-full hover:bg-red-600 transition-colors"
+                    className="absolute top-1 right-1 p-0.5 bg-black/70 text-retro-fg rounded-full hover:bg-danger transition-colors"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -209,7 +209,7 @@ export function PostCreatorModal({
                   <button
                     type="button"
                     onClick={() => handleRemoveTag(tag)}
-                    className="hover:text-red-400 cursor-pointer"
+                    className="hover:text-danger-fg cursor-pointer"
                   >
                     <X className="w-3 h-3" />
                   </button>

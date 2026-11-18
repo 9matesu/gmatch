@@ -69,8 +69,8 @@ export function AdminActionMenu<T>({
                   disabled={action.disabled?.(row)}
                   className={cn(
                     "w-full px-3 py-2 text-left text-xs flex items-center gap-2 transition-colors",
-                    action.variant === "danger" && "text-red-300 hover:bg-red-500/10",
-                    action.variant === "primary" && "text-cyan-300 hover:bg-cyan-500/10",
+                    action.variant === "danger" && "text-danger-fg hover:bg-danger/0",
+                    action.variant === "primary" && "text-info-fg hover:bg-info/0",
                     action.variant === "ghost" && "text-retro-muted hover:text-retro-fg hover:bg-glass-w5",
                     (!action.variant || action.variant === "default") && "text-retro-fg hover:bg-glass-w10",
                     "disabled:opacity-40 disabled:cursor-not-allowed"
@@ -133,8 +133,8 @@ export function BulkActionBar<T>({
               disabled={action.disabled?.(selectedRows)}
               className={cn(
                 "px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded transition-colors flex items-center gap-1.5",
-                action.variant === "danger" && "bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30",
-                action.variant === "primary" && "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/30",
+                action.variant === "danger" && "bg-danger/0 text-danger-fg border border-danger/0 hover:bg-danger/0",
+                action.variant === "primary" && "bg-info/0 text-info-fg border border-info/0 hover:bg-info/0",
                 action.variant !== "danger" && action.variant !== "primary" && "bg-surface-interactive text-retro-fg border border-border-glass hover:bg-glass-w10",
                 "disabled:opacity-40 disabled:cursor-not-allowed"
               )}
@@ -215,8 +215,8 @@ export function ConfirmDialog({
             disabled={isLoading}
             className={cn(
               "px-3 py-1.5 text-xs font-bold rounded flex items-center gap-1.5 transition-colors disabled:opacity-40",
-              variant === "danger" && "bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30",
-              variant === "primary" && "bg-cyan-500 text-retro-accent-text border border-cyan-500 hover:bg-cyan-400",
+              variant === "danger" && "bg-danger/0 text-danger-fg border border-danger/0 hover:bg-danger/0",
+              variant === "primary" && "bg-info text-retro-accent-text border border-info hover:bg-info",
               variant === "default" && "bg-surface-interactive text-retro-fg border border-border-glass hover:bg-glass-w10"
             )}
           >
@@ -337,7 +337,7 @@ export function FormModal<T extends Record<string, unknown>>({
             <div key={String(field.key)} className="space-y-1.5">
               <label className="text-2xs font-bold text-retro-muted uppercase tracking-wider flex items-center gap-1">
                 {field.label}
-                {field.required && <span className="text-red-400">*</span>}
+                {field.required && <span className="text-danger-fg">*</span>}
               </label>
               {field.render ? (
                 field.render(formData[field.key], (v: unknown) => handleChange(String(field.key), v))
@@ -372,7 +372,7 @@ export function FormModal<T extends Record<string, unknown>>({
                         type="checkbox"
                         checked={formData[field.key] === true}
                         onChange={e => handleChange(String(field.key), e.target.checked)}
-                        className="w-4 h-4 accent-cyan-500 rounded border border-border-glass bg-surface-canvas cursor-pointer"
+                        className="w-4 h-4 accent-info rounded border border-border-glass bg-surface-canvas cursor-pointer"
                       />
                       <span className="text-xs text-retro-fg">{field.placeholder || "Enable"}</span>
                     </label>
@@ -394,7 +394,7 @@ export function FormModal<T extends Record<string, unknown>>({
                     />
                   )}
                   {errors[String(field.key)] && (
-                    <p className="text-2xs text-red-400">{errors[String(field.key)]}</p>
+                    <p className="text-2xs text-danger-fg">{errors[String(field.key)]}</p>
                   )}
                 </>
               )}
@@ -415,7 +415,7 @@ export function FormModal<T extends Record<string, unknown>>({
             form={undefined}
             onClick={handleSubmit}
             disabled={isLoading}
-            className="px-3 py-1.5 text-xs font-bold rounded bg-cyan-500 text-retro-accent-text border border-cyan-500 hover:bg-cyan-400 transition-colors flex items-center gap-1.5 disabled:opacity-40"
+            className="px-3 py-1.5 text-xs font-bold rounded bg-info text-retro-accent-text border border-info hover:bg-info transition-colors flex items-center gap-1.5 disabled:opacity-40"
           >
             {isLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             {submitLabel}
@@ -472,7 +472,7 @@ function TagsInput({ value, onChange, placeholder }: {
               <button
                 type="button"
                 onClick={() => handleRemove(tag)}
-                className="text-retro-muted hover:text-red-400 text-2xs leading-none"
+                className="text-retro-muted hover:text-danger-fg text-2xs leading-none"
               >
                 <X className="w-3 h-3" />
               </button>

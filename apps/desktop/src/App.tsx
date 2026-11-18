@@ -3757,7 +3757,7 @@ export default function Home() {
                   {mainView === 'feed' && (
                     <div className={isVisionJammed ? "relative" : ""}>
                       {isVisionJammed && (
-                        <div className="mb-3 p-3 bg-red-950/90 border border-red-500/50 rounded-xl text-center text-xs font-bold text-red-200 uppercase tracking-wider flex items-center justify-center gap-2">
+                        <div className="mb-3 p-3 bg-danger/0 border border-danger/0 rounded-xl text-center text-xs font-bold text-danger-fg uppercase tracking-wider flex items-center justify-center gap-2">
                           <span>Your images are blurred &mdash; someone paid for a vision jam. It expires shortly.</span>
                         </div>
                       )}

@@ -461,7 +461,7 @@ export function GMatchSettingsModal({
                   {/* Theme: one switch, the whole light theme is a token block. */}
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-xs text-retro-muted">Theme</span>
-                    <div className="flex items-center gap-1 p-0.5 rounded-lg bg-glass-w4 border border-border-glass" role="group" aria-label="Theme">
+                    <div className="flex items-center gap-1 p-0.5 rounded-lg bg-glass-w5 border border-border-glass" role="group" aria-label="Theme">
                       {(['dark', 'light'] as const).map((mode) => (
                         <button
                           key={mode}

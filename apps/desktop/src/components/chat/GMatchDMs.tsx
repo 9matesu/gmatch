@@ -1038,7 +1038,7 @@ export function GMatchDMs({
                       <button
                         type="button"
                         onClick={() => { handleDeleteThread(peerId); setDeleteThreadPeerId(null); }}
-                        className="w-full px-3 py-2 text-left text-xs text-rose-400 hover:bg-glass-w5 cursor-pointer"
+                        className="w-full px-3 py-2 text-left text-xs text-danger-fg hover:bg-glass-w5 cursor-pointer"
                       >
                         Delete Conversation
                       </button>
@@ -1117,7 +1117,7 @@ export function GMatchDMs({
                     onClick={() => { playPress(520); onLeaveRoom(activeRoom.id); onSelectRoom?.(null); setListMode(true); }}
                     title="Leave room"
                     aria-label="Leave room"
-                    className="p-1.5 rounded-md text-retro-muted hover:text-rose-400 transition-colors cursor-pointer"
+                    className="p-1.5 rounded-md text-retro-muted hover:text-danger-fg transition-colors cursor-pointer"
                   >
                     <LogOut className="w-4 h-4" />
                   </button>
@@ -1139,7 +1139,7 @@ export function GMatchDMs({
                     type="button"
                     onClick={() => { playPress(800); onLeaveGroup(activeGroupId); onSelectGroup?.(null); setListMode(true); }}
                     title="Leave group"
-                    className="p-1.5 rounded-md text-retro-muted hover:text-rose-400 transition-colors cursor-pointer"
+                    className="p-1.5 rounded-md text-retro-muted hover:text-danger-fg transition-colors cursor-pointer"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -1383,7 +1383,7 @@ export function GMatchDMs({
                                     </time>
                                   )}
                                   {isOwn && msg.courierStatus === 'failed' && (
-                                    <span title="Not delivered" className="text-2xs text-rose-400">not delivered</span>
+                                    <span title="Not delivered" className="text-2xs text-danger-fg">not delivered</span>
                                   )}
                                   {isOwn && msg.courierStatus === 'sending' && (
                                     <span title="Sending"><Clock3 className="w-3 h-3 text-retro-muted" /></span>
@@ -1477,21 +1477,21 @@ export function GMatchDMs({
                                     <button
                                       type="button"
                                       onClick={() => handleDeleteForEveryone(msg)}
-                                      className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-2xs flex items-center gap-1 cursor-pointer text-rose-400 hover:bg-glass-w12"
+                                      className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-2xs flex items-center gap-1 cursor-pointer text-danger-fg hover:bg-glass-w12"
                                     ><Trash className="w-3 h-3" /> Delete for Everyone</button>
                                   )}
                                   {isOwn && (
                                     <button
                                       type="button"
                                       onClick={() => { onDeleteMessage?.(msg.id, activePmPeer?.orbitId || ''); setActionFor(null); }}
-                                      className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-2xs flex items-center gap-1 cursor-pointer text-rose-400 hover:bg-glass-w12"
+                                      className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-2xs flex items-center gap-1 cursor-pointer text-danger-fg hover:bg-glass-w12"
                                     ><Trash2 className="w-3 h-3" /> Delete for Me</button>
                                   )}
                                   {!isOwn && onReportMessage && (
-                                    <button type="button" onClick={() => { onReportMessage(msg.id); setActionFor(null); }} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-2xs flex items-center gap-1 cursor-pointer text-rose-400 hover:bg-glass-w12"><Flag className="w-3 h-3" /> Report</button>
+                                    <button type="button" onClick={() => { onReportMessage(msg.id); setActionFor(null); }} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-2xs flex items-center gap-1 cursor-pointer text-danger-fg hover:bg-glass-w12"><Flag className="w-3 h-3" /> Report</button>
                                   )}
                                   {!isOwn && onReportUser && (
-                                    <button type="button" onClick={() => { onReportUser(msg.senderId); setActionFor(null); }} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-2xs cursor-pointer text-rose-400 hover:bg-glass-w12">Report user</button>
+                                    <button type="button" onClick={() => { onReportUser(msg.senderId); setActionFor(null); }} className="px-2 py-1 rounded-md bg-glass-w8 border border-border-glass text-2xs cursor-pointer text-danger-fg hover:bg-glass-w12">Report user</button>
                                   )}
                                 </div>
                                 );

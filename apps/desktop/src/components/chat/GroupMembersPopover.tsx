@@ -89,7 +89,7 @@ export function GroupMembersPopover({
             {m.id === meId && <span className="text-retro-muted"> (you)</span>}
           </span>
           {m.is_owner === 1 && (
-            <span className="ml-auto flex items-center gap-1 text-2xs text-amber-400 shrink-0">
+            <span className="ml-auto flex items-center gap-1 text-2xs text-warning-fg shrink-0">
               <Crown className="w-3 h-3" /> owner
             </span>
           )}

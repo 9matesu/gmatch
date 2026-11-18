@@ -261,7 +261,7 @@ export function ProfileEditorModal({
                         type="button"
                         onClick={() => removeTag(t)}
                         aria-label={`Remove tag ${t}`}
-                        className="p-0.5 rounded-full text-retro-muted hover:text-rose-400 hover:bg-glass-w12 cursor-pointer"
+                        className="p-0.5 rounded-full text-retro-muted hover:text-danger-fg hover:bg-glass-w12 cursor-pointer"
                       >
                         <X className="w-3 h-3" />
                       </button>

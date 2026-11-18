@@ -329,7 +329,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
           aria-pressed={isLiked}
           className="p-1.5 hover:bg-glass-w12 rounded-full transition-colors cursor-pointer"
         >
-          <Heart className={`w-5 h-5 ${isLiked ? 'fill-red-500 text-red-500' : 'text-retro-fg'}`} />
+          <Heart className={`w-5 h-5 ${isLiked ? 'fill-danger text-danger-fg' : 'text-retro-fg'}`} />
         </button>
         <button
           type="button"
@@ -347,7 +347,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
           aria-pressed={isSaved}
           className="p-1.5 hover:bg-glass-w12 rounded-full transition-colors cursor-pointer"
         >
-          <Bookmark className={`w-5 h-5 ${isSaved ? 'fill-amber-400 text-amber-400' : 'text-retro-fg'}`} />
+          <Bookmark className={`w-5 h-5 ${isSaved ? 'fill-warning text-warning-fg' : 'text-retro-fg'}`} />
         </button>
       </div>
 

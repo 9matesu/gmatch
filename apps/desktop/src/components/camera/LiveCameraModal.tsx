@@ -185,7 +185,7 @@ export function LiveCameraModal({
         <div className="relative aspect-square w-full bg-retro-bg flex items-center justify-center overflow-hidden">
           {cameraError ? (
             <div className="p-6 text-center space-y-3 bg-surface-canvas text-retro-fg w-full h-full flex flex-col items-center justify-center">
-              <AlertCircle className="w-12 h-12 text-rose-500 mx-auto" />
+              <AlertCircle className="w-12 h-12 text-danger-fg mx-auto" />
               <p className="text-xs text-retro-body font-medium leading-relaxed max-w-xs mx-auto">
                 {cameraError}
               </p>

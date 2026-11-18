@@ -100,7 +100,7 @@ export function AdminSidebar({
                       <span className={cn(
                         "text-2xs px-1.5 py-0.5 rounded-full font-mono font-bold",
                         active ? "bg-retro-selection text-retro-accent" : "bg-glass-w8 text-retro-muted",
-                        tab.id === "reports" && tab.badge && Number(tab.badge) > 0 && "bg-red-500 text-retro-fg"
+                        tab.id === "reports" && tab.badge && Number(tab.badge) > 0 && "bg-danger text-retro-fg"
                       )}>
                         {tab.badge}
                       </span>
@@ -115,7 +115,7 @@ export function AdminSidebar({
       <div className="p-4 border-t border-border-glass space-y-2">
         <div className="flex items-center justify-between text-2xs font-mono text-retro-muted">
           <span>Admin Status:</span>
-          <span className="text-emerald-400 font-bold uppercase tracking-wider">Active</span>
+          <span className="text-success-fg font-bold uppercase tracking-wider">Active</span>
         </div>
         <a
           href="/"

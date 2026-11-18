@@ -30,8 +30,8 @@ interface Pick {
 }
 
 const DOT: Record<PickStatus, string> = {
-  checking: 'bg-amber-400 animate-pulse',
-  live: 'bg-emerald-500',
+  checking: 'bg-warning animate-pulse',
+  live: 'bg-success',
   unverified: 'bg-retro-muted',
 };
 
@@ -237,7 +237,7 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
                 onClick={() => setExcludes((prev) => prev.filter((t) => t !== x))}
                 aria-label={`Remove exclude ${x}`}
                 title={`${x}. Tap to remove`}
-                className="inline-flex items-center gap-1.5 rounded-full border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-xs font-mono text-red-200 cursor-pointer hover:bg-red-500/25"
+                className="inline-flex items-center gap-1.5 rounded-full border border-danger/0 bg-danger/0 px-3 py-1.5 text-xs font-mono text-danger-fg cursor-pointer hover:bg-danger/5"
               >
                 {x}
                 <span aria-hidden="true">×</span>
@@ -264,7 +264,7 @@ export function FeedTuneStep({ onFinished }: { onFinished: () => void }) {
         )}
 
         {ready && !allLive && (
-          <div className="glass-inset rounded-lg p-3 text-xs text-amber-100">
+          <div className="glass-inset rounded-lg p-3 text-xs text-warning-fg">
             Some starter tags could not be verified live. You can still start. The grid falls back until they resolve.
           </div>
         )}

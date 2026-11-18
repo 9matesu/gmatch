@@ -592,7 +592,7 @@ export function NativeVideoPlayer({
                   onExpand();
                 }}
                 title="Expand to Fullscreen / Lightbox"
-                className="p-1.5 rounded-md bg-black/60 hover:bg-black/80 backdrop-blur-xs border border-border-glass text-zinc-300 hover:text-retro-fg transition-colors cursor-pointer"
+                className="p-1.5 rounded-md bg-black/60 hover:bg-black/80 backdrop-blur-xs border border-border-glass text-retro-body hover:text-retro-fg transition-colors cursor-pointer"
               >
                 <Maximize2 className="w-3.5 h-3.5" />
               </button>
@@ -667,7 +667,7 @@ export function NativeVideoPlayer({
                   className="p-1.5 rounded-md hover:bg-glass-w10 text-retro-fg transition-colors cursor-pointer"
                 >
                   {isMuted || volume === 0 ? (
-                    <VolumeX className="w-4 h-4 text-zinc-400" />
+                    <VolumeX className="w-4 h-4 text-retro-muted" />
                   ) : volume < 0.5 ? (
                     <Volume1 className="w-4 h-4" />
                   ) : (
@@ -686,7 +686,7 @@ export function NativeVideoPlayer({
                 />
               </div>
 
-              <div className="text-2xs font-mono text-zinc-300 ml-1 select-none">
+              <div className="text-2xs font-mono text-retro-body ml-1 select-none">
                 <span>{formatVideoTime(currentTime)}</span>
                 <span className="opacity-40 mx-1">/</span>
                 <span className="opacity-75">{formatVideoTime(duration)}</span>
@@ -699,7 +699,7 @@ export function NativeVideoPlayer({
                   type="button"
                   onClick={cycleSpeed}
                   title="Playback Speed"
-                  className="px-1.5 py-0.5 rounded text-2xs font-mono font-bold hover:bg-glass-w10 text-zinc-300 hover:text-retro-fg transition-colors cursor-pointer"
+                  className="px-1.5 py-0.5 rounded text-2xs font-mono font-bold hover:bg-glass-w10 text-retro-body hover:text-retro-fg transition-colors cursor-pointer"
                 >
                   {playbackRate}x
                 </button>
@@ -711,7 +711,7 @@ export function NativeVideoPlayer({
                   onClick={toggleLoop}
                   title={isLooping ? 'Loop is On' : 'Loop is Off'}
                   className={`p-1.5 rounded-md hover:bg-glass-w10 transition-colors cursor-pointer ${
-                    isLooping ? 'text-retro-accent' : 'text-zinc-400 hover:text-retro-fg'
+                    isLooping ? 'text-retro-accent' : 'text-retro-muted hover:text-retro-fg'
                   }`}
                 >
                   <Repeat className="w-3.5 h-3.5" />
@@ -723,7 +723,7 @@ export function NativeVideoPlayer({
                   type="button"
                   onClick={togglePip}
                   title="Picture in Picture"
-                  className="p-1.5 rounded-md hover:bg-glass-w10 text-zinc-400 hover:text-retro-fg transition-colors cursor-pointer hidden sm:block"
+                  className="p-1.5 rounded-md hover:bg-glass-w10 text-retro-muted hover:text-retro-fg transition-colors cursor-pointer hidden sm:block"
                 >
                   <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
                     <path d="M19 7h-8v6h8V7zm2-4H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16.01H3V4.99h18v14.02z" />
@@ -740,7 +740,7 @@ export function NativeVideoPlayer({
                   }}
                   title="Expand to Lightbox"
                   aria-label="Expand to Lightbox"
-                  className="p-1.5 rounded-md hover:bg-glass-w10 text-zinc-300 hover:text-retro-fg transition-colors cursor-pointer"
+                  className="p-1.5 rounded-md hover:bg-glass-w10 text-retro-body hover:text-retro-fg transition-colors cursor-pointer"
                 >
                   <Maximize2 className="w-4 h-4" />
                 </button>
@@ -751,7 +751,7 @@ export function NativeVideoPlayer({
                   type="button"
                   onClick={toggleFullscreen}
                   aria-label={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-                  className="p-1.5 rounded-md hover:bg-glass-w10 text-zinc-300 hover:text-retro-fg transition-colors cursor-pointer"
+                  className="p-1.5 rounded-md hover:bg-glass-w10 text-retro-body hover:text-retro-fg transition-colors cursor-pointer"
                 >
                   {isFullscreen ? (
                     <Minimize className="w-4 h-4" />

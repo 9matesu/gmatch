@@ -307,7 +307,7 @@ export function MatchRoundPanel({
         <div className="flex flex-col gap-1">
           <div className="h-1 w-full bg-surface-interactive border border-border-glass rounded-full overflow-hidden">
             <div
-              className={`h-full transition-all duration-700 ease-linear ${isResult ? 'bg-retro-muted' : msLeft <= 10000 ? 'bg-rose-500' : 'bg-retro-accent'}`}
+              className={`h-full transition-all duration-700 ease-linear ${isResult ? 'bg-retro-muted' : msLeft <= 10000 ? 'bg-danger' : 'bg-retro-accent'}`}
               style={{ width: `${isResult ? 100 : pct}%` }}
             />
           </div>
@@ -383,7 +383,7 @@ export function MatchRoundPanel({
                               <span className={`text-2xs font-black uppercase tracking-wider px-2 py-0.5 rounded-md border shadow-md ${rarity.badgeClass}`}>
                                 {rarity.label}
                               </span>
-                              <span className="text-2xs font-mono font-black px-1.5 py-0.5 rounded-md bg-black/80 text-amber-300 border border-amber-400/40 shadow-md backdrop-blur-xs">
+                              <span className="text-2xs font-mono font-black px-1.5 py-0.5 rounded-md bg-black/80 text-warning-fg border border-warning/0 shadow-md backdrop-blur-xs">
                                 {formatGc(val)}
                               </span>
                             </div>
@@ -506,12 +506,12 @@ export function MatchRoundPanel({
                               <span className={`text-2xs font-medium px-1 rounded ${rarity.badgeClass}`}>
                                 {rarity.label}
                               </span>
-                              <span className="text-2xs font-mono font-bold px-1 rounded bg-black/80 text-amber-300 border border-amber-500/30">
+                              <span className="text-2xs font-mono font-bold px-1 rounded bg-black/80 text-warning-fg border border-warning/0">
                                 {formatGc(cardVal)}
                               </span>
                             </div>
                             {isAlreadyPlayed && (
-                              <span className="absolute inset-0 bg-black/70 flex items-center justify-center text-2xs font-medium text-rose-400 p-1 text-center rounded">
+                              <span className="absolute inset-0 bg-black/70 flex items-center justify-center text-2xs font-medium text-danger-fg p-1 text-center rounded">
                                 Used
                               </span>
                             )}
@@ -579,7 +579,7 @@ export function MatchRoundPanel({
                 <div className="space-y-1 text-center">
                   <div
                     className={`metallic-card-border w-full aspect-[3/4.2] mx-auto select-none transition-all ${
-                      isRoundResult && match.matched ? 'ring-2 ring-emerald-400 shadow-2xl' : ''
+                      isRoundResult && match.matched ? 'ring-2 ring-success shadow-2xl' : ''
                     } ${myPlayedImg.url ? 'cursor-pointer' : ''}`}
                     data-rarity={myRarity.rarity}
                     onClick={() => {
@@ -600,7 +600,7 @@ export function MatchRoundPanel({
                         <span className={`text-2xs font-black uppercase tracking-wider px-2 py-0.5 rounded-md border shadow-md ${myRarity.badgeClass}`}>
                           {myRarity.label}
                         </span>
-                        <span className="text-2xs font-mono font-black px-1.5 py-0.5 rounded-md bg-black/80 text-amber-300 border border-amber-400/40 shadow-md backdrop-blur-xs">
+                        <span className="text-2xs font-mono font-black px-1.5 py-0.5 rounded-md bg-black/80 text-warning-fg border border-warning/0 shadow-md backdrop-blur-xs">
                           {formatGc(myVal)}
                         </span>
                       </div>
@@ -635,7 +635,7 @@ export function MatchRoundPanel({
                             className="w-full h-full flex flex-col items-center justify-center gap-2 text-retro-muted hover:text-retro-fg transition-colors"
                             title={myPlayedImg.linkUrl || undefined}
                           >
-                            <LinkIcon className="w-5 h-5 text-purple-400" />
+                            <LinkIcon className="w-5 h-5 text-chrome-lav-fg" />
                             <span className="text-xs font-medium">Link card</span>
                             <span className="text-2xs font-mono border border-border-glass px-2 py-0.5 rounded">Open ↗</span>
                           </a>
@@ -647,7 +647,7 @@ export function MatchRoundPanel({
                         {isRoundResult && match.my_decision && (
                           <span
                             className={`absolute bottom-2 left-2 text-2xs font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shadow-lg ${
-                              match.my_decision === 'like' ? 'bg-emerald-500 text-retro-accent-text' : 'bg-rose-500 text-retro-fg'
+                              match.my_decision === 'like' ? 'bg-success text-retro-accent-text' : 'bg-danger text-retro-fg'
                             }`}
                           >
                             {match.my_decision === 'like' ? <><Check className="w-3 h-3 stroke-[3]" /> Liked</> : <><X className="w-3 h-3 stroke-[3]" /> Rejected</>}
@@ -676,7 +676,7 @@ export function MatchRoundPanel({
                 <div className="space-y-1 text-center">
                   <div
                     className={`metallic-card-border w-full aspect-[3/4.2] mx-auto select-none transition-all ${
-                      isRoundResult && match.matched ? 'ring-2 ring-emerald-400 shadow-2xl' : ''
+                      isRoundResult && match.matched ? 'ring-2 ring-success shadow-2xl' : ''
                     } ${oppUrl || oppCardId ? 'cursor-pointer hover:opacity-80' : ''}`}
                     data-rarity={oppRarity.rarity}
                     onClick={() => {
@@ -700,7 +700,7 @@ export function MatchRoundPanel({
                             {oppRarity.label}
                           </span>
                           {oppKnownValue !== null && (
-                            <span className="text-2xs font-mono font-black px-1.5 py-0.5 rounded-md bg-black/80 text-amber-300 border border-amber-400/40 shadow-md backdrop-blur-xs">
+                            <span className="text-2xs font-mono font-black px-1.5 py-0.5 rounded-md bg-black/80 text-warning-fg border border-warning/0 shadow-md backdrop-blur-xs">
                               {formatGc(oppKnownValue)}
                             </span>
                           )}
@@ -736,7 +736,7 @@ export function MatchRoundPanel({
                             className="w-full h-full flex flex-col items-center justify-center gap-2 text-retro-muted hover:text-retro-fg transition-colors"
                             title={opponentImg.linkUrl || undefined}
                           >
-                            <LinkIcon className="w-5 h-5 text-purple-400" />
+                            <LinkIcon className="w-5 h-5 text-chrome-lav-fg" />
                             <span className="text-xs font-medium">Link card</span>
                             <span className="text-2xs font-mono border border-border-glass px-2 py-0.5 rounded">Open ↗</span>
                           </a>
@@ -752,7 +752,7 @@ export function MatchRoundPanel({
                         {isRoundResult && match.opponent_decision && (
                           <span
                             className={`absolute bottom-2 left-2 text-2xs font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shadow-lg ${
-                              match.opponent_decision === 'like' ? 'bg-emerald-500 text-retro-accent-text' : 'bg-rose-500 text-retro-fg'
+                              match.opponent_decision === 'like' ? 'bg-success text-retro-accent-text' : 'bg-danger text-retro-fg'
                             }`}
                           >
                             {match.opponent_decision === 'like' ? <><Check className="w-3 h-3 stroke-[3]" /> Liked</> : <><X className="w-3 h-3 stroke-[3]" /> Rejected</>}
@@ -796,7 +796,7 @@ export function MatchRoundPanel({
               <button
                 disabled={submitting}
                 onClick={() => handleDecide('reject')}
-                className="py-2.5 px-2 text-xs font-medium border border-border-glass text-retro-muted hover:text-rose-400 hover:border-rose-500/30 cursor-pointer rounded-lg bg-surface-interactive hover:bg-rose-500/5 transition-colors flex items-center justify-center gap-1.5"
+                className="py-2.5 px-2 text-xs font-medium border border-border-glass text-retro-muted hover:text-danger-fg hover:border-danger/0 cursor-pointer rounded-lg bg-surface-interactive hover:bg-danger/ transition-colors flex items-center justify-center gap-1.5"
                 title="Reject (-5 pts)"
               >
                 <X className="w-3.5 h-3.5" />
@@ -808,7 +808,7 @@ export function MatchRoundPanel({
                 className="py-2.5 px-2 text-xs font-medium bg-retro-fg text-retro-bg hover:bg-retro-fg/90 cursor-pointer rounded-lg transition-colors flex items-center justify-center gap-1.5"
                 title="Like (+10 pts)"
               >
-                <Heart className="w-3.5 h-3.5 fill-current text-rose-400" />
+                <Heart className="w-3.5 h-3.5 fill-current text-danger-fg" />
                 <span>Like</span>
               </button>
               <button

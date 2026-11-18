@@ -430,7 +430,7 @@ export function MediaPickerPanel({
 
           {pending && (
             <div className="space-y-2 pt-1">
-              <div className="flex justify-center border border-border-glass rounded-xl bg-glass-w4 p-2">
+              <div className="flex justify-center border border-border-glass rounded-xl bg-glass-w5 p-2">
                 <Preview url={pending.kind === 'file' ? pending.previewUrl : pending.url} isVideo={pending.kind === 'file' ? fileAccepted(pending.file, ['video']) && !fileAccepted(pending.file, ['image']) : /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(pending.url)} />
               </div>
               <div className="flex justify-end gap-2">

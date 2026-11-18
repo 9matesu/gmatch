@@ -149,7 +149,7 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
         </div>
 
         <div className={`flex items-center gap-2 px-3 py-1 rounded-xl border text-xs font-mono font-bold tabular-nums ${
-          secondsRemaining < 30 ? 'bg-red-950/40 border-red-500/40 text-red-300' : 'bg-surface-interactive border-border-glass text-retro-fg'
+          secondsRemaining < 30 ? 'bg-danger/0 border-danger/0 text-danger-fg' : 'bg-surface-interactive border-border-glass text-retro-fg'
         }`}>
           <Clock className="w-3.5 h-3.5" />
           <span>{formatTimer(secondsRemaining)}</span>
@@ -167,7 +167,7 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
             <span className={`px-3 py-1 rounded-full font-mono text-2xs font-bold tracking-wider border ${
               feedError
                 ? 'bg-glass-w5 border-border-glass text-retro-muted'
-                : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                : 'bg-success/0 border-success/0 text-success-fg'
             }`}>
               {feedError ? 'OFFLINE' : 'LIVE'}
             </span>
@@ -184,7 +184,7 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
 
             <div className="bg-black/40 p-3.5 rounded-xl border border-border-glass space-y-1">
               <span className="text-retro-muted block text-2xs uppercase tracking-wider font-bold">Session</span>
-              <p className={feedError ? 'text-amber-300 font-bold' : 'text-emerald-300 font-bold'}>
+              <p className={feedError ? 'text-warning-fg font-bold' : 'text-success-fg font-bold'}>
                 {feedError || 'Live'}
               </p>
               <p className="text-2xs text-retro-muted">Their public posts are visible while the timer runs</p>

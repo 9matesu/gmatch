@@ -267,7 +267,7 @@ export function UserProfileModal({
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border-glass shrink-0">
             <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-glass-w20'}`} />
+              <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-success' : 'bg-glass-w20'}`} />
               <span className="text-xs font-medium text-retro-muted">
                 {isOnline ? 'Online' : 'Offline'}
               </span>
@@ -370,7 +370,7 @@ export function UserProfileModal({
                   className="text-2xs text-retro-muted hover:text-retro-fg px-2 py-0.5 border border-border-glass bg-retro-bg rounded-md cursor-pointer flex items-center gap-1 shrink-0 transition-colors"
                   title="Copy ID"
                 >
-                  {copied ? <Check className="w-2.5 h-2.5 text-emerald-400" /> : <Copy className="w-2.5 h-2.5" />}
+                  {copied ? <Check className="w-2.5 h-2.5 text-success-fg" /> : <Copy className="w-2.5 h-2.5" />}
                   <span>{copied ? 'Copied' : 'Copy'}</span>
                 </button>
               </div>
@@ -454,11 +454,11 @@ export function UserProfileModal({
                   onClick={() => followHandler(user.id)}
                   className={`flex-1 py-2 px-3 border text-xs font-semibold rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5 ${
                      following
-                       ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+                       ? 'border-warning/0 bg-warning/0 text-warning-fg'
                       : 'border-border-glass bg-retro-bg text-retro-fg hover:border-border-glass hover:bg-retro-panel'
                   }`}
                 >
-                   <Star className={`w-3.5 h-3.5 ${following ? 'fill-amber-400 text-amber-400' : ''}`} />
+                   <Star className={`w-3.5 h-3.5 ${following ? 'fill-warning text-warning-fg' : ''}`} />
                    <span>{following ? 'Following' : 'Follow'}</span>
                 </button>
               )}
@@ -470,7 +470,7 @@ export function UserProfileModal({
                     onBlockUser(user.id);
                     onClose();
                   }}
-                  className="py-2 px-3 border border-red-500/25 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-medium rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5"
+                  className="py-2 px-3 border border-danger/5 bg-danger/0 hover:bg-danger/0 text-danger-fg text-xs font-medium rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <Ban className="w-3.5 h-3.5" />
                   <span>Block</span>
@@ -483,7 +483,7 @@ export function UserProfileModal({
                     onReportUser(user.id, user.display_name?.trim() || 'Unknown User');
                     onClose();
                   }}
-                  className="py-2 px-3 border border-red-500/25 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-medium rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5"
+                  className="py-2 px-3 border border-danger/5 bg-danger/0 hover:bg-danger/0 text-danger-fg text-xs font-medium rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5"
                   title="Report this user"
                 >
                   <Flag className="w-3.5 h-3.5" />

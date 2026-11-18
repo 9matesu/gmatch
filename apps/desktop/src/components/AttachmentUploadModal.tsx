@@ -277,13 +277,13 @@ export function AttachmentUploadModal({
             <>
               <CameraCapture onCapture={handleCameraFile} onCancel={() => setMode('upload')} />
               {hasFile && (
-                <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-800">
+                <div className="flex items-center gap-2 px-3 py-2 bg-success/10 border border-success/30 rounded-xl text-xs font-bold text-success-fg">
                   <Check className="w-4 h-4" />
                   <span>Snapshot captured & ready to attach.</span>
                   <button
                     type="button"
                     onClick={() => { fileRef.current = null; setHasFile(false); setPreview(null) }}
-                    className="ml-auto text-retro-muted hover:text-red-500 underline cursor-pointer"
+                    className="ml-auto text-retro-muted hover:text-danger-fg underline cursor-pointer"
                   >
                     Discard
                   </button>
@@ -303,7 +303,7 @@ export function AttachmentUploadModal({
               </div>
               {urlInput && (
                 <div className="p-3 rounded-xl border border-border-glass bg-surface-raised text-xs text-retro-body flex items-center gap-2">
-                  <LinkIcon className="w-4 h-4 text-cyan-600 shrink-0" />
+                  <LinkIcon className="w-4 h-4 text-info-fg shrink-0" />
                   <span className="truncate">URL ready. Will be fetched and stored on submit</span>
                 </div>
               )}
@@ -321,7 +321,7 @@ export function AttachmentUploadModal({
                   <video src={preview} controls className="w-full max-h-52 object-contain rounded-xl border border-border-glass bg-retro-bg" />
                 ) : preview.startsWith('http://') || preview.startsWith('https://') ? (
                   <div className="w-full text-center py-3 rounded-xl border border-border-glass bg-surface-raised text-xs text-retro-body flex items-center justify-center gap-2">
-                    <LinkIcon className="w-3.5 h-3.5 text-cyan-600" />
+                    <LinkIcon className="w-3.5 h-3.5 text-info-fg" />
                     <span>Link ready to submit</span>
                   </div>
                 ) : (
@@ -333,7 +333,7 @@ export function AttachmentUploadModal({
         </div>
 
         {error && (
-          <p role="alert" className="text-xs font-bold text-red-700 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+          <p role="alert" className="text-xs font-bold text-danger-fg bg-danger/10 border border-danger/30 rounded-xl px-3 py-2">
             {error}
           </p>
         )}

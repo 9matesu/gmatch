@@ -106,7 +106,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
         </div>
         <div className="flex items-center gap-3">
           <div className="glass-inset px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs font-semibold">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
             <span className="text-retro-fg">System Online</span>
             <span className="text-retro-faint">·</span>
             <span className="text-2xs text-retro-muted font-mono">
@@ -127,13 +127,13 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
 
       {/* Needs Attention / Security Alert Banner */}
       {pendingReports > 0 ? (
-        <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-4 flex flex-wrap items-center justify-between gap-4 animate-orbit-fade-in">
+        <div className="rounded-xl border border-danger/0 bg-danger/0 p-4 flex flex-wrap items-center justify-between gap-4 animate-orbit-fade-in">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-lg bg-danger/0 text-danger-fg flex items-center justify-center shrink-0">
               <ShieldAlert className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-xs font-bold text-rose-300 tracking-wider">
+              <h3 className="text-xs font-bold text-danger-fg tracking-wider">
                 {pendingReports} Pending Moderation Case{pendingReports === 1 ? '' : 's'}
               </h3>
               <p className="text-xs text-retro-muted mt-0.5">
@@ -144,15 +144,15 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
           <button
             type="button"
             onClick={() => onNavigate?.("moderation")}
-            className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-retro-fg rounded-lg text-xs font-bold tracking-wide transition-colors cursor-pointer"
+            className="px-4 py-2 bg-danger hover:bg-danger text-retro-fg rounded-lg text-xs font-bold tracking-wide transition-colors cursor-pointer"
           >
             Review Reports →
           </button>
         </div>
       ) : (
-        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-2 text-emerald-400 font-semibold">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+        <div className="rounded-xl border border-success/0 bg-success/ px-4 py-3 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2 text-success-fg font-semibold">
+            <ShieldCheck className="w-4 h-4 text-success-fg" />
             <span>All Clear: Zero pending reports in moderation queue</span>
           </div>
           <button
@@ -172,9 +172,9 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
           <div className="flex items-start justify-between">
             <div>
               <p className="text-2xs font-bold uppercase tracking-wider text-retro-muted">Online Users</p>
-              <p className="text-2xl font-black text-emerald-400 mt-1">{onlineUsers.toLocaleString()}</p>
+              <p className="text-2xl font-black text-success-fg mt-1">{onlineUsers.toLocaleString()}</p>
             </div>
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-success/0 text-success-fg flex items-center justify-center">
               <Activity className="w-4 h-4" />
             </div>
           </div>
@@ -183,18 +183,18 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
         {/* 2. Open Reports */}
         <div className={cn(
           "p-4 rounded-xl border",
-          pendingReports > 0 ? "border-rose-500/40 bg-rose-500/10" : "border-border-glass bg-surface-raised"
+          pendingReports > 0 ? "border-danger/0 bg-danger/0" : "border-border-glass bg-surface-raised"
         )}>
           <div className="flex items-start justify-between">
             <div>
               <p className="text-2xs font-bold uppercase tracking-wider text-retro-muted">Open Reports</p>
-              <p className={cn("text-2xl font-black mt-1", pendingReports > 0 ? "text-rose-400" : "text-retro-fg")}>
+              <p className={cn("text-2xl font-black mt-1", pendingReports > 0 ? "text-danger-fg" : "text-retro-fg")}>
                 {pendingReports.toLocaleString()}
               </p>
             </div>
             <div className={cn(
               "w-8 h-8 rounded-lg flex items-center justify-center",
-              pendingReports > 0 ? "bg-rose-500/20 text-rose-400" : "bg-glass-w10 text-retro-muted"
+              pendingReports > 0 ? "bg-danger/0 text-danger-fg" : "bg-glass-w10 text-retro-muted"
             )}>
               <Flag className="w-4 h-4" />
             </div>
@@ -206,9 +206,9 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
           <div className="flex items-start justify-between">
             <div>
               <p className="text-2xs font-bold uppercase tracking-wider text-retro-muted">Active Duels</p>
-              <p className="text-2xl font-black text-purple-400 mt-1">{activeDuels.toLocaleString()}</p>
+              <p className="text-2xl font-black text-chrome-lav-fg mt-1">{activeDuels.toLocaleString()}</p>
             </div>
-            <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-chrome-lav/0 text-chrome-lav-fg flex items-center justify-center">
               <GitCompare className="w-4 h-4" />
             </div>
           </div>
@@ -219,9 +219,9 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
           <div className="flex items-start justify-between">
             <div>
               <p className="text-2xs font-bold uppercase tracking-wider text-retro-muted">Total Accounts</p>
-              <p className="text-2xl font-black text-cyan-400 mt-1">{totalUsers.toLocaleString()}</p>
+              <p className="text-2xl font-black text-info-fg mt-1">{totalUsers.toLocaleString()}</p>
             </div>
-            <div className="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-info/0 text-info-fg flex items-center justify-center">
               <Users className="w-4 h-4" />
             </div>
           </div>
@@ -232,9 +232,9 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
           <div className="flex items-start justify-between">
             <div>
               <p className="text-2xs font-bold uppercase tracking-wider text-retro-muted">In Match Queue</p>
-              <p className="text-2xl font-black text-blue-400 mt-1">{queueWaiting.toLocaleString()}</p>
+              <p className="text-2xl font-black text-info-fg mt-1">{queueWaiting.toLocaleString()}</p>
             </div>
-            <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-info/0 text-info-fg flex items-center justify-center">
               <Clock className="w-4 h-4" />
             </div>
           </div>
@@ -245,9 +245,9 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
           <div className="flex items-start justify-between">
             <div>
               <p className="text-2xs font-bold uppercase tracking-wider text-retro-muted">Public Media</p>
-              <p className="text-2xl font-black text-amber-400 mt-1">{totalPosts.toLocaleString()}</p>
+              <p className="text-2xl font-black text-warning-fg mt-1">{totalPosts.toLocaleString()}</p>
             </div>
-            <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-warning/0 text-warning-fg flex items-center justify-center">
               <Globe className="w-4 h-4" />
             </div>
           </div>
@@ -267,7 +267,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
             className="p-3 rounded-lg border border-border-glass bg-surface-canvas hover:bg-glass-w5 transition-all text-left group cursor-pointer"
           >
             <div className="flex items-center gap-2 mb-1">
-              <GitCompare className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
+              <GitCompare className="w-4 h-4 text-chrome-lav-fg group-hover:scale-110 transition-transform" />
               <span className="text-xs font-bold text-retro-fg">Force Matchup</span>
             </div>
             <p className="text-2xs text-retro-muted">Pair all waiting players in the duel queue</p>
@@ -279,7 +279,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
             className="p-3 rounded-lg border border-border-glass bg-surface-canvas hover:bg-glass-w5 transition-all text-left group cursor-pointer"
           >
             <div className="flex items-center gap-2 mb-1">
-              <Megaphone className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
+              <Megaphone className="w-4 h-4 text-info-fg group-hover:scale-110 transition-transform" />
               <span className="text-xs font-bold text-retro-fg">Broadcast Notice</span>
             </div>
             <p className="text-2xs text-retro-muted">Publish system announcement banner</p>
@@ -291,7 +291,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
             className="p-3 rounded-lg border border-border-glass bg-surface-canvas hover:bg-glass-w5 transition-all text-left group cursor-pointer"
           >
             <div className="flex items-center gap-2 mb-1">
-              <TrendingUp className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+              <TrendingUp className="w-4 h-4 text-warning-fg group-hover:scale-110 transition-transform" />
               <span className="text-xs font-bold text-retro-fg">Database Maintenance</span>
             </div>
             <p className="text-2xs text-retro-muted">Sweep expired items and optimize storage</p>
@@ -303,7 +303,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
             className="p-3 rounded-lg border border-border-glass bg-surface-canvas hover:bg-glass-w5 transition-all text-left group cursor-pointer"
           >
             <div className="flex items-center gap-2 mb-1">
-              <BarChart2 className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+              <BarChart2 className="w-4 h-4 text-success-fg group-hover:scale-110 transition-transform" />
               <span className="text-xs font-bold text-retro-fg">View Audit Log</span>
             </div>
             <p className="text-2xs text-retro-muted">Review administrative access and actions</p>
@@ -317,7 +317,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
         <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
           <div className="px-4 py-3 border-b border-border-glass flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Globe className="w-4 h-4 text-cyan-400" />
+              <Globe className="w-4 h-4 text-info-fg" />
               <h2 className="text-xs font-bold tracking-wider text-retro-fg">Recent Public Posts</h2>
             </div>
             <button
@@ -363,7 +363,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
         <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
           <div className="px-4 py-3 border-b border-border-glass flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <GitCompare className="w-4 h-4 text-purple-400" />
+              <GitCompare className="w-4 h-4 text-chrome-lav-fg" />
               <h2 className="text-xs font-bold tracking-wider text-retro-fg">Active Duels ({liveMatches.length})</h2>
             </div>
             <button
@@ -376,7 +376,7 @@ export function DashboardTab({ identity, pinVerified, onZoom, onAction, onNaviga
           </div>
           {liveMatches.length === 0 ? (
             <div className="p-8 text-center text-xs text-retro-muted">
-              <CheckCircle2 className="w-8 h-8 text-emerald-400/60 mx-auto mb-2" />
+              <CheckCircle2 className="w-8 h-8 text-success-fg60 mx-auto mb-2" />
               <p className="font-semibold text-retro-fg">No Active Duels Right Now</p>
               <p className="text-2xs text-retro-muted mt-0.5">Players in queue will automatically pair into new matches</p>
             </div>

@@ -564,7 +564,7 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
                   className="absolute bottom-20 z-40 pointer-events-none animate-orbit-pop"
                   style={{ left: `${heart.x}%` }}
                 >
-                  <Heart className="w-12 h-12 text-amber-400 fill-rose-500 drop-shadow-2xl animate-bounce" />
+                  <Heart className="w-12 h-12 text-warning-fg fill-danger drop-shadow-2xl animate-bounce" />
                 </div>
               ))}
             </div>
@@ -585,7 +585,7 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
                   onClick={handleLike}
                   className={`w-10 h-10 rounded-full border flex items-center justify-center transition-all cursor-pointer active:scale-80 shadow-md ${
                     likedStories.has(currentStory.id)
-                      ? 'bg-cyan-500 border-cyan-500 text-retro-fg'
+                      ? 'bg-info border-info text-retro-fg'
                       : 'bg-surface-raised/10 hover:bg-surface-raised/20 border-border-strong text-retro-fg'
                   }`}
                   aria-label="Like story"

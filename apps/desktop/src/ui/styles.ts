@@ -61,8 +61,8 @@ export const HP_FILL_LOW =
 
 /** Floating +GP popup. Refined tabular figures with clean drop shadow. */
 export const FLOAT_GC =
-  'pointer-events-none absolute z-[10] animate-[gg-float-up_0.9s_ease-out_forwards] text-sm font-bold text-emerald-400 font-mono drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] [transform:translate(-50%,-50%)]'
-export const FLOAT_GC_CRIT = 'text-xl text-amber-300 font-black drop-shadow-[0_0_8px_rgba(252,211,77,0.6)]'
+  'pointer-events-none absolute z-[10] animate-[gg-float-up_0.9s_ease-out_forwards] text-sm font-bold text-success-fg font-mono drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] [transform:translate(-50%,-50%)]'
+export const FLOAT_GC_CRIT = 'text-xl text-warning-fg font-black drop-shadow-[0_0_8px_rgba(252,211,77,0.6)]'
 
 /** Full-bleed feed image (was .goon-image). */
 export const GOON_IMAGE = 'block h-full w-full object-contain'

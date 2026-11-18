@@ -49,7 +49,7 @@ function LocalEntryTransfer({ partyId, entryId, objectId, hash }: {
         onClick={() => signalLocalReady(partyId, entryId, hash)}
         title="Bytes verified on this machine — tell the room"
         aria-label="Mark local file ready"
-        className="p-1 rounded-md hover:bg-glass-w10 text-emerald-400 hover:text-emerald-300 cursor-pointer"
+        className="p-1 rounded-md hover:bg-glass-w10 text-success-fg hover:text-success-fg cursor-pointer"
       >
         <Download className="w-3 h-3" />
       </button>
@@ -207,7 +207,7 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
                 {q.name || q.url}
               </span>
               {q.status === 'proposed' && (
-                <span className="rounded-full border border-amber-400/40 px-1.5 py-px text-2xs font-semibold uppercase tracking-wider text-amber-300" title="A participant suggestion — the host approves it before it can play">
+                <span className="rounded-full border border-warning/0 px-1.5 py-px text-2xs font-semibold uppercase tracking-wider text-warning-fg" title="A participant suggestion — the host approves it before it can play">
                   proposed
                 </span>
               )}
@@ -230,7 +230,7 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
                 />
               )}
               {isHost && q.status === 'proposed' && (
-                <button type="button" onClick={() => queueOp(party.id, 'approve', q.id)} aria-label={`Approve ${q.name || 'video'}`} title="Approve suggestion" className="px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 hover:bg-emerald-500/30 cursor-pointer text-2xs font-bold uppercase tracking-wider">
+                <button type="button" onClick={() => queueOp(party.id, 'approve', q.id)} aria-label={`Approve ${q.name || 'video'}`} title="Approve suggestion" className="px-2 py-0.5 rounded-md bg-success/0 border border-success/0 text-success-fg hover:bg-success/0 cursor-pointer text-2xs font-bold uppercase tracking-wider">
                   Approve
                 </button>
               )}

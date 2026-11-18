@@ -198,7 +198,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
           <div className="rounded-xl border border-border-glass bg-surface-raised p-5 space-y-6">
             <div className="flex items-center justify-between border-b border-border-glass pb-3">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-retro-fg">
-                <Globe className="w-4 h-4 text-cyan-300" />
+                <Globe className="w-4 h-4 text-info-fg" />
                 <span>Discord Community Invite</span>
               </div>
             </div>
@@ -227,7 +227,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
           <div className="rounded-xl border border-border-glass bg-surface-raised p-5 space-y-6">
             <div className="flex items-center justify-between border-b border-border-glass pb-3">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-retro-fg">
-                <ZapIcon className="w-4 h-4 text-amber-400" />
+                <ZapIcon className="w-4 h-4 text-warning-fg" />
                 <span>Economy Cashout Rate</span>
               </div>
             </div>
@@ -349,8 +349,8 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
       {/* Subtab 3: Maintenance & Danger Zone */}
       {activeSubTab === "danger" && (
         <div className="space-y-4">
-          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-5 space-y-2">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-red-300">
+          <div className="bg-danger/0 border border-danger/0 rounded-xl p-5 space-y-2">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-danger-fg">
               <AlertTriangle className="w-4 h-4" />
               <span>Danger Zone & Server Maintenance</span>
             </div>
@@ -360,48 +360,48 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-5 space-y-3">
+            <div className="rounded-xl border border-danger/0 bg-danger/ p-5 space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-xs font-bold text-red-300 tracking-wider">Run Database Cleanup</h3>
+                  <h3 className="text-xs font-bold text-danger-fg tracking-wider">Run Database Cleanup</h3>
                   <p className="text-2xs text-retro-muted mt-1">Expires stale content, sweeps orphan blobs, and resets daily scores.</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowCleanupConfirm(true)}
-                  className="px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shrink-0 cursor-pointer"
+                  className="px-3 py-2 bg-danger/0 hover:bg-danger/0 text-danger-fg border border-danger/0 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shrink-0 cursor-pointer"
                 >
                   Run Cleanup
                 </button>
               </div>
             </div>
 
-            <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-5 space-y-3">
+            <div className="rounded-xl border border-danger/0 bg-danger/ p-5 space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-xs font-bold text-red-300 tracking-wider">Clean ALL Posts & Reset</h3>
+                  <h3 className="text-xs font-bold text-danger-fg tracking-wider">Clean ALL Posts & Reset</h3>
                   <p className="text-2xs text-retro-muted mt-1">Purges all user posts, media objects, likes and comments platform-wide.</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowCleanPostsConfirm(true)}
-                  className="px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shrink-0 cursor-pointer"
+                  className="px-3 py-2 bg-danger/0 hover:bg-danger/0 text-danger-fg border border-danger/0 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shrink-0 cursor-pointer"
                 >
                   Clean All
                 </button>
               </div>
             </div>
 
-            <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5 space-y-3 md:col-span-2">
+            <div className="rounded-xl border border-warning/0 bg-warning/ p-5 space-y-3 md:col-span-2">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-xs font-bold text-amber-300 tracking-wider">Migrate Lobby → Posts</h3>
+                  <h3 className="text-xs font-bold text-warning-fg tracking-wider">Migrate Lobby → Posts</h3>
                   <p className="text-2xs text-retro-muted mt-1">Transfers all lobby board images into user gMatch profiles under Posts, preserving metadata.</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowMigrateConfirm(true)}
-                  className="px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shrink-0 cursor-pointer"
+                  className="px-3 py-2 bg-warning/0 hover:bg-warning/0 text-warning-fg border border-warning/0 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shrink-0 cursor-pointer"
                 >
                   Migrate Now
                 </button>

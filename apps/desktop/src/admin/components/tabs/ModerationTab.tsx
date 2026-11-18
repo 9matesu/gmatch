@@ -183,7 +183,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
             className="text-retro-muted hover:text-retro-fg transition-transform shrink-0 mt-0.5 cursor-pointer"
             title={isExpanded ? "Collapse" : "Expand report"}
           >
-            {isExpanded ? <ChevronUp className="w-4 h-4 text-cyan-300" /> : <ChevronDown className="w-4 h-4" />}
+            {isExpanded ? <ChevronUp className="w-4 h-4 text-info-fg" /> : <ChevronDown className="w-4 h-4" />}
           </button>
           {report.content_url && (
             <AdminMediaThumbnail
@@ -217,7 +217,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                   type="button"
                   onClick={() => handleReportAction(report, "delete")}
                   disabled={actionLoading === report.id}
-                  className="px-2.5 py-1 text-2xs font-bold rounded-md border border-red-500/30 text-red-300 hover:bg-red-500/10 disabled:opacity-40 cursor-pointer"
+                  className="px-2.5 py-1 text-2xs font-bold rounded-md border border-danger/0 text-danger-fg hover:bg-danger/0 disabled:opacity-40 cursor-pointer"
                 >
                   {actionLoading === report.id ? "..." : "Delete"}
                 </button>
@@ -225,7 +225,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                   type="button"
                   onClick={() => handleReportAction(report, "ban")}
                   disabled={actionLoading === report.id}
-                  className="px-2.5 py-1 text-2xs font-bold rounded-md border border-red-500/30 text-red-300 hover:bg-red-500/10 disabled:opacity-40 cursor-pointer"
+                  className="px-2.5 py-1 text-2xs font-bold rounded-md border border-danger/0 text-danger-fg hover:bg-danger/0 disabled:opacity-40 cursor-pointer"
                 >
                   {actionLoading === report.id ? "..." : "Ban"}
                 </button>
@@ -233,7 +233,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                   type="button"
                   onClick={() => handleReportAction(report, "deny")}
                   disabled={actionLoading === report.id}
-                  className="px-2.5 py-1 text-2xs font-bold rounded-md border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-40 cursor-pointer"
+                  className="px-2.5 py-1 text-2xs font-bold rounded-md border border-success/0 text-success-fg hover:bg-success/0 disabled:opacity-40 cursor-pointer"
                 >
                   {actionLoading === report.id ? "..." : "Dismiss"}
                 </button>
@@ -333,7 +333,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
               <Icon className="w-3.5 h-3.5" />
               {tab.label}
               {tab.id === "reports" && reportsTotal > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 bg-rose-500/20 text-rose-300 rounded-full text-2xs">
+                <span className="ml-1 px-1.5 py-0.2 bg-danger/0 text-danger-fg rounded-full text-2xs">
                   {reportsTotal}
                 </span>
               )}
@@ -442,7 +442,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                           <button
                             type="button"
                             onClick={() => { onAction("hideComment", c.id); setTimeout(fetchComments, 300); }}
-                            className="px-2 py-1 text-2xs font-semibold rounded border border-amber-500/30 text-amber-300 hover:bg-amber-500/10 cursor-pointer"
+                            className="px-2 py-1 text-2xs font-semibold rounded border border-warning/0 text-warning-fg hover:bg-warning/0 cursor-pointer"
                           >
                             Hide
                           </button>
@@ -450,7 +450,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                         <button
                           type="button"
                           onClick={() => { onAction("deleteComment", c.id); setTimeout(fetchComments, 300); }}
-                          className="px-2 py-1 text-2xs font-semibold rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 cursor-pointer"
+                          className="px-2 py-1 text-2xs font-semibold rounded border border-danger/0 text-danger-fg hover:bg-danger/0 cursor-pointer"
                         >
                           Delete
                         </button>
@@ -477,7 +477,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                       <button
                         type="button"
                         onClick={() => { onAction("deleteChatMessage", m.id); setTimeout(fetchChat, 300); }}
-                        className="px-2 py-1 text-2xs font-semibold rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 cursor-pointer"
+                        className="px-2 py-1 text-2xs font-semibold rounded border border-danger/0 text-danger-fg hover:bg-danger/0 cursor-pointer"
                       >
                         Delete
                       </button>
@@ -498,7 +498,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
               <AdminLoadingState rows={4} columns={3} />
             ) : bannedUsers.length === 0 ? (
               <div className="p-8 text-center text-xs text-retro-muted">
-                <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
+                <CheckCircle2 className="w-8 h-8 text-success-fg mx-auto mb-2" />
                 <p className="font-semibold text-retro-fg">No Banned Users</p>
                 <p className="text-2xs text-retro-muted mt-0.5">There are currently no active account bans or suspensions</p>
               </div>
@@ -512,7 +512,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                         <Badge variant="danger" size="sm" dot>Banned</Badge>
                         <span className="text-2xs text-retro-muted font-mono">{user.id}</span>
                       </div>
-                      <p className="text-xs text-red-300 mt-1">
+                      <p className="text-xs text-danger-fg mt-1">
                         Reason: {user.ban_reason || "Admin policy violation"}
                       </p>
                       {user.ban_created_at && (
@@ -524,7 +524,7 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
                     <button
                       type="button"
                       onClick={() => handleUnban(user.id)}
-                      className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+                      className="px-3 py-1.5 bg-success/0 hover:bg-success/0 text-success-fg border border-success/0 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
                     >
                       <UserCheck className="w-3.5 h-3.5" />
                       <span>Lift Ban</span>

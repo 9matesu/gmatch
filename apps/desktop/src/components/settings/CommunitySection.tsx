@@ -53,7 +53,7 @@ export function CommunitySection({ toast }: { toast?: (message: string, type?: '
             onClick={() => void copy()}
             className="inline-flex items-center gap-1.5 rounded-md border border-border-glass px-2.5 py-1.5 text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 cursor-pointer"
           >
-            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+            {copied ? <Check className="w-3.5 h-3.5 text-success-fg" /> : <Copy className="w-3.5 h-3.5" />}
             {copied ? 'Copied' : 'Copy'}
           </button>
         </div>

@@ -143,7 +143,7 @@ export function ContextMenu({ x, y, title, subtitle, actions, onDismiss, width =
                   void run(a);
                 }}
                 className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between gap-2 transition-colors font-medium cursor-pointer disabled:opacity-40 disabled:cursor-default ${
-                  a.danger ? 'text-rose-400 hover:bg-rose-500/15' : 'hover:bg-glass-w12'
+                  a.danger ? 'text-danger-fg hover:bg-danger/5' : 'hover:bg-glass-w12'
                 } ${expanded ? 'bg-glass-w10' : ''}`}
               >
                 <span className="flex items-center gap-2 min-w-0">

@@ -109,7 +109,7 @@ export function ExploreSearchModal({
 
         {/* Search Input */}
         <div className="p-3 border-b border-border-glass bg-surface-interactive shrink-0">
-          <div className="flex items-center gap-2 bg-surface-raised border border-border-glass rounded-xl px-3 py-2 focus-within:ring-2 focus-within:ring-cyan-500/30">
+          <div className="flex items-center gap-2 bg-surface-raised border border-border-glass rounded-xl px-3 py-2 focus-within:ring-2 focus-within:ring-info/0">
             <Search className="w-4 h-4 text-retro-muted shrink-0" />
             <input
               type="text"

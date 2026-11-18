@@ -205,7 +205,7 @@ function ProfileStep(props: Props & { onDone: () => void }) {
       </button>
 
       {error && (
-        <div role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400">{error}</div>
+        <div role="alert" className="rounded-lg border border-danger/0 bg-danger/0 p-3 text-xs text-danger-fg">{error}</div>
       )}
 
       <button
@@ -218,7 +218,7 @@ function ProfileStep(props: Props & { onDone: () => void }) {
           <span>Joining…</span>
         ) : (
           <>
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <CheckCircle2 className="w-4 h-4 text-success-fg" />
             <span>Enter</span>
             <ArrowRight className="w-4 h-4" />
           </>

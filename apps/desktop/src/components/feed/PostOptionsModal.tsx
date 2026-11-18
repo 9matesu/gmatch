@@ -67,7 +67,7 @@ export function PostOptionsModal({
             toast?.('Post shared to your profile feed!', 'success');
             onClose();
           }}
-          className="w-full py-3.5 hover:bg-glass-w5 text-emerald-600 font-bold flex items-center justify-center gap-2 cursor-pointer"
+          className="w-full py-3.5 hover:bg-glass-w5 text-success-fg font-bold flex items-center justify-center gap-2 cursor-pointer"
         >
           <Repeat className="w-4 h-4" />
           <span>Repost to Profile</span>
@@ -109,7 +109,7 @@ export function PostOptionsModal({
                 toast?.('Post moved to archive', 'info');
                 onClose();
               }}
-              className="w-full py-3.5 hover:bg-glass-w5 text-amber-600 flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-3.5 hover:bg-glass-w5 text-warning-fg flex items-center justify-center gap-2 cursor-pointer"
             >
               <Archive className="w-4 h-4" />
               <span>Archive Post</span>
@@ -121,7 +121,7 @@ export function PostOptionsModal({
                 toast?.('Post deleted', 'success');
                 onClose();
               }}
-              className="w-full py-3.5 hover:bg-glass-w5 text-red-600 font-bold flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-3.5 hover:bg-glass-w5 text-danger-fg font-bold flex items-center justify-center gap-2 cursor-pointer"
             >
               <Trash2 className="w-4 h-4" />
               <span>Delete Post</span>
@@ -135,7 +135,7 @@ export function PostOptionsModal({
               onReport?.(post);
               onClose();
             }}
-            className="w-full py-3.5 hover:bg-glass-w5 text-red-600 font-bold flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full py-3.5 hover:bg-glass-w5 text-danger-fg font-bold flex items-center justify-center gap-2 cursor-pointer"
           >
             <Flag className="w-4 h-4" />
             <span>Report Post</span>

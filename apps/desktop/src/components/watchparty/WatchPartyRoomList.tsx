@@ -264,7 +264,7 @@ export function WatchPartyRoomList({
 
               <div className="flex items-center justify-between pt-1.5 border-t border-border-subtle/40 text-2xs text-retro-muted">
                 <span className="flex items-center gap-1.5">
-                  <span className={`w-1.5 h-1.5 rounded-full ${r.members > 0 ? 'bg-emerald-400 animate-pulse' : 'bg-retro-muted/40'}`} />
+                  <span className={`w-1.5 h-1.5 rounded-full ${r.members > 0 ? 'bg-success animate-pulse' : 'bg-retro-muted/40'}`} />
                   {r.members > 0 ? 'Active' : 'Persistent'}
                 </span>
                 <span className="font-mono text-2xs uppercase tracking-wider text-retro-muted/60">
@@ -277,7 +277,7 @@ export function WatchPartyRoomList({
       </div>
 
       {failed && (
-        <div className="mt-8 p-4 rounded-xl border border-red-500/20 bg-red-500/10 text-center max-w-md mx-auto text-xs text-red-400">
+        <div className="mt-8 p-4 rounded-xl border border-danger/0 bg-danger/0 text-center max-w-md mx-auto text-xs text-danger-fg">
           Could not load watch rooms. Please check your network connection.
         </div>
       )}

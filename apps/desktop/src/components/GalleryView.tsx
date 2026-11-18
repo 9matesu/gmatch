@@ -265,7 +265,7 @@ export function GalleryView({
         {selectedGalleryIds.size > 0 && (
           <div className="glass-header px-4 py-2.5 flex items-center justify-between gap-3 text-xs animate-orbit-fade-in">
             <div className="flex items-center gap-2 text-retro-fg font-bold">
-              <CheckSquare className="w-4 h-4 text-emerald-600" />
+              <CheckSquare className="w-4 h-4 text-success-fg" />
               <span>{selectedGalleryIds.size} cards selected</span>
             </div>
             <div className="flex items-center gap-2">

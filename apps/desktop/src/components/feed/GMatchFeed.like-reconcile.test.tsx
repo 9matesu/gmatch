@@ -112,6 +112,6 @@ describe('like reconciliation (observable state sequence)', () => {
     await waitFor(() => expect(countText()).toMatch(/^10 likes$/));
     // Heart must also revert to unliked.
     const heart = container.querySelector('[aria-label="Like post"] svg');
-    expect(heart?.getAttribute('class') ?? '').not.toMatch(/fill-rose-500/);
+    expect(heart?.getAttribute('class') ?? '').not.toMatch(/fill-danger/);
   });
 });

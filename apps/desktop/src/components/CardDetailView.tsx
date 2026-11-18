@@ -204,7 +204,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
             </button>
           </div>
           <div className="text-center py-8">
-            <p className="text-red-400">{error || 'Card not found'}</p>
+            <p className="text-danger-fg">{error || 'Card not found'}</p>
           </div>
         </div>
       </div>
@@ -290,7 +290,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
             <div className="glass-inset flex items-center justify-between gap-3 p-4">
               <div>
                 <div className="text-2xs uppercase tracking-wider text-retro-muted font-bold">Community market price</div>
-                <div className="text-lg font-black font-mono text-cyan-300 tabular-nums">{formatGc(listingPrice ?? 0)} g$</div>
+                <div className="text-lg font-black font-mono text-info-fg tabular-nums">{formatGc(listingPrice ?? 0)} g$</div>
               </div>
               <button
                 type="button"
@@ -329,7 +329,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
                         onClick={() => onGiftCard(card)}
                         className="glass-action flex-1 py-2 px-4 rounded-lg font-semibold cursor-pointer disabled:opacity-40 flex items-center justify-center gap-1.5"
                       >
-                        <Gift className="w-3.5 h-3.5 text-amber-400" />
+                        <Gift className="w-3.5 h-3.5 text-warning-fg" />
                         <span>Gift Card</span>
                       </button>
                     )}
@@ -337,7 +337,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
                 )}
                 {card.marketStatus === 'listed' && (
                   <>
-                    <div className="flex-1 text-xs text-cyan-300 font-semibold self-center">
+                    <div className="flex-1 text-xs text-info-fg font-semibold self-center">
                       Listed for {formatGc(listingPrice ?? (Number(listPrice) > 0 ? Number(listPrice) : 0))} g$
                     </div>
                     <button

@@ -294,7 +294,7 @@ export function SlideshowManager({
                   type="button"
                   onClick={() => remove(s.id)}
                   aria-label="Delete slideshow"
-                  className="p-1.5 rounded-lg text-retro-muted hover:text-rose-400 hover:bg-surface-interactive cursor-pointer"
+                  className="p-1.5 rounded-lg text-retro-muted hover:text-danger-fg hover:bg-surface-interactive cursor-pointer"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>

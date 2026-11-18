@@ -67,23 +67,23 @@ export interface NotificationsPanelProps {
 }
 
 const TYPE_ICONS: Record<string, React.ReactNode> = {
-  match_invite: <Gamepad2 className="w-4 h-4 text-emerald-400" />,
-  match_result: <Trophy className="w-4 h-4 text-amber-400" />,
-  pm: <MessageSquare className="w-4 h-4 text-cyan-400" />,
-  babecock_invite: <Flame className="w-4 h-4 text-rose-400" />,
-  babecock_start: <Flame className="w-4 h-4 text-rose-400" />,
-  like: <Heart className="w-4 h-4 text-rose-500 fill-rose-500" />,
-  comment: <MessageSquare className="w-4 h-4 text-sky-400" />,
-  follow: <UserPlus className="w-4 h-4 text-purple-400" />,
-  card_received: <Sparkles className="w-4 h-4 text-amber-300" />,
+  match_invite: <Gamepad2 className="w-4 h-4 text-success-fg" />,
+  match_result: <Trophy className="w-4 h-4 text-warning-fg" />,
+  pm: <MessageSquare className="w-4 h-4 text-info-fg" />,
+  babecock_invite: <Flame className="w-4 h-4 text-danger-fg" />,
+  babecock_start: <Flame className="w-4 h-4 text-danger-fg" />,
+  like: <Heart className="w-4 h-4 text-danger-fg fill-danger" />,
+  comment: <MessageSquare className="w-4 h-4 text-info-fg" />,
+  follow: <UserPlus className="w-4 h-4 text-chrome-lav-fg" />,
+  card_received: <Sparkles className="w-4 h-4 text-warning-fg" />,
   // Was missing: the group fold still folded these, but the row fell back to a
   // generic bell, so "bought your card" had no icon.
-  card_purchase: <ShoppingBag className="w-4 h-4 text-emerald-300" />,
-  reply: <MessageSquare className="w-4 h-4 text-sky-300" />,
-  comment_like: <Heart className="w-4 h-4 text-rose-400" />,
-  mention: <AtSign className="w-4 h-4 text-amber-400" />,
-  dm: <MessageSquare className="w-4 h-4 text-cyan-400" />,
-  room: <Users className="w-4 h-4 text-violet-400" />,
+  card_purchase: <ShoppingBag className="w-4 h-4 text-success-fg" />,
+  reply: <MessageSquare className="w-4 h-4 text-info-fg" />,
+  comment_like: <Heart className="w-4 h-4 text-danger-fg" />,
+  mention: <AtSign className="w-4 h-4 text-warning-fg" />,
+  dm: <MessageSquare className="w-4 h-4 text-info-fg" />,
+  room: <Users className="w-4 h-4 text-chrome-lav-fg" />,
   system: <Bell className="w-4 h-4 text-retro-muted" />,
 };
 
@@ -217,7 +217,7 @@ export function NotificationsPanel({
                     <p className="text-xs text-retro-muted mt-0.5 truncate">{item.body}</p>
                   )}
                   {typeof item.mentions === 'number' && item.mentions > 0 && (
-                    <span className="mt-1 inline-flex items-center gap-1 text-2xs font-bold text-amber-300">
+                    <span className="mt-1 inline-flex items-center gap-1 text-2xs font-bold text-warning-fg">
                       <AtSign className="w-3 h-3" />
                       {item.mentions === 1 ? '1 mention' : `${item.mentions} mentions`}
                     </span>

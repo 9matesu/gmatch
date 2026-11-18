@@ -80,11 +80,11 @@ export default function CustomSourcesModal({ onClose }: { onClose: () => void })
             >
               <span
                 aria-hidden="true"
-                className={`absolute inset-0 rounded-full transition-colors ${s.enabled ? 'bg-emerald-500/40' : 'bg-glass-w10'}`}
+                className={`absolute inset-0 rounded-full transition-colors ${s.enabled ? 'bg-success/0' : 'bg-glass-w10'}`}
               />
               <span
                 aria-hidden="true"
-                className={`absolute left-0.5 h-4 w-4 rounded-full shadow-md transition-transform duration-150 ${s.enabled ? 'translate-x-4 bg-emerald-400' : 'translate-x-0 bg-glass-w20'}`}
+                className={`absolute left-0.5 h-4 w-4 rounded-full shadow-md transition-transform duration-150 ${s.enabled ? 'translate-x-4 bg-success' : 'translate-x-0 bg-glass-w20'}`}
               />
             </button>
             <div className="min-w-0 flex-1">
