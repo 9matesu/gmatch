@@ -98,7 +98,6 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
   const canGridBack = useGame((s) => s.gridPast.length > 0)
   const queue = useGame((s) => s.queue)
   const past = useGame((s) => s.past)
-  const imageReady = useGame((s) => s.imageReady)
   const setImageReady = useGame((s) => s.setImageReady)
 
   const [floats, setFloats] = useState<Float[]>([])
@@ -613,15 +612,24 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           )}
         </div>
       ) : (
-        <button
-          type="button"
-          // No `key` here on purpose ÔÇö see the grid tile above. This div holds
+        <div
+          // No `key` here on purpose — see the grid tile above. This box holds
           // the <img>/<video>, and a per-click key remounted them.
-          className={`${STAGE_FRAME} border-beam relative min-h-0 flex-1 ${imageReady ? 'cursor-pointer active:cursor-grabbing' : 'cursor-progress'} max-[1100px]:min-h-[320px]`}
-          onClick={handleClick}
-          onAuxClick={handleAuxClick}
-          aria-label="Attack the current foe"
+          className={`${STAGE_FRAME} border-beam relative min-h-0 flex-1 max-[1100px]:min-h-[320px]`}
         >
+          {/* The click target is a real button LAYERED OVER the media, not the
+              stage element itself: the stage also holds <video controls> and
+              the prev/next/purge buttons, and interactive content must never
+              nest inside a button. */}
+          {!showOffline && (
+            <button
+              type="button"
+              onClick={handleClick}
+              onAuxClick={handleAuxClick}
+              aria-label="Attack the current foe"
+              className="absolute inset-0 z-[2] cursor-pointer"
+            />
+          )}
           {critFlashEl}
           {koPopEl}
           {/* Shake on its own keyed-free overlay, and the progressive damage
@@ -663,7 +671,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           )}
           {isMotion && current ? (
             <video
-              className={`${GOON_IMAGE} relative z-[1]`}
+              className={`${GOON_IMAGE} relative z-[3]`}
               src={redgifsPlayable(current.url)}
               poster={current.preview ? redgifsPlayable(current.preview) : undefined}
               autoPlay={!reduceMotion}
@@ -748,7 +756,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                 {f.text}
               </span>
             ))}
-        </button>
+        </div>
       )}
       <div className="flex flex-none flex-wrap items-center gap-2 px-1 py-0.5">
         {/* Hoverable novelty tray: KO drops never pause gameplay. */}

@@ -188,6 +188,21 @@ describe('GoonPanel click feedback', () => {
     expect(useGame.getState().clicks).toBe(1)
   })
 
+
+  // The stage is a BOX, not a button: it holds <video controls> and the
+  // prev/next/purge buttons, and interactive content must never nest inside a
+  // button. The click target is a real button layered over the media.
+  it('layers the click target over the stage instead of nesting it', () => {
+    useGame.setState({ viewMode: '1x1', current: post('foe-1', 'video'), foeHp: 100, foeMaxHp: 100, imageReady: true } as never)
+    const { container } = render(<GoonPanel />)
+    const target = container.querySelector('button[aria-label="Attack the current foe"]')
+    expect(target).toBeTruthy()
+    expect(target!.querySelector('video')).toBeNull()
+    expect(target!.querySelector('button')).toBeNull()
+    const video = container.querySelector('video')
+    expect(video).toBeTruthy()
+    expect(video!.closest('button')).toBeNull()
+  })
   it('applies a damage wash per grid tile based on that tile own HP', () => {
     seedGrid([cell('g1', 100, 100), cell('g2', 10, 100), cell('g3', 100, 100), cell('g4', 100, 100)])
     render(<GoonPanel />)
