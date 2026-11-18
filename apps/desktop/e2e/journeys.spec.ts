@@ -76,7 +76,12 @@ test('navigation round-trip preserves idle state', async ({ page }) => {
   await expect
     .poll(
       async () => {
-        await stage.click()
+        // A feed fetch can empty the queue and take the attack button with it
+        // (no foe, nothing to attack). Re-seed before each attempt so the poll
+        // measures the click path, not the feed mood.
+        await seedPlayableFoe(page)
+        if (!(await stage.isVisible().catch(() => false))) return idlePoints(page)
+        await stage.click({ timeout: 1_000 }).catch(() => {})
         return idlePoints(page)
       },
       { timeout: 15_000, intervals: [100, 250, 500] },
@@ -121,8 +126,16 @@ test('offline card shows and retry recovers', async ({ page }) => {
   // Either offline (all sources failed) or empty (feed not yet pulled) is a
   // valid "not playable" stage state; both carry the Retry affordance.
   await expect(page.getByText(/sources offline|no image/i)).toBeVisible({ timeout: 30_000 })
-  // Two retry affordances exist (OfflineCard + header button) — scope to the card.
+  // Unblock and serve a real feed BEFORE retrying: clicking while the network
+  // is down only starts a doomed fetch (the button disables on "Retrying..."),
+  // so a second click can never land. Recovery is the card leaving.
+  await page.unroute('**/booru/**')
+  await page.unroute('**://127.0.0.1:8790/**')
+  await mockBooruFeed(page)
   await page.getByRole('status').getByRole('button', { name: /retry/i }).click()
+  await expect(page.getByText(/sources offline|no image/i)).toBeHidden({ timeout: 30_000 })
+  // And the stage is playable again: a foe exists and accepts clicks.
+  await seedPlayableFoe(page)
   await expect(page.getByRole('button', { name: /attack the current foe/i })).toBeVisible({
     timeout: 30_000,
   })
