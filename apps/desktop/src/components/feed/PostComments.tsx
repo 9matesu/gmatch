@@ -108,21 +108,20 @@ export function PostComments({
         </div>
         <div>
           <div className="flex items-baseline gap-1.5">
-            <span
-              role={onCommentAuthorClick ? 'button' : undefined}
-              tabIndex={onCommentAuthorClick ? 0 : undefined}
-              onClick={(e) => {
-                if (!onCommentAuthorClick) return
-                e.stopPropagation()
-                onCommentAuthorClick(c.author_id)
-              }}
-              onKeyDown={(e) => {
-                if (!onCommentAuthorClick || e.key !== 'Enter') return
-                e.stopPropagation()
-                onCommentAuthorClick(c.author_id)
-              }}
-              className={`text-xs font-bold text-retro-fg ${onCommentAuthorClick ? 'hover:underline cursor-pointer' : ''}`}
-            >{c.author_name}</span>
+            {onCommentAuthorClick ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onCommentAuthorClick(c.author_id)
+                }}
+                className="text-xs font-bold text-retro-fg hover:underline cursor-pointer"
+              >
+                {c.author_name}
+              </button>
+            ) : (
+              <span className="text-xs font-bold text-retro-fg">{c.author_name}</span>
+            )}
             <span className="text-2xs text-retro-muted">{timeAgo(c.created_at)}</span>
             {c.pending && <span className="text-2xs text-retro-muted italic">sending…</span>}
           </div>
@@ -174,16 +173,18 @@ export function PostComments({
         {/* Caption item */}
         {post.caption && (
           <div className="flex items-start gap-3 pb-3 border-b border-edge">
-            <div
-              className="w-8 h-8 rounded-full bg-surface-interactive overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold text-retro-fg cursor-pointer"
+            <button
+              type="button"
               onClick={onAuthorClick}
+              aria-label={onAuthorClick ? `View ${post.author_name || 'author'}'s profile` : undefined}
+              className="w-8 h-8 rounded-full bg-surface-interactive overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold text-retro-fg enabled:cursor-pointer"
             >
               {authorAvatar ? (
                 <img src={authorAvatar} alt="" className="w-full h-full object-cover" />
               ) : (
                 post.author_name.charAt(0).toUpperCase()
               )}
-            </div>
+            </button>
             <div className="flex-1 min-w-0">
               <span className="text-xs font-extrabold text-retro-fg mr-1.5">{post.author_name}</span>
               <Linkify text={post.caption} linkClassName="text-xs text-retro-body leading-relaxed underline break-all" />

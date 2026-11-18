@@ -62,7 +62,7 @@ describe('PostTimestamp', () => {
   it('latches the absolute date on click, so touch can read it', () => {
     render(<PostTimestamp createdAt={ISO} />)
     const el = stamp()
-    fireEvent.click(el)
+    fireEvent.click(el.querySelector("button")!)
     expect(el.textContent).toMatch(/\d{4}/)
     // Still absolute with the pointer gone: the click persisted the choice.
     fireEvent.mouseLeave(el)
@@ -78,7 +78,7 @@ describe('PostTimestamp', () => {
 
   it('remembers the choice across posts', () => {
     const { unmount } = render(<PostTimestamp createdAt={ISO} />)
-    fireEvent.click(stamp())
+    fireEvent.click(stamp().querySelector("button")!)
     unmount()
     render(<PostTimestamp createdAt={ISO} />)
     expect(stamp().textContent).toMatch(/\d{4}/)
@@ -87,7 +87,7 @@ describe('PostTimestamp', () => {
   it('reports the toggle so a caller can react', () => {
     const onToggle = vi.fn()
     render(<PostTimestamp createdAt={ISO} onToggle={onToggle} />)
-    fireEvent.click(stamp())
+    fireEvent.click(stamp().querySelector("button")!)
     expect(onToggle).toHaveBeenCalledWith(true)
   })
 

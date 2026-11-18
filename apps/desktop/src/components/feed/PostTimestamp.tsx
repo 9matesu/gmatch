@@ -60,17 +60,22 @@ export function PostTimestamp({
       // Hover previews the exact date; click latches it (touch has no hover).
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      onClick={() => {
-        const next = !absolute;
-        setAbsolute(next);
-        try {
-          localStorage.setItem(KEY, next ? '1' : '0');
-        } catch { /* private mode: the choice just does not persist */ }
-        onToggle?.(next);
-      }}
-      className={`${className} shrink-0 cursor-pointer`}
+      className={`${className} shrink-0`}
     >
-      {label}
+      <button
+        type="button"
+        onClick={() => {
+          const next = !absolute;
+          setAbsolute(next);
+          try {
+            localStorage.setItem(KEY, next ? '1' : '0');
+          } catch { /* private mode: the choice just does not persist */ }
+          onToggle?.(next);
+        }}
+        className="cursor-pointer"
+      >
+        {label}
+      </button>
     </time>
   );
 }
