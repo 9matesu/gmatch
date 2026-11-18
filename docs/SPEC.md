@@ -397,13 +397,18 @@ heat streak). Each +5% click power. Persist across prestige.
 
 ## 10d. P2P Swarm & Blind Courier Presence (ARCHITECTURE-P2P.md)
 
-- **The courier is the node each client is connected to** (since 2026-11-07 there
-  is no hosted service of any kind: every packaged app runs its own node, and
-  that node is the directory, the mail relay and the swarm rendezvous). A node is
-  strictly a blind, zero-knowledge forwarder for its clients: it
-  holds no profiles, presence, posts or media, only sealed envelopes and relayed
-  swarm frames. All legacy central routes (`/api/users/online`, `/api/posts`,
-  `/api/objects`, `/api/signal/*`) intentionally 404.
+- **Two kinds of node, one codebase** (`serve.ts` decides with `SITE_SERVICES`):
+  - **Full node** (the default: every packaged install; `mode: "legacy"` in
+    `/api/health`). It stores the world it serves — profiles, posts, objects,
+    presence — and is the directory, the mail relay and the swarm rendezvous
+    for its clients. `/api/users/online`, `/api/posts`, `/api/objects/:id` and
+    `/api/signal/*` exist and answer a signed request.
+  - **Courier** (`SITE_SERVICES` set: the Pages rendezvous). Blind and
+    zero-knowledge: it holds only sealed envelopes and relayed swarm frames,
+    and every route outside its allowlist 404s at the edge.
+  The older text here ("a node holds no profiles or posts, those routes 404")
+  described the COURIER only. Read as the packaged node it was false, and it
+  would have argued for deleting routes that work.
 - **A peer on another node is reachable:** the signed presence beacon carries the node
   URL the peer is connected to, and a sealed envelope addressed to that peer is dropped
   into THAT node's mailbox (the node still cannot open it). The client learns the other
@@ -601,7 +606,7 @@ what it lives in.
     with friends. There is no hosted world to dial (nothing hosted is in the
     loop since 2026-11-07), so a packaged build with no stored mode starts
     its own node.
-  - **client** (opt-in in Settings → Server): talks to someone else's node —
+  - **client** (opt-in in the Servers page): talks to someone else's node —
     a friend's machine or any `http(s)://host[:port]` the user was given
     (validated, applied on relaunch). `gmatch_SERVER_URL` env overrides both.
     There is **no fallback to a hosted default**: a machine with no node and no
@@ -616,7 +621,7 @@ what it lives in.
     keeps it as the destination, silence pauses it
     (`pausedReason:'unreachable'`). Either way the launch runs the bundled node
     instead of showing an empty world, `server:state` carries
-    `pausedUrl`/`pausedReason`, and Settings → Server explains it with Reconnect
+    `pausedUrl`/`pausedReason`, and the Servers page explains it with Reconnect
     (health-probed, writes `v:2`) / Forget it; Servers shows the same notice.
     Nothing is deleted and no hostname blacklist exists to drift out of date.
     The renderer applies the same standard to its own stored base

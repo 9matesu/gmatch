@@ -15,9 +15,12 @@ client is connected to**: it serves a signed public-node directory and a
 sealed-mail relay, with no content tables, no accounts and no presence. It is
 not a world, never a data base.
 
-A node is still a *blind, stateless courier* for its own clients: it holds no
-user profiles, no presence, no posts, no feeds and no media objects. It only
-moves sealed envelopes and relays swarm frames.
+A packaged install runs a **full node**: it stores the world it serves
+(profiles, posts, objects, presence) and is the directory, the mail relay and
+the swarm rendezvous for its clients. The **courier** is the same code with
+`SITE_SERVICES` set (the Pages rendezvous): blind and stateless, holding only
+sealed envelopes and relayed swarm frames, with every other route 404 at the
+edge. The two are one codebase with one env flag, not two deployments.
 
 The courier role moved from "one central host" to "the node each client is
 connected to":
@@ -26,8 +29,8 @@ connected to":
         +-------------------------+            +-------------------------+
         |      Node A (you)       |            |      Node B (friend)    |
         |  bundled Bun, :8790     |            |  bundled Bun, :8790     |
-        |  blind courier for its  |            |  blind courier for its  |
-        |  own clients            |            |  own clients            |
+        |  full node: world +    |            |  full node: world +    |
+        |  relay for its clients|            |  relay for its clients|
         +-------------------------+            +-------------------------+
              ^          |                             ^          |
    sealed mail |        | presence beacon              |        | presence beacon
@@ -47,7 +50,9 @@ node's mailbox — the node still cannot open it.
 1. **Blind Courier Relay (`/api/mail/:token` & `/api/mail/ws`):**
    - The courier only handles sealed binary envelopes (`Envelope v2`) addressed by 64-hex BLAKE3 delivery tokens.
    - The courier learns nothing about the sender's identity, the message body, or the routing kind.
-   - Deliberately returns `404 Not Found` for legacy central endpoints: `/api/users/online`, `/api/posts`, `/api/objects`, and `/api/signal/*`.
+   - In COURIER mode it deliberately returns `404 Not Found` for the legacy central
+     endpoints (`/api/users/online`, `/api/posts`, `/api/objects`, `/api/signal/*`);
+     a FULL node serves them to signed clients.
    - A node whose WebSocket is unavailable (a relay behind a proxy that drops upgrades) offers the HTTP mailbox only, so `MailClient` polls that origin every 20 s instead of opening `/api/mail/ws`.
 
 2. **Ephemeral Presence Discovery:**
@@ -714,7 +719,7 @@ The same plan bounded the last four session-lifetime collections:
 
 ## 5. Honest Boundaries & Fallback Behavior
 
-| Feature | Courier (Render) | Peer Node (Client) |
+| Feature | Courier mode (Pages) | Full node (packaged) |
 | :--- | :--- | :--- |
 | **User Accounts / Passwords** | None (Zero knowledge) | Self-generated Ed25519/X25519 Identity in local DPAPI / localStorage |
 | **Media / Content Storage** | 404 (None stored) | Stored in local IndexedDB; seeded over WebRTC DataChannel |
