@@ -10,6 +10,7 @@ import { useNow } from '../hooks/useNow';
 import { playPress, playLike } from '../utils/sounds';
 import { ObjectImage } from './ObjectImage';
 import CachedImg from '../ui/CachedImg';
+import { logger } from '../utils/logger'
 import {
   Heart,
   X,
@@ -313,7 +314,9 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
       if (res.ok) {
         toast('Story liked! +10 g$', 'success');
       }
-    } catch {}
+    } catch (err) {
+      logger.warn('[GMatchStories] POST /api/likes/:id failed', err)
+    }
   };
 
   const formatTimeAgo = (dateStr?: string) => {

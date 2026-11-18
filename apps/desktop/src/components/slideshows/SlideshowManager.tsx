@@ -7,6 +7,7 @@ import type { OrbitIdentity } from '@orbit/crypto';
 import type { OrbitObject } from '@orbit/shared';
 import type { FeedPost } from '../feed/GMatchFeed';
 import { SlideshowPlayer, type ResolvedItem } from './SlideshowPlayer';
+import { logger } from '../../utils/logger'
 import {
   Play,
   Trash2,
@@ -141,7 +142,9 @@ export function SlideshowManager({
         toast?.('Slideshow deleted', 'info');
         load();
       }
-    } catch { }
+    } catch (err) {
+      logger.warn('[SlideshowManager] DELETE /api/slideshows/:id failed', err)
+    }
   };
 
   const play = async (s: SlideshowSummary) => {

@@ -1009,7 +1009,9 @@ export default function Home() {
             setActiveHacks(data.active_hacks);
           }
         }
-      } catch { }
+      } catch (err) {
+        logger.warn('[App] GET /api/users/hacks/active failed', err)
+      }
     };
 
     pollHacks();
@@ -1900,7 +1902,9 @@ export default function Home() {
     try {
       await orbitFetch(`/api/posts/${postId}`, { method: 'DELETE' }, identity)
       setServerPosts(prev => prev.filter(p => p.id !== postId))
-    } catch { }
+    } catch (err) {
+      logger.warn('[App] POST /api/report failed', err)
+    }
   }, [identity])
 
   // ─── Publish media (camera snapshots / in-feed creator) as a public post ───
@@ -2750,7 +2754,9 @@ export default function Home() {
           // Cap matches the server's own 200-row ceiling (routes/objects.ts),
           // so a warm boot can render the whole tray while we revalidate.
           localStorage.setItem('orbit_cached_stories', JSON.stringify(list.slice(0, 200)))
-        } catch {}
+        } catch (err) {
+          logger.warn('[App] GET /api/objects/stories failed', err)
+        }
       })
       .catch(err => {
         logger.error(err)
@@ -3437,7 +3443,9 @@ export default function Home() {
           a.click()
           URL.revokeObjectURL(url)
         }
-      } catch { }
+      } catch (err) {
+        logger.warn('[App] GET /api/objects/:id failed', err)
+      }
     }
   }
 
@@ -3459,7 +3467,9 @@ export default function Home() {
           URL.revokeObjectURL(url)
           count++
         }
-      } catch { }
+      } catch (err) {
+        logger.warn('[App] GET /api/objects/:id failed', err)
+      }
     }
     setBatchDownloading(false)
     toast(`Downloaded ${count} cards.`, 'success')
@@ -4692,7 +4702,9 @@ export default function Home() {
             a.download = `${item.id.substring(0, 8)}.jpg`
             a.click()
             URL.revokeObjectURL(a.href)
-          } catch { }
+          } catch (err) {
+            logger.warn('[App] GET /api/objects/:id failed', err)
+          }
         }}
         onCopyImageLink={(id) => {
           // Public share page for this object — openable anywhere.
@@ -4706,7 +4718,9 @@ export default function Home() {
             await orbitFetch(`/api/inbox/${item.id}/remove`, { method: 'POST' }, identity!)
             toast('Removed from inbox', 'success')
             loadGallery()
-          } catch { }
+          } catch (err) {
+            logger.warn('[App] GET /api/objects/:id failed', err)
+          }
         }}
         onReportUser={(id, name) => openReportModal(id, name)}
         onReportItem={(ownerId, ownerName, objectId) => openReportModal(ownerId, ownerName, objectId)}

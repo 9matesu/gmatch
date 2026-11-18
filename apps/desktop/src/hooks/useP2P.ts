@@ -641,7 +641,9 @@ export function useP2P(identity: OrbitIdentity | null) {
         const res = await orbitFetch('/api/ws-ticket', { method: 'POST' }, identity);
         const json = await res.json().catch(() => null);
         ticket = json && typeof json.ticket === 'string' ? json.ticket : null;
-      } catch {}
+      } catch (err) {
+        logger.warn('[useP2P] POST /api/ws-ticket failed', err)
+      }
       if (socket.readyState !== WebSocket.OPEN) return;
       if (ticket) {
         socket.send(JSON.stringify({ type: 'auth', ticket }));
@@ -972,7 +974,9 @@ export function useP2P(identity: OrbitIdentity | null) {
         for (const message of mapped) byId.set(message.id, message)
         return Array.from(byId.values()).sort((a, b) => a.timestamp - b.timestamp).slice(-100)
       })
-    } catch {}
+    } catch (err) {
+      logger.warn('[useP2P] GET /api/lobby/chat failed', err)
+    }
   }, [identity])
 
   useEffect(() => {
@@ -1145,7 +1149,9 @@ export function useP2P(identity: OrbitIdentity | null) {
       try {
         const safe = chatMessages.slice(-100);
         localStorage.setItem('orbit_chat_messages', JSON.stringify(safe));
-      } catch {}
+      } catch (err) {
+        logger.warn('[useP2P] POST /api/lobby/chat failed', err)
+      }
     }
   }, [chatMessages]);
 

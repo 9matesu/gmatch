@@ -327,7 +327,9 @@ export function useLobby({
         } else if (res.status === 404) {
           setSpectatingSnapshot((prev) => prev ? { ...prev, status: 'ended' } : null)
         }
-      } catch {}
+      } catch (err) {
+        logger.warn('[useLobby] GET /api/lobby/match/:id/spectate failed', err)
+      }
     }, 1500)
     return () => clearInterval(id)
   }, [identity, spectatingMatchId])
@@ -650,7 +652,9 @@ export function useLobby({
       try {
         const body = await res.json()
         if (body && typeof body.error === 'string') error = body.error
-      } catch {}
+      } catch (err) {
+        logger.warn('[useLobby] POST /api/lobby/match/:id/decision failed', err)
+      }
       refresh()
       return { ok: false, status: res.status, error }
     },

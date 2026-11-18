@@ -310,7 +310,9 @@ export function BabecockPanel({
       if (res.ok) {
         setInvites((prev) => prev.filter((i) => i.id !== inviteId))
       }
-    } catch { }
+    } catch (err) {
+      logger.warn('[BabecockPanel] POST /api/babecock/:id/invite failed', err)
+    }
   }
 
   // Promote a finished round's OP picture to the caller's public feed.

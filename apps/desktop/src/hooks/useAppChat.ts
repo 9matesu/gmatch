@@ -39,6 +39,7 @@ import { resolveDisplayName, UNKNOWN_NAME } from '../utils/displayName'
 import type { toNameRoster } from '../utils/displayName'
 import type { MainViewType } from '../components/home/CommandIsland'
 
+import { logger } from '../utils/logger'
 const DM_SEEN_KEY = 'gmatch_dm_seen_v1';
 const ROOM_SEEN_KEY = 'gmatch_room_seen_v1';
 const LAST_DM_PEER_KEY = 'gmatch_last_dm_peer_v1';
@@ -877,7 +878,9 @@ export function useAppChat(ctx: AppChatContext) {
         body: JSON.stringify({ reason: 'Reported from DM' }),
       }, identity)
       toast('Message reported', 'info')
-    } catch { }
+    } catch (err) {
+      logger.warn('[useAppChat] POST /api/pm/:id/report failed', err)
+    }
   }, [identity, toast])
 
   const reportPmUser = useCallback(async (userId: string) => {
@@ -889,7 +892,9 @@ export function useAppChat(ctx: AppChatContext) {
         body: JSON.stringify({ user_id: userId, reason: 'Reported from DM' }),
       }, identity)
       toast('User reported', 'info')
-    } catch { }
+    } catch (err) {
+      logger.warn('[useAppChat] POST /api/pm/:id/report failed', err)
+    }
   }, [identity, toast])
 
   /** Delete from this device. Courier rows become tombstones so a re-pulled
@@ -965,7 +970,9 @@ export function useAppChat(ctx: AppChatContext) {
       })
       loadPmThreads()
       loadPmUnreadCount()
-    } catch { }
+    } catch (err) {
+      logger.warn('[useAppChat] DELETE /api/pm/threads/:id failed', err)
+    }
   }, [identity, courierActive, courierThreadFor, courierRemove, stampDmSeen, loadPmThreads, loadPmUnreadCount])
 
   const loadPmHistory = useCallback(async (peerId: string, beforeTimestamp: string): Promise<boolean> => {
@@ -1305,7 +1312,9 @@ export function useAppChat(ctx: AppChatContext) {
     try {
       await orbitFetch(`/api/groups/${groupId}/leave`, { method: 'POST' }, identity)
       loadChatGroups()
-    } catch { }
+    } catch (err) {
+      logger.warn('[useAppChat] POST /api/groups/:id/leave failed', err)
+    }
   }, [identity, loadChatGroups])
 
   useEffect(() => {

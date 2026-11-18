@@ -6,6 +6,7 @@ import { playChime } from '../utils/sounds'
 import type { OrbitIdentity } from '@orbit/crypto'
 import type { OrbitObject } from '@orbit/shared'
 
+import { logger } from '../utils/logger'
 export function IdleOverlay({ items, identity, onExit }: {
   items: OrbitObject[]
   identity: OrbitIdentity
@@ -31,7 +32,9 @@ export function IdleOverlay({ items, identity, onExit }: {
           const blob = await res.blob()
           const url = URL.createObjectURL(blob)
           urls.set(item.id, url)
-        } catch {}
+        } catch (err) {
+          logger.warn('[IdleOverlay] GET /api/objects/:id failed', err)
+        }
       }
     }
     const workers = Array.from({ length: limit }, () => worker())

@@ -8,6 +8,7 @@ import { localHeldMediaUrl } from '../utils/localMedia';
 import { MediaBadge } from './MediaBadge';
 import { ObjectImage } from './ObjectImage';
 
+import { logger } from '../utils/logger'
 interface IdentityLike {
   orbitId: string;
   publicKeyHex: string;
@@ -219,7 +220,9 @@ export function CardZoomModal({
                     const url = URL.createObjectURL(blob)
                     window.open(url, '_blank', 'noopener,noreferrer')
                     setTimeout(() => URL.revokeObjectURL(url), 60_000)
-                  } catch { }
+                  } catch (err) {
+                    logger.warn('[CardZoomModal] request failed', err)
+                  }
                 })()
               }}
               className="glass-action h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer"

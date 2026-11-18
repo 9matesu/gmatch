@@ -22,6 +22,7 @@ import { QueueControls } from './lobby/QueueControls'
 import { CardTile } from './home/CardTile'
 import { openCardDetail } from '../utils/openCard'
 
+import { logger } from '../utils/logger'
 type IdentityLike = OrbitIdentity | null;
 
 interface Props {
@@ -70,7 +71,9 @@ const selfId = identity?.orbitId || ''
           const data = await res.json()
           setLeague(data.league || [])
         }
-      } catch { }
+      } catch (err) {
+        logger.warn('[LobbyPanel] GET /api/lobby/league failed', err)
+      }
     }
     loadLeague()
     const id = setInterval(loadLeague, 15000)

@@ -43,6 +43,7 @@ import { groupMessagesByDay } from '../../utils/chatDays';
 import { searchThread } from '../../utils/dmSearch';
 import { UNKNOWN_NAME } from '../../utils/displayName';
 
+import { logger } from '../../utils/logger'
 export interface PeerInfo {
   orbitId: string;
   name?: string;
@@ -465,7 +466,9 @@ export function GMatchDMs({
           onBackToThreads?.();
         }
       }
-    } catch {}
+    } catch (err) {
+      logger.warn('[GMatchDMs] DELETE /api/pm/threads/:id failed', err)
+    }
     setDeleteThreadPeerId(null);
   };
 
@@ -485,7 +488,9 @@ export function GMatchDMs({
           scrollEl.scrollTop = scrollEl.scrollHeight - prevHeight;
         }
       });
-    } catch {}
+    } catch (err) {
+      logger.warn('[GMatchDMs] DELETE /api/pm/threads/:id failed', err)
+    }
     setLoadingHistory(false);
   };
 

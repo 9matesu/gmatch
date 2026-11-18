@@ -9,6 +9,7 @@ import { computeCardRarity, formatGc } from '@orbit/shared'
 import { MediaBadge } from './MediaBadge'
 import { ObjectImage } from './ObjectImage'
 import { playPress } from '../utils/sounds'
+import { logger } from '../utils/logger'
 import {
   X,
   ZoomIn,
@@ -213,7 +214,9 @@ export function ImageViewer({
         a.click()
         document.body.removeChild(a)
       }
-    } catch {}
+    } catch (err) {
+      logger.warn('[ImageViewer] GET /api/objects/:id failed', err)
+    }
   }
 
   const handleCopyLink = () => {
@@ -223,7 +226,9 @@ export function ImageViewer({
       navigator.clipboard.writeText(imageUrl)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
-    } catch {}
+    } catch (err) {
+      logger.warn('[ImageViewer] GET /api/objects/:id failed', err)
+    }
   }
 
   return (
