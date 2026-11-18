@@ -56,6 +56,28 @@ import { vaultPin, vaultBridge } from '../../services/vault';
 function siblingMimesFor(post: FeedPost): string[] {
   return Array.isArray(post.media) ? post.media.map((m) => m.mime_type) : [];
 }
+
+/**
+ * A locally-held object (vault / swarm / magnet / urn) rather than an http URL.
+ * One regex instead of eight startsWith calls per row per render.
+ */
+const OBJECT_URL_RE = /^(?:\/api\/objects\/|vault:|magnet:|urn:sha256:|p2p-)/;
+
+/**
+ * Video detection is pure per (mime, url, media), so it is computed once per
+ * row and reused. The CPU profile showed isVideoPost -> isVideoPageUrl (a
+ * URL parse per call) as one of the three hottest functions in the timeline.
+ */
+const videoCache = (() => {
+  const cache = new WeakMap<FeedPost, boolean>();
+  return (post: FeedPost): boolean => {
+    const hit = cache.get(post);
+    if (hit !== undefined) return hit;
+    const value = isVideoPost(post.mime_type, post.url, siblingMimesFor(post));
+    cache.set(post, value);
+    return value;
+  };
+})();
 import { orbitFetch, postShareUrl } from '../../utils/api';
 import { GAME_AD_TEMPLATES } from '../../utils/gameAds';
 import { ExploreSearchModal } from './ExploreSearchModal';
@@ -1076,8 +1098,8 @@ function GMatchFeedImpl({
             // post has been opened (inline expansion or lightbox).
             const postCommentCount = Math.max(post.comment_count ?? 0, postComments.length);
             const authorHasStory = storyOwners.has(post.author_id);
-            const isObjectMedia = post.url.includes('/api/objects/') || post.url.startsWith('vault://') || !post.url || post.url.startsWith('magnet:') || post.url.startsWith('urn:sha256:') || post.url.startsWith('p2p-');
-            const isVideo = isVideoPost(post.mime_type, post.url, siblingMimesFor(post));
+            const isObjectMedia = OBJECT_URL_RE.test(post.url || '');
+            const isVideo = videoCache(post);
            const isNewPost = animatedPostIds.has(post.id);
            const multiMedia = Array.isArray(post.media) && post.media.length > 1 ? post.media : null;
             const currentIdx = multiMedia ? Math.min(Math.max(0, mediaIdx[post.id] || 0), multiMedia.length - 1) : 0;
