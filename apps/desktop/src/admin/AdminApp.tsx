@@ -403,7 +403,7 @@ export default function AdminPageClient({ identity: appIdentity }: { identity?: 
             <button
               type="submit"
               disabled={verifyingPin || !pin.trim()}
-              className="w-full py-2 bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text font-bold text-xs rounded-md uppercase tracking-wider transition-colors disabled:opacity-40 cursor-pointer shadow-[0_4px_12px_rgba(159,227,255,0.15)]"
+              className="w-full py-2 bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text font-bold text-xs rounded-md uppercase tracking-wider transition-colors disabled:opacity-40 cursor-pointer"
             >
               {verifyingPin ? "Verifying..." : "Unlock Admin Console"}
             </button>

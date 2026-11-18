@@ -30,7 +30,7 @@ export function FlashOverlay({
 
   return (
     <div className="fixed inset-0 z-[var(--z-lightbox)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-orbit-fade-in">
-      <div className="relative max-w-md w-full rounded-xl overflow-hidden border-4 border-warning shadow-[0_0_80px_rgba(250,204,21,0.45)]">
+      <div className="relative max-w-md w-full rounded-xl overflow-hidden border-4 border-warning">
         <div className="absolute top-0 inset-x-0 bg-gradient-to-b from-black/80 to-transparent p-3 z-10 flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
             {flash.pfp_url ? (

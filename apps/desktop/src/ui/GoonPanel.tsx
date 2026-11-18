@@ -375,7 +375,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
 
   const critFlashEl = critFlash && (
     <div className="pointer-events-none absolute inset-0 z-[10] flex items-center justify-center bg-danger/5 backdrop-blur-[1px] animate-[gg-crit_0.35s_ease-out_forwards]">
-      <div className="flex items-center gap-2 rounded-xl border border-danger/0 bg-retro-bg/90 px-6 py-2.5 font-mono text-xl font-black tracking-widest text-danger-fg shadow-[0_0_40px_rgba(244,63,94,0.4)]">
+      <div className="flex items-center gap-2 rounded-xl border border-danger/0 bg-retro-bg/90 px-6 py-2.5 font-mono text-xl font-black tracking-widest text-danger-fg">
         <Lightning className="h-5 w-5 text-danger-fg" weight="fill" />
         CRITICAL HIT!
       </div>
@@ -400,7 +400,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
 
   const koPopEl = koPop && (
     <div className="pointer-events-none absolute inset-0 z-[11] flex items-center justify-center">
-      <div className="animate-orbit-pop flex items-center gap-2 rounded-2xl border border-edge bg-black/85 px-8 py-3 font-mono text-3xl font-black tracking-widest text-retro-fg shadow-[0_0_50px_rgba(244,63,94,0.5)]">
+      <div className="animate-orbit-pop flex items-center gap-2 rounded-2xl border border-edge bg-black/85 px-8 py-3 font-mono text-3xl font-black tracking-widest text-retro-fg">
         <Skull className="h-7 w-7 text-danger-fg" weight="fill" />
         KO
       </div>
@@ -845,7 +845,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
         )}
         {heatLive && (
           <span
-            className={`${MONO} inline-flex min-w-0 shrink items-center gap-1.5 whitespace-nowrap rounded-lg border border-warning/0 bg-warning/5 px-2.5 py-1 text-xs font-black text-warning-fg shadow-[0_0_12px_rgba(245,158,11,0.2)]${reduceMotion ? '' : ' animate-pulse'}`}
+            className={`${MONO} inline-flex min-w-0 shrink items-center gap-1.5 whitespace-nowrap rounded-lg border border-warning/0 bg-warning/5 px-2.5 py-1 text-xs font-black text-warning-fg${reduceMotion ? '' : ' animate-pulse'}`}
             title={`Heat combo: ${heatStreak} rapid clicks. X${heat} click power`}
             aria-label={`Heat combo x${heat}`}
           >

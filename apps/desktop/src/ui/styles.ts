@@ -55,14 +55,14 @@ export const STAGE_FRAME =
 export const HP_BAR =
   'h-1.5 overflow-hidden rounded-full border border-edge bg-surface-canvas/80 shadow-inner'
 export const HP_FILL =
-  'h-full rounded-full bg-gradient-to-r from-pink-500 to-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)] transition-[width] duration-[120ms] ease-linear'
+  'h-full rounded-full bg-gradient-to-r from-pink-500 to-rose-500 transition-[width] duration-[120ms] ease-linear'
 export const HP_FILL_LOW =
-  'from-amber-500 to-orange-500 shadow-[0_0_8px_rgba(245,158,11,0.5)] animate-[gg-hp-low_0.7s_ease-in-out_infinite]'
+  'from-amber-500 to-orange-500 animate-[gg-hp-low_0.7s_ease-in-out_infinite]'
 
 /** Floating +GP popup. Refined tabular figures with clean drop shadow. */
 export const FLOAT_GC =
-  'pointer-events-none absolute z-[10] animate-[gg-float-up_0.9s_ease-out_forwards] text-sm font-bold text-success-fg font-mono drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] [transform:translate(-50%,-50%)]'
-export const FLOAT_GC_CRIT = 'text-xl text-warning-fg font-black drop-shadow-[0_0_8px_rgba(252,211,77,0.6)]'
+  'pointer-events-none absolute z-[10] animate-[gg-float-up_0.9s_ease-out_forwards] text-sm font-bold text-success-fg font-mono drop- [transform:translate(-50%,-50%)]'
+export const FLOAT_GC_CRIT = 'text-xl text-warning-fg font-black drop-'
 
 /** Full-bleed feed image (was .goon-image). */
 export const GOON_IMAGE = 'block h-full w-full object-contain'

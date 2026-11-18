@@ -979,7 +979,7 @@ export default function IdleGalleryView({
                     )
                     e.dataTransfer.effectAllowed = 'copy'
                   }}
-                  className={`group relative aspect-square rounded-[10px] border bg-retro-bg shadow-[0_4px_10px_rgba(0,0,0,0.5)] cursor-grab active:cursor-grabbing ${
+                  className={`group relative aspect-square rounded-[10px] border bg-retro-bg cursor-grab active:cursor-grabbing ${
                     openMenuId === img.id ? 'z-30' : 'overflow-hidden'
                   } ${
                     isSelected

@@ -288,7 +288,7 @@ export function CommandIsland({
               aria-haspopup={onPickMedia ? 'dialog' : undefined}
               aria-expanded={onPickMedia ? postPickerOpen : undefined}
               title="Create a post — hover or click for the media picker"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-retro-accent text-retro-accent-text hover:bg-retro-accent-hover hover:-translate-y-0.5 hover:shadow-[0_6px_18px_-6px_var(--color-retro-accent)] active:scale-95 active:translate-y-0 transition-all text-xs font-bold tracking-wide"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-retro-accent text-retro-accent-text hover:bg-retro-accent-hover hover:-translate-y-0.5 hover: active:scale-95 active:translate-y-0 transition-all text-xs font-bold tracking-wide"
             >
               <Plus className="w-3.5 h-3.5" weight="bold" />
               <span className="hidden sm:inline">Post</span>
