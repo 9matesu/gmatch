@@ -80,6 +80,20 @@
   --text-2xs: 0.625rem;
   --text-2xs--line-height: 1.5;
 
+  /* Status roles: one hue per job, two values. The base carries tints and
+     borders; the -fg value is what text wears, and it flips in the light
+     theme (a light tint on a white page is a rumour). Before this, 869
+     palette classes (red, rose, amber, emerald, cyan, purple...) did the job
+     with no name and no light-theme answer. */
+  --color-danger: #ef4444;
+  --color-danger-fg: #fca5a5;
+  --color-warning: #f59e0b;
+  --color-warning-fg: #fcd34d;
+  --color-success: #10b981;
+  --color-success-fg: #34d399;
+  --color-info: #06b6d4;
+  --color-info-fg: #67e8f9;
+
   /* Hairline borders and highlights */
   --color-border-glass: #27272a;
   --color-border-subtle: #1f1f23;
@@ -107,7 +121,7 @@
   --color-chrome-mint: #3fb950;
 
   /* Text hierarchy. Contrast measured on --color-retro-bg (#09090b), not eyeballed:
-     fg 17:1 · body 11:1 · muted 5.8:1 · faint 4.6:1.
+   fg 15.9:1, body 9.3:1, muted 6.9:1, faint 4.7:1 (measured on #f2f2f4).
      `faint` is the floor: anything below it is decoration, never a label. */
   --color-retro-fg: #fafafa;
   --color-retro-body: #d4d4d8;
@@ -1537,7 +1551,13 @@ html.theme-light body {
   --color-retro-fg: #18181b;
   --color-retro-body: #3f3f46;
   --color-retro-muted: #52525b;
-  --color-retro-faint: #82828b;
+  /* 4.71:1 on the canvas (the old #82828b measured 3.41:1, below the 4.5
+     floor this block claims). Status roles were not flipped at all: green
+     and amber sat at ~2.5:1 on white. */
+  --color-retro-faint: #6b6b75;
+  --color-retro-online: #1a7f37;
+  --color-retro-warning: #8a5a00;
+  --color-retro-error: #cf222e;
 
   /* The accent inverts: black pill, white text (it was white-on-black). */
   --color-retro-accent: #18181b;
@@ -1545,6 +1565,16 @@ html.theme-light body {
   --color-retro-accent-text: #ffffff;
   --color-hud-accent: #18181b;
   --color-hud-accent-hover: #000000;
+
+  /* The same roles, dark enough to read on a light page. */
+  --color-danger: #dc2626;
+  --color-danger-fg: #b91c1c;
+  --color-warning: #d97706;
+  --color-warning-fg: #92400e;
+  --color-success: #059669;
+  --color-success-fg: #047857;
+  --color-info: #0891b2;
+  --color-info-fg: #155e75;
 
   /* The ladder inverted: dark enough to read on a white card. */
   --color-rarity-common: #52525b;
