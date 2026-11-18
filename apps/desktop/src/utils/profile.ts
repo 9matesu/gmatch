@@ -78,7 +78,7 @@ export async function saveUserProfile(
  */
 const REMOVED_TAGS_KEY = 'orbit_tags_removed_v1';
 
-export function readRemovedProfileTags(): string[] {
+function readRemovedProfileTags(): string[] {
   try {
     if (typeof window === 'undefined' || typeof localStorage === 'undefined') return [];
     const raw = localStorage.getItem(REMOVED_TAGS_KEY);

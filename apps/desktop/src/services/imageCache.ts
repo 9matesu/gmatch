@@ -41,10 +41,6 @@ function bridge(): Bridge | null {
   }
 }
 
-// Session RAM store removed — main process handles caching via encrypted disk.
-// ponytail: dev mode has no cache; acceptable since Electron bridge owns it in prod.
-export const SESSION_CAP = 0
-
 // Destroy the legacy IndexedDB store once per session (fire-and-forget).
 let idbCleanupStarted = false
 function destroyLegacyIdb(): void {

@@ -12,7 +12,7 @@ export function isVideoUrl(url: string): boolean {
 
 /** Long-form video threshold: short mp4/webm loops (redgifs gifs) stay,
  *  only videos with duration metadata above this are dropped. */
-export const LONG_VIDEO_SEC = 90
+const LONG_VIDEO_SEC = 90
 
 function durationSec(post: BooruPost): number | null {
   const r = post as unknown as Record<string, unknown>
@@ -30,7 +30,7 @@ function durationSec(post: BooruPost): number | null {
 
 /** True only when duration metadata proves a long-form video (> LONG_VIDEO_SEC).
  *  Duration-less mp4/webm (redgifs loops, realbooru clips) are NOT long. */
-export function isLongVideo(post: BooruPost): boolean {
+function isLongVideo(post: BooruPost): boolean {
   if (!/\.(mp4|webm)(?:[?#]|$)/i.test(post.url)) return false
   if (typeof post.id === 'string' && post.id.startsWith('rg-')) return false
   const secs = durationSec(post)

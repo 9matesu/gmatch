@@ -31,7 +31,7 @@ export interface PresenceBeacon {
   sig?: string
 }
 
-export const PRESENCE_TTL_MS = 90_000 // 90 seconds
+const PRESENCE_TTL_MS = 90_000 // 90 seconds
 
 function randomHex(bytesLen: number): string {
   const bytes = new Uint8Array(bytesLen)

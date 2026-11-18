@@ -58,7 +58,7 @@ export const TAB_REGISTRY: TabConfig[] = [
   },
 ];
 
-export function getTabConfig(tabId: TabId): TabConfig | undefined {
+function getTabConfig(tabId: TabId): TabConfig | undefined {
   return TAB_REGISTRY.find(t => t.id === tabId);
 }
 

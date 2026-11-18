@@ -85,8 +85,8 @@ const TIMEOUT_MS = 3_500
 const HTML_TIMEOUT_MS = 8_000
 
 /** View-page (gallery) expansion bounds: capped lanes, exact file URLs. */
-export const VIEW_POST_CAP = 6
-export const VIEW_POST_LANES = 3
+const VIEW_POST_CAP = 6
+const VIEW_POST_LANES = 3
 
 /**
  * Hard budget for ONE feed round.
@@ -243,7 +243,7 @@ function writeSeen(): void {
 }
 
 /** Flush the pending seen-set immediately (page hide / app close). */
-export function flushSeen(): void {
+function flushSeen(): void {
   if (!seenTimer) return
   clearTimeout(seenTimer)
   seenTimer = null
@@ -1437,7 +1437,7 @@ function withRedgifsQueryTags(posts: BooruPost[], query: string): BooruPost[] {
 /** Galleries expanded per gallery-source round; lanes expanded in parallel. */
 const GALLERY_CAP = 6
 const GALLERY_LANES = 3
-export async function babesourceDirect(
+async function babesourceDirect(
   query: string,
   limit: number,
   budget?: RoundBudget,

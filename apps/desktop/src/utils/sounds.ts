@@ -38,7 +38,7 @@ export function throttled<T extends (...a: never[]) => unknown>(
   }) as unknown as T;
 }
 
-export const MUTE_KEY = '***';
+const MUTE_KEY = '***';
 
 export function isAudioMuted(): boolean {
   try { return localStorage.getItem(MUTE_KEY) === 'true'; } catch { return false; }
@@ -67,7 +67,7 @@ function ensureCtx(): AudioContext | null {
  * Atonal click: very short noise-based rimshot click with NO tonal oscillator,
  * at a subtle, comfortable lower volume.
  */
-export function playAtonalClick(gainVol = 0.12, duration = 0.025) {
+function playAtonalClick(gainVol = 0.12, duration = 0.025) {
   const audio = ensureCtx();
   if (!audio) return;
   const now = audio.currentTime;
@@ -112,7 +112,7 @@ export function playPress(_freq?: number) {
 }
 
 /** Short rimshot click (atonal noise crack, lower volume, no tonal oscillator) */
-export function playRimshot() {
+function playRimshot() {
   playAtonalClick(0.15, 0.032);
 }
 
@@ -176,7 +176,7 @@ export function playLike() {
 }
 
 /** Low descending buzz for reject */
-export function playReject() {
+function playReject() {
   const audio = ensureCtx();
   if (!audio) return;
   const now = audio.currentTime;
@@ -223,7 +223,7 @@ export const playWin = playMatch;
 export const playMatchFound = playMatch;
 
 /** Rising cascade for Tier Advance */
-export function playTierUp() {
+function playTierUp() {
   const audio = ensureCtx();
   if (!audio) return;
   const now = audio.currentTime;
@@ -247,7 +247,7 @@ export function playTierUp() {
 }
 
 /** Clock tick */
-export function playCountdown() {
+function playCountdown() {
   const audio = ensureCtx();
   if (!audio) return;
   const now = audio.currentTime;
@@ -266,7 +266,7 @@ export function playCountdown() {
 }
 
 /** Heavy warning thud */
-export function playTimeout() {
+function playTimeout() {
   const audio = ensureCtx();
   if (!audio) return;
   const now = audio.currentTime;

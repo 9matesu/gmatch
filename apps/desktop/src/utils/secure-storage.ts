@@ -184,7 +184,7 @@ async function drain(): Promise<void> {
 }
 
 /** Await all queued writes (used by tests + beforeunload). */
-export async function flushWrites(): Promise<void> {
+async function flushWrites(): Promise<void> {
   while (pending.size) await drain()
 }
 

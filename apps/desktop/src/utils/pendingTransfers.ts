@@ -8,7 +8,7 @@
  * Bytes are only accepted after hash verification (see p2pSwarm).
  */
 
-export const PENDING_TRANSFERS_KEY = 'gmatch_pending_transfers_v1';
+const PENDING_TRANSFERS_KEY = 'gmatch_pending_transfers_v1';
 const MAX_PENDING_TRANSFERS = 128
 const MAX_TRANSFER_ID_LENGTH = 256
 const MAX_ATTEMPTS = 1000

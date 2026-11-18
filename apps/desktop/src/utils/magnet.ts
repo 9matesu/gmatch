@@ -2,7 +2,7 @@
  * Canonical WebTorrent / BitTorrent Magnet URI helpers
  */
 
-export const PUBLIC_WEBTORRENT_TRACKERS = [
+const PUBLIC_WEBTORRENT_TRACKERS = [
   'wss://tracker.openwebtorrent.com',
   'wss://tracker.btorrent.xyz',
   'wss://tracker.webtorrent.dev',

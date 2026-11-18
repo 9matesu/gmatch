@@ -13,7 +13,7 @@
  */
 
 export const DM_SEARCH_MAX_INDEX = 5_000
-export const DM_SEARCH_MAX_RESULTS = 50
+const DM_SEARCH_MAX_RESULTS = 50
 
 export interface SearchableMessage {
   id: string

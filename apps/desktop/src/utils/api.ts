@@ -108,7 +108,7 @@ export function resolveLiveApiBase(): string {
 }
 
 /** Fired after a client-to-client switch commits, so effects re-subscribe. */
-export const API_BASE_CHANGED_EVENT = 'gmatch-api-base-changed'
+const API_BASE_CHANGED_EVENT = 'gmatch-api-base-changed'
 
 export function notifyApiBaseChanged(base: string): void {
   try {

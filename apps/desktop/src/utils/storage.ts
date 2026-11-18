@@ -78,7 +78,7 @@ export interface StoredSwarmReceipt {
 }
 
 /** Receipt store bound: matches the in-memory cap in p2pSwarm. */
-export const MAX_STORED_RECEIPTS = 256
+const MAX_STORED_RECEIPTS = 256
 
 /** Distinct custody holders remembered per object (matches the in-session
  *  bound in p2pSwarm). */

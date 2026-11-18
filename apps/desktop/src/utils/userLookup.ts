@@ -27,15 +27,3 @@ export function findUserById(
   if (!id) return undefined;
   return users.find((u) => u.id === id);
 }
-
-/**
- * O(1) lookup for the directory.
- *
- * The directory is capped at 200 rows but is scanned inside feed renders, so
- * the linear version was O(rows × items) per render pass.
- */
-export function buildUserIndex(users: readonly User[]): Map<string, User> {
-  const index = new Map<string, User>();
-  for (const u of users) index.set(u.id, u);
-  return index;
-}

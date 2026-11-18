@@ -320,7 +320,7 @@ export function registerLocalObject(id: string, blob: Blob, meta: LocalObjectMet
 }
 
 /** Register and confirm persistence before reporting an object as received. */
-export async function persistLocalObject(id: string, blob: Blob, meta: LocalObjectMeta = {}): Promise<void> {
+async function persistLocalObject(id: string, blob: Blob, meta: LocalObjectMeta = {}): Promise<void> {
   if (!id || !blob || blob.size < 1 || blob.size > SWARM_MAX_OBJECT_BYTES) throw new Error('Invalid local object')
   const previous = localObjects.get(id)
   rememberLocalObject(id, blob)

@@ -105,7 +105,7 @@ function bumpAttempts(objectId: string): void {
   writeAll(list);
 }
 
-export function removeOutbox(objectId: string): void {
+function removeOutbox(objectId: string): void {
   writeAll(readAll().filter((e) => e.objectId !== objectId));
 }
 
