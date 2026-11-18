@@ -183,6 +183,8 @@
   --max-h-sheet: 70vh;
   --scale-press: 0.98;
   --scale-press-sm: 0.96;
+  /* Touch floor: the platform minimum for a hit area. */
+  --tap-target: 44px;
   --radius: 6px;
   --radius-sm: 6px;
   --radius-md: 6px;
@@ -508,7 +510,7 @@
 .command-island {
   background: var(--color-glass-strong);
   border: 1px solid var(--color-edge);
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65);
   transition: border-color 150ms ease-out;
   /* Narrow windows: the dock scrolls instead of spilling icons off-screen,
@@ -716,7 +718,7 @@
   border: 0;
   background: transparent;
   color: var(--color-retro-muted);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   transition: background 120ms ease, color 120ms ease;
   cursor: pointer;
 }
@@ -936,7 +938,7 @@
 }
 ::-webkit-scrollbar-thumb {
   background: rgba(245, 247, 250, 0.12);
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
 }
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(245, 247, 250, 0.2);
@@ -964,7 +966,7 @@
 }
 .styled-scrollbar::-webkit-scrollbar-thumb {
   background: rgba(245, 247, 250, 0.12);
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
 }
 .styled-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(245, 247, 250, 0.2);
@@ -983,7 +985,7 @@
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: rgba(245, 247, 250, 0.12);
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(245, 247, 250, 0.2);
@@ -1454,14 +1456,14 @@ html[data-motion="on"] {
 
   button,
   [role="button"] {
-    min-height: 44px;
+    min-height: var(--tap-target);
     touch-action: manipulation;
   }
 
   input,
   textarea,
   select {
-    min-height: 44px;
+    min-height: var(--tap-target);
   }
 
   .module {
