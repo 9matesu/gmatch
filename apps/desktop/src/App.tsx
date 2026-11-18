@@ -25,6 +25,7 @@ import { usePeerFeedPosts } from './hooks/usePeerFeedPosts'
 import type { ChatMessage } from "./hooks/useP2P";
 import { mergeMyCards, filterToActiveDeck, galleryItemVisible, type CanonicalCard } from "./utils/cardCollection";
 import { outboxStatesByGroup } from "./services/postOutbox";
+import { localFeedPosts } from "./utils/localFeed";
 import { buildMirrorRow } from "./utils/galleryMirror";
 import { collectConfigBundle, applyConfigBundle, applyStashFromBundle, parseConfigBundle, configDownloadFilename, bundleToString } from "./utils/configBackup";
 import { runMigrations } from "./utils/migration";
@@ -1266,6 +1267,15 @@ export default function Home() {
     return p
   }, [])
 
+  // The outbox is durable storage, not state: bump a counter when it changes
+  // so a post that is still local/pending appears (and updates) without a reload.
+  const [outboxTick, setOutboxTick] = useState(0)
+  useEffect(() => {
+    const bump = () => setOutboxTick((n) => n + 1)
+    window.addEventListener('gmatch:post-outbox-changed', bump)
+    return () => window.removeEventListener('gmatch:post-outbox-changed', bump)
+  }, [])
+
   const feedPosts: FeedPost[] = useMemo(() => {
     // Real public posts from the server feed
     const serverVisible = serverPosts
@@ -1273,6 +1283,11 @@ export default function Home() {
         (p) => !deletedPostIds.has(p.id)
       )
       .map(normalizeFeedPost);
+    // My durable posts the node has not echoed back yet (see utils/localFeed).
+    const serverIds = new Set(serverVisible.map((p) => p.id));
+    const localPending = localFeedPosts(identity, myProfile.displayName).filter(
+      (p) => !serverIds.has(p.id) && !deletedPostIds.has(p.id),
+    );
     // Public posts: both own uploaded public posts and peer public posts received via P2P
     const seenServerIds = new Set(serverVisible.map((p) => p.id));
     const localPublicPosts: FeedPost[] = items
@@ -1361,8 +1376,8 @@ export default function Home() {
       (p) => !deletedPostIds.has(p.id) && !seenServerIds.has(p.id),
     );
 
-    return [...optimisticVisible, ...pinnedVisible, ...peerVisible, ...serverVisible, ...repostedPosts, ...localPublicPosts, ...myProfileVisible];
-  }, [items, profilePics, identity, myProfile, repostedPosts, archivedPostIds, deletedPostIds, serverPosts, normalizeFeedPost, users, optimisticPosts, pinnedPosts, peerFeedPosts, myProfilePosts]);
+    return [...optimisticVisible, ...localPending, ...pinnedVisible, ...peerVisible, ...serverVisible, ...repostedPosts, ...localPublicPosts, ...myProfileVisible];
+  }, [items, profilePics, identity, myProfile, repostedPosts, archivedPostIds, deletedPostIds, serverPosts, normalizeFeedPost, users, optimisticPosts, outboxTick, pinnedPosts, peerFeedPosts, myProfilePosts]);
 
   const feedPostsRef = useRef<FeedPost[]>(feedPosts)
   useEffect(() => { feedPostsRef.current = feedPosts }, [feedPosts])
