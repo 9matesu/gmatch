@@ -1,4 +1,5 @@
 
+import { useStories } from "./hooks/useStories";
 import { useIdentity } from "./hooks/useIdentity";
 import { getSecureItem, setSecureItem } from './utils/secure-storage'
 import { useSettings } from "./hooks/useSettings";
@@ -1103,6 +1104,8 @@ export default function Home() {
   const [lobbyLightboxUrl, setLobbyLightboxUrl] = useState<string | null>(null)
   const [selectedProfileUser, setSelectedProfileUser] = useState<User | null>(null)
 
+  const { stories, setStories, storiesLoading, loadStories } = useStories(identity);
+
   // One overlay at a time: a profile opened from a post lightbox dismisses
   // the lightbox, so the two never stack (and the profile can sit on the
     // shared modal layer instead of floating above the whole app).
@@ -1163,25 +1166,6 @@ export default function Home() {
   const [gallerySort, setGallerySort] = useState<'newest' | 'oldest' | 'likes' | 'score'>('newest');
   const [batchDownloading, setBatchDownloading] = useState(false);
   const [transferProgress, setTransferProgress] = useState<string | null>(null);
-  const [stories, setStories] = useState<OrbitObject[]>(() => {
-    try {
-      const saved = localStorage.getItem('orbit_cached_stories');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  })
-  // Stale-first: the boot mirror above is real data, so a revalidating fetch
-  // must NOT blank the tray. Loading starts true only when we have nothing to
-  // show, which is what makes the tray pop in empty on every cold start.
-  const [storiesLoading, setStoriesLoading] = useState(() => {
-    try {
-      return !localStorage.getItem('orbit_cached_stories')
-    } catch {
-      return true
-    }
-  })
-  const storiesRequestRef = useRef(0)
   const [showStoryModal, setShowStoryModal] = useState(false)
   const [showCreateCardModal, setShowCreateCardModal] = useState(false)
   const [createCardNeeded, setCreateCardNeeded] = useState(0)
@@ -2736,33 +2720,6 @@ export default function Home() {
   }, [identity, updateSettings, toast, myProfile.displayName]);
 
 
-  const loadStories = useCallback(() => {
-    if (!identity) return Promise.resolve()
-    const requestId = ++storiesRequestRef.current
-    const requestIdentity = identity.orbitId
-    setStoriesLoading(true)
-    return orbitFetch('/api/objects/stories', {}, identity)
-      .then(async res => {
-        if (!res.ok) throw new Error(await res.text())
-        return res.json()
-      })
-      .then((data: OrbitObject[]) => {
-        if (requestId !== storiesRequestRef.current || requestIdentity !== identity.orbitId) return
-         const list = Array.isArray(data) ? data : []
-         setStories(list)
-        try {
-          // Cap matches the server's own 200-row ceiling (routes/objects.ts),
-          // so a warm boot can render the whole tray while we revalidate.
-          localStorage.setItem('orbit_cached_stories', JSON.stringify(list.slice(0, 200)))
-        } catch (err) {
-          logger.warn('[App] GET /api/objects/stories failed', err)
-        }
-      })
-      .catch(err => {
-        logger.error(err)
-      })
-      .finally(() => setStoriesLoading(false))
-  }, [identity, users])
 
   const loadCards = useCallback(() => {
     if (!identity) return Promise.resolve()
