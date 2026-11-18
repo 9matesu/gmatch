@@ -1027,6 +1027,7 @@ const registerNotifyHandlers = require("./ipc/notify.cjs")
 const registerAppHandlers = require("./ipc/app.cjs")
 const registerDominationMediaHandlers = require("./ipc/domination-media.cjs")
 const registerBooruHandlers = require("./ipc/booru.cjs")
+const registerUpdateHandlers = require("./ipc/update.cjs")
 const notify = registerNotifyHandlers({
   ipcMain, app, mainLog,
   getTray: () => appTray,
@@ -1350,13 +1351,11 @@ app.whenReady().then(async () => {
       },
     })
   }
-  ipcMain.handle('update:check', () => (updater ? updater.check(true) : { phase: 'unsupported', current: app.getVersion() }))
-  ipcMain.handle('update:state', () => (updater ? updater.getState() : { phase: 'unsupported', current: app.getVersion() }))
-  ipcMain.handle('update:install', () => {
-    if (!updater) return { ok: false, error: 'updates only work in packaged builds' }
-    // The swap script restarts the app: that is a real quit, not a close.
-    isQuitting = true
-    return updater.install()
+  // Update IPC (Settings): the updater is created above (packaged only).
+  registerUpdateHandlers({
+    ipcMain, app,
+    getUpdater: () => updater,
+    onInstall: () => { isQuitting = true },
   })
   // Topology: packaged builds default to HOST mode (bundled Bun sidecar,
   // fully local — no Render required). Client mode (friend's node or central
