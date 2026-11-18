@@ -1,4 +1,5 @@
 
+import { usePagination } from "./hooks/usePagination";
 import { useCardForge } from "./hooks/useCardForge";
 import { useBatchDownload } from "./hooks/useBatchDownload";
 import { useStories } from "./hooks/useStories";
@@ -1157,7 +1158,6 @@ export default function Home() {
     }
   }, [openProfileById])
 
-  const [galleryPage, setGalleryPage] = useState(0);
   const [gallerySort, setGallerySort] = useState<'newest' | 'oldest' | 'likes' | 'score'>('newest');
   const [transferProgress, setTransferProgress] = useState<string | null>(null);
   const [showStoryModal, setShowStoryModal] = useState(false)
@@ -3358,14 +3358,11 @@ export default function Home() {
   const { showCoffee, triggerReason, dismiss: dismissCoffee } = useCoffeeGate(playtimeMs, matchesTotal)
   const [manualCoffeeOpen, setManualCoffeeOpen] = useState(false)
 
-  const totalPages = Math.max(1, Math.ceil(filteredItems.length / ITEMS_PER_PAGE))
-  const paginatedItems = useMemo(() => {
-    return filteredItems.slice(galleryPage * ITEMS_PER_PAGE, (galleryPage + 1) * ITEMS_PER_PAGE)
-  }, [filteredItems, galleryPage])
-
-  useEffect(() => {
-    setGalleryPage(0)
-  }, [galleryFilter])
+  const { page: galleryPage, setPage: setGalleryPage, totalPages, pageItems: paginatedItems } = usePagination(
+    filteredItems,
+    ITEMS_PER_PAGE,
+    galleryFilter,
+  )
 
   
 
