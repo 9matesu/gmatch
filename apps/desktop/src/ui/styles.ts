@@ -16,9 +16,6 @@ export const MONO = 'font-mono tabular-nums'
 /** Small uppercase-muted helper text (was .muted). */
 export const MUTED = 'text-xs text-retro-muted'
 
-/** Display face for headings/labels — the shell's sans (Outfit). */
-export const DISPLAY = 'font-sans'
-
 /** Panel surface — unified solid-panel glass card. */
 export const PLATE = 'rounded-lg border border-edge solid-panel'
 
@@ -38,14 +35,6 @@ export const BTN_SMALL = 'rounded-lg px-2.5 py-1 text-xs'
  *  BTN's white one and the button renders white-on-white. */
 export const BTN_PRIMARY =
   'bg-retro-accent text-retro-accent-text! hover:bg-retro-accent-hover border-transparent font-bold'
-
-/** Destructive prestige action. */
-export const BTN_DANGER =
-  'bg-retro-error/15 border-retro-error/40 text-retro-error hover:bg-retro-error/25'
-
-/** Bundled skin behind an inline backgroundImage. */
-export const SKIN =
-  'bg-cover bg-center bg-no-repeat [text-shadow:0_1px_3px_#000]'
 
 /** Feed stage frame: canvas well with hairline border. */
 export const STAGE_FRAME =

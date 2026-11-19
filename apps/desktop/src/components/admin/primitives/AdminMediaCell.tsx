@@ -125,29 +125,3 @@ export function AdminMediaCell({
     </div>
   );
 }
-
-interface AdminRowMediaProps {
-  id?: string;
-  contentUrl?: string | null;
-  mimeType?: string | null;
-  identity?: OrbitIdentity | null;
-  onZoom: (url: string, isVideo: boolean, title: string, subtitle: string) => void;
-  title?: string;
-  subtitle?: string;
-  className?: string;
-}
-
-export function AdminRowMedia({ id, contentUrl, mimeType, identity, onZoom, title, className }: AdminRowMediaProps) {
-  return (
-    <AdminMediaCell
-      id={id}
-      contentUrl={contentUrl}
-      mimeType={mimeType}
-      identity={identity}
-      onZoom={onZoom}
-      size="md"
-      title={title || "Media"}
-      className={className}
-    />
-  );
-}

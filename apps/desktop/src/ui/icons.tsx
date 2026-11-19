@@ -21,12 +21,6 @@ function Base({ size = 14, children, ...rest }: P & { children: React.ReactNode 
   )
 }
 
-export const IconRefresh = (p: P) => (
-  <Base {...p}>
-    <path d="M20 12a8 8 0 1 1-2.3-5.6M20 3v4h-4" />
-  </Base>
-)
-
 export const IconWallpaper = (p: P) => (
   <Base {...p}>
     <rect x="2" y="5" width="20" height="14" rx="2" />

@@ -20,7 +20,7 @@ import {
   readTurnEnv,
   type PeerMeshConnection,
 } from '../courierSignaling';
-import { infoHashHex, infoHashWindow } from './infohash';
+import { infoHashWindow } from './infohash';
 import { exchangeHello, localFingerprint, type Signer } from './hello';
 import {
   addPeer,
@@ -310,9 +310,4 @@ export async function startMesh(opts: MeshOptions): Promise<MeshHandle> {
       }
     },
   };
-}
-
-/** The day's infohash, for the UI ("mesh id" is not a secret). */
-export async function meshInfoHash(communityKey: string): Promise<string> {
-  return infoHashHex(communityKey);
 }

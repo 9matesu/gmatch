@@ -26,7 +26,6 @@ export const LOBBY_ROUND_RESULT_SECONDS = 3;
 // Stories and active lobby images last 7 hours, while cards/portfolios persist eternally.
 // Lobby chat is capped at 12 hours.
 export const PICTURE_WIPE_SECONDS = 7 * 60 * 60;
-export const CHAT_WIPE_SECONDS = 12 * 60 * 60;
 export const STORY_TTL_SECONDS = 7 * 60 * 60;
 export const PICTURE_TTL_SECONDS = 7 * 60 * 60;
 
