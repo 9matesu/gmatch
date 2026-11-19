@@ -7,6 +7,7 @@ import { useState, useCallback, useEffect } from "react";
 import { Flag, MessageSquare, Ban, ChevronDown, ChevronUp, Maximize2, CheckCircle2, UserCheck } from "lucide-react";
 import { cn } from "../../../lib/utils";
 import { AdminMediaThumbnail } from "../AdminMediaThumbnail";
+import { SubTabBar } from "../SubTabBar";
 import { resolveMediaUrl } from "../../../utils/media";
 import { formatAbsoluteTime } from "../../../utils/timeAgo";
 import type { AdminReport, AdminLobbyComment, AdminChatMessage, AdminUser, TableParams, OrbitIdentity } from "../../../utils/adminTypes";
@@ -313,39 +314,14 @@ export function ModerationTab({ identity, pinVerified, onZoom, onAction }: Moder
         </div>
       </div>
 
-      {/* Subtab Navigation */}
-      <div className="flex flex-wrap gap-1 bg-surface-raised border border-edge rounded-xl p-1">
-        {subTabs.map(tab => {
-          const Icon = tab.icon;
-          const active = activeSubTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveSubTab(tab.id)}
-              className={cn(
-                "px-3 py-1.5 text-xs font-bold rounded-lg transition flex items-center gap-1.5 cursor-pointer",
-                active
-                  ? "bg-retro-accent text-retro-accent-text shadow-sm"
-                  : "text-retro-muted hover:text-retro-fg"
-              )}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {tab.label}
-              {tab.id === "reports" && reportsTotal > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 bg-danger/20 text-danger-fg rounded-full text-2xs">
-                  {reportsTotal}
-                </span>
-              )}
-              {tab.id === "bans" && bansTotal > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 bg-glass-w10 text-retro-muted rounded-full text-2xs">
-                  {bansTotal}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      <SubTabBar
+        tabs={subTabs.map((t) => ({
+          ...t,
+          badge: t.id === "reports" ? reportsTotal : t.id === "bans" ? bansTotal : null,
+        }))}
+        active={activeSubTab}
+        onChange={(id) => setActiveSubTab(id as SubTab)}
+      />
 
       {/* Subtab 1: Reports & Cases */}
       {activeSubTab === "reports" && (

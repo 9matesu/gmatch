@@ -13,6 +13,7 @@ import {
 import { cn } from "../../../lib/utils";
 import { formatAbsoluteTime } from "../../../utils/timeAgo";
 import { AdminMediaThumbnail } from "../AdminMediaThumbnail";
+import { SubTabBar } from "../SubTabBar";
 import type {
   AdminPost,
   AdminLobbyImage,
@@ -207,34 +208,14 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
         </div>
       </div>
 
-      {/* Subtab Navigation */}
-      <div className="flex flex-wrap gap-1 bg-surface-raised border border-edge rounded-xl p-1">
-        {subTabs.map(tab => {
-          const Icon = tab.icon;
-          const active = activeSubTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveSubTab(tab.id)}
-              className={cn(
-                "px-3 py-1.5 text-xs font-bold rounded-lg transition flex items-center gap-1.5 cursor-pointer",
-                active
-                  ? "bg-retro-accent text-retro-accent-text shadow-sm"
-                  : "text-retro-muted hover:text-retro-fg"
-              )}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {tab.label}
-              {tab.id === "matches" && matches.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 bg-chrome-lav/20 text-chrome-lav rounded-full text-2xs">
-                  {matches.length} live
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      <SubTabBar
+        tabs={subTabs.map((t) => ({
+          ...t,
+          badge: t.id === "matches" && matches.length > 0 ? matches.length : null,
+        }))}
+        active={activeSubTab}
+        onChange={(id) => setActiveSubTab(id as SubTab)}
+      />
 
       {/* Subtab 1: Public Posts & Lobby Board (NO Private Content) */}
       {activeSubTab === "posts_lobby" && (

@@ -12,6 +12,7 @@ import {
   BarChart2,
 } from "lucide-react";
 import { cn } from "../../../lib/utils";
+import { SubTabBar } from "../SubTabBar";
 import { formatAbsoluteTime } from "../../../utils/timeAgo";
 import type { OrbitIdentity } from "@orbit/crypto";
 import type { AdminAuditEntry, AdminDailyStat } from "../../../utils/adminTypes";
@@ -168,29 +169,11 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
         </div>
       </div>
 
-      {/* Subtab Navigation */}
-      <div className="flex flex-wrap gap-1 bg-surface-raised border border-edge rounded-xl p-1">
-        {subTabs.map(section => {
-          const Icon = section.icon;
-          const active = activeSubTab === section.id;
-          return (
-            <button
-              key={section.id}
-              type="button"
-              onClick={() => setActiveSubTab(section.id)}
-              className={cn(
-                "px-3 py-1.5 text-xs font-bold rounded-lg transition flex items-center gap-1.5 cursor-pointer",
-                active
-                  ? "bg-retro-accent text-retro-accent-text shadow-sm"
-                  : "text-retro-muted hover:text-retro-fg"
-              )}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {section.label}
-            </button>
-          );
-        })}
-      </div>
+      <SubTabBar
+        tabs={subTabs}
+        active={activeSubTab}
+        onChange={(id) => setActiveSubTab(id as SubTab)}
+      />
 
       {/* Subtab 1: Platform Settings */}
       {activeSubTab === "platform" && (
