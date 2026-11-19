@@ -1,20 +1,15 @@
 "use client";
 
-import { useEffect, useState } from 'react'
 import { generateFallbackName } from '@orbit/shared'
 import type { PostComment } from '../components/feed/GMatchFeed'
-import {
-  OPERATION_LOG_CHANGED_EVENT,
-  sharedSocialOperationLog,
-  type LoggedOperation,
-} from '../services/socialOperationLog'
+import type { LoggedOperation } from '../services/socialOperationLog'
 import {
   projectComments,
   projectReactions,
   reactionKey,
   type ProjectedComment,
 } from '../services/socialInteractionProjection'
-import { PEER_ONLINE_EVENT } from '../utils/p2pSwarm'
+import { usePeerProjection } from './usePeerProjection'
 
 /**
  * Peer-replicated comments (roadmap L5.2, read half).
@@ -60,25 +55,9 @@ export function peerCommentsByPost(
 
 /** Peer comments per post id, refreshed whenever the operation log changes. */
 export function usePeerCommentsByPost(selfId?: string | null): Map<string, PostComment[]> {
-  const [comments, setComments] = useState<Map<string, PostComment[]>>(new Map())
-  useEffect(() => {
-    let alive = true
-    const refresh = () => {
-      void sharedSocialOperationLog()
-        .listAllOperations()
-        .then((entries) => {
-          if (alive) setComments(peerCommentsByPost(entries, selfId))
-        })
-        .catch(() => { /* IndexedDB unavailable: no peer comments */ })
-    }
-    refresh()
-    window.addEventListener(OPERATION_LOG_CHANGED_EVENT, refresh)
-    window.addEventListener(PEER_ONLINE_EVENT, refresh)
-    return () => {
-      alive = false
-      window.removeEventListener(OPERATION_LOG_CHANGED_EVENT, refresh)
-      window.removeEventListener(PEER_ONLINE_EVENT, refresh)
-    }
-  }, [selfId])
-  return comments
+  return usePeerProjection<Map<string, PostComment[]>>(
+    (entries) => peerCommentsByPost(entries, selfId),
+    selfId,
+    new Map(),
+  )
 }
