@@ -23,9 +23,15 @@ import { PEER_ONLINE_EVENT } from '../utils/p2pSwarm'
  */
 export function usePeerProjection<T>(
   read: (entries: readonly LoggedOperation[]) => T,
-  selfId?: string | null,
-  /** Reset to this value while there is no identity (instead of an empty read). */
-  empty: T = undefined as T,
+  selfId: string | null | undefined,
+  /**
+   * The value held while there is no identity. Required on purpose: it used to
+   * default to `undefined as T`, which type-checks for ANY T while lying about
+   * the type — a caller that forgot it would get `undefined` back and only find
+   * out at runtime. Making it a required argument turns that omission into a
+   * compile error.
+   */
+  empty: T,
 ): T {
   const [value, setValue] = useState<T>(empty)
 
