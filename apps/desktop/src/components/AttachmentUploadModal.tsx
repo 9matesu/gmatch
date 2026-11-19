@@ -5,6 +5,7 @@ import { orbitFetch } from '../utils/api'
 import { CameraCapture } from './CameraCapture'
 import { DropZone } from './DropZone'
 import { contentHash } from '../utils/media'
+import { dataUrlToFile } from '../utils/mediaData'
 import { useCropper } from '../hooks/useCropper'
 import { isCropableImage } from './CropModal'
 import { forgeMediaLocally } from '../services/mediaForge'
@@ -107,19 +108,12 @@ export function AttachmentUploadModal({
     if (!trimmed) return
     setUrlInput(trimmed)
     setError(null)
-    if (trimmed.startsWith('data:')) {
-      try {
-        const [meta, b64] = trimmed.split(',')
-        const mime = (meta.match(/data:([^;]+)/) || [])[1] || 'image/jpeg'
-        const bin = atob(b64)
-        const bytes = new Uint8Array(bin.length)
-        for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i)
-        const file = new File([bytes], `attachment-${Date.now()}.jpg`, { type: mime })
-        fileRef.current = file
-        setHasFile(true)
-        setPreview(trimmed)
-        return
-      } catch { }
+    const dataFile = dataUrlToFile(trimmed, `attachment-${Date.now()}.jpg`)
+    if (dataFile) {
+      fileRef.current = dataFile
+      setHasFile(true)
+      setPreview(trimmed)
+      return
     }
     fileRef.current = null
     setHasFile(false)
@@ -159,14 +153,9 @@ export function AttachmentUploadModal({
       const recipientStr = recipientList.length > 0 ? recipientList.join(',') : undefined
 
       if (file || (preview && preview.startsWith('data:'))) {
-        let payloadFile = file
-        if (!payloadFile && preview && preview.startsWith('data:')) {
-          const [meta, b64] = preview.split(',')
-          const mime = (meta.match(/data:([^;]+)/) || [])[1] || 'image/jpeg'
-          const bin = atob(b64)
-          const bytes = new Uint8Array(bin.length)
-          for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i)
-          payloadFile = new File([bytes], `attachment-${Date.now()}.jpg`, { type: mime })
+        let payloadFile: File | null = file ?? null
+        if (!payloadFile && preview) {
+          payloadFile = dataUrlToFile(preview, `attachment-${Date.now()}.jpg`)
         }
         if (payloadFile) {
           // Zero-media P2P path: seed into swarm + register metadata (no 422).
@@ -190,14 +179,9 @@ export function AttachmentUploadModal({
         form.append('image', file, file.name || `attachment-${Date.now()}.jpg`)
       } else if (link) {
         form.append('url', link)
-      } else if (preview && preview.startsWith('data:')) {
-        const [meta, b64] = preview.split(',')
-        const mime = (meta.match(/data:([^;]+)/) || [])[1] || 'image/jpeg'
-        const bin = atob(b64)
-        const bytes = new Uint8Array(bin.length)
-        for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i)
-        const f = new File([bytes], `attachment-${Date.now()}.jpg`, { type: mime })
-        form.append('image', f)
+      } else {
+        const f = preview ? dataUrlToFile(preview, `attachment-${Date.now()}.jpg`) : null
+        if (f) form.append('image', f)
       }
 
       form.append('content_hash', await contentHash(file || new File([], '')))

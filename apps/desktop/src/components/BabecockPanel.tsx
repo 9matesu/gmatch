@@ -5,6 +5,7 @@ import { type BabecockRound, type BabecockEntry, type BabecockInvite, type User 
 import { orbitFetch } from '../utils/api'
 import { ObjectImage } from './ObjectImage'
 import { resolveMediaUrl } from '../utils/media'
+import { dataUrlToFile } from '../utils/mediaData'
 import { useToast } from './Toast'
 import { userFacingError } from '../utils/userError'
 import { DropZone } from './DropZone'
@@ -209,19 +210,12 @@ export function BabecockPanel({
     const trimmed = url.trim()
     if (!trimmed) return
     setUrlInput(trimmed)
-    if (trimmed.startsWith('data:')) {
-      try {
-        const [meta, b64] = trimmed.split(',')
-        const mime = (meta.match(/data:([^;]+)/) || [])[1] || 'image/jpeg'
-        const bin = atob(b64)
-        const bytes = new Uint8Array(bin.length)
-        for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i)
-        const file = new File([bytes], `babecock-paste-${Date.now()}.jpg`, { type: mime })
-        fileRef.current = file
-        setHasFile(true)
-        setPreview(trimmed)
-        return
-      } catch { }
+    const dataFile = dataUrlToFile(trimmed, `babecock-paste-${Date.now()}.jpg`)
+    if (dataFile) {
+      fileRef.current = dataFile
+      setHasFile(true)
+      setPreview(trimmed)
+      return
     }
     fileRef.current = null
     setHasFile(false)
@@ -246,14 +240,9 @@ export function BabecockPanel({
         }
       } else if (link) {
         form.append('url', link)
-      } else if (preview && preview.startsWith('data:')) {
-        const [meta, b64] = preview.split(',')
-        const mime = (meta.match(/data:([^;]+)/) || [])[1] || 'image/jpeg'
-        const bin = atob(b64)
-        const bytes = new Uint8Array(bin.length)
-        for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i)
-        const f = new File([bytes], `babecock-${Date.now()}.jpg`, { type: mime })
-        form.append('image', f)
+      } else {
+        const f = preview ? dataUrlToFile(preview, `babecock-${Date.now()}.jpg`) : null
+        if (f) form.append('image', f)
       }
 
       const endpoint = modal === 'start' ? '/api/babecock/start' : `/api/babecock/${round?.id || ''}/join`

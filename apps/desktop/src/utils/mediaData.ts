@@ -10,6 +10,27 @@ export function dataUrlToBlob(dataUrl: string): Blob {
   return new Blob([bytes], { type: mime })
 }
 
+/**
+ * A `data:` URL pasted by the user, as a File ready for an upload form.
+ *
+ * Six call sites (attachment modal, babecock panel, card forge, crop) each
+ * inlined this same `split(',')` + `atob` + byte-loop decode. It lives here
+ * beside `dataUrlToBlob` so the decode rule is one rule; the caller keeps its
+ * own filename convention.
+ *
+ * Returns null for a non-data URL or an undecodable payload — the caller falls
+ * back to treating the input as a plain link.
+ */
+export function dataUrlToFile(dataUrl: string, fallbackName = `upload-${Date.now()}.jpg`): File | null {
+  if (!dataUrl.startsWith('data:')) return null
+  try {
+    const blob = dataUrlToBlob(dataUrl)
+    return new File([blob], fallbackName, { type: blob.type || 'image/jpeg' })
+  } catch {
+    return null
+  }
+}
+
 // Local (IndexedDB) object blobs are turned into stable, reusable object URLs so
 // they render directly instead of being decoded to garbage text (which produced
 // broken `file://`/relative requests on the front page). One URL per object id.

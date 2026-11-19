@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { dataUrlToBlob, localObjectBlobUrl } from './mediaData';
+import { dataUrlToBlob, dataUrlToFile, localObjectBlobUrl } from './mediaData';
 
 describe('dataUrlToBlob', () => {
   it('decodes a base64 data URL and infers the mime type', async () => {
@@ -21,6 +21,33 @@ describe('dataUrlToBlob', () => {
 
   it('decodes video mimes too', () => {
     expect(dataUrlToBlob('data:video/mp4;base64,AAA=').type).toBe('video/mp4');
+  });
+});
+
+/**
+ * The paste-a-data-URL path. Six call sites used to inline this decode; they
+ * all go through dataUrlToFile now, so the behaviour is pinned once here.
+ */
+describe('dataUrlToFile', () => {
+  it('turns a base64 data URL into a File with the declared type', () => {
+    const file = dataUrlToFile('data:image/png;base64,aGVsbG8=', 'x.png');
+    expect(file).not.toBeNull();
+    expect(file!.type).toBe('image/png');
+    expect(file!.name).toBe('x.png');
+  });
+
+  it('honours the caller-supplied filename', () => {
+    const file = dataUrlToFile('data:image/jpeg;base64,YWJj', 'card-123.jpg');
+    expect(file!.name).toBe('card-123.jpg');
+  });
+
+  it('returns null for a plain http(s) link (the caller treats it as a URL)', () => {
+    expect(dataUrlToFile('https://example.com/x.png')).toBeNull();
+  });
+
+  it('returns null for an undecodable payload instead of throwing', () => {
+    expect(() => dataUrlToFile('data:image/png;base64,!!!not-base64!!!')).not.toThrow();
+    expect(dataUrlToFile('data:image/png;base64,!!!not-base64!!!')).toBeNull();
   });
 });
 

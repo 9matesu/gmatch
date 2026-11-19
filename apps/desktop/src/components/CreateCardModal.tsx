@@ -7,6 +7,7 @@ import { DropZone, DND_KEEPSAKE } from './DropZone';
 import { useMediaPicker } from './media/MediaPickerModal';
 import { selectionToFile, type MediaSelection } from './media/picker';
 import { mediaUrlToCachedFile } from '../utils/cacheMedia';
+import { dataUrlToFile } from '../utils/mediaData';
 import { forgeMediaLocally } from '../services/mediaForge';
 import { createCardFromMedia, type CanonicalCard, type CardCreationMetadata } from '../utils/cardCollection';
 import { useCropper } from '../hooks/useCropper';
@@ -165,18 +166,12 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0,
 
   const handlePasteUrl = (value: string) => {
     const trimmed = value.trim()
-    if (trimmed.startsWith('data:')) {
-      try {
-        const [meta, b64] = trimmed.split(',')
-        const mime = (meta.match(/data:([^;]+)/) || [])[1] || 'image/jpeg'
-        const bin = atob(b64)
-        const bytes = new Uint8Array(bin.length)
-        for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i)
-        setFile(new File([bytes], `card-${Date.now()}.jpg`, { type: mime }))
-        setUrl('')
-        setError(null)
-        return
-      } catch { /* fall through to URL handling */ }
+    const dataFile = dataUrlToFile(trimmed, `card-${Date.now()}.jpg`)
+    if (dataFile) {
+      setFile(dataFile)
+      setUrl('')
+      setError(null)
+      return
     }
     setUrl(trimmed)
     setFile(null)
