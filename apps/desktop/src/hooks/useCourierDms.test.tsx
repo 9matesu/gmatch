@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { ReactNode } from 'react'
 import { createElement } from 'react'
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { generateIdentity } from '@orbit/crypto'
 import { seal1to1 } from '@orbit/protocol'
 import { useCourierDms } from './useCourierDms'
@@ -257,5 +257,33 @@ describe('useCourierDms', () => {
     await waitFor(() => expect(r.result.current.isTyping(alice.orbitId)).toBe(false))
     // Typing never becomes chat history.
     expect(r.result.current.threadFor(alice.orbitId)?.some((m) => m.text === '')).toBe(false)
+  })
+
+  it('a failed message is re-sent when that peer comes online', async () => {
+    // The outbox is the store: a message that never left must have a path back.
+    // Presence is the precise trigger — the addressed box is now being read.
+    const box: { value: unknown[] } = { value: [] }
+    const r = renderHook(
+      () => useCourierDms(alice, { fetchImpl: mockFetch(box), webSocketFactory: () => new FakeSocket() }),
+      { wrapper },
+    )
+    await waitFor(() => expect(r.result.current.courierActive).toBe(true))
+    // No peer keys yet: the send fails LOUD and is held locally.
+    const held = (await r.result.current.send(bob.orbitId, 'held until you appear'))!
+    expect(held.status).toBe('failed')
+
+    // Bob becomes addressable and presence fires.
+    r.result.current.registerPeerKeys(bob.orbitId, bob.publicKeyHex, bob.encryptionPubHex)
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('orbit-peer-online', { detail: { peerId: bob.orbitId } }))
+    })
+
+    await waitFor(() => {
+      const m = r.result.current.threadFor(bob.orbitId)?.find((x) => x.id === held.id)
+      expect(m?.status).toBe('sent')
+    })
+    // One row, not two: the replay updates the existing row by id.
+    const mine = (r.result.current.threadFor(bob.orbitId) || []).filter((m) => m.own)
+    expect(mine).toHaveLength(1)
   })
 })

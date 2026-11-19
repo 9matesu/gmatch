@@ -350,10 +350,20 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
     // After the first drain: whatever failed while we were closed is replayed.
     const kick = window.setTimeout(() => { void resendFailed() }, 1_500)
     const onOnline = () => { void resendFailed() }
+    // A specific peer becoming reachable is the precise moment a held message
+    // can land: the sender addressed a box that was not being read, and now it
+    // is. Presence carries the orbitId; the replay is per peer, so a roster of
+    // 50 does not cost 50 full outbox sweeps.
+    const onPeerOnline = (e: Event) => {
+      const peerId = (e as CustomEvent<{ peerId?: string }>).detail?.peerId
+      if (peerId) void resendFailed(peerId)
+    }
     window.addEventListener('online', onOnline)
+    window.addEventListener('orbit-peer-online', onPeerOnline)
     return () => {
       window.clearTimeout(kick)
       window.removeEventListener('online', onOnline)
+      window.removeEventListener('orbit-peer-online', onPeerOnline)
     }
   }, [identity, mode, resendFailed])
 
