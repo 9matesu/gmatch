@@ -46,7 +46,7 @@ export async function hashFileSha256(file: File | Blob): Promise<string> {
  */
 const REGISTER_ATTACH_CAP = 1 * 1024 * 1024
 
-async function attachBytes(file: File, contentHash: string): Promise<Record<string, unknown> | undefined> {
+async function attachBytes(file: File): Promise<Record<string, unknown> | undefined> {
   if (file.size > REGISTER_ATTACH_CAP) return undefined
   const b64 = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
@@ -59,7 +59,11 @@ async function attachBytes(file: File, contentHash: string): Promise<Record<stri
     reader.readAsDataURL(file)
   }).catch(() => '')
   if (!b64) return undefined
-  return { data_base64: b64, data_mime: file.type || 'application/octet-stream', data_hash: contentHash }
+  // No hash travels with the bytes on purpose: the node hashes what it STORES.
+  // The client can only hash the file it holds (pre-crop / pre-metadata-strip),
+  // which legitimately differs from the canonical row bytes - sending it would
+  // make every real post look like a mismatch.
+  return { data_base64: b64, data_mime: file.type || 'application/octet-stream' }
 }
 
 export async function forgeMediaLocally(
@@ -149,7 +153,7 @@ export async function forgeMediaLocally(
     post_group: options.postGroup || null,
     tags: options.tags || null,
     recipients: options.recipients || null,
-    ...(await attachBytes(file, contentHash)),
+    ...(await attachBytes(file)),
   }
 
   const gossipable = (options.isPublic ?? true) && !options.isStory && !options.isAvatar && !options.isChat

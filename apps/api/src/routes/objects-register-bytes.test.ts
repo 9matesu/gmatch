@@ -90,16 +90,41 @@ describe('register carries the bytes it describes', () => {
     expect(new Uint8Array(await res.arrayBuffer())).toEqual(PNG)
   })
 
-  it('bytes that do not match the declared content_hash are refused', async () => {
+  it('the node hashes the bytes it stored, not the client claim', async () => {
+    // The client can only hash the file it holds (pre-crop / pre-strip), which
+    // legitimately differs from the canonical row bytes. Rejecting that pair
+    // dropped the bytes of every real post - the row survived, the picture did
+    // not. So the node recomputes the hash from what it actually stored.
+    const bytes = new Uint8Array(PNG)
+    const { sha256 } = await import('@noble/hashes/sha256')
+    const { bytesToHex } = await import('@noble/hashes/utils')
+    const storedHash = bytesToHex(sha256(bytes))
+
     const res = await register({
-      id: 'bad-hash-1',
+      id: 'stale-hash-1',
       mime_type: 'image/png',
       is_public: 1,
       content_hash: 'a'.repeat(64),
       data_base64: Buffer.from(PNG).toString('base64'),
     })
-    expect(res.status).toBe(400)
-    expect((await res.json()) as { error?: string }).toMatchObject({ error: expect.stringContaining('content_hash') })
+    expect(res.status).toBe(200)
+
+    // The row now addresses ITS OWN bytes: content_hash describes the stored
+    // blob, so the addressable id is derivable from it.
+    const row = await env.DB.prepare(
+      'SELECT content_hash, content_url, size_bytes FROM Objects WHERE id = ?',
+    ).bind('stale-hash-1').first<{ content_hash: string; content_url: string; size_bytes: number }>()
+    expect(row!.content_hash).toBe(storedHash)
+    expect(row!.content_url).toBe('urn:sha256:' + storedHash)
+    expect(row!.size_bytes).toBe(PNG.length)
+
+    // And the bytes are really there: served back byte-for-byte.
+    const getPath = '/api/objects/stale-hash-1'
+    const found = await app.request(getPath, {
+      method: 'GET', headers: signRequestHeaders(owner, 'GET', getPath),
+    }, env)
+    expect(found.status).toBe(200)
+    expect(new Uint8Array(await found.arrayBuffer())).toEqual(PNG)
   })
 
   it('the node stores ciphertext at rest, never the raw bytes', async () => {

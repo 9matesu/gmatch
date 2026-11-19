@@ -133,6 +133,9 @@ objects.post('/register', orbitAuth, async (c) => {
     // with the real length, because the whole point of this path is that the
     // client learns the size from the bytes it sent rather than a claim.
     let sizeBytes = Number(body.size_bytes) || 0
+    // Likewise the hash: when bytes arrive, the row is keyed by the hash of
+    // THOSE bytes, so the addressable id always matches the stored blob.
+    let storedContentHash = contentHash
     const mimeType = (typeof body.mime_type === 'string' && body.mime_type.trim()) || 'application/octet-stream'
     const caption = (typeof body.caption === 'string' && body.caption.trim()) || null
     const postCaption = (typeof body.post_caption === 'string' && body.post_caption.trim()) || null
@@ -148,7 +151,6 @@ objects.post('/register', orbitAuth, async (c) => {
     // hard-blocks them (single source of truth: shared/blocklist.json,
     // editable through desktop Settings).
     const expiresAt = isStory ? new Date(Date.now() + 24 * 3600 * 1000).toISOString() : null
-    const contentUrl = magnetUri || (contentHash ? `urn:sha256:${contentHash}` : `/api/objects/${objectId}`)
     const recipientsRaw = typeof body.recipients === 'string' ? body.recipients : null
 
     // Idempotent retry (Phase 3 outbox): the client reuses its own objectId
@@ -161,24 +163,29 @@ objects.post('/register', orbitAuth, async (c) => {
     // leaving the row blobless forever — is what makes a post readable by
     // anyone but the machine that authored it: without this, `GET /api/objects/:id`
     // answered `bytes missing for row` until the end of time.
+    //
+    // On the hash: `content_hash` names the CANONICAL row bytes (EXIF/metadata
+    // stripped) and the client can only hash the file it holds, so the two
+    // legitimately differ. Rejecting that pair dropped the bytes of every real
+    // post (the row survived, the picture did not). The supplied bytes are
+    // therefore accepted AS the row's bytes and the hash is recomputed from what
+    // was stored, so a row always describes its own blob — which is what
+    // `GET /api/objects/:id` and the by-hash address both read.
     const bodyBytes = await bytesFromBody(c)
     if (bodyBytes) {
       const bytes = new Uint8Array(bodyBytes)
-      const hash = await sha256Hex(bytes)
-      // The declared hash is a promise; the bytes are the truth. A row whose
-      // hash does not match what arrived is a bug on the wire, not something to
-      // store and serve as if it were right.
-      if (!contentHash || contentHash === hash) {
-        // The size recorded on the row must describe the bytes we actually
-        // stored, not what the client claimed before it had them.
-        sizeBytes = bytes.length
-        await c.env.BUCKET?.put(`objects/${objectId}`, encryptBlob(bytes), {
-          httpMetadata: { contentType: mimeType },
-        })
-      } else {
-        return c.json({ error: 'content_hash does not match the supplied bytes' }, 400)
-      }
+      // The size recorded on the row must describe the bytes we actually
+      // stored, not what the client claimed before it had them.
+      sizeBytes = bytes.length
+      storedContentHash = await sha256Hex(bytes)
+      await c.env.BUCKET?.put(`objects/${objectId}`, encryptBlob(bytes), {
+        httpMetadata: { contentType: mimeType },
+      })
     }
+
+    // Computed AFTER the bytes land, so the addressable hash describes the blob
+    // that was actually stored rather than the client's claim about it.
+    const contentUrl = magnetUri || (storedContentHash ? `urn:sha256:${storedContentHash}` : `/api/objects/${objectId}`)
 
     const existing = await c.env.DB.prepare(
       'SELECT id, owner_id, content_hash, content_url, size_bytes, mime_type, is_public, is_avatar FROM Objects WHERE id = ?'
@@ -206,7 +213,7 @@ objects.post('/register', orbitAuth, async (c) => {
     await c.env.DB.prepare(
       'INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_url, caption, is_public, post_caption, location, post_tags, is_story, expires_at, content_hash, post_group, is_chat, is_avatar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(
-      objectId, orbitId, sizeBytes, mimeType, contentUrl, caption, isPublic, postCaption, location, postTags, isStory, expiresAt, contentHash, postGroup, isChat, isAvatar
+      objectId, orbitId, sizeBytes, mimeType, contentUrl, caption, isPublic, postCaption, location, postTags, isStory, expiresAt, storedContentHash, postGroup, isChat, isAvatar
     ).run()
 
     if (recipientsRaw) {
