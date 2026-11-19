@@ -14,7 +14,7 @@ import { ModerationTab } from "./components/tabs/ModerationTab";
 import { UsersTab } from "./components/tabs/UsersTab";
 import { ContentTab } from "./components/tabs/ContentTab";
 import { SettingsTab } from "./components/tabs/SettingsTab";
-import { CardZoomModal } from "../components/CardZoomModal";
+import { ZoomModal, useZoomModal } from "../components/CardZoomModalHost";
 import { TAB_REGISTRY, LEGACY_TAB_MAP, getTabBadge } from "../utils/adminTabs";
 import { useAdminWebSocket } from "../hooks/useAdminWebSocket";
 import type { OrbitIdentity } from "@orbit/crypto";
@@ -76,13 +76,7 @@ export default function AdminPageClient({ identity: appIdentity }: { identity?: 
   });
 
   // Modals
-  const [zoomModal, setZoomModal] = useState<{
-    isOpen: boolean;
-    imageUrl: string | null;
-    isVideo?: boolean;
-    title?: string;
-    subtitle?: string;
-  }>({ isOpen: false, imageUrl: null });
+  const zoom = useZoomModal();
 
   // WebSocket for real-time updates (must be called before any early returns)
   useAdminWebSocket({
@@ -338,8 +332,8 @@ export default function AdminPageClient({ identity: appIdentity }: { identity?: 
   }, [identity, pinVerified, confirm, toast, loadDashboardData]);
 
   const handleZoom = useCallback((url: string, isVideo: boolean, title: string, subtitle: string) => {
-    setZoomModal({ isOpen: true, imageUrl: url, isVideo, title, subtitle });
-  }, []);
+    zoom.showZoom(url, { isVideo, title, subtitle });
+  }, [zoom.showZoom]);
 
   const tabsForLayout = useMemo(() => TAB_REGISTRY.map(tab => ({
     id: tab.id,
@@ -442,17 +436,7 @@ export default function AdminPageClient({ identity: appIdentity }: { identity?: 
       isLoading={loading}
       onSignOut={() => handleAuthError()}
     >
-      {zoomModal.isOpen && zoomModal.imageUrl && (
-        <CardZoomModal
-          isOpen={zoomModal.isOpen}
-          onClose={() => setZoomModal({ isOpen: false, imageUrl: null })}
-          imageUrl={zoomModal.imageUrl}
-          isVideo={zoomModal.isVideo}
-          title={zoomModal.title}
-          subtitle={zoomModal.subtitle}
-          identity={identity}
-        />
-      )}
+      <ZoomModal zoom={zoom} identity={identity} />
 
       {activeTab === "dashboard" && (
         <DashboardTab identity={identity} pinVerified={pinVerified} onZoom={handleZoom} onAction={handleAction} onNavigate={handleTabChange} />

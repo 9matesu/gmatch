@@ -9,7 +9,7 @@ import { useObjectImage } from '../hooks/useObjectImage'
 import { playTierUpOnce, playMatchOnce, playRejectOnce, playTimeoutOnce } from '../utils/sounds'
 import { matchEndSummary } from '../utils/matchEndSummary'
 import { notifyWhenHidden } from '../utils/notifyHidden'
-import { CardZoomModal } from './CardZoomModal'
+import { ZoomModal, useZoomModal } from './CardZoomModalHost'
 import { CardBack } from './CardBack'
 import { CreateCardModal } from './CreateCardModal'
 import { LazyVideo } from './LazyVideo'
@@ -60,10 +60,7 @@ export function YourMatchTab({
     const res = (await onDecide(match.id, decision)) as { payout?: { gp: number; reason: string } } | null | undefined
     if (res && typeof res.payout?.gp === 'number') setLastPayout(res.payout)
   }
-  const [zoomModal, setZoomModal] = useState<{ isOpen: boolean; imageUrl: string | null; title?: string; subtitle?: string }>({
-    isOpen: false,
-    imageUrl: null,
-  })
+  const zoom = useZoomModal()
   const [showCreateCardModal, setShowCreateCardModal] = useState(false)
   const prevKey = useMemo(() => `${match.id}:${match.tier}:${match.last_result}:${match.status}`, [match.id, match.tier, match.last_result, match.status])
   const [lastKey, setLastKey] = useState<string>(prevKey)
@@ -143,9 +140,7 @@ export function YourMatchTab({
             onOpenProfile?.(profileUser)
             return
           }
-          setZoomModal({
-            isOpen: true,
-            imageUrl: img.url,
+          zoom.showZoom(img.url, {
             title: `${label} Card`,
             subtitle: `Tier ${st.tier} · ${opponentName}`,
           })
@@ -166,9 +161,7 @@ export function YourMatchTab({
               onClick={(e) => {
                 e.stopPropagation()
                 if (img?.url) {
-                  setZoomModal({
-                    isOpen: true,
-                    imageUrl: img.url,
+                  zoom.showZoom(img.url, {
                     title: `${label} Card`,
                     subtitle: `Tier ${st.tier} · ${opponentName}`,
                   })
@@ -360,14 +353,7 @@ export function YourMatchTab({
         )}
       </div>
 
-      <CardZoomModal
-        isOpen={zoomModal.isOpen}
-        onClose={() => setZoomModal({ isOpen: false, imageUrl: null })}
-        imageUrl={zoomModal.imageUrl}
-        title={zoomModal.title}
-        subtitle={zoomModal.subtitle}
-        identity={identity}
-      />
+      <ZoomModal zoom={zoom} identity={identity} />
       {showCreateCardModal && identity && (
         <CreateCardModal
           identity={identity}

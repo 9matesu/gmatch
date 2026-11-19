@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import type { MatchSnapshot, OrbitObject, OrbitId } from '@orbit/shared'
 import { Avatar } from './Avatar'
 import { formatCountdown, countdownMs } from '../utils/lobby'
-import { CardZoomModal } from './CardZoomModal'
+import { ZoomModal, useZoomModal } from './CardZoomModalHost'
 import {  formatGc } from '@orbit/shared'
 import { isMediaVideo } from '../utils/media'
 import { ObjectImage } from './ObjectImage'
@@ -46,16 +46,7 @@ export function SpectateModal({
   const [isExpanded, setIsExpanded] = useState(false)
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null)
   const [pipPos, setPipPos] = useState<{ x: number; y: number } | null>(null)
-  const [zoomModal, setZoomModal] = useState<{
-    isOpen: boolean
-    imageUrl: string | null
-    isVideo?: boolean
-    title?: string
-    subtitle?: string
-  }>({
-    isOpen: false,
-    imageUrl: null,
-  })
+  const zoom = useZoomModal()
 
   // Simulated ticking shuffle card animation while players are choosing cards
   const [tickIdx, setTickIdx] = useState(0)
@@ -173,9 +164,7 @@ export function SpectateModal({
     playPress(780)
     if (onOpenItem) onOpenItem(buildViewerItems(), id)
     else
-      setZoomModal({
-        isOpen: true,
-        imageUrl: url,
+      zoom.showZoom(url, {
         isVideo: isMediaVideo(url),
         title: 'Spectator Card Zoom',
         subtitle: `Round ${currentRound}`,
@@ -660,15 +649,7 @@ export function SpectateModal({
         </div>
       </div>
 
-      <CardZoomModal
-        isOpen={zoomModal.isOpen}
-        onClose={() => setZoomModal({ isOpen: false, imageUrl: null })}
-        imageUrl={zoomModal.imageUrl}
-        isVideo={zoomModal.isVideo}
-        title={zoomModal.title}
-        subtitle={zoomModal.subtitle}
-        identity={identity}
-      />
+      <ZoomModal zoom={zoom} identity={identity} />
     </>
   )
 }

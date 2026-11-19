@@ -13,7 +13,7 @@ import {
   playUpload,
 } from '../utils/sounds'
 import type { LobbyDecisionResult, LobbyDecisionFailure } from '../hooks/useLobby'
-import { CardZoomModal } from './CardZoomModal'
+import { ZoomModal, useZoomModal } from './CardZoomModalHost'
 import { computeCardRarity, formatGc, matchEconomy } from '@orbit/shared'
 import { isMediaVideo } from '../utils/media'
 import { CardBack } from './CardBack'
@@ -65,10 +65,7 @@ export function MatchRoundPanel({
   const [localDecidedRound, setLocalDecidedRound] = useState<number | null>(null)
   const [boostsRemaining, setBoostsRemaining] = useState<number>(1)
   const [notices, setNotices] = useState<string[]>([])
-  const [zoomModal, setZoomModal] = useState<{ isOpen: boolean; imageUrl: string | null; isVideo?: boolean; title?: string; subtitle?: string; caption?: string }>({
-    isOpen: false,
-    imageUrl: null,
-  })
+  const zoom = useZoomModal()
   const prevPhase = useRef<string | null>(null)
   const prevMatchId = useRef<string | null>(null)
   const prevRound = useRef<number | null>(null)
@@ -584,9 +581,7 @@ export function MatchRoundPanel({
                     data-rarity={myRarity.rarity}
                     onClick={() => {
                       if (myPlayedImg.url) {
-                        setZoomModal({
-                          isOpen: true,
-                          imageUrl: myPlayedImg.url,
+                        zoom.showZoom(myPlayedImg.url, {
                           isVideo: myPlayedImg.isVideo,
                           title: myTitle,
                           subtitle: `Valuation: ${formatGc(myVal)} · Round ${currentRound}`,
@@ -682,9 +677,7 @@ export function MatchRoundPanel({
                     onClick={() => {
                       const zoomUrl = oppUrl || opponentImg.url
                       if (zoomUrl) {
-                        setZoomModal({
-                          isOpen: true,
-                          imageUrl: zoomUrl,
+                        zoom.showZoom(zoomUrl, {
                           isVideo: opponentImg.isVideo,
                           title: oppTitle,
                           subtitle: `Round ${currentRound}`,
@@ -850,16 +843,7 @@ export function MatchRoundPanel({
       </div>
 
       {/* Fullscreen Card Zoom Lightbox Modal */}
-      <CardZoomModal
-        isOpen={zoomModal.isOpen}
-        onClose={() => setZoomModal({ isOpen: false, imageUrl: null })}
-        imageUrl={zoomModal.imageUrl}
-        isVideo={zoomModal.isVideo}
-        title={zoomModal.title}
-        subtitle={zoomModal.subtitle}
-        caption={zoomModal.caption}
-        identity={identity}
-      />
+      <ZoomModal zoom={zoom} identity={identity} />
     </section>
   )
 }
