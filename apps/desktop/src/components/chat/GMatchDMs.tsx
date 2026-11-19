@@ -256,7 +256,15 @@ export function GMatchDMs({
    */
   const [boundaryAt, setBoundaryAt] = useState<Record<string, number>>({});
   const [highlightedMessage, setHighlightedMessage] = useState<string | null>(null);
-  const [listMode, setListMode] = useState(false);
+  /**
+   * Which of the two mobile panes is showing: the conversation list or the open
+   * conversation. Starts on the LIST on a phone (there is nothing to show yet,
+   * and hiding the list would leave a blank column), and on the conversation from
+   * md up, where both are visible side by side.
+   */
+  const [listMode, setListMode] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth < 768,
+  );
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [actionFor, setActionFor] = useState<string | null>(null);
@@ -762,8 +770,16 @@ export function GMatchDMs({
 
   return (
     <div className="flex-1 min-h-0 h-full w-full overflow-hidden flex flex-row font-sans text-retro-fg animate-orbit-fade-in bg-transparent">
-      {/* 1. Left Column: Channels, Rooms & DMs */}
-      <div className="w-60 lg:w-64 border-r border-edge flex flex-col bg-glass-w5 shrink-0 min-h-0 select-none">
+      {/* 1. Left Column: Channels, Rooms & DMs.
+          On a phone this is the WHOLE screen while `listMode` is on (picking a
+          conversation) and hidden once one is open — two fixed 240px columns plus
+          the conversation column is 480px of chrome on a 390px viewport, which
+          pushed the composer off the right edge. `listMode` is the one bit that
+          already means "show me the list", so the responsive rule follows it
+          rather than inventing a second state. */}
+      <div
+        className={`${listMode ? 'flex' : 'hidden'} md:flex w-full md:w-60 lg:w-64 md:border-r border-edge flex-col bg-glass-w5 shrink-0 min-h-0 select-none`}
+      >
         <div className="p-3 sm:p-4 border-b border-edge flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <h2 className="font-semibold text-sm text-retro-fg truncate">
@@ -1057,8 +1073,12 @@ export function GMatchDMs({
         </div>
       </div>
 
-      {/* 2. Center Column: Active Conversation */}
-      <div className="flex-1 min-h-0 flex flex-col bg-transparent min-w-0 overflow-hidden">
+      {/* 2. Center Column: Active Conversation.
+          On a phone it is hidden while the LIST is showing, so exactly one pane
+          is on screen at a time; from md up both are visible together. */}
+      <div
+        className={`${listMode ? 'hidden md:flex' : 'flex'} flex-1 min-h-0 flex-col bg-transparent min-w-0 overflow-hidden`}
+      >
         {openTarget ? (
           <>
             <div className="p-3 sm:p-3.5 px-4 border-b border-edge bg-glass-w5 flex items-center justify-between shrink-0 select-none">
@@ -1652,8 +1672,11 @@ export function GMatchDMs({
         )}
       </div>
 
-      {/* 3. Right Column: Expanded Player List */}
-      <div className="w-60 lg:w-64 border-l border-edge flex flex-col bg-glass-w5 shrink-0 min-h-0 select-none">
+      {/* 3. Right Column: Expanded Player List.
+          Desktop-only: on a phone it would be a second 240px column beside the
+          conversation, so the toggle in the header (which already exists) owns
+          the phone case and this column appears from md up. */}
+      <div className="hidden md:flex w-60 lg:w-64 border-l border-edge flex-col bg-glass-w5 shrink-0 min-h-0 select-none">
         <ChatPlayerList
           identity={identity}
           users={users}
