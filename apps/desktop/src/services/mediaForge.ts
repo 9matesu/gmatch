@@ -26,6 +26,42 @@ export async function hashFileSha256(file: File | Blob): Promise<string> {
     .join('')
 }
 
+/**
+ * Bytes for the metadata registration, or undefined.
+ *
+ * The node is the only place a PEER can read a post's media from. Until this
+ * existed, a publish registered metadata only and the bytes stayed in this
+ * machine's IndexedDB — so `GET /api/objects/:id` answered `bytes missing for
+ * row` for everyone else, and for this same user after a reinstall.
+ *
+ * `data_base64` is the least invasive channel: a registration that carries no
+ * bytes is byte-identical on the wire to the old JSON-only body, so a node
+ * running older code still accepts it (it ignores the field).
+ *
+ * Bounded at 1 MB ON PURPOSE. The outbox lives in localStorage, whose whole
+ * origin budget is ~5 MB: one 4 MB image (5.3 MB as base64) would blow the
+ * quota and `setItem` would fail, silently destroying the outbox — the post
+ * AND every other pending write. Bigger media keeps its IndexedDB bytes and
+ * relies on the swarm, which is the existing durable path.
+ */
+const REGISTER_ATTACH_CAP = 1 * 1024 * 1024
+
+async function attachBytes(file: File, contentHash: string): Promise<Record<string, unknown> | undefined> {
+  if (file.size > REGISTER_ATTACH_CAP) return undefined
+  const b64 = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = String(reader.result || '')
+      const comma = result.indexOf(',')
+      resolve(comma >= 0 ? result.slice(comma + 1) : '')
+    }
+    reader.onerror = () => reject(reader.error ?? new Error('read failed'))
+    reader.readAsDataURL(file)
+  }).catch(() => '')
+  if (!b64) return undefined
+  return { data_base64: b64, data_mime: file.type || 'application/octet-stream', data_hash: contentHash }
+}
+
 export async function forgeMediaLocally(
   file: File,
   // Loose like-type: callers hold local IdentityLike shapes (encryption keys
@@ -91,7 +127,12 @@ export async function forgeMediaLocally(
   }
   let socialOperationId: string | undefined
 
-  // 3. Register metadata ONLY with the backend - no binary bytes leave this machine
+  // 3. Register metadata with the backend. The bytes travel WITH the
+  // registration when they are small enough: the node is where a peer reads a
+  // post from, and a row without bytes answers `bytes missing for row` for
+  // everyone but the machine that authored it (and for that same user after a
+  // reinstall). A node that does not know `data_base64` ignores the field, so
+  // this stays compatible with an older server.
   const payload = {
     id: objectId,
     content_hash: contentHash,
@@ -108,6 +149,7 @@ export async function forgeMediaLocally(
     post_group: options.postGroup || null,
     tags: options.tags || null,
     recipients: options.recipients || null,
+    ...(await attachBytes(file, contentHash)),
   }
 
   const gossipable = (options.isPublic ?? true) && !options.isStory && !options.isAvatar && !options.isChat

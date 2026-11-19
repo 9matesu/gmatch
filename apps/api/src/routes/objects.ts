@@ -94,6 +94,30 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
 /** Any object still alive (profile pics never expire, everything else has a future expires_at). */
 const LIVE_OBJECT_FILTER = "(expires_at IS NULL OR datetime(expires_at) > datetime('now'))"
 
+/**
+ * Bytes the client attached to a metadata registration, or null.
+ *
+ * The metadata path is JSON, so an optional `data_base64` is the least invasive
+ * way to carry bytes: a JSON-only register stays byte-identical on the wire, and
+ * an offline publisher can replay the SAME body with its bytes attached — which
+ * is exactly what the outbox already stores and re-sends.
+ *
+ * Bounded: 50 MB, matching the multipart limit. Anything larger belongs on the
+ * multipart path.
+ */
+const REGISTER_BYTES_CAP = 50 * 1024 * 1024
+
+function bytesFromBody(c: { req: { json: () => Promise<unknown> } }): Promise<Uint8Array | null> {
+  return c.req.json().then((raw) => {
+    const b64 = (raw as { data_base64?: unknown })?.data_base64
+    if (typeof b64 !== 'string' || b64.length === 0) return null
+    // A malformed payload must not become a corrupt row.
+    const bin = Buffer.from(b64, 'base64')
+    if (bin.length === 0 || bin.length > REGISTER_BYTES_CAP) return null
+    return new Uint8Array(bin)
+  }).catch(() => null)
+}
+
 objects.post('/register', orbitAuth, async (c) => {
   try {
     const orbitId = c.get('orbitId')
@@ -105,7 +129,10 @@ objects.post('/register', orbitAuth, async (c) => {
     const objectId = (typeof body.id === 'string' && body.id.trim()) ? body.id.trim() : crypto.randomUUID()
     const contentHash = (typeof body.content_hash === 'string' && body.content_hash.trim().toLowerCase()) || null
     const magnetUri = (typeof body.magnet_uri === 'string' && body.magnet_uri.trim()) || null
-    const sizeBytes = Number(body.size_bytes) || 0
+    // `let`, not `const`: a registration that carries its bytes REPLACES this
+    // with the real length, because the whole point of this path is that the
+    // client learns the size from the bytes it sent rather than a claim.
+    let sizeBytes = Number(body.size_bytes) || 0
     const mimeType = (typeof body.mime_type === 'string' && body.mime_type.trim()) || 'application/octet-stream'
     const caption = (typeof body.caption === 'string' && body.caption.trim()) || null
     const postCaption = (typeof body.post_caption === 'string' && body.post_caption.trim()) || null
@@ -128,6 +155,31 @@ objects.post('/register', orbitAuth, async (c) => {
     // across attempts. Same owner => return the existing row (no duplicate,
     // no double posts_count, no second broadcast). Foreign owner => 409 so a
     // client id can never squat or overwrite another owner's row.
+    //
+    // A retry MAY carry the bytes the first attempt never delivered (the
+    // outbox replays after an offline publish). Storing them HERE — rather than
+    // leaving the row blobless forever — is what makes a post readable by
+    // anyone but the machine that authored it: without this, `GET /api/objects/:id`
+    // answered `bytes missing for row` until the end of time.
+    const bodyBytes = await bytesFromBody(c)
+    if (bodyBytes) {
+      const bytes = new Uint8Array(bodyBytes)
+      const hash = await sha256Hex(bytes)
+      // The declared hash is a promise; the bytes are the truth. A row whose
+      // hash does not match what arrived is a bug on the wire, not something to
+      // store and serve as if it were right.
+      if (!contentHash || contentHash === hash) {
+        // The size recorded on the row must describe the bytes we actually
+        // stored, not what the client claimed before it had them.
+        sizeBytes = bytes.length
+        await c.env.BUCKET?.put(`objects/${objectId}`, encryptBlob(bytes), {
+          httpMetadata: { contentType: mimeType },
+        })
+      } else {
+        return c.json({ error: 'content_hash does not match the supplied bytes' }, 400)
+      }
+    }
+
     const existing = await c.env.DB.prepare(
       'SELECT id, owner_id, content_hash, content_url, size_bytes, mime_type, is_public, is_avatar FROM Objects WHERE id = ?'
     ).bind(objectId).first<{

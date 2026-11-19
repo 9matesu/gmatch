@@ -1652,6 +1652,7 @@ export default function Home() {
       // multi-image post (the server groups them in the feed).
       const postGroup = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `pg_${Date.now()}_${Math.random().toString(36).slice(2)}`
       const mediaUrls: string[] = []
+      const mediaIds: string[] = []
       const mediaMimes: string[] = []
       let localPreviewUrl: string | null = null
       for (const dataUrl of mediaDataUrls) {
@@ -1680,6 +1681,7 @@ export default function Home() {
         })
         if (forged?.id) {
           uploadedAny = true
+          mediaIds.push(forged.id)
           mediaUrls.push(`/api/objects/${forged.id}`)
           mediaMimes.push(mime)
           // Instant tile: the blob URL renders with zero fetch while the
@@ -1689,8 +1691,14 @@ export default function Home() {
       }
       if (uploadedAny) {
         const primaryUrl = mediaUrls[0]
+        // The id MUST be the real objectId the node registered, not a
+        // synthetic `group_<uuid>`. The durable outbox rebuilds this same post
+        // by objectId (localFeedPosts), so a synthetic id made the optimistic
+        // tile and the rebuilt one two rows for one post — the duplicate that
+        // appeared on every reload.
+        const primaryId = mediaIds[0]
         const newPost: FeedPost = {
-          id: `group_${postGroup}`,
+          id: primaryId,
           author_id: identity.orbitId,
           author_name: myProfile.displayName || 'You',
           author_avatar: profilePics[identity.orbitId] || null,
@@ -1753,15 +1761,22 @@ export default function Home() {
   // Sync badge: reflect each optimistic own-post's outbox state (local /
   // pending / replicated) without re-fetching. Reconciled server rows carry
   // no sync_state, so the badge disappears once the post is authoritative.
+  //
+  // Keyed by the outbox entry (objectId, or its group), not by a synthetic
+  // `group_` id prefix: an optimistic tile now carries the real objectId so it
+  // reconciles with the server row instead of being duplicated by it, and the
+  // badge has to follow that same id.
   useEffect(() => {
     const apply = () => {
       const states = outboxStatesByGroup()
       setServerPosts((prev) =>
-        prev.map((p) =>
-          p.id.startsWith('group_')
-            ? { ...p, sync_state: states[p.id.slice('group_'.length)] }
-            : p,
-        ),
+        prev.map((p) => {
+          const own = states[p.id]
+          if (own) return { ...p, sync_state: own }
+          const g = (p as { postGroup?: string | null }).postGroup
+          const gs = g ? states[g] : undefined
+          return gs ? { ...p, sync_state: gs } : p
+        }),
       )
     }
     apply()

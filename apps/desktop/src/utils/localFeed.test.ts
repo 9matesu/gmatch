@@ -39,8 +39,11 @@ describe('localFeedPosts', () => {
 
     const rows = localFeedPosts(identity, 'Tester')
     expect(rows).toHaveLength(1)
+    // The id is the OBJECT id — the same id the server row will carry, so the
+    // optimistic tile is replaced by the authoritative one instead of rendered
+    // beside it as a duplicate.
     expect(rows[0]).toMatchObject({
-      id: 'g1',
+      id: 'o1',
       author_id: 'u1',
       author_name: 'Tester',
       url: '/api/objects/o1',
@@ -48,6 +51,24 @@ describe('localFeedPosts', () => {
       tags: ['a', 'b'],
       sync_state: 'local',
     })
+  })
+
+  it('renders ONE row for a multi-image post, carrying its siblings', () => {
+    // The outbox holds one entry per image; the server coalesces the group into
+    // a single row. Rebuilding each entry as its own tile used to render N rows.
+    for (const [i, id] of ['m1', 'm2', 'm3'].entries()) {
+      enqueueOutbox({
+        objectId: id,
+        postGroup: 'grp-1',
+        registerBody: { id, mime_type: 'image/png', post_caption: 'carousel' },
+        gossipInput: null,
+      })
+      void i
+    }
+    const rows = localFeedPosts(identity, 'Tester')
+    expect(rows).toHaveLength(1)
+    expect(rows[0].id).toBe('m1')
+    expect(rows[0].media?.map((m) => m.id)).toEqual(['m1', 'm2', 'm3'])
   })
 
   it('survives a reload (the outbox is localStorage, not memory)', () => {
