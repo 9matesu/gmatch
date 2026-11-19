@@ -107,15 +107,13 @@ const LIVE_OBJECT_FILTER = "(expires_at IS NULL OR datetime(expires_at) > dateti
  */
 const REGISTER_BYTES_CAP = 50 * 1024 * 1024
 
-function bytesFromBody(c: { req: { json: () => Promise<unknown> } }): Promise<Uint8Array | null> {
-  return c.req.json().then((raw) => {
-    const b64 = (raw as { data_base64?: unknown })?.data_base64
-    if (typeof b64 !== 'string' || b64.length === 0) return null
-    // A malformed payload must not become a corrupt row.
-    const bin = Buffer.from(b64, 'base64')
-    if (bin.length === 0 || bin.length > REGISTER_BYTES_CAP) return null
-    return new Uint8Array(bin)
-  }).catch(() => null)
+function bytesFromBody(raw: unknown): Uint8Array | null {
+  const b64 = (raw as { data_base64?: unknown } | null)?.data_base64
+  if (typeof b64 !== 'string' || b64.length === 0) return null
+  // A malformed payload must not become a corrupt row.
+  const bin = Buffer.from(b64, 'base64')
+  if (bin.length === 0 || bin.length > REGISTER_BYTES_CAP) return null
+  return new Uint8Array(bin)
 }
 
 objects.post('/register', orbitAuth, async (c) => {
@@ -171,7 +169,10 @@ objects.post('/register', orbitAuth, async (c) => {
     // therefore accepted AS the row's bytes and the hash is recomputed from what
     // was stored, so a row always describes its own blob — which is what
     // `GET /api/objects/:id` and the by-hash address both read.
-    const bodyBytes = await bytesFromBody(c)
+    // The body was already parsed above (a request body is a one-shot stream),
+    // so the bytes come from that object - NOT a second c.req.json() read, which
+    // would always be empty and silently drop every attachment.
+    const bodyBytes = bytesFromBody(body)
     if (bodyBytes) {
       const bytes = new Uint8Array(bodyBytes)
       // The size recorded on the row must describe the bytes we actually
