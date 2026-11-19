@@ -13,6 +13,7 @@ vi.mock('../../utils/sounds', () => ({
 vi.mock('../../services/imageCache', () => ({
   resolveImage: vi.fn(async (u: string) => u),
   devFetchable: vi.fn(() => null),
+  cachedImageFor: vi.fn(() => undefined),
 }));
 
 // The real tile resolves over the network; this stub reports the terminal

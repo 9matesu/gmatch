@@ -231,10 +231,14 @@ export function CommandIsland({
 
   return (
     <>
-      {/* Primary Floating Command Island Dock */}
+      {/* Primary Floating Command Island Dock.
+          `left-1/2` alone was the bug: it moved the box's LEFT EDGE to the
+          midline, so a dock wider than half the viewport hung off the right
+          side (measured: right edge 853 at a 768px viewport). The inset pair
+          centres the box on both axes and lets `w-max` shrink to the content. */}
       <nav
         aria-label="Command Island"
-        className={`command-island fixed bottom-5 left-1/2 -translate-x-1/2 z-[var(--z-dropdown)] flex max-w-[calc(100vw-1.5rem)] w-max items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full select-none transition duration-300 overflow-x-auto flex-nowrap ${recessed ? 'island-recessed' : ''}`}
+        className={`command-island fixed bottom-5 inset-x-0 mx-auto w-max max-w-[calc(100vw-1.5rem)] z-[var(--z-dropdown)] flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full select-none transition duration-300 overflow-x-auto flex-nowrap ${recessed ? 'island-recessed' : ''}`}
       >
         {/* Left zone: primary nav tabs, kept intact (shrink-0) so a narrow
             window scrolls the dock instead of squashing the icons. */}

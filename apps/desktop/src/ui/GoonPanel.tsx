@@ -5,7 +5,7 @@ import { HEAT_WINDOW_MS, heatMultiplier } from '../game/economy'
 import { ALL_CAP_IDS } from '../game/caps'
 import type { CapId, ViewMode } from '../game/types'
 import { playPress } from '../utils/sounds'
-import { prefetchImages, resolveImage } from '../services/imageCache'
+import { cachedImageFor, prefetchImages, resolveImage } from '../services/imageCache'
 import { isVideoUrl } from '../services/postFilter'
 import { redgifsPlayable } from '../services/redgifs'
 import { formatNum } from './format'
@@ -292,6 +292,11 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
   // Verified stage swap: keep the last decoded picture on screen until the
   // next one is cached + decoded successfully — arrows never show a blank
   // frame, and scoring stays locked (store.imageReady) until it is visible.
+  //
+  // The FIRST paint uses the session cache map when it already knows the bytes
+  // (`cachedImageFor`), so a foe whose picture is on disk mounts straight on
+  // gmcache:// instead of the remote URL. That is the difference between
+  // "instant" and "a frame late" for every picture after the first.
   useEffect(() => {
     if (showOffline || !current) {
       setImageReady(false)
@@ -305,14 +310,24 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
     }
     let live = true
     const url = current.url
-    setShownUrl(url)
+    const warm = cachedImageFor(url)
+    setShownUrl(warm ?? url)
     // NOT ready yet. This used to be set immediately, which meant clicks
     // scored against a picture that had not painted: the "Loading" overlay was
     // unreachable and the first click or two of every picture were lost (or
     // worse, scored while the old frame was still up). The stage <img> now
     // reports its own load, and readiness follows the pixels.
+    //
+    // A warm picture is decoded ahead of time (imageCache.decodeAhead), so its
+    // load event lands in the same frame the element mounts — the player sees
+    // it and can click it immediately.
     setImageReady(false)
     setStageLoaded(false)
+    if (warm) {
+      // Already local: the bytes are in the encrypted disk cache, so the only
+      // remaining work is the browser's own decode of a gmcache:// URL.
+      return () => { live = false }
+    }
     void (async () => {
       try {
         const resolved = await resolveImage(url)

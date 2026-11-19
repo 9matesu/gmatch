@@ -332,6 +332,31 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
     storeRef.current?.rememberPeer(orbitId, { publicKeyHex, encryptionPubHex })
   }, [])
 
+  /**
+   * Replay messages this device authored that never left it.
+   *
+   * The store is the outbox, so this is the only "retry" that exists: a failed
+   * row stays failed until something runs this. Wired to connectivity returning
+   * (`online`) and to the initial drain, so a courier that was down when the
+   * player hit Enter delivers the message on the next breath instead of never.
+   */
+  const resendFailed = useCallback(async (peerId?: string): Promise<number> => {
+    if (!managerRef.current) return 0
+    return managerRef.current.resendFailed(peerId)
+  }, [])
+
+  useEffect(() => {
+    if (!identity || mode !== 'courier') return
+    // After the first drain: whatever failed while we were closed is replayed.
+    const kick = window.setTimeout(() => { void resendFailed() }, 1_500)
+    const onOnline = () => { void resendFailed() }
+    window.addEventListener('online', onOnline)
+    return () => {
+      window.clearTimeout(kick)
+      window.removeEventListener('online', onOnline)
+    }
+  }, [identity, mode, resendFailed])
+
   /** Mesh domination send (Fase 5/6): sealed dom_request, free, no server.
    *  Null when the peer has no known keys — the caller falls back to the
    *  server route; the mesh never fires blind. */
@@ -404,5 +429,5 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
 
   const courierActive = useMemo(() => mode === 'courier' && !!identity, [mode, identity])
 
-  return { mode, courierActive, send, pull, threadFor, registerPeerKeys, meshSend, peerAddressable, threads, rooms, createRoom, createRoomWithId, inviteToRoom, sayInRoom, leaveRoom, roomMessages, edit, remove, react, type, markRead, isTyping }
+  return { mode, courierActive, send, pull, threadFor, registerPeerKeys, meshSend, peerAddressable, threads, rooms, createRoom, createRoomWithId, inviteToRoom, sayInRoom, leaveRoom, roomMessages, edit, remove, react, type, markRead, isTyping, resendFailed }
 }

@@ -10,6 +10,7 @@ import { projectFeed } from './feedProjection'
 import {
   feedTimelineUnchanged, fetchFeedSnapshot, fetchPostById, invalidateFeedCache,
 } from './feedRepository'
+import { readCachedFeed, writeCachedFeed } from './feedSnapshotCache'
 
 /**
  * Feed controller: the stateful half. Owns the request sequence (so a slow
@@ -42,6 +43,9 @@ export interface FeedController {
    *  node listed" rather than the rendered timeline (badge baseline, tag sync). */
   serverPosts: FeedPost[]
   status: FeedStatus
+  /** True while the timeline came from the durable snapshot (this device's own
+   *  last read) rather than a live node response. */
+  restoredFromCache: boolean
   hasMore: boolean
   loadingMore: boolean
   load: () => Promise<FeedPost[]>
@@ -78,6 +82,50 @@ export function useFeedController(input: FeedControllerInput): FeedController {
   const seqRef = useRef(0)
   const pushedRef = useRef<Map<string, PushedEntry<FeedPost>>>(new Map())
   const postsRef = useRef<FeedPost[]>([])
+  /**
+   * True while the timeline on screen came from the durable snapshot rather
+   * than from a read this session. It is what makes the stale-first behaviour
+   * honest: the UI can say "showing what you had" instead of implying the node
+   * answered. Cleared the moment a live snapshot lands.
+   */
+  const [restoredFromCache, setRestoredFromCache] = useState(false)
+
+  // Hydrate from the durable snapshot BEFORE the first read, so a node that is
+  // still booting (or a machine that is offline) shows the timeline this device
+  // already holds instead of "Loading…". This is a STALE read by definition:
+  // the live snapshot below replaces it as soon as it lands.
+  const identityId = identity?.orbitId ?? null
+  useEffect(() => {
+    if (!identityId) {
+      setServerPosts([])
+      setRestoredFromCache(false)
+      return
+    }
+    const cached = readCachedFeed(identityId)
+    if (cached && cached.posts.length > 0) {
+      setServerPosts((prev) => (prev.length > 0 ? prev : cached.posts))
+      setRestoredFromCache(true)
+    } else {
+      setRestoredFromCache(false)
+    }
+  }, [identityId])
+
+  // Persist each successful live snapshot, so the NEXT boot has something to
+  // show. Keyed by identity, so a second player never inherits this one's feed.
+  useEffect(() => {
+    if (!identityId || status !== 'ready' || serverPosts.length === 0) return
+    if (restoredFromCache) return
+    writeCachedFeed(identityId, serverPosts)
+  }, [identityId, status, serverPosts, restoredFromCache])
+
+  // Signing out must not leave this player's timeline on the disk for the next
+  // identity to read.
+  useEffect(() => {
+    if (identityId) return
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith('gmatch.feed.snapshot.v1:')) localStorage.removeItem(key)
+    }
+  }, [identityId])
 
   // The outbox is durable storage, not state: bump a counter when it changes so
   // a post that is still local/pending appears (and updates) without a reload.
@@ -122,10 +170,13 @@ export function useFeedController(input: FeedControllerInput): FeedController {
         if (snap.stale) return []
         if (!snap.ok) {
           // 404 = this node hosts no feed: a state, not a retryable failure.
+          // A restored snapshot stays on screen (it is this device's own data);
+          // the status says which one the player is looking at.
           setStatus('offline')
           return []
         }
         setServerPosts((prev) => (feedTimelineUnchanged(prev, snap.posts) ? prev : snap.posts))
+        setRestoredFromCache(false)
         setStatus('ready')
         setHasMore(snap.posts.length >= PAGE_SIZE)
         return snap.posts
@@ -196,7 +247,7 @@ export function useFeedController(input: FeedControllerInput): FeedController {
   }, [])
 
   return {
-    posts, serverPosts, status, hasMore, loadingMore,
+    posts, serverPosts, status, restoredFromCache, hasMore, loadingMore,
     load, refresh, loadMore, resolvePostById,
     setServerPosts, setOptimisticPosts, setPinnedPosts, setRepostedPosts, setMyProfilePosts,
     removePost, pushPost, reset,

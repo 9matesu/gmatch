@@ -137,6 +137,36 @@ describe('mail DM layer (courier-only, local source of truth)', () => {
     expect(store.thread(bob.orbitId)[0].status).toBe('failed')
   })
 
+  it('resendFailed() replays a failed message once the peer is known (persistent outbox)', async () => {
+    // The store IS the outbox: a failed row used to be terminal, so words the
+    // courier rejected were stuck on this device forever.
+    const { mgr, mail, store } = managerFor(alice)
+    const first = await mgr.send(bob.orbitId, 'never left')
+    expect(first.status).toBe('failed')
+    expect(mail.sent).toHaveLength(0)
+
+    // The peer becomes addressable (roster / TOFU / a later beacon).
+    store.rememberPeer(bob.orbitId, { publicKeyHex: bob.publicKeyHex, encryptionPubHex: bob.encryptionPubHex })
+    const resent = await mgr.resendFailed(bob.orbitId)
+
+    expect(resent).toBe(1)
+    expect(mail.sent).toHaveLength(1)
+    expect(store.thread(bob.orbitId)[0].status).toBe('sent')
+  })
+
+  it('resendFailed() is idempotent for the peer and leaves nothing to replay twice', async () => {
+    const { mgr, mail, store } = managerFor(alice)
+    store.rememberPeer(bob.orbitId, { publicKeyHex: bob.publicKeyHex, encryptionPubHex: bob.encryptionPubHex })
+    const msg = await mgr.send(bob.orbitId, 'one copy only')
+    expect(mail.sent).toHaveLength(1)
+
+    // Nothing failed: a second sweep must not re-send the delivered row.
+    expect(await mgr.resendFailed(bob.orbitId)).toBe(0)
+    expect(mail.sent).toHaveLength(1)
+    // Same envelope id either way: a replay can never double-render.
+    expect(decodeBody(mail.sent[0].body)).toMatchObject({ id: msg.id })
+  })
+
   it('handleOpened(dm) appends the inbound, then returns a sealed ack to the sender', async () => {
     const { mgr, mail, store } = managerFor(bob)
     // Alice actually seals a DM to bob through the protocol; bob opens it:

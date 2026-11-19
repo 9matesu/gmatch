@@ -198,6 +198,7 @@ function GMatchFeedImpl({
   onForceRefresh,
   onPingAttention,
   feedStatus = 'ready',
+  restoredFromCache = false,
   onResolveMissingPost,
 }: {
   identity: OrbitIdentity | null;
@@ -247,6 +248,9 @@ function GMatchFeedImpl({
   onForceRefresh?: () => void;
   /** Initial load vs refresh vs blind-courier node vs read error. */
   feedStatus?: 'idle' | 'loading' | 'ready' | 'offline' | 'error';
+  /** True while the timeline is the durable snapshot from this device, not a
+   *  live node read. The UI labels it instead of implying it is fresh. */
+  restoredFromCache?: boolean;
   /**
    * Ask the owner of the feed for a single post by id when a deep link names
    * one the snapshot does not carry. Resolves true when the post is (or just
@@ -605,6 +609,12 @@ function GMatchFeedImpl({
   }, [posts, mediaReady, deadPosts, promoteMedia, hidePost]);
 
   const hiddenCount = useMemo(() => countHidden(posts), [posts]);
+  /** How many rows the projection actually produced — the count the empty copy
+   *  needs, computed once instead of re-deriving it inside the memo. */
+  const visiblePostCount = useMemo(
+    () => posts.filter((p) => !p.is_archived).length,
+    [posts],
+  );
   const visiblePosts = useMemo(
     () => posts.filter((p) => {
       if (p.is_archived) return false;
@@ -688,7 +698,17 @@ function GMatchFeedImpl({
   // The empty state is four different situations, not one. Collapsing them made
   // a blind courier (no feed route) look like a genuinely quiet timeline, and a
   // failed read look like "nobody posted".
+  //
+  // A restored snapshot is the FIFTH: the rows on screen are this device's own
+  // last read, not something the node just said. Saying so is the difference
+  // between "cached" and "pretending to be live".
   const emptyCopy = useMemo(() => {
+    if (restoredFromCache && visiblePostCount > 0) {
+      return {
+        title: 'Showing your last read.',
+        body: 'The node has not answered yet — this is the timeline from this device.',
+      };
+    }
     switch (feedStatus) {
       case 'loading':
       case 'idle':
@@ -712,7 +732,7 @@ function GMatchFeedImpl({
           body: 'Upload a post, or join a node that has some.',
         };
     }
-  }, [feedStatus]);
+  }, [feedStatus, restoredFromCache, visiblePostCount]);
 
   // First-like chime: session-local celebration when MY post crosses 0 -> 1
   // likes after mount. Pre-liked posts at mount are seeded into the baseline

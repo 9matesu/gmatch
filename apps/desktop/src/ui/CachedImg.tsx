@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ImgHTMLAttributes } from 'react'
-import { resolveImage } from '../services/imageCache'
+import { cachedImageFor, resolveImage } from '../services/imageCache'
 import { resolveMediaUrl } from '../utils/media'
 
 interface CachedImgProps extends ImgHTMLAttributes<HTMLImageElement> {
@@ -21,8 +21,12 @@ export default function CachedImg({ src: rawSrc, fallbackSrc, onError, onLoading
   // (a raw uuid would fire a file:// request -> ERR_FILE_NOT_FOUND).
   const src = resolveMediaUrl(rawSrc)
   const isLocal = /^(gmcache|idle-file|vault|blob|data):/i.test(src)
-  const [display, setDisplay] = useState<string>(isLocal ? src : '')
-  const [inView, setInView] = useState<boolean>(isLocal || rest.loading === 'eager')
+  // The session map answers BEFORE the first paint: a picture whose bytes are
+  // already cached mounts straight on gmcache:// instead of flashing the
+  // remote URL and swapping a frame later (the "instant image" path).
+  const warm = isLocal ? src : cachedImageFor(src)
+  const [display, setDisplay] = useState<string>(warm ?? (isLocal ? src : ''))
+  const [inView, setInView] = useState<boolean>(!!warm || rest.loading === 'eager')
   const imgRef = useRef<HTMLImageElement | null>(null)
 
   // Consumers (the story ring avatars) need to know "still decoding" vs

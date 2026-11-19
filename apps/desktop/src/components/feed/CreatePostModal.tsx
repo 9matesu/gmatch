@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Trash2,
+  Link2,
 } from 'lucide-react';
 import { useMediaPicker } from '../media/MediaPickerModal';
 import { selectionToFile, type MediaSelection } from '../media/picker';
@@ -69,6 +70,8 @@ export function CreatePostModal({
   const [tags, setTags] = useState(initialTags || '');
   const [aspectRatio, setAspectRatio] = useState<'square' | 'portrait' | 'landscape'>('square');
   const [uploading, setUploading] = useState(false);
+  /** Typed link to post as a shared anchor (not media). */
+  const [linkUrl, setLinkUrl] = useState('');
 
   // Camera state
   const [,setIsCameraActive] = useState(false);
@@ -166,6 +169,43 @@ function extForMime(mime: string): string {
   return 'jpg';
 }
 
+/**
+ * True when a URL points straight at media BYTES (an image / video file), as
+ * opposed to a page that merely shows one.
+ *
+ * The share path proxies every URL as if it were an image, so this decides
+ * whether a pasted link belongs in the media list or in the written body.
+ * Extension-less URLs are NOT media here: a query-string image
+ * (`?image=…`) is rare next to the far more common article/product link, and
+ * a false positive means the post FAILS instead of degrading to a text post.
+ */
+function isDirectMediaUrl(raw: string): boolean {
+  try {
+    const clean = new URL(raw).pathname.toLowerCase();
+    return /\.(?:jpe?g|png|gif|webp|avif|bmp|mp4|webm|mov|m4v|ogv|mkv)$/.test(clean);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Put a shared link into the written body.
+ *
+ * Appended, never replacing: the player may have written a caption already, and
+ * the link is the thing being shared, not a reason to lose their words. The
+ * feed renders it as a safe anchor (Linkify) and the notification/permalink
+ * paths already escape everything.
+ */
+function addLinkToCaption(raw: string): void {
+  setCaption((prev) => {
+    const trimmed = prev.trim();
+  if (trimmed.includes(raw)) return prev;
+  return trimmed ? `${trimmed}\n${raw}` : raw;
+  });
+  toast?.('Link added to your post.', 'success');
+  playPress(840);
+}
+
   const handleFilesSelected = async (files: FileList | File[] | null) => {
     if (!files || files.length === 0) return;
     const room = MAX_MEDIA - mediaList.length;
@@ -208,6 +248,20 @@ function extForMime(mime: string): string {
     if (!raw) return;
     if (!/^https?:\/\//i.test(raw)) {
       toast?.('Paste a full https:// link', 'warning');
+      return;
+    }
+    // A link that is NOT media belongs in the written body, not in the media
+    // list: the server proxies every URL as if it were an image, so a news
+    // article or a product page failed with "Could not fetch or validate the
+    // URL" and the post could not be made at all. The feed already renders
+    // URLs in a caption as safe anchors (Linkify), so a text post that carries
+    // a link is the SAME post — no schema, no migration.
+    //
+    // A video PAGE (redgifs watch, YouTube, Vimeo) still goes to the media
+    // list: the server has a resolver for those and the row is honest about
+    // being a placeholder until it lands.
+    if (!isDirectMediaUrl(raw) && !isTwitterUrl(raw) && !isVideoPageUrl(raw)) {
+      addLinkToCaption(raw);
       return;
     }
     // Page URLs (X posts, watch pages) are not media bytes: resolve to a
@@ -610,21 +664,53 @@ function extForMime(mime: string): string {
 
           {/* Active Tab Modalities */}
           {activeTab === 'upload' && (
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-edge hover:border-retro-accent rounded-xl bg-surface-interactive hover:bg-glass-w10 p-5 flex flex-col items-center justify-center gap-2 cursor-pointer transition text-center group"
-            >
-              <UploadCloud className="w-8 h-8 text-retro-muted group-hover:text-retro-accent group-hover:scale-110 transition-transform" />
-              <p className="text-xs font-bold text-retro-body">Drag &amp; drop photos or click to browse</p>
-              <span className="text-2xs text-retro-muted">Images and video, up to {MAX_MEDIA}. {mediaList.length}/{MAX_MEDIA} added</span>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept="image/*,video/*"
-                onChange={(e) => handleFilesSelected(e.target.files)}
-                className="hidden"
-              />
+            <div className="space-y-2">
+              {/* Share a LINK instead of a file: the bytes never leave the
+                  origin, and the row carries the anchor in its written body. */}
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1 min-w-0">
+                  <Link2 className="w-3.5 h-3.5 text-retro-muted absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="url"
+                    inputMode="url"
+                    value={linkUrl}
+                    onChange={(e) => setLinkUrl(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key !== 'Enter') return;
+                      e.preventDefault();
+                      addLinkToCaption(linkUrl.trim());
+                      setLinkUrl('');
+                    }}
+                    placeholder="Paste a link to share…"
+                    aria-label="Link to share"
+                    className="w-full bg-retro-bg border border-edge rounded-lg pl-9 pr-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted focus:outline-none focus:border-edge"
+                  />
+                </div>
+                <button
+                  type="button"
+                  disabled={!linkUrl.trim()}
+                  onClick={() => { addLinkToCaption(linkUrl.trim()); setLinkUrl(''); }}
+                  className="shrink-0 rounded-lg chrome-accent px-3 py-2 text-xs font-bold text-retro-accent-text disabled:opacity-40 cursor-pointer active:scale-95 transition"
+                >
+                  Add
+                </button>
+              </div>
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-edge hover:border-retro-accent rounded-xl bg-surface-interactive hover:bg-glass-w10 p-5 flex flex-col items-center justify-center gap-2 cursor-pointer transition text-center group"
+              >
+                <UploadCloud className="w-8 h-8 text-retro-muted group-hover:text-retro-accent group-hover:scale-110 transition-transform" />
+                <p className="text-xs font-bold text-retro-body">Drag &amp; drop photos or click to browse</p>
+                <span className="text-2xs text-retro-muted">Images and video, up to {MAX_MEDIA}. {mediaList.length}/{MAX_MEDIA} added</span>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*,video/*"
+                  onChange={(e) => handleFilesSelected(e.target.files)}
+                  className="hidden"
+                />
+              </div>
             </div>
           )}
 

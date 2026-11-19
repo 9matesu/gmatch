@@ -10,6 +10,7 @@ vi.mock('../services/imageCache', () => ({
   devFetchable: vi.fn((url: string) =>
     url.includes('dev-proxy') ? '/px?u=' + encodeURIComponent(url) : null
   ),
+  cachedImageFor: vi.fn(() => undefined),
 }));
 
 describe('Avatar offline cache and fallback', () => {

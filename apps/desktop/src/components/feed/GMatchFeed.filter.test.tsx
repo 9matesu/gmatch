@@ -23,6 +23,7 @@ global.IntersectionObserver = vi.fn().mockImplementation((cb) => ({
 vi.mock('../../services/imageCache', () => ({
   resolveImage: vi.fn(async (u: string) => u),
   devFetchable: vi.fn(() => null),
+  cachedImageFor: vi.fn(() => undefined),
 }));
 
 describe('GMatchFeed timeline filtering and resilience', () => {

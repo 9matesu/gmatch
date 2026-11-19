@@ -1236,7 +1236,7 @@ export default function Home() {
     },
   })
   const {
-    posts: feedPosts, status: feedStatus, hasMore: hasMoreFeed,
+    posts: feedPosts, status: feedStatus, restoredFromCache, hasMore: hasMoreFeed,
     loadingMore: isLoadingMoreFeed, load: loadServerFeed, refresh: forceRefreshFeed,
     loadMore: loadMoreFeedPosts, resolvePostById, setServerPosts, setOptimisticPosts,
     setMyProfilePosts,
@@ -3469,6 +3469,7 @@ export default function Home() {
                                 onPublishPost={publishPost}
                                 onForceRefresh={forceRefreshFeed}
                                 feedStatus={feedStatus}
+                                restoredFromCache={restoredFromCache}
                                 onResolveMissingPost={resolvePostById}
                                 onDeletePostApi={deletePostOnServer}
                                 onOpenNetwork={onOpenNetwork}

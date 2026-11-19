@@ -27,6 +27,7 @@ vi.mock('../../utils/sounds', () => ({
 vi.mock('../../services/imageCache', () => ({
   resolveImage: vi.fn(async (u: string) => u),
   devFetchable: vi.fn(() => null),
+  cachedImageFor: vi.fn(() => undefined),
 }));
 
 const mockIdentity = { orbitId: 'me', sign: vi.fn() } as any;

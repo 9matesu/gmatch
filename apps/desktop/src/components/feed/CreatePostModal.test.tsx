@@ -53,6 +53,18 @@ describe('CreatePostModal URL uploads', () => {
     expect(document.body.querySelector('img')).not.toBeInTheDocument();
   });
 
+  it('puts a plain page link in the written body instead of failing as media', async () => {
+    // The share path proxies every URL as an image, so an article link used to
+    // die with "Could not fetch or validate the URL" and the post could not be
+    // made at all. A link is content, not bytes: it belongs in the caption.
+    await pickUrl('https://example.com/some-article');
+    await waitFor(() => {
+      expect(screen.getByDisplayValue(/https:\/\/example\.com\/some-article/)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/video link attached/i)).toBeNull();
+    expect(document.body.querySelector('img')).not.toBeInTheDocument();
+  });
+
   it('rejects unusable URL input in the picker with an inline reason', async () => {
     const toast = vi.fn();
     render(<CreatePostModal identity={identity} onClose={() => {}} toast={toast} />);
