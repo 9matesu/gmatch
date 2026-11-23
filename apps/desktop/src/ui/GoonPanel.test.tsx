@@ -189,6 +189,26 @@ describe('GoonPanel click feedback', () => {
   })
 
 
+  it('scores on press, ignores the follow-up click, and keeps keyboard activation', () => {
+    seedSingle(100, 100)
+    useGame.setState({ clicks: 0, crits: 0, foeClicks: 0 } as never)
+    const { container } = render(<GoonPanel />)
+    const stage = container.querySelector('button[aria-label="Attack the current foe"]')!
+    // Scoring is gated on the picture painting; jsdom never loads images.
+    fireEvent.load(container.querySelector('img[alt="goon feed"]')!)
+    expect(useGame.getState().imageReady).toBe(true)
+
+    // Press (pointerdown) scores immediately…
+    stage.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+    expect(useGame.getState().clicks).toBe(1)
+    // …and the click that follows a real press (detail > 0) does NOT double-count.
+    stage.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
+    expect(useGame.getState().clicks).toBe(1)
+    // Keyboard activation (detail 0) still scores exactly once.
+    stage.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 }))
+    expect(useGame.getState().clicks).toBe(2)
+  })
+
   // The stage is a BOX, not a button: it holds <video controls> and the
   // prev/next/purge buttons, and interactive content must never nest inside a
   // button. The click target is a real button layered over the media.

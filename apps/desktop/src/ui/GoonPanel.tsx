@@ -639,7 +639,14 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           {!showOffline && (
             <button
               type="button"
-              onClick={handleClick}
+              onPointerDown={(e) => {
+                // Score on PRESS, not release: a clicker that waits for mouse-up
+                // feels a frame late. The click that follows is ignored (detail > 0)
+                // so one press scores exactly once; keyboard activation (detail 0)
+                // still scores through onClick.
+                if (e.button === 0) handleClick(e)
+              }}
+              onClick={(e) => { if (e.detail === 0) handleClick(e) }}
               onAuxClick={handleAuxClick}
               aria-label="Attack the current foe"
               className="absolute inset-0 z-[2] cursor-pointer"

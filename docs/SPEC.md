@@ -168,7 +168,13 @@ text overlays kept for caption hunts, §6).
 - Removed on purpose: e621 (furry), safebooru (safe-only), rule34.xxx (login wall).
 - Caption hunts: a query carrying `caption`/`goon_caption` keeps text-overlay tags (`speech_bubble`, `english_text`, …) that the double gate otherwise drops — same flag in main.cjs and postFilter; everything else filters identically on both sides.
 - AND-combos of narrow tags return 0 often → query variant ladder: full combo →
-  top-2 tags → leading tag, per source, first non-empty wins.
+  top-2 tags → leading tag, per source, first non-empty wins. A variant is an
+  OVER-FETCH, never an answer: every returned post is gated on the FULL query
+  (matchesQuery, strict AND), so a wider variant can surface extra candidates
+  but never widens the result set. Both runtimes enforce this (main
+  `booruSources.cjs`, renderer `services/booru.ts`); the renderer used to gate
+  on the narrowed variant and so served posts that matched only a sub-tag
+  (2026-11-23) — the "picture doesn't match the tags" bug.
 - Browser/dev mode: direct fetch may CORS-fail → offline SVG placeholder
   (generated gradient + tag text + "OFFLINE" badge). Never crash on fetch error.
 - Dedupe by post id across a session; cache last 40 urls.
@@ -256,6 +262,9 @@ product path.
   header (blurs images until hover) — default ON.
 - Toasts for purchases/unlocks live in the header 🔔 tab (capped at 50, no
   floating overlay spam).
+- The Goon Panel scores on **press** (`pointerdown`), not release, so a click
+  feels instant; the click event that follows is ignored (`detail > 0`) so one
+  press scores once, and keyboard activation (`detail 0`) still scores.
 - **KO novelty drops show every tag on the defeated foe (2026-11-23).** The
   drop tray under the Goon Panel lists ALL actionable tags of the image — valid,
   not already owned, not already excluded — instead of one arbitrary suggested

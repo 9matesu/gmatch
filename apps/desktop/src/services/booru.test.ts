@@ -163,12 +163,25 @@ describe('fetchPosts (SPEC §6/§8)', () => {
     expect(res.ok).toBe(false)
   })
 
-  it('browser mode falls back to narrower variants when combos truncate', async () => {
+  it('browser mode over-fetches narrower variants but gates on the FULL query', async () => {
     vi.stubGlobal('window', {})
-    const good = {
+    // A post that answers EVERY one of the five tags, recovered from the top-2
+    // over-fetch — this one must survive.
+    const full = {
       id: 99,
       directory: 5,
       image: 'good-variant-fallback.jpg',
+      width: 900,
+      height: 900,
+      rating: 'explicit',
+      tags: 'gangbang creampie ahegao deepthroat anal',
+    }
+    // A post that answers only the top-2 variant must NOT be served under the
+    // 5-tag query — that is exactly the "picture doesn't match the tags" bug.
+    const loose = {
+      id: 100,
+      directory: 5,
+      image: 'loose.jpg',
       width: 900,
       height: 900,
       rating: 'explicit',
@@ -179,15 +192,17 @@ describe('fetchPosts (SPEC §6/§8)', () => {
       // full 5-tag query comes back truncated on both mirrors…
       .mockResolvedValueOnce({ ok: true, json: () => Promise.reject(new Error('truncated')) })
       .mockResolvedValueOnce({ ok: true, json: () => Promise.reject(new Error('truncated')) })
-      // …top-2 variant on tbib hits
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([good]) })
+      // …top-2 variant on tbib hits, carrying both a full and a loose post
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([loose, full]) })
     vi.stubGlobal('fetch', fetchMock)
     const res = await fetchPosts({ tags: 'gangbang creampie ahegao deepthroat anal', limit: 10 })
-    expect(res.ok).toBe(true)
-    expect(res.posts).toHaveLength(1)
+    // The narrower variant was still requested (over-fetch)…
     const urls = fetchMock.mock.calls.map((c) => decodeURIComponent(String(c[0])))
     expect(urls[0]).toContain('gangbang creampie ahegao deepthroat anal')
     expect(urls[1]).toContain('gangbang creampie rating:explicit')
+    // …but only the post answering EVERY tag survives.
+    expect(res.ok).toBe(true)
+    expect(res.posts.map((p) => String(p.id))).toEqual(['99'])
   })
 
   it('browser mode uses paheal single-tag when danbooru mirrors yield nothing', async () => {

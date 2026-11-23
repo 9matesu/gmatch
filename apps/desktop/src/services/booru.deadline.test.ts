@@ -213,6 +213,16 @@ describe('variant ladder racing', () => {
   it('fires the whole ladder at once so a slow wide query cannot gate it', async () => {
     vi.stubGlobal('window', {})
     const seen: string[] = []
+    // A post that answers the FULL 3-tag query, so it survives the full-query
+    // gate even when it is recovered from a narrower over-fetch variant.
+    const fullPost = (n: number) => ({
+      id: `p${n}`,
+      file_url: `https://cdn.test/${n}.jpg`,
+      tags: 'creampie ahegao pregnant rating_explicit 1girl',
+      rating: 'e',
+      width: 1200,
+      height: 1600,
+    })
     // Three unblocked tags, so queryVariants yields the full ladder (query,
     // top-two, leading). NOTE: do not use a word the blocklist substring-matches
     // here — a blocked token refuses the whole query before any request is
@@ -230,7 +240,7 @@ describe('variant ladder racing', () => {
             init?.signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true })
           })
         }
-        return { ok: true, json: async () => [dapiPost(1), dapiPost(2)] }
+        return { ok: true, json: async () => [fullPost(1), fullPost(2)] }
       }),
     )
 

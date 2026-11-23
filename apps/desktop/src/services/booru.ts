@@ -1036,16 +1036,13 @@ async function fetchVariant(
     parsed = kind === 'moe' ? toMoePosts(data, src.origin) : toPosts(data, src.origin)
   }
 
-  let clean: BooruPost[] = []
-  if (src.type === 'booruorg') {
-    // Single tagless fetch; check all variants against the page's posts in memory.
-    for (const v of queryVariants(req.tags)) {
-      clean = sanitize(parsed, v)
-      if (clean.length > 0) break
-    }
-  } else {
-    clean = sanitize(parsed, variant)
-  }
+  // Gate on the FULL query (req.tags), never the narrowed variant that was
+  // sent. The ladder over-fetches (full -> top-2 -> leading tag) because a narrow
+  // AND combo often returns 0 from the mirror, but a KEPT post must answer EVERY
+  // requested tag — otherwise a one-tag variant satisfies a multi-tag (merged)
+  // request and the picture stops matching the tags. The main-process twin
+  // (booruSources.cjs) already does this; the renderer must not drift.
+  const clean = sanitize(parsed, req.tags)
   return { posts: clean, sick: false }
 }
 
