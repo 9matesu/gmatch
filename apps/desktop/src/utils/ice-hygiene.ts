@@ -2,6 +2,13 @@
 // that direct connections require.
 // - STUN (Cloudflare, stateless UDP, no account) tells a peer its own
 //   public reflexive address so peers on different NATs can hole-punch.
+//   ONE server, on purpose: Chromium logs a socket_manager error for every
+//   STUN host whose DNS it cannot resolve, and offline / behind a filtering
+//   resolver that is one line per server per peer. Four providers meant eight
+//   "Failed to resolve address for stun..." lines on every launch; one means
+//   two. The WS-relay swarm is the documented fallback when no direct channel
+//   forms, so losing a redundant STUN costs a little direct-path reach, never
+//   connectivity.
 // - sanitizeCandidate drops every literal-IP `host` candidate — the LAN
 //   address never leaves the machine (mDNS `.local` hosts only). `srflx`
 //   candidates ARE exchanged: without them cross-NAT peers can never meet,
@@ -11,12 +18,7 @@
 // - peerConnectionConfig() is the single source of truth for both the
 //   file-transfer peer (webrtc.ts) and the payload relay (removed).
 
-export const STUN_SERVERS: RTCIceServer[] = [
-  { urls: 'stun:stun.cloudflare.com:3478' },
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:global.stun.twilio.com:3478' },
-]
+export const STUN_SERVERS: RTCIceServer[] = [{ urls: 'stun:stun.cloudflare.com:3478' }]
 
 /** Literal IPv4 (dotted quad) or IPv6 (contains ':') — never `.local`. */
 export function isLiteralIp(address: string): boolean {

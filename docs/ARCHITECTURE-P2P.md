@@ -178,6 +178,15 @@ type CourierSignalPayload =
 
 - Peer connections configure STUN and TURN relays provided by the environment (`defaultIceConfig(readTurnEnv())`).
 - Private LAN IP candidates are stripped/sanitized before dispatch over the courier (`sanitizeCandidate`) to prevent internal network leakage.
+- **One STUN endpoint, not a list (2026-11-23).** `STUN_SERVERS` is a single
+  Cloudflare server. Chromium logs a `socket_manager.cc` error for every STUN
+  host whose DNS it cannot resolve, so the old four-provider list printed up to
+  eight `Failed to resolve address for stun... (errorcode: -105)` lines per peer
+  on an offline or filtering network. `errorcode: -105` is
+  `ERR_NAME_NOT_RESOLVED` — the network, not the app. One provider keeps that to
+  a single line; the WS-relay swarm remains the documented fallback when no
+  direct channel forms, so a redundant STUN costs a little direct-path reach, not
+  connectivity. TURN (relay-forced posture) still appends to the list.
 
 ### Transport selection is explicit and bounded (2026-10-22)
 

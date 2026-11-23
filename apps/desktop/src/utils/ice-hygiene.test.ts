@@ -110,8 +110,11 @@ describe('turnCredentials + config', () => {
     expect((mod as Record<string, unknown>).defaultTurn).toBeUndefined()
   })
 
-  it('STUN is a public, stateless list (Cloudflare first)', () => {
-    expect(STUN_SERVERS.length).toBeGreaterThanOrEqual(3)
+  it('STUN is one public, stateless endpoint (Cloudflare) — not four', () => {
+    // One server, not a redundant list: every extra provider is one more
+    // "Failed to resolve address" line in Chromium's log when DNS cannot reach
+    // it, and the WS-relay swarm is the fallback. Keep this at one.
+    expect(STUN_SERVERS).toHaveLength(1)
     expect(STUN_SERVERS[0]).toEqual({ urls: 'stun:stun.cloudflare.com:3478' })
     expect(STUN_SERVERS.every((s) => String(s.urls).startsWith('stun:'))).toBe(true)
   })
