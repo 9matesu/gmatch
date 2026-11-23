@@ -473,8 +473,20 @@ export function useObjectImage(
       cacheSource.delete(cleanId)
     }
 
-    // Adopt a cached entry immediately if present
-    if (cacheGet(cleanId, identity.orbitId)) return
+    // Adopt a cached entry immediately if present.
+    //
+    // This used to `return` on a cache hit WITHOUT setting state, so a warm
+    // object only rendered on the FIRST mount (where the useState initialiser
+    // reads the cache). Change the cardId on a mounted consumer — a feed tile
+    // recycled by the window, a story tray advance — and `img` still pointed
+    // at the previous id, the `img.cardId !== normalized` branch below fell
+    // through to EMPTY, and the tile sat on "Loading media..." until an
+    // unrelated retry. Adopting the value is the whole point of the cache.
+    const cached = cacheGet(cleanId, identity.orbitId)
+    if (cached) {
+      setImg(cached)
+      return
+    }
 
     let cancelled = false
 

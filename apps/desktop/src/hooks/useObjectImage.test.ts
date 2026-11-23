@@ -68,6 +68,44 @@ describe('useObjectImage magic-byte video sniffing', () => {
   })
 })
 
+/**
+ * A cache hit on a MOUNTED consumer must render the cached bytes.
+ *
+ * The effect used to `return` on a cache hit without calling setImg, so only
+ * the FIRST mount (whose useState initialiser reads the cache) ever showed a
+ * warm object. Recycle the hook to another id — a feed tile the window
+ * reuses, a story tray advance — and `img` still pointed at the previous
+ * cardId, so the `img.cardId !== normalized` branch fell through to EMPTY and
+ * the tile sat on "Loading media..." until an unrelated retry.
+ */
+describe('useObjectImage warm cache on a recycled consumer', () => {
+  it('renders a cached object after cardId changes to one already resolved', async () => {
+    const { useObjectImage } = await import('./useObjectImage')
+    const { orbitFetch } = await import('../utils/api')
+
+    // Resolve A first so its bytes land in the LRU.
+    const a = renderHook(() => useObjectImage('warm-a', identity))
+    await waitFor(() => expect(a.result.current.url).toMatch(/^blob:/))
+    a.unmount()
+
+    // Now mount on B, then switch to A: A is warm, B is not.
+    const h = renderHook(
+      ({ id }) => useObjectImage(id, identity),
+      { initialProps: { id: 'warm-b' } },
+    )
+    await waitFor(() => expect(h.result.current.url).toMatch(/^blob:/))
+
+    vi.mocked(orbitFetch).mockClear()
+    h.rerender({ id: 'warm-a' })
+
+    // The cached A must render immediately, with no network call at all.
+    await waitFor(() => expect(h.result.current.url).toMatch(/^blob:/))
+    expect(h.result.current.failed).toBe(false)
+    expect(orbitFetch).not.toHaveBeenCalled()
+    h.unmount()
+  })
+})
+
 describe('useObjectImage transient gateway retry', () => {
   it('retries a 502 response instead of poisoning the media cache', async () => {
     const { useObjectImage } = await import('./useObjectImage')
