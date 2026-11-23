@@ -1,30 +1,38 @@
 import type { OrbitObject } from "@orbit/shared";
+import type { StoredObject } from "./storage";
 
-/** A locally mirrored (IndexedDB) object row. Flag fields are present only
- * when the writer knew them (forge time / receive time); absent otherwise. */
-export interface MirrorStoredRow {
-  id: string
-  owner_id: string
-  size_bytes: number
-  mime_type: string
-  created_at: string
-  sender_pubkey: string
-  sender_enc_pubkey: string
-  is_public?: number | null
-  is_story?: number | null
-  is_chat?: number | null
-  is_avatar?: number | null
-  caption?: string | null
-  post_caption?: string | null
-  tags?: string[] | string | null
-  location?: string | null
-  author_name?: string | null
-  author_avatar?: string | null
-  comments?: unknown[] | null
-  likes_count?: number | null
-  like_count?: number | null
-  comment_count?: number | null
-}
+/**
+ * A locally mirrored (IndexedDB) object row, as `buildMirrorRow` needs it.
+ *
+ * This is `StoredObject` minus the byte-level fields: the projection reads
+ * metadata only, and the mirror row is exactly what the gallery keeps after a
+ * restart. Deriving it (rather than re-listing the fields) means a new stored
+ * field reaches the projection automatically instead of silently missing here.
+ */
+export type MirrorStoredRow = Pick<
+  StoredObject,
+  | "id"
+  | "owner_id"
+  | "size_bytes"
+  | "mime_type"
+  | "created_at"
+  | "sender_pubkey"
+  | "sender_enc_pubkey"
+  | "is_public"
+  | "is_story"
+  | "is_chat"
+  | "is_avatar"
+  | "caption"
+  | "post_caption"
+  | "tags"
+  | "location"
+  | "author_name"
+  | "author_avatar"
+  | "comments"
+  | "likes_count"
+  | "like_count"
+  | "comment_count"
+>;
 
 const FLAG_KEYS = ['is_public', 'is_story', 'is_chat', 'is_avatar'] as const
 

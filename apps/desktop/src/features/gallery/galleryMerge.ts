@@ -16,9 +16,6 @@ import type { StoredObject } from '../../utils/storage'
  * without mounting the app.
  */
 
-/** The IndexedDB shape the gallery reads (`getAllObjects()`). */
-export type StoredObjectRow = StoredObject
-
 export interface GalleryMergeInput {
   /** Rows the node listed (inbox). */
   inbox: OrbitObject[]
