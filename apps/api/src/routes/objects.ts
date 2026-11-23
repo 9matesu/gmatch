@@ -13,6 +13,17 @@ import { isPartyMediaObject } from '../watchparty'
 import { stripImageMetadata } from '../metadata-strip'
 import { findDisplayName } from '../common/userLookup'
 
+/**
+ * An object id is CLIENT-CHOSEN (an outbox replays the id it minted) and it
+ * becomes a blob-store path component, so it must be a single safe segment.
+ *
+ * Deliberately not `requireId`: that helper enforces an 8-char minimum for
+ * database ids, while the client legitimately registers short ids. The rule
+ * that matters here is "no separators, no traversal" — the length is the
+ * blob store's business, not a security boundary.
+ */
+const SAFE_OBJECT_ID = /^[A-Za-z0-9_-]{1,128}$/
+
 type Bindings = {
   DB: D1Turso
   BUCKET?: LocalBlobStore
@@ -124,7 +135,14 @@ objects.post('/register', orbitAuth, async (c) => {
       return c.json({ error: 'Invalid JSON body' }, 400)
     }
 
-    const objectId = (typeof body.id === 'string' && body.id.trim()) ? body.id.trim() : crypto.randomUUID()
+    // The id is CLIENT-CHOSEN (an outbox replays the id it minted), and it
+    // becomes a blob-store path component. Validate it as an id, not as a path:
+    // a traversal-shaped id used to reach the filesystem verbatim.
+    const requestedId = typeof body.id === 'string' ? body.id.trim() : ''
+    if (requestedId && !SAFE_OBJECT_ID.test(requestedId)) {
+      return c.json({ error: 'Invalid object id' }, 400)
+    }
+    const objectId = requestedId || crypto.randomUUID()
     const contentHash = (typeof body.content_hash === 'string' && body.content_hash.trim().toLowerCase()) || null
     const magnetUri = (typeof body.magnet_uri === 'string' && body.magnet_uri.trim()) || null
     // `let`, not `const`: a registration that carries its bytes REPLACES this

@@ -29,4 +29,31 @@ describe('LocalBlobStore', () => {
     const store = new LocalBlobStore(await mkdtemp(join(tmpdir(), 'blob-')))
     expect(await store.get('objects/nope')).toBeNull()
   })
+
+  /**
+   * Object ids are client-chosen, so the key is attacker-influenced input and
+   * this store is the boundary between "a key" and "a file on disk".
+   */
+  describe('path containment', () => {
+    it('refuses to write a key that escapes the store', async () => {
+      const base = await mkdtemp(join(tmpdir(), 'blob-'))
+      const store = new LocalBlobStore(base)
+      await expect(store.put('../escaped', new Uint8Array([1]))).rejects.toThrow()
+      await expect(store.put('../../etc/passwd', new Uint8Array([1]))).rejects.toThrow()
+      await expect(store.put('objects/../../escaped', new Uint8Array([1]))).rejects.toThrow()
+    })
+
+    it('reads and deletes an escaping key as a miss, never as a file', async () => {
+      const store = new LocalBlobStore(await mkdtemp(join(tmpdir(), 'blob-')))
+      expect(await store.get('../package.json')).toBeNull()
+      // delete() is idempotent and must not throw on an uncontainable key.
+      await expect(store.delete('../package.json')).resolves.toBeUndefined()
+    })
+
+    it('still round-trips a legitimate nested key', async () => {
+      const store = new LocalBlobStore(await mkdtemp(join(tmpdir(), 'blob-')))
+      await store.put('objects/nested/deep/file', new Uint8Array([1, 2, 3]))
+      expect(await store.get('objects/nested/deep/file')).not.toBeNull()
+    })
+  })
 })

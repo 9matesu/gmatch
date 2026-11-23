@@ -87,4 +87,33 @@ describe('register attaches the bytes it was given', () => {
     const got = await get('attach-3')
     expect(got.status).toBe(404) // row is real, bytes are not here
   })
+
+  /**
+   * The id is client-chosen and becomes a blob-store path component, so it is
+   * attacker-influenced input. A traversal-shaped id must be refused at the
+   * route (400), not carried into the filesystem.
+   */
+  describe('rejects a traversal-shaped id', () => {
+    for (const badId of ['../escaped', '../../etc/passwd', 'objects/../../x', 'a/b', '..\\..\\win']) {
+      it(`refuses ${JSON.stringify(badId)}`, async () => {
+        const res = await register({
+          id: badId,
+          mime_type: 'image/png',
+          is_public: 1,
+          data_base64: Buffer.from(PNG).toString('base64'),
+        })
+        expect(res.status).toBe(400)
+      })
+    }
+
+    it('still accepts a legitimate client-chosen id', async () => {
+      const res = await register({
+        id: 'legit-client-id_1',
+        mime_type: 'image/png',
+        is_public: 1,
+        data_base64: Buffer.from(PNG).toString('base64'),
+      })
+      expect(res.status).toBe(200)
+    })
+  })
 })
