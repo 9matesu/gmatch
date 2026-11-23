@@ -1633,13 +1633,26 @@ export default function Home() {
     }, identity).catch(() => { })
   }, [identity, toast])
 
-  const deletePostOnServer = useCallback(async (postId: string) => {
-    if (!identity) return
+  /**
+   * Delete a post on the node. Returns whether it actually happened.
+   *
+   * This used to return void and swallow the failure into a log line, so every
+   * caller that toasted "Post deleted" was guessing. The caller owns the toast;
+    * this owns the truth.
+   */
+  const deletePostOnServer = useCallback(async (postId: string): Promise<boolean> => {
+    if (!identity) return false
     try {
-      await orbitFetch(`/api/posts/${postId}`, { method: 'DELETE' }, identity)
+      const res = await orbitFetch(`/api/posts/${postId}`, { method: 'DELETE' }, identity)
+      if (!res.ok) {
+        logger.warn('[App] DELETE /api/posts/:id failed', res.status)
+        return false
+      }
       setServerPosts(prev => prev.filter(p => p.id !== postId))
+      return true
     } catch (err) {
-      logger.warn('[App] POST /api/report failed', err)
+      logger.warn('[App] DELETE /api/posts/:id threw', err)
+      return false
     }
   }, [identity])
 
