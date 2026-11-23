@@ -93,6 +93,7 @@ import { PostLikersModal } from './PostLikersModal';
 import { FeedHeader } from './FeedHeader';
 import { FeedStatusPills } from './FeedStatusPills';
 import { Linkify } from '../Linkify';
+import { copyText } from '../../utils/clipboard';
 
 export interface PostComment {
   id: string;
@@ -971,8 +972,11 @@ function GMatchFeedImpl({
 
   const handleCopyLink = (post: FeedPost) => {
     playPress(800);
-    void navigator.clipboard.writeText(postShareUrl(post.id));
-    toast?.('Post link copied to clipboard!', 'success');
+    // Awaited so the toast reflects the real outcome instead of firing before
+    // the write is known to have landed.
+    void copyText(postShareUrl(post.id)).then((ok) => {
+      toast?.(ok ? 'Post link copied to clipboard!' : 'Could not copy the link', ok ? 'success' : 'error');
+    });
     setOptionsPost(null);
   };
 

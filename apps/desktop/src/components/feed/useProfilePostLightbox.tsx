@@ -5,6 +5,7 @@ import type { OrbitIdentity } from '@orbit/crypto';
 import { createLikeGovernor, type LikeGovernor } from '../../utils/likeReconcile';
 import { playPress, playMsgReceive } from '../../utils/sounds';
 import { orbitFetch, postShareUrl } from '../../utils/api';
+import { copyText } from '../../utils/clipboard';
 import { ProfileExpandedPost } from './ProfileExpandedPost';
 import { SideSheet } from '../../ui/kit';
 import { SharePostModal } from './SharePostModal';
@@ -238,8 +239,9 @@ export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
       if (onCopyLink) {
         onCopyLink(post);
       } else {
-        void navigator.clipboard?.writeText(postShareUrl(post.id));
-        toast?.('Post link copied to clipboard!', 'success');
+        void copyText(postShareUrl(post.id)).then((ok) => {
+          toast?.(ok ? 'Post link copied to clipboard!' : 'Could not copy the link', ok ? 'success' : 'error');
+        });
       }
       setOptionsPost(null);
     },

@@ -14,6 +14,7 @@ import type { FeedPost } from './GMatchFeed';
 import { ObjectImage } from '../ObjectImage';
 import { orbitFetch, postShareUrl } from '../../utils/api';
 import { userFacingError } from '../../utils/userError';
+import { copyText } from '../../utils/clipboard';
 
 // Last 8 share targets, per device (no server state until a real
 // cross-device need shows up). Cleared on logout via USER_STORAGE_KEYS.
@@ -149,15 +150,11 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
 
   const handleCopyLink = async () => {
     playPress(800);
-    try {
-      await navigator.clipboard?.writeText(permalink);
-      toast?.('Post link copied', 'success');
-      onClose();
-    } catch {
-      // fallback if clipboard fails or in test environments
-      toast?.('Post link copied', 'success');
-      onClose();
-    }
+    // Report the real outcome: the old code toasted "copied" in BOTH branches,
+    // so a failed copy looked identical to a successful one.
+    const ok = await copyText(permalink);
+    toast?.(ok ? 'Post link copied' : 'Could not copy the link', ok ? 'success' : 'error');
+    if (ok) onClose();
   };
 
   return (
