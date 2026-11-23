@@ -60,8 +60,8 @@ export function ProfileView({
   loadUsers: () => void;
   setArchivedPostIds: React.Dispatch<React.SetStateAction<Set<string>>>;
   setDeletedPostIds: React.Dispatch<React.SetStateAction<Set<string>>>;
-  /** Resolves true only when the node confirmed the delete. */
-  deletePostOnServer: (postId: string) => Promise<boolean>;
+  /** Resolves how the delete went: node-confirmed, local-only, or failed. */
+  deletePostOnServer: (postId: string) => Promise<'deleted' | 'local' | 'failed'>;
   users: Array<{ id: string; display_name?: string }>;
   onSendDm: (peerId: string, text: string) => Promise<boolean>;
   onPersistLike: (postId: string, liked: boolean) => Promise<number | undefined>;
@@ -113,16 +113,16 @@ export function ProfileView({
           toast('Post archived', 'info');
         }}
         onDeletePost={async (id) => {
-          // Only claim the delete once the node confirmed it. The old code
-          // added the tombstone and toasted success before the request even
-          // resolved, so a failed delete read as a completed one.
-          const ok = await deletePostOnServer(id);
-          if (ok) {
-            setDeletedPostIds((prev) => new Set(prev).add(id));
-            toast('Post deleted', 'success');
-          } else {
+          // Only claim the delete once it actually happened. A post that never
+          // reached the node (a local-only outbox row) is removed locally, so
+          // that is a success with different wording, not a failure.
+          const result = await deletePostOnServer(id);
+          if (result === 'failed') {
             toast('Could not delete the post', 'error');
+            return;
           }
+          setDeletedPostIds((prev) => new Set(prev).add(id));
+          toast(result === 'local' ? 'Post removed from this device' : 'Post deleted', 'success');
         }}
         followingIds={followingIds}
         users={users}

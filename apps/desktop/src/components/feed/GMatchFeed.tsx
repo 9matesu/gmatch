@@ -183,7 +183,6 @@ function GMatchFeedImpl({
   onPersistReport,
   onReportComment,
   onPublishPost,
-  onDeletePostApi,
   onDeletePost,
   onArchivePost,
   onRepostPost,
@@ -229,7 +228,6 @@ function GMatchFeedImpl({
   onPersistReport?: (postId: string, reason: string) => void;
   onReportComment?: (commentId: string) => void;
   onPublishPost?: (mediaUrls: string[], caption: string, tags: string[]) => Promise<boolean>;
-  onDeletePostApi?: (postId: string) => void;
   onDeletePost?: (postId: string) => void;
   onArchivePost?: (postId: string) => void;
   onRepostPost?: (post: FeedPost) => void;
@@ -1761,7 +1759,7 @@ function GMatchFeedImpl({
           onShare={(p) => setSharingPost(p)}
           onCopyLink={handleCopyLink}
           onArchive={onArchivePost}
-          onDelete={(id) => { onDeletePostApi?.(id); onDeletePost?.(id); }}
+          onDelete={(id) => onDeletePost?.(id)}
           onReport={(p) => setReportingPost(p)}
         />,
         document.body,

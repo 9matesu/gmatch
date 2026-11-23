@@ -16,6 +16,7 @@ import {
   setOutboxState,
   pruneOutbox,
   flushPostOutbox,
+  removeOutboxEntry,
   OUTBOX_KEY,
 } from './postOutbox';
 
@@ -53,6 +54,20 @@ describe('postOutbox store (Phase 3b)', () => {
     setOutboxState('o1', 'replicated');
     pruneOutbox(0, Date.now() + 1);
     expect(listOutbox().map((e) => e.objectId)).toEqual(['o2']);
+  });
+
+  it('removeOutboxEntry removes a local-only row and reports what it was', () => {
+    enqueueOutbox({ objectId: 'o1', postGroup: null, registerBody: regBody('o1'), gossipInput: null });
+    const removed = removeOutboxEntry('o1');
+    expect(removed?.objectId).toBe('o1');
+    expect(listOutbox()).toHaveLength(0);
+  });
+
+  it('removeOutboxEntry returns null when the object was never outboxed', () => {
+    enqueueOutbox({ objectId: 'o1', postGroup: null, registerBody: regBody('o1'), gossipInput: null });
+    expect(removeOutboxEntry('nope')).toBeNull();
+    // the unrelated row is untouched
+    expect(listOutbox().map((e) => e.objectId)).toEqual(['o1']);
   });
 });
 

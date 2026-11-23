@@ -85,6 +85,24 @@ export function enqueueOutbox(entry: {
   return created;
 }
 
+/**
+ * Remove one object from the outbox and report what it was.
+ *
+ * Deleting a post that only exists locally (a publish that never reached the
+ * node, or an offline compose) must not send a DELETE to the node: there is no
+ * row there, so the request could only 404. This is the one place that knows
+ * whether a post is local-only, so the delete path asks it instead of guessing.
+ *
+ * Returns null when the object was not in the outbox at all.
+ */
+export function removeOutboxEntry(objectId: string): PostOutboxEntry | null {
+  const list = readAll()
+  const found = list.find((e) => e.objectId === objectId)
+  if (!found) return null
+  writeAll(list.filter((e) => e.objectId !== objectId))
+  return found
+}
+
 export function setOutboxState(objectId: string, state: OutboxState): void {
   const list = readAll();
   const found = list.find((e) => e.objectId === objectId);

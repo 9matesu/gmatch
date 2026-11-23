@@ -263,6 +263,16 @@ product path.
   never doubles; a post the node never lists stays visible as locally durable
   instead of vanishing, and a failed upload inserts nothing (the modal reports
   the reason and stays open).
+- Deleting a post reports what actually happened (2026-11-23): a post lives in
+  one of three places, and the delete path distinguishes them instead of toasting
+  one message for all. `deletePostOnServer` returns `deleted` (the node confirmed,
+  or it was already gone — a 404 is the goal state, not a failure), `local` (the
+  post never reached the node: it is an outbox row, so removing it from
+  `gmatch_post_outbox_v1` IS the delete and no request is made), or `failed`
+  (the node refused or was unreachable). The feed and profile toasts follow the
+  result: `local` says "Post removed from this device", only `failed` shows an
+  error. Before this, a local-only test post answered 404 and read as "Could not
+  delete the post" for something that had actually been removed.
 - **Reading the timeline is a stated state, not a guess (2026-10-19).** The feed
   carries an explicit status (`idle|loading|ready|offline|error`), so an empty
   list says which one it is instead of implying "nothing here". The snapshot read

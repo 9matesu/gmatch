@@ -1634,25 +1634,47 @@ export default function Home() {
   }, [identity, toast])
 
   /**
-   * Delete a post on the node. Returns whether it actually happened.
+   * Delete a post, and say what actually happened.
    *
-   * This used to return void and swallow the failure into a log line, so every
-   * caller that toasted "Post deleted" was guessing. The caller owns the toast;
-    * this owns the truth.
+   * Three outcomes, because a post can be in three places:
+   *  - `deleted`  the node confirmed the delete (or the row was already gone)
+   *  - `local`    the post never reached the node (an outbox row): removing it
+   *               from the durable outbox IS the delete, and there is no request
+   *               to make. Sending one would 404 and read as a failure.
+   *  - `failed`   the node refused or was unreachable
+   *
+   * This used to return a bare boolean, so a local-only post reported a failure
+   * and the profile toasted "Could not delete the post" for something that had
+   * actually been removed.
    */
-  const deletePostOnServer = useCallback(async (postId: string): Promise<boolean> => {
-    if (!identity) return false
+  const deletePostOnServer = useCallback(async (postId: string): Promise<'deleted' | 'local' | 'failed'> => {
+    if (!identity) return 'failed'
+    // Local-only: an outbox row is this device's own copy, so the delete is the
+    // removal. No network call, and nothing to 404.
+    try {
+      const { removeOutboxEntry } = await import('./services/postOutbox')
+      if (removeOutboxEntry(postId)) {
+        setServerPosts(prev => prev.filter(p => p.id !== postId))
+        return 'local'
+      }
+    } catch { /* outbox unavailable (private mode): fall through to the node */ }
     try {
       const res = await orbitFetch(`/api/posts/${postId}`, { method: 'DELETE' }, identity)
+      if (res.status === 404) {
+        // Already gone from the node (a replica that never had it, or a post
+        // deleted elsewhere): the row is not there, so the goal state holds.
+        setServerPosts(prev => prev.filter(p => p.id !== postId))
+        return 'deleted'
+      }
       if (!res.ok) {
         logger.warn('[App] DELETE /api/posts/:id failed', res.status)
-        return false
+        return 'failed'
       }
       setServerPosts(prev => prev.filter(p => p.id !== postId))
-      return true
+      return 'deleted'
     } catch (err) {
       logger.warn('[App] DELETE /api/posts/:id threw', err)
-      return false
+      return 'failed'
     }
   }, [identity])
 
@@ -3279,10 +3301,18 @@ export default function Home() {
       toast('Archive failed. Try again.', 'error');
     }
   });
-  const onDeletePost = useStableCallback((id: string) => {
+  const onDeletePost = useStableCallback(async (id: string) => {
+    // One funnel for feed deletes. It used to fire deletePostOnServer without
+    // awaiting it and toast success unconditionally, so a local-only or failed
+    // delete still claimed "Post deleted". GMatchFeed also called the raw
+    // deletePostOnServer alongside this, issuing the request twice.
+    const result = await deletePostOnServer(id);
+    if (result === 'failed') {
+      toast('Could not delete the post', 'error');
+      return;
+    }
     setDeletedPostIds((prev) => new Set(prev).add(id));
-    deletePostOnServer(id);
-    toast('Post deleted', 'success');
+    toast(result === 'local' ? 'Post removed from this device' : 'Post deleted', 'success');
   });
   const onRepostPost = useStableCallback((post: FeedPost) => {
     setRepostedPosts((prev) => [
@@ -3499,7 +3529,6 @@ export default function Home() {
                                 feedStatus={feedStatus}
                                 restoredFromCache={restoredFromCache}
                                 onResolveMissingPost={resolvePostById}
-                                onDeletePostApi={deletePostOnServer}
                                 onOpenNetwork={onOpenNetwork}
                                 onUserContext={onUserContext}
                                 onArchivePost={onArchivePost}
