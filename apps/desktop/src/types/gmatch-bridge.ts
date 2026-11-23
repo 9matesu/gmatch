@@ -85,7 +85,7 @@ export interface GmatchBridge {
   wallpaperSetData?: (
     buf: ArrayBuffer,
     mime: string,
-  ) => Promise<{ ok: boolean; hadPrevious?: boolean; reason?: 'unsupported-platform' | 'no-data' | 'set-failed' | 'error' }>
+  ) => Promise<{ ok: boolean; hadPrevious?: boolean; reason?: 'unsupported-platform' | 'no-data' | 'set-failed' | 'no-powershell' | 'restore-failed' | 'error' }>
   wallpaperRestore?: () => Promise<{ ok: boolean; reason?: string }>
   wallpaperCleanupFiles?: () => Promise<{ ok: boolean }>
   grantCameraOnce?: () => Promise<{ ok: boolean }>

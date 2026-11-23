@@ -628,6 +628,8 @@ export default function Home() {
       const out = await bridge(await blob.arrayBuffer(), blob.type);
       if (out?.ok) toast('OS wallpaper updated', 'success');
       else if (out?.reason === 'unsupported-platform') toast('OS wallpaper is Windows-only. Try "Set as app background" instead.', 'warning');
+      else if (out?.reason === 'no-powershell') toast('OS wallpaper needs Windows PowerShell (not available)', 'error');
+      else if (out?.reason === 'no-data') toast('OS wallpaper needs an image file', 'warning');
       else toast('Could not set OS wallpaper', 'error');
     } catch {
       toast('Could not set OS wallpaper', 'error');

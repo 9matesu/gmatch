@@ -48,6 +48,30 @@ function restorePlan(platform, swapped, previousPath) {
 }
 
 /**
+ * The outcome `setWallpaperFromBuffer` reports for a raw `set` run result.
+ *
+ * A missing PowerShell (`no-powershell`: PATH or policy) is a different problem
+ * from a command that ran and failed (`set-failed`), and the renderer shows a
+ * different message for each — so the distinction has to survive the run.
+ */
+function classifySetResult(result) {
+  if (result && result.ok) return { ok: true }
+  const reason = result && result.reason === 'no-powershell' ? 'no-powershell' : 'set-failed'
+  return { ok: false, reason }
+}
+
+/**
+ * The wallpaper path from a raw `get` run result, or null when there is none.
+ * An empty buffer is a solid-colour desktop, not a missing path: returning null
+ * lets restore skip instead of blanking the background.
+ */
+function getWallpaperPath(result) {
+  if (!result || !result.ok) return null
+  const p = String(result.out || '').trim()
+  return p || null
+}
+
+/**
  * How many temp files to keep on disk. Windows copies the file into its own
  * store when SPI runs, so these are disposable — but not before the swap
  * completes, hence a small cap rather than zero.
@@ -62,4 +86,6 @@ module.exports = {
   rejectReason,
   restorePlan,
   tempFileCap,
+  classifySetResult,
+  getWallpaperPath,
 }
