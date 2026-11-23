@@ -801,7 +801,7 @@ export function ServersView({
     setConnectingId(s.id)
     try {
       if (!mine(s)) {
-        const out = await joinServer(s, toast, askPassword)
+        const out = await joinServer(s, toast, askPassword, identity)
         if (out === 'connected') onServerJoined?.(s)
         if (out !== 'relaunching') setConnectingId(null)
         return
@@ -993,7 +993,7 @@ export function ServersView({
         }
         return
       }
-      const out = await joinServer(s, toast, askPassword)
+      const out = await joinServer(s, toast, askPassword, identity)
       if (out === 'connected' && onServerJoined) {
         onServerJoined(s)
       }
@@ -1028,7 +1028,7 @@ export function ServersView({
     // Persist before the relaunch kills the process.
     const serverObj = { id: `mask:${host}`, name: coord.name, owner_id: '', password_required: 0, endpoint_hint: host }
     writeDirectoryCache(mergeDirectory(readDirectoryCache(), [serverObj]))
-    const res = await joinServer(serverObj, toast, askPassword)
+    const res = await joinServer(serverObj, toast, askPassword, identity)
     if (res === 'connected') {
       onServerJoined?.(serverObj)
     }
