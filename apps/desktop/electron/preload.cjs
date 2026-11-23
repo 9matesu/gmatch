@@ -7,6 +7,7 @@ if (apiArg) contextBridge.exposeInMainWorld('__API_BASE__', apiArg.slice('--api-
 
 contextBridge.exposeInMainWorld('gmatch', {
   booruFetch: (request) => ipcRenderer.invoke('booru:fetch', request),
+  booruTimings: () => ipcRenderer.invoke('booru:timings'),
   cacheImage: (url) => ipcRenderer.invoke('cache:image', url),
   cacheStats: () => ipcRenderer.invoke('cache:stats'),
   clearCache: () => ipcRenderer.invoke('cache:clear'),

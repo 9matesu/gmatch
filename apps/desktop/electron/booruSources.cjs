@@ -15,6 +15,7 @@ const { firstAnswer } = require('./booru-sources-core.cjs')
 // src/game/matchRule.ts). The ladder over-FETCHES, but only posts answering the
 // FULL query are kept — never the widened variant's meaning.
 const { matchesQuery } = require('./matchRule.cjs')
+const { categoriesOf } = require('./providers/contentProvider.cjs')
 
 function queryVariants(query) {
   // OVER-FETCH LADDER, deliberately looser than the query. Narrow providers
@@ -72,9 +73,9 @@ const COOLDOWN_429_MS = 300_000
 // exist to answer, not to compete: racing them beside tbib meant an 8s
 // imhentai gallery crawl could occupy lanes and budget while a mirror that
 // answers in 300ms was never started. Two phases keep the cheap answer cheap.
-const FAST_PHASE = new Set(['dapi', 'moebooru', 'paheal', 'redgifs', 'realhtml', 'booruorg'])
+const FAST_PHASE = new Set(['dapi', 'moebooru', 'paheal', 'redgifs', 'realhtml', 'booruorg', 'mediaq'])
 
-function createFetchBooru({ sources, httpGet, cache, blocked = () => false, deadlineMs = ROUND_DEADLINE_MS, queryVariants: ladderOverride }) {
+function createFetchBooru({ sources, httpGet, cache, blocked = () => false, deadlineMs = ROUND_DEADLINE_MS, queryVariants: ladderOverride, metrics }) {
   let rrIndex = 0
   // sourceId -> timestamp until which it is skipped.
   const unhealthyUntil = new Map()
@@ -106,21 +107,30 @@ function createFetchBooru({ sources, httpGet, cache, blocked = () => false, dead
     // Probes (tag validation, page 0) need deterministic first pages, not a
     // random draw — mirrors the renderer's isProbe handling in dapiPass.
     const deterministic = probe === true || page === 0
-    const fetchOpts = deterministic ? { deterministic: true } : undefined
+    const roundStart = Date.now()
+    let usedSlow = false
+    let firstResultMs = null
 
     // READ the memo fetchBooru already writes if fresh isn't requested.
     // # ponytail: fresh=true bypasses 10-minute memo so idle loop gets new images
     const memo = !fresh ? cache?.getFeedCache?.(query) : null
     if (memo && memo.length > 0) {
+      metrics?.round({ totalMs: Date.now() - roundStart, resultCount: memo.length, fromCache: true, source: 'cache' })
       return { posts: memo, source: 'cache', ok: true, query, cached: true }
     }
 
     const useReal = allowReal !== false
     const useHentai = allowHentai !== false
+    // The category flags travel to the provider so a multi-category provider
+    // (mediaq serves both) queries only the sites the player enabled.
+    const fetchOpts = { deterministic, allowReal: useReal, allowHentai: useHentai }
     const filtered = sources.filter((s) => {
-      if (s.category === 'real' && !useReal) return false
-      if (s.category === 'hentai' && !useHentai) return false
-      return true
+      const cats = categoriesOf(s)
+      if (cats.length === 0) return true
+      // Include a provider if it serves AT LEAST ONE enabled category — a
+      // multi-category provider (mediaq serves both) must not be dropped when
+      // only one of its categories is disabled.
+      return cats.some((c) => (c === 'real' ? useReal : c === 'hentai' ? useHentai : true))
     })
     // NO fallback to `sources` when the category filter empties the pool: the
     // player switched a category off and the toggle must actually hold. The
@@ -128,6 +138,7 @@ function createFetchBooru({ sources, httpGet, cache, blocked = () => false, dead
     // "nothing enabled here" — an honest empty round, not the disabled category.
     const pool = filtered
     if (pool.length === 0) {
+      metrics?.round({ totalMs: Date.now() - roundStart, resultCount: 0, source: null })
       return { posts: [], source: null, ok: false, error: 'no enabled source for this category' }
     }
     // The ladder is injectable (tests pin it to a single variant to keep the
@@ -146,6 +157,7 @@ function createFetchBooru({ sources, httpGet, cache, blocked = () => false, dead
             // to finish (httpGet owns its own timeout) and their results
             // discarded.
             if (Date.now() >= deadline) return null
+            const started = Date.now()
             try {
               const posts = source.fetch
                 ? await source.fetch(variant, n, fetchOpts)
@@ -157,10 +169,13 @@ function createFetchBooru({ sources, httpGet, cache, blocked = () => false, dead
               // could satisfy a two-tag query and the count would look healthy
               // while meaning nothing.
               const kept = (posts || []).filter((p) => matchesQuery(p.tags, query, { trustUntagged: true }))
+              metrics?.attempt(source.id, Date.now() - started, kept.length > 0 ? 'ok' : 'empty')
+              if (kept.length > 0 && firstResultMs === null) firstResultMs = Date.now() - roundStart
               // An empty answer is NOT a failure — this source simply has
               // nothing for this query. Do not cool it.
               return kept.length > 0 ? { source, variant, posts: kept } : null
             } catch (err) {
+              metrics?.attempt(source.id, Date.now() - started, /quality-gate timeout|aborted|timeout/i.test(String((err && err.message) || err || '')) ? 'timeout' : 'error')
               // Distinguish "we ran out of budget" from "this mirror is unwell".
               // httpGet reports both as errors, and cooling a healthy mirror
               // because the round was slow is exactly the bug the renderer
@@ -201,6 +216,7 @@ function createFetchBooru({ sources, httpGet, cache, blocked = () => false, dead
 
     let { posts: winner, meta } = await runPhase(fast)
     if (!winner && slow.length > 0 && Date.now() < deadline) {
+      usedSlow = true
       const second = await runPhase(slow)
       winner = second.posts
       meta = second.meta
@@ -216,15 +232,18 @@ function createFetchBooru({ sources, httpGet, cache, blocked = () => false, dead
       // under the FULL query: the gate above guarantees `winner` answers it,
       // so a memo entry can never hand back posts that answer fewer tags.
       if (!fresh) cache?.setFeedCache?.(query, winner)
+      metrics?.round({ totalMs: Date.now() - roundStart, firstResultMs, resultCount: winner.length, source: meta.source.id, fallback: usedSlow })
       return { posts: winner, source: meta.source.id, ok: true, query }
     }
 
     // Nothing in time, or everything empty: a stale memo beats a bare failure.
     const stale = cache?.getFeedCache?.(query)
     if (stale && stale.length > 0) {
+      metrics?.round({ totalMs: Date.now() - roundStart, resultCount: stale.length, fromCache: true, source: 'cache', fallback: usedSlow })
       return { posts: stale, source: 'cache', ok: true, query, cached: true, timedOut: true }
     }
     rrIndex = (rrIndex + 1) % pool.length
+    metrics?.round({ totalMs: Date.now() - roundStart, resultCount: 0, source: null, fallback: usedSlow })
     return { posts: [], source: null, ok: false, timedOut: Date.now() >= deadline }
   }
 }

@@ -1,12 +1,15 @@
 'use strict'
 // Booru fetch bridge (the main process is the authority; the renderer only
 // receives already-filtered posts) + pmv:playlist lookups.
-module.exports = function registerBooruHandlers({ ipcMain, fetchBooru, setRoundExcludes, httpGet }) {
+module.exports = function registerBooruHandlers({ ipcMain, fetchBooru, setRoundExcludes, httpGet, feedMetrics }) {
   ipcMain.handle('booru:fetch', (_event, payload) => {
     // Player excludes arrive per round and become query negatives.
     setRoundExcludes((payload && payload.excludes) || [])
     return fetchBooru(payload ?? {})
   })
+
+  // Read-only feed search metrics (observability, never rendered in the UI).
+  ipcMain.handle('booru:timings', () => (feedMetrics ? feedMetrics.summary() : null))
 
   ipcMain.handle('pmv:playlist', async (_event, id) => {
     const rawId = String(id || '').trim()

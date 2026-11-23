@@ -109,6 +109,14 @@ per capability with its dependencies injected (`secure`, `cache`, `vault`,
 2k-line orchestrator; `node --check` + `eslint electron` cover them (there is no
 tsc for `.cjs`).
 
+The `booru` group also exposes `booru:timings` (read-only feed search metrics
+from `electron/feedMetrics.cjs`). Its fetch path may include an optional
+**mediaq** content provider (`electron/providers/mediaq.cjs`): a self-hosted
+REST instance at `GMATCH_MEDIAQ_URL` (default `http://127.0.0.1:8765`). It
+auto-probes and is silently skipped when absent, so a packaged build with no
+mediaq behaves exactly as before (local sources only). Python is not bundled —
+mediaq is an optional local service, never a dependency of the app.
+
 1. `requestSingleInstanceLock` — duplicate launches exit after focusing.
 2. `migrateUserData()` — one-shot move from the legacy `@goongrid` profile.
 3. `mainLog()` + `uncaughtException`/`unhandledRejection` handlers — a fatal

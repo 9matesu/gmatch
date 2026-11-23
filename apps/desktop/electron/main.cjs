@@ -363,6 +363,42 @@ async function httpGet(url, headers, timeoutMs) {
   })
 }
 
+/**
+ * POST JSON with the same timeout/abort contract as httpGet. Used by the mediaq
+ * ContentProvider (the only POST caller). An aborted request is a TIMEOUT, not a
+ * network failure, so a slow/absent mediaq is cooled and skipped like any slow
+ * mirror instead of stalling the round.
+ */
+async function postJson(url, body, timeoutMs, signal) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs || TIMEOUT_MS)
+  const unref = timer.unref
+  if (typeof unref === 'function') unref.call(timer)
+  if (signal) {
+    if (signal.aborted) controller.abort()
+    else signal.addEventListener('abort', () => controller.abort(), { once: true })
+  }
+  try {
+    const doFetch = net && typeof net.fetch === 'function' ? net.fetch.bind(net) : fetch
+    const res = await doFetch(url, {
+      method: 'POST',
+      headers: { 'User-Agent': UA, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+      redirect: 'follow',
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return await res.json()
+  } catch (err) {
+    if (err && (err.name === 'AbortError' || /abort/i.test(String(err.message || err)))) {
+      throw new Error('quality-gate timeout')
+    }
+    throw err
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 // --- source parsers -------------------------------------------------------
 
 function parseDanbooruJson(body, baseUrl, prefix = '') {
@@ -1133,6 +1169,15 @@ const SOURCE_FETCHERS = {
 }
 
 // Round-robin over sources with mirror health tracking (BOORU-API.md §7).
+// mediaq ContentProvider (self-hosted REST; default localhost, auto-probe, and
+// silently off when nothing answers). One provider serves BOTH categories — its
+// capabilities carry that, so it is never duplicated per category.
+const { createMediaqProvider } = require('./providers/mediaq.cjs')
+const { createFeedMetrics } = require('./feedMetrics.cjs')
+const MEDIAQ_URL = process.env.GMATCH_MEDIAQ_URL || 'http://127.0.0.1:8765'
+const mediaqProvider = createMediaqProvider({ baseUrl: MEDIAQ_URL, postJson })
+const feedMetrics = createFeedMetrics()
+
 // Explicit-rated human sources categorized as 'real' or 'hentai'. Built from
 // shared/sources.json — before this, main and the renderer kept independent
 // lists and allgirl.booru.org / rule34.booru.org shipped main-only.
@@ -1147,13 +1192,15 @@ const SOURCES = booruSources.flatMap((s) => {
   // lane while a mirror that answers in 300ms is never tried (FAST_PHASE).
   return [{ ...make(s), kind: s.kind }]
 })
-mainLog(`[booru] ${SOURCES.length} sources from registry: ${SOURCES.map((s) => s.id).join(', ')}`)
+SOURCES.push(mediaqProvider)
+mainLog(`[booru] ${SOURCES.length} sources: ${SOURCES.map((s) => s.id).join(', ')} (mediaq at ${MEDIAQ_URL}; auto-probe, off when unreachable)`)
 
 const fetchBooru = createFetchBooru({
   sources: SOURCES,
   httpGet,
   cache: imageCache,
   blocked: isQueryBlocked,
+  metrics: feedMetrics,
 })
 
 function createWindow() {
@@ -1286,7 +1333,7 @@ app.whenReady().then(async () => {
   protocol.handle(imageCache.SCHEME, (request) => imageCache.serveImage(request))
   protocol.handle(vault.SCHEME, (request) => vault.serveVault(request))
   customFolders.init(app.getPath('userData'), { ipcMain, BrowserWindow })
-  registerBooruHandlers({ ipcMain, fetchBooru, setRoundExcludes, httpGet })
+  registerBooruHandlers({ ipcMain, fetchBooru, setRoundExcludes, httpGet, feedMetrics })
   // Secure KV + encrypted picture cache: handlers live in ./ipc/*.cjs (deps injected).
   registerSecureHandlers({ ipcMain, secureKV, secureAvailable })
   registerCacheHandlers({ ipcMain, imageCache })

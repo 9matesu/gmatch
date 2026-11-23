@@ -13,9 +13,32 @@ export interface GmatchUpdateStatus {
   manual?: boolean
 }
 
+/** Per-provider feed search metrics (from electron/feedMetrics.cjs). */
+export interface FeedProviderMetrics {
+  attempts: number
+  oks: number
+  empties: number
+  timeouts: number
+  errors: number
+  medianMs: number | null
+}
+
+/** Aggregate feed search metrics (from electron/feedMetrics.cjs). */
+export interface FeedMetricsSummary {
+  rounds: number
+  totalLatencyMs: number | null
+  firstResultMs: number | null
+  resultCount: number | null
+  cacheHitRate: number | null
+  fallbacks: number
+  providers: Record<string, FeedProviderMetrics>
+}
+
 /** The single source of truth for the preload bridge surface. */
 export interface GmatchBridge {
   booruFetch?: (req: BooruRequest) => Promise<BooruResponse>
+  /** Read-only feed search metrics (observability). Never a UI surface. */
+  booruTimings?: () => Promise<FeedMetricsSummary>
   cacheImage?: (url: string) => Promise<{ local: string | null }>
   cacheStats?: () => Promise<{ files: number; bytes: number }>
   clearCache?: () => Promise<{ files: number; bytes: number }>

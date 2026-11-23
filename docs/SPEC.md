@@ -229,6 +229,20 @@ the main-process parsers are pinned by fixtures (`electron/imhentai.test.cjs`,
 `booru-*.test.cjs`) and the blocklist by `blocklistParity.test.ts`. A provider
 change lands in main first; the renderer copy is a dev convenience, not a second
 product path.
+- **Content providers, one contract (2026-11-23).** A source is a
+  `ContentProvider` (`electron/providers/contentProvider.cjs`):
+  `{ id, capabilities, fetch }`, where `capabilities.categories` is METADATA
+  (mediaq serves both `real` and `hentai`), so a provider is never duplicated
+  per category. `createFetchBooru` routes by capability and gates every result
+  on the FULL query — it never learns a provider's endpoints or schema.
+- **mediaq is an optional remote provider (`electron/providers/mediaq.cjs`).**
+  A self-hosted REST instance (Python; NOT bundled) at `GMATCH_MEDIAQ_URL`
+  (default `http://127.0.0.1:8765`). It auto-probes: when nothing answers it is
+  cooled and skipped, so the app is unchanged offline and needs no configuration.
+  One provider serves the `real` tier (tube sites) and the hentai/booru niche
+  (nhentai, rule34, gelbooru). Feed search metrics live in
+  `electron/feedMetrics.cjs` (read-only over `booru:timings`; never a UI
+  surface). A dependency installer for mediaq is a follow-up, not part of the app.
 
 ### 6b. Feed/market queries (user spec: player picks, no hardcodes)
 
