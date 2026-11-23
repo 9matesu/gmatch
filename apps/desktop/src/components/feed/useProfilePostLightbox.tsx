@@ -351,7 +351,6 @@ export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
             setOptionsPost(null);
           }}
           onReport={handleReport}
-          toast={toast}
           zIndexClass={zIndexClass}
         />
       )}

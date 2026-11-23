@@ -1759,7 +1759,6 @@ function GMatchFeedImpl({
           onArchive={onArchivePost}
           onDelete={(id) => { onDeletePostApi?.(id); onDeletePost?.(id); }}
           onReport={(p) => setReportingPost(p)}
-          toast={toast}
         />,
         document.body,
       )}

@@ -108,8 +108,12 @@ describe('useProfilePostLightbox (inline expansion, no modal)', () => {
     await screen.findByPlaceholderText(/add a comment/i);
     const optionsBtn = document.body.querySelector('button:has(.lucide-ellipsis)') as HTMLElement;
     await userEvent.click(optionsBtn);
+    // Copy Link works here (the lightbox wires onCopyLink).
     expect(await screen.findByText(/copy link/i)).toBeInTheDocument();
-    expect(await screen.findByText(/repost to profile/i)).toBeInTheDocument();
+    // Repost does NOT: this surface never passes onRepost. The row used to
+    // render anyway and fire a "Post shared to your profile feed!" toast while
+    // nothing happened - the bug this assertion now pins shut.
+    expect(screen.queryByText(/repost to profile/i)).not.toBeInTheDocument();
   });
 
   it('send button opens the share sheet', async () => {
