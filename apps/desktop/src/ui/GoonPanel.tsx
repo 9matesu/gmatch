@@ -782,7 +782,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               onClick={() => setDropsOpen((v) => !v)}
               aria-expanded={dropsOpen}
               aria-label={`${pendingDrops.length} novelty drops waiting`}
-              title="KO drops. Adopt a tag, ban an anti-tag, one click each"
+              title="KO drops. Adopt (+) or ban (✕) any tag from the foe"
               className={`${MONO} inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border border-danger/40 bg-danger/10 px-2.5 py-1 text-xs font-bold text-danger-fg hover:bg-danger/20 transition-colors`}
             >
               <Gift size={14} weight="bold" className="text-danger-fg" />
@@ -808,26 +808,30 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                       </button>
                     </div>
                     <div className="mt-1.5 flex flex-wrap gap-1">
-                      {drop.suggestedTag && (
-                        <button
-                          type="button"
-                          onClick={() => claimDropTag(drop.id)}
-                          title={`Adopt +${drop.suggestedTag} into your feed`}
-                          className={`${MONO} cursor-pointer rounded-md border border-success/40 bg-success/15 px-2 py-0.5 text-2xs font-bold text-success-fg hover:bg-success/25 transition-colors`}
+                      {drop.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className={`${MONO} inline-flex items-center overflow-hidden rounded-md border border-edge bg-glass-w8 text-2xs font-bold`}
                         >
-                          + {drop.suggestedTag}
-                        </button>
-                      )}
-                      {drop.suggestedAntiTag && (
-                        <button
-                          type="button"
-                          onClick={() => claimDropAntiTag(drop.id)}
-                          title={`Ban ${drop.suggestedAntiTag} from your feed`}
-                          className={`${MONO} inline-flex items-center gap-1 cursor-pointer rounded-md border border-danger/40 bg-danger/10 px-2 py-0.5 text-2xs font-bold text-danger-fg hover:bg-danger/20 transition-colors`}
-                        >
-                          <X size={10} weight="bold" className="shrink-0" /> {drop.suggestedAntiTag}
-                        </button>
-                      )}
+                          <button
+                            type="button"
+                            onClick={() => claimDropTag(drop.id, tag)}
+                            title={`Adopt +${tag} into your feed`}
+                            className="cursor-pointer px-1.5 py-0.5 text-success-fg hover:bg-success/20 transition-colors"
+                          >
+                            + {tag}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => claimDropAntiTag(drop.id, tag)}
+                            title={`Ban ${tag} from your feed`}
+                            aria-label={`Ban ${tag}`}
+                            className="cursor-pointer border-l border-edge px-1 py-0.5 text-danger-fg hover:bg-danger/20 transition-colors"
+                          >
+                            <X size={10} weight="bold" />
+                          </button>
+                        </span>
+                      ))}
                     </div>
                   </div>
                 ))}

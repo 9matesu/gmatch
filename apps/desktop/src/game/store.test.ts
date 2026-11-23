@@ -747,23 +747,32 @@ describe('3x3 grid mode', () => {
     expect(s.pendingDrops.length).toBeGreaterThanOrEqual(1)
   })
 
-  it('claimDropTag adopts the suggested tag, claimDropAntiTag adds the exclude', () => {
+  it('claimDropTag adopts one tag, claimDropAntiTag bans another, drop survives until empty', () => {
     useGame.setState({
       tags: [],
       userExcludes: [],
       pendingDrops: [
-        { id: 'd1', foeTitle: 'milf', suggestedTag: 'milf', suggestedAntiTag: 'feet', timestamp: Date.now() },
+        { id: 'd1', foeTitle: 'milf', tags: ['milf', 'feet', 'blonde'], timestamp: Date.now() },
       ],
     })
-    expect(useGame.getState().claimDropTag('d1')).toBe(true)
+    // Adopt one tag: it joins owned, and the drop keeps its other tags so the
+    // player can keep acting on the same foe.
+    expect(useGame.getState().claimDropTag('d1', 'milf')).toBe(true)
     expect(useGame.getState().tags.map((t) => t.name)).toContain('milf')
-    useGame.setState({
-      pendingDrops: [
-        { id: 'd2', foeTitle: 'x', suggestedAntiTag: 'feet', timestamp: Date.now() },
-      ],
-    })
-    expect(useGame.getState().claimDropAntiTag('d2')).toBe(true)
+    expect(useGame.getState().pendingDrops[0].tags).toEqual(['feet', 'blonde'])
+    // Ban another: it becomes an exclude, the drop still has the last tag.
+    expect(useGame.getState().claimDropAntiTag('d1', 'feet')).toBe(true)
     expect(useGame.getState().userExcludes).toContain('feet')
+    expect(useGame.getState().pendingDrops[0].tags).toEqual(['blonde'])
+    // Claiming the last tag removes the drop entirely.
+    expect(useGame.getState().claimDropTag('d1', 'blonde')).toBe(true)
+    expect(useGame.getState().pendingDrops).toHaveLength(0)
+    // A tag the drop does not carry is refused, and the drop is left alone.
+    useGame.setState({
+      pendingDrops: [{ id: 'd2', foeTitle: 'x', tags: ['x'], timestamp: Date.now() }],
+    })
+    expect(useGame.getState().claimDropTag('d2', 'nope')).toBe(false)
+    expect(useGame.getState().pendingDrops).toHaveLength(1)
   })
 
   it('gridSizeForMode sizes layouts and reorderGrid swaps tiles', () => {

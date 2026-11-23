@@ -105,8 +105,8 @@ export interface GameState {
   reorderGrid: (from: number, to: number) => void
   /** KO novelty pipeline (session-only): generated per drain from foe tags. */
   pendingDrops: KoDrop[]
-  claimDropTag: (id: string) => boolean
-  claimDropAntiTag: (id: string) => boolean
+  claimDropTag: (id: string, tag: string) => boolean
+  claimDropAntiTag: (id: string, tag: string) => boolean
   dismissDrop: (id: string) => void
   /** Player-picked starter tags + extra excludes (setup screen, one shot). */
   setupComplete: boolean
@@ -472,22 +472,24 @@ function gallerySpoils(s: GameState, post: BooruPost, clicksOnFoe: number, now: 
     // kept so a failed keep stays retryable; nothing points at a live URL.
     saveState: post.url ? 'downloading' : 'failed',
   }
-  // Novelty drop (non-blocking): one suggested tag + one anti-tag from the foe.
+  // Novelty drop (non-blocking): every actionable tag on the defeated foe, so
+  // the player adopts or bans each one instead of an arbitrary single pair.
   const ownedNames = new Set(s.tags.map((t) => t.name.toLowerCase()))
+  const excludedNames = new Set(s.userExcludes)
   const cleanFoeTags = post.tags
     .map((t) => normalizeCustomTag(String(t)))
     .filter((t) => t.length >= 2 && !isQueryBlocked(t) && !isNoise(t))
-  const candidateTag = cleanFoeTags.find((t) => !ownedNames.has(t))
-  const candidateAntiTag = cleanFoeTags.find(
-    (t) => t !== candidateTag && !s.userExcludes.includes(t),
+  // De-dupe, then keep only tags the player can still act on: not already owned
+  // (adopting is a no-op) and not already excluded (banning is a no-op).
+  const actionableTags = [...new Set(cleanFoeTags)].filter(
+    (t) => !ownedNames.has(t) && !excludedNames.has(t),
   )
   const newDrop: KoDrop | null =
-    candidateTag || candidateAntiTag
+    actionableTags.length > 0
       ? {
           id: `drop:${post.id}:${now}`,
           foeTitle: cleanFoeTags[0] ?? 'foe',
-          suggestedTag: candidateTag,
-          suggestedAntiTag: candidateAntiTag,
+          tags: actionableTags,
           timestamp: now,
         }
       : null
@@ -549,6 +551,17 @@ function koFoe(s: GameState, now: number, clicksOnFoe: number) {
     foeMaxHp: foe,
     foeClicks: 0,
   }
+}
+
+/**
+ * Return the drop list with `tag` removed from drop `id`. The drop itself is
+ * removed once its last tag is claimed. Pure — used by both claim actions so
+ * "acted on this tag" means the same thing for adopt and ban.
+ */
+function withoutDropTag(drops: KoDrop[], id: string, tag: string): KoDrop[] {
+  return drops
+    .map((d) => (d.id === id ? { ...d, tags: d.tags.filter((t) => t !== tag) } : d))
+    .filter((d) => d.tags.length > 0)
 }
 
 export const useGame = create<GameState>((set, get) => ({
@@ -803,29 +816,34 @@ export const useGame = create<GameState>((set, get) => ({
     set({ grid })
   },
 
-  claimDropTag: (id) => {
+  claimDropTag: (id, tag) => {
     const s = get()
     const drop = s.pendingDrops.find((d) => d.id === id)
-    if (!drop?.suggestedTag) return false
-    const name = drop.suggestedTag
-    if (s.tags.some((t) => t.name.toLowerCase() === name)) {
-      set({ pendingDrops: s.pendingDrops.filter((d) => d.id !== id) })
+    if (!drop || !drop.tags.includes(tag)) return false
+    // Remove just the acted-on tag; keep the rest so the player can keep
+    // adopting/banning the other tags of the same foe. The drop disappears
+    // once its last tag is claimed.
+    const pendingDrops = withoutDropTag(s.pendingDrops, id, tag)
+    if (s.tags.some((t) => t.name.toLowerCase() === tag)) {
+      set({ pendingDrops })
       return true
     }
-    const stats = deriveTagStats(name, 1)
-    const tags = [...s.tags, { name, level: 1, selected: true, ...stats }]
-    set({ tags, pendingDrops: s.pendingDrops.filter((d) => d.id !== id) })
+    const stats = deriveTagStats(tag, 1)
+    const tags = [...s.tags, { name: tag, level: 1, selected: true, ...stats }]
+    set({ tags, pendingDrops })
     get().save()
     return true
   },
 
-  claimDropAntiTag: (id) => {
+  claimDropAntiTag: (id, tag) => {
     const s = get()
     const drop = s.pendingDrops.find((d) => d.id === id)
-    if (!drop?.suggestedAntiTag) return false
-    const ok = get().addUserExclude(drop.suggestedAntiTag)
-    set({ pendingDrops: get().pendingDrops.filter((d) => d.id !== id) })
-    return ok
+    if (!drop || !drop.tags.includes(tag)) return false
+    // Only drop the tag from the drop if the exclude actually landed; a tag
+    // addUserExclude refuses stays visible so the player can still dismiss it.
+    if (!get().addUserExclude(tag)) return false
+    set({ pendingDrops: withoutDropTag(get().pendingDrops, id, tag) })
+    return true
   },
 
   dismissDrop: (id) => {

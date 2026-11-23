@@ -256,6 +256,14 @@ product path.
   header (blurs images until hover) — default ON.
 - Toasts for purchases/unlocks live in the header 🔔 tab (capped at 50, no
   floating overlay spam).
+- **KO novelty drops show every tag on the defeated foe (2026-11-23).** The
+  drop tray under the Goon Panel lists ALL actionable tags of the image — valid,
+  not already owned, not already excluded — instead of one arbitrary suggested
+  tag + one anti-tag. Each tag is a pill with **+** (adopt into your feed) and
+  **✕** (ban from it); acting on one removes only that tag and keeps the rest, so
+  a single foe can be tuned tag by tag, and the drop disappears when its last tag
+  is claimed. The choice lives in the store (`claimDropTag(id, tag)` /
+  `claimDropAntiTag(id, tag)`); the panel only renders `drop.tags`.
 - Publishing a post shows it immediately: the upload response (its bytes are
   already durable locally) becomes an optimistic feed tile, and the node is
   re-read through a cache-bypassing refresh until it lists the row
