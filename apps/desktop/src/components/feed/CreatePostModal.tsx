@@ -403,6 +403,9 @@ function addLinkToCaption(raw: string): void {
       let primaryId = '';
       let primaryLocalUrl: string | null = null;
       let primaryMime: string | null = null;
+      // Per-item failures are collected, not fatal: one unreadable file must
+      // not discard the whole carousel. The post fails only if NOTHING lands.
+      const itemErrors: string[] = [];
       for (let i = 0; i < mediaList.length; i++) {
         const item = mediaList[i];
         const formData = new FormData();
@@ -475,65 +478,76 @@ function addLinkToCaption(raw: string): void {
           }
         }
 
-        if (uploadFile) {
-          // Zero-media P2P path: seed locally into swarm and register metadata
-          // with central server. Never sends raw binary bytes (which 422).
-          const forged = await forgeMediaLocally(uploadFile, identity, {
-            caption: i === 0 ? caption.trim() : undefined,
-            postCaption: i === 0 ? caption.trim() : undefined,
-            location: i === 0 ? location.trim() : undefined,
-            tags: i === 0 ? tags.trim() : undefined,
-            isPublic: mode !== 'story',
-            isStory: mode === 'story',
-            postGroup,
-            durable: true,
-          });
-          ids.push(forged.id);
-          if (!primaryId) primaryId = forged.id;
-          // Instant tile: render the session blob URL with zero fetch.
-          if (!primaryLocalUrl && forged.localUrl) primaryLocalUrl = forged.localUrl;
-          // Optimistic mime so the feed renders <video> immediately (the
-          // forge already recovered empty File.types via resolveVideoMime).
-          if (!primaryMime && forged.mimeType) primaryMime = forged.mimeType;
-        } else {
-          // Local-only URLs (vault/gmcache/loopback) can never render off
-          // this machine: they must resolve to bytes + forge above. Posting
-          // the URL string would store an unrenderable row for everyone.
-          if (/^(gmcache|idle-file|vault):/i.test(item.previewUrl) || item.previewUrl.includes('/api/objects/') || /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//i.test(item.previewUrl)) {
-            throw new Error('Could not read those local bytes for sharing — try again or pick the file directly');
+        try {
+          if (uploadFile) {
+            // Zero-media P2P path: seed locally into swarm and register metadata
+            // with central server. Never sends raw binary bytes (which 422).
+            const forged = await forgeMediaLocally(uploadFile, identity, {
+              caption: i === 0 ? caption.trim() : undefined,
+              postCaption: i === 0 ? caption.trim() : undefined,
+              location: i === 0 ? location.trim() : undefined,
+              tags: i === 0 ? tags.trim() : undefined,
+              isPublic: mode !== 'story',
+              isStory: mode === 'story',
+              postGroup,
+              durable: true,
+            });
+            ids.push(forged.id);
+            if (!primaryId) primaryId = forged.id;
+            // Instant tile: render the session blob URL with zero fetch.
+            if (!primaryLocalUrl && forged.localUrl) primaryLocalUrl = forged.localUrl;
+            // Optimistic mime so the feed renders <video> immediately (the
+            // forge already recovered empty File.types via resolveVideoMime).
+            if (!primaryMime && forged.mimeType) primaryMime = forged.mimeType;
+          } else {
+            // Local-only URLs (vault/gmcache/loopback) can never render off
+            // this machine: they must resolve to bytes + forge above. Posting
+            // the URL string would store an unrenderable row for everyone.
+            if (/^(gmcache|idle-file|vault):/i.test(item.previewUrl) || item.previewUrl.includes('/api/objects/') || /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//i.test(item.previewUrl)) {
+              throw new Error('Could not read those local bytes for sharing — try again or pick the file directly');
+            }
+            formData.append('url', item.previewUrl);
+            formData.append('is_public', mode === 'story' ? '0' : '1');
+            if (mode === 'story') {
+              formData.append('is_story', '1');
+            }
+            formData.append('post_group', postGroup);
+            const fallbackMime = urlFallbackMime(item as any);
+            if (!primaryMime) primaryMime = item.mimeType || fallbackMime;
+            if (fallbackMime) {
+              formData.append('mime_type', fallbackMime);
+            }
+            if (i === 0) {
+              formData.append('post_caption', caption.trim());
+              formData.append('location', location.trim());
+              formData.append('tags', tags.trim());
+            }
+            const res = await orbitFetch('/api/objects', { method: 'POST', body: formData }, identity);
+            if (!res.ok) {
+              const errData = await res.json().catch(() => null);
+              let host = '';
+              try { host = new URL(item.previewUrl).hostname; } catch { /* relative/data urls */ }
+              const hint = item.isVideoPage || (host && !/\.(jpe?g|png|gif|webp|mp4|webm)$/i.test(item.previewUrl.split('?')[0]))
+                ? ', that link has no direct media. Try a direct image/GIF/MP4 URL'
+                : '';
+              throw new Error(errData?.error || `Upload failed on item ${i + 1} of ${mediaList.length}${host ? ` (${host})` : ''}${hint}`);
+            }
+            const data = await res.json();
+            if (data.id) {
+              ids.push(data.id);
+              if (!primaryId) primaryId = data.id;
+            }
           }
-          formData.append('url', item.previewUrl);
-          formData.append('is_public', mode === 'story' ? '0' : '1');
-          if (mode === 'story') {
-            formData.append('is_story', '1');
-          }
-          formData.append('post_group', postGroup);
-          const fallbackMime = urlFallbackMime(item as any);
-          if (!primaryMime) primaryMime = item.mimeType || fallbackMime;
-          if (fallbackMime) {
-            formData.append('mime_type', fallbackMime);
-          }
-          if (i === 0) {
-            formData.append('post_caption', caption.trim());
-            formData.append('location', location.trim());
-            formData.append('tags', tags.trim());
-          }
-          const res = await orbitFetch('/api/objects', { method: 'POST', body: formData }, identity);
-          if (!res.ok) {
-            const errData = await res.json().catch(() => null);
-            let host = '';
-            try { host = new URL(item.previewUrl).hostname; } catch { /* relative/data urls */ }
-            const hint = item.isVideoPage || (host && !/\.(jpe?g|png|gif|webp|mp4|webm)$/i.test(item.previewUrl.split('?')[0]))
-              ? ', that link has no direct media. Try a direct image/GIF/MP4 URL'
-              : '';
-            throw new Error(errData?.error || `Upload failed on item ${i + 1} of ${mediaList.length}${host ? ` (${host})` : ''}${hint}`);
-          }
-          const data = await res.json();
-          if (data.id) {
-            ids.push(data.id);
-            if (!primaryId) primaryId = data.id;
-          }
+        } catch (err) {
+          // One bad item is a partial success, not a failed post: record it
+          // and keep going so the rest of the carousel still publishes.
+          itemErrors.push(err instanceof Error ? err.message : String(err));
         }
+      }
+      if (ids.length === 0) {
+        // Nothing at all landed: report the real reason instead of posting an
+        // empty row that claims success.
+        throw new Error(itemErrors[0] || 'Could not publish the post');
       }
       const objectId = primaryId || 'post_' + Math.random().toString(36).substring(2, 9);
  
