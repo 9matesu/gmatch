@@ -689,13 +689,19 @@ what it lives in.
     on the node, so a busy/offline node can no longer leave "invalid" posts
     undeletable. A definitive 4xx refusal is still reported as a failure. The
     rule lives in the pure `utils/deleteOutcome.ts` (unit-tested).
-  - **Lightweight runtime (2026-11-24):** this is a clicker + static pictures,
-    not a 3D app, so the packaged client opts OUT of GPU composition
-    (`app.disableHardwareAcceleration()`), caps the renderer heap at 256MB
-    (`--max-old-space-size=256`), and throttles hidden windows. The Goon Panel
-    drops the decorative full-stage `blur-2xl` cover (recomposited every
-    shake/crit frame) and videos no longer autoplay / `preload="auto"`. No new
-    dependencies — the existing LRU caches and flat CSS stay as they are.
+  - **Bounded runtime (2026-11-24, corrected):** the renderer heap is capped at
+    256MB (`--max-old-space-size=256`), the decorative full-stage `blur-2xl`
+    cover is gone, and videos do not autoplay. The earlier attempt to force
+    software composition (`disableHardwareAcceleration`) and throttle hidden
+    windows made the UI stall/go black on a real machine, so both were
+    REVERTED: the GPU process is cheap compared with a frozen renderer.
+  - **No retry storm (2026-11-24):** an `orbitFetch` timeout used to cost 30s +
+    2 exponential retries (up to 90s each); with a dozen pollers this piled up
+    into a renderer freeze. Normal API calls now time out in 8s with ONE short
+    retry (250ms); only actual media streams keep the long budget. Poll cadence
+    was relaxed too (lobby 5/8/12s, heartbeat 20s, roster re-pull at most once
+    per 15s on focus) — the WebSocket already pushes changes. A failed media
+    resolution is cached for only 30s so a returned node/seeder is retried.
   - **client** (opt-in in the Servers page): talks to someone else's node —
     a friend's machine or any `http(s)://host[:port]` the user was given
     (validated, applied on relaunch). `gmatch_SERVER_URL` env overrides both.

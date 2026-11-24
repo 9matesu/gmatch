@@ -409,7 +409,11 @@ export function useLobby({
 
     const schedule = () => {
       if (cancelled) return
-      const windowMs = inMatchRef.current ? 2_000 : autoQueueRef.current ? 3_000 : 5_000
+      // The WebSocket already pushes state changes; the poll is only a
+      // catch-up. The old 2/3/5s cadence meant a busy node heard a burst of
+      // signed GETs every few seconds from every open tab. Back off — a
+      // missed push is recovered on the next tick anyway.
+      const windowMs = inMatchRef.current ? 5_000 : autoQueueRef.current ? 8_000 : 12_000
       timer = setTimeout(() => {
         if (cancelled) return
         lastPollRef.current = Date.now()

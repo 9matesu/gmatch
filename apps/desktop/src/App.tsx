@@ -1370,12 +1370,18 @@ export default function Home() {
       last = now
       void forceRefreshFeed()
     }
+    let lastRosterPull = 0
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
         refresh(15_000)
         // The bundled sidecar may have restarted while the window sat idle; pull
-        // the roster again so the profile has data instead of a stale/empty list.
-        void loadUsersRef.current?.()
+        // the roster again so the profile has data instead of a stale/empty list —
+        // but at most once per 15s, so tab switching cannot pile up reads.
+        const now = Date.now()
+        if (now - lastRosterPull > 15_000) {
+          lastRosterPull = now
+          void loadUsersRef.current?.()
+        }
       }
     }
     document.addEventListener('visibilitychange', onVisible)
@@ -2907,7 +2913,7 @@ export default function Home() {
     }
 
     const syncIntervalMs = isWsConnected ? 120_000 : 60_000
-    const heartbeatIntervalMs = isWsConnected ? 30_000 : 10_000
+    const heartbeatIntervalMs = isWsConnected ? 30_000 : 20_000
     // Skip DB-heavy pollers while the tab is hidden; timers are also throttled
     // by the browser, so this removes the remaining background read load.
     const pageHidden = () => document.visibilityState === 'hidden'

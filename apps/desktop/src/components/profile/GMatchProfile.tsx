@@ -24,7 +24,7 @@ import { ProfileEditorModal } from './ProfileEditorModal';
 import { ProfilePicModal } from './ProfilePicModal';
 import { useProfilePostLightbox } from '../feed/useProfilePostLightbox';
 import { ObjectImage } from '../ObjectImage';
-import { isVideoPost, resolveMediaUrl } from '../../utils/media';
+import { isVideoPost } from '../../utils/media';
 import { saveUserProfile } from '../../utils/profile';
 import { profileShareUrl, orbitFetch, invalidateCache } from '../../utils/api';
 
@@ -293,11 +293,16 @@ export function GMatchProfile({
             }`}
           >
             {pfp ? (
-              <img
-                src={resolveMediaUrl(pfp)}
+              <ObjectImage
+                contentUrl={pfp}
+                objectId={pfp?.includes('/api/objects/') ? pfp.slice(pfp.indexOf('/api/objects/') + 13).split(/[?#]/)[0] : null}
+                identity={identity}
                 alt={displayName}
-                onError={() => setPfp('')}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                loading="eager"
+                fetchPriority="high"
+                hideUnavailable
+                onMediaUnavailable={() => setPfp('')}
               />
             ) : (
               <div className="w-full h-full bg-surface-interactive flex items-center justify-center text-xl sm:text-2xl font-medium text-retro-muted">
@@ -440,6 +445,9 @@ export function GMatchProfile({
                   muted
                   autoPlay={false}
                   playsInline
+                  loading="eager"
+                  fetchPriority="high"
+                  hideUnavailable
                 />
                 {(isVideoPost(post.mime_type, post.url, post.media?.map((mm) => mm.mime_type) ?? [])) && (
                   <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-retro-fg z-10">
@@ -488,6 +496,9 @@ export function GMatchProfile({
                   muted
                   autoPlay={false}
                   playsInline
+                  loading="eager"
+                  fetchPriority="high"
+                  hideUnavailable
                 />
                 {(isVideoPost(post.mime_type, post.url, post.media?.map((mm) => mm.mime_type) ?? [])) && (
                   <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-retro-fg z-10">
@@ -529,6 +540,9 @@ export function GMatchProfile({
                   muted
                   autoPlay={false}
                   playsInline
+                  loading="eager"
+                  fetchPriority="high"
+                  hideUnavailable
                 />
                 {(isVideoPost(post.mime_type, post.url, post.media?.map((mm) => mm.mime_type) ?? [])) && (
                   <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-retro-fg z-10">
@@ -567,6 +581,9 @@ export function GMatchProfile({
                   muted
                   autoPlay={false}
                   playsInline
+                  loading="eager"
+                  fetchPriority="high"
+                  hideUnavailable
                 />
                 {(isVideoPost(card.mime_type, card.content_url || (card as any).url)) && (
                   <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-retro-fg z-10">

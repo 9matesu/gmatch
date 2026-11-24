@@ -41,6 +41,48 @@ afterEach(() => {
   cleanup()
 })
 
+describe('useObjectImage failed-resolution TTL', () => {
+  it('a failed object is retried after the TTL instead of staying failed forever', async () => {
+    const { useObjectImage } = await import('./useObjectImage')
+    const orbitFetch = (await import('../utils/api')).orbitFetch as ReturnType<typeof vi.fn>
+    // Keep the module's default mock implementation for the other tests in this
+    // file; override only this case and restore it afterwards.
+    const defaultImpl = orbitFetch.getMockImplementation()
+    orbitFetch.mockClear()
+    // First call fails definitively (404) -> cached as FAILED.
+    orbitFetch.mockResolvedValueOnce({ ok: false, status: 404, headers: new Headers(), json: async () => ({}) })
+    let h = renderHook(() => useObjectImage('ttl-404', identity))
+    await waitFor(() => expect(h.result.current.failed).toBe(true))
+    h.unmount()
+    expect(orbitFetch).toHaveBeenCalledTimes(1)
+
+    // Immediately remounting must use the cached failure — no new request.
+    h = renderHook(() => useObjectImage('ttl-404', identity))
+    await waitFor(() => expect(h.result.current.failed).toBe(true))
+    h.unmount()
+    expect(orbitFetch).toHaveBeenCalledTimes(1)
+
+    // After the TTL the cached failure expires and the tile retries.
+    const realNow = Date.now
+    Date.now = () => realNow() + 60_000
+    try {
+      orbitFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'Content-Type': 'image/png' }),
+        blob: async () => new Blob(['ok'], { type: 'image/png' }),
+      })
+      h = renderHook(() => useObjectImage('ttl-404', identity))
+      await waitFor(() => expect(h.result.current.failed).toBe(false))
+      h.unmount()
+      expect(orbitFetch).toHaveBeenCalledTimes(2)
+    } finally {
+      Date.now = realNow
+      if (defaultImpl) orbitFetch.mockImplementation(defaultImpl)
+    }
+  })
+})
+
 describe('useObjectImage magic-byte video sniffing', () => {
   it('marks typeless local bytes with mp4 magic as video', async () => {
     const { useObjectImage } = await import('./useObjectImage')

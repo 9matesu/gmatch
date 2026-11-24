@@ -572,8 +572,10 @@ export async function orbitFetch(
     }
     const retryAfter = response?.headers.get('Retry-After')
     const parsed = retryAfter ? Number(retryAfter) * 1000 : 0
-    const base = Math.min(1000 * (2 ** attempt), 8000)
-    return Math.min(parsed || base, 10000) + Math.floor(Math.random() * 250)
+    // One short retry. The old 1s -> 2s -> 4s ladder let a dead node hold the
+    // renderer hostage for tens of seconds across a dozen concurrent polls.
+    const base = 250
+    return Math.min(parsed || base, 2000) + Math.floor(Math.random() * 100)
   }
   const waitRetry = (attempt: number, response?: Response) => new Promise<void>((resolve) => setTimeout(resolve, retryDelay(attempt, response)))
 
@@ -586,7 +588,11 @@ export async function orbitFetch(
     // them the upload-scale budget rather than letting the abort masquerade as
     // a hard failure (see the catch below).
     const isMedia = method === 'GET' && /\/api\/(objects|watchparty\/[^/]+\/stream)/.test(url)
-    const timeout = setTimeout(() => controller.abort(), isUpload || isMedia ? 120000 : 30000)
+    // A round of small API calls used to wait 30s + 2 retries = up to 90s each.
+    // With a dozen pollers that is a promise pile-up that freezes the renderer
+    // (the "tudo trava / fica preto" report). Short and bounded for normal
+    // calls; only real media streams keep the long budget.
+    const timeout = setTimeout(() => controller.abort(), isUpload || isMedia ? 120000 : 8000)
     try {
       // GET must never carry a body (real fetch throws) — the seal lives in
       // the header alone; only non-GET sealed requests send the placeholder.
@@ -620,8 +626,8 @@ export async function orbitFetch(
         }
         return retryRes
       }
-      if (canRetry && attempt < 4 && (res.status === 408 || res.status === 425 || res.status === 429 || res.status >= 500)) {
-        logger.warn(`[orbitFetch] transient ${res.status}; retry ${attempt + 1}/4`)
+      if (canRetry && attempt < 1 && (res.status === 408 || res.status === 425 || res.status === 429 || res.status >= 500)) {
+        logger.warn(`[orbitFetch] transient ${res.status}; retry ${attempt + 1}/1`)
         await waitRetry(attempt, res)
         return doFetch(attempt + 1)
       }
@@ -633,8 +639,8 @@ export async function orbitFetch(
       // unavailable and (b) bypassed the retry ladder above, since that lives
       // inside the try. A big media GET that simply took too long therefore
       // surfaced as "Media unavailable" with no retry. Retry a real timeout.
-      if ((err as Error)?.name === 'AbortError' && attempt < 2) {
-        logger.warn(`[orbitFetch] ${isMedia ? 'media ' : ''}request timed out; retry ${attempt + 1}/2`)
+      if ((err as Error)?.name === 'AbortError' && attempt < 1) {
+        logger.warn(`[orbitFetch] ${isMedia ? 'media ' : ''}request timed out; retry ${attempt + 1}/1`)
         await waitRetry(attempt)
         return doFetch(attempt + 1)
       }

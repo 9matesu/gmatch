@@ -7,7 +7,7 @@ import { resolveObjectRefId } from '../utils/objectRef'
 import { useObjectImage } from '../hooks/useObjectImage'
 import { NativeVideoPlayer } from './media/NativeVideoPlayer'
 import { useVaultUrl, useVaultHttpUrls } from '../services/vault'
-import { resolveImage, devFetchable } from '../services/imageCache'
+import { resolveImage, devFetchable, cachedImageFor } from '../services/imageCache'
 
 interface IdentityLike {
   orbitId: string
@@ -159,7 +159,14 @@ export function ObjectImage({
   const shouldDefer = signed && loading === 'lazy'
   const [inView, setInView] = useState(!shouldDefer)
   const [hasError, setHasError] = useState(false)
-  const [cachedDirectUrl, setCachedDirectUrl] = useState<string | null>(null)
+  // Warm from the SYNC session cache on the first render. Without this a warm
+  // picture starts on the remote URL (slow / timeout) and only swaps to the
+  // cached bytes after an effect — the "doesn't load right away" symptom. The
+  // GoonPanel already does exactly this; every media surface should too.
+  const [cachedDirectUrl, setCachedDirectUrl] = useState<string | null>(() => {
+    if (signed || !contentUrl) return null
+    return cachedImageFor(resolveMediaUrl(contentUrl)) ?? null
+  })
   const placeholderRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {

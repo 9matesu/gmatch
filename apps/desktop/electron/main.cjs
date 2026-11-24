@@ -3,18 +3,13 @@
 // Endpoints per docs/SPEC.md §6. 10s timeout, browser UA, round-robin health.
 const { app, BrowserWindow, ipcMain, protocol, net, dialog, safeStorage, session } = require('electron')
 
-// ── Lightweight runtime (2026-11-24) ──────────────────────────────────────
-// This is a clicker + static pictures, not a 3D app. Compositing on the GPU was
-// the top cost (a separate GPU process + backing stores for every blur/scrim),
-// so we opt out BEFORE the window is created. Software composition is plenty
-// here, uses no dedicated GPU, and keeps the app honest about "render básico".
-app.disableHardwareAcceleration()
-// Bound the renderer heap so a runaway cache/blur cannot grow to ~2GB. 256MB is
-// above this bundle's steady state (LRUs are already capped in JS); raise only
-// if a real workload proves it necessary.
+// ── Bounded runtime (2026-11-24) ──────────────────────────────────────────
+// Keep the renderer heap bounded (LRUs are already capped in JS, so a runaway
+// blur/cache cannot grow to ~2GB). GPU acceleration stays ON: forcing software
+// composition made the UI stall and go black on this machine — the real cost
+// was the decorative blurred cover (removed) and the poll storm (shortened),
+// not the GPU process itself.
 app.commandLine.appendSwitch('js-flags', '--max-old-space-size=256')
-// Avoid large shared-memory allocations on Windows (Chromium falls back to the
-// paging file instead of exhausting /dev/shm-style buffers).
 app.commandLine.appendSwitch('disable-dev-shm-usage')
 
 const https = require('https')
@@ -1245,9 +1240,9 @@ function createWindow() {
     backgroundColor: '#080A0D',
     title: 'gMatch',
     webPreferences: {
-      // Throttle background tabs: a hidden window must not keep animating
-      // (CPU/GPU burn) — the mesh/socket work runs in main, unaffected.
-      backgroundThrottling: true,
+      // Background throttling made a returning window stall/go black. The
+      // process stays responsive; pollers already skip work while hidden.
+      backgroundThrottling: false,
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,

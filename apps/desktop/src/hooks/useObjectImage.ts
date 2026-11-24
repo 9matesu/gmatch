@@ -60,6 +60,14 @@ function isProtectedObjectUrl(value: string): boolean {
 const CACHE_MAX = 24
 const objectCache = new Map<string, ImageState>()
 const cacheSource = new Map<string, string>()
+/**
+ * A failed resolution is cached for a SHORT time only. A definitive-looking
+ * failure (404 with no seeder, a bad payload) used to sit in the LRU forever,
+ * so a post whose bytes arrived later — or whose node came back — still showed
+ * "No preview" until LRU eviction. After this window the tile retries once.
+ */
+const failedAt = new Map<string, number>()
+const FAILED_TTL_MS = 30_000
 
 // A mounted consumer's entry must never be evicted-and-revoked out from under
 // it: the <img>/<video> keeps pointing at that blob URL and dies the moment it
@@ -72,6 +80,7 @@ const pinned = new Set<string>()
 export function __resetObjectImageCacheForTests(): void {
   objectCache.clear()
   cacheSource.clear()
+  failedAt.clear()
   pinned.clear()
   inflight.clear()
 }
@@ -102,6 +111,17 @@ function cacheGet(rawCardId: string, source: string): ImageState | null {
   const hit = objectCache.get(cardId)
   if (!hit) return null
   if (cacheSource.get(cardId) !== source) return null
+  if (hit.failed) {
+    const at = failedAt.get(cardId) ?? 0
+    if (Date.now() - at > FAILED_TTL_MS) {
+      // Expired failure: drop it so the consumer re-resolves (the node may be
+      // back, or a seeder may have arrived).
+      objectCache.delete(cardId)
+      cacheSource.delete(cardId)
+      failedAt.delete(cardId)
+      return null
+    }
+  }
   // refresh LRU position
   objectCache.delete(cardId)
   objectCache.set(cardId, hit)
@@ -111,6 +131,8 @@ function cacheGet(rawCardId: string, source: string): ImageState | null {
 function cacheSet(rawCardId: string, source: string, img: ImageState): void {
   const cardId = normalizeCardId(rawCardId)
   cacheSource.set(cardId, source)
+  if (img.failed) failedAt.set(cardId, Date.now())
+  else failedAt.delete(cardId)
   objectCache.delete(cardId)
   objectCache.set(cardId, { ...img, cardId })
   // Evict oldest (front) entries beyond the cap, revoking their object URLs to
@@ -128,6 +150,7 @@ function cacheSet(rawCardId: string, source: string, img: ImageState): void {
     if (evicted?.url) URL.revokeObjectURL(evicted.url)
     objectCache.delete(victim)
     cacheSource.delete(victim)
+    failedAt.delete(victim)
   }
 }
 
