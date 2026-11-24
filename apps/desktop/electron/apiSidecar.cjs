@@ -211,9 +211,11 @@ async function ping(timeoutMs = 3000) {
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
     const r = await fetch(`${API_BASE}/api/health`, { signal: controller.signal })
-    if (!r.ok) return false
-    const j = await r.json()
-    return Boolean(j && j.db_ready)
+    // HTTP 200 proves the process answers. `db_ready` was required here before
+    // and produced false negatives when the Bun/SQLite event loop was busy: a
+    // healthy-but-slow sidecar looked dead and the watchdog needlessly killed
+    // it (which then caused EADDRINUSE / the real death it was trying to avoid).
+    return r.ok
   } catch {
     return false
   } finally {
@@ -221,4 +223,11 @@ async function ping(timeoutMs = 3000) {
   }
 }
 
-module.exports = { startApi, stopApi, ping, API_BASE, PORT, sidecarEvents }
+/** True while a spawned sidecar child is alive. The supervisor uses it to
+ *  stop a hung process before restarting, instead of spawning a second one
+ *  against the same port (EADDRINUSE). */
+function isRunning() {
+  return proc !== null
+}
+
+module.exports = { startApi, stopApi, ping, isRunning, API_BASE, PORT, sidecarEvents }

@@ -23,8 +23,12 @@ separate economies, no bridge between them.
   (`electron/sidecarSupervision.cjs`): a crash OR a failed 45s health probe
   restarts it with capped exponential backoff. The old handler restarted once
   ever, so a sidecar that died while the app sat idle was never brought back and
-  the profile read empty; the budget now resets after a healthy minute, so an
-  occasional crash never exhausts it.
+  the profile read empty. A restart now requires N **consecutive** failed health
+  probes (debounce), resets its budget on every healthy probe, and **stops the
+  old process before restarting** — an early version required `db_ready` on a
+  single probe and killed a healthy-but-busy sidecar under load, which then died
+  on `EADDRINUSE` (the exact symptom it was meant to fix). `ping` only needs an
+  HTTP 200; `db_ready` is a boot detail, not liveness.
 - UI authority: Orbit's retro-glass Tailwind design system (shell). The idle
   game renders inside the shell's `grid` view, restyled to Tailwind 4 with
   shared recipes in `src/ui/styles.ts` (legacy goongrid.css deleted; only

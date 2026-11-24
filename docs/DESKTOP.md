@@ -112,7 +112,9 @@ tsc for `.cjs`).
 The local Bun API sidecar is supervised (`electron/sidecarSupervision.cjs`): a
 crash or a failed health probe restarts it with capped exponential backoff, and
 the attempt budget resets after a healthy minute — so a sidecar that died while
-the app sat idle is brought back instead of leaving the profile empty.
+the app sat idle is brought back instead of leaving the profile empty. It
+debounces failed probes (3 in a row), resets after any healthy answer, and stops
+a hung child before respawning so two Bun processes never fight over :8790.
 
 The `booru` group also exposes `booru:timings` (read-only feed search metrics
 from `electron/feedMetrics.cjs`). Its fetch path may include an optional
