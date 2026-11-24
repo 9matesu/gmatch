@@ -8,6 +8,15 @@ if (apiArg) contextBridge.exposeInMainWorld('__API_BASE__', apiArg.slice('--api-
 contextBridge.exposeInMainWorld('gmatch', {
   booruFetch: (request) => ipcRenderer.invoke('booru:fetch', request),
   booruTimings: () => ipcRenderer.invoke('booru:timings'),
+  // mediaq setup suite: status, one-shot install (streams progress), start.
+  mediaqStatus: () => ipcRenderer.invoke('mediaq:status'),
+  mediaqInstall: () => ipcRenderer.invoke('mediaq:install'),
+  mediaqStart: () => ipcRenderer.invoke('mediaq:start'),
+  onMediaqProgress: (cb) => {
+    const handler = (_e, p) => cb(p)
+    ipcRenderer.on('mediaq:progress', handler)
+    return () => ipcRenderer.removeListener('mediaq:progress', handler)
+  },
   cacheImage: (url) => ipcRenderer.invoke('cache:image', url),
   cacheStats: () => ipcRenderer.invoke('cache:stats'),
   clearCache: () => ipcRenderer.invoke('cache:clear'),

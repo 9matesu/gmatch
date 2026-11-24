@@ -82,6 +82,9 @@ process.on('unhandledRejection', (reason) => mainLog(`unhandledRejection: ${reas
 let cameraGrantOnce = false
 const { createSecureStore } = require('./secureStore.cjs')
 const apiSidecar = require('./apiSidecar.cjs')
+const mediaqInstaller = require('./mediaqInstaller.cjs')
+const mediaqSidecar = require('./mediaqSidecar.cjs')
+const registerMediaqHandlers = require('./ipc/mediaq.cjs')
 const { createTray } = require('./tray.cjs')
 const serverMode = require('./server-mode.cjs')
 
@@ -1334,6 +1337,20 @@ app.whenReady().then(async () => {
   protocol.handle(vault.SCHEME, (request) => vault.serveVault(request))
   customFolders.init(app.getPath('userData'), { ipcMain, BrowserWindow })
   registerBooruHandlers({ ipcMain, fetchBooru, setRoundExcludes, httpGet, feedMetrics })
+  registerMediaqHandlers({
+    ipcMain,
+    installer: mediaqInstaller,
+    sidecar: mediaqSidecar,
+    getUserData: () => app.getPath('userData'),
+    mainLog,
+  })
+  // Start the mediaq sidecar if the one-shot setup suite has installed it. Off
+  // (installed=false) this is a cheap no-op; a failure leaves mediaq off, never
+  // blocks boot, and the feed still runs on local sources.
+  void mediaqInstaller
+    .mediaqStatus({ userData: app.getPath('userData') })
+    .then((st) => (st.bin ? mediaqSidecar.startMediaq({ mediaqBin: st.bin, onLog: (l) => mainLog('[mediaq] ' + l) }) : false))
+    .catch(() => false)
   // Secure KV + encrypted picture cache: handlers live in ./ipc/*.cjs (deps injected).
   registerSecureHandlers({ ipcMain, secureKV, secureAvailable })
   registerCacheHandlers({ ipcMain, imageCache })
@@ -1544,12 +1561,13 @@ app.on('before-quit', () => {
   // Close the startup window early on quit so the summary is still written
   // (otherwise a fast close loses the measurement entirely).
   try { bootMetrics?.finish('quit') } catch { /* diagnostics only */ }
-  apiSidecar.stopApi(); try { if (secureKV) secureKV.flush() } catch { /* best effort */ }
+  apiSidecar.stopApi(); mediaqSidecar.stopMediaq(); try { if (secureKV) secureKV.flush() } catch { /* best effort */ }
 })
 app.on('will-quit', () => {
   try { appTray?.destroy() } catch { /* already gone */ }
   appTray = null
   apiSidecar.stopApi()
+  mediaqSidecar.stopMediaq()
 })
 
 app.on('window-all-closed', () => {

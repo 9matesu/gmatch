@@ -242,7 +242,16 @@ product path.
   One provider serves the `real` tier (tube sites) and the hentai/booru niche
   (nhentai, rule34, gelbooru). Feed search metrics live in
   `electron/feedMetrics.cjs` (read-only over `booru:timings`; never a UI
-  surface). A dependency installer for mediaq is a follow-up, not part of the app.
+  surface).
+- **The media suite is one-shot (2026-11-23).** A first-run modal
+  (`components/mediaq/MediaqSetupModal.tsx` + `useMediaqSetup`) offers to
+  install mediaq once. `electron/mediaqInstaller.cjs` downloads `uv` (a single
+  binary) and runs `uv tool install --python 3.12 mediaq` — uv pulls a managed
+  CPython, so Python is never bundled and nothing is installed system-wide.
+  `electron/mediaqSidecar.cjs` runs it on 127.0.0.1:8765 and stops it on quit;
+  IPC `mediaq:status` / `mediaq:install` / `mediaq:start` (+ `mediaq:progress`)
+  drive the suite. If the install is skipped or fails the app is unchanged
+  (local sources only) — it never blocks boot or the feed.
 
 ### 6b. Feed/market queries (user spec: player picks, no hardcodes)
 

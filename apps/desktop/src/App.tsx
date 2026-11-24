@@ -65,6 +65,8 @@ import { WatchPartyView } from "./components/watchparty/WatchPartyView";
 import { setWatchDisplayName, useWatchParty, restoreRememberedParties } from "./hooks/watchPartyStore";
 import { GameView } from "./components/views/GameView";
 import { AgeGateModal } from "./components/auth/AgeGateModal";
+import { MediaqSetupModal } from "./components/mediaq/MediaqSetupModal";
+import { useMediaqSetup } from "./components/mediaq/useMediaqSetup";
 import { saveUserProfile, deriveProfileTags } from "./utils/profile";
 import { GamesView } from "./components/views/GamesView";
 import { getStoredActiveDeckId, type Deck } from "./components/games/DeckBuilder";
@@ -3336,6 +3338,8 @@ export default function Home() {
     updateSettings('feedLayout', layout),
   );
 
+  const mediaqSetup = useMediaqSetup();
+
   if (!isLoaded) return <PageSkeleton />;
 
   const myPostTags = identity ? deriveProfileTags(feed.serverPosts.filter(p => p.author_id === identity.orbitId), []) : []
@@ -4373,6 +4377,7 @@ export default function Home() {
 
       <DominationEffects identity={identity} />
       <AgeGateModal />
+      <MediaqSetupModal open={mediaqSetup.open} onClose={mediaqSetup.close} onInstalled={mediaqSetup.installed} />
 
       <ContextOverlay
         contextMenu={contextMenu}

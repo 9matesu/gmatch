@@ -39,6 +39,11 @@ export interface GmatchBridge {
   booruFetch?: (req: BooruRequest) => Promise<BooruResponse>
   /** Read-only feed search metrics (observability). Never a UI surface. */
   booruTimings?: () => Promise<FeedMetricsSummary>
+  /** mediaq setup suite (one-shot). The app is unchanged offline when mediaq is absent. */
+  mediaqStatus?: () => Promise<{ installed: boolean; running: boolean; base: string; error?: string }>
+  mediaqInstall?: () => Promise<{ ok: boolean; bin?: string; error?: string }>
+  mediaqStart?: () => Promise<{ ok: boolean; base?: string; error?: string }>
+  onMediaqProgress?: (cb: (p: { phase: string; message: string }) => void) => () => void
   cacheImage?: (url: string) => Promise<{ local: string | null }>
   cacheStats?: () => Promise<{ files: number; bytes: number }>
   clearCache?: () => Promise<{ files: number; bytes: number }>

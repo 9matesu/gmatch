@@ -111,11 +111,20 @@ tsc for `.cjs`).
 
 The `booru` group also exposes `booru:timings` (read-only feed search metrics
 from `electron/feedMetrics.cjs`). Its fetch path may include an optional
-**mediaq** content provider (`electron/providers/mediaq.cjs`): a self-hosted
-REST instance at `GMATCH_MEDIAQ_URL` (default `http://127.0.0.1:8765`). It
-auto-probes and is silently skipped when absent, so a packaged build with no
-mediaq behaves exactly as before (local sources only). Python is not bundled —
-mediaq is an optional local service, never a dependency of the app.
+**mediaq** content provider (`electron/providers/mediaq.cjs`) at
+`GMATCH_MEDIAQ_URL` (default `http://127.0.0.1:8765`); it auto-probes and is
+silently skipped when absent, so a build with no mediaq behaves as before (local
+sources only).
+
+**mediaq setup suite (one-shot).** A first-run modal
+(`src/components/mediaq/`) offers to install mediaq once.
+`electron/mediaqInstaller.cjs` downloads `uv` (a single binary from Astral) and
+runs `uv tool install --python 3.12 mediaq`, which pulls a managed CPython — so
+Python is never bundled and nothing is installed system-wide.
+`electron/mediaqSidecar.cjs` then runs the server on 127.0.0.1:8765 and stops it
+on quit. The `mediaq` IPC group (`mediaq:status` / `mediaq:install` /
+`mediaq:start`, with `mediaq:progress` events) drives the suite. A skipped or
+failed install is a no-op for the feed.
 
 1. `requestSingleInstanceLock` — duplicate launches exit after focusing.
 2. `migrateUserData()` — one-shot move from the legacy `@goongrid` profile.
