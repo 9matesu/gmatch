@@ -83,6 +83,8 @@ export function __resetObjectImageCacheForTests(): void {
   failedAt.clear()
   pinned.clear()
   inflight.clear()
+  objectFetchQueue.length = 0
+  activeObjectFetches = 0
 }
 
 function pinKey(cardId: string, source: string): string {
@@ -174,6 +176,40 @@ interface ResolvedObject {
 const FAILED = (cardId: string): ImageState =>
   ({ cardId, url: '', failed: true, isVideo: false, isLink: false, linkUrl: null })
 
+/**
+ * At most N signed object streams in flight at once.
+ *
+ * Chromium opens six connections per host. A grid that mounts dozens of tiles
+ * (a profile with its posts, saved, likes and gallery) used to start a signed
+ * GET for every one of them at the same time, and media keeps the long 120s
+ * budget — so all six sockets sat on media and every other call (feed, lobby,
+ * notifications, DELETE) queued behind them and died on its own 8s timeout.
+ * The UI read that as "nothing loads and nothing deletes". Media is a
+ * background job: give it a small budget and let the rest of the app breathe.
+ */
+const MAX_CONCURRENT_OBJECT_FETCHES = 3
+let activeObjectFetches = 0
+const objectFetchQueue: Array<() => void> = []
+
+function withObjectFetchSlot<T>(run: () => Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const release = () => {
+      activeObjectFetches -= 1
+      const next = objectFetchQueue.shift()
+      if (next) next()
+    }
+    const start = () => {
+      activeObjectFetches += 1
+      run().then(
+        (value) => { release(); resolve(value) },
+        (err) => { release(); reject(err) },
+      )
+    }
+    if (activeObjectFetches < MAX_CONCURRENT_OBJECT_FETCHES) start()
+    else objectFetchQueue.push(start)
+  })
+}
+
 /** Local (P2P/vault/IndexedDB) → signed GET → swarm. Never throws. */
 async function resolveObject(cleanId: string, identity: IdentityLike): Promise<ResolvedObject> {
   // A descriptor (magnet/urn/absolute URL) is not an id. Fail without touching
@@ -225,6 +261,21 @@ async function resolveObject(cleanId: string, identity: IdentityLike): Promise<R
     })
   }
 
+  // The signed object stream is the only long-held request in the app: run a
+  // bounded number of them at a time (see MAX_CONCURRENT_OBJECT_FETCHES).
+  return withObjectFetchSlot(() => resolveObjectNetwork(cleanId, identity, commit))
+}
+
+/**
+ * The network half of a resolution: the signed GET, the p2p descriptor / link
+ * handling and the swarm fallback. Everything local already happened in
+ * resolveObject; this is the part that must never monopolise the pool.
+ */
+async function resolveObjectNetwork(
+  cleanId: string,
+  identity: IdentityLike,
+  commit: (state: ImageState) => ResolvedObject,
+): Promise<ResolvedObject> {
   let res: Response | null = null
   for (let attempt = 0; attempt < 3; attempt++) {
     try {

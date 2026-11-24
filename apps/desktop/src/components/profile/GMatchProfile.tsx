@@ -445,9 +445,6 @@ export function GMatchProfile({
                   muted
                   autoPlay={false}
                   playsInline
-                  loading="eager"
-                  fetchPriority="high"
-                  hideUnavailable
                 />
                 {(isVideoPost(post.mime_type, post.url, post.media?.map((mm) => mm.mime_type) ?? [])) && (
                   <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-retro-fg z-10">
@@ -496,9 +493,6 @@ export function GMatchProfile({
                   muted
                   autoPlay={false}
                   playsInline
-                  loading="eager"
-                  fetchPriority="high"
-                  hideUnavailable
                 />
                 {(isVideoPost(post.mime_type, post.url, post.media?.map((mm) => mm.mime_type) ?? [])) && (
                   <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-retro-fg z-10">
@@ -540,9 +534,6 @@ export function GMatchProfile({
                   muted
                   autoPlay={false}
                   playsInline
-                  loading="eager"
-                  fetchPriority="high"
-                  hideUnavailable
                 />
                 {(isVideoPost(post.mime_type, post.url, post.media?.map((mm) => mm.mime_type) ?? [])) && (
                   <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-retro-fg z-10">
@@ -581,9 +572,6 @@ export function GMatchProfile({
                   muted
                   autoPlay={false}
                   playsInline
-                  loading="eager"
-                  fetchPriority="high"
-                  hideUnavailable
                 />
                 {(isVideoPost(card.mime_type, card.content_url || (card as any).url)) && (
                   <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-retro-fg z-10">

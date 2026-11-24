@@ -12,10 +12,21 @@
  */
 export type DeleteOutcome = 'deleted' | 'local' | 'failed'
 
+export interface DeleteContext {
+  /**
+   * The post is served by this node (it appears in a node snapshot). A
+   * transport failure then means "unknown", not "it was local": treating it as
+   * removed made the tile vanish and reappear on the next refresh.
+   */
+  nodeBacked?: boolean
+}
+
 /** Map an HTTP status from DELETE /api/posts/:id to the honest outcome. */
-export function deleteOutcomeForStatus(status: number): DeleteOutcome {
+export function deleteOutcomeForStatus(status: number, context: DeleteContext = {}): DeleteOutcome {
   if (status === 404) return 'deleted' // already gone: goal state holds
-  if (status === 503 || status === 408 || status === 425 || status === 429) return 'local'
   if (status >= 200 && status < 300) return 'deleted'
+  if (status === 503 || status === 408 || status === 425 || status === 429) {
+    return context.nodeBacked ? 'failed' : 'local'
+  }
   return 'failed'
 }

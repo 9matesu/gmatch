@@ -1244,9 +1244,20 @@ export default function Home() {
     posts: feedPosts, status: feedStatus, restoredFromCache, hasMore: hasMoreFeed,
     loadingMore: isLoadingMoreFeed, load: loadServerFeed, refresh: forceRefreshFeed,
     loadMore: loadMoreFeedPosts, resolvePostById, setServerPosts, setOptimisticPosts,
-    setMyProfilePosts,
+    setMyProfilePosts, myProfilePosts: myProfilePostRows,
     pushPost: rememberPushedPost, reset: resetFeed,
   } = feed
+
+  // Which rows the node actually serves. A delete that cannot reach the node
+  // must not claim success for one of these: it used to vanish from the list
+  // and come straight back on the next refresh ("can't delete anything").
+  const nodePostIdsRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    nodePostIdsRef.current = new Set([
+      ...feed.serverPosts.map((post) => post.id),
+      ...myProfilePostRows.map((post) => post.id),
+    ])
+  }, [feed.serverPosts, myProfilePostRows])
 
   const feedPostsRef = useRef<FeedPost[]>(feedPosts)
   useEffect(() => { feedPostsRef.current = feedPosts }, [feedPosts])
@@ -1683,8 +1694,10 @@ export default function Home() {
     } catch { /* outbox unavailable (private mode): fall through to the node */ }
     try {
       const res = await orbitFetch(`/api/posts/${postId}`, { method: 'DELETE' }, identity)
-      const outcome = deleteOutcomeForStatus(res.status)
+      const outcome = deleteOutcomeForStatus(res.status, { nodeBacked: nodePostIdsRef.current.has(postId) })
       if (outcome === 'failed') {
+        // The node never confirmed: keep the row so the user sees the truth
+        // instead of a tile that reappears on the next refresh.
         logger.warn('[App] DELETE /api/posts/:id failed', res.status)
         return 'failed'
       }

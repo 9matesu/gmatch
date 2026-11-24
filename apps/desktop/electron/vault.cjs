@@ -186,6 +186,17 @@ function indexContent(storeKey, file, hash, mime, bytes, pins) {
  * a hash is never re-read, and bytes that cannot be read or decrypted are
  * skipped (reported unreadable by `probe`, never as absence).
  */
+/**
+ * Decrypt-verified entries, per session. probe() used to read and decrypt the
+ * WHOLE file on every call just to prove the envelope was intact - and every
+ * media tile asks (useVaultUrl, useObjectImage's vaultProbe). That is a
+ * synchronous read + AES on the main thread, so a screenful of tiles blocked
+ * the browser process and every IPC reply queued behind it. The diagnostic is
+ * worth keeping; repeating it per lookup is not: one check per entry per
+ * session.
+ */
+const verifiedEntries = new Map()
+
 function bindContentHashes(want) {
   if (!HASH_RE.test(want)) return
   let changed = false
@@ -241,6 +252,7 @@ function entryFor(ref) {
 }
 
 function init(userDataPath, storageKeyHex) {
+  verifiedEntries.clear()
   dir = path.join(String(userDataPath), 'media-vault')
   try {
     fs.mkdirSync(dir, { recursive: true })
@@ -309,17 +321,23 @@ function probe(ref) {
     } catch {
       return { state: 'unreadable', reason: 'missing-file' }
     }
-    // Encrypted rows: prove the envelope actually decrypts, so a corrupt or
+    // Encrypted rows: prove ONCE that the envelope decrypts, so a corrupt or
     // key-mismatched file is diagnosable instead of a silently broken render
-    // (aead.decrypt returns null rather than throwing on a bad envelope).
+    // (aead.decrypt returns null rather than throwing on a bad envelope). The
+    // verdict is cached per entry - this is the hottest path in the app.
     if (hit.entry.enc) {
-      let plain = null
-      try {
-        plain = readFileBytes(hit.entry)
-      } catch {
-        plain = null
+      let ok = verifiedEntries.get(hit.storeKey)
+      if (ok === undefined) {
+        let plain = null
+        try {
+          plain = readFileBytes(hit.entry)
+        } catch {
+          plain = null
+        }
+        ok = Boolean(plain)
+        verifiedEntries.set(hit.storeKey, ok)
       }
-      if (!plain) return { state: 'unreadable', reason: 'decrypt' }
+      if (!ok) return { state: 'unreadable', reason: 'decrypt' }
     }
     hit.entry.atime = Date.now()
     return { state: 'local', local: `${SCHEME}://f/${fileOf(hit.entry)}`, mime: hit.entry.mime || '' }

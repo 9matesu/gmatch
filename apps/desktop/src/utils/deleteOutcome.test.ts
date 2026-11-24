@@ -21,6 +21,16 @@ describe('deleteOutcomeForStatus', () => {
     expect(deleteOutcomeForStatus(429)).toBe('local')
   })
 
+  it('a node-backed row stays on a transport failure (unknown, not removed)', () => {
+    // Saying "removed" here made the tile vanish and come straight back on the
+    // next refresh: the node still served the post.
+    expect(deleteOutcomeForStatus(503, { nodeBacked: true })).toBe('failed')
+    expect(deleteOutcomeForStatus(408, { nodeBacked: true })).toBe('failed')
+    expect(deleteOutcomeForStatus(429, { nodeBacked: true })).toBe('failed')
+    // A local-only row still gets its tombstone: there is no server row to wait for.
+    expect(deleteOutcomeForStatus(503, { nodeBacked: false })).toBe('local')
+  })
+
   it('a definitive refusal is a real failure, never hidden', () => {
     expect(deleteOutcomeForStatus(403)).toBe('failed')
     expect(deleteOutcomeForStatus(500)).toBe('failed')

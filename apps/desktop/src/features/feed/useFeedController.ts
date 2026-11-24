@@ -42,6 +42,9 @@ export interface FeedController {
   /** The raw server snapshot (before merge), for callers that need "what the
    *  node listed" rather than the rendered timeline (badge baseline, tag sync). */
   serverPosts: FeedPost[]
+  /** The caller's own profile rows (node snapshot + local/P2P mirrors), so a
+   *  delete can tell a node-backed post from a local-only one. */
+  myProfilePosts: FeedPost[]
   status: FeedStatus
   /** True while the timeline came from the durable snapshot (this device's own
    *  last read) rather than a live node response. */
@@ -247,7 +250,7 @@ export function useFeedController(input: FeedControllerInput): FeedController {
   }, [])
 
   return {
-    posts, serverPosts, status, restoredFromCache, hasMore, loadingMore,
+    posts, serverPosts, myProfilePosts, status, restoredFromCache, hasMore, loadingMore,
     load, refresh, loadMore, resolvePostById,
     setServerPosts, setOptimisticPosts, setPinnedPosts, setRepostedPosts, setMyProfilePosts,
     removePost, pushPost, reset,

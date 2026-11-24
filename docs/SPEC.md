@@ -326,6 +326,30 @@ product path.
   result: `local` says "Post removed from this device", only `failed` shows an
   error. Before this, a local-only test post answered 404 and read as "Could not
   delete the post" for something that had actually been removed.
+- **"Unknown" is not "removed" (2026-11-24).** A transport failure on a post the
+  NODE serves is not proof the post is gone: `deleteOutcomeForStatus` takes
+  `{ nodeBacked }` (the row appears in a node snapshot — `serverPosts` or
+  `myProfilePosts`), and for such a row 503/408/425/429 now return `failed`, so
+  the tile stays and the toast says so. Treating it as `local` removed it from
+  the list and the next refresh brought it straight back — "can't delete
+  anything". A row that is not node-backed (a local/P2P mirror) still gets its
+  tombstone: there is no server row to wait for.
+- **Media has its own connection budget (2026-11-24).** Chromium opens six
+  connections per host. Signed object streams keep the long 120s budget, and a
+  profile grid used to start one per tile — all six sockets sat on media while
+  every other call (feed, lobby, notifications, DELETE) queued behind them and
+  died on its own 8s timeout, which read as "nothing loads and nothing deletes".
+  `useObjectImage` now runs at most 3 signed object streams at once
+  (`MAX_CONCURRENT_OBJECT_FETCHES`, FIFO queue); vault/IndexedDB reads stay
+  unbounded because they never hold a socket. Profile grid tiles are also back to
+  the default lazy load: `loading="eager"` on four grids was what started the
+  storm.
+- **A tile in flight is not unavailable (2026-11-24).** `ObjectImage`'s
+  availability timer only fires when nothing can still arrive (an unresolvable
+  descriptor, or a failed fetch) — or when the caller passed an explicit budget
+  (a story must skip media that outlives it). Firing it at 6s while a signed
+  fetch was still running hid `hideUnavailable` tiles mid-load: "the images
+  disappeared".
 - **Reading the timeline is a stated state, not a guess (2026-10-19).** The feed
   carries an explicit status (`idle|loading|ready|offline|error`), so an empty
   list says which one it is instead of implying "nothing here". The snapshot read

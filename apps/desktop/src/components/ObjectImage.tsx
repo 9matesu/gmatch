@@ -246,23 +246,28 @@ export function ObjectImage({
 
   // Strict availability timeout: if media cannot be resolved or fails to load,
   // treat as unavailable so broken/loading containers collapse to 0 space.
-  // Timeboxed surfaces (a story lasts 5s) pass a shorter budget so a dead
-  // story is skipped by its own clock instead of outlasting it.
+  // A signed fetch that is still RUNNING is not "unavailable": the bytes can
+  // still arrive, and the hook owns that deadline. It may only time out when
+  // the caller set an explicit budget (a story must skip media that outlives
+  // the story) — otherwise every tile vanished mid-load, which reads as "the
+  // images disappeared".
+  const waitingForBytes = signed && !img.failed && !unresolvable
+  const explicitBudget = unavailableTimeoutMs !== DEFAULT_UNAVAILABLE_TIMEOUT_MS
+  const budgetApplies = !waitingForBytes || explicitBudget
   useEffect(() => {
-    if (!src && !hasError && !(signed && img.failed)) {
-      onLoadingChange?.(true)
-      const timer = setTimeout(() => {
-        setHasError(true)
-        onMediaUnavailable?.()
-        onLoadingChange?.(false)
-      }, unavailableTimeoutMs)
-      return () => clearTimeout(timer)
-    }
-  }, [src, hasError, signed, img.failed, unavailableTimeoutMs, onMediaUnavailable, onLoadingChange])
+    if (src || hasError || !budgetApplies) return
+    onLoadingChange?.(true)
+    const timer = setTimeout(() => {
+      setHasError(true)
+      onMediaUnavailable?.()
+      onLoadingChange?.(false)
+    }, unavailableTimeoutMs)
+    return () => clearTimeout(timer)
+  }, [src, hasError, budgetApplies, unavailableTimeoutMs, onMediaUnavailable, onLoadingChange])
 
   if (!src) {
     if (hideUnavailable && (signed ? img.failed || unresolvable : hasError)) return null
-    const waiting = signed && !img.failed && !unresolvable
+    const waiting = waitingForBytes
     const seeding = signed && img.awaitingSeeder
     return (
       <div

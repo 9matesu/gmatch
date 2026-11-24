@@ -273,3 +273,50 @@ describe('useObjectImage resolveObject edge cases (Fase 4)', () => {
     h.unmount()
   })
 })
+
+describe('useObjectImage bounded object fetches', () => {
+  it('never holds more than 3 signed object streams at once', async () => {
+    // Media keeps the long 120s budget, and a grid used to start one fetch per
+    // tile. Chromium only opens six connections per host, so every other call
+    // (feed, lobby, DELETE) queued behind the media and timed out.
+    const { useObjectImage } = await import('./useObjectImage')
+    const orbitFetch = (await import('../utils/api')).orbitFetch as ReturnType<typeof vi.fn>
+    const defaultImpl = orbitFetch.getMockImplementation()
+    const releases: Array<() => void> = []
+    let active = 0
+    let peak = 0
+    orbitFetch.mockImplementation(async (url: string) => {
+      active += 1
+      peak = Math.max(peak, active)
+      await new Promise<void>((resolve) => {
+        releases.push(() => { active -= 1; resolve() })
+      })
+      const id = String(url).split('/').pop() || 'x'
+      return {
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'Content-Type': 'image/png' }),
+        blob: async () => new Blob([id], { type: 'image/png' }),
+      }
+    })
+    try {
+      const hooks = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) =>
+        renderHook(() => useObjectImage(`slot-${id}`, identity)),
+      )
+      await waitFor(() => expect(orbitFetch).toHaveBeenCalled())
+      await new Promise((resolve) => setTimeout(resolve, 60))
+      expect(peak).toBe(3)
+
+      // Draining one slot lets the next queued fetch start, never more than 3.
+      for (let round = 0; round < 12; round++) {
+        releases.splice(0).forEach((release) => release())
+        await new Promise((resolve) => setTimeout(resolve, 20))
+      }
+      expect(peak).toBeLessThanOrEqual(3)
+      hooks.forEach((hook) => hook.unmount())
+    } finally {
+      releases.splice(0).forEach((release) => release())
+      if (defaultImpl) orbitFetch.mockImplementation(defaultImpl)
+    }
+  })
+})

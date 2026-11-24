@@ -116,6 +116,16 @@ calls time out in 8s with one short retry (media exempt); pollers are deliberate
 (lobby 5/8/12s, heartbeat 20s) because a retry storm freezes the renderer more
 than any GPU process ever did.
 
+**Media never eats the connection pool:** a signed `/api/objects/:id` stream
+keeps the 120s budget, but `useObjectImage` runs at most 3 at once
+(`MAX_CONCURRENT_OBJECT_FETCHES`). Chromium opens 6 connections per host, so an
+unbounded start-them-all (a profile grid) left every other call — feed, lobby,
+notifications, DELETE — queued behind media and dying at 8s. The budget is the
+whole reason "nothing loads / nothing deletes" disappeared. Profile grid tiles
+also load lazily (`IntersectionObserver`, 400px): only the avatar is eager.
+`deletePostOnServer` reports `failed` (and keeps the tile) when a row the node
+serves cannot be confirmed deleted, so a post never vanishes and reappears.
+
 The local Bun API sidecar is supervised (`electron/sidecarSupervision.cjs`): a
 crash or a failed health probe restarts it with capped exponential backoff, and
 the attempt budget resets after a healthy minute — so a sidecar that died while

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 // Signed objects render from a fetched blob; the placeholder must not claim
 // "No preview" while that fetch is simply still in flight (T-W3).
@@ -130,5 +130,22 @@ describe('ObjectImage placeholder (T-W3)', () => {
     rec.cardId = null
     render(<ObjectImage contentUrl={`urn:sha256:${hex}`} identity={identity} />)
     expect(rec.cardId).toBe(hex)
+  })
+})
+
+describe('ObjectImage strict availability (2026-11-24)', () => {
+  it('never collapses a tile while the signed fetch is still in flight', () => {
+    // The 6s availability timer used to fire while useObjectImage was still
+    // fetching, and hideUnavailable then removed the tile: every profile image
+    // "disappeared" mid-load. A fetch in flight is waiting, not unavailable.
+    vi.useFakeTimers()
+    try {
+      render(<ObjectImage contentUrl="/api/objects/pending" identity={identity} hideUnavailable />)
+      act(() => { vi.advanceTimersByTime(30_000) })
+      expect(screen.getByText('Loading media...')).toBeInTheDocument()
+      expect(screen.queryByText('Image unavailable')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
