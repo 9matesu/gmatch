@@ -681,6 +681,14 @@ what it lives in.
     failed health probe restarts it with capped backoff, and the roster re-pulls
     on window focus, so leaving the app idle and returning to the profile no
     longer reads as "nothing loaded".
+  - **Timeline survives navigation (2026-11-24):** opening another player's
+    profile no longer clears `myProfilePosts`, so returning to the feed keeps my
+    own local/P2P posts even when `/api/posts` times out.
+  - **Deleting local posts (2026-11-24):** `deletePostOnServer` maps a transport
+    failure (503/408/425/429) to a LOCAL tombstone — a P2P/local post has no row
+    on the node, so a busy/offline node can no longer leave "invalid" posts
+    undeletable. A definitive 4xx refusal is still reported as a failure. The
+    rule lives in the pure `utils/deleteOutcome.ts` (unit-tested).
   - **client** (opt-in in the Servers page): talks to someone else's node —
     a friend's machine or any `http(s)://host[:port]` the user was given
     (validated, applied on relaunch). `gmatch_SERVER_URL` env overrides both.

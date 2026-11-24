@@ -66,6 +66,7 @@ import { setWatchDisplayName, useWatchParty, restoreRememberedParties } from "./
 import { GameView } from "./components/views/GameView";
 import { AgeGateModal } from "./components/auth/AgeGateModal";
 import { MediaqSetupModal } from "./components/mediaq/MediaqSetupModal";
+import { deleteOutcomeForStatus } from "./utils/deleteOutcome";
 import { useMediaqSetup } from "./components/mediaq/useMediaqSetup";
 import { saveUserProfile, deriveProfileTags } from "./utils/profile";
 import { GamesView } from "./components/views/GamesView";
@@ -1289,10 +1290,17 @@ export default function Home() {
   // irrelevant for a fallback, and the authoritative answer comes from the
   // author_id query below.
   useEffect(() => {
-    if (!identity || selectedProfileUser) {
+    // Only sign-out clears this state. Opening ANOTHER player's profile used to
+    // clear it too, and coming back left the feed with none of my own posts: the
+    // author_id fallback had nothing to read until the network answered (and a
+    // timed-out /api/posts request left the timeline empty). The other player's
+    // view uses selectedProfilePosts, so this state is not needed while their
+    // profile is open — but it must SURVIVE until we return.
+    if (!identity) {
       setMyProfilePosts([])
       return
     }
+    if (selectedProfileUser) return
 
     let cancelled = false
     const fallbackPosts = feedPostsRef.current.filter((post) => post.author_id === identity.orbitId)
@@ -1669,18 +1677,16 @@ export default function Home() {
     } catch { /* outbox unavailable (private mode): fall through to the node */ }
     try {
       const res = await orbitFetch(`/api/posts/${postId}`, { method: 'DELETE' }, identity)
-      if (res.status === 404) {
-        // Already gone from the node (a replica that never had it, or a post
-        // deleted elsewhere): the row is not there, so the goal state holds.
-        setServerPosts(prev => prev.filter(p => p.id !== postId))
-        return 'deleted'
-      }
-      if (!res.ok) {
+      const outcome = deleteOutcomeForStatus(res.status)
+      if (outcome === 'failed') {
         logger.warn('[App] DELETE /api/posts/:id failed', res.status)
         return 'failed'
       }
+      if (outcome === 'local') {
+        logger.warn('[App] DELETE /api/posts/:id unreachable; treating local post as removed', res.status)
+      }
       setServerPosts(prev => prev.filter(p => p.id !== postId))
-      return 'deleted'
+      return outcome
     } catch (err) {
       logger.warn('[App] DELETE /api/posts/:id threw', err)
       return 'failed'

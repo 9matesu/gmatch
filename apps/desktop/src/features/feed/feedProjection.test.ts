@@ -71,6 +71,18 @@ describe('projectFeed', () => {
     expect(rows.map((r) => r.id)).toEqual(['new', 'old'])
   })
 
+  it('keeps my own local posts when the node snapshot is empty (offline / timeout)', () => {
+    // The "go to profile, come back, everything is gone" bug: the local posts
+    // stayed in myProfilePosts but the node snapshot was empty (a timed-out
+    // /api/posts request). They must still render.
+    const rows = projectFeed({
+      ...base,
+      serverPosts: [],
+      myProfilePosts: [post('mine-1', { author_id: 'self' })],
+    })
+    expect(rows.map((r) => r.id)).toEqual(['mine-1'])
+  })
+
   it('drops a deleted post from every source', () => {
     const rows = projectFeed({
       ...base,
