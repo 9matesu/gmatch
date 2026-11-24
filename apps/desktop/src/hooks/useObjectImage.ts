@@ -576,7 +576,10 @@ export function useObjectImage(
       if (!cancelled) setImg(FAILED(cleanId))
     })
     return () => { cancelled = true }
-  }, [cardId, identity, enabled, retryNonce])
+    // `identity?.orbitId` (a string), not the identity object: an unstable
+    // object from a caller re-ran this effect on every render, and each run
+    // re-asked the vault over IPC. The id is all the cache key needs.
+  }, [cardId, identity?.orbitId, enabled, retryNonce])
 
   // Hold a pin for as long as this consumer is mounted, so the LRU can never
   // revoke the URL we are currently rendering.

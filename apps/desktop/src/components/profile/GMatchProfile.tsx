@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { playPress } from '../../utils/sounds';
 import {
   Grid,
@@ -139,6 +139,25 @@ export function GMatchProfile({
     (p) => identity && p.author_id === identity.orbitId && !p.is_archived && !p.id.startsWith('stream_') && !p.id.startsWith('booru_') && !p.is_sponsored
   );
   const displayPosts = myPosts;
+
+  // isVideoPost ran four times per render (once per grid) with a fresh
+  // post.media.map() each time. The profile re-renders often, so this was
+  // thousands of allocations and regex tests per second. One pass per list.
+  const videoPostIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const post of [...displayPosts, ...(savedPosts ?? []), ...(repostPosts ?? [])]) {
+      if (isVideoPost(post.mime_type, post.url, post.media?.map((mm) => mm.mime_type) ?? [])) ids.add(post.id)
+    }
+    return ids
+  }, [displayPosts, savedPosts, repostPosts]);
+
+  const videoCardIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const card of cards) {
+      if (isVideoPost(card.mime_type, card.content_url || (card as { url?: string }).url)) ids.add(card.id)
+    }
+    return ids
+  }, [cards]);
 
   const isSelf = Boolean(identity && (!myUser?.id || myUser?.id === identity.orbitId));
   const totalLikes = myPosts.reduce((acc, p) => acc + (p.like_count || 0), 0) + (myUser?.likes_received || 0);
@@ -446,7 +465,7 @@ export function GMatchProfile({
                   autoPlay={false}
                   playsInline
                 />
-                {(isVideoPost(post.mime_type, post.url, post.media?.map((mm) => mm.mime_type) ?? [])) && (
+                {videoPostIds.has(post.id) && (
                   <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-retro-fg z-10">
                     <Play className="w-3 h-3 fill-white" />
                   </div>
@@ -494,7 +513,7 @@ export function GMatchProfile({
                   autoPlay={false}
                   playsInline
                 />
-                {(isVideoPost(post.mime_type, post.url, post.media?.map((mm) => mm.mime_type) ?? [])) && (
+                {videoPostIds.has(post.id) && (
                   <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-retro-fg z-10">
                     <Play className="w-3 h-3 fill-white" />
                   </div>
@@ -535,7 +554,7 @@ export function GMatchProfile({
                   autoPlay={false}
                   playsInline
                 />
-                {(isVideoPost(post.mime_type, post.url, post.media?.map((mm) => mm.mime_type) ?? [])) && (
+                {videoPostIds.has(post.id) && (
                   <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-retro-fg z-10">
                     <Play className="w-3 h-3 fill-white" />
                   </div>
@@ -573,7 +592,7 @@ export function GMatchProfile({
                   autoPlay={false}
                   playsInline
                 />
-                {(isVideoPost(card.mime_type, card.content_url || (card as any).url)) && (
+                {videoCardIds.has(card.id) && (
                   <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-retro-fg z-10">
                     <Play className="w-3 h-3 fill-white" />
                   </div>
