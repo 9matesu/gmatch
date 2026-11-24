@@ -19,7 +19,12 @@ separate economies, no bridge between them.
   (`apps/desktop/electron/apiSidecar.cjs`): port 8790, SQLite snapshot + blob
   store under `userData`. Renderer base: `window.__API_BASE__` (preload) or
   `VITE_API_URL`. Identity = client Ed25519 keypair (`@orbit/crypto`); every
-  request signed (`orbitFetch`).
+  request signed (`orbitFetch`). The sidecar is **supervised**
+  (`electron/sidecarSupervision.cjs`): a crash OR a failed 45s health probe
+  restarts it with capped exponential backoff. The old handler restarted once
+  ever, so a sidecar that died while the app sat idle was never brought back and
+  the profile read empty; the budget now resets after a healthy minute, so an
+  occasional crash never exhausts it.
 - UI authority: Orbit's retro-glass Tailwind design system (shell). The idle
   game renders inside the shell's `grid` view, restyled to Tailwind 4 with
   shared recipes in `src/ui/styles.ts` (legacy goongrid.css deleted; only
@@ -249,9 +254,13 @@ product path.
   binary) and runs `uv tool install --python 3.12 mediaq` — uv pulls a managed
   CPython, so Python is never bundled and nothing is installed system-wide.
   `electron/mediaqSidecar.cjs` runs it on 127.0.0.1:8765 and stops it on quit;
-  IPC `mediaq:status` / `mediaq:install` / `mediaq:start` (+ `mediaq:progress`)
-  drive the suite. If the install is skipped or fails the app is unchanged
-  (local sources only) — it never blocks boot or the feed.
+  IPC `mediaq:status` / `mediaq:install` / `mediaq:cancel` / `mediaq:start`
+  (+ `mediaq:progress`) drive the suite. The modal shows a real progress bar
+  (percent during the uv download, indeterminate during the install) with Cancel
+  and "Send to background"; backgrounded, the install keeps running and its
+  progress shows as a card in the notification centre (`NotificationCenter`).
+  If the install is skipped or fails the app is unchanged (local sources only) —
+  it never blocks boot or the feed.
 
 ### 6b. Feed/market queries (user spec: player picks, no hardcodes)
 
@@ -664,6 +673,10 @@ what it lives in.
     with friends. There is no hosted world to dial (nothing hosted is in the
     loop since 2026-11-07), so a packaged build with no stored mode starts
     its own node.
+  - **Resilience (2026-11-24):** the bundled server is supervised — a crash or a
+    failed health probe restarts it with capped backoff, and the roster re-pulls
+    on window focus, so leaving the app idle and returning to the profile no
+    longer reads as "nothing loaded".
   - **client** (opt-in in the Servers page): talks to someone else's node —
     a friend's machine or any `http(s)://host[:port]` the user was given
     (validated, applied on relaunch). `gmatch_SERVER_URL` env overrides both.

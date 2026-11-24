@@ -9,17 +9,28 @@
  * managed CPython 3.12 and mediaq's deps into an isolated tool env.
  *
  * Everything that touches the network or spawns a process is here (Electron
- * main). The decision logic (`uvAssetName`, `installPlan`) is pure and exported
- * so it is unit-tested without a network.
+ * main) and is CANCELLABLE through an AbortSignal: the uv download aborts, and
+ * the tar/uv child processes are killed. The decision logic (`uvAssetName`,
+ * `installPlan`) is pure and exported so it is unit-tested without a network.
+ *
+ * Progress events are `{ phase, message, percent? }`: `percent` is a number for
+ * the determinate phases (the uv download, sized by Content-Length) and ABSENT
+ * for indeterminate ones (the uv install), which the UI renders as a spinner.
  */
 
-const { spawn, execFile } = require('node:child_process')
+const { spawn } = require('node:child_process')
 const fs = require('node:fs')
 const path = require('node:path')
 
 const UV_BASE = 'https://github.com/astral-sh/uv/releases/latest/download'
 const MEDIAQ_SPEC = 'mediaq'
 const PYTHON_SPEC = '3.12'
+
+function abortError() {
+  const e = new Error('cancelled')
+  e.name = 'AbortError'
+  return e
+}
 
 /** The uv release asset for a platform/arch, or null when unsupported. */
 function uvAssetName(platform, arch) {
@@ -49,30 +60,93 @@ function installPlan({ platform, arch, hasUv, hasMediaq }) {
   return { step: 'ready', asset }
 }
 
+/** Spawn, capture output, resolve {stdout, stderr}; kill on abort. */
 function run(cmd, args, opts = {}) {
+  const { signal, onData } = opts
   return new Promise((resolve, reject) => {
-    execFile(cmd, args, { windowsHide: true, ...opts }, (err, stdout, stderr) => {
-      if (err) return reject(err)
-      resolve({ stdout: String(stdout || ''), stderr: String(stderr || '') })
+    const child = spawn(cmd, args, { windowsHide: true })
+    let stdout = ''
+    let stderr = ''
+    const onAbort = () => {
+      try {
+        child.kill('SIGKILL')
+      } catch {
+        /* already dead */
+      }
+    }
+    if (signal) {
+      if (signal.aborted) {
+        try {
+          child.kill('SIGKILL')
+        } catch {
+          /* ignore */
+        }
+        return reject(abortError())
+      }
+      signal.addEventListener('abort', onAbort, { once: true })
+    }
+    child.stdout.on('data', (d) => {
+      stdout += d
+      if (onData) onData(String(d))
+    })
+    child.stderr.on('data', (d) => {
+      stderr += d
+      if (onData) onData(String(d))
+    })
+    child.on('error', (err) => {
+      if (signal) signal.removeEventListener('abort', onAbort)
+      reject(err)
+    })
+    child.on('exit', (code) => {
+      if (signal) signal.removeEventListener('abort', onAbort)
+      if (signal && signal.aborted) return reject(abortError())
+      if (code === 0) resolve({ stdout, stderr })
+      else reject(new Error(`exit ${code}: ${stderr.slice(-500)}`))
     })
   })
 }
 
-/** Spawn and stream stdout+stderr lines to `onLine`; resolve on exit 0. */
-function runStreaming(cmd, args, onLine) {
+/** Spawn and stream stdout+stderr lines to `onLine`; resolve on exit 0; kill on abort. */
+function runStreaming(cmd, args, onLine, signal) {
   return new Promise((resolve, reject) => {
-    const p = spawn(cmd, args, { windowsHide: true })
+    const child = spawn(cmd, args, { windowsHide: true })
     let tail = ''
-    const onData = (d) => {
-      const s = String(d).trim()
-      if (!s) return
-      tail = (tail + '\n' + s).slice(-800)
-      if (onLine) onLine(s)
+    const onAbort = () => {
+      try {
+        child.kill('SIGKILL')
+      } catch {
+        /* already dead */
+      }
     }
-    p.stdout.on('data', onData)
-    p.stderr.on('data', onData)
-    p.on('error', reject)
-    p.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`exit ${code}: ${tail}`))))
+    if (signal) {
+      if (signal.aborted) {
+        try {
+          child.kill('SIGKILL')
+        } catch {
+          /* ignore */
+        }
+        return reject(abortError())
+      }
+      signal.addEventListener('abort', onAbort, { once: true })
+    }
+    const onData = (d) => {
+      const line = String(d).trim()
+      if (!line) return
+      tail = (tail + '\n' + line).slice(-800)
+      if (onLine) onLine(line)
+    }
+    child.stdout.on('data', onData)
+    child.stderr.on('data', onData)
+    child.on('error', (err) => {
+      if (signal) signal.removeEventListener('abort', onAbort)
+      reject(err)
+    })
+    child.on('exit', (code) => {
+      if (signal) signal.removeEventListener('abort', onAbort)
+      if (signal && signal.aborted) return reject(abortError())
+      if (code === 0) resolve()
+      else reject(new Error(`exit ${code}: ${tail}`))
+    })
   })
 }
 
@@ -91,7 +165,7 @@ function hasUv(userData) {
 }
 
 /** Download + extract the uv release binary. Returns its path. */
-async function ensureUv({ userData, platform = process.platform, arch = process.arch, onProgress }) {
+async function ensureUv({ userData, platform = process.platform, arch = process.arch, onProgress, signal }) {
   const existing = uvPath(userData)
   if (fs.existsSync(existing)) return existing
   const asset = uvAssetName(platform, arch)
@@ -101,22 +175,53 @@ async function ensureUv({ userData, platform = process.platform, arch = process.
   const url = `${UV_BASE}/${asset}`
   const archive = path.join(dir, asset)
   onProgress?.({ phase: 'download-uv', message: 'Downloading uv (Python manager)…' })
-  const res = await fetch(url)
+  const res = await fetch(url, { signal })
   if (!res.ok) throw new Error(`uv download HTTP ${res.status}`)
-  fs.writeFileSync(archive, Buffer.from(await res.arrayBuffer()))
-  onProgress?.({ phase: 'extract-uv', message: 'Extracting uv…' })
+  // Stream to a temp file so the bar tracks real bytes (Content-Length).
+  const total = Number(res.headers.get('content-length')) || 0
+  const reader = res.body ? res.body.getReader() : null
+  const chunks = []
+  if (reader) {
+    let received = 0
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      if (signal?.aborted) throw abortError()
+      chunks.push(Buffer.from(value))
+      received += value.length
+      if (total > 0) {
+        onProgress?.({
+          phase: 'download-uv',
+          percent: Math.min(50, Math.round((50 * received) / total)),
+          message: `Downloading uv… ${Math.round((100 * received) / total)}%`,
+        })
+      }
+    }
+    fs.writeFileSync(archive, Buffer.concat(chunks))
+  } else {
+    fs.writeFileSync(archive, Buffer.from(await res.arrayBuffer()))
+  }
+  onProgress?.({ phase: 'extract-uv', percent: 55, message: 'Extracting uv…' })
   // bsdtar (Windows) reads zip with -xf; GNU tar (mac/linux) needs -xzf for tar.gz.
   const tarArgs = platform === 'win32' ? ['-xf', archive, '-C', dir] : ['-xzf', archive, '-C', dir]
-  await run('tar', tarArgs)
+  await run('tar', tarArgs, { signal })
   if (!fs.existsSync(existing)) throw new Error('uv binary missing after extract')
-  try { fs.chmodSync(existing, 0o755) } catch { /* best effort */ }
-  try { fs.unlinkSync(archive) } catch { /* best effort */ }
+  try {
+    fs.chmodSync(existing, 0o755)
+  } catch {
+    /* best effort */
+  }
+  try {
+    fs.unlinkSync(archive)
+  } catch {
+    /* best effort */
+  }
   return existing
 }
 
 /** The mediaq executable path (from `uv tool dir --bin`), or null. */
-async function resolveMediaqBin(uv) {
-  const { stdout } = await run(uv, ['tool', 'dir', '--bin'])
+async function resolveMediaqBin(uv, signal) {
+  const { stdout } = await run(uv, ['tool', 'dir', '--bin'], { signal })
   const dir = stdout.trim()
   if (!dir) return null
   const name = process.platform === 'win32' ? 'mediaq.exe' : 'mediaq'
@@ -125,23 +230,22 @@ async function resolveMediaqBin(uv) {
 }
 
 /** Install mediaq (and a managed Python 3.12) via uv. */
-async function installMediaq({ uv, onProgress }) {
+async function installMediaq({ uv, onProgress, signal }) {
   onProgress?.({ phase: 'install-mediaq', message: 'Installing mediaq (first run downloads Python 3.12)…' })
-  await runStreaming(uv, ['tool', 'install', '--python', PYTHON_SPEC, MEDIAQ_SPEC], (line) =>
-    onProgress?.({ phase: 'install-mediaq', message: line }),
-  )
-  return resolveMediaqBin(uv)
+  await runStreaming(uv, ['tool', 'install', '--python', PYTHON_SPEC, MEDIAQ_SPEC], (line) => onProgress?.({ phase: 'install-mediaq', message: line }), signal)
+  return resolveMediaqBin(uv, signal)
 }
 
 /**
- * Full one-shot install: uv (if needed) then mediaq. Returns the mediaq bin.
- * @param {{userData:string, onProgress?:(p:{phase:string,message:string})=>void}} deps
+ * Full one-shot install: uv (if needed) then mediaq. Cancellable through
+ * `signal`. Returns the mediaq bin.
+ * @param {{userData:string, onProgress?:(p:{phase:string,message:string,percent?:number})=>void, signal?:AbortSignal}} deps
  */
-async function installMediaqSuite({ userData, onProgress }) {
-  const uv = await ensureUv({ userData, onProgress })
-  const bin = await installMediaq({ uv, onProgress })
+async function installMediaqSuite({ userData, onProgress, signal }) {
+  const uv = await ensureUv({ userData, onProgress, signal })
+  const bin = await installMediaq({ uv, onProgress, signal })
   if (!bin) throw new Error('mediaq installed but its executable was not found')
-  onProgress?.({ phase: 'done', message: 'mediaq is ready' })
+  onProgress?.({ phase: 'done', percent: 100, message: 'mediaq is ready' })
   return { uv, bin }
 }
 
@@ -172,5 +276,5 @@ module.exports = {
   installMediaqSuite,
   mediaqStatus,
   // exported for tests
-  _internal: { run, runStreaming },
+  _internal: { run, runStreaming, abortError },
 }

@@ -1,123 +1,92 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
 import { Modal, Button } from '../../ui/kit'
+import { useMediaqInstall } from '../../services/mediaqInstall'
 
 /**
- * One-shot "media suite" installer shown to the user (mediaq = the optional real
- * + hentai content provider). It is a convenience: the app is fully usable
- * offline without it. The heavy lifting (download uv → install mediaq → start
- * the sidecar) runs in the main process; this only shows honest progress.
+ * One-shot "media suite" installer (mediaq = the optional real + hentai content
+  * provider). It is a convenience: the app is fully usable offline without it.
+ * The heavy lifting (download uv → install mediaq → start the sidecar) runs in
+ * the main process; this reads the shared store so the install survives the
+ * modal being closed ("Send to background") and shows in the notification centre.
  */
-
-type Phase = 'checking' | 'idle' | 'installing' | 'done' | 'error'
-
-export function MediaqSetupModal({
-  open,
-  onClose,
-  onInstalled,
-}: {
-  open: boolean
-  onClose: () => void
-  onInstalled?: () => void
-}) {
-  const [phase, setPhase] = useState<Phase>('checking')
-  const [message, setMessage] = useState('')
-  const offRef = useRef<(() => void) | null>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const g = window.gmatch
-    if (!g?.mediaqStatus) {
-      setPhase('error')
-      setMessage('Media suite needs the gMatch desktop app.')
-      return
-    }
-    setPhase('checking')
-    setMessage('')
-    let live = true
-    void g
-      .mediaqStatus()
-      .then((st) => {
-        if (!live) return
-        if (st.installed) {
-          setPhase('done')
-          setMessage('mediaq is already installed')
-        } else {
-          setPhase('idle')
-        }
-      })
-      .catch(() => {
-        if (!live) return
-        setPhase('error')
-        setMessage('Could not check mediaq status.')
-      })
-    if (g.onMediaqProgress) {
-      offRef.current = g.onMediaqProgress((p) => {
-        setMessage(p.message)
-        if (p.phase === 'done') setPhase('done')
-        else if (p.phase === 'error') setPhase('error')
-      })
-    }
-    return () => {
-      live = false
-      offRef.current?.()
-      offRef.current = null
-    }
-  }, [open])
-
-  const install = useCallback(async () => {
-    const g = window.gmatch
-    if (!g?.mediaqInstall) return
-    setPhase('installing')
-    setMessage('Starting…')
-    try {
-      const res = await g.mediaqInstall()
-      if (res.ok) {
-        setPhase('done')
-        setMessage('mediaq is ready')
-        onInstalled?.()
-      } else {
-        setPhase('error')
-        setMessage(res.error || 'Install failed.')
-      }
-    } catch (err) {
-      setPhase('error')
-      setMessage(String((err as Error)?.message || err))
-    }
-  }, [onInstalled])
+export function MediaqSetupModal() {
+  const { open, status, percent, message, closeModal, start, cancel, reset } = useMediaqInstall()
 
   if (!open) return null
 
   return (
-    <Modal title="Media suite" onClose={onClose} maxWidth="max-w-md">
+    <Modal title="Media suite" onClose={closeModal} maxWidth="max-w-md">
       <div className="space-y-4">
         <p className="text-sm text-retro-muted">
           Set up the optional media provider once. It adds real and niche hentai
           sources; the app works fully offline without it.
         </p>
 
-        <div className="rounded-lg border border-edge bg-glass-w5 p-3 text-xs">
-          {phase === 'checking' && <span className="text-retro-muted">Checking…</span>}
-          {phase === 'idle' && (
-            <span className="text-retro-muted">
-              First run downloads a small Python manager and mediaq (~100 MB).
-            </span>
-          )}
-          {phase === 'installing' && (
-            <span className="text-retro-accent">{message || 'Installing…'}</span>
-          )}
-          {phase === 'done' && <span className="text-success-fg">{message}</span>}
-          {phase === 'error' && <span className="text-danger-fg">{message}</span>}
-        </div>
+        {status === 'installing' && (
+          <div className="space-y-1.5">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-glass-w8">
+              {percent !== null ? (
+                <div
+                  className="h-full rounded-full bg-retro-accent transition-[width] duration-300"
+                  style={{ width: `${percent}%` }}
+                />
+              ) : (
+                <div className="h-full w-1/3 animate-pulse rounded-full bg-retro-accent" />
+              )}
+            </div>
+            <div className="flex justify-between text-2xs text-retro-muted">
+              <span className="truncate">{message || 'Installing…'}</span>
+              {percent !== null && <span className="tabular-nums">{percent}%</span>}
+            </div>
+          </div>
+        )}
 
-        <div className="flex justify-end gap-2">
-          {(phase === 'idle' || phase === 'error') && (
-            <Button variant="primary" onClick={() => void install()}>
-              {phase === 'error' ? 'Retry' : 'Install media suite'}
+        {status === 'idle' && (
+          <div className="rounded-lg border border-edge bg-glass-w5 p-3 text-xs text-retro-muted">
+            First run downloads a small Python manager and mediaq (~100 MB).
+          </div>
+        )}
+        {status === 'done' && (
+          <div className="rounded-lg border border-edge bg-glass-w5 p-3 text-xs text-success-fg">
+            {message || 'mediaq is ready'}
+          </div>
+        )}
+        {status === 'error' && (
+          <div className="rounded-lg border border-danger/40 bg-danger/10 p-3 text-xs text-danger-fg">
+            {message || 'Install failed.'}
+          </div>
+        )}
+        {status === 'cancelled' && (
+          <div className="rounded-lg border border-edge bg-glass-w5 p-3 text-xs text-warning-fg">
+            Cancelled. You can install it later from the notification centre.
+          </div>
+        )}
+
+        <div className="flex flex-wrap justify-end gap-2">
+          {(status === 'idle' || status === 'error' || status === 'cancelled') && (
+            <Button variant="primary" onClick={start}>
+              {status === 'idle' ? 'Install media suite' : status === 'error' ? 'Retry' : 'Install'}
             </Button>
           )}
-          <Button variant="secondary" onClick={onClose}>
-            {phase === 'done' ? 'Done' : 'Skip for now'}
-          </Button>
+          {status === 'installing' && (
+            <>
+              <Button variant="secondary" onClick={closeModal}>
+                Send to background
+              </Button>
+              <Button variant="danger" onClick={cancel}>
+                Cancel
+              </Button>
+            </>
+          )}
+          {status === 'done' && (
+            <Button variant="primary" onClick={reset}>
+              Done
+            </Button>
+          )}
+          {(status === 'idle' || status === 'error' || status === 'cancelled') && (
+            <Button variant="ghost" onClick={reset}>
+              {status === 'idle' ? 'Skip for now' : 'Close'}
+            </Button>
+          )}
         </div>
       </div>
     </Modal>

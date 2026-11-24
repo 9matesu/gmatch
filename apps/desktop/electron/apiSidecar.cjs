@@ -204,4 +204,21 @@ process.on('exit', () => stopApi())
 process.on('SIGINT', () => { stopApi(); process.exit(0) })
 process.on('SIGTERM', () => { stopApi(); process.exit(0) })
 
-module.exports = { startApi, stopApi, API_BASE, PORT, sidecarEvents }
+/** One-shot health probe: true when a ready sidecar answers on API_BASE.
+ *  Used by the main-process watchdog to detect a hung (not cleanly-exited) server. */
+async function ping(timeoutMs = 3000) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const r = await fetch(`${API_BASE}/api/health`, { signal: controller.signal })
+    if (!r.ok) return false
+    const j = await r.json()
+    return Boolean(j && j.db_ready)
+  } catch {
+    return false
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+module.exports = { startApi, stopApi, ping, API_BASE, PORT, sidecarEvents }

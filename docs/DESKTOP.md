@@ -109,6 +109,11 @@ per capability with its dependencies injected (`secure`, `cache`, `vault`,
 2k-line orchestrator; `node --check` + `eslint electron` cover them (there is no
 tsc for `.cjs`).
 
+The local Bun API sidecar is supervised (`electron/sidecarSupervision.cjs`): a
+crash or a failed health probe restarts it with capped exponential backoff, and
+the attempt budget resets after a healthy minute — so a sidecar that died while
+the app sat idle is brought back instead of leaving the profile empty.
+
 The `booru` group also exposes `booru:timings` (read-only feed search metrics
 from `electron/feedMetrics.cjs`). Its fetch path may include an optional
 **mediaq** content provider (`electron/providers/mediaq.cjs`) at

@@ -8,6 +8,7 @@ import { useSettings } from '../../hooks/useSettings';
 import { NotificationsPanel } from '../NotificationsPanel';
 import type { NotificationItem, MatchInviteItem } from '../NotificationsPanel';
 import type { AppNotification, NotificationTarget } from '../../utils/notifications';
+import { useMediaqInstall } from '../../services/mediaqInstall';
 
 function IconFor({ type }: { type: ToastMessage['type'] }) {
   const cls = 'w-3.5 h-3.5 shrink-0';
@@ -68,6 +69,7 @@ export function NotificationCenter(props: NotificationCenterProps) {
     onOpenBabecock,
   } = props;
 
+  const mediaq = useMediaqInstall();
   const { messages, dismiss, clearAll, overflowCount } = useToast();
   const [expanded, setExpanded] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -150,6 +152,60 @@ export function NotificationCenter(props: NotificationCenterProps) {
           aria-label="Notification centre"
           className="absolute left-1/2 -translate-x-1/2 top-full mt-1 w-[min(420px,92vw)] max-h-(--max-h-sheet) flex flex-col bg-retro-bg/95 border border-edge rounded-lg shadow-2xl backdrop-blur-md z-[var(--z-dropdown)] overflow-hidden"
         >
+          {/* Active mediaq setup: the install survives the modal being closed
+              ("Send to background"), so its progress lives here too. */}
+          {mediaq.status !== 'idle' && (
+            <div className="shrink-0 border-b border-edge p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-retro-fg">Media suite</span>
+                <button
+                  type="button"
+                  onClick={() => mediaq.reset()}
+                  aria-label="Dismiss media suite"
+                  className="p-0.5 rounded text-retro-muted hover:text-retro-fg cursor-pointer"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+              {mediaq.status === 'installing' && (
+                <div className="mt-1.5 space-y-1">
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-glass-w8">
+                    {mediaq.percent !== null ? (
+                      <div className="h-full rounded-full bg-retro-accent transition-[width] duration-300" style={{ width: `${mediaq.percent}%` }} />
+                    ) : (
+                      <div className="h-full w-1/3 animate-pulse rounded-full bg-retro-accent" />
+                    )}
+                  </div>
+                  <div className="flex justify-between text-2xs text-retro-muted">
+                    <span className="truncate">{mediaq.message || 'Installing…'}</span>
+                    {mediaq.percent !== null && <span className="tabular-nums">{mediaq.percent}%</span>}
+                  </div>
+                </div>
+              )}
+              {mediaq.status === 'done' && <p className="mt-1 text-2xs text-success-fg">mediaq is ready</p>}
+              {mediaq.status === 'error' && <p className="mt-1 text-2xs text-danger-fg">{mediaq.message}</p>}
+              {mediaq.status === 'cancelled' && <p className="mt-1 text-2xs text-warning-fg">Cancelled</p>}
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => mediaq.openModal()}
+                  className="glass-action px-2 py-0.5 rounded text-2xs cursor-pointer text-retro-muted hover:text-retro-fg"
+                >
+                  Show setup
+                </button>
+                {mediaq.status === 'installing' && (
+                  <button
+                    type="button"
+                    onClick={() => mediaq.cancel()}
+                    className="glass-action px-2 py-0.5 rounded text-2xs cursor-pointer text-danger-fg hover:bg-danger/20"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Transient toasts: an error stays until dismissed, so it needs a
               home inside the same surface rather than a floating overlay. */}
           {messages.length > 0 && (

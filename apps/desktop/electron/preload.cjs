@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('gmatch', {
   // mediaq setup suite: status, one-shot install (streams progress), start.
   mediaqStatus: () => ipcRenderer.invoke('mediaq:status'),
   mediaqInstall: () => ipcRenderer.invoke('mediaq:install'),
+  mediaqCancel: () => ipcRenderer.invoke('mediaq:cancel'),
   mediaqStart: () => ipcRenderer.invoke('mediaq:start'),
   onMediaqProgress: (cb) => {
     const handler = (_e, p) => cb(p)

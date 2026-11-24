@@ -82,6 +82,7 @@ process.on('unhandledRejection', (reason) => mainLog(`unhandledRejection: ${reas
 let cameraGrantOnce = false
 const { createSecureStore } = require('./secureStore.cjs')
 const apiSidecar = require('./apiSidecar.cjs')
+const { createSidecarSupervisor } = require('./sidecarSupervision.cjs')
 const mediaqInstaller = require('./mediaqInstaller.cjs')
 const mediaqSidecar = require('./mediaqSidecar.cjs')
 const registerMediaqHandlers = require('./ipc/mediaq.cjs')
@@ -1429,32 +1430,26 @@ app.whenReady().then(async () => {
   // on startApi() before createWindow(), so a slow/migrating bundled server
   // looked like "Task Mgr spin, never opens" (and invited double-clicks
   // that EADDRINUSE-crashed the sidecar).
-  let sidecarRestartTried = false
-  const onSidecarCrash = async (code) => {
-    mainLog(`sidecar crashed code=${code}`)
-    if (!sidecarRestartTried) {
-      sidecarRestartTried = true
+  const sidecarSupervisor = createSidecarSupervisor({
+    apiSidecar,
+    log: mainLog,
+    onError: () => {
       try {
-        await apiSidecar.startApi()
-        mainLog('sidecar restarted ok')
-        return
-      } catch (e) {
-        mainLog(`sidecar restart failed: ${e?.message || e}`)
+        dialog.showErrorBox(
+          'The local server stopped',
+          `gMatch could not keep its bundled server running.\n\nRestart the app, or switch to a friend's server in Settings > Server.\n\n${LOG_HINT}`,
+        )
+      } catch {
+        /* headless edge */
       }
-    }
-    try {
-      dialog.showErrorBox(
-        'The local server stopped',
-        `gMatch could not keep its bundled server running.\n\nRestart the app, or switch to a friend's server in Settings > Server.\n\n${LOG_HINT}`,
-      )
-    } catch { /* headless edge */ }
-  }
+    },
+  })
   let sidecarLogCount = 0
   apiSidecar.sidecarEvents.on('stderr', (line) => {
     // Crash forensics without letting a chatty server fill main.log.
     if (sidecarLogCount++ < 40) mainLog(`[sidecar] ${line}`)
   })
-  apiSidecar.sidecarEvents.on('crashed', (code) => void onSidecarCrash(code))
+  apiSidecar.sidecarEvents.on('crashed', (code) => sidecarSupervisor.crashed(code))
   // Read topology early so the window gets the right --api-base. A stored
   // client pointer is resolved ONCE here: an older app's choice is kept but not
   // dialed, a node this app verified is health-checked, and either way a launch
@@ -1507,6 +1502,7 @@ app.whenReady().then(async () => {
       try {
         await apiSidecar.startApi()
         mainLog('boot: bundled server ready')
+        sidecarSupervisor.markHealthy()
         bootMetrics.mark('sidecar.healthy')
       } catch (err) {
         mainLog(`bundled server start failed: ${err?.message || err}`)
@@ -1520,6 +1516,7 @@ app.whenReady().then(async () => {
     } else {
       try {
         await apiSidecar.startApi()
+        sidecarSupervisor.markHealthy()
       } catch (err) {
         // Sidecar down (e.g. bun missing): the renderer still boots and shows
         // offline states; Grid feed works via IPC booru.
@@ -1528,6 +1525,7 @@ app.whenReady().then(async () => {
     }
   }
   void startSidecarBg()
+  sidecarSupervisor.startWatchdog()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })

@@ -41,9 +41,10 @@ export interface GmatchBridge {
   booruTimings?: () => Promise<FeedMetricsSummary>
   /** mediaq setup suite (one-shot). The app is unchanged offline when mediaq is absent. */
   mediaqStatus?: () => Promise<{ installed: boolean; running: boolean; base: string; error?: string }>
-  mediaqInstall?: () => Promise<{ ok: boolean; bin?: string; error?: string }>
+  mediaqInstall?: () => Promise<{ ok: boolean; bin?: string; error?: string; cancelled?: boolean }>
+  mediaqCancel?: () => Promise<{ ok: boolean }>
   mediaqStart?: () => Promise<{ ok: boolean; base?: string; error?: string }>
-  onMediaqProgress?: (cb: (p: { phase: string; message: string }) => void) => () => void
+  onMediaqProgress?: (cb: (p: { phase: string; message: string; percent?: number }) => void) => () => void
   cacheImage?: (url: string) => Promise<{ local: string | null }>
   cacheStats?: () => Promise<{ files: number; bytes: number }>
   clearCache?: () => Promise<{ files: number; bytes: number }>

@@ -2,6 +2,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MediaqSetupModal } from './MediaqSetupModal'
+import { useMediaqInstall } from '../../services/mediaqInstall'
 
 // Manual storage stub (repo convention): the jsdom pragma is unreliable for
 // localStorage when vitest runs from the workspace root.
@@ -13,46 +14,53 @@ vi.stubGlobal('localStorage', {
   clear: () => mem.clear(),
 })
 
-type GmatchStub = {
-  mediaqStatus: ReturnType<typeof vi.fn>
-  mediaqInstall: ReturnType<typeof vi.fn>
-  onMediaqProgress: ReturnType<typeof vi.fn>
-}
-
-function stubGmatch(over: Partial<GmatchStub> = {}) {
-  const g: GmatchStub = {
-    mediaqStatus: vi.fn(async () => ({ installed: false, running: false, base: 'http://127.0.0.1:8765' })),
+function stubGmatch() {
+  const g = {
+    mediaqStatus: vi.fn(async () => ({ installed: false, running: false, base: 'x' })),
     mediaqInstall: vi.fn(async () => ({ ok: true, bin: 'mediaq' })),
+    mediaqCancel: vi.fn(async () => ({ ok: true })),
     onMediaqProgress: vi.fn(() => () => {}),
-    ...over,
   }
-  ;(window as unknown as { gmatch: GmatchStub }).gmatch = g
+  ;(window as unknown as { gmatch: typeof g }).gmatch = g
   return g
 }
 
 describe('MediaqSetupModal', () => {
   beforeEach(() => {
     mem.clear()
+    useMediaqInstall.setState({ open: false, status: 'idle', percent: null, message: '' })
   })
 
-  it('offers the install action when mediaq is absent and installs on click', async () => {
+  it('offers the install action when idle and installs on click', async () => {
     const g = stubGmatch()
-    render(<MediaqSetupModal open onClose={() => {}} />)
+    useMediaqInstall.setState({ open: true, status: 'idle' })
+    render(<MediaqSetupModal />)
     const btn = await screen.findByRole('button', { name: /install media suite/i })
     fireEvent.click(btn)
     await waitFor(() => expect(g.mediaqInstall).toHaveBeenCalledTimes(1))
   })
 
-  it('reports already-installed and hides the install button', async () => {
-    stubGmatch({ mediaqStatus: vi.fn(async () => ({ installed: true, running: true, base: 'x' })) })
-    render(<MediaqSetupModal open onClose={() => {}} />)
-    await screen.findByText(/already installed/i)
+  it('shows a progress bar while installing and can cancel', async () => {
+    stubGmatch()
+    useMediaqInstall.setState({ open: true, status: 'installing', percent: 42, message: 'Downloading uv…' })
+    render(<MediaqSetupModal />)
+    expect(screen.getByText('42%')).toBeTruthy()
+    const cancel = screen.getByRole('button', { name: /cancel/i })
+    expect(cancel).toBeTruthy()
+  })
+
+  it('shows done and hides the install button when done', () => {
+    stubGmatch()
+    useMediaqInstall.setState({ open: true, status: 'done', percent: 100, message: 'mediaq is ready' })
+    render(<MediaqSetupModal />)
+    expect(screen.getByText(/mediaq is ready/i)).toBeTruthy()
     expect(screen.queryByRole('button', { name: /install media suite/i })).toBeNull()
   })
 
   it('renders nothing when closed', () => {
     stubGmatch()
-    const { container } = render(<MediaqSetupModal open={false} onClose={() => {}} />)
+    useMediaqInstall.setState({ open: false })
+    const { container } = render(<MediaqSetupModal />)
     expect(container.firstChild).toBeNull()
   })
 })

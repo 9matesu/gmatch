@@ -1363,7 +1363,12 @@ export default function Home() {
       void forceRefreshFeed()
     }
     const onVisible = () => {
-      if (document.visibilityState === 'visible') refresh(15_000)
+      if (document.visibilityState === 'visible') {
+        refresh(15_000)
+        // The bundled sidecar may have restarted while the window sat idle; pull
+        // the roster again so the profile has data instead of a stale/empty list.
+        void loadUsersRef.current?.()
+      }
     }
     document.addEventListener('visibilitychange', onVisible)
     window.addEventListener('focus', onVisible)
@@ -3338,7 +3343,7 @@ export default function Home() {
     updateSettings('feedLayout', layout),
   );
 
-  const mediaqSetup = useMediaqSetup();
+  useMediaqSetup();
 
   if (!isLoaded) return <PageSkeleton />;
 
@@ -4377,7 +4382,7 @@ export default function Home() {
 
       <DominationEffects identity={identity} />
       <AgeGateModal />
-      <MediaqSetupModal open={mediaqSetup.open} onClose={mediaqSetup.close} onInstalled={mediaqSetup.installed} />
+      <MediaqSetupModal />
 
       <ContextOverlay
         contextMenu={contextMenu}
