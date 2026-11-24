@@ -2,6 +2,21 @@
 // All booru HTTP happens HERE (renderer never touches the network directly).
 // Endpoints per docs/SPEC.md §6. 10s timeout, browser UA, round-robin health.
 const { app, BrowserWindow, ipcMain, protocol, net, dialog, safeStorage, session } = require('electron')
+
+// ── Lightweight runtime (2026-11-24) ──────────────────────────────────────
+// This is a clicker + static pictures, not a 3D app. Compositing on the GPU was
+// the top cost (a separate GPU process + backing stores for every blur/scrim),
+// so we opt out BEFORE the window is created. Software composition is plenty
+// here, uses no dedicated GPU, and keeps the app honest about "render básico".
+app.disableHardwareAcceleration()
+// Bound the renderer heap so a runaway cache/blur cannot grow to ~2GB. 256MB is
+// above this bundle's steady state (LRUs are already capped in JS); raise only
+// if a real workload proves it necessary.
+app.commandLine.appendSwitch('js-flags', '--max-old-space-size=256')
+// Avoid large shared-memory allocations on Windows (Chromium falls back to the
+// paging file instead of exhausting /dev/shm-style buffers).
+app.commandLine.appendSwitch('disable-dev-shm-usage')
+
 const https = require('https')
 const fs = require('node:fs')
 const path = require('node:path')
@@ -1230,7 +1245,9 @@ function createWindow() {
     backgroundColor: '#080A0D',
     title: 'gMatch',
     webPreferences: {
-      backgroundThrottling: false,
+      // Throttle background tabs: a hidden window must not keep animating
+      // (CPU/GPU burn) — the mesh/socket work runs in main, unaffected.
+      backgroundThrottling: true,
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,

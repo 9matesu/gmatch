@@ -525,11 +525,11 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                     className={GOON_IMAGE}
                     src={redgifsPlayable(cell.post.url)}
                     poster={cell.post.preview ? redgifsPlayable(cell.post.preview) : undefined}
-                    autoPlay={!reduceMotion}
+                    autoPlay={false}
                     loop
                     muted
                     playsInline
-                    preload="auto"
+                    preload="metadata"
                     controls={reduceMotion}
                     onError={() => dropCell(i)}
                   />
@@ -681,26 +681,19 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               </span>
             </span>
           )}
-          {/* Blurred cover fill so the stage reads as an image, not a
-              letterbox. The foreground stays 100% visible (object-contain). */}
-          {!showOffline && shownUrl && (
-            <img
-              src={shownUrl}
-              alt=""
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 z-0 h-full w-full scale-110 object-cover opacity-40 blur-2xl select-none"
-            />
-          )}
+          {/* Lightweight runtime: no blurred cover fill. It forced a full-stage
+              backdrop re-composite on every shake/crit frame for a purely
+              decorative effect — the object-contain image is the whole stage. */}
           {isMotion && current ? (
             <video
               className={`${GOON_IMAGE} relative z-[3]`}
               src={redgifsPlayable(current.url)}
               poster={current.preview ? redgifsPlayable(current.preview) : undefined}
-              autoPlay={!reduceMotion}
+              autoPlay={false}
               loop
               muted
               playsInline
-              preload="auto"
+              preload="metadata"
               controls={reduceMotion}
               onError={onImageError}
             />

@@ -689,6 +689,13 @@ what it lives in.
     on the node, so a busy/offline node can no longer leave "invalid" posts
     undeletable. A definitive 4xx refusal is still reported as a failure. The
     rule lives in the pure `utils/deleteOutcome.ts` (unit-tested).
+  - **Lightweight runtime (2026-11-24):** this is a clicker + static pictures,
+    not a 3D app, so the packaged client opts OUT of GPU composition
+    (`app.disableHardwareAcceleration()`), caps the renderer heap at 256MB
+    (`--max-old-space-size=256`), and throttles hidden windows. The Goon Panel
+    drops the decorative full-stage `blur-2xl` cover (recomposited every
+    shake/crit frame) and videos no longer autoplay / `preload="auto"`. No new
+    dependencies — the existing LRU caches and flat CSS stay as they are.
   - **client** (opt-in in the Servers page): talks to someone else's node —
     a friend's machine or any `http(s)://host[:port]` the user was given
     (validated, applied on relaunch). `gmatch_SERVER_URL` env overrides both.

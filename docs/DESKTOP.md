@@ -109,6 +109,12 @@ per capability with its dependencies injected (`secure`, `cache`, `vault`,
 2k-line orchestrator; `node --check` + `eslint electron` cover them (there is no
 tsc for `.cjs`).
 
+**Lightweight runtime:** `main.cjs` calls `app.disableHardwareAcceleration()`
+and caps the renderer heap at 256MB before creating the window; hidden windows
+throttle. The Goon Panel renders the stage without the old blurred cover and
+videos do not autoplay (`preload="metadata"`). GPU process + large backing
+stores are therefore not part of this app's footprint.
+
 The local Bun API sidecar is supervised (`electron/sidecarSupervision.cjs`): a
 crash or a failed health probe restarts it with capped exponential backoff, and
 the attempt budget resets after a healthy minute — so a sidecar that died while
