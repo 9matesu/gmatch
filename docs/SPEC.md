@@ -371,15 +371,18 @@ product path.
   `descriptorUrlFromBytes` (extended to accept `vault://`) and resolve it through
   `readVaultBlob(ref)` instead of rehydrating text as media; `ObjectImage` also
   evicts a broken `blob:` entry from the `useObjectImage` LRU on media `onError`.
-- **Retired-host client config is cleared on boot (2026-11-25).** An unstamped
-  (pre-v2) `server-mode.json` is paused by the main process
-  (`pausedReason: 'legacy'`) and this machine's node boots on `:8790`, but the
-  renderer's cached `gmatch.api.url` / `gmatch.central.url` /
-  `gmatch.onboarding.serverUrl` (`https://gmatch.fly.dev`) and old
-  `gmatch.feed.snapshot.v1:*` rows survived because `fly.dev/api/health` still
-  answered `200`. `App.tsx` now clears those keys and stale snapshots once when
-  `serverState()` reports `mode === 'host'` && `pausedReason === 'legacy'`, so
-  `flushPostOutbox` delivers pending local posts to `http://127.0.0.1:8790`.
+- **Retired-host client config is cleared on boot (2026-11-25).** A stored
+  `gmatch.api.url` / `gmatch.onboarding.serverUrl` pointing at a retired host
+  (`https://gmatch.fly.dev`) and old `gmatch.feed.snapshot.v1:*` rows survived
+  because `fly.dev/api/health` still answered `200`, so `flushPostOutbox`
+  replicated new posts to the dead host instead of this machine's node. The rule
+  is provenance, not reachability: **a host-mode launch must use THIS node**, so
+  `App.tsx` drops a stored **non-loopback** `gmatch.api.url` / onboarding marker
+  whenever `serverState().mode === 'host'` (a client launch keeps its pointer),
+  clears a retired `gmatch.central.url` (`fly.dev`), and drops stale snapshots —
+  then reloads once so `API_BASE` and the outbox target `http://127.0.0.1:8790`.
+  This also covers a non-packaged run, where `server:state` returns `mode:'host'`
+  with no `pausedReason`.
 - **Dead media rows hide and REAPPEAR when bytes arrive (2026-11-25).**
   `GMatchFeed` sets `hideUnavailable={true}` on timeline `ObjectImage`s and
   `visiblePosts` drops a row once `deadPosts` marks it, so legacy

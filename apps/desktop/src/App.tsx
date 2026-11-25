@@ -142,33 +142,43 @@ export default function Home() {
     let dead = false;
     void (async () => {
       try {
-        // Legacy client pointer (pre-v2 `server-mode.json`): the main process
-        // paused it (`pausedReason: 'legacy'`) and booted this machine's node,
-        // but the renderer's cached `gmatch.api.url` / `gmatch.central.url` /
-        // `gmatch.onboarding.serverUrl` and old feed snapshots still point at
-        // the retired host. Clear them once so API_BASE and the outbox target
-        // this machine's sidecar (`http://127.0.0.1:8790`).
+        // A HOST launch must use THIS machine's node. A stored non-loopback
+        // `gmatch.api.url` (or onboarding marker) is a leftover client pointer
+        // from an older run — it can still answer /api/health (a retired host
+        // does), so reachability cannot decide. Provenance does: in host mode the
+        // data base is this node, so drop the remote pointer and let API_BASE
+        // fall through to the local sidecar (`http://127.0.0.1:8790`). A client
+        // launch (`mode === 'client'`) keeps its pointer untouched.
         const st = await window.gmatch?.serverState?.().catch(() => null)
-        if (st?.mode === 'host' && st?.pausedReason === 'legacy') {
-          let purged = false
-          for (const key of ['gmatch.api.url', 'gmatch.central.url', 'gmatch.onboarding.serverUrl']) {
+        const hosting = !st || st.mode === 'host'
+        const isLoopback = (v: string) => /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:|\/|$)/i.test(v)
+        let purged = false
+        if (hosting) {
+          for (const key of ['gmatch.api.url', 'gmatch.onboarding.serverUrl']) {
             const v = localStorage.getItem(key)
-            if (v && /fly\.dev|gmatch\.pages\.dev/i.test(v)) {
+            if (v && /^https?:\/\//i.test(v) && !isLoopback(v)) {
               localStorage.removeItem(key)
               purged = true
             }
           }
+        }
+        // A retired directory host (the old fly.dev API) is never a valid base.
+        for (const key of ['gmatch.central.url']) {
+          const v = localStorage.getItem(key)
+          if (v && /fly\.dev/i.test(v)) {
+            localStorage.removeItem(key)
+            purged = true
+          }
+        }
+        // Stale snapshots were read from the retired host; drop them so the
+        // timeline re-reads from this node instead of replaying dead rows.
+        if (purged) {
           for (let i = localStorage.length - 1; i >= 0; i--) {
             const k = localStorage.key(i)
-            if (k?.startsWith('gmatch.feed.snapshot.v1:')) {
-              localStorage.removeItem(k)
-              purged = true
-            }
+            if (k?.startsWith('gmatch.feed.snapshot.v1:')) localStorage.removeItem(k)
           }
-          if (purged) {
-            window.location.reload()
-            return
-          }
+          if (!dead) window.location.reload()
+          return
         }
         if (dead) return;
         const {
