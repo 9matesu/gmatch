@@ -76,6 +76,7 @@ import { type MainViewType, type ActiveHackSession } from "./components/home/Com
 import { CommandIsland } from "./components/home/CommandIsland";
 import { ThemeDrawer } from "./components/theme/ThemeDrawer";
 import { NativeHeaderBar } from "./components/home/NativeHeaderBar";
+import { NotificationSidebar } from "./components/notifications/NotificationSidebar";
 import { RoomsPreview } from "./components/chat/RoomsPreview";
 import { ServersView } from "./components/servers/ServersView";
 import { PCDominationView } from "./components/views/PCDominationView";
@@ -349,6 +350,7 @@ export default function Home() {
     )
   });
    const [showCreatePostModal, setShowCreatePostModal] = useState(false);
+   const [notifOpen, setNotifOpen] = useState(false);
    const [adminModalOpen, setAdminModalOpen] = useState(false);
   const [createPostInitialData, setCreatePostInitialData] = useState<{
     mediaList?: Array<{ id: string; previewUrl: string; isExternalUrl?: boolean; file?: File; kind?: 'video' | 'image'; mimeType?: string }>;
@@ -3542,7 +3544,30 @@ export default function Home() {
         ) : (
           <ErrorBoundary>
             <div className="app-glass relative z-10 w-full h-full min-h-0 bg-transparent text-retro-fg shadow-2xl flex flex-col overflow-hidden">
-              <NativeHeaderBar />
+              <NativeHeaderBar
+                onToggleNotifications={() => setNotifOpen((v) => !v)}
+                notificationsOpen={notifOpen}
+              />
+              <NotificationSidebar
+                open={notifOpen}
+                onClose={() => setNotifOpen(false)}
+                notifications={{
+                  notifications: lobby.notifications,
+                  invites: lobby.invites,
+                  localItems: notificationCenter.localItems,
+                  unreadCount: notificationCenter.unreadCount,
+                  unreadByType: notificationCenter.unreadByType,
+                  latestTitle: notificationCenter.latest?.title,
+                  onMarkAllRead: () => { void lobby.markNotificationsRead(); },
+                  onMarkRead: (ids) => { void lobby.markNotificationsRead(ids); },
+                  onOpenTarget: handleOpenNotificationTarget,
+                  onOpenLocalTarget: openLocalNotification,
+                  onMarkLocalRead: markLocalNotificationsRead,
+                  onRespondInvite: (id, accept) => { void lobby.respondToInvite(id, accept); },
+                  onRespondBabecock: handleRespondBabecock,
+                  onOpenBabecock: () => { setGamesSubTab('babecock'); setMainView('games'); },
+                }}
+              />
               <div className="flex-1 min-w-0 min-h-0 flex flex-row overflow-hidden relative">
 
                   <div ref={mainScrollRef} className="mobile-app-scroll flex-1 min-w-0 min-h-0 w-full flex flex-col relative z-10 overflow-y-auto styled-scrollbar pb-24">
@@ -4374,22 +4399,6 @@ export default function Home() {
               gamesOnlineCount={gamesOnlineCount}
               watchWatchingCount={watchWatchingCount}
               feedNewPostsCount={feedNewPostsCount}
-              notifications={{
-                notifications: lobby.notifications,
-                invites: lobby.invites,
-                localItems: notificationCenter.localItems,
-                unreadCount: notificationCenter.unreadCount,
-                unreadByType: notificationCenter.unreadByType,
-                latestTitle: notificationCenter.latest?.title,
-                onMarkAllRead: () => { void lobby.markNotificationsRead(); },
-                onMarkRead: (ids) => { void lobby.markNotificationsRead(ids); },
-                onOpenTarget: handleOpenNotificationTarget,
-                onOpenLocalTarget: openLocalNotification,
-                onMarkLocalRead: markLocalNotificationsRead,
-                onRespondInvite: (id, accept) => { void lobby.respondToInvite(id, accept); },
-                onRespondBabecock: handleRespondBabecock,
-                onOpenBabecock: () => { setGamesSubTab('babecock'); setMainView('games'); },
-              }}
               recessed={mainView === 'watch' && watchRoomOpen}
               displayName={myProfile.displayName || myUser?.display_name || 'You'}
               profilePic={profilePics[identity?.orbitId || ''] || myProfile.pfpUrl}
