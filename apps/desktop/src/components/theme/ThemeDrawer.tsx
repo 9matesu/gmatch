@@ -3,7 +3,6 @@ import {
   PaintBrush,
   X,
   Upload,
-  Image as ImageIcon,
   Sliders,
   ArrowsOut,
   Clock,
@@ -137,7 +136,6 @@ export function ThemeDrawer({ isOpen, onClose, settings, updateSettings, toast }
   };
 
   const panelOpacityVal = Math.round((settings.panelOpacity ?? 0.75) * 100);
-  const glassBlurVal = Math.round((settings.glassBlur ?? 0.7) * 100);
 
   return (
     <div
@@ -162,9 +160,8 @@ export function ThemeDrawer({ isOpen, onClose, settings, updateSettings, toast }
         </button>
       </div>
 
-      {/* Sliders: Blur & Opacity */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-surface-interactive/60 border border-edge-subtle rounded-xl">
-        {/* Panel Opacity */}
+      {/* Panel Opacity (the one appearance knob; blur is fixed) */}
+      <div className="p-3 bg-surface-interactive/60 border border-edge-subtle rounded-xl">
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <label htmlFor="theme-panel-opacity" className="text-2xs font-medium text-retro-muted flex items-center gap-1">
@@ -180,26 +177,6 @@ export function ThemeDrawer({ isOpen, onClose, settings, updateSettings, toast }
             step={5}
             value={panelOpacityVal}
             onChange={(e) => updateSettings('panelOpacity', Number(e.target.value) / 100)}
-            className="w-full accent-retro-accent cursor-pointer h-1.5 bg-surface-raised rounded-lg"
-          />
-        </div>
-
-        {/* Glass Blur */}
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <label htmlFor="theme-glass-blur" className="text-2xs font-medium text-retro-muted flex items-center gap-1">
-              <ImageIcon className="w-3.5 h-3.5 text-retro-muted" /> Glass Blur
-            </label>
-            <span className="text-xs font-mono font-bold text-retro-fg tabular-nums">{glassBlurVal}%</span>
-          </div>
-          <input
-            id="theme-glass-blur"
-            type="range"
-            min={0}
-            max={100}
-            step={5}
-            value={glassBlurVal}
-            onChange={(e) => updateSettings('glassBlur', Number(e.target.value) / 100)}
             className="w-full accent-retro-accent cursor-pointer h-1.5 bg-surface-raised rounded-lg"
           />
         </div>

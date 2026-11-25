@@ -86,6 +86,11 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
     }
   }, [])
 
+  // Auto-save: every edit persists immediately (no manual Save step).
+  useEffect(() => {
+    void saveBlocklist(data).catch(() => {})
+  }, [data])
+
   // Check if current data differs from factory defaults
   const isModified = useMemo(() => {
     try {

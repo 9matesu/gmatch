@@ -227,6 +227,13 @@ export function GMatchSettingsModal({
   initialTab = 'preferences',
 }: GMatchSettingsModalProps) {
   const [activeTab, setActiveTab] = useState<SettingsTabId>(() => resolveTab(initialTab));
+  const [appVer, setAppVer] = useState('');
+  useEffect(() => {
+    let dead = false
+    void window.gmatch?.appVersion?.().then((v) => { if (!dead) setAppVer(String(v || '')); }).catch(() => {})
+    return () => { dead = true }
+  }, []);
+  const accountName = (() => { try { return localStorage.getItem('orbit_display_name') || ''; } catch { return ''; } })();
   const [showLegalCenter, setShowLegalCenter] = useState(false);
   const [wallpaperExpanded, setWallpaperExpanded] = useState(() => initialTab === 'wallpaper');
   const [copiedId, setCopiedId] = useState(false);
@@ -376,7 +383,12 @@ export function GMatchSettingsModal({
               <div className="w-7 h-7 rounded-lg bg-glass-w10 flex items-center justify-center text-retro-muted">
                 <Settings className="w-4 h-4" />
               </div>
-              <h2 id="settings-title" className="text-base font-black tracking-tight text-retro-fg">Settings</h2>
+              <div className="min-w-0">
+                <h2 id="settings-title" className="text-base font-black tracking-tight text-retro-fg">Settings</h2>
+                <div className="text-2xs text-retro-muted truncate max-w-[8rem]">
+                  {accountName || 'Guest'}{appVer ? ` · v${appVer}` : ''}
+                </div>
+              </div>
             </div>
 
             <button
