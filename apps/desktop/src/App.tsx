@@ -55,6 +55,7 @@ import { reconcilePublishedPost } from "./utils/feedPublish";
 import { useStableCallback } from "./hooks/useStableCallback";
 import { PEER_ONLINE_EVENT } from "./utils/p2pSwarm";
 import { readCachedFeed, writeCachedFeed } from "./features/feed/feedSnapshotCache";
+import { tombstonePost } from "./utils/deletedPosts";
 import { localHeldMediaUrl } from "./utils/localMedia";
 import { GMatchDMs } from "./components/chat/GMatchDMs";
 import { toChatPeer, type ChatPeer } from "./components/chat/chatPeer";
@@ -1600,8 +1601,12 @@ export default function Home() {
 
   const persistSave = useCallback((postId: string, saved: boolean) => {
     if (!identity) return
-    orbitFetch(`/api/posts/${postId}/save`, { method: saved ? 'POST' : 'DELETE' }, identity).catch(() => { })
-  }, [identity])
+    // Re-read the snapshot on success so `is_saved` lands and the profile
+    // "Saved" tab (which reads the server row) updates without a manual reload.
+    void orbitFetch(`/api/posts/${postId}/save`, { method: saved ? 'POST' : 'DELETE' }, identity)
+      .then((res) => { if (res.ok) { invalidateCache('/api/posts'); loadServerFeed() } })
+      .catch(() => { })
+  }, [identity, loadServerFeed])
 
   const persistComment = useCallback(async (postId: string, text: string, parentCommentId?: string | null) => {
     if (!identity) return null
@@ -1752,6 +1757,7 @@ export default function Home() {
       if (entry && entry.state !== 'replicated') {
         setServerPosts(prev => prev.filter(p => p.id !== postId))
         purgeLocal()
+        tombstonePost(postId)
         return 'local'
       }
     } catch { /* outbox unavailable (private mode): fall through to the node */ }
@@ -1776,6 +1782,7 @@ export default function Home() {
       }
       setServerPosts(prev => prev.filter(p => p.id !== postId))
       purgeLocal()
+      tombstonePost(postId)
       return outcome
     } catch (err) {
       logger.warn('[App] DELETE /api/posts/:id threw', err)

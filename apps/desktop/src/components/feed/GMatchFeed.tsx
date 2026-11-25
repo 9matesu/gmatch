@@ -92,6 +92,7 @@ import { FeedHeader } from './FeedHeader';
 import { FeedStatusPills } from './FeedStatusPills';
 import { Linkify } from '../Linkify';
 import { copyText } from '../../utils/clipboard';
+import { isPostDeleted } from '../../utils/deletedPosts';
 
 export interface PostComment {
   id: string;
@@ -585,7 +586,7 @@ function GMatchFeedImpl({
     [posts],
   );
   const visiblePosts = useMemo(
-    () => posts.filter((p) => !p.is_archived && isRenderable(p)),
+    () => posts.filter((p) => !p.is_archived && isRenderable(p) && !isPostDeleted(p.id)),
     [posts],
   );
 

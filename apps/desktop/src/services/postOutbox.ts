@@ -2,6 +2,7 @@
 
 import { orbitFetch, type OrbitIdentityLike } from '../utils/api';
 import { gossipOwnPost, type GossipPostInput } from './gossip';
+import { isPostDeleted } from '../utils/deletedPosts';
 
 export const OUTBOX_KEY = 'gmatch_post_outbox_v1';
 
@@ -135,6 +136,7 @@ export async function rearmMissingReplicated(
   for (const e of listOutbox()) {
     if (rearmChecked.size >= max) break;
     if (e.state !== 'replicated' || rearmChecked.has(e.objectId)) continue;
+    if (isPostDeleted(e.objectId)) continue; // tombstoned: never re-register
     rearmChecked.add(e.objectId);
     try {
       const res = await orbitFetch(`/api/objects/${e.objectId}`, {}, identity);
