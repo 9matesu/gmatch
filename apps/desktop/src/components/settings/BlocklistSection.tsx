@@ -69,6 +69,13 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
   const [isSaving, setIsSaving] = useState(false)
   const [isCopied, setIsCopied] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  /** True once the first bridge sync resolved: before that, the panel must
+   *  NOT write (its initial state is the renderer's in-memory copy, which can
+   *  be older than the file). */
+  const [synced, setSynced] = useState(false)
+  /** The last state known to be ON DISK. An edit that does not differ from it
+   *  is not written (opening the panel must not write anything). */
+  const onDiskRef = useRef<string | null>(null)
 
   // Sync with main process / bridge on mount
   useEffect(() => {
@@ -76,20 +83,34 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
     syncBlocklistFromBridge()
       .then((current) => {
         if (mounted && current) {
+          onDiskRef.current = JSON.stringify(current)
           setData(current)
           setJsonText(JSON.stringify(current, null, 2))
         }
       })
       .catch(() => {})
+      .finally(() => {
+        if (mounted) setSynced(true)
+      })
     return () => {
       mounted = false
     }
   }, [])
 
   // Auto-save: every edit persists immediately (no manual Save step).
+  //
+  // NOT before the first bridge sync, and NOT when the panel shows exactly
+  // what is already on disk. The panel used to save on MOUNT, which wrote the
+  // renderer's in-memory copy over the file — silently reverting a ban made
+  // in the clicker ("I banned yaoi and it came back").
   useEffect(() => {
-    void saveBlocklist(data).catch(() => {})
-  }, [data])
+    if (!synced) return
+    const stamp = JSON.stringify(data)
+    if (onDiskRef.current === stamp) return
+    void saveBlocklist(data)
+      .then(() => { onDiskRef.current = stamp })
+      .catch(() => {})
+  }, [data, synced])
 
   // Check if current data differs from factory defaults
   const isModified = useMemo(() => {
@@ -256,6 +277,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
     try {
       const ok = await saveBlocklist(payload)
       if (ok) {
+        onDiskRef.current = JSON.stringify(payload)
         setData(payload)
         setJsonText(JSON.stringify(payload, null, 2))
         toast?.('blocklist.json saved and applied to active filters.', 'success')

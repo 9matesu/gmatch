@@ -53,9 +53,24 @@ describe('fetchPosts (SPEC §6/§8)', () => {
     })
     vi.stubGlobal('window', { gmatch: { booruFetch } })
     const res = await fetchPosts({ tags: 'gangbang', limit: 10 })
-    expect(booruFetch).toHaveBeenCalledWith({ tags: 'gangbang', limit: 10 })
+    expect(booruFetch).toHaveBeenCalledWith({ tags: 'gangbang', limit: 10, excludes: [] })
     expect(res.ok).toBe(true)
     expect(res.source).toBe('tbib')
+  })
+
+  it('sends the player excludes so the provider query carries -term', async () => {
+    // The excludes used to stop at the renderer: the source offered the
+    // excluded content, we paid to download it, and only then threw it away.
+    setUserExcludes(['yaoi', 'feet'])
+    const booruFetch = vi.fn().mockResolvedValue({ posts: [], source: 'tbib', ok: true })
+    vi.stubGlobal('window', { gmatch: { booruFetch } })
+    await fetchPosts({ tags: 'blonde', limit: 10 })
+    expect(booruFetch).toHaveBeenCalledWith({
+      tags: 'blonde',
+      limit: 10,
+      excludes: ['yaoi', 'feet'],
+    })
+    setUserExcludes([])
   })
 
   it('returns offline:true when the bridge reports failure', async () => {

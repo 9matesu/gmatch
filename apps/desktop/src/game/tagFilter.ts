@@ -114,6 +114,44 @@ export async function saveBlocklist(data: BlocklistData): Promise<boolean> {
   return true
 }
 
+/**
+ * Ban terms FOR GOOD: they land in the user's blocklist.json, so the clicker
+ * never offers them again (the main process sends `-term` in every provider
+ * query AND the renderer post-filter drops the post).
+ *
+ * The MAIN PROCESS owns the file: it merges the terms into the authoritative
+ * list and hands the result back. The renderer used to send its own (possibly
+ * stale) full list, which silently clobbered anything main had written since.
+ */
+export async function banTagsInBlocklist(
+  terms: readonly string[],
+): Promise<{ ok: boolean; data?: BlocklistData; error?: string }> {
+  const clean = [...new Set(terms.map((t) => String(t || '').toLowerCase().trim()).filter(Boolean))]
+  if (!clean.length) return { ok: true, data: getActiveBlocklistData() }
+  if (typeof window !== 'undefined' && window.gmatch?.blocklistBan) {
+    try {
+      const res = await window.gmatch.blocklistBan(clean)
+      if (res?.ok && res.data) {
+        updateActiveBlocklist(res.data)
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(res.data))
+        } catch {
+          /* ignore */
+        }
+        return { ok: true, data: res.data }
+      }
+      return { ok: false, error: res?.error || 'the blocklist write was refused' }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+  // No bridge (browser dev): merge locally and persist.
+  const data = getActiveBlocklistData()
+  const next = { ...data, blocklist: [...new Set([...data.blocklist, ...clean])] }
+  const ok = await saveBlocklist(next)
+  return { ok, data }
+}
+
 export async function resetBlocklist(): Promise<BlocklistData> {
   try {
     if (typeof localStorage !== 'undefined') {

@@ -747,7 +747,7 @@ describe('3x3 grid mode', () => {
     expect(s.pendingDrops.length).toBeGreaterThanOrEqual(1)
   })
 
-  it('claimDropTag adopts one tag, claimDropAntiTag bans another, drop survives until empty', () => {
+  it('claimDropTag adopts one tag, claimDropAntiTag bans another, drop survives until empty', async () => {
     useGame.setState({
       tags: [],
       userExcludes: [],
@@ -761,7 +761,7 @@ describe('3x3 grid mode', () => {
     expect(useGame.getState().tags.map((t) => t.name)).toContain('milf')
     expect(useGame.getState().pendingDrops[0].tags).toEqual(['feet', 'blonde'])
     // Ban another: it becomes an exclude, the drop still has the last tag.
-    expect(useGame.getState().claimDropAntiTag('d1', 'feet')).toBe(true)
+    expect(await useGame.getState().claimDropAntiTag('d1', 'feet')).toBe(true)
     expect(useGame.getState().userExcludes).toContain('feet')
     expect(useGame.getState().pendingDrops[0].tags).toEqual(['blonde'])
     // Claiming the last tag removes the drop entirely.

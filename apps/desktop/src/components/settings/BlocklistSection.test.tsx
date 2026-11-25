@@ -74,6 +74,27 @@ describe('BlocklistSection', () => {
     })
   })
 
+  it('opening the panel does NOT write the list back', async () => {
+    // The panel used to auto-save on MOUNT, which wrote the renderer's
+    // in-memory copy over the file — silently reverting a ban made in the
+    // clicker ("I banned yaoi and it came back").
+    const blocklistSet = vi.fn(async () => ({ ok: true }))
+    const blocklistGet = vi.fn(async () => ({
+      current: { blocklist: ['loli', 'yaoi'], suggested: [], noise: [] },
+      defaults: { blocklist: [], suggested: [], noise: [] },
+    }))
+    ;(window as unknown as { gmatch: unknown }).gmatch = { blocklistGet, blocklistSet }
+
+    try {
+      render(<BlocklistSection />)
+      await waitFor(() => expect(blocklistGet).toHaveBeenCalled())
+      // The panel loaded the CURRENT list (the ban is in it) and wrote NOTHING.
+      expect(blocklistSet).not.toHaveBeenCalled()
+    } finally {
+      delete (window as unknown as { gmatch?: unknown }).gmatch
+    }
+  })
+
   it('allows removing a tag in visual mode and saving', async () => {
     const toast = vi.fn()
     render(<BlocklistSection toast={toast} />)

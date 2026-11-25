@@ -449,8 +449,33 @@ product path.
   tag into a per-drop selection and one "Ban N selected" button applies them all
   (`claimDropAntiTag` per tag), instead of banning one tag per click. The top-right
   Prohibit button no longer purges: it opens a picker of THAT image's tags
-  (checkboxes + "Ban N selected" → `addUserExclude` + skip), with "Purge" kept as
+  (checkboxes + "Ban N selected" → `banTag` + skip), with "Purge" kept as
   the explicit whole-image option.
+- **A ban is DURABLE: it lands in blocklist.json (2026-11-25).** "Ban yaoi" now
+  means yaoi never appears again — in ANY later clicker round, not just the next
+  one. The chain:
+  - **The MAIN PROCESS owns the file.** `blocklist:ban` merges the terms into the
+    AUTHORITATIVE list (read-modify-write on the user's `blocklist.json`) and
+    hands the result back; the renderer sends only the TERMS. It used to send its
+    own full list, which silently clobbered anything main had written since.
+    `currentBlocklist` is updated in the same step, so every later provider query
+    carries `-yaoi`.
+  - **The runtime exclude list can no longer veto the ban.** It is capped at 100
+    and refuses duplicates, and the old code routed the ban THROUGH it
+    (`addUserExclude` → early return), so a duplicate or a full list meant the
+    term never reached the blocklist and it came back. The durable write is now
+    the primary half; the exclude list is secondary and best-effort.
+  - **A failed write is reported, not swallowed.** The old path was
+    fire-and-forget with a silent catch, so a failed write looked exactly like a
+    successful ban. `banTag` resolves `false` and toasts the reason; the drop
+    tray keeps the tag visible so the player can retry.
+  - **The feed reacts immediately:** the current foe, the queued foes, the grid
+    squares and the back-arrow history are purged of the banned term — the back
+    arrow included, so it is not a way back to it.
+  - **The player's excludes reach the provider.** `fetchPosts` sends the live
+    exclude list to the main process (`excludes`), which turns it into `-term`
+    query negatives. The source never OFFERS the excluded content (it used to be
+    downloaded and only then thrown away by the renderer filter).
 - **Fewer clicks: picker opens on the gallery, post modal is 2 columns (2026-11-25).**
   `MediaPickerPanel` opens on the Browse (gallery) pane whenever it is offered, so
   a keepsake is one click away. The Create Post modal is a 2-column grid on

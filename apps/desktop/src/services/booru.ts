@@ -2,7 +2,7 @@
 // the only booru client — the social feed carries peer media over the swarm
 // (docs/ARCHITECTURE-P2P.md) and never asks a booru for it.
 import type { BooruPost } from '../game/types'
-import { isQueryBlocked, isUserExcluded } from '../game/tagFilter'
+import { isQueryBlocked, isUserExcluded, getUserExcludes } from '../game/tagFilter'
 import { blockedPair, getCoRules, isFeedIntent } from '../game/tagCooccur'
 import { matchesQuery as matchMatchesQuery, parseQuery } from '../game/matchRule'
 import { endRound, markStage, startRound } from './queryTiming'
@@ -61,6 +61,15 @@ export interface BooruRequest {
   silent?: boolean
   /** Query one provider by id (tag browser source picker, e.g. 'imhentai'). */
   source?: string
+  /**
+   * Player excludes for this round. They become `-term` negatives in the
+   * provider query, so the source never OFFERS the excluded content (it used
+   * to be fetched and then thrown away by the renderer filter).
+   *
+   * Filled in by `fetchPosts` from the live exclude list — callers do not
+   * pass it.
+   */
+  excludes?: string[]
 }
 
 export interface BooruResponse {
@@ -1649,7 +1658,7 @@ async function fetchPostsUncached(req: BooruRequest): Promise<BooruResponse> {
       const budget = startRoundBudget()
       const t0 = Date.now()
       const res = await Promise.race([
-        window.gmatch.booruFetch(req),
+        window.gmatch.booruFetch({ ...req, excludes: getUserExcludes() }),
         budget.signal.aborted
           ? Promise.reject(new DOMException('round deadline', 'TimeoutError'))
           : new Promise<never>((_, reject) => {

@@ -94,6 +94,9 @@ contextBridge.exposeInMainWorld('gmatch', {
   domVideoOpen: (url, durationMs) => ipcRenderer.invoke('dom-video:open', url, durationMs),
   blocklistGet: () => ipcRenderer.invoke('blocklist:get'),
   blocklistSet: (data) => ipcRenderer.invoke('blocklist:set', data),
+  // Ban terms for good: main merges them into the authoritative list and
+  // returns it. The renderer never sends its own (possibly stale) full list.
+  blocklistBan: (terms) => ipcRenderer.invoke('blocklist:ban', terms),
   blocklistReset: () => ipcRenderer.invoke('blocklist:reset'),
   pmvPlaylist: (id) => ipcRenderer.invoke('pmv:playlist', id),
   logError: (scope, msg) => { try { ipcRenderer.send('log:renderer', { scope: String(scope || ''), msg: String(msg || '') }) } catch { /* never log-loop */ } },

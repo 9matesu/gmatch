@@ -4,18 +4,8 @@ import { clickGain, heatMultiplier, heatStreakAfter, isCrit } from './economy'
 import type { EconomyInput } from './economy'
 import { buyTag as buyTagLevel, deriveTagStats, discoverTags, feedQuery, mergeTags as mergeTagList, normalizeCustomTag, removeTag as removeTagList, setupTag, soloTag as soloTagList, toggleTag as toggleTagLevel, validateCustomTag } from './tags'
 import { buildRoundQueries, roundQueryKey, PILLS_PER_ROUND, RECENT_QUERY_DEPTH } from './queryBuilder'
-import { getActiveBlocklistData, getUserExcludes, isNoise, isQueryBlocked, rankTags, saveBlocklist, setUserExcludes } from './tagFilter'
-
-/** Ban a tag for good: add it to the user's blocklist.json (durable, enforced
- *  by the main process + postFilter), not just the runtime exclude list. */
-function banTagInBlocklist(tag: string): void {
-  void (async () => {
-    const data = getActiveBlocklistData()
-    const t = tag.toLowerCase().trim()
-    if (!t || data.blocklist.includes(t)) return
-    await saveBlocklist({ ...data, blocklist: [...data.blocklist, t] })
-  })().catch(() => { /* best-effort: the runtime exclude still applies */ })
-}
+import { getUserExcludes, banTagsInBlocklist, isNoise, isQueryBlocked, rankTags, setUserExcludes } from './tagFilter'
+import { tagHitsAnyTerm } from '@orbit/shared'
 import { learnPurge, setCoRules, setFeedIntent } from './tagCooccur'
 import { KILL_XP, foeMaxHp, killBonusPoints } from './battle'
 import { ALL_CAP_IDS, CAPS, activeCaps, popCap as popCapList } from './caps'
@@ -117,7 +107,12 @@ export interface GameState {
   /** KO novelty pipeline (session-only): generated per drain from foe tags. */
   pendingDrops: KoDrop[]
   claimDropTag: (id: string, tag: string) => boolean
-  claimDropAntiTag: (id: string, tag: string) => boolean
+  /** Ban a tag for good. Resolves true only when the DURABLE write landed
+   *  (the term is now in the user's blocklist.json). */
+  claimDropAntiTag: (id: string, tag: string) => Promise<boolean>
+  /** Ban a tag for good: it lands in the user's blocklist.json (enforced by
+   *  the main process on every query) AND in the runtime exclude list. */
+  banTag: (tag: string) => Promise<boolean>
   dismissDrop: (id: string) => void
   /** Player-picked starter tags + extra excludes (setup screen, one shot). */
   setupComplete: boolean
@@ -367,6 +362,27 @@ export function shufflePosts<T>(posts: readonly T[]): T[] {
 function pushPast(past: BooruPost[], post: BooruPost | null): BooruPost[] {
   if (!post) return past
   return [...past, post].slice(-HISTORY_CAP)
+}
+
+/**
+ * Drop every foe that carries a banned term: the current one, the queued
+ * ones, the grid squares and the back-arrow history.
+ *
+ * The ban is durable (blocklist.json), so a foe that already slipped into the
+ * feed must not stay on screen — and the back arrow must not be a way back
+ * to it.
+ */
+function purgeFoesWithTag(
+  s: { current: BooruPost | null; queue: BooruPost[]; grid: GridCell[]; past: BooruPost[] },
+  term: string,
+): { current: BooruPost | null; queue: BooruPost[]; grid: GridCell[]; past: BooruPost[] } {
+  const hits = (p: BooruPost) => p.tags.some((t) => tagHitsAnyTerm(t, [term]))
+  return {
+    current: s.current && hits(s.current) ? null : s.current,
+    queue: s.queue.filter((p) => !hits(p)),
+    grid: s.grid.filter((c) => !hits(c.post)),
+    past: s.past.filter((p) => !hits(p)),
+  }
 }
 
 /**
@@ -846,14 +862,49 @@ export const useGame = create<GameState>((set, get) => ({
     return true
   },
 
-  claimDropAntiTag: (id, tag) => {
+  /**
+   * Ban a tag FOR GOOD.
+   *
+   * The durable half is the user's blocklist.json: the main process merges the
+   * term into the authoritative list and hands it back, so every later query
+   * carries `-term` and the renderer post-filter drops the post. The runtime
+   * exclude list (capped at 100) is a SECONDARY, best-effort half — it must
+   * never be able to veto the ban, which is what the old code did: a
+   * duplicate or a full list made `addUserExclude` refuse, the ban never
+   * reached the blocklist, and the tag came back.
+   */
+  banTag: async (raw) => {
+    const t = String(raw || '').toLowerCase().trim()
+    if (!t) return false
+    const res = await banTagsInBlocklist([t])
+    if (!res.ok) {
+      // Honest failure: the term is NOT banned, so say so instead of
+      // pretending the ban landed.
+      get().notify(`Could not ban "${t}" — ${res.error || 'the blocklist write failed'}`)
+      return false
+    }
+    // Runtime exclude (best-effort; the durable ban already landed).
+    const s = get()
+    if (!s.userExcludes.includes(t) && s.userExcludes.length < MAX_USER_EXCLUDES) {
+      setUserExcludes([...s.userExcludes, t])
+      set({ userExcludes: getUserExcludes() })
+    }
+    // The foes already on screen must go too — the back arrow included.
+    const purged = purgeFoesWithTag(get(), t)
+    set(purged)
+    if (!get().current && get().queue.length > 0) get().advanceFeed()
+    get().save()
+    return true
+  },
+
+  claimDropAntiTag: async (id, tag) => {
     const s = get()
     const drop = s.pendingDrops.find((d) => d.id === id)
     if (!drop || !drop.tags.includes(tag)) return false
-    // Only drop the tag from the drop if the exclude actually landed; a tag
-    // addUserExclude refuses stays visible so the player can still dismiss it.
-    if (!get().addUserExclude(tag)) return false
-    banTagInBlocklist(tag)
+    // Only drop the tag from the drop if the DURABLE ban landed; a failed
+    // write stays visible so the player can still dismiss it (and retry).
+    const banned = await get().banTag(tag)
+    if (!banned) return false
     set({ pendingDrops: withoutDropTag(get().pendingDrops, id, tag) })
     return true
   },

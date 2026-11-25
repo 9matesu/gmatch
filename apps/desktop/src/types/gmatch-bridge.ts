@@ -126,6 +126,9 @@ export interface GmatchBridge {
   domVideoOpen?: (url: string, durationMs?: number) => Promise<{ ok: boolean; reason?: string }>
   blocklistGet?: () => Promise<{ current: BlocklistData; defaults: BlocklistData; isCustom?: boolean }>
   blocklistSet?: (data: BlocklistData | string) => Promise<{ ok: boolean; data?: BlocklistData; error?: string }>
+  /** Ban terms for good. Main merges them into the authoritative list and
+   *  returns it, so the renderer never clobbers a newer list. */
+  blocklistBan?: (terms: string[] | string) => Promise<{ ok: boolean; data?: BlocklistData; added?: string[]; error?: string }>
   blocklistReset?: () => Promise<{ ok: boolean; data?: BlocklistData; error?: string }>
   /** Fire-and-forget renderer log line; main appends it to userData/main.log. */
   logError?: (scope: string, msg: string) => void

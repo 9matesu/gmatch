@@ -114,23 +114,28 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
       const next = cur.includes(tag) ? cur.filter((t) => t !== tag) : [...cur, tag]
       return { ...prev, [dropId]: next }
     })
-  const applyBanSel = (dropId: string) => {
-    for (const t of banSel[dropId] || []) claimDropAntiTag(dropId, t)
+  const applyBanSel = async (dropId: string) => {
+    for (const t of banSel[dropId] || []) await claimDropAntiTag(dropId, t)
     setBanSel((prev) => ({ ...prev, [dropId]: [] }))
   }
   // Ban-by-tag for the CURRENT foe: the Prohibit button opens a picker of that
   // image's tags instead of purging the whole image + auto-learning 3 tags.
   const userExcludes = useGame((s) => s.userExcludes)
-  const addUserExclude = useGame((s) => s.addUserExclude)
+  const banTag = useGame((s) => s.banTag)
   const [banPickerOpen, setBanPickerOpen] = useState(false)
   const [banPick, setBanPick] = useState<string[]>([])
   const toggleBanPick = (tag: string) =>
     setBanPick((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]))
-  const applyBanCurrent = () => {
-    for (const t of banPick) addUserExclude(t)
+  const applyBanCurrent = async () => {
+    const before = current?.id
+    // A ban is DURABLE: the term lands in the user's blocklist.json, so the
+    // clicker never offers it again.
+    for (const t of banPick) await banTag(t)
     setBanPick([])
     setBanPickerOpen(false)
-    advanceFeed()
+    // The ban already pulled the current foe if it carried the term; only
+    // advance when it did not.
+    if (useGame.getState().current?.id === before) advanceFeed()
   }
   // A new foe is a new picker: drop the previous selection.
   useEffect(() => { setBanPick([]); setBanPickerOpen(false) }, [current?.id])

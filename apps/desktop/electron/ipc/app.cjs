@@ -24,6 +24,16 @@ module.exports = function registerAppHandlers({ ipcMain, app, blocklist }) {
     isCustom: Boolean(userPath() && fs.existsSync(userPath())),
   }))
 
+  // Write the user's blocklist override file. Single source of truth:
+  // shared/blocklist.json is the factory default (read-only); the user's copy
+  // takes precedence on load.
+  const persist = (data) => {
+    const target = userPath()
+    if (!target) return
+    fs.mkdirSync(path.dirname(target), { recursive: true })
+    fs.writeFileSync(target, JSON.stringify(data, null, 2), 'utf8')
+  }
+
   ipcMain.handle('blocklist:set', (_event, payload) => {
     try {
       let data = payload
@@ -34,16 +44,45 @@ module.exports = function registerAppHandlers({ ipcMain, app, blocklist }) {
       if (!Array.isArray(data.blocklist)) {
         return { ok: false, error: 'Payload must contain a "blocklist" array' }
       }
-      // Single source of truth: shared/blocklist.json is the factory
-      // default (read-only); Settings edits land ONLY in the userData copy,
-      // which takes precedence on load.
-      const target = userPath()
-      if (target) {
-        fs.mkdirSync(path.dirname(target), { recursive: true })
-        fs.writeFileSync(target, JSON.stringify(data, null, 2), 'utf8')
-      }
+      persist(data)
       apply(data)
       return { ok: true, data: get() }
+    } catch (err) {
+      return { ok: false, error: err?.message || String(err) }
+    }
+  })
+
+  /**
+   * Ban terms FOR GOOD ("never show this again" in the clicker).
+   *
+   * The read-modify-write happens HERE, on the authoritative list: the
+   * renderer sends only the TERMS and adopts the list main returns. The old
+   * path sent the renderer's own full list, which silently clobbered anything
+   * main had written since (the renderer's copy could be a session old).
+   */
+  ipcMain.handle('blocklist:ban', (_event, payload) => {
+    try {
+      const raw = Array.isArray(payload)
+        ? payload
+        : typeof payload === 'string'
+          ? [payload]
+          : [payload?.tag]
+      const data = load()
+      const list = Array.isArray(data.blocklist) ? [...data.blocklist] : []
+      const added = []
+      for (const r of raw) {
+        // Only real strings are terms: a number payload is not a tag.
+        if (typeof r !== 'string') continue
+        const t = r.toLowerCase().trim()
+        if (!t || list.includes(t)) continue
+        list.push(t)
+        added.push(t)
+      }
+      if (!added.length) return { ok: true, data, added: [] }
+      const next = { ...data, blocklist: list }
+      persist(next)
+      apply(next)
+      return { ok: true, data: next, added }
     } catch (err) {
       return { ok: false, error: err?.message || String(err) }
     }
