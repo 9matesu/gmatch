@@ -328,7 +328,7 @@ function KeepsakeErrorState({
 
 export interface IdleGalleryViewProps {
   onCreateCard?: (media: { url: string; tags: string[]; name: string }) => void
-  onSetWallpaper?: (url: string, mime?: string) => void
+  onSetWallpaper?: (url: string, target?: 'app' | 'os', mime?: string) => void
   onRepostImage?: (media: { url: string; tags: string[]; name?: string; kind?: 'video' | 'image'; mimeType?: string }) => void
   onAddToStory?: (media: { url: string; tags: string[]; name?: string; kind?: 'video' | 'image'; mimeType?: string }) => void
 }
@@ -416,8 +416,11 @@ export default function IdleGalleryView({
           break
         case 'backdrop': {
           const url = forwardUrlRef.current(img)
+          const target = (detail as { target?: string }).target === 'os' ? 'os' : 'app'
           setBackground(url)
-          onSetWallpaper?.(url, img.kind === 'video' ? 'video/mp4' : undefined)
+          // Local keepsake -> OS wallpaper needs NO consent (it is this machine's
+  // own bytes, an explicit user action). The app tier is the in-app background.
+          onSetWallpaper?.(url, target, img.kind === 'video' ? 'video/mp4' : undefined)
           break
         }
         case 'delete':
@@ -1331,7 +1334,7 @@ export default function IdleGalleryView({
                 size="sm"
                 onClick={() => {
                   setBackground(viewer.url)
-                  onSetWallpaper?.(viewer.url, viewer.kind === 'video' ? 'video/mp4' : undefined)
+                  onSetWallpaper?.(viewer.url, 'app', viewer.kind === 'video' ? 'video/mp4' : undefined)
                 }}
                 title="Set as app backdrop"
               >
