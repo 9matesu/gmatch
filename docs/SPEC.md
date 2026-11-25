@@ -425,9 +425,10 @@ product path.
   `MediaPickerPanel` opens on the Browse (gallery) pane whenever it is offered, so
   a keepsake is one click away. The Create Post modal is a 2-column grid on
   `md+` (media left, caption/fields right) so the whole post fits one screen.
-  The notification bell is a header button that opens a fixed, animated **left
-  sidebar** (`NotificationSidebar`) dedicated to the unified `NotificationCenter`
-  — not a port into the Command Island.
+  The notification button is a chat-style pill in the `CommandIsland` (bell +
+  unread `CountBadge`) that opens a fixed, animated **left sidebar**
+  (`NotificationSidebar`) dedicated to the unified `NotificationCenter` (opened
+  expanded) — not in the header.
 - **The feed post opens as a side sheet (2026-11-25).** Clicking a timeline
   post opens the detail in a right `SideSheet` (media + caption + like/save/vault/
   share + comments), like opening a photo in the profile — the row no longer

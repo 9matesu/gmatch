@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { SpeakerHigh, SpeakerSlash, Minus, Square, X, CaretLeft, CaretRight, Bell } from '@phosphor-icons/react';
+import { SpeakerHigh, SpeakerSlash, Minus, Square, X, CaretLeft, CaretRight } from '@phosphor-icons/react';
 import { isAudioMuted, setAudioMuted, playPress } from '../../utils/sounds';
 
 export interface NativeHeaderBarProps {
@@ -10,9 +10,6 @@ export interface NativeHeaderBarProps {
   activeRoomName?: string;
   onGoBack?: () => void;
   onGoForward?: () => void;
-  /** Toggle the left notification sidebar. */
-  onToggleNotifications?: () => void;
-  notificationsOpen?: boolean;
 }
 
 export function NativeHeaderBar({
@@ -21,8 +18,6 @@ export function NativeHeaderBar({
   activeRoomName: _activeRoomName,
   onGoBack,
   onGoForward,
-  onToggleNotifications,
-  notificationsOpen = false,
 }: NativeHeaderBarProps = {}) {
   const [isMuted, setIsMuted] = useState(false);
 
@@ -87,18 +82,6 @@ export function NativeHeaderBar({
         className="flex items-center gap-2 text-retro-muted"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
-        {onToggleNotifications && (
-          <button
-            type="button"
-            onClick={() => { playPress(760); onToggleNotifications(); }}
-            className={`p-1.5 min-w-[28px] min-h-[28px] flex items-center justify-center rounded-md transition-colors cursor-pointer ${notificationsOpen ? 'bg-glass-w15 text-retro-fg' : 'hover:bg-glass-w10 hover:text-retro-fg'}`}
-            aria-label="Notifications"
-            title="Notifications"
-          >
-            <Bell className="w-3.5 h-3.5" />
-          </button>
-        )}
-
         <button
           type="button"
           onClick={toggleSound}

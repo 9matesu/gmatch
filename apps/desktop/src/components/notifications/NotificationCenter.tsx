@@ -37,6 +37,8 @@ export interface NotificationCenterProps {
   onRespondInvite?: (inviteId: string, accept: boolean) => void;
   onRespondBabecock?: (inviteId: string, accept: boolean) => void;
   onOpenBabecock?: () => void;
+  /** Open the list by default (the left sidebar renders it expanded). */
+  defaultOpen?: boolean;
 }
 
 /**
@@ -67,11 +69,12 @@ export function NotificationCenter(props: NotificationCenterProps) {
     onRespondInvite,
     onRespondBabecock,
     onOpenBabecock,
+  defaultOpen = false,
   } = props;
 
   const mediaq = useMediaqInstall();
   const { messages, dismiss, clearAll, overflowCount } = useToast();
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(defaultOpen);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const latestToast = messages.length ? messages[messages.length - 1] : null;
   const preview = latestTitle || latestToast?.text || "";

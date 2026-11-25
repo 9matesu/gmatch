@@ -3544,10 +3544,7 @@ export default function Home() {
         ) : (
           <ErrorBoundary>
             <div className="app-glass relative z-10 w-full h-full min-h-0 bg-transparent text-retro-fg shadow-2xl flex flex-col overflow-hidden">
-              <NativeHeaderBar
-                onToggleNotifications={() => setNotifOpen((v) => !v)}
-                notificationsOpen={notifOpen}
-              />
+              <NativeHeaderBar />
               <NotificationSidebar
                 open={notifOpen}
                 onClose={() => setNotifOpen(false)}
@@ -4399,6 +4396,9 @@ export default function Home() {
               gamesOnlineCount={gamesOnlineCount}
               watchWatchingCount={watchWatchingCount}
               feedNewPostsCount={feedNewPostsCount}
+              notificationCount={notificationCenter.unreadCount}
+              onToggleNotifications={() => setNotifOpen((v) => !v)}
+              notificationsOpen={notifOpen}
               recessed={mainView === 'watch' && watchRoomOpen}
               displayName={myProfile.displayName || myUser?.display_name || 'You'}
               profilePic={profilePics[identity?.orbitId || ''] || myProfile.pfpUrl}

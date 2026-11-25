@@ -21,6 +21,7 @@ import {
   FilmSlate,
   User,
   UsersThree,
+  Bell,
 } from '@phosphor-icons/react';
 import { playPress } from '../../utils/sounds';
 import { useCommunityInvite, openCommunityInvite } from '../../services/community';
@@ -90,6 +91,11 @@ export interface CommandIslandProps {
   /** Active Clicker layout; the pill only renders when this prop pair is given. */
   gridSize?: ViewMode;
   onGridSizeChange?: (mode: ViewMode) => void;
+  /** Unread notification count for the pill (0 hides it). */
+  notificationCount?: number;
+  /** Toggle the left notification sidebar. */
+  onToggleNotifications?: () => void;
+  notificationsOpen?: boolean;
 }
 
 export function CommandIsland({
@@ -119,6 +125,9 @@ export function CommandIsland({
   showAdmin,
   gridSize: _gridSize,
   onGridSizeChange: _onGridSizeChange,
+  notificationCount = 0,
+  onToggleNotifications,
+  notificationsOpen = false,
 }: CommandIslandProps) {
   const [satelliteOpen, setSatelliteOpen] = useState<boolean>(readSatelliteOpen);
   const [postPickerOpen, setPostPickerOpen] = useState(false);
@@ -304,6 +313,22 @@ export function CommandIsland({
 
         {/* Right zone: chat, profile, contextual action, extra tools. */}
         <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 justify-start">
+
+          {/* Notifications: chat-style button + unread pill, opens the left sidebar. */}
+          {onToggleNotifications && (
+            <button
+              type="button"
+              onClick={() => { playPress(760); onToggleNotifications(); }}
+              aria-label="Notifications"
+              aria-expanded={notificationsOpen}
+              className={`relative flex items-center gap-1 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full text-xs font-medium transition ${notificationsOpen ? 'bg-glass-w15 text-retro-fg' : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-(--scale-press)'}`}
+            >
+              <Bell className="w-4 h-4" weight={notificationsOpen ? 'fill' : 'regular'} />
+              {notificationCount > 0 && (
+                <CountBadge count={notificationCount} label={`${notificationCount} unread notifications`} />
+              )}
+            </button>
+          )}
 
           {/* Messages Drawer Toggle Button */}
           <button
