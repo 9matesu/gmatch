@@ -142,9 +142,10 @@ async function startApi() {
   const childLog = (kind) => (d) => {
     const line = String(d).trim()
     if (!line) return
-    // A closed log pipe (the main process is gone / restarting) makes
-    // console.* throw EPIPE. That must never escape as an uncaught exception
-    // and take the sidecar's logging (or the process) down with it.
+    // A closed log pipe makes console.* raise EPIPE. That arrives as an async
+    // 'error' EVENT on the stream, so this try/catch cannot catch it — the
+    // real guard is stdio-guard.cjs (installed in main.cjs). The try/catch
+    // still covers a synchronous throw, and the guard keeps the app alive.
     try {
       (kind === 'out' ? console.log : console.error)(`[api${kind === 'err' ? '!' : ''}]`, line)
     } catch {

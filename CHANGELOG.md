@@ -1,5 +1,68 @@
 # Changelog
 
+## Unreleased — the requests that were coded but never worked
+
+Every item below was requested, was already "implemented" in some form, and
+did not actually work in the running app. Each one is now built, tested and
+verified live.
+
+- **The profile's "Saved" tab reads the NODE, not the timeline.** It was fed
+  by `feedPosts.filter((p) => p.is_saved)` — the 50-row timeline snapshot — so
+  a post saved days ago was invisible forever. `GET /api/posts?saved=1` is now
+  a dedicated, user-scoped query (`EXISTS … Saves`), and the profile loads it
+  on open and after every save/un-save.
+- **A deleted post stays deleted across a reload.** The tombstone set started
+  EMPTY on every launch, so a post deleted yesterday came back the next
+  morning. It is re-read at boot, the node is always asked (a 404 is the goal
+  state, not a failure), and the cached posts snapshot is invalidated on every
+  confirmed delete.
+- **Clicking out of the side sheet closes it.** The overlay was a wrapper
+  carrying `pointer-events-none`, so an outside click could never reach a
+  handler. The click-catcher is now a SIBLING of the panel: it covers exactly
+  the page area beside it and never the panel itself. The feed and the profile
+  share the same `SideSheet`, so both dismiss the same way.
+- **The vault no longer flickers.** The guard read a MODULE-level
+  "lookup settled" set, so a URL looked up on a previous visit read as settled
+  instantly and the remote frame painted before the local copy landed. The
+  settled set is now per-mount, and `ObjectImage` runs ONE lookup driving both
+  the URL and the reveal gate (two independent lookups could resolve out of
+  order and open the gate on the remote src).
+- **The tag browser's viewer actually plays the clip.** The grid tile played;
+  the VIEWER modal was `muted={false}` with no `preload`, so Chromium refused
+  to autoplay it and opening a clip showed a black, paused first frame. The
+  viewer is muted + `preload="auto"` + `controls`, and both videos resolve
+  their URL through `redgifsPlayable()`.
+- **Banning a tag is DURABLE — it lands in `blocklist.json`.** The renderer
+  used to send its own stale full list, silently clobbering whatever main had
+  written. The main process now owns the file (read-modify-write on the
+  authoritative list) and the renderer sends only the TERMS. The durable write
+  is primary: the 100-cap runtime exclude list can no longer veto a ban, a
+  failed write is reported instead of swallowed, and the player's excludes
+  reach the provider as `-term` query negatives — so "ban yaoi" means yaoi
+  never appears again.
+- **The clicker's picture cache is a real cache.** Moving on used to EVICT the
+  picture that had just been cached, so the cache was permanently empty, the
+  viewer had nothing to show, and the BACK arrow re-downloaded the very
+  picture the player had just seen. Moving on is not rejecting: the BACK arrow
+  serves the last pictures from disk, and a new "Cache" viewer (in the
+  clicker header) lists what the device holds and saves a tile straight to the
+  gallery. The url→file map is now PERSISTED next to the bytes
+  (`imgcache/index.json`), so the cache survives a restart instead of being
+  write-only.
+- **Post options are a RIGHT-CLICK context menu; a caption can be edited.**
+  The three-dots button is gone. Right-click a post (in the timeline or in
+  the detail sidepanel) and the menu opens at the cursor, clamped to the
+  viewport, carrying every action the post has — like, save, save-to-vault,
+  repost, share, copy link, edit, archive, delete, report. Each row is gated
+  on its handler, and the menu never claims an outcome. Editing a caption is
+  owner-only: a node post is edited with `PATCH /api/posts/:id`, a
+  peer-replicated post with the protocol's `post.edit` operation.
+- **A closed stdout/stderr pipe no longer kills the app.** `console.log` into
+  a closed pipe raises EPIPE as an async `'error'` EVENT on the stream, so the
+  try/catch around the sidecar's logging could never catch it — the main
+  process died with "uncaught: Error: EPIPE: broken pipe, write". The guard
+  now lives on the stream itself (`electron/stdio-guard.cjs`).
+
 ## Unreleased — gmatch 2.0: no hosted service; the own node is the world
 
 - **Nothing hosted is contacted.** The client defaults to `central = none`

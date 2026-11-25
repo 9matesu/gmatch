@@ -588,6 +588,13 @@ product path.
   logged child stdout/stderr with `console.*` and no error handling, so a closed
   pipe threw an uncaught `EPIPE: broken pipe` (seen as "broken pipe" on delete).
   The log write is wrapped and the pipes swallow stream errors.
+- **A closed stdout/stderr pipe does not kill the app (2026-11-25).** The fix
+  above was INCOMPLETE: writing to a broken pipe does not throw at the call
+  site, node emits an async `'error'` EVENT on the stream, so the `try/catch`
+  around the log write could never catch it — the main process still died with
+  `uncaught: Error: EPIPE: broken pipe, write` (live in `main.log`). The guard
+  now lives on the stream itself (`electron/stdio-guard.cjs`, installed at
+  boot): EPIPE/ECONNRESET are swallowed, any other error is still reported.
 - **SQLITE_BUSY waits instead of 503 (2026-11-25).** The sidecar set WAL but no
   `busy_timeout`, so a concurrent writer (RateLimits/Users) returned
   `SQLITE_BUSY` → a 503 that made a DELETE which actually applied read as "could

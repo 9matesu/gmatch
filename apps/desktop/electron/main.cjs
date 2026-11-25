@@ -15,6 +15,11 @@ app.commandLine.appendSwitch('disable-dev-shm-usage')
 const https = require('https')
 const fs = require('node:fs')
 const path = require('node:path')
+// A closed stdout/stderr pipe used to kill the whole main process with an
+// uncaught "EPIPE: broken pipe, write" (main.log, 2026-11-25). The error is
+// an async 'error' EVENT on the stream, so the try/catch in apiSidecar.cjs
+// could never catch it — the listener has to live on the stream itself.
+require('./stdio-guard.cjs').guardStdio()
 const imageCache = require('./imageCache.cjs')
 const { createFetchBooru } = require('./booruSources.cjs')
 const vault = require('./vault.cjs')
