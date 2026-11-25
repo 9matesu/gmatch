@@ -255,12 +255,25 @@ export function SideSheet({
 
   if (!open) return null
   return (
-    <div className={`fixed inset-0 ${zIndexClass} flex justify-end pointer-events-none`} onClick={onClose}>
+    <div className={`fixed inset-0 ${zIndexClass} flex justify-end pointer-events-none`}>
+      {/* Click-catcher for the page area BESIDE the sheet. It is a SIBLING of
+          the aside, so it never covers the sheet itself, and it is the only
+          element that owns the outside-click handler.
+          The overlay used to carry `pointer-events-none` on the whole thing,
+          so an outside click could never reach a handler and the sheet stayed
+          open until Escape — the user asked for "clicking out of it
+          intentionally should close it". */}
+      <div
+        data-side-sheet-backdrop
+        aria-hidden="true"
+        onClick={onClose}
+        className="pointer-events-auto flex-1"
+      />
       <aside
         role="complementary"
         aria-label={typeof title === 'string' ? title : undefined}
         onClick={(e) => e.stopPropagation()}
-        className={`pointer-events-auto ${width} h-[calc(100%-4.5rem)] bg-[var(--color-glass)] backdrop-blur-xl border-l border-edge shadow-2xl flex flex-col animate-orbit-slide-left`}
+        className={`pointer-events-auto shrink-0 ${width} h-[calc(100%-4.5rem)] bg-[var(--color-glass)] backdrop-blur-xl border-l border-edge shadow-2xl flex flex-col animate-orbit-slide-left`}
       >
         <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-edge shrink-0">
           <h2 className="text-base font-black tracking-tight text-retro-fg truncate">{title}</h2>

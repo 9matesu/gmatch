@@ -467,6 +467,14 @@ product path.
   Save + Add-to-Vault are grouped on the right. The like chime (`playLike`/
   `playLikeOnce`) is deleted for good. `ObjectImage` keeps the last loaded `src`
   until a vault/cached swap loads, so opening a post no longer blinks.
+- **Clicking out of the side sheet closes it (2026-11-25).** The sheet's overlay
+  carried `pointer-events-none` on the whole thing, so an outside click could
+  never reach a handler and the panel stayed open until Escape — the user asked
+  for "clicking out of it intentionally should close it". The click-catcher is
+  now a **sibling** of the sheet (not a wrapper), so it covers exactly the page
+  area BESIDE the panel and never the panel itself; a click inside still keeps
+  it open. Both the feed and the profile use the same `SideSheet`, so both
+  surfaces now dismiss the same way.
 - **Timeline order: media → author → caption → actions (2026-11-25).** A
   timeline card renders the **media first**, then the author row (avatar, name,
   handle, time), then the written body, then the action row. The old
