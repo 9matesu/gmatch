@@ -183,9 +183,11 @@ export default function TagBrowser({ onClose }: { onClose?: () => void }) {
                     className="block h-full w-full object-cover"
                     src={p.url}
                     poster={p.preview || undefined}
+                    autoPlay
+                    loop
                     muted
-                    preload="metadata"
                     playsInline
+                    preload="auto"
                   />
                 ) : (
                   <CachedImg

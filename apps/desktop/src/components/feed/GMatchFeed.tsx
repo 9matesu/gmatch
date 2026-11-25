@@ -42,6 +42,7 @@ import { FeedGrid } from './FeedGrid';
 import { GMatchStories } from '../GMatchStories';
 import { PostComments } from './PostComments';
 import { SideSheet } from '../../ui/kit';
+import { ProfileExpandedPost } from './ProfileExpandedPost';
 import { LiveCameraModal } from '../camera/LiveCameraModal';
 import { ObjectImage } from '../ObjectImage';
 import { Avatar } from '../Avatar';
@@ -1188,60 +1189,13 @@ function GMatchFeedImpl({
                 onContextMenu={(e) => { e.preventDefault(); setOptionsPost(post) }}
                 className={`cv-row relative bg-surface-raised border border-edge rounded-lg overflow-hidden flex flex-col mb-3 break-inside-avoid ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
               >
-                {/* Repost attribution: a quiet line, not a filled band, so the
-                    post reads as one media-first tile, Instagram-style. */}
-                {post.is_reposted && (
-                  <div className="flex items-center gap-1.5 px-3 pt-2.5 text-xs text-retro-muted">
-                    <Repeat className="w-3.5 h-3.5 text-retro-fg" />
-                    <span>Reposted by <strong className="text-retro-fg font-medium">@{post.reposted_by || 'Peer'}</strong></span>
-                  </div>
-                )}
-
-                {/* One header row per post: avatar, name, handle, time, menu.
-                    It used to be a gradient painted over the picture, which
-                    drew the author and "No preview" on the same line. */}
-                <div
-                  data-testid="post-author-overlay"
-                  className="flex items-center gap-3 px-3 pt-3 pb-2"
-                  onContextMenu={(e) => onUserContext?.(e, post.author_id, post.author_name)}
-                >
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); handleAvatarClick(post.author_id); }}
-                    title={authorHasStory ? 'Watch story' : 'View profile'}
-                    aria-label={authorHasStory ? `Watch story of ${post.author_name}` : `View profile of ${post.author_name}`}
-                    className={`relative w-10 h-10 rounded-full p-[2px] flex-shrink-0 cursor-pointer ${authorHasStory ? 'bg-retro-accent' : 'bg-transparent'}`}
-                  >
-                    <span className="relative block w-full h-full rounded-full bg-surface-raised overflow-hidden">
-                      <Avatar id={post.author_id} size={40} imageUrl={profilePics[post.author_id] || post.author_avatar} fill={true} />
-                    </span>
-                  </button>
-                  <div className="flex min-w-0 flex-1 items-baseline gap-1.5">
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); handleNameClick(post.author_id); }}
-                      className="truncate text-sm font-semibold text-retro-fg hover:underline cursor-pointer"
-                    >
-                      {post.author_name || generateFallbackName(post.author_id)}
-                    </button>
-                    <span className="shrink-0 text-xs text-retro-faint">@{post.author_id.slice(0, 8)}</span>
-                    <span className="shrink-0 text-xs text-retro-faint" aria-hidden="true">·</span>
-                    <PostTimestamp createdAt={post.created_at} className="shrink-0 text-xs text-retro-faint" />
-                  </div>
-                </div>
-
-                {/* Written body sits ABOVE the media, directly under the author
-                    line, so the username + post data read as one block before
-                    the picture (the old card/image header is gone). */}
-                {post.caption ? (
-                  <p className="px-3 pt-1 pb-2 text-xs leading-snug text-retro-body whitespace-pre-wrap break-words">
-                    <Linkify text={post.caption} />
-                  </p>
-                ) : null}
+                {/* Media comes FIRST (media → author → caption → actions). The
+                    author line and written body are rendered AFTER the media
+                    block below. */}
 
                 {/* Media. A post with no bytes at all renders nothing here
                     (no empty frame, no "No preview"). The written body sits
-                    ABOVE the image (see above). */}
+                    BELOW the image (see after the media block). */}
                 {!post.url && !post.localPreviewUrl ? null : (() => {
                   const activeItem = multiMedia ? multiMedia[currentIdx] : null;
                   const activeUrl = activeItem ? activeItem.url : post.url;
@@ -1466,6 +1420,52 @@ function GMatchFeedImpl({
                     </div>
                   );
                 })()}
+
+                {/* Repost attribution (kept with the author block, under the media). */}
+                {post.is_reposted && (
+                  <div className="flex items-center gap-1.5 px-3 pt-2.5 text-xs text-retro-muted">
+                    <Repeat className="w-3.5 h-3.5 text-retro-fg" />
+                    <span>Reposted by <strong className="text-retro-fg font-medium">@{post.reposted_by || 'Peer'}</strong></span>
+                  </div>
+                )}
+
+                {/* Author row: avatar, name, handle, time — under the media. */}
+                <div
+                  data-testid="post-author-overlay"
+                  className="flex items-center gap-3 px-3 pt-3 pb-2"
+                  onContextMenu={(e) => onUserContext?.(e, post.author_id, post.author_name)}
+                >
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); handleAvatarClick(post.author_id); }}
+                    title={authorHasStory ? 'Watch story' : 'View profile'}
+                    aria-label={authorHasStory ? `Watch story of ${post.author_name}` : `View profile of ${post.author_name}`}
+                    className={`relative w-10 h-10 rounded-full p-[2px] flex-shrink-0 cursor-pointer ${authorHasStory ? 'bg-retro-accent' : 'bg-transparent'}`}
+                  >
+                    <span className="relative block w-full h-full rounded-full bg-surface-raised overflow-hidden">
+                      <Avatar id={post.author_id} size={40} imageUrl={profilePics[post.author_id] || post.author_avatar} fill={true} />
+                    </span>
+                  </button>
+                  <div className="flex min-w-0 flex-1 items-baseline gap-1.5">
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleNameClick(post.author_id); }}
+                      className="truncate text-sm font-semibold text-retro-fg hover:underline cursor-pointer"
+                    >
+                      {post.author_name || generateFallbackName(post.author_id)}
+                    </button>
+                    <span className="shrink-0 text-xs text-retro-faint">@{post.author_id.slice(0, 8)}</span>
+                    <span className="shrink-0 text-xs text-retro-faint" aria-hidden="true">·</span>
+                    <PostTimestamp createdAt={post.created_at} className="shrink-0 text-xs text-retro-faint" />
+                  </div>
+                </div>
+
+                {/* Written body — under the author line. */}
+                {post.caption ? (
+                  <p className="px-3 pt-1 pb-2 text-xs leading-snug text-retro-body whitespace-pre-wrap break-words">
+                    <Linkify text={post.caption} />
+                  </p>
+                ) : null}
 
                 {/* Action row: no fill, no separator — it sits directly under
                     the media so the whole tile reads as one object. */}
@@ -1742,68 +1742,32 @@ function GMatchFeedImpl({
             onClose={() => setExpandedPostId(null)}
             title={`Post · ${expandedPost.author_name}`}
           >
-            {/* Post detail (like the profile photo sidebar) with footer clearance
-                so the bottom nav never covers the last row. */}
-            <div className="pb-24 space-y-3">
-              {/* Author + data, then the written body, both ABOVE the media —
-                  the same order as the timeline card. */}
-              {expandedPost.caption ? (
-                <p className="text-xs leading-snug text-retro-body whitespace-pre-wrap break-words">
-                  <Linkify text={expandedPost.caption} />
-                </p>
-              ) : null}
-              {(() => {
-                const m = expandedPost.media?.[0];
-                const url = m?.url || expandedPost.url;
-                const mime = m?.mime_type || expandedPost.mime_type;
-                const id = m?.id || expandedPost.id;
-                const isObj = !!url && (url.includes('/api/objects/') || url.startsWith('vault://') || url.startsWith('magnet:') || url.startsWith('urn:sha256:') || url.startsWith('p2p-') || !url);
-                const vid = isVideoPost(mime, url, siblingMimesFor(expandedPost));
-                if (!url) return null;
-                return (
-                  <div className="overflow-hidden rounded-lg bg-black/40">
-                    {isObj ? (
-                      <ObjectImage objectId={id} contentUrl={url} identity={identity} mimeType={mime} className="w-full h-auto max-h-[55vh] object-contain" videoClassName="w-full max-h-[55vh] object-contain" controls alwaysShowControls autoPlay muted loop hideUnavailable={false} />
-                    ) : vid ? (
-                      <NativeVideoPlayer natural src={url} videoClassName="w-full max-h-[55vh] object-contain" controls alwaysShowControls autoPlay muted loop />
-                    ) : (
-                      <CachedImg src={url} alt={expandedPost.caption || 'Post image'} className="w-full h-auto max-h-[55vh] object-contain" loading="lazy" />
-                    )}
-                  </div>
-                );
-              })()}
-              <div className="flex items-center gap-1">
-                <button type="button" onClick={() => toggleLike(expandedPost)} aria-label="Like post" className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer">
-                  <Heart className={`w-4 h-4 stroke-[1.75] ${likedPosts[expandedPost.id] ? 'text-danger-fg fill-danger' : 'text-retro-muted hover:text-retro-fg'}`} />
-                </button>
-                <button type="button" onClick={() => toggleSave(expandedPost)} aria-label="Save post" className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer">
-                  <Bookmark className={`w-4 h-4 stroke-[1.75] ${savedPosts[expandedPost.id] ? 'text-retro-fg fill-retro-fg' : 'text-retro-muted hover:text-retro-fg'}`} />
-                </button>
-                <div className="ml-auto flex items-center gap-1">
-                  {vaultBridge() && expandedPost.url && (
-                    <button type="button" onClick={() => void savePostToVault(expandedPost)} aria-label="Save to Vault" title="Save the media to your Vault" className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer">
-                      <FolderPlus className={`w-4 h-4 stroke-[1.75] ${vaultSaved.has(expandedPost.url) ? 'text-success-fg' : 'text-retro-muted hover:text-retro-fg'}`} />
-                    </button>
-                  )}
-                  <button type="button" onClick={() => setSharingPost(expandedPost)} aria-label="Share post" className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer">
-                    <Send className="w-4 h-4 stroke-[1.75] text-retro-muted hover:text-retro-fg" />
-                  </button>
-                </div>
-              </div>
+            {/* Unified detail: the SAME ProfileExpandedPost the profile grid
+                uses, so the image sidepanel looks identical in feed and
+                profile. Footer clearance so the bottom nav never covers it. */}
+            <div className="pb-24">
+              <ProfileExpandedPost
+                post={expandedPost}
+                onClose={() => setExpandedPostId(null)}
+                identity={identity}
+                profilePics={profilePics}
+                isLiked={!!likedPosts[expandedPost.id]}
+                isSaved={!!savedPosts[expandedPost.id]}
+                likeCount={likeCounts[expandedPost.id] ?? expandedPost.like_count ?? 0}
+                comments={sheetComments}
+                commentsLoading={commentsLoadingId === expandedPost.id}
+                onToggleLike={toggleLike}
+                onToggleSave={toggleSave}
+                onAddComment={handleAddComment}
+                onToggleCommentLike={handleToggleCommentLike}
+                onReportComment={onReportComment}
+                onOpenShare={(p) => setSharingPost(p)}
+                onOptionsClick={(p) => setOptionsPost(p)}
+                onOpenLikers={(id) => setLikersModalPostId(id)}
+                onAvatarClick={handleAvatarClick}
+                onSelectUser={handleAvatarClick}
+              />
             </div>
-            <PostComments
-              key={expandedPost.id}
-              post={expandedPost}
-              comments={sheetComments}
-              commentsLoading={commentsLoadingId === expandedPost.id}
-              authorAvatar={profilePics[expandedPost.author_id]}
-              onAuthorClick={() => handleAvatarClick(expandedPost.author_id)}
-              onCommentAuthorClick={(authorId) => handleAvatarClick(authorId)}
-              onAddComment={handleAddComment}
-              onToggleCommentLike={handleToggleCommentLike}
-              onReportComment={onReportComment}
-              focusCommentId={focusCommentId}
-            />
           </SideSheet>
         );
       })()}

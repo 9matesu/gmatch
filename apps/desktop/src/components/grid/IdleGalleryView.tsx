@@ -10,7 +10,7 @@ import CachedImg from '../../ui/CachedImg'
 import MediaViewerModal from '../../ui/MediaViewerModal'
 import { EmptyState } from '../EmptyState'
 import { Button, Tabs, Title } from '../../ui/kit'
-import { useVaultUrls, useVaultUrl, useVaultHttpUrls, vaultLookupSettled, vaultForgetFailure } from '../../services/vault'
+import { useVaultUrls, useVaultUrl, useVaultHttpUrls, vaultLookupSettled, vaultForgetFailure, vaultOptIn } from '../../services/vault'
 import { resolveKeepsakeLocal, resolveLocalMedia, retainLocalUrl, releaseLocalUrl, markLocalLookupSettled, keepsakeLocalSettled, type KeepsakeLocal } from '../../services/keepsake'
 import { SlideshowPlayer, type ResolvedItem } from '../slideshows/SlideshowPlayer'
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer'
@@ -955,6 +955,13 @@ export default function IdleGalleryView({
               const isMotion = img.kind === 'video'
               const isSelected = selectedIds.has(img.id)
               const tileUrl = getTileUrl(img)
+              // Vault flicker guard: while the local vault lookup is still
+              // resolving (or a vault:// ref has not become a playable http
+              // url yet), keep the tile invisible instead of flashing the
+              // remote frame first. Layout is held by the aspect-square parent.
+              const vaultPending =
+                vaultOptIn() &&
+                (!vaultLookupSettled(img.url || '') || tileUrl.startsWith('vault://'))
               // A record that CLAIMS persisted bytes but whose lookup finished
               // with nothing (evicted vault / cleared object store / unreadable
               // row) must say so and offer a retry — the tile used to render a
@@ -1013,6 +1020,7 @@ export default function IdleGalleryView({
                   <button
                     type="button"
                     className="block h-full w-full cursor-pointer border-0 bg-transparent p-0"
+                    style={vaultPending ? { opacity: 0 } : undefined}
                     title="View keepsake"
                     aria-label={`View ${img.tags.slice(0, 2).join(' ') || 'keepsake'}`}
                     onClick={(e) => {

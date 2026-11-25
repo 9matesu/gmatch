@@ -437,18 +437,26 @@ product path.
   Save + Add-to-Vault are grouped on the right. The like chime (`playLike`/
   `playLikeOnce`) is deleted for good. `ObjectImage` keeps the last loaded `src`
   until a vault/cached swap loads, so opening a post no longer blinks.
-- **Author + data above the description (2026-11-25).** On a timeline card the
-  order is now author row (avatar, name, handle, time) → **caption** → media →
-  actions: the username and post data read as one block above the written body,
-  and the old caption-under-the-image block (the "card/image header") is gone.
-  The detail `SideSheet` uses the same order (caption above the media).
+- **Timeline order: media → author → caption → actions (2026-11-25).** A
+  timeline card renders the **media first**, then the author row (avatar, name,
+  handle, time), then the written body, then the action row. The old
+  caption-under-the-image block is gone; the repost line sits with the author
+  block under the media.
+- **One detail sidepanel for feed and profile (2026-11-25).** Clicking a post in
+  the feed opens the SAME `ProfileExpandedPost` inside the right `SideSheet` that
+  the profile grid uses, so the image sidepanel is visually identical in both
+  surfaces (and closes on outside click / Esc). The bespoke feed detail JSX was
+  removed.
 - **Vault no longer flickers on open (2026-11-25).** For an opted-in `http(s)`
   source, `ObjectImage` holds the media at `opacity:0` until the local vault
   lookup settles (a fast IPC), so a remote frame never flashes before the local
-  copy swaps in; a no-copy image reveals as soon as the lookup returns.
-- **Clicker videos actually play (2026-11-25).** The Goon Panel `<video>` (single
-  foe and grid) uses `autoPlay` + `preload="auto"` (muted, loop, playsInline) so
-  a motion foe animates instead of sitting on a black/poster frame.
+  copy swaps in; the gallery grid does the same per tile (`vaultPending` until
+  the vault lookup + `vault://`→http resolution settle). A no-copy image reveals
+  as soon as the lookup returns.
+- **Clicker + tag-browser videos actually play (2026-11-25).** The Goon Panel
+  `<video>` (single foe and grid) and the Tag Browser grid `<video>` use
+  `autoPlay` + `preload="auto"` (muted, loop, playsInline) so a motion foe/clip
+  animates instead of sitting on a black/poster frame.
 - **Posting is universal: every post shows (2026-11-25).** The text-less hiding
   rule (a row with no words was hidden until its bytes resolved) made a fresh
   post vanish from its author's own timeline, and a descriptor post whose bytes
