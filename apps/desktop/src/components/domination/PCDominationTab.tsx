@@ -707,10 +707,6 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                     const { label, icon: Icon, consent } = ACTION_LABELS[action];
                     const allowed = Boolean(selectedTarget.consents?.[consent]);
                     const sendable = allowed && Boolean(selectedTarget.enabled) && selectedTarget.online !== false;
-                    // Mesh-addressable peers skip the ledger entirely: no
-                    // price, no charge — the badge says so up front.
-                    const meshable = Boolean(mesh && mesh.peerKnown(selectedTarget.id));
-                    const price = prices[action];
                     return (
                       <button
                         key={action}
@@ -733,13 +729,6 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <Icon className="w-4 h-4 text-retro-muted" />
-                          {meshable ? (
-                            <span className="text-xs font-mono text-success-fg/80">Free</span>
-                          ) : price != null ? (
-                            <span className="text-xs font-mono text-retro-muted">{price} g$</span>
-                          ) : (
-                            <Zap className="w-3.5 h-3.5 text-retro-muted opacity-40" />
-                          )}
                         </div>
                         <div className="text-xs font-semibold text-retro-fg">{label}</div>
                         {/* Consented is the default and lives in the group line; the card
@@ -753,9 +742,6 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                     );
                   })}
                 </div>
-                <p className="text-2xs text-retro-muted leading-relaxed px-1">
-                  A drop mid-send? Check History → Outbox before retrying.
-                </p>
               </>
             )}
           </div>
@@ -799,7 +785,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
               {!receiving && <span className="text-2xs text-retro-muted ml-2">(saved. Inactive while Receiving is off)</span>}
             </div>
             <div className="divide-y divide-edge-subtle">
-              {CONSENT_ROWS.map(({ key, label, desc }) => {
+              {CONSENT_ROWS.map(({ key, label }) => {
                 const value = Boolean((settings as any)[key]);
                 return (
                   <div key={key} className="flex items-start gap-3 px-4 py-3 hover:bg-glass-w10 cursor-pointer transition-colors">
@@ -825,7 +811,6 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                       </button>
                     <div className="min-w-0">
                       <div className="text-xs font-medium text-retro-fg">{label}</div>
-                      <div className="text-xs text-retro-muted leading-snug mt-0.5">{desc}</div>
                     </div>
                   </div>
                 );
