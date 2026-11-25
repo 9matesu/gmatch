@@ -14,7 +14,6 @@ import {
   Send,
   Bookmark,
   FolderPlus,
-  MoreHorizontal,
   Sparkles,
   Repeat,
   PlusSquare,
@@ -1228,15 +1227,6 @@ function GMatchFeedImpl({
                     <span className="shrink-0 text-xs text-retro-faint" aria-hidden="true">·</span>
                     <PostTimestamp createdAt={post.created_at} className="shrink-0 text-xs text-retro-faint" />
                   </div>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setOptionsPost(post); }}
-                    className="shrink-0 p-1.5 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w10 cursor-pointer transition-colors"
-                    aria-label="Post options"
-                    title="Post options"
-                  >
-                    <MoreHorizontal className="w-4 h-4" />
-                  </button>
                 </div>
 
                 {/* Media. A post with no bytes at all renders nothing here

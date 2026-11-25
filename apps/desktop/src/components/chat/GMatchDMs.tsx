@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback, Fragment } from 'react';
 import { playPress } from '../../utils/sounds';
+import { EmojiReaction } from '../ui/EmojiReaction';
 import { resolveMediaUrl } from '../../utils/media';
 import { GroupMembersPopover, type GroupMember } from './GroupMembersPopover';
 import {
@@ -1423,6 +1424,14 @@ export function GMatchDMs({
                                   {msg.editedAt && (
                                     <span className="text-2xs text-retro-muted">Edited</span>
                                   )}
+                                </div>
+                              )}
+                              {showActions && (
+                                <div className={`mt-1 ${isOwn ? 'flex justify-end' : 'flex justify-start'}`}>
+                                  <EmojiReaction
+                                    size="sm"
+                                    onReact={(name) => onReactMessage?.(activePmPeer?.orbitId || '', msg.id, name, !isOwn)}
+                                  />
                                 </div>
                               )}
                               {openTarget === 'peer' && msg.reactions && Object.keys(msg.reactions).length > 0 && (

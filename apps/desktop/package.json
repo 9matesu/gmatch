@@ -23,7 +23,8 @@
   "dependencies": {
     "@noble/curves": "^1.9.0",
     "@noble/hashes": "^1.8.0",
-    "motion": "^14.14.0"
+    "motion": "^14.14.0",
+    "react-apple-emojis": "^3.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
