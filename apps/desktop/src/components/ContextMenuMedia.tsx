@@ -6,7 +6,6 @@ import {
   Copy,
   Download,
   ExternalLink,
-  Image as ImageIcon,
   Monitor,
   Pause,
   Play,
@@ -31,11 +30,10 @@ import { requestGalleryAction, type GalleryActionId } from '../utils/galleryActi
  */
 
 const GALLERY_ACTIONS: Array<{ id: GalleryActionId; label: string; icon: React.ReactNode; danger?: boolean }> = [
-  { id: 'repost', label: 'Repost to feed', icon: <Repeat className="w-3.5 h-3.5 text-info-fg" /> },
-  { id: 'story', label: 'Add to story', icon: <Sparkles className="w-3.5 h-3.5 text-warning-fg" /> },
-  { id: 'card', label: 'Create card', icon: <ImageIcon className="w-3.5 h-3.5 text-chrome-lav" /> },
-  { id: 'feature', label: 'Re-feature in the panel', icon: <RefreshCw className="w-3.5 h-3.5 text-success-fg" /> },
-  { id: 'backdrop', label: 'Set as backdrop', icon: <Monitor className="w-3.5 h-3.5 text-info-fg" /> },
+  { id: 'repost', label: 'Repost to feed', icon: <Repeat className="w-3.5 h-3.5" /> },
+  { id: 'story', label: 'Add to story', icon: <Sparkles className="w-3.5 h-3.5" /> },
+  { id: 'feature', label: 'Re-feature in the panel', icon: <RefreshCw className="w-3.5 h-3.5" /> },
+  { id: 'backdrop', label: 'Set as background', icon: <Monitor className="w-3.5 h-3.5" /> },
   { id: 'delete', label: 'Delete keepsake', icon: <Trash2 className="w-3.5 h-3.5" />, danger: true },
 ];
 
@@ -86,7 +84,7 @@ export function MediaContextMenu({ ctx, onDismiss, toast, onRepostImage, onSetWa
   actions.push({
     id: 'save',
     label: isVideo ? 'Save video as…' : 'Save image as…',
-    icon: <Download className="w-3.5 h-3.5 text-retro-accent" />,
+    icon: <Download className="w-3.5 h-3.5" />,
     params: [{ id: 'filename', label: 'File name', type: 'text', value: fallbackName }],
     run: async ({ filename }) => {
       toast('Downloading…', 'info');
@@ -98,7 +96,7 @@ export function MediaContextMenu({ ctx, onDismiss, toast, onRepostImage, onSetWa
   actions.push({
     id: 'copy-link',
     label: isVideo ? 'Copy video link' : 'Copy image link',
-    icon: <Copy className="w-3.5 h-3.5 text-retro-muted" />,
+    icon: <Copy className="w-3.5 h-3.5" />,
     run: () => {
       void navigator.clipboard?.writeText(resolved);
       toast(isVideo ? 'Video link copied' : 'Image link copied', 'info');
@@ -109,7 +107,7 @@ export function MediaContextMenu({ ctx, onDismiss, toast, onRepostImage, onSetWa
     actions.push({
       id: 'copy-image',
       label: 'Copy image',
-      icon: <Clipboard className="w-3.5 h-3.5 text-retro-muted" />,
+      icon: <Clipboard className="w-3.5 h-3.5" />,
       run: async () => {
         toast('Copying…', 'info');
         const ok = await copyImageToClipboard(src);
@@ -121,7 +119,7 @@ export function MediaContextMenu({ ctx, onDismiss, toast, onRepostImage, onSetWa
   actions.push({
     id: 'open',
     label: 'Open in new window',
-    icon: <ExternalLink className="w-3.5 h-3.5 text-retro-muted" />,
+    icon: <ExternalLink className="w-3.5 h-3.5" />,
     run: () => {
       // Keepsakes resolve local-only through the gallery: the tile src may be a
       // preview, not the durable copy.
@@ -138,17 +136,19 @@ export function MediaContextMenu({ ctx, onDismiss, toast, onRepostImage, onSetWa
       id: 'repost-inline',
       label: 'Repost to feed',
       separatorBefore: true,
-      icon: <Repeat className="w-3.5 h-3.5 text-retro-accent" />,
+      icon: <Repeat className="w-3.5 h-3.5" />,
       run: () => onRepostImage(resolved),
     });
   }
 
-  if (onSetWallpaper && !noWallpaper) {
+  // A keepsake's background comes from the gallery's own resolved bytes (the
+  // `backdrop` action below, with app/OS), so the generic one would duplicate it.
+  if (onSetWallpaper && !noWallpaper && !keepsakeId) {
     actions.push({
       id: 'background',
       label: 'Set as background',
       separatorBefore: true,
-      icon: <Monitor className="w-3.5 h-3.5 text-retro-muted" />,
+      icon: <Monitor className="w-3.5 h-3.5" />,
       params: [{
         id: 'target',
         label: 'Apply to',
