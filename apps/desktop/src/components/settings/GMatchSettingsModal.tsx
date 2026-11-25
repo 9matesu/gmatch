@@ -32,6 +32,7 @@ import { PasskeyManager } from '../PasskeyManager';
 import { UpdateSection } from './UpdateSection';
 import { CommunitySection } from './CommunitySection';
 import { BlocklistSection } from './BlocklistSection';
+import { CacheViewer } from './CacheViewer';
 import {
   Settings,
   User,
@@ -900,6 +901,7 @@ export function GMatchSettingsModal({
                   {!vaultBridge() && (
                     <p className="text-2xs text-retro-muted">Desktop app only. The browser build always streams.</p>
                   )}
+                  <CacheViewer toast={toast} />
                 </div>
               </div>
             )}
