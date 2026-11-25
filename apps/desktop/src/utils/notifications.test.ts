@@ -173,17 +173,16 @@ describe('deriveConversationNotifications', () => {
     expect(item.actorName).toBe('Payload Name')
   })
 
-  it('falls back to the readable handle, never a truncated raw id', () => {
+  it('does NOT fabricate a notification for an unnamed peer (no random "User_…")', () => {
     const peerId = 'A1B2C3D4E5F60718293A4B5C6D7E8F90'
-    const [item] = deriveConversationNotifications({
+    const items = deriveConversationNotifications({
       threads: { [peerId]: [{ id: 'm', text: 'hi', ts: 5 }] },
       dmSeen: {},
       selfId: 'self',
     })
-    expect(item.actorName).toBe('User_a1b2c3')
-    expect(item.title).toBe('User_a1b2c3 sent you a message')
-    // Regression: a slice of the internal hash names nobody.
-    expect(item.actorName).not.toBe(peerId.slice(0, 10))
+    // The chat badge still shows the thread; the notification centre must not
+    // invent a random alert for a peer with no real display name.
+    expect(items).toHaveLength(0)
   })
 
   it('derives a room row from inbound-only messages', () => {

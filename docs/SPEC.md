@@ -1214,13 +1214,12 @@ left-rail dock is gone. The trigger keeps
 - DM display names are self-declared labels (the payload name wins over the
   directory); identity is signature-verified, so a notification never authorizes
   on a name.
-- **The name fallback is a readable handle, never a raw id (2026-10-19).** When a
-  DM/room row has no payload name, no directory entry and no cached peer name,
-  the row shows `generateFallbackName(peerId)` (`User_abc123` — the same handle
-  `courierPresence`, the lobby and the gallery owner label already use) instead
-  of a truncated hash fragment (`peerId.slice(0, 10)`), which named nobody and
-  disagreed with every other surface. The canonical `actorId` still carries the
-  full id for routing, dedupe and authorization; only the display label changed.
+- **An unnamed peer does NOT raise a notification (2026-11-25).** A derived DM
+  row whose peer has no real display name (payload name absent, no directory/cached
+  name) is **suppressed** — no random "`User_abc123` sent you a message" alert.
+  The chat badge still shows the thread; only the notification is dropped. The
+  readable handle (`generateFallbackName`) remains the label everywhere the peer
+  is actually rendered (chat, roster, gallery), never a truncated hash fragment.
 - `MAX_PER_THREAD = 2000` truncates DM history, and multi-machine swarm delivery
   remains unverified (§10d).
 

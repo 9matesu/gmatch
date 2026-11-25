@@ -22,6 +22,7 @@ import type { AppNotification, NotificationTarget } from "../utils/notifications
 import { playPress } from "../utils/sounds";
 import { resolveMediaUrl } from "../utils/media";
 import { formatAbsoluteTime } from "../utils/timeAgo";
+import { generateFallbackName } from "@orbit/shared";
 
 export interface NotificationItem {
   id: string;
@@ -256,7 +257,7 @@ export function NotificationsPanel({
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium text-retro-fg truncate">
-                      {inv.inviter_name?.trim() || 'Unknown User'}
+                      {inv.inviter_name?.trim() || generateFallbackName(inv.inviter_id)}
                     </p>
                     <p className="text-xs text-retro-muted">
                       Challenged you to a duel · expires in {secondsLeft}s

@@ -236,6 +236,10 @@ export function deriveConversationNotifications(
     if (unread <= 0) continue
     const last = newestInbound(thread, selfId)
     const name = resolveName(peerId, last?.senderName)
+    // No real display name anywhere (payload name absent, default resolver):
+    // this is an unidentified peer. Do NOT fabricate a random "User_abc sent you
+    // a message" notification for it — the chat badge still shows the thread.
+    if (!last?.senderName?.trim() && /^User_[0-9a-f]{6,}$/i.test(name)) continue
     // Same helper the chat badge uses, so the "Mentioned you" note and the
     // chat's per-thread mention count can never tell different stories.
     const mentions = countMentions(thread, matcher, dmSeen?.[peerId] ?? 0)

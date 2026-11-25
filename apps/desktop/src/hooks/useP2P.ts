@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { OrbitIdentity } from '@orbit/crypto';
-import { User, OrbitObject } from '@orbit/shared';
+import { User, OrbitObject, generateFallbackName } from '@orbit/shared';
 import { parseBareSwarmAnnounce, parseSwarmEnvelope, type SwarmAnnounce, type SwarmMessage } from '@orbit/protocol';
 import { saveObject, getObject } from '../utils/storage';
 import { getApiBaseUrl, getApiWebSocketUrl, isCourierHost, orbitFetch, subscribeApiBase } from '../utils/api';
@@ -735,7 +735,7 @@ export function useP2P(identity: OrbitIdentity | null) {
                 return [...prev, {
                   id: m.id,
                   senderId: m.sender_id,
-                  senderName: m.sender_name?.trim() || 'Unknown User',
+                  senderName: m.sender_name?.trim() || generateFallbackName(m.sender_id),
                   text: m.body,
                   timestamp: parseApiTimestamp(m.created_at)?.getTime() || Date.now(),
                   channel: chan,
@@ -961,7 +961,7 @@ export function useP2P(identity: OrbitIdentity | null) {
         .map((m) => ({
           id: m.id,
           senderId: m.sender_id,
-          senderName: m.sender_name?.trim() || 'Unknown User',
+          senderName: m.sender_name?.trim() || generateFallbackName(m.sender_id),
           text: m.body,
           timestamp: parseApiTimestamp(m.created_at)?.getTime() || Date.now(),
           channel: m.channel || 'global_lobby',
