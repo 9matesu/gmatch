@@ -5,6 +5,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { GMatchFeed } from './GMatchFeed';
 
+// Local-object store: bytes are available for the descriptor post below.
+vi.mock('../../utils/p2pSwarm', () => ({
+  getLocalObject: vi.fn(async () => new Blob(['x'])),
+  PEER_ONLINE_EVENT: 'orbit-peer-online',
+}));
+
 const identity = { orbitId: 'me', publicKeyHex: 'aa', privateKeyHex: 'bb' } as never;
 
 const imagePost = {
@@ -75,5 +81,18 @@ describe('a text-less row waits for its bytes', () => {
     );
     expect(container.querySelector('article')).not.toBeNull();
     expect(screen.getByText('words are content')).toBeTruthy();
+  });
+
+  it('a text-less local-object post appears once its bytes resolve locally', async () => {
+    const { container } = render(
+      <GMatchFeed
+        identity={identity}
+        posts={[{ ...imagePost, id: 'obj-1', url: `magnet:?xt=urn:btih:${'a'.repeat(40)}` }]}
+        stories={[]}
+        users={[]}
+      />,
+    );
+    // Hidden until the local store answers, then promoted (no infinite wait).
+    await waitFor(() => expect(container.querySelector('article')).not.toBeNull());
   });
 });

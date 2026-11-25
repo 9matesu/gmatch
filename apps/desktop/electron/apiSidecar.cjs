@@ -142,9 +142,20 @@ async function startApi() {
   const childLog = (kind) => (d) => {
     const line = String(d).trim()
     if (!line) return
-    (kind === 'out' ? console.log : console.error)(`[api${kind === 'err' ? '!' : ''}]`, line)
+    // A closed log pipe (the main process is gone / restarting) makes
+    // console.* throw EPIPE. That must never escape as an uncaught exception
+    // and take the sidecar's logging (or the process) down with it.
+    try {
+      (kind === 'out' ? console.log : console.error)(`[api${kind === 'err' ? '!' : ''}]`, line)
+    } catch {
+      /* log sink closed: drop the line */
+    }
     sidecarEvents.emit('stderr', `${kind}:${line}`.slice(0, 500))
   }
+  // Swallow stream errors on the log pipes: EPIPE/ECONNRESET here is normal
+  // when the parent closes the read end, not a crash.
+  proc.stdout.on('error', () => {})
+  proc.stderr.on('error', () => {})
   proc.stdout.on('data', childLog('out'))
   proc.stderr.on('data', childLog('err'))
   proc.on('error', (err) => {

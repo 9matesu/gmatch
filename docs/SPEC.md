@@ -401,6 +401,20 @@ product path.
   (dozens of old rows) could read "Loading media…" for the life of the session.
   A hard cap (`HARD_UNAVAILABLE_CAP_MS` = 30s) now applies when bytes are still
   expected; an explicit budget (a 5s story) still wins.
+- **A text-less local-object post is probed too (2026-11-25).** A text-less post
+  with a `magnet:`/`vault:`/`urn:`/`p2p-` url was hidden by the text-less rule
+  and the probe only ran for `http(s)`/`/`, so its tile never mounted and never
+  promoted — permanently invisible even with the bytes in the vault. The probe
+  now resolves `getLocalObject(id)` for object posts and promotes on bytes.
+- **A closed sidecar log pipe is not a crash (2026-11-25).** `apiSidecar.cjs`
+  logged child stdout/stderr with `console.*` and no error handling, so a closed
+  pipe threw an uncaught `EPIPE: broken pipe` (seen as "broken pipe" on delete).
+  The log write is wrapped and the pipes swallow stream errors.
+- **SQLITE_BUSY waits instead of 503 (2026-11-25).** The sidecar set WAL but no
+  `busy_timeout`, so a concurrent writer (RateLimits/Users) returned
+  `SQLITE_BUSY` → a 503 that made a DELETE which actually applied read as "could
+  not delete" (the row vanished on the next refresh). `serve.ts` now sets
+  `PRAGMA busy_timeout = 5000`.
 - **Dead media rows hide and REAPPEAR when bytes arrive (2026-11-25).**
   `GMatchFeed` sets `hideUnavailable={true}` on timeline `ObjectImage`s and
   `visiblePosts` drops a row once `deadPosts` marks it, so legacy

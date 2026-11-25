@@ -611,12 +611,23 @@ function GMatchFeedImpl({
       if (post.caption?.trim()) continue;
       if (mediaReady.has(post.id) || deadPosts.has(post.id)) continue;
       const url = post.media?.[0]?.url || post.url;
-      if (!url || !/^https?:|^\//i.test(url)) continue; // inline or descriptor: no probe
+      if (!url) continue;
       if (hasInlineMedia(post)) continue;
-      const img = new Image();
-      img.onload = () => { if (live) promoteMedia(post.id); };
-      img.onerror = () => { if (live) hidePost(post.id); };
-      img.src = resolveMediaUrl(url);
+      if (/^https?:|^\//i.test(url)) {
+        const img = new Image();
+        img.onload = () => { if (live) promoteMedia(post.id); };
+        img.onerror = () => { if (live) hidePost(post.id); };
+        img.src = resolveMediaUrl(url);
+        continue;
+      }
+      // A local object (vault / magnet / urn / p2p): a hidden card can never
+      // load itself, so resolve the bytes here. With bytes -> promote; without
+      // -> stay hidden (a peer may bring them; the PEER_ONLINE re-check promotes).
+      const oid = resolveObjectRefId(url) || post.media?.[0]?.id || post.id;
+      if (!oid) continue;
+      void getLocalObject(oid).then((blob) => {
+        if (live && blob) promoteMedia(post.id);
+      }).catch(() => { /* still no bytes */ });
     }
     return () => { live = false; };
   }, [posts, mediaReady, deadPosts, promoteMedia, hidePost]);

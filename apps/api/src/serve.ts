@@ -47,6 +47,10 @@ const dbReadyPromise = (async () => {
     // pre-existing DB file auto_vacuum only takes effect after one VACUUM —
     // the guard makes that happen exactly once per DB lifetime.
     await client.execute('PRAGMA journal_mode = WAL')
+    // A busy/locked DB (a concurrent writer, a WAL checkpoint) must WAIT, not
+    // fail: SQLITE_BUSY surfaced as a 503 made a DELETE that actually applied
+    // read as "could not delete" (the row vanished on the next refresh).
+    await client.execute('PRAGMA busy_timeout = 5000')
     const av = await client.execute('PRAGMA auto_vacuum')
     const avValue = Number(Object.values((av.rows[0] ?? {}) as Record<string, unknown>)[0] ?? 0)
     if (!avValue) {
