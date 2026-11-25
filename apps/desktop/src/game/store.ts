@@ -4,7 +4,18 @@ import { clickGain, heatMultiplier, heatStreakAfter, isCrit } from './economy'
 import type { EconomyInput } from './economy'
 import { buyTag as buyTagLevel, deriveTagStats, discoverTags, feedQuery, mergeTags as mergeTagList, normalizeCustomTag, removeTag as removeTagList, setupTag, soloTag as soloTagList, toggleTag as toggleTagLevel, validateCustomTag } from './tags'
 import { buildRoundQueries, roundQueryKey, PILLS_PER_ROUND, RECENT_QUERY_DEPTH } from './queryBuilder'
-import { getUserExcludes, isNoise, isQueryBlocked, rankTags, setUserExcludes } from './tagFilter'
+import { getActiveBlocklistData, getUserExcludes, isNoise, isQueryBlocked, rankTags, saveBlocklist, setUserExcludes } from './tagFilter'
+
+/** Ban a tag for good: add it to the user's blocklist.json (durable, enforced
+ *  by the main process + postFilter), not just the runtime exclude list. */
+function banTagInBlocklist(tag: string): void {
+  void (async () => {
+    const data = getActiveBlocklistData()
+    const t = tag.toLowerCase().trim()
+    if (!t || data.blocklist.includes(t)) return
+    await saveBlocklist({ ...data, blocklist: [...data.blocklist, t] })
+  })().catch(() => { /* best-effort: the runtime exclude still applies */ })
+}
 import { learnPurge, setCoRules, setFeedIntent } from './tagCooccur'
 import { KILL_XP, foeMaxHp, killBonusPoints } from './battle'
 import { ALL_CAP_IDS, CAPS, activeCaps, popCap as popCapList } from './caps'
@@ -842,6 +853,7 @@ export const useGame = create<GameState>((set, get) => ({
     // Only drop the tag from the drop if the exclude actually landed; a tag
     // addUserExclude refuses stays visible so the player can still dismiss it.
     if (!get().addUserExclude(tag)) return false
+    banTagInBlocklist(tag)
     set({ pendingDrops: withoutDropTag(get().pendingDrops, id, tag) })
     return true
   },
@@ -1237,10 +1249,15 @@ export const useGame = create<GameState>((set, get) => ({
     if (s.queue.length > 0) {
       // Skipping is free but pays nothing — the beaten-or-not choice is the player's.
       // The skipped foe stays reachable via the back arrow at full HP.
+      // RANDOM pick (not the queue head): a small pool + sequential walk is what
+      // made the same pictures repeat in order. A random unseen index keeps it fresh.
       const foe = foeMaxHp(s.defeated)
+      const idx = Math.floor(Math.random() * s.queue.length)
+      const next = s.queue[idx]
+      const queue = [...s.queue.slice(0, idx), ...s.queue.slice(idx + 1)]
       set({
-        current: s.queue[0],
-        queue: s.queue.slice(1),
+        current: next,
+        queue,
         past: pushPast(s.past, s.current),
         foeHp: foe,
         foeMaxHp: foe,
