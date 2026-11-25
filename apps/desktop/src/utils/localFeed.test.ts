@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { enqueueOutbox, OUTBOX_KEY, setOutboxState } from '../services/postOutbox'
+import { tombstonePost } from './deletedPosts'
 import { localFeedPosts } from './localFeed'
 
 const identity = { orbitId: 'u1' }
@@ -86,5 +87,15 @@ describe('localFeedPosts', () => {
   it('is empty without an identity', () => {
     enqueueOutbox({ objectId: 'o4', registerBody: { id: 'o4' }, gossipInput: null })
     expect(localFeedPosts(null, 'Nobody')).toEqual([])
+  })
+
+  it('never renders a tombstoned post, even while the outbox still holds it', () => {
+    // The outbox is durable storage: a deleted post can still sit there (a
+    // delete from an older build, or one whose outbox removal never ran). It
+    // must not come back on the profile.
+    enqueueOutbox({ objectId: 'o5', registerBody: { id: 'o5', mime_type: 'image/png' }, gossipInput: null })
+    enqueueOutbox({ objectId: 'o6', registerBody: { id: 'o6', mime_type: 'image/png' }, gossipInput: null })
+    tombstonePost('o5')
+    expect(localFeedPosts(identity, 'Tester').map((r) => r.id)).toEqual(['o6'])
   })
 })

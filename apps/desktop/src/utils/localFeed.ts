@@ -1,4 +1,5 @@
 import { listOutbox, type OutboxState } from '../services/postOutbox'
+import { isPostDeleted } from './deletedPosts'
 import type { FeedPost } from '../components/feed/GMatchFeed'
 
 function tagsOf(raw: unknown): string[] {
@@ -52,6 +53,12 @@ export function localFeedPosts(
     const body = (entry.registerBody || {}) as Record<string, unknown>
     const objectId = String(body.id || entry.objectId)
     if (!objectId) continue
+    // A tombstoned post never comes back, whatever still holds it. The outbox
+    // is durable storage: an entry deleted before this app version (or one
+    // whose delete never reached the outbox) would otherwise keep rendering the
+    // post on the profile forever, and the outbox flush would keep trying to
+    // register it.
+    if (isPostDeleted(objectId)) continue
     if (entry.postGroup) {
       if (emittedGroups.has(entry.postGroup)) continue
       emittedGroups.add(entry.postGroup)

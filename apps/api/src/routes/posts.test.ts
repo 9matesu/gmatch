@@ -216,6 +216,44 @@ describe('Posts API (gMatch feed engagement)', () => {
     const feedJson: any = await feed.json()
     expect(feedJson.posts.find((p: any) => p.id === postId)).toBeUndefined()
   })
+
+  it('a deleted post is GONE FOR GOOD: the row is removed and no read path lists it', async () => {
+    // The durable proof. The feed query is not enough: the row can be hidden
+    // from a read path and still sit in the table, where the next snapshot or
+    // the profile query brings it back.
+    const id = await createPublicPost(env, alice, 'An old post that must stay deleted')
+
+    const before = await env.DB.prepare('SELECT id FROM Objects WHERE id = ?').bind(id).first<{ id: string }>()
+    expect(before?.id).toBe(id)
+
+    const del = await app.request(`/api/posts/${id}`, { method: 'DELETE', headers: authHeaders(alice, 'DELETE', `/api/posts/${id}`) }, env)
+    expect(del.status).toBe(200)
+
+    // 1. The row itself is gone.
+    const after = await env.DB.prepare('SELECT id FROM Objects WHERE id = ?').bind(id).first<{ id: string }>()
+    expect(after).toBeFalsy()
+
+    // 2. The public feed does not list it.
+    const feed = await app.request('/api/posts', { headers: authHeaders(bob, 'GET', '/api/posts') }, env)
+    const feedJson: any = await feed.json()
+    expect(feedJson.posts.find((p: any) => p.id === id)).toBeUndefined()
+
+    // 3. The PROFILE query does not list it — this is the path the own profile
+    //    uses, and it is the one that used to keep showing deleted posts.
+    //    The signature covers the PATHNAME only (the server signs
+    //    `new URL(req.url).pathname`), so the query string is not signed.
+    const profile = await app.request(`/api/posts?author_id=${alice.orbitId}&limit=200&sort=latest`, { headers: authHeaders(alice, 'GET', '/api/posts') }, env)
+    const profileJson: any = await profile.json()
+    expect(profileJson.posts.find((p: any) => p.id === id)).toBeUndefined()
+
+    // 4. The detail route 404s.
+    const detail = await app.request(`/api/posts/${id}`, { headers: authHeaders(alice, 'GET', `/api/posts/${id}`) }, env)
+    expect(detail.status).toBe(404)
+
+    // 5. Deleting it again is still the goal state, not a failure.
+    const again = await app.request(`/api/posts/${id}`, { method: 'DELETE', headers: authHeaders(alice, 'DELETE', `/api/posts/${id}`) }, env)
+    expect(again.status).toBe(404)
+  })
 })
 
 describe('Report abuse prevention', () => {

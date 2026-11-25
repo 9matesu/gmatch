@@ -55,7 +55,7 @@ import { reconcilePublishedPost } from "./utils/feedPublish";
 import { useStableCallback } from "./hooks/useStableCallback";
 import { PEER_ONLINE_EVENT } from "./utils/p2pSwarm";
 import { readCachedFeed, writeCachedFeed } from "./features/feed/feedSnapshotCache";
-import { tombstonePost } from "./utils/deletedPosts";
+import { tombstonePost, readDeletedPostIds } from "./utils/deletedPosts";
 import { localHeldMediaUrl } from "./utils/localMedia";
 import { GMatchDMs } from "./components/chat/GMatchDMs";
 import { toChatPeer, type ChatPeer } from "./components/chat/chatPeer";
@@ -1251,7 +1251,7 @@ export default function Home() {
 
   const [repostedPosts, setRepostedPosts] = useState<FeedPost[]>([])
   const [archivedPostIds, setArchivedPostIds] = useState<Set<string>>(() => new Set())
-  const [deletedPostIds, setDeletedPostIds] = useState<Set<string>>(() => new Set())
+  const [deletedPostIds, setDeletedPostIds] = useState<Set<string>>(() => readDeletedPostIds())
   const [followingIds, setFollowingIds] = useState<string[]>([])
   const [pmMessagesByPeer, setPmMessagesByPeer] = useState<Record<string, ChatMessage[]>>({})
 
@@ -1718,11 +1718,19 @@ export default function Home() {
    * Delete a post, and say what actually happened.
    *
    * Three outcomes, because a post can be in three places:
-   *  - `deleted`  the node confirmed the delete (or the row was already gone)
-   *  - `local`    the post never reached the node (an outbox row): removing it
-   *               from the durable outbox IS the delete, and there is no request
-   *               to make. Sending one would 404 and read as a failure.
-   *  - `failed`   the node refused or was unreachable
+   *  - `deleted`  the node confirmed the delete (or the row was already gone:
+   *               a 404 IS the goal state, not a failure)
+   *  - `local`    the node could not be reached and the post was never on one
+   *               (a local/P2P post): removing it here IS the delete
+   *  - `failed`   the node refused, or the transport failed for a post the node
+   *               serves — the row stays and the user is told the truth
+   *
+   * The node is ALWAYS asked, whatever the local outbox says. An outbox entry
+   * can read `pending` while its row is already on the node (the flush
+   * registered it a moment before the local state advanced), and treating that
+   * as "local only" left the row on the node — so the next snapshot brought the
+   * post back. One request covers every case: 404 means "not on a node", which
+   * is the goal state for a local post.
    *
    * This used to return a bare boolean, so a local-only post reported a failure
    * and the profile toasted "Could not delete the post" for something that had
@@ -1747,20 +1755,30 @@ export default function Home() {
       } catch { /* private mode */ }
       void deleteObject(postId).catch(() => { /* not in IndexedDB */ });
     };
-    // Local-only: an outbox row that never reached a node is this device's own
-    // copy, so removing it IS the delete (no request, nothing to 404). A
-    // `replicated` entry is on a node — deleting it locally without the node
-    // call is exactly why a deleted post "came back" on the next snapshot.
+    // Tombstone the post in durable storage AND in the React copy of the
+    // tombstone set, in ONE place. The feed projection takes that set as a
+    // plain argument (so it stays pure), and this callback is where every
+    // delete routes through — so the row is dropped from the timeline AND the
+    // profile immediately, and the tombstone survives the next launch.
+    const forget = (id: string) => {
+      tombstonePost(id);
+      setDeletedPostIds(prev => new Set(prev).add(id));
+      // The node snapshot changed, so every cached GET of the posts
+      // collection is stale. Without this the 3s response cache still served
+      // the deleted row: the tombstone masked it in the UI, but the next
+      // refresh re-seeded `serverPosts`/`myProfilePosts` with a post the
+      // node had already removed.
+      invalidateCache('/api/posts');
+    };
+    // The local outbox row must never be registered again, so it goes first.
+    // It is NOT a reason to skip the node: the flush can have registered the
+    // post on the node a moment before the local state advanced to
+    // 'replicated', and a `pending`/`local` entry whose row IS on the node is
+    // exactly how a deleted post came back on the next snapshot.
     try {
       const { removeOutboxEntry } = await import('./services/postOutbox')
-      const entry = removeOutboxEntry(postId)
-      if (entry && entry.state !== 'replicated') {
-        setServerPosts(prev => prev.filter(p => p.id !== postId))
-        purgeLocal()
-        tombstonePost(postId)
-        return 'local'
-      }
-    } catch { /* outbox unavailable (private mode): fall through to the node */ }
+      removeOutboxEntry(postId)
+    } catch { /* outbox unavailable (private mode): the node call below still runs */ }
     try {
       const nodeBacked = nodePostIdsRef.current.has(postId)
       let res = await orbitFetch(`/api/posts/${postId}`, { method: 'DELETE' }, identity)
@@ -1782,11 +1800,20 @@ export default function Home() {
       }
       setServerPosts(prev => prev.filter(p => p.id !== postId))
       purgeLocal()
-      tombstonePost(postId)
+      forget(postId)
       return outcome
     } catch (err) {
+      // The node could not be reached at all (no status to map). Same rule as
+      // a 503: a post this node does not serve has no row to wait for, so it
+      // IS deleted here; a post the node serves keeps its row and the user is
+      // told the truth.
+      const nodeBacked = nodePostIdsRef.current.has(postId)
       logger.warn('[App] DELETE /api/posts/:id threw', err)
-      return 'failed'
+      if (nodeBacked) return 'failed'
+      setServerPosts(prev => prev.filter(p => p.id !== postId))
+      purgeLocal()
+      forget(postId)
+      return 'local'
     }
   }, [identity])
 

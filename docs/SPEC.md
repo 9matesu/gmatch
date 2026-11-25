@@ -390,12 +390,33 @@ product path.
   `rearmMissingReplicated`: each `replicated` entry is probed once
   (`GET /api/objects/:id`) and a 404 moves it back to `local` (bounded, once
   per session), so the normal flush registers it on `127.0.0.1:8790`.
-- **Deleting a replicated post deletes it on the node (2026-11-25).**
-  `deletePostOnServer` treated ANY outbox row as local-only and removed it
-  without a node call — but a `replicated` row IS on a node, so the row survived
-  and the next snapshot brought the post back ("deleted posts reappear"). Only a
-  `local`/`pending` entry is now a local delete; a `replicated` entry goes
-  through `DELETE /api/posts/:id` first.
+- **Deleting a post deletes it on the node, ALWAYS (2026-11-25).**
+  `deletePostOnServer` used to treat an outbox row that was not `replicated`
+  as local-only and remove it without a node call — but the flush can have
+  registered the row on the node a moment before the local state advanced, so
+  the row survived and the next snapshot brought the post back ("deleted posts
+  reappear"). The node is now ALWAYS asked: a `404` is the goal state (the
+  post was never on a node), not a failure, so one request covers every case.
+  The local outbox row is removed first so it is never registered again.
+- **A deleted post stays deleted across a reload (2026-11-25).** The durable
+  tombstone (`gmatch_deleted_posts_v1`) is re-read at BOOT into the tombstone
+  set the feed projection filters by. It used to start EMPTY on every launch,
+  so a post deleted yesterday was filtered for the rest of that session and
+  came back on the profile the next morning — the server had really removed
+  the row, so nothing but the client's own tombstone bookkeeping brought it
+  back. `deletePostOnServer` now writes the tombstone and the live set in ONE
+  place, so every delete (feed, profile, anywhere) drops the row from the
+  timeline AND the profile, and the tombstone survives the next launch.
+  Proven by `e2e/post-delete-durable.spec.ts` (delete → RELOAD → still gone)
+  and by the API test that asserts the `Objects` row is gone and no read path
+  (feed, profile query, detail) lists it.
+- **A delete invalidates the cached posts snapshot (2026-11-25).** The 3s GET
+  response cache still served the deleted row after the node had removed it:
+  the tombstone masked it in the UI, but the next refresh re-seeded
+  `serverPosts`/`myProfilePosts` from the stale snapshot with a post the node
+  no longer had. Every confirmed delete now calls `invalidateCache('/api/posts')`
+  in the same place the tombstone is written — one owner for "this post is
+  gone" — so the next read of the posts collection goes to the node.
 - **A stuck signed fetch gives up (2026-11-25).** `ObjectImage` had no ceiling
   for a signed fetch still in flight, so a request queued behind the 3-slot pool
   (dozens of old rows) could read "Loading media…" for the life of the session.

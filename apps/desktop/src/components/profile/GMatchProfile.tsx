@@ -440,6 +440,7 @@ export function GMatchProfile({
             {displayPosts.map((post) => (
               <div
                 key={post.id}
+                data-post-id={post.id}
                 onClick={() => {
                   playPress(700);
                   openPost(post);

@@ -10,7 +10,17 @@
  */
 const KEY = 'gmatch_deleted_posts_v1';
 
-function read(): Set<string> {
+/**
+ * The tombstone set, read from durable storage.
+ *
+ * Exported because the app keeps a React copy of it (the feed projection takes
+ * it as a plain argument so it stays pure), and that copy must be SEEDED from
+ * here at boot. It used to start empty: a post deleted yesterday was filtered
+ * for the rest of that session and then came back on the next launch, because
+ * nothing re-read the tombstones — "I deleted it and it is on my profile
+ * again".
+ */
+export function readDeletedPostIds(): Set<string> {
   try {
     if (typeof localStorage === 'undefined') return new Set();
     const raw = localStorage.getItem(KEY);
@@ -29,19 +39,19 @@ function write(set: Set<string>): void {
 }
 
 export function isPostDeleted(id: string): boolean {
-  return !!id && read().has(id);
+  return !!id && readDeletedPostIds().has(id);
 }
 
 export function tombstonePost(id: string): void {
   if (!id) return;
-  const set = read();
+  const set = readDeletedPostIds();
   if (set.has(id)) return;
   set.add(id);
   write(set);
 }
 
 export function filterDeleted<T extends { id?: string }>(rows: T[]): T[] {
-  const dead = read();
+  const dead = readDeletedPostIds();
   if (dead.size === 0) return rows;
   return rows.filter((r) => !r.id || !dead.has(r.id));
 }

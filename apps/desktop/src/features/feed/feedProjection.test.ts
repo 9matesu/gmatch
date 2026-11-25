@@ -93,6 +93,29 @@ describe('projectFeed', () => {
     expect(rows.map((r) => r.id)).toEqual(['b'])
   })
 
+  it('drops a deleted post from the own-profile list', () => {
+    // The profile grid is fed by this same projection. A deleted post that
+    // survives here is one the user still sees on their profile.
+    const rows = projectFeed({
+      ...base,
+      myProfilePosts: [post('mine-1', { author_id: 'self' }), post('mine-2', { author_id: 'self' })],
+      deletedPostIds: new Set(['mine-1']),
+    })
+    expect(rows.map((r) => r.id)).toEqual(['mine-2'])
+  })
+
+  it('drops a deleted local object (the P2P gallery mirror of an old post)', () => {
+    const rows = projectFeed({
+      ...base,
+      items: [{
+        id: 'mine-1', owner_id: 'self', is_public: 1,
+        mime_type: 'image/jpeg', created_at: '2026-01-01T00:00:00.000Z',
+      } as unknown as OrbitObject],
+      deletedPostIds: new Set(['mine-1']),
+    })
+    expect(rows).toHaveLength(0)
+  })
+
   it('never lets an unverified owner claim borrow a directory name or avatar', () => {
     const rows = projectFeed({
       ...base,
