@@ -142,6 +142,35 @@ export default function Home() {
     let dead = false;
     void (async () => {
       try {
+        // Legacy client pointer (pre-v2 `server-mode.json`): the main process
+        // paused it (`pausedReason: 'legacy'`) and booted this machine's node,
+        // but the renderer's cached `gmatch.api.url` / `gmatch.central.url` /
+        // `gmatch.onboarding.serverUrl` and old feed snapshots still point at
+        // the retired host. Clear them once so API_BASE and the outbox target
+        // this machine's sidecar (`http://127.0.0.1:8790`).
+        const st = await window.gmatch?.serverState?.().catch(() => null)
+        if (st?.mode === 'host' && st?.pausedReason === 'legacy') {
+          let purged = false
+          for (const key of ['gmatch.api.url', 'gmatch.central.url', 'gmatch.onboarding.serverUrl']) {
+            const v = localStorage.getItem(key)
+            if (v && /fly\.dev|gmatch\.pages\.dev/i.test(v)) {
+              localStorage.removeItem(key)
+              purged = true
+            }
+          }
+          for (let i = localStorage.length - 1; i >= 0; i--) {
+            const k = localStorage.key(i)
+            if (k?.startsWith('gmatch.feed.snapshot.v1:')) {
+              localStorage.removeItem(k)
+              purged = true
+            }
+          }
+          if (purged) {
+            window.location.reload()
+            return
+          }
+        }
+        if (dead) return;
         const {
           clearDeadLoopbackApiBase,
           clearUnreachableApiBase,

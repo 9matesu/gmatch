@@ -617,17 +617,16 @@ function GMatchFeedImpl({
   const visiblePosts = useMemo(
     () => posts.filter((p) => {
       if (p.is_archived) return false;
+      // A captioned post whose media is dead stays (it still has content).
+      if (deadPosts.has(p.id) && !p.caption?.trim()) return false;
       // No words, no url, no media = no post. Never a card, never a slot.
       if (!isRenderable(p)) return false;
       // Words carry the row on their own. Bytes that are already inline
       // (data:/blob:) need no probe; anything else must arrive first.
       if (!p.caption?.trim() && !mediaReady.has(p.id) && !hasInlineMedia(p)) return false;
-      // Media that cannot be fetched right now keeps the post on screen (its
-      // tile shows the placeholder). Hiding the whole post here is what made a
-      // user's own old uploads disappear when no seeder held the bytes.
       return true;
     }),
-    [posts, mediaReady],
+    [posts, mediaReady, deadPosts],
   );
 
   // Hold the reader's place when rows arrive above them.
@@ -1353,7 +1352,7 @@ function GMatchFeedImpl({
                                 autoPlay={true}
                                 muted={true}
                                 loop={true}
-                                hideUnavailable={false}
+                                hideUnavailable={true}
                           onMediaUnavailable={() => hidePost(post.id)}
                         onLoad={() => promoteMedia(post.id)}
                                 onExpand={() => toggleExpand(post)}
@@ -1419,7 +1418,7 @@ function GMatchFeedImpl({
                           autoPlay={true}
                           muted={true}
                           loop={true}
-                          hideUnavailable={false}
+                          hideUnavailable={true}
                           onExpand={() => toggleExpand(post)}
                           onDoubleTapLike={() => handleDoubleTap(post)}
                         onMediaUnavailable={() => hidePost(post.id)}
