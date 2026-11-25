@@ -39,9 +39,6 @@ import type { OrbitIdentity } from '@orbit/crypto';
 import type { OrbitObject as StoryItem } from '@orbit/shared';
 import { generateFallbackName } from '@orbit/shared';
 import { countHidden, isRenderable } from './isRenderable';
-import { hasInlineMedia } from './mediaReadiness';
-import { getLocalObject, PEER_ONLINE_EVENT } from '../../utils/p2pSwarm';
-import { resolveObjectRefId } from '../../utils/objectRef';
 import { FeedGrid } from './FeedGrid';
 import { GMatchStories } from '../GMatchStories';
 import { PostComments } from './PostComments';
@@ -51,7 +48,7 @@ import { ObjectImage } from '../ObjectImage';
 import { Avatar } from '../Avatar';
 import CachedImg from '../../ui/CachedImg';
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer';
-import { isVideoPost, resolveMediaUrl } from '../../utils/media';
+import { isVideoPost } from '../../utils/media';
 import { vaultPin, vaultBridge } from '../../services/vault';
 
 /** Sibling item MIME types for render-time video detection (see isVideoPost). */
@@ -576,90 +573,11 @@ function GMatchFeedImpl({
     // The timeline is filtered once and sorted once. The two sorts are separate
   // memos so the minute tick behind relative timestamps only re-ranks the
   // "for you" order — the "latest" order does not depend on the clock at all.
-  // "No preview" is not content. A post whose media never resolves is
-  // dropped from the timeline instead of filling it with empty frames.
-  const [deadPosts, setDeadPosts] = useState<Set<string>>(new Set());
-  // A row with NO words is only content once its bytes are real. Until then it
-  // must not appear (and must not flash): it renders hidden, off the visible
-  // list, and is promoted by the media itself.
   //
-  // The media state is REVERSIBLE: a post whose bytes cannot be resolved yet is
-  // `dead` (hidden), but the moment the bytes arrive — a local read, a signed
-  // fetch, or a peer that came online with the bytes — `promoteMedia` clears
-  // `dead` and the row REAPPEARS. A one-way `deadPosts` set used to hide a post
-  // for the rest of the session even after its bytes landed ("appears, then
-  // gone for good").
-  const [mediaReady, setMediaReady] = useState<Set<string>>(new Set());
-  const promoteMedia = useCallback((id: string) => {
-    setMediaReady((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
-    setDeadPosts((prev) => {
-      if (!prev.has(id)) return prev;
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-  }, []);
-  const hidePost = useCallback((id: string) => {
-    setDeadPosts((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
-  }, []);
-  // A text-less row must not appear (or flash) while its bytes are in flight.
-  // The card cannot probe itself: a hidden card has no box, so the lazy image
-  // never intersects and the row would wait forever. This is the one probe.
-  useEffect(() => {
-    let live = true;
-    for (const post of posts) {
-      if (post.caption?.trim()) continue;
-      if (mediaReady.has(post.id) || deadPosts.has(post.id)) continue;
-      const url = post.media?.[0]?.url || post.url;
-      if (!url) continue;
-      if (hasInlineMedia(post)) continue;
-      if (/^https?:|^\//i.test(url)) {
-        const img = new Image();
-        img.onload = () => { if (live) promoteMedia(post.id); };
-        img.onerror = () => { if (live) hidePost(post.id); };
-        img.src = resolveMediaUrl(url);
-        continue;
-      }
-      // A local object (vault / magnet / urn / p2p): a hidden card can never
-      // load itself, so resolve the bytes here. With bytes -> promote; without
-      // -> stay hidden (a peer may bring them; the PEER_ONLINE re-check promotes).
-      const oid = resolveObjectRefId(url) || post.media?.[0]?.id || post.id;
-      if (!oid) continue;
-      void getLocalObject(oid).then((blob) => {
-        if (live && blob) promoteMedia(post.id);
-      }).catch(() => { /* still no bytes */ });
-    }
-    return () => { live = false; };
-  }, [posts, mediaReady, deadPosts, promoteMedia, hidePost]);
-
-  // Reversible hide: a dead post is re-checked when a peer comes online (the
-  // swarm may have just seeded its bytes locally). If the bytes are now held —
-  // inline, or in the vault/IndexedDB — the row is promoted back. Without this
-  // a hidden row could never reappear, because its tile is unmounted and can no
-  // longer fire `onLoad` itself.
-  useEffect(() => {
-    if (deadPosts.size === 0) return;
-    let live = true;
-    const recheck = () => {
-      for (const id of deadPosts) {
-        const post = posts.find((p) => p.id === id);
-        if (!post) continue;
-        if (hasInlineMedia(post)) { promoteMedia(id); continue; }
-        const url = post.media?.[0]?.url || post.url;
-        const oid = resolveObjectRefId(url) || post.media?.[0]?.id || post.id;
-        if (!oid) continue;
-        void getLocalObject(oid).then((blob) => {
-          if (live && blob) promoteMedia(id);
-        }).catch(() => { /* still no bytes */ });
-      }
-    };
-    window.addEventListener(PEER_ONLINE_EVENT, recheck);
-    return () => {
-      live = false;
-      window.removeEventListener(PEER_ONLINE_EVENT, recheck);
-    };
-  }, [deadPosts, posts, promoteMedia]);
-
+  // Universal posting: a post is content the moment it exists. Every renderable
+  // row shows; media that has no bytes yet renders "No preview" (bounded by
+  // ObjectImage's cap), never a hidden row and never an endless spinner. Hiding
+  // text-less rows is what made a fresh post vanish from its author's timeline.
   const hiddenCount = useMemo(() => countHidden(posts), [posts]);
   /** How many rows the projection actually produced — the count the empty copy
    *  needs, computed once instead of re-deriving it inside the memo. */
@@ -668,19 +586,8 @@ function GMatchFeedImpl({
     [posts],
   );
   const visiblePosts = useMemo(
-    () => posts.filter((p) => {
-      if (p.is_archived) return false;
-      // A dead post is hidden (reversibly): `promoteMedia` brings it back the
-      // moment its bytes resolve, so this is not a permanent drop.
-      if (deadPosts.has(p.id)) return false;
-      // No words, no url, no media = no post. Never a card, never a slot.
-      if (!isRenderable(p)) return false;
-      // Words carry the row on their own. Bytes that are already inline
-      // (data:/blob:/vault:) need no probe; anything else must arrive first.
-      if (!p.caption?.trim() && !mediaReady.has(p.id) && !hasInlineMedia(p)) return false;
-      return true;
-    }),
-    [posts, mediaReady, deadPosts],
+    () => posts.filter((p) => !p.is_archived && isRenderable(p)),
+    [posts],
   );
 
   // Hold the reader's place when rows arrive above them.
@@ -1192,8 +1099,6 @@ function GMatchFeedImpl({
                likeCounts={likeCounts}
                onToggleLike={toggleLike}
                onOpen={toggleExpand}
-               onMediaReady={promoteMedia}
-               onMediaDead={hidePost}
              />
            ) : (
              <>
@@ -1407,9 +1312,7 @@ function GMatchFeedImpl({
                                 autoPlay={true}
                                 muted={true}
                                 loop={true}
-                                hideUnavailable={true}
-                          onMediaUnavailable={() => hidePost(post.id)}
-                        onLoad={() => promoteMedia(post.id)}
+                                hideUnavailable={false}
                                 onExpand={() => toggleExpand(post)}
                                 onDoubleTapLike={() => handleDoubleTap(post)}
                               />
@@ -1473,11 +1376,9 @@ function GMatchFeedImpl({
                           autoPlay={true}
                           muted={true}
                           loop={true}
-                          hideUnavailable={true}
+                          hideUnavailable={false}
                           onExpand={() => toggleExpand(post)}
                           onDoubleTapLike={() => handleDoubleTap(post)}
-                        onMediaUnavailable={() => hidePost(post.id)}
-                        onLoad={() => promoteMedia(post.id)}
                           />
                       ) : isVideo ? (
                         <NativeVideoPlayer
@@ -1498,7 +1399,6 @@ function GMatchFeedImpl({
                           alt={post.caption || 'Post image'}
                           className="w-full h-auto max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
                           loading="lazy"
-                          onLoad={() => promoteMedia(post.id)}
                         />
                       )}
                         </div>

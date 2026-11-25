@@ -401,11 +401,13 @@ product path.
   (dozens of old rows) could read "Loading media…" for the life of the session.
   A hard cap (`HARD_UNAVAILABLE_CAP_MS` = 30s) now applies when bytes are still
   expected; an explicit budget (a 5s story) still wins.
-- **A text-less local-object post is probed too (2026-11-25).** A text-less post
-  with a `magnet:`/`vault:`/`urn:`/`p2p-` url was hidden by the text-less rule
-  and the probe only ran for `http(s)`/`/`, so its tile never mounted and never
-  promoted — permanently invisible even with the bytes in the vault. The probe
-  now resolves `getLocalObject(id)` for object posts and promotes on bytes.
+- **Posting is universal: every post shows (2026-11-25).** The text-less hiding
+  rule (a row with no words was hidden until its bytes resolved) made a fresh
+  post vanish from its author's own timeline, and a descriptor post whose bytes
+  were not local could never promote (its tile never mounted). Now every
+  renderable row shows immediately; media with no bytes renders "No preview"
+  (bounded by `ObjectImage`'s 30s cap), never a hidden row and never an endless
+  spinner. The `deadPosts`/`mediaReady` probe machinery is gone.
 - **A closed sidecar log pipe is not a crash (2026-11-25).** `apiSidecar.cjs`
   logged child stdout/stderr with `console.*` and no error handling, so a closed
   pipe threw an uncaught `EPIPE: broken pipe` (seen as "broken pipe" on delete).
