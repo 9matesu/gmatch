@@ -50,6 +50,8 @@ interface UserProfileModalProps {
   onPersistComment?: (postId: string, text: string) => Promise<PostComment | null>;
   onCopyLink?: (post: FeedPost) => void;
   onReportPost?: (post: FeedPost) => void;
+  /** Edit the caption of an own post. The caller owns the request + the toast. */
+  onEditPost?: (post: FeedPost) => void;
   toast?: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 }
 
@@ -83,6 +85,7 @@ export function UserProfileModal({
   onPersistComment,
   onCopyLink,
   onReportPost,
+  onEditPost,
   toast,
 }: UserProfileModalProps) {
   const [showPic, setShowPic] = useState(false);
@@ -117,6 +120,7 @@ export function UserProfileModal({
     onSendDm,
     onCopyLink,
     onReportPost,
+    onEditPost,
     zIndexClass: 'z-[var(--z-modal)]',
   });
 

@@ -40,6 +40,7 @@ import { hashForView, resolveInitialView, viewFromHash } from "./utils/routing";
 import { playChime, playPress } from "./utils/sounds";
 import { useLobby } from "./hooks/useLobby";
 import { UserProfileModal } from "./components/UserProfileModal";
+import { EditPostModal } from "./components/feed/EditPostModal";
 import { SendCardModal } from "./components/cards/SendCardModal";
 import { MIN_GAME_CARDS, generateFallbackName, type User, type OrbitObject } from "@orbit/shared";
 import { applyCanonicalCard } from "./game/galleryMapping";
@@ -1252,6 +1253,9 @@ export default function Home() {
   const [repostedPosts, setRepostedPosts] = useState<FeedPost[]>([])
   const [archivedPostIds, setArchivedPostIds] = useState<Set<string>>(() => new Set())
   const [deletedPostIds, setDeletedPostIds] = useState<Set<string>>(() => readDeletedPostIds())
+  /** The post whose caption is being edited (the modal is root-level). */
+  const [editingPost, setEditingPost] = useState<FeedPost | null>(null)
+  const [editingPostSaving, setEditingPostSaving] = useState(false)
   const [followingIds, setFollowingIds] = useState<string[]>([])
   const [pmMessagesByPeer, setPmMessagesByPeer] = useState<Record<string, ChatMessage[]>>({})
 
@@ -3494,6 +3498,50 @@ export default function Home() {
       ...prev,
     ]);
   });
+
+  /**
+   * Edit a post's caption.
+   *
+   * The post lives in one of two places, and the route follows the post:
+   *  - a NODE post is edited on the node (`PATCH /api/posts/:id`, owner-only);
+   *  - a PEER-replicated post has no node row, so the edit is a signed
+   *    `post.edit` operation in the durable log, replicated to peers.
+   *
+   * The caption is applied to the local lists on success, so the row updates
+   * at once instead of waiting for the next refresh.
+   */
+  const onEditPost = useStableCallback((post: FeedPost) => {
+    setEditingPost(post);
+  });
+
+  const onSavePostEdit = useStableCallback(async (caption: string) => {
+    const post = editingPost;
+    if (!post || !identity) return;
+    setEditingPostSaving(true);
+    try {
+      const { postEditRoute, editPostCaptionOnNode, editPostCaptionAsOperation } = await import('./services/postEdit');
+      let result;
+      if (postEditRoute(post) === 'peer-operation') {
+        const { sharedSocialOperationLog } = await import('./services/socialOperationLog');
+        result = await editPostCaptionAsOperation(identity, post.id, caption, sharedSocialOperationLog());
+      } else {
+        result = await editPostCaptionOnNode(identity, post.id, caption);
+      }
+      if (!result.ok) {
+        toast(result.error || 'Could not edit the post.', 'error');
+        return;
+      }
+      const next = result.caption ?? '';
+      setServerPosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, caption: next } : p)));
+      setMyProfilePosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, caption: next } : p)));
+      setEditingPost(null);
+      toast('Post updated.', 'success');
+    } catch {
+      toast('Could not edit the post.', 'error');
+    } finally {
+      setEditingPostSaving(false);
+    }
+  });
   const onFeedSortChange = useStableCallback((mode: FeedSort) => {
     // The feed effect is keyed on `feedSort`; loading from here would close
     // over the OLD sort and re-fetch the previous ranking.
@@ -3708,6 +3756,7 @@ export default function Home() {
                                 onArchivePost={onArchivePost}
                                 onDeletePost={onDeletePost}
                                 onRepostPost={onRepostPost}
+                                onEditPost={onEditPost}
                                 onLoadMore={loadMoreFeedPosts}
                                 isLoadingMore={isLoadingMoreFeed}
                                 hasMore={hasMoreFeed}
@@ -3763,6 +3812,7 @@ export default function Home() {
                       }}
                       onOpenNetwork={(userId) => openUserNetwork(userId)}
                       shareGroups={chatGroups.map((g) => ({ id: g.id, name: g.name, member_count: g.member_count }))}
+                      onEditPost={onEditPost}
                     />
                   )}
 
@@ -4216,7 +4266,18 @@ export default function Home() {
                     onPersistLike={persistLike}
                     onPersistSave={persistSave}
                     onPersistComment={persistComment}
+                    onEditPost={onEditPost}
                     toast={toast}
+                  />
+                )}
+
+                {/* Edit a post's caption (opened from the post context menu). */}
+                {editingPost && (
+                  <EditPostModal
+                    post={editingPost}
+                    onClose={() => setEditingPost(null)}
+                    onSave={onSavePostEdit}
+                    saving={editingPostSaving}
                   />
                 )}
 

@@ -298,6 +298,82 @@ describe('Posts API (gMatch feed engagement)', () => {
   })
 })
 
+describe('Editing a post caption (PATCH /api/posts/:id)', () => {
+  let env: Awaited<ReturnType<typeof createMockEnv>>
+  let postId: string
+
+  beforeAll(async () => {
+    env = await createMockEnv()
+    await registerUser(env, alice)
+    await registerUser(env, bob)
+    await setDisplayName(env, alice, 'Alice Arcade')
+    postId = await createPublicPost(env, alice, 'the original caption')
+  })
+
+  async function patch(caption: unknown, identity = alice) {
+    const body = JSON.stringify({ caption })
+    return app.request(`/api/posts/${postId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...authHeaders(identity, 'PATCH', `/api/posts/${postId}`, body) },
+      body,
+    }, env)
+  }
+
+  it('the owner can edit the caption and the feed shows the new one', async () => {
+    const res = await patch('the EDITED caption')
+    expect(res.status).toBe(200)
+    const json: any = await res.json()
+    expect(json.success).toBe(true)
+    expect(json.caption).toBe('the EDITED caption')
+
+    const feed = await app.request('/api/posts', { headers: authHeaders(bob, 'GET', '/api/posts') }, env)
+    const feedJson: any = await feed.json()
+    const post = feedJson.posts.find((p: any) => p.id === postId)
+    expect(post.caption).toBe('the EDITED caption')
+  })
+
+  it('a NON-owner cannot edit the caption', async () => {
+    const res = await patch('hijacked', bob)
+    expect(res.status).toBe(403)
+
+    const feed = await app.request('/api/posts', { headers: authHeaders(bob, 'GET', '/api/posts') }, env)
+    const feedJson: any = await feed.json()
+    expect(feedJson.posts.find((p: any) => p.id === postId).caption).toBe('the EDITED caption')
+  })
+
+  it('editing a post that does not exist is a 404', async () => {
+    const body = JSON.stringify({ caption: 'nope' })
+    const res = await app.request('/api/posts/does-not-exist', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...authHeaders(alice, 'PATCH', '/api/posts/does-not-exist', body) },
+      body,
+    }, env)
+    expect(res.status).toBe(404)
+  })
+
+  it('rejects a caption that is not a string', async () => {
+    const res = await patch(42)
+    expect(res.status).toBe(400)
+  })
+
+  it('rejects an absurdly long caption', async () => {
+    const res = await patch('x'.repeat(2001))
+    expect(res.status).toBe(400)
+  })
+
+  it('an empty caption CLEARS the text (it does not fall back to the old one)', async () => {
+    const res = await patch('   ')
+    expect(res.status).toBe(200)
+    // The API serializes an empty caption as null (a caption is text or
+    // absent) — the point is that the OLD text does not come back.
+    const json: any = await res.json()
+    expect(json.caption).toBeNull()
+    const feed = await app.request('/api/posts', { headers: authHeaders(bob, 'GET', '/api/posts') }, env)
+    const feedJson: any = await feed.json()
+    expect(feedJson.posts.find((p: any) => p.id === postId).caption).toBeNull()
+  })
+})
+
 describe('Report abuse prevention', () => {
   let env: Awaited<ReturnType<typeof createMockEnv>>
   let postId: string

@@ -85,7 +85,7 @@ import { usePeerCommentsByPost } from '../../hooks/usePeerComments';
 import { mergeCommentRows } from '../../utils/commentMerge';
 import { SharePostModal } from './SharePostModal';
 import { PostTimestamp } from './PostTimestamp';
-import { PostOptionsModal } from './PostOptionsModal';
+import { PostContextMenu } from './PostContextMenu';
 import { ReportPostModal } from './ReportPostModal';
 import { PostCreatorModal } from './PostCreatorModal';
 import { PostLikersModal } from './PostLikersModal';
@@ -186,6 +186,7 @@ function GMatchFeedImpl({
   onDeletePost,
   onArchivePost,
   onRepostPost,
+  onEditPost,
   onLoadMore,
   hasMore = true,
   isLoadingMore = false,
@@ -231,6 +232,8 @@ function GMatchFeedImpl({
   onDeletePost?: (postId: string) => void;
   onArchivePost?: (postId: string) => void;
   onRepostPost?: (post: FeedPost) => void;
+  /** Edit the caption of an own post. The caller owns the request + the toast. */
+  onEditPost?: (post: FeedPost) => void;
   onLoadMore?: () => Promise<void | boolean>;
   hasMore?: boolean;
   isLoadingMore?: boolean;
@@ -445,9 +448,17 @@ function GMatchFeedImpl({
     return () => window.removeEventListener('gmatch-open-post', onOpen);
   }, [requestDeepLink]);
 
-  // Post Options Modal State
+  // Post context menu state (right-click replaces the old three-dots button).
+  // The position is the CURSOR point of the right-click; the menu clamps
+  // itself to the viewport, so a corner click is still fully visible.
   const [optionsPost, setOptionsPost] = useState<FeedPost | null>(null);
+  const [optionsAt, setOptionsAt] = useState({ x: 0, y: 0 });
   const [reportingPost, setReportingPost] = useState<FeedPost | null>(null);
+
+  const openPostMenu = (post: FeedPost, position?: { x: number; y: number }) => {
+    setOptionsPost(post);
+    setOptionsAt(position ?? { x: Math.round(window.innerWidth / 2), y: Math.round(window.innerHeight / 2) });
+  };
 
   const handleAvatarClick = (userId: string) => {
     playPress(750);
@@ -1186,7 +1197,7 @@ function GMatchFeedImpl({
               <article
                 key={post.id}
                 data-post-id={post.id}
-                onContextMenu={(e) => { e.preventDefault(); setOptionsPost(post) }}
+                onContextMenu={(e) => { e.preventDefault(); openPostMenu(post, { x: e.clientX, y: e.clientY }) }}
                 className={`cv-row relative bg-surface-raised border border-edge rounded-lg overflow-hidden flex flex-col mb-3 break-inside-avoid ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
               >
                 {/* Media comes FIRST (media → author → caption → actions). The
@@ -1699,15 +1710,23 @@ function GMatchFeedImpl({
         document.body,
       )}
 
-      {/* ─── MODAL 3: Post Options Action Sheet (portaled) ─── */}
+      {/* ─── Post context menu (right-click replaces the three-dots) ─── */}
       {optionsPost && createPortal(
-        <PostOptionsModal
+        <PostContextMenu
           post={optionsPost}
+          x={optionsAt.x}
+          y={optionsAt.y}
           onClose={() => setOptionsPost(null)}
           identityOrbitId={identity?.orbitId}
+          isLiked={!!likedPosts[optionsPost.id]}
+          isSaved={!!savedPosts[optionsPost.id]}
+          onToggleLike={toggleLike}
+          onToggleSave={toggleSave}
+          onSaveToVault={vaultBridge() && optionsPost.url ? (p) => void savePostToVault(p) : undefined}
           onRepost={onRepostPost}
           onShare={(p) => setSharingPost(p)}
           onCopyLink={handleCopyLink}
+          onEdit={onEditPost}
           onArchive={onArchivePost}
           onDelete={(id) => onDeletePost?.(id)}
           onReport={(p) => setReportingPost(p)}
@@ -1762,7 +1781,7 @@ function GMatchFeedImpl({
                 onToggleCommentLike={handleToggleCommentLike}
                 onReportComment={onReportComment}
                 onOpenShare={(p) => setSharingPost(p)}
-                onOptionsClick={(p) => setOptionsPost(p)}
+                onOptionsClick={(p, pos) => openPostMenu(p, pos)}
                 onOpenLikers={(id) => setLikersModalPostId(id)}
                 onAvatarClick={handleAvatarClick}
                 onSelectUser={handleAvatarClick}

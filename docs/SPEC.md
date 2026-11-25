@@ -530,6 +530,24 @@ product path.
   the profile grid uses, so the image sidepanel is visually identical in both
   surfaces (and closes on outside click / Esc). The bespoke feed detail JSX was
   removed.
+- **Post options are a RIGHT-CLICK context menu (2026-11-25).** The three-dots
+  button is gone: right-click a post (in the timeline or in the detail
+  sidepanel) and the menu opens at the cursor, clamped to the viewport. It
+  carries every action the post has — like, save, save-to-vault, repost, share,
+  copy link, **edit**, archive, delete, report. Two rules carried over from the
+  old action sheet: every row is gated on its handler (a surface that cannot
+  do something does not show it), and the menu never claims an outcome — it
+  closes after firing and the caller owns the toast.
+- **A post caption can be EDITED (2026-11-25).** The caption is the author's
+  own words, so the edit is owner-only. Two routes, mirroring the like/comment
+  split: a NODE post is edited on the node (`PATCH /api/posts/:id`, owner-only,
+  `post_caption` only, empty clears the text); a PEER-replicated post has no
+  node row, so the edit is a signed `post.edit` operation in the durable log,
+  replicating to peers like every other operation. The protocol already defined
+  `post.edit`; only the UI was missing. An edit must supersede EXACTLY the
+  current post heads (the create plus the edits no other edit superseded), and
+  the manifest is unchanged — a caption edit does not touch the bytes. The
+  caption is capped at 2000 chars on both sides.
 - **Vault no longer flickers on open (2026-11-25).** For an opted-in `http(s)`
   source, `ObjectImage` holds the media at `opacity:0` until the local vault
   lookup settles (a fast IPC), so a remote frame never flashes before the local

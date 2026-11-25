@@ -55,6 +55,7 @@ export function GMatchProfile({
   onReportPost,
   onArchivePost,
   onDeletePost,
+  onEditPost,
   profileTags = [],
   toast,
 }: {
@@ -74,6 +75,8 @@ export function GMatchProfile({
   onProfileUpdated?: (updated: { name: string; bio: string; website: string; pfpUrl?: string; tags?: string[] }) => void;
   onArchivePost?: (postId: string) => void;
   onDeletePost?: (postId: string) => void;
+  /** Edit the caption of an own post. The caller owns the request + the toast. */
+  onEditPost?: (post: FeedPost) => void;
   followingIds?: string[];
   users?: Array<{ id: string; display_name?: string }>;
   shareGroups?: { id: string; name: string; member_count: number }[];
@@ -107,6 +110,7 @@ export function GMatchProfile({
     onArchivePost,
     onDeletePost,
     onReportPost,
+    onEditPost,
   });
   const [bio, setBio] = useState(() => myUser?.bio || '');
   const [website, setWebsite] = useState(() => myUser?.website || '');

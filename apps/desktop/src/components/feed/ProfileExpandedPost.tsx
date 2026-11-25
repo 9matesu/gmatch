@@ -6,7 +6,6 @@ import {
   Heart,
   Send,
   Bookmark,
-  MoreHorizontal,
   X,
   ChevronLeft,
   ChevronRight,
@@ -46,7 +45,12 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
   onToggleCommentLike?: (postId: string, commentId: string) => void;
   onReportComment?: (commentId: string) => void;
   onOpenShare?: (post: FeedPost) => void;
-  onOptionsClick?: (post: FeedPost) => void;
+  /**
+   * Open the post context menu. The optional position is the CURSOR point of
+   * the right-click; when absent the caller picks a sensible spot (the menu
+   * is clamped to the viewport either way).
+   */
+  onOptionsClick?: (post: FeedPost, position?: { x: number; y: number }) => void;
   onOpenLikers?: (postId: string) => void;
   onSelectUser?: (userId: string) => void;
   onAvatarClick?: (userId: string) => void;
@@ -133,9 +137,15 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
   return (
     <article
       data-expanded-post={post.id}
+      onContextMenu={(e) => {
+        // The context menu REPLACED the three-dots button: right-click the
+        // post (here or in the timeline) for every action it has.
+        e.preventDefault();
+        onOptionsClick?.(post, { x: e.clientX, y: e.clientY });
+      }}
       className="mt-2 rounded-xl border border-edge bg-retro-panel text-retro-fg overflow-hidden animate-orbit-slide-up"
     >
-      {/* Header: author + options + collapse */}
+      {/* Header: author + collapse */}
       <div className="p-3 border-b border-edge flex items-center justify-between">
         <button
           type="button"
@@ -163,14 +173,6 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
         </button>
 
         <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => onOptionsClick?.(post)}
-            aria-label="Post options"
-            className="p-1.5 text-retro-muted hover:text-retro-fg rounded-md cursor-pointer hover:bg-glass-w12 transition-colors"
-          >
-            <MoreHorizontal className="w-4 h-4" />
-          </button>
           <button
             type="button"
             onClick={() => { playPress(700); onClose(); }}

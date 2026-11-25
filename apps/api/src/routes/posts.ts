@@ -634,6 +634,45 @@ posts.post('/:id/report', async (c) => {
 })
 
 // Delete a post (owner only)
+/**
+ * Edit a post's caption.
+ *
+ * Owner-only: a caption is the author's own words, and the server stores it
+ * verbatim (it never hard-blocks content — the desktop client's blocklist
+ * does that). An EMPTY caption clears the text: the row keeps an empty
+ * `post_caption` rather than NULL, because the read path is
+ * `COALESCE(post_caption, caption)` and a NULL would resurrect the legacy
+ * `caption` column instead of clearing anything.
+ */
+posts.patch('/:id', async (c) => {
+  const db = c.env.DB
+  const orbitId = c.get('orbitId')
+  const id = c.req.param('id')
+
+  const obj = await db.prepare('SELECT owner_id FROM Objects WHERE id = ?').bind(id).first<{ owner_id: string }>()
+  if (!obj) return c.json({ error: 'Post not found' }, 404)
+  if (obj.owner_id !== orbitId) return c.json({ error: 'Forbidden' }, 403)
+
+  let body: unknown
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400)
+  }
+  const caption = (body as { caption?: unknown })?.caption
+  if (typeof caption !== 'string') return c.json({ error: 'caption must be a string' }, 400)
+  // The protocol caps a post caption at 2000 chars (packages/protocol
+  // social-operation.ts); the node must not be looser than the wire.
+  if (caption.length > 2000) return c.json({ error: 'Caption too long' }, 400)
+
+  const trimmed = caption.trim()
+  await db.prepare('UPDATE Objects SET post_caption = ? WHERE id = ?').bind(trimmed, id).run()
+  // The read path serializes an empty caption as null (serializePost: a
+  // caption is text or absent). Answer the same shape so the client can
+  // apply the response without a second special case.
+  return c.json({ success: true, caption: trimmed || null })
+})
+
 posts.delete('/:id', async (c) => {
   const db = c.env.DB
   const orbitId = c.get('orbitId')
