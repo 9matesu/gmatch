@@ -160,8 +160,6 @@ export function GMatchProfile({
   }, [cards]);
 
   const isSelf = Boolean(identity && (!myUser?.id || myUser?.id === identity.orbitId));
-  const totalLikes = myPosts.reduce((acc, p) => acc + (p.like_count || 0), 0) + (myUser?.likes_received || 0);
-  const goonCoins = myUser?.balance ?? 0;
   const [showPfpModal, setShowPfpModal] = useState(false);
 
   const handleShareProfile = async () => {
@@ -274,12 +272,7 @@ export function GMatchProfile({
     { label: 'posts', value: displayPosts.length, onClick: () => setProfileTab('posts') },
     { value: effectiveFollowersCount, label: 'followers', onClick: () => { playPress(700); onOpenFollowers?.('followers'); } },
     { value: effectiveFollowingCount, label: 'following', onClick: () => { playPress(700); onOpenFollowers?.('following'); } },
-    { value: totalLikes, label: 'likes' },
   ];
-
-  if (isSelf) {
-    stats.push({ value: goonCoins, label: 'coins' } as any);
-  }
 
   const tabs = [
     { id: 'posts', label: 'Posts', icon: Grid },

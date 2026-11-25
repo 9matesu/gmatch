@@ -1684,3 +1684,14 @@ html.theme-light [class*="bg-black/"] .text-retro-body {
   outline: 2px solid var(--color-retro-accent) !important;
   outline-offset: 2px;
 }
+
+/* Text fields: no outline/ring/box on click or typing — just the field itself. */
+input:focus,
+textarea:focus,
+select:focus,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}

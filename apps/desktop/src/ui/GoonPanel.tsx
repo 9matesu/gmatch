@@ -417,7 +417,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
     viewMode === '2x2' || viewMode === '1x2' ? 'grid-cols-2' : 'grid-cols-3'
 
   const critFlashEl = critFlash && (
-    <div className="pointer-events-none absolute inset-0 z-[10] flex items-center justify-center bg-danger/15 backdrop-blur-[1px] animate-[gg-crit_0.35s_ease-out_forwards]">
+    <div className="pointer-events-none absolute inset-0 z-[10] flex items-center justify-center bg-danger/15 backdrop-blur-[1px] animate-[gg-crit_0.2s_ease-out_forwards]">
       <div className="flex items-center gap-2 rounded-xl border border-danger/60 bg-retro-bg/90 px-6 py-2.5 font-mono text-xl font-black tracking-widest text-danger-fg">
         <Lightning className="h-5 w-5 text-danger-fg" weight="fill" />
         CRITICAL HIT!
@@ -945,7 +945,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           <div className="flex min-w-0 flex-1 items-center gap-2.5" title={`${Math.ceil(foeHp)} / ${foeMaxHp} HP`}>
             <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-black/60 border border-edge">
               <div
-                className={`h-full rounded-full transition duration-150 ${hpPct <= 30 ? 'bg-gradient-to-r from-rose-500 to-amber-500' : 'bg-gradient-to-r from-emerald-500 to-teal-400'}`}
+                className={`h-full rounded-full transition duration-150 ${hpPct <= 30 ? 'bg-amber-500' : 'bg-emerald-500'}`}
                 style={{ width: `${hpPct}%` }}
               />
             </div>

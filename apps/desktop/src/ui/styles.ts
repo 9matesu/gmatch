@@ -44,9 +44,9 @@ export const STAGE_FRAME =
 export const HP_BAR =
   'h-1.5 overflow-hidden rounded-full border border-edge bg-surface-canvas/80 shadow-inner'
 export const HP_FILL =
-  'h-full rounded-full bg-gradient-to-r from-pink-500 to-rose-500 transition-[width] duration-[120ms] ease-linear'
+  'h-full rounded-full bg-pink-500 transition-[width] duration-[120ms] ease-linear'
 export const HP_FILL_LOW =
-  'from-amber-500 to-orange-500 animate-[gg-hp-low_0.7s_ease-in-out_infinite]'
+  'bg-amber-500 animate-[gg-hp-low_0.7s_ease-in-out_infinite]'
 
 /** Floating +GP popup. Refined tabular figures with clean drop shadow. */
 export const FLOAT_GC =
