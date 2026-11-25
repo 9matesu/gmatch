@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { playPress, playLike } from '../../utils/sounds';
+import { playPress } from '../../utils/sounds';
 import { Camera, X, RefreshCw, Check, AlertCircle, Upload } from 'lucide-react';
 import { logger } from '../../utils/logger';
 
@@ -117,7 +117,7 @@ export function LiveCameraModal({
       ctx.drawImage(video, startX, startY, size, size, 0, 0, size, size);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
       setCapturedPhoto(dataUrl);
-      playLike();
+      playPress(820);
       stopStream();
     }
   };

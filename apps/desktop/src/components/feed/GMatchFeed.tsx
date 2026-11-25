@@ -7,7 +7,7 @@ import { DEFAULT_FEED_SORT, FEED_SORT_LABELS, firstLikeCrossed, type FeedSort } 
 import { formatLikedBy } from '../../utils/likedBy'
 import { createLikeGovernor, type LikeGovernor } from '../../utils/likeReconcile'
 import { suggestFollows } from './suggestFollows'
-import { playPress, playWin, playMsgReceive, playLikeOnce } from '../../utils/sounds';
+import { playPress, playWin, playMsgReceive } from '../../utils/sounds';
 import {
   Heart,
   MessageCircle,
@@ -765,7 +765,6 @@ function GMatchFeedImpl({
       if (prev === undefined) continue
       if (firstLikeCrossed(prev, next) && !firstLikedBaseline.current.has(p.id)) {
         firstLikedBaseline.current.add(p.id)
-        playLikeOnce()
       }
     }
   }, [posts, identity?.orbitId])
@@ -1129,7 +1128,9 @@ function GMatchFeedImpl({
            const isNewPost = animatedPostIds.has(post.id);
            const multiMedia = Array.isArray(post.media) && post.media.length > 1 ? post.media : null;
             const currentIdx = multiMedia ? Math.min(Math.max(0, mediaIdx[post.id] || 0), multiMedia.length - 1) : 0;
-            const expanded = expandedPostId === post.id;
+            // The detail opens in the side sheet (like the profile photo), so a
+            // timeline row never expands inline and pushes the list around.
+            const expanded = false;
 
             return post.is_sponsored ? (
               <article
@@ -1238,16 +1239,9 @@ function GMatchFeedImpl({
                   </button>
                 </div>
 
-                {/* Body: the words are content, so they sit above the media
-                    (Twitter order) instead of under the action row. */}
-                {post.caption ? (
-                  <p className="px-3 pb-2 text-[15px] leading-5 text-retro-body whitespace-pre-wrap break-words">
-                    <Linkify text={post.caption} />
-                  </p>
-                ) : null}
-
                 {/* Media. A post with no bytes at all renders nothing here
-                    (no empty frame, no "No preview"). */}
+                    (no empty frame, no "No preview"). The written body sits
+                    BELOW the image (see after the media block). */}
                 {!post.url && !post.localPreviewUrl ? null : (() => {
                   const activeItem = multiMedia ? multiMedia[currentIdx] : null;
                   const activeUrl = activeItem ? activeItem.url : post.url;
@@ -1473,6 +1467,13 @@ function GMatchFeedImpl({
                   );
                 })()}
 
+                {/* Written body BELOW the image, smaller type. */}
+                {post.caption ? (
+                  <p className="px-3 pt-2 text-xs leading-snug text-retro-body whitespace-pre-wrap break-words">
+                    <Linkify text={post.caption} />
+                  </p>
+                ) : null}
+
                 {/* Action row: no fill, no separator — it sits directly under
                     the media so the whole tile reads as one object. */}
                 <div className="px-3 sm:px-4 pt-2.5 pb-3 flex flex-col gap-2">
@@ -1510,6 +1511,7 @@ function GMatchFeedImpl({
                       </button>
                     </div>
 
+                    <div className="flex items-center gap-1">
                     <button
                       type="button"
                       onClick={() => toggleSave(post)}
@@ -1539,6 +1541,7 @@ function GMatchFeedImpl({
                         />
                       </button>
                     )}
+                    </div>
                   </div>
 
                   {/* Likes: named likers when the row carries them, otherwise the
@@ -1744,8 +1747,55 @@ function GMatchFeedImpl({
           <SideSheet
             open
             onClose={() => setExpandedPostId(null)}
-            title={`Comments · ${expandedPost.author_name}`}
+            title={`Post · ${expandedPost.author_name}`}
           >
+            {/* Post detail (like the profile photo sidebar) with footer clearance
+                so the bottom nav never covers the last row. */}
+            <div className="pb-24 space-y-3">
+              {(() => {
+                const m = expandedPost.media?.[0];
+                const url = m?.url || expandedPost.url;
+                const mime = m?.mime_type || expandedPost.mime_type;
+                const id = m?.id || expandedPost.id;
+                const isObj = !!url && (url.includes('/api/objects/') || url.startsWith('vault://') || url.startsWith('magnet:') || url.startsWith('urn:sha256:') || url.startsWith('p2p-') || !url);
+                const vid = isVideoPost(mime, url, siblingMimesFor(expandedPost));
+                if (!url) return null;
+                return (
+                  <div className="overflow-hidden rounded-lg bg-black/40">
+                    {isObj ? (
+                      <ObjectImage objectId={id} contentUrl={url} identity={identity} mimeType={mime} className="w-full h-auto max-h-[55vh] object-contain" videoClassName="w-full max-h-[55vh] object-contain" controls alwaysShowControls autoPlay muted loop hideUnavailable={false} />
+                    ) : vid ? (
+                      <NativeVideoPlayer natural src={url} videoClassName="w-full max-h-[55vh] object-contain" controls alwaysShowControls autoPlay muted loop />
+                    ) : (
+                      <CachedImg src={url} alt={expandedPost.caption || 'Post image'} className="w-full h-auto max-h-[55vh] object-contain" loading="lazy" />
+                    )}
+                  </div>
+                );
+              })()}
+              {expandedPost.caption ? (
+                <p className="text-xs leading-snug text-retro-body whitespace-pre-wrap break-words">
+                  <Linkify text={expandedPost.caption} />
+                </p>
+              ) : null}
+              <div className="flex items-center gap-1">
+                <button type="button" onClick={() => toggleLike(expandedPost)} aria-label="Like post" className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer">
+                  <Heart className={`w-4 h-4 stroke-[1.75] ${likedPosts[expandedPost.id] ? 'text-danger-fg fill-danger' : 'text-retro-muted hover:text-retro-fg'}`} />
+                </button>
+                <button type="button" onClick={() => toggleSave(expandedPost)} aria-label="Save post" className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer">
+                  <Bookmark className={`w-4 h-4 stroke-[1.75] ${savedPosts[expandedPost.id] ? 'text-retro-fg fill-retro-fg' : 'text-retro-muted hover:text-retro-fg'}`} />
+                </button>
+                <div className="ml-auto flex items-center gap-1">
+                  {vaultBridge() && expandedPost.url && (
+                    <button type="button" onClick={() => void savePostToVault(expandedPost)} aria-label="Save to Vault" title="Save the media to your Vault" className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer">
+                      <FolderPlus className={`w-4 h-4 stroke-[1.75] ${vaultSaved.has(expandedPost.url) ? 'text-success-fg' : 'text-retro-muted hover:text-retro-fg'}`} />
+                    </button>
+                  )}
+                  <button type="button" onClick={() => setSharingPost(expandedPost)} aria-label="Share post" className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer">
+                    <Send className="w-4 h-4 stroke-[1.75] text-retro-muted hover:text-retro-fg" />
+                  </button>
+                </div>
+              </div>
+            </div>
             <PostComments
               key={expandedPost.id}
               post={expandedPost}

@@ -7,7 +7,7 @@ import type { OrbitIdentity } from '@orbit/crypto';
 import { orbitFetch } from '../utils/api';
 import { useToast } from './Toast';
 import { useNow } from '../hooks/useNow';
-import { playPress, playLike } from '../utils/sounds';
+import { playPress } from '../utils/sounds';
 import { ObjectImage } from './ObjectImage';
 import CachedImg from '../ui/CachedImg';
 import { logger } from '../utils/logger'
@@ -290,7 +290,7 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
 
   const handleLike = async () => {
     if (!currentStory || !identity) return;
-    playLike();
+    playPress(820);
 
     // Spawn floating heart particles
     const newHeart = { id: Date.now() + Math.random(), x: Math.random() * 60 + 20 };

@@ -237,6 +237,13 @@ export function ObjectImage({
   const proxied = devFetchable(baseSrc)
   const src = vaultSrc || cachedDirectUrl || proxied || baseSrc
 
+  // Vault/cached swaps used to blank the tile for a frame (the <img> reloaded
+  // from the remote URL to the local one). Keep showing the last loaded source
+  // until the new one actually loads, so opening a post never blinks.
+  const [shownSrc, setShownSrc] = useState<string | null>(null)
+  useEffect(() => { setShownSrc(null) }, [objectId, contentUrl])
+  const renderSrc = shownSrc || src
+
   // A direct provider URL may fail while its IPC/vault copy is still being
   // resolved. When that resolution swaps `src` to the local copy, clear the
   // previous URL's error instead of leaving a good cached image hidden.
@@ -320,7 +327,7 @@ export function ObjectImage({
     if (controls) {
       return (
         <NativeVideoPlayer
-          src={src}
+          src={renderSrc}
           className={videoClassName || className}
           videoClassName={videoClassName}
           natural={natural}
@@ -333,6 +340,7 @@ export function ObjectImage({
           onDoubleTapLike={onDoubleTapLike}
           onLoadedData={() => {
             onLoad?.()
+            setShownSrc(src)
             onLoadingChange?.(false)
           }}
           onError={(_e) => {
@@ -348,7 +356,7 @@ export function ObjectImage({
 
   return (
     <video
-      src={src}
+      src={renderSrc}
       className={videoClassName || className}
       muted={muted}
       autoPlay={autoPlay}
@@ -360,6 +368,7 @@ export function ObjectImage({
       onLoadedData={(e) => {
         onLoad?.()
         onLoadSize?.(e.currentTarget.videoWidth, e.currentTarget.videoHeight)
+        setShownSrc(src)
         onLoadingChange?.(false)
       }}
       onError={(_e) => {
@@ -375,7 +384,7 @@ export function ObjectImage({
 
   return (
     <img
-      src={src}
+      src={renderSrc}
       alt={alt}
       className={className}
       loading={loading}
@@ -385,6 +394,7 @@ export function ObjectImage({
       onLoad={(e) => {
         onLoad?.()
         onLoadSize?.(e.currentTarget.naturalWidth, e.currentTarget.naturalHeight)
+        setShownSrc(src)
         onLoadingChange?.(false)
       }}
       onError={(_e) => {

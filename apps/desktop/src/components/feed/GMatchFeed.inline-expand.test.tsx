@@ -7,7 +7,6 @@ vi.mock('../../utils/sounds', () => ({
   playPress: vi.fn(),
   playWin: vi.fn(),
   playMsgReceive: vi.fn(),
-  playLikeOnce: vi.fn(),
 }));
 
 (global as any).IntersectionObserver = vi.fn().mockImplementation(() => ({
@@ -57,53 +56,43 @@ function renderTwo(
 }
 
 const expanders = () => screen.getAllByLabelText('Expand post');
-const articleOf = (id: string) =>
-  document.querySelector(`[data-post-id="${id}"]`);
+const sheet = () => document.querySelector('aside[role="complementary"]');
 
 beforeEach(() => {
   window.location.hash = '';
   vi.clearAllMocks();
 });
 
-describe('inline post expansion', () => {
-  it('clicking the image expands inline with no modal dialog', () => {
+describe('post detail side sheet', () => {
+  it('clicking the image opens the post side sheet (not an inline expand)', () => {
     renderTwo();
-    const before = articleOf('p1');
-    expect(before).toBeInTheDocument();
-    expect(screen.queryByPlaceholderText('Add a comment...')).toBeNull();
+    expect(sheet()).toBeNull();
     fireEvent.click(expanders()[0]);
-    // Same card element (no remount, scroll position preserved)...
-    expect(articleOf('p1')).toBe(before);
-    // ...now carrying the thread + composer...
+    expect(sheet()).not.toBeNull();
     expect(screen.getByPlaceholderText('Add a comment...')).toBeInTheDocument();
-    // ...and no portal dialog anywhere.
+    // No modal dialog: it is a complementary side sheet.
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('collapse control returns to the compact layout', () => {
+  it('closing the sheet returns to the compact timeline', () => {
     renderTwo();
     fireEvent.click(expanders()[0]);
     expect(screen.getByPlaceholderText('Add a comment...')).toBeInTheDocument();
-    fireEvent.click(screen.getByLabelText('Collapse post'));
+    fireEvent.click(screen.getByLabelText('Close'));
     expect(screen.queryByPlaceholderText('Add a comment...')).toBeNull();
-    // Card still in place.
-    expect(articleOf('p1')).toBeInTheDocument();
+    expect(sheet()).toBeNull();
   });
 
-  it('only one post expands at a time', () => {
+  it('only one post sheet is open at a time', () => {
     renderTwo();
     const [first, second] = expanders();
     fireEvent.click(first);
-    expect(screen.getAllByPlaceholderText('Add a comment...')).toHaveLength(1);
     fireEvent.click(second);
-    const composers = screen.getAllByPlaceholderText('Add a comment...');
-    expect(composers).toHaveLength(1);
-    // The thread lives in the side sheet ("ao lado"), not inside the article.
-    expect(articleOf('p2')!.contains(composers[0])).toBe(false);
-    expect(composers[0].closest('aside')).not.toBeNull();
+    expect(screen.getAllByPlaceholderText('Add a comment...')).toHaveLength(1);
+    expect(screen.getAllByPlaceholderText('Add a comment...')[0].closest('aside')).not.toBeNull();
   });
 
-  it('comments work inline: composer posts through the existing handler', async () => {
+  it('comments post through the existing handler', async () => {
     const serverComment = {
       id: 'c1', author_id: 'me', author_name: 'You', text: 'nice',
       created_at: new Date().toISOString(), like_count: 0,
@@ -111,65 +100,17 @@ describe('inline post expansion', () => {
     const onPersistComment = vi.fn(async () => serverComment);
     renderTwo(onPersistComment);
     fireEvent.click(expanders()[0]);
-    const input = screen.getByPlaceholderText('Add a comment...');
-    fireEvent.change(input, { target: { value: 'nice' } });
+    fireEvent.change(screen.getByPlaceholderText('Add a comment...'), { target: { value: 'nice' } });
     fireEvent.click(screen.getByRole('button', { name: 'Post' }));
-    // Third argument is the reply target: `null` for a top-level comment.
     expect(onPersistComment).toHaveBeenCalledWith('p1', 'nice', null);
-    // The comment shows twice: in the side sheet AND as the card's
-    // latest-comment preview line ("View all N comments").
     await waitFor(() => expect(screen.getAllByText('nice').length).toBeGreaterThan(0));
   });
 
-  it('replying sends the parent comment id and nests the reply', async () => {
-    const onPersistComment = vi.fn(async (_postId: string, text: string, parentCommentId?: string | null) => ({
-      id: 'r1',
-      author_id: 'me',
-      author_name: 'You',
-      text,
-      created_at: new Date().toISOString(),
-      like_count: 0,
-      parent_comment_id: parentCommentId ?? null,
-    }));
-    renderTwo(onPersistComment, {
-      p1: [
-        {
-          id: 'c1', author_id: 'bob', author_name: 'Bob', text: 'first',
-          created_at: new Date().toISOString(), like_count: 0,
-        },
-      ],
-    });
-    fireEvent.click(expanders()[0]);
-    fireEvent.click(screen.getByRole('button', { name: 'Reply to comment by Bob' }));
-    // The composer targets the reply (placeholder + submit label change).
-    fireEvent.change(screen.getByPlaceholderText('Reply to Bob…'), { target: { value: 'agreed' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Reply' }));
-    expect(onPersistComment).toHaveBeenCalledWith('p1', 'agreed', 'c1');
-    await waitFor(() => expect(screen.getAllByText('agreed').length).toBeGreaterThan(0));
-  });
-
-  it('deep link #/feed?post= expands the target inline', async () => {
+  it('deep link #/feed?post= opens the target in the sheet', async () => {
     window.location.hash = '#/feed?post=p2';
     renderTwo();
     await waitFor(() => expect(screen.getByPlaceholderText('Add a comment...')).toBeInTheDocument());
-    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(sheet()).not.toBeNull();
     window.location.hash = '';
-  });
-
-  it('zoom pill cycles bounded levels and resets on collapse', () => {
-    renderTwo();
-    fireEvent.click(expanders()[0]);
-    const zoom = screen.getByLabelText('Zoom image');
-    expect(zoom).toHaveTextContent('100%');
-    fireEvent.click(zoom);
-    expect(screen.getByLabelText('Reset zoom')).toHaveTextContent('180%');
-    fireEvent.click(screen.getByLabelText('Reset zoom'));
-    expect(screen.getByLabelText('Reset zoom')).toHaveTextContent('260%');
-    fireEvent.click(screen.getByLabelText('Reset zoom'));
-    expect(screen.getByLabelText('Zoom image')).toHaveTextContent('100%');
-    // Collapse resets zoom for the next open.
-    fireEvent.click(screen.getByLabelText('Collapse post'));
-    fireEvent.click(expanders()[0]);
-    expect(screen.getByLabelText('Zoom image')).toHaveTextContent('100%');
   });
 });

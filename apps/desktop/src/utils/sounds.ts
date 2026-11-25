@@ -153,28 +153,6 @@ export function playChime() {
   });
 }
 
-/** Uplifting like ding */
-export function playLike() {
-  const audio = ensureCtx();
-  if (!audio) return;
-  const now = audio.currentTime;
-  [523.25, 783.99].forEach((freq, idx) => {
-    const osc = audio.createOscillator();
-    const gain = audio.createGain();
-    const start = now + idx * 0.05;
-
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(freq, start);
-
-    gain.gain.setValueAtTime(0.35, start);
-    gain.gain.exponentialRampToValueAtTime(0.001, start + 0.2);
-
-    osc.connect(gain).connect(audio.destination);
-    osc.start(start);
-    osc.stop(start + 0.22);
-  });
-}
-
 /** Low descending buzz for reject */
 function playReject() {
   const audio = ensureCtx();
@@ -317,5 +295,4 @@ export const playMatchOnce = /* @__PURE__ */ throttled(playMatch, 1500, 'match')
 export const playTierUpOnce = /* @__PURE__ */ throttled(playTierUp, 1500, 'tier');
 export const playCountdownOnce = /* @__PURE__ */ throttled(playCountdown, 900, 'countdown');
 export const playTimeoutOnce = /* @__PURE__ */ throttled(playTimeout, 1500, 'timeout');
-export const playLikeOnce = /* @__PURE__ */ throttled(playLike, 300, 'like');
 export const playRejectOnce = /* @__PURE__ */ throttled(playReject, 300, 'reject');

@@ -111,16 +111,15 @@ describe('GMatchFeed author header', () => {
     expect(screen.queryByPlaceholderText(/add a comment\.\.\./i)).toBeNull();
   });
 
-  it('clicking the media expands inline instead of opening a lightbox', () => {
+  it('clicking the media opens the post side sheet instead of a lightbox', () => {
     const { container } = renderFeed([imagePost]);
     const card = container.querySelector('article') as HTMLElement;
     const mediaBox = card.querySelector('.group\\/post div[role="button"]') as HTMLElement;
 
     fireEvent.click(mediaBox);
 
-    // Inline expansion replaces the lightbox: the media node flips to
-    // expanded and no modal dialog is mounted.
-    expect(card.querySelector('[data-expanded="true"]')).toBeTruthy();
+    // The detail opens in a complementary side sheet, not a modal dialog.
+    expect(document.querySelector('aside[role="complementary"]')).not.toBeNull();
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 });

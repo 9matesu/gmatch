@@ -7,10 +7,10 @@ import { useObjectImage } from '../hooks/useObjectImage'
 import {
   playCountdownOnce,
   playTimeoutOnce,
-  playLikeOnce,
   playRejectOnce,
   playMatchOnce,
   playUpload,
+  playPress,
 } from '../utils/sounds'
 import type { LobbyDecisionResult, LobbyDecisionFailure } from '../hooks/useLobby'
 import { ZoomModal, useZoomModal } from './CardZoomModalHost'
@@ -191,7 +191,7 @@ export function MatchRoundPanel({
       setBoostsRemaining((prev) => Math.max(0, prev - 1))
     }
     if (soundEnabled) {
-      if (decision === 'like' || decision === 'boost') playLikeOnce()
+      if (decision === 'like' || decision === 'boost') playPress(820)
       else playRejectOnce()
     }
     const result = await onDecide(match.id, decision)

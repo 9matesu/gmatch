@@ -417,7 +417,18 @@ product path.
   authority (blocklist + postFilter); the silent path now uses its posts as-is.
 - **The clicker ban is a multi-select (2026-11-25).** The drop tray's ✕ toggles a
   tag into a per-drop selection and one "Ban N selected" button applies them all
-  (`claimDropAntiTag` per tag), instead of banning one tag per click.
+  (`claimDropAntiTag` per tag), instead of banning one tag per click. The top-right
+  Prohibit button no longer purges: it opens a picker of THAT image's tags
+  (checkboxes + "Ban N selected" → `addUserExclude` + skip), with "Purge" kept as
+  the explicit whole-image option.
+- **The feed post opens as a side sheet (2026-11-25).** Clicking a timeline
+  post opens the detail in a right `SideSheet` (media + caption + like/save/vault/
+  share + comments), like opening a photo in the profile — the row no longer
+  expands inline. The sheet content is padded (`pb-24`) so the bottom nav never
+  covers it. The post caption sits **below** the image at a smaller size, and
+  Save + Add-to-Vault are grouped on the right. The like chime (`playLike`/
+  `playLikeOnce`) is deleted for good. `ObjectImage` keeps the last loaded `src`
+  until a vault/cached swap loads, so opening a post no longer blinks.
 - **Posting is universal: every post shows (2026-11-25).** The text-less hiding
   rule (a row with no words was hidden until its bytes resolved) made a fresh
   post vanish from its author's own timeline, and a descriptor post whose bytes

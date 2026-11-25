@@ -118,6 +118,22 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
     for (const t of banSel[dropId] || []) claimDropAntiTag(dropId, t)
     setBanSel((prev) => ({ ...prev, [dropId]: [] }))
   }
+  // Ban-by-tag for the CURRENT foe: the Prohibit button opens a picker of that
+  // image's tags instead of purging the whole image + auto-learning 3 tags.
+  const userExcludes = useGame((s) => s.userExcludes)
+  const addUserExclude = useGame((s) => s.addUserExclude)
+  const [banPickerOpen, setBanPickerOpen] = useState(false)
+  const [banPick, setBanPick] = useState<string[]>([])
+  const toggleBanPick = (tag: string) =>
+    setBanPick((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]))
+  const applyBanCurrent = () => {
+    for (const t of banPick) addUserExclude(t)
+    setBanPick([])
+    setBanPickerOpen(false)
+    advanceFeed()
+  }
+  // A new foe is a new picker: drop the previous selection.
+  useEffect(() => { setBanPick([]); setBanPickerOpen(false) }, [current?.id])
   const [dragFrom, setDragFrom] = useState<number | null>(null)
   const [dragOver, setDragOver] = useState<number | null>(null)
   // Shake + hit-flash are retriggered by REMOUNTING a child span, not the tile
@@ -763,16 +779,67 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           <button
             type="button"
             className="icon-btn absolute right-3 top-3 z-[6] flex h-8 w-8 items-center justify-center rounded-xl bg-black/60 text-retro-fg/70 border border-edge backdrop-blur-md hover:bg-danger/80 hover:text-retro-fg hover:border-danger/60 transition duration-150 active:scale-95 cursor-pointer"
-            aria-label="Never show this again"
-            title="Purge. This image and its rarest tags never return"
+            aria-label="Ban tags from this image"
+            title="Choose which tags of this image to ban"
             hidden={!current}
             onClick={(e) => {
               e.stopPropagation()
-              if (current) purgePost(current)
+              setBanPickerOpen((v) => !v)
+              setBanPick([])
             }}
           >
             <Prohibit size={16} weight="bold" />
           </button>
+          {banPickerOpen && current && (
+            <div
+              className="absolute right-3 top-14 z-[7] w-60 rounded-xl border border-edge bg-retro-panel p-2.5 shadow-2xl backdrop-blur-md"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mb-1.5 text-2xs font-bold uppercase tracking-wider text-retro-muted">
+                Ban tags from this image
+              </div>
+              <div className="flex max-h-40 flex-wrap gap-1 overflow-y-auto styled-scrollbar">
+                {current.tags.map((tag) => {
+                  const already = userExcludes.includes(tag)
+                  const on = banPick.includes(tag)
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      disabled={already}
+                      onClick={() => toggleBanPick(tag)}
+                      aria-pressed={on}
+                      title={already ? `${tag} is already excluded` : `Ban ${tag}`}
+                      className={`${MONO} cursor-pointer rounded-md border px-1.5 py-0.5 text-2xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${on ? 'border-danger/60 bg-danger/20 text-danger-fg' : 'border-edge bg-glass-w8 text-retro-body hover:text-retro-fg'}`}
+                    >
+                      {tag}
+                    </button>
+                  )
+                })}
+                {current.tags.length === 0 && (
+                  <span className="text-2xs text-retro-muted">No tags on this one.</span>
+                )}
+              </div>
+              <div className="mt-2 flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={applyBanCurrent}
+                  disabled={banPick.length === 0}
+                  className={`${MONO} flex-1 cursor-pointer rounded-md border border-danger/50 bg-danger/15 px-2 py-1 text-2xs font-bold text-danger-fg hover:bg-danger/25 transition-colors disabled:opacity-40`}
+                >
+                  Ban {banPick.length || ''} selected
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { purgePost(current); setBanPickerOpen(false); setBanPick([]) }}
+                  title="Purge the image and auto-learn its rarest tags"
+                  className={`${MONO} cursor-pointer rounded-md border border-edge bg-glass-w8 px-2 py-1 text-2xs font-bold text-retro-muted hover:text-retro-fg transition-colors`}
+                >
+                  Purge
+                </button>
+              </div>
+            </div>
+          )}
           {floats
             .filter((f) => f.cell === null)
             .map((f) => (

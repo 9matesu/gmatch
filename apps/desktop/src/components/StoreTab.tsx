@@ -5,7 +5,7 @@ import { STORE_ITEMS, type StoreItem, type User, formatGc, computeCashoutPayout,
 import { orbitFetch, invalidateCache } from '../utils/api';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { ActiveHackSession } from './home/CommandIsland';
-import { playPress, playLike } from '../utils/sounds';
+import { playPress } from '../utils/sounds';
 import { formatCount } from '../ui/format';
 import { PageHeader } from '../ui/kit';
 import type { CanonicalCard } from '../utils/cardCollection';
@@ -242,7 +242,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
       setCashoutProgress({ done: i + 1, total: cashable.length });
     }
 
-    playLike();
+    playPress(820);
     refreshPortfolio();
     window.dispatchEvent(new CustomEvent('orbit-cards-refresh'));
     window.dispatchEvent(new CustomEvent('orbit-score-refresh'));
@@ -313,7 +313,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
         identity
       );
       if (res.ok) {
-        playLike();
+        playPress(820);
         toast?.(`Purchased ${item.name}`, 'success');
         onPurchase?.(item);
         // A purchase moves the wallet, so the balance everywhere (top bar,
