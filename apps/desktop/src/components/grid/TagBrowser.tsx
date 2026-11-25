@@ -5,6 +5,7 @@ import type { BooruPost } from '../../game/types'
 import { browseQuery, dedupePosts, provenanceLabel } from '../../game/tagBrowse'
 import { fetchPosts } from '../../services/booru'
 import { offlineSvg } from '../../services/offlineSvg'
+import { redgifsPlayable } from '../../services/redgifs'
 import CachedImg from '../../ui/CachedImg'
 import MediaViewerModal from '../../ui/MediaViewerModal'
 import { EmptyState } from '../EmptyState'
@@ -181,8 +182,8 @@ export default function TagBrowser({ onClose }: { onClose?: () => void }) {
                 {p.kind === 'video' ? (
                   <video
                     className="block h-full w-full object-cover"
-                    src={p.url}
-                    poster={p.preview || undefined}
+                    src={redgifsPlayable(p.url)}
+                    poster={p.preview ? redgifsPlayable(p.preview) : undefined}
                     autoPlay
                     loop
                     muted
@@ -210,14 +211,20 @@ export default function TagBrowser({ onClose }: { onClose?: () => void }) {
           <figure className="relative flex max-h-(--max-h-panel) min-h-0 w-auto max-w-full flex-col items-center">
             {viewer.kind === 'video' ? (
               <video
-                src={viewer.url}
-                poster={viewer.preview || undefined}
+                src={redgifsPlayable(viewer.url)}
+                poster={viewer.preview ? redgifsPlayable(viewer.preview) : undefined}
                 className="max-h-(--max-h-sheet) w-auto max-w-full rounded-lg object-contain"
                 controls
                 autoPlay
-                muted={false}
+                // Chromium refuses to autoplay an UNMUTED video without a user
+                // gesture, so the viewer sat on a black, paused first frame —
+                // the clicker's video was already muted and did play. The
+                // viewer now matches it exactly; `controls` lets the player
+                // turn the sound on by hand.
+                muted
                 loop
                 playsInline
+                preload="auto"
               />
             ) : (
               <img

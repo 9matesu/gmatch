@@ -494,7 +494,13 @@ product path.
 - **Clicker + tag-browser videos actually play (2026-11-25).** The Goon Panel
   `<video>` (single foe and grid) and the Tag Browser grid `<video>` use
   `autoPlay` + `preload="auto"` (muted, loop, playsInline) so a motion foe/clip
-  animates instead of sitting on a black/poster frame.
+  animates instead of sitting on a black/poster frame. The Tag Browser's
+  **viewer** modal is now the same: it was `muted={false}` with no `preload`, so
+  Chromium refused to autoplay it and opening a clip showed a black, paused
+  first frame — the grid tile played, the thing the player actually clicked
+  did not. The viewer is muted + `preload="auto"` (with `controls`, so the
+  sound can be turned on by hand), and both tag-browser videos resolve their
+  URL through `redgifsPlayable` like the clicker does.
 - **Posting is universal: every post shows (2026-11-25).** The text-less hiding
   rule (a row with no words was hidden until its bytes resolved) made a fresh
   post vanish from its author's own timeline, and a descriptor post whose bytes
