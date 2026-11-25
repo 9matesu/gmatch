@@ -74,12 +74,12 @@ describe('postOutbox store (Phase 3b)', () => {
     expect(listOutbox().map((e) => e.objectId)).toEqual(['o1']);
   });
 
-  it('rearmMissingReplicated moves a replicated entry back to pending when the node 404s', async () => {
+  it('rearmMissingReplicated moves a replicated entry back to local when the node 404s', async () => {
     enqueueOutbox({ objectId: 'rearm-1', postGroup: null, registerBody: regBody('rearm-1'), gossipInput: null });
     setOutboxState('rearm-1', 'replicated');
     (orbitFetch as unknown as { mockResolvedValue: (v: unknown) => void }).mockResolvedValue({ status: 404 });
     await rearmMissingReplicated(identity);
-    expect(listOutbox()[0].state).toBe('pending');
+    expect(listOutbox()[0].state).toBe('local');
   });
 
   it('rearmMissingReplicated leaves a replicated entry alone when the node holds it', async () => {

@@ -138,7 +138,10 @@ export async function rearmMissingReplicated(
     rearmChecked.add(e.objectId);
     try {
       const res = await orbitFetch(`/api/objects/${e.objectId}`, {}, identity);
-      if (res.status === 404) setOutboxState(e.objectId, 'pending', true);
+      // 404 = the row is not on THIS node. Send it back to `local` (not
+      // `pending`): `pending` means "already registered", so the flush would
+      // only re-stamp it replicated without ever registering it here.
+      if (res.status === 404) setOutboxState(e.objectId, 'local', true);
     } catch {
       /* node unreachable: leave it replicated, retry on the next boot */
     }

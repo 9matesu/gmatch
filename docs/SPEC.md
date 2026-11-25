@@ -388,7 +388,7 @@ product path.
   (`fly.dev`) and `flushPostOutbox` skipped it forever, so it never reached the
   local node and never appeared in the timeline. On boot the flush now calls
   `rearmMissingReplicated`: each `replicated` entry is probed once
-  (`GET /api/objects/:id`) and a 404 moves it back to `pending` (bounded, once
+  (`GET /api/objects/:id`) and a 404 moves it back to `local` (bounded, once
   per session), so the normal flush registers it on `127.0.0.1:8790`.
 - **Deleting a replicated post deletes it on the node (2026-11-25).**
   `deletePostOnServer` treated ANY outbox row as local-only and removed it
