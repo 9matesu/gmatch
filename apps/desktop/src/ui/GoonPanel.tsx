@@ -105,6 +105,19 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
   const [failedUrl, setFailedUrl] = useState<string | null>(null)
   const [shownUrl, setShownUrl] = useState<string | null>(null)
   const [dropsOpen, setDropsOpen] = useState(false)
+  // Multi-select ban: the ✕ toggles a tag into a per-drop selection, then one
+  // "Ban selected" button applies them all (claimDropAntiTag per tag).
+  const [banSel, setBanSel] = useState<Record<string, string[]>>({})
+  const toggleBanSel = (dropId: string, tag: string) =>
+    setBanSel((prev) => {
+      const cur = prev[dropId] || []
+      const next = cur.includes(tag) ? cur.filter((t) => t !== tag) : [...cur, tag]
+      return { ...prev, [dropId]: next }
+    })
+  const applyBanSel = (dropId: string) => {
+    for (const t of banSel[dropId] || []) claimDropAntiTag(dropId, t)
+    setBanSel((prev) => ({ ...prev, [dropId]: [] }))
+  }
   const [dragFrom, setDragFrom] = useState<number | null>(null)
   const [dragOver, setDragOver] = useState<number | null>(null)
   // Shake + hit-flash are retriggered by REMOUNTING a child span, not the tile
@@ -808,31 +821,44 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                       </button>
                     </div>
                     <div className="mt-1.5 flex flex-wrap gap-1">
-                      {drop.tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className={`${MONO} inline-flex items-center overflow-hidden rounded-md border border-edge bg-glass-w8 text-2xs font-bold`}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => claimDropTag(drop.id, tag)}
-                            title={`Adopt +${tag} into your feed`}
-                            className="cursor-pointer px-1.5 py-0.5 text-success-fg hover:bg-success/20 transition-colors"
+                      {drop.tags.map((tag) => {
+                        const banned = (banSel[drop.id] || []).includes(tag)
+                        return (
+                          <span
+                            key={tag}
+                            className={`${MONO} inline-flex items-center overflow-hidden rounded-md border text-2xs font-bold ${banned ? 'border-danger/60 bg-danger/15' : 'border-edge bg-glass-w8'}`}
                           >
-                            + {tag}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => claimDropAntiTag(drop.id, tag)}
-                            title={`Ban ${tag} from your feed`}
-                            aria-label={`Ban ${tag}`}
-                            className="cursor-pointer border-l border-edge px-1 py-0.5 text-danger-fg hover:bg-danger/20 transition-colors"
-                          >
-                            <X size={10} weight="bold" />
-                          </button>
-                        </span>
-                      ))}
+                            <button
+                              type="button"
+                              onClick={() => claimDropTag(drop.id, tag)}
+                              title={`Adopt +${tag} into your feed`}
+                              className="cursor-pointer px-1.5 py-0.5 text-success-fg hover:bg-success/20 transition-colors"
+                            >
+                              + {tag}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => toggleBanSel(drop.id, tag)}
+                              title={banned ? `Unselect ${tag}` : `Select ${tag} to ban`}
+                              aria-label={banned ? `Unselect ${tag}` : `Select ${tag} to ban`}
+                              aria-pressed={banned}
+                              className="cursor-pointer border-l border-edge px-1 py-0.5 text-danger-fg hover:bg-danger/20 transition-colors"
+                            >
+                              <X size={10} weight="bold" />
+                            </button>
+                          </span>
+                        )
+                      })}
                     </div>
+                    {(banSel[drop.id]?.length || 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => applyBanSel(drop.id)}
+                        className={`${MONO} mt-1.5 w-full cursor-pointer rounded-md border border-danger/50 bg-danger/15 px-2 py-1 text-2xs font-bold text-danger-fg hover:bg-danger/25 transition-colors`}
+                      >
+                        Ban {banSel[drop.id].length} selected
+                      </button>
+                    )}
                   </div>
                 ))}
                 {pendingDrops.length > 4 && (

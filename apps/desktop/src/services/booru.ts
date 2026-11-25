@@ -1664,11 +1664,14 @@ async function fetchPostsUncached(req: BooruRequest): Promise<BooruResponse> {
         const fetched = res.posts || []
         const f0 = Date.now()
         if (req.silent) {
-          // Validation-only: checked, never memoized (see BooruRequest.silent).
-          const clean = sanitize(fetched, req.tags)
+          // Validation-only: the MAIN process already applied the blocklist +
+          // postFilter (dims, tags, kind). Re-running the renderer's stricter
+          // sanitize() here dropped every imhentai cover (small gallery thumbs),
+          // so the tag browser read "offline" for a source that answered. Trust
+          // the authority; only the dev `directFetch` path needs the local gate.
           markStage(round, 'filter', Date.now() - f0)
           endRound(round)
-          return clean.length > 0 ? { ...res, posts: clean } : { ...offline }
+          return fetched.length > 0 ? { ...res, posts: fetched } : { ...offline }
         }
         const fresh = remember(sanitize(fetched, req.tags), req.tags)
         markStage(round, 'filter', Date.now() - f0)

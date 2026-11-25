@@ -401,6 +401,14 @@ product path.
   (dozens of old rows) could read "Loading media…" for the life of the session.
   A hard cap (`HARD_UNAVAILABLE_CAP_MS` = 30s) now applies when bytes are still
   expected; an explicit budget (a 5s story) still wins.
+- **The tag browser trusts the main gate (2026-11-25).** The browser fetches with
+  `silent:true`, and the renderer re-ran its stricter `sanitize()` on the main
+  process's already-gated results — imhentai's small gallery covers were dropped,
+  so the source read "offline" though it answered. The main process is the
+  authority (blocklist + postFilter); the silent path now uses its posts as-is.
+- **The clicker ban is a multi-select (2026-11-25).** The drop tray's ✕ toggles a
+  tag into a per-drop selection and one "Ban N selected" button applies them all
+  (`claimDropAntiTag` per tag), instead of banning one tag per click.
 - **Posting is universal: every post shows (2026-11-25).** The text-less hiding
   rule (a row with no words was hidden until its bytes resolved) made a fresh
   post vanish from its author's own timeline, and a descriptor post whose bytes
