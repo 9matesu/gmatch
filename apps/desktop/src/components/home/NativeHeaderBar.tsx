@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { SpeakerHigh, SpeakerSlash, Minus, Square, X, CaretLeft, CaretRight } from '@phosphor-icons/react';
 import { isAudioMuted, setAudioMuted, playPress } from '../../utils/sounds';
-import { NotificationCenter, type NotificationCenterProps } from '../notifications/NotificationCenter';
 
 export interface NativeHeaderBarProps {
   wsConnected?: boolean;
@@ -11,11 +10,6 @@ export interface NativeHeaderBarProps {
   activeRoomName?: string;
   onGoBack?: () => void;
   onGoForward?: () => void;
-  /**
-   * The unified notification centre's data + handlers. Omitted only in tests /
-   * non-shell embeds; the bell still renders, just with an empty inbox.
-   */
-  notifications?: NotificationCenterProps;
 }
 
 export function NativeHeaderBar({
@@ -24,7 +18,6 @@ export function NativeHeaderBar({
   activeRoomName: _activeRoomName,
   onGoBack,
   onGoForward,
-  notifications,
 }: NativeHeaderBarProps = {}) {
   const [isMuted, setIsMuted] = useState(false);
 
@@ -80,27 +73,9 @@ export function NativeHeaderBar({
         <span className="text-field font-bold tracking-wide text-retro-fg select-none ml-1">gMatch</span>
       </div>
 
-      {/* Centre: the notification centre. One bell and its badge  the
-          permanent "Notifications / All quiet" text is gone, because a label
-          that never changes is chrome, not information. */}
-      <div
-        className="absolute left-1/2 -translate-x-1/2 flex items-center"
-        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-      >
-        <NotificationCenter
-          {...(notifications ?? {
-            onMarkAllRead: () => {},
-            onMarkRead: () => {},
-            onOpenTarget: () => {},
-            onOpenLocalTarget: () => {},
-            onMarkLocalRead: () => {},
-          })}
-        />
-      </div>
-      {/* The Post button lives in the footer Command Island now — one focal
-          point at the bottom, not duplicated in the chrome. */}
+      {/* The notification bell lives in the footer Command Island (navbar). */}
 
-      {/* Right: notifications + mute + window controls (frameless: buttons
+      {/* Right: mute + window controls (frameless: buttons
           render only when the preload bridge exposes them. Browser/dev =
           no bridge) */}
       <div

@@ -673,8 +673,10 @@ function addLinkToCaption(raw: string): void {
         </div>
 
         {/* Body Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 styled-scrollbar">
-          {captionField}
+        <div className="flex-1 overflow-y-auto p-4 styled-scrollbar">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+            <div className="space-y-3 md:order-2">{captionField}</div>
+            <div className="space-y-3 md:order-1">
 
           {/* Active Tab Modalities */}
           {activeTab === 'upload' && (
@@ -921,6 +923,8 @@ function addLinkToCaption(raw: string): void {
               </div>
             </div>
           )}
+            </div>
+          </div>
         </div>
       </div>
       {cropper}

@@ -421,6 +421,12 @@ product path.
   Prohibit button no longer purges: it opens a picker of THAT image's tags
   (checkboxes + "Ban N selected" → `addUserExclude` + skip), with "Purge" kept as
   the explicit whole-image option.
+- **Fewer clicks: picker opens on the gallery, post modal is 2 columns (2026-11-25).**
+  `MediaPickerPanel` opens on the Browse (gallery) pane whenever it is offered, so
+  a keepsake is one click away. The Create Post modal is a 2-column grid on
+  `md+` (media left, caption/fields right) so the whole post fits one screen.
+  The notification bell moved from `NativeHeaderBar` to the `CommandIsland`
+  navbar (single entry point, `data-notifications-toggle` preserved).
 - **The feed post opens as a side sheet (2026-11-25).** Clicking a timeline
   post opens the detail in a right `SideSheet` (media + caption + like/save/vault/
   share + comments), like opening a photo in the profile — the row no longer

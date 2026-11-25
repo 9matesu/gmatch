@@ -27,6 +27,7 @@ import { useCommunityInvite, openCommunityInvite } from '../../services/communit
 import { resolveMediaUrl } from '../../utils/media';
 import { CountBadge } from './CountBadge';
 import { MediaPickerPanel } from '../media/MediaPickerModal';
+import { NotificationCenter, type NotificationCenterProps } from '../notifications/NotificationCenter';
 import type { MediaSelection } from '../media/picker';
 import type { ViewMode } from '../../game/types';
 export type MainViewType = 'feed' | 'games' | 'create' | 'messages' | 'profile' | 'game' | 'gallery' | 'store' | 'pc_domination' | 'grid' | 'rooms' | 'servers' | 'watch';
@@ -90,6 +91,8 @@ export interface CommandIslandProps {
   /** Active Clicker layout; the pill only renders when this prop pair is given. */
   gridSize?: ViewMode;
   onGridSizeChange?: (mode: ViewMode) => void;
+  /** The unified notification centre (moved here from the header). */
+  notifications?: NotificationCenterProps;
 }
 
 export function CommandIsland({
@@ -119,6 +122,7 @@ export function CommandIsland({
   showAdmin,
   gridSize: _gridSize,
   onGridSizeChange: _onGridSizeChange,
+  notifications,
 }: CommandIslandProps) {
   const [satelliteOpen, setSatelliteOpen] = useState<boolean>(readSatelliteOpen);
   const [postPickerOpen, setPostPickerOpen] = useState(false);
@@ -305,8 +309,8 @@ export function CommandIsland({
         {/* Right zone: chat, profile, contextual action, extra tools. */}
         <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 justify-start">
 
-          {/* The notification bell lives in the header now (single entry point);
-              the footer island no longer duplicates it. */}
+          {/* Notification bell (moved here from the header). */}
+          {notifications && <NotificationCenter {...notifications} />}
 
           {/* Messages Drawer Toggle Button */}
           <button

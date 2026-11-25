@@ -54,7 +54,9 @@ export function MediaPickerPanel({
   const sources = options.sources ?? ['browse', 'upload', 'url'];
   const gallery = useGame((s) => s.gallery);
 
-  const [pane, setPane] = useState<Pane>(sources[0]);
+  // Open on Browse (the gallery) whenever it is offered — fewest clicks to a
+  // keepsake. Callers that only allow upload/url still open on their first pane.
+  const [pane, setPane] = useState<Pane>(sources.includes('browse') ? 'browse' : sources[0]);
   const [pending, setPending] = useState<Pending | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tagFilter, setTagFilter] = useState('');
