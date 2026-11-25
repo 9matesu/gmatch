@@ -34,7 +34,7 @@ export function mediaFlag(v: unknown): MediaFlag {
 /** A link is short; anything larger is content, whatever it decodes to. */
 const DESCRIPTOR_MAX_BYTES = 4096
 
-const DESCRIPTOR_URL_RE = /^(https?:\/\/|gmcache:\/\/|\/api\/objects\/)\S+$/i
+const DESCRIPTOR_URL_RE = /^(https?:\/\/|gmcache:\/\/|vault:\/\/|\/api\/objects\/)\S+$/i
 
 /**
  * The provider URL a legacy row stored in place of media bytes, else null.

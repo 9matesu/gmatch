@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { isMediaVideo, resolveMediaUrl } from '../utils/media'
 import { resolveObjectRefId } from '../utils/objectRef'
-import { useObjectImage } from '../hooks/useObjectImage'
+import { useObjectImage, evictObjectImage } from '../hooks/useObjectImage'
 import { NativeVideoPlayer } from './media/NativeVideoPlayer'
 import { useVaultUrl, useVaultHttpUrls } from '../services/vault'
 import { resolveImage, devFetchable, cachedImageFor } from '../services/imageCache'
@@ -327,6 +327,7 @@ export function ObjectImage({
           onError={(_e) => {
             onError?.()
             setHasError(true)
+            if (signed && effObjectId) evictObjectImage(effObjectId)
             onMediaUnavailable?.()
             onLoadingChange?.(false)
           }}
@@ -352,6 +353,7 @@ export function ObjectImage({
       onError={(_e) => {
         onError?.()
         setHasError(true)
+        if (signed && effObjectId) evictObjectImage(effObjectId)
         onMediaUnavailable?.()
         onLoadingChange?.(false)
       }}
@@ -375,6 +377,7 @@ export function ObjectImage({
       onError={(_e) => {
         onError?.()
         setHasError(true)
+        if (signed && effObjectId) evictObjectImage(effObjectId)
         onMediaUnavailable?.()
         onLoadingChange?.(false)
       }}

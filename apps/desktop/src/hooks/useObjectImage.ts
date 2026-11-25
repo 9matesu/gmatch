@@ -156,6 +156,17 @@ function cacheSet(rawCardId: string, source: string, img: ImageState): void {
   }
 }
 
+/** Drop a specific object from the LRU and revoke its blob URL if present. */
+export function evictObjectImage(rawCardId: string): void {
+  const cardId = normalizeCardId(rawCardId)
+  const hit = objectCache.get(cardId)
+  if (!hit) return
+  if (hit.url && hit.url.startsWith('blob:')) URL.revokeObjectURL(hit.url)
+  objectCache.delete(cardId)
+  cacheSource.delete(cardId)
+  failedAt.delete(cardId)
+}
+
 /**
  * In-flight resolution, keyed like the LRU. Two consumers of the same
  * objectId (a feed tile and the post lightbox, or a story ring and the story

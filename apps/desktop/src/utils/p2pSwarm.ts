@@ -24,6 +24,7 @@ import {
   type SwarmReceiptIdentity,
   type SwarmReceiptRoles,
 } from './swarmEngine'
+import { descriptorUrlFromBytes } from './objectDescriptor'
 
 // The wire contract (the frame shapes and their bounds) lives in
 // @orbit/protocol: the node's relay allowlist and this engine read the SAME
@@ -245,11 +246,16 @@ async function persistToVault(id: string, blob: Blob, meta: LocalObjectMeta = {}
   }
 }
 
-/** Read verified bytes from the vault (disk) by content hash, else null. */
+/**
+ * Read verified bytes from the vault (disk) by content hash, else null.
+ * Accepts `vault://f/<ref>` descriptors as well as bare hashes.
+ */
 async function readVaultBlob(id: string): Promise<Blob | null> {
   if (typeof window === 'undefined' || !window.gmatch?.vaultGet) return null
+  const ref = id.startsWith('vault://f/') ? id.slice('vault://f/'.length) : id
+  if (!ref) return null
   try {
-    const res = await window.gmatch.vaultGet(id)
+    const res = await window.gmatch.vaultGet(ref)
     if (!res?.local) return null
     const resp = await fetch(res.local)
     if (!resp.ok) return null
@@ -295,6 +301,26 @@ export async function hydrateLocalObjects(maxBytes = RAM_LIMIT_BYTES): Promise<n
     for (const o of all) {
       const data = o?.data as ArrayBuffer | undefined
       if (!o?.id || !data || !(data instanceof ArrayBuffer) || data.byteLength === 0) continue
+
+      // A legacy descriptor row stores its provider URL in `data` instead of
+      // bytes. If that URL is a vault address, resolve it to real bytes here;
+      // otherwise skip it so the descriptor text is never rehydrated as media.
+      const descriptorUrl = descriptorUrlFromBytes(data)
+      if (descriptorUrl) {
+        if (!descriptorUrl.startsWith('vault://f/')) continue
+        const ref = descriptorUrl.slice('vault://f/'.length)
+        if (used + 74 > maxBytes) continue
+        if (!localObjects.has(o.id)) {
+          const blob = await readVaultBlob(ref)
+          if (blob) {
+            localObjects.set(o.id, blob)
+            used += blob.size
+            count += 1
+          }
+        }
+        continue
+      }
+
       if (used + data.byteLength > maxBytes) continue
       if (!localObjects.has(o.id)) {
         localObjects.set(o.id, new Blob([data], { type: o.mime_type || 'application/octet-stream' }))
@@ -364,6 +390,11 @@ async function readDurableObject(id: string): Promise<Blob | null> {
     }
     const data = stored?.data as ArrayBuffer | undefined
     if (stored && data && data.byteLength > 0) {
+      const descriptorUrl = descriptorUrlFromBytes(data)
+      if (descriptorUrl) {
+        if (!descriptorUrl.startsWith('vault://f/')) return null
+        return await readVaultBlob(descriptorUrl.slice('vault://f/'.length))
+      }
       return new Blob([data], { type: stored.mime_type || 'application/octet-stream' })
     }
   } catch {

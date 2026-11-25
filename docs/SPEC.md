@@ -362,6 +362,35 @@ product path.
   (a story must skip media that outlives it). Firing it at 6s while a signed
   fetch was still running hid `hideUnavailable` tiles mid-load: "the images
   disappeared".
+- **Legacy `vault://f/<hash>` descriptors resolve to bytes (2026-11-25).**
+  `persistToVault` wrote the 74-byte UTF-8 descriptor `vault://f/<hash>` into
+  IndexedDB `objects.data` (with `source_url` set) so the gallery/feed could
+  render from the vault stream. `hydrateLocalObjects` and `readDurableObject`
+  wrapped that descriptor text in a `Blob` and minted a `blob:` URL whose bytes
+  were the URL string (`naturalWidth === 0`). Both now detect the descriptor via
+  `descriptorUrlFromBytes` (extended to accept `vault://`) and resolve it through
+  `readVaultBlob(ref)` instead of rehydrating text as media; `ObjectImage` also
+  evicts a broken `blob:` entry from the `useObjectImage` LRU on media `onError`.
+- **Retired-host client config is cleared on boot (2026-11-25).** An unstamped
+  (pre-v2) `server-mode.json` is paused by the main process
+  (`pausedReason: 'legacy'`) and this machine's node boots on `:8790`, but the
+  renderer's cached `gmatch.api.url` / `gmatch.central.url` /
+  `gmatch.onboarding.serverUrl` (`https://gmatch.fly.dev`) and old
+  `gmatch.feed.snapshot.v1:*` rows survived because `fly.dev/api/health` still
+  answered `200`. `App.tsx` now clears those keys and stale snapshots once when
+  `serverState()` reports `mode === 'host'` && `pausedReason === 'legacy'`, so
+  `flushPostOutbox` delivers pending local posts to `http://127.0.0.1:8790`.
+- **Dead media rows stay hidden until bytes arrive (2026-11-25).**
+  `GMatchFeed` sets `hideUnavailable={true}` on timeline `ObjectImage`s and
+  `visiblePosts` drops a text-less row once `deadPosts` marks it, so legacy
+  `magnet:`/`p2p` posts without local or online-peer bytes no longer fill the
+  timeline with empty frames; a captioned row whose media is dead stays (it
+  still has content).
+- **`onClick={window.gmatch.winMinimize}` no longer throws (2026-11-25).**
+  Passing the `contextBridge` function directly as the React `onClick` handler
+  handed React's non-cloneable `SyntheticEvent` to `ipcRenderer.send`, which
+  threw `Error: An object could not be cloned.` on every window-button click.
+  `NativeHeaderBar` now wraps each call in `() => window.gmatch?.winX?.()`.
 - **Reading the timeline is a stated state, not a guess (2026-10-19).** The feed
   carries an explicit status (`idle|loading|ready|offline|error`), so an empty
   list says which one it is instead of implying "nothing here". The snapshot read
