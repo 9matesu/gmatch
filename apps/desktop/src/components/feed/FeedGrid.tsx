@@ -4,6 +4,8 @@ import { justifyRows, type JustifiedInput } from './justifyRows'
 import { ratioOf, rememberRatio } from './tileMetrics'
 import { FeedTile } from './FeedTile'
 import { resolveMediaUrl } from '../../utils/media'
+import { resolveObjectRefId } from '../../utils/objectRef'
+import { getLocalObject } from '../../utils/p2pSwarm'
 import type { OrbitIdentity } from '@orbit/crypto'
 
 interface FeedGridProps {
@@ -14,6 +16,10 @@ interface FeedGridProps {
   likedPosts: Record<string, boolean>
   likeCounts: Record<string, number>
   onToggleLike: (post: FeedPost) => void
+  /** A tile's bytes resolved: clear its dead flag (reversible) and re-measure. */
+  onMediaReady?: (id: string) => void
+  /** A tile's bytes could not be resolved: mark it dead (reversible hide). */
+  onMediaDead?: (id: string) => void
 }
 
 /**
@@ -26,7 +32,7 @@ interface FeedGridProps {
  * from the model: `FeedPost` carries no width/height and adding it would be a
  * data-format change.
  */
-export function FeedGrid({ posts, identity, onOpen, likedPosts, likeCounts, onToggleLike }: FeedGridProps) {
+export function FeedGrid({ posts, identity, onOpen, likedPosts, likeCounts, onToggleLike, onMediaReady, onMediaDead }: FeedGridProps) {
   const ref = useRef<HTMLDivElement | null>(null)
   const [width, setWidth] = useState(0)
   const [, bump] = useState(0)
@@ -45,19 +51,38 @@ export function FeedGrid({ posts, identity, onOpen, likedPosts, likeCounts, onTo
   }, [])
 
   // Probe the pictures we still cannot measure.
+  //
+  // Two kinds of source: a plain http(s) URL is measured directly; a local
+  // object (vault / magnet / urn / p2p / /api/objects) has no fetchable URL,
+  // so its bytes are resolved from the local stores and measured from a blob
+  // URL. A descriptor whose bytes we do NOT hold stays without a ratio — and
+  // therefore out of the grid — until a peer brings the bytes (the tile never
+  // mounts, so nothing is faked).
   useEffect(() => {
     let live = true
-    for (const post of posts) {
-      if (ratioOf(post) !== undefined) continue
-      const url = post.media?.[0]?.url || post.url
-      if (!/^https?:/i.test(url)) continue // signed/descriptor rows: no bytes, no ratio
+    const measure = (post: FeedPost, src: string) => {
       const img = new Image()
       img.decoding = 'async'
       img.onload = () => {
         if (!live) return
         if (rememberRatio(post, img.naturalWidth, img.naturalHeight)) bump((n) => n + 1)
+        if (src.startsWith('blob:')) URL.revokeObjectURL(src)
       }
-      img.src = resolveMediaUrl(url)
+      img.onerror = () => { if (src.startsWith('blob:')) URL.revokeObjectURL(src) }
+      img.src = src
+    }
+    for (const post of posts) {
+      if (ratioOf(post) !== undefined) continue
+      const url = post.media?.[0]?.url || post.url
+      if (!url) continue
+      if (/^https?:/i.test(url)) { measure(post, resolveMediaUrl(url)); continue }
+      // Local object: resolve bytes (vault/IndexedDB) and measure the blob.
+      const id = resolveObjectRefId(url) || post.media?.[0]?.id || post.id
+      if (!id) continue
+      void getLocalObject(id).then((blob) => {
+        if (!live || !blob) return
+        measure(post, URL.createObjectURL(blob))
+      }).catch(() => { /* no local bytes: stays out of the grid */ })
     }
     return () => {
       live = false
@@ -89,6 +114,11 @@ export function FeedGrid({ posts, identity, onOpen, likedPosts, likeCounts, onTo
                 likes={likeCounts[post.id] ?? post.like_count ?? 0}
                 onOpen={onOpen}
                 onToggleLike={onToggleLike}
+                onMediaLoad={(w, h) => {
+                  if (rememberRatio(post, w, h)) bump((n) => n + 1)
+                  onMediaReady?.(post.id)
+                }}
+                onMediaUnavailable={() => onMediaDead?.(post.id)}
               />
             )
           })}

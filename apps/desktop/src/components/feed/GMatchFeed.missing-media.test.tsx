@@ -16,6 +16,13 @@ vi.mock('../../services/imageCache', () => ({
   cachedImageFor: vi.fn(() => undefined),
 }));
 
+// The swarm store: no bytes at first, then a blob once a "peer" seeds them.
+const getLocalObject = vi.fn(async (_id: string) => null as Blob | null);
+vi.mock('../../utils/p2pSwarm', () => ({
+  getLocalObject: (id: string) => getLocalObject(id),
+  PEER_ONLINE_EVENT: 'orbit-peer-online',
+}));
+
 // The real tile resolves over the network; this stub reports the terminal
 // "media not on this device" result the tile produces after its vault probe +
 // bounded swarm attempt.
@@ -33,7 +40,7 @@ global.IntersectionObserver = vi.fn().mockImplementation((cb) => ({
   disconnect: vi.fn(),
 })) as any;
 
-describe('GMatchFeed missing media', () => {
+describe('GMatchFeed missing media (reversible)', () => {
   const identity = { orbitId: 'my-user-id', sign: vi.fn() } as any;
   const posts: any[] = [
     {
@@ -48,20 +55,21 @@ describe('GMatchFeed missing media', () => {
     },
   ];
 
-  it('keeps the post on the timeline when its media is not on this device', () => {
+  it('hides the post when its media is dead and brings it back when bytes arrive', async () => {
     render(
       <GMatchFeed identity={identity} posts={posts} stories={[]} users={[]} feedSort="latest" />,
     );
 
+    // Visible while the bytes are still in flight.
     expect(screen.getByText('My own post without local bytes')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'missing media' }));
 
-    // The tile reports the miss; the row (author, caption, counts) stays.
-    // Clicking the media also opens the comments side sheet, which repeats
-    // the caption beside the timeline — the tile keeps its own copy too.
-    expect(screen.getAllByText('My own post without local bytes').length).toBeGreaterThan(0);
-    expect(
-      screen.queryByText(/hidden — media not on this device/),
-    ).not.toBeInTheDocument();
+    // The tile reports the miss: the row is hidden (reversibly).
+    fireEvent.click(screen.getByRole('button', { name: 'missing media' }));
+    expect(screen.queryByText('My own post without local bytes')).not.toBeInTheDocument();
+
+    // A peer came online and the swarm now holds the bytes: the row REAPPEARS.
+    getLocalObject.mockResolvedValueOnce(new Blob(['x']));
+    fireEvent(window, new Event('orbit-peer-online'));
+    expect((await screen.findAllByText('My own post without local bytes')).length).toBeGreaterThan(0);
   });
 });

@@ -380,12 +380,24 @@ product path.
   answered `200`. `App.tsx` now clears those keys and stale snapshots once when
   `serverState()` reports `mode === 'host'` && `pausedReason === 'legacy'`, so
   `flushPostOutbox` delivers pending local posts to `http://127.0.0.1:8790`.
-- **Dead media rows stay hidden until bytes arrive (2026-11-25).**
+- **Dead media rows hide and REAPPEAR when bytes arrive (2026-11-25).**
   `GMatchFeed` sets `hideUnavailable={true}` on timeline `ObjectImage`s and
-  `visiblePosts` drops a text-less row once `deadPosts` marks it, so legacy
+  `visiblePosts` drops a row once `deadPosts` marks it, so legacy
   `magnet:`/`p2p` posts without local or online-peer bytes no longer fill the
-  timeline with empty frames; a captioned row whose media is dead stays (it
-  still has content).
+  timeline with empty frames. The state is **reversible**: `promoteMedia` clears
+  `dead` (a local read, a signed fetch, or a peer that came online with the
+  bytes), and a feed-level re-check on `PEER_ONLINE_EVENT` re-promotes a hidden
+  row whose bytes are now held locally — so a post that "appeared then vanished"
+  comes back the moment its bytes exist. A one-way `deadPosts` set used to hide a
+  post for the rest of the session even after its bytes landed.
+- **The grid measures local-object posts too (2026-11-25).** `FeedGrid` only
+  laid out posts whose aspect ratio was known, and the ratio probe ran for
+  `^https?:` URLs only — so `vault:`/`magnet:`/`p2p`/`/api/objects` posts never
+  got a ratio and the grid stayed empty ("Nothing to lay out yet"). The probe now
+  also resolves a local object's bytes (`getLocalObject`) and measures the blob,
+  and each `FeedTile` reports its rendered natural size (`onLoadSize`) so a tile
+  that mounts can be measured; a descriptor whose bytes nobody holds stays out of
+  the grid (per the visibility rule) until a peer brings them.
 - **`onClick={window.gmatch.winMinimize}` no longer throws (2026-11-25).**
   Passing the `contextBridge` function directly as the React `onClick` handler
   handed React's non-cloneable `SyntheticEvent` to `ipcRenderer.send`, which

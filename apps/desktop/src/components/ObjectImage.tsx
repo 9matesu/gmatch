@@ -46,6 +46,9 @@ export interface ObjectImageProps {
   hideUnavailable?: boolean
   /** Invoked when media successfully finishes loading */
   onLoad?: () => void
+  /** Grid only: the rendered media's natural size, so a tile with no http URL
+   *  (vault/magnet/p2p) can still be measured for the justified layout. */
+  onLoadSize?: (w: number, h: number) => void
   /** Invoked whenever loading state changes */
   onLoadingChange?: (loading: boolean) => void
   /**
@@ -144,6 +147,7 @@ export function ObjectImage({
   onMediaUnavailable,
   hideUnavailable = false,
   onLoad,
+  onLoadSize,
   onLoadingChange,
   unavailableTimeoutMs = DEFAULT_UNAVAILABLE_TIMEOUT_MS,
 }: ObjectImageProps) {
@@ -346,8 +350,9 @@ export function ObjectImage({
       playsInline={playsInline}
       preload={preload}
       data-media-url={contentUrl || undefined}
-      onLoadedData={() => {
+      onLoadedData={(e) => {
         onLoad?.()
+        onLoadSize?.(e.currentTarget.videoWidth, e.currentTarget.videoHeight)
         onLoadingChange?.(false)
       }}
       onError={(_e) => {
@@ -370,8 +375,9 @@ export function ObjectImage({
       decoding="async"
       fetchPriority={fetchPriority}
       data-media-url={contentUrl || undefined}
-      onLoad={() => {
+      onLoad={(e) => {
         onLoad?.()
+        onLoadSize?.(e.currentTarget.naturalWidth, e.currentTarget.naturalHeight)
         onLoadingChange?.(false)
       }}
       onError={(_e) => {

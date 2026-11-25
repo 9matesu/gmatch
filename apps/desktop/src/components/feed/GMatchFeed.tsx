@@ -40,6 +40,8 @@ import type { OrbitObject as StoryItem } from '@orbit/shared';
 import { generateFallbackName } from '@orbit/shared';
 import { countHidden, isRenderable } from './isRenderable';
 import { hasInlineMedia } from './mediaReadiness';
+import { getLocalObject, PEER_ONLINE_EVENT } from '../../utils/p2pSwarm';
+import { resolveObjectRefId } from '../../utils/objectRef';
 import { FeedGrid } from './FeedGrid';
 import { GMatchStories } from '../GMatchStories';
 import { PostComments } from './PostComments';
@@ -579,11 +581,23 @@ function GMatchFeedImpl({
   const [deadPosts, setDeadPosts] = useState<Set<string>>(new Set());
   // A row with NO words is only content once its bytes are real. Until then it
   // must not appear (and must not flash): it renders hidden, off the visible
-  // list, and is promoted by the media itself. A failure drops it for good
-  // (`hidePost`), so a post never sits in the timeline as an empty frame.
+  // list, and is promoted by the media itself.
+  //
+  // The media state is REVERSIBLE: a post whose bytes cannot be resolved yet is
+  // `dead` (hidden), but the moment the bytes arrive — a local read, a signed
+  // fetch, or a peer that came online with the bytes — `promoteMedia` clears
+  // `dead` and the row REAPPEARS. A one-way `deadPosts` set used to hide a post
+  // for the rest of the session even after its bytes landed ("appears, then
+  // gone for good").
   const [mediaReady, setMediaReady] = useState<Set<string>>(new Set());
   const promoteMedia = useCallback((id: string) => {
     setMediaReady((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+    setDeadPosts((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
   }, []);
   const hidePost = useCallback((id: string) => {
     setDeadPosts((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
@@ -607,6 +621,34 @@ function GMatchFeedImpl({
     return () => { live = false; };
   }, [posts, mediaReady, deadPosts, promoteMedia, hidePost]);
 
+  // Reversible hide: a dead post is re-checked when a peer comes online (the
+  // swarm may have just seeded its bytes locally). If the bytes are now held —
+  // inline, or in the vault/IndexedDB — the row is promoted back. Without this
+  // a hidden row could never reappear, because its tile is unmounted and can no
+  // longer fire `onLoad` itself.
+  useEffect(() => {
+    if (deadPosts.size === 0) return;
+    let live = true;
+    const recheck = () => {
+      for (const id of deadPosts) {
+        const post = posts.find((p) => p.id === id);
+        if (!post) continue;
+        if (hasInlineMedia(post)) { promoteMedia(id); continue; }
+        const url = post.media?.[0]?.url || post.url;
+        const oid = resolveObjectRefId(url) || post.media?.[0]?.id || post.id;
+        if (!oid) continue;
+        void getLocalObject(oid).then((blob) => {
+          if (live && blob) promoteMedia(id);
+        }).catch(() => { /* still no bytes */ });
+      }
+    };
+    window.addEventListener(PEER_ONLINE_EVENT, recheck);
+    return () => {
+      live = false;
+      window.removeEventListener(PEER_ONLINE_EVENT, recheck);
+    };
+  }, [deadPosts, posts, promoteMedia]);
+
   const hiddenCount = useMemo(() => countHidden(posts), [posts]);
   /** How many rows the projection actually produced — the count the empty copy
    *  needs, computed once instead of re-deriving it inside the memo. */
@@ -617,12 +659,13 @@ function GMatchFeedImpl({
   const visiblePosts = useMemo(
     () => posts.filter((p) => {
       if (p.is_archived) return false;
-      // A captioned post whose media is dead stays (it still has content).
-      if (deadPosts.has(p.id) && !p.caption?.trim()) return false;
+      // A dead post is hidden (reversibly): `promoteMedia` brings it back the
+      // moment its bytes resolve, so this is not a permanent drop.
+      if (deadPosts.has(p.id)) return false;
       // No words, no url, no media = no post. Never a card, never a slot.
       if (!isRenderable(p)) return false;
       // Words carry the row on their own. Bytes that are already inline
-      // (data:/blob:) need no probe; anything else must arrive first.
+      // (data:/blob:/vault:) need no probe; anything else must arrive first.
       if (!p.caption?.trim() && !mediaReady.has(p.id) && !hasInlineMedia(p)) return false;
       return true;
     }),
@@ -1138,11 +1181,12 @@ function GMatchFeedImpl({
                likeCounts={likeCounts}
                onToggleLike={toggleLike}
                onOpen={toggleExpand}
+               onMediaReady={promoteMedia}
+               onMediaDead={hidePost}
              />
            ) : (
              <>
            {windowedPosts.map((post, _idx) => {
-              if (deadPosts.has(post.id)) return null;
             const isLiked = !!likedPosts[post.id];
             const isSaved = !!savedPosts[post.id];
              const currentLikes = likeCounts[post.id] ?? post.like_count ?? 0;

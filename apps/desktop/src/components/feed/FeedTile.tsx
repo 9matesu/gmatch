@@ -13,6 +13,11 @@ export interface FeedTileProps {
   likes: number
   onOpen: (post: FeedPost) => void
   onToggleLike: (post: FeedPost) => void
+  /** Grid only: report the rendered media's natural size so the tile can be
+   *  measured (a descriptor/vault post has no http URL to probe). */
+  onMediaLoad?: (w: number, h: number) => void
+  /** Grid only: the media could not be resolved (reversible hide). */
+  onMediaUnavailable?: () => void
 }
 
 /**
@@ -25,7 +30,7 @@ export interface FeedTileProps {
  * a button. The open button is the card's accessible name; the like sits above
  * it in the stacking order so it stays clickable.
  */
-export const FeedTile = memo(function FeedTile({ post, identity, liked, likes, onOpen, onToggleLike }: FeedTileProps) {
+export const FeedTile = memo(function FeedTile({ post, identity, liked, likes, onOpen, onToggleLike, onMediaLoad, onMediaUnavailable }: FeedTileProps) {
   const url = post.media?.[0]?.url || post.url
   const mime = post.media?.[0]?.mime_type || post.mime_type
   const isObject =
@@ -60,6 +65,8 @@ export const FeedTile = memo(function FeedTile({ post, identity, liked, likes, o
             className="h-full w-full object-cover"
             videoClassName="h-full w-full object-cover"
             hideUnavailable
+            onLoadSize={onMediaLoad}
+            onMediaUnavailable={onMediaUnavailable}
           />
         ) : (
           <img
@@ -68,6 +75,8 @@ export const FeedTile = memo(function FeedTile({ post, identity, liked, likes, o
             loading="lazy"
             decoding="async"
             className="h-full w-full object-cover"
+            onLoad={(e) => onMediaLoad?.(e.currentTarget.naturalWidth, e.currentTarget.naturalHeight)}
+            onError={() => onMediaUnavailable?.()}
           />
         )
       ) : null}
