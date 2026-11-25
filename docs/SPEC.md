@@ -491,6 +491,19 @@ product path.
   copy swaps in; the gallery grid does the same per tile (`vaultPending` until
   the vault lookup + `vault://`→http resolution settle). A no-copy image reveals
   as soon as the lookup returns.
+- **The vault guard waits for ITS OWN lookup (2026-11-25).** The flicker guard
+  read a MODULE-level `vaultLookupSettled` set, sticky for the whole session: once
+  a url had been looked up — even on a PREVIOUS visit to the gallery — every later
+  mount of it read as "settled" the moment it appeared, so the remote frame
+  painted while the local copy was still on its way and the local copy swapped in
+  under the player's eyes ("the vault still flickers"). Two changes, one rule:
+  the settled flag is now PER MOUNT (`useVaultUrlLookups` returns
+  `{ urls, settled }`; `settled` only lists urls THIS mount resolved), and
+  `ObjectImage` runs ONE lookup (`useVaultLookup`) instead of two independent
+  `vaultGet` calls. The two calls could resolve in any order — the reveal gate
+  could open while `src` was still the remote URL — so the URL and the gate can
+  no longer disagree. A url with no local copy reveals as soon as its own lookup
+  answers.
 - **Clicker + tag-browser videos actually play (2026-11-25).** The Goon Panel
   `<video>` (single foe and grid) and the Tag Browser grid `<video>` use
   `autoPlay` + `preload="auto"` (muted, loop, playsInline) so a motion foe/clip

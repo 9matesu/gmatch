@@ -18,6 +18,13 @@ vi.mock('../../services/vault', async (importOriginal) => {
   return {
     ...mod,
     useVaultUrls: () => vaultMap,
+    // The gallery reads the PER-MOUNT settled set: a url is only "settled"
+    // once THIS mount's lookup answered. The mock answers immediately, so
+    // every requested url is settled from the first render.
+    useVaultUrlLookups: (urls: Array<string | null | undefined>) => ({
+      urls: vaultMap,
+      settled: new Set((urls ?? []).filter((u): u is string => !!u)),
+    }),
     useVaultUrl: () => null,
     useVaultHttpUrls: () => vaultHttpMap,
   }

@@ -10,7 +10,7 @@ import CachedImg from '../../ui/CachedImg'
 import MediaViewerModal from '../../ui/MediaViewerModal'
 import { EmptyState } from '../EmptyState'
 import { Button, Tabs, Title } from '../../ui/kit'
-import { useVaultUrls, useVaultUrl, useVaultHttpUrls, vaultLookupSettled, vaultForgetFailure, vaultOptIn } from '../../services/vault'
+import { useVaultUrlLookups, useVaultUrl, useVaultHttpUrls, vaultForgetFailure, vaultOptIn } from '../../services/vault'
 import { resolveKeepsakeLocal, resolveLocalMedia, retainLocalUrl, releaseLocalUrl, markLocalLookupSettled, keepsakeLocalSettled, type KeepsakeLocal } from '../../services/keepsake'
 import { SlideshowPlayer, type ResolvedItem } from '../slideshows/SlideshowPlayer'
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer'
@@ -529,7 +529,15 @@ export default function IdleGalleryView({
   }, [sortedGallery, safePage])
 
   // Local vault (opt-in): render pinned bytes from disk instead of remote.
-  const vaultUrls = useVaultUrls(paginatedGallery.map((g) => g.url))
+  //
+  // The per-mount `settled` set is what makes the flicker guard honest: it
+  // says "THIS mount's lookup for this url has answered". The old guard used
+  // the module-level `vaultLookupSettled`, which is sticky across visits — so
+  // on the second visit to the gallery a tile read as settled the moment it
+  // mounted, the remote frame painted, and the local copy swapped in under
+  // the player's eyes.
+  const vaultLookups = useVaultUrlLookups(paginatedGallery.map((g) => g.url))
+  const vaultUrls = vaultLookups.urls
   // Phase 5: local bytes from the swarm store (covers dev / vault-off).
   const localUrls = useKeepsakeLocalUrls(paginatedGallery, vaultUrls)
   // Viewer may sit outside the current page; resolve its url separately.
@@ -955,13 +963,13 @@ export default function IdleGalleryView({
               const isMotion = img.kind === 'video'
               const isSelected = selectedIds.has(img.id)
               const tileUrl = getTileUrl(img)
-              // Vault flicker guard: while the local vault lookup is still
-              // resolving (or a vault:// ref has not become a playable http
-              // url yet), keep the tile invisible instead of flashing the
+              // Vault flicker guard: while THIS mount's local vault lookup is
+              // still resolving (or a vault:// ref has not become a playable
+              // http url yet), keep the tile invisible instead of flashing the
               // remote frame first. Layout is held by the aspect-square parent.
               const vaultPending =
                 vaultOptIn() &&
-                (!vaultLookupSettled(img.url || '') || tileUrl.startsWith('vault://'))
+                (!vaultLookups.settled.has(img.url || '') || tileUrl.startsWith('vault://'))
               // A record that CLAIMS persisted bytes but whose lookup finished
               // with nothing (evicted vault / cleared object store / unreadable
               // row) must say so and offer a retry — the tile used to render a
@@ -970,7 +978,7 @@ export default function IdleGalleryView({
                 img.saveState === 'persisted' &&
                 !vaultUrls[img.url || ''] &&
                 !localUrls[img.url || ''] &&
-                vaultLookupSettled(img.url || '') &&
+                vaultLookups.settled.has(img.url || '') &&
                 keepsakeLocalSettled(img.localRef || img.url)
 
               return (

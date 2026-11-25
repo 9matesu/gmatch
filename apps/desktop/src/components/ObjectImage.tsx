@@ -6,7 +6,7 @@ import { isMediaVideo, resolveMediaUrl } from '../utils/media'
 import { resolveObjectRefId } from '../utils/objectRef'
 import { useObjectImage, evictObjectImage } from '../hooks/useObjectImage'
 import { NativeVideoPlayer } from './media/NativeVideoPlayer'
-import { useVaultUrl, useVaultHttpUrls, vaultGet, vaultOptIn } from '../services/vault'
+import { useVaultLookup, useVaultHttpUrls, vaultOptIn } from '../services/vault'
 import { resolveImage, devFetchable, cachedImageFor } from '../services/imageCache'
 
 interface IdentityLike {
@@ -217,7 +217,16 @@ export function ObjectImage({
   }
 
   // Local vault (opt-in): for direct http(s) content, prefer pinned bytes.
-  const vaultSrc = useVaultUrl(!signed && /^https?:/i.test(baseSrc) ? baseSrc : null)
+  //
+  // ONE lookup drives BOTH the URL and the reveal gate. They used to be two
+  // independent `vaultGet` calls (one for the URL, one for "is it settled?"),
+  // and the two promises resolve in any order — so the gate could open while
+  // `src` was still the remote URL: the remote frame flashed and the media
+  // then reloaded from the local copy. One promise, one answer: the URL and
+  // the settled flag can never disagree.
+  const vaultEligible = !signed && /^https?:/i.test(baseSrc) && vaultOptIn()
+  const vault = useVaultLookup(vaultEligible ? baseSrc : null)
+  const vaultSrc = vault.local
 
   // Resolve direct remote images through disk cache (gmcache://) when offline/available
   useEffect(() => {
@@ -249,21 +258,7 @@ export function ObjectImage({
   // flashes before the local copy swaps in. The element stays mounted (its
   // layout is reserved); only opacity is gated, and only for the few ms the
   // local IPC takes — a no-copy image reveals as soon as the lookup returns.
-  const vaultEligible = !signed && /^https?:/i.test(baseSrc) && vaultOptIn()
-  const [vaultSettled, setVaultSettled] = useState(!vaultEligible)
-  useEffect(() => {
-    if (!vaultEligible) {
-      setVaultSettled(true)
-      return
-    }
-    let live = true
-    setVaultSettled(false)
-    void vaultGet(baseSrc)
-      .catch(() => null)
-      .finally(() => { if (live) setVaultSettled(true) })
-    return () => { live = false }
-  }, [vaultEligible, baseSrc])
-  const vaultPending = vaultEligible && !vaultSettled
+  const vaultPending = vaultEligible && !vault.settled
 
   // A direct provider URL may fail while its IPC/vault copy is still being
   // resolved. When that resolution swaps `src` to the local copy, clear the

@@ -24,6 +24,9 @@ vi.mock('../hooks/useObjectImage', () => ({
 }))
 vi.mock('../services/vault', () => ({
   useVaultUrl: () => null,
+  // ONE lookup drives both the URL and the reveal gate. The vault is off in
+  // these tests, so the lookup is settled with no local copy from the start.
+  useVaultLookup: () => ({ local: null, settled: true }),
   useVaultHttpUrls: () => ({}),
   vaultGet: async () => null,
   vaultOptIn: () => false,
