@@ -12,6 +12,19 @@ import { MUTED } from '../../ui/styles'
 
 const PAGE_LIMIT = 30
 
+/** Providers the browser can pin to (the main process owns the real list). */
+const SOURCE_OPTIONS: { id: string; label: string }[] = [
+  { id: '', label: 'All sources' },
+  { id: 'imhentai', label: 'imhentai' },
+  { id: 'tbib', label: 'tbib' },
+  { id: 'xbooru', label: 'xbooru' },
+  { id: 'realbooru', label: 'realbooru' },
+  { id: 'paheal', label: 'paheal' },
+  { id: 'redgifs', label: 'redgifs' },
+  { id: 'babesource', label: 'babesource' },
+  { id: 'mediaq', label: 'mediaq' },
+]
+
 /**
  * Tag-picker gallery browser.
  *
@@ -34,6 +47,7 @@ export default function TagBrowser({ onClose }: { onClose?: () => void }) {
   const [loading, setLoading] = useState(false)
   const [viewerId, setViewerId] = useState<string | null>(null)
   const [retry, setRetry] = useState(0)
+  const [source, setSource] = useState('')
 
   // Discards stale responses: a slow round must not overwrite a newer one.
   const requestRef = useRef(0)
@@ -59,7 +73,7 @@ export default function TagBrowser({ onClose }: { onClose?: () => void }) {
     }
     const reqId = ++requestRef.current
     setLoading(true)
-    void fetchPosts({ tags: query, limit: PAGE_LIMIT, silent: true })
+    void fetchPosts({ tags: query, limit: PAGE_LIMIT, silent: true, source: source || undefined })
       .then((res) => {
         if (reqId !== requestRef.current) return // a newer query won
         const clean = dedupePosts(res.posts || [])
@@ -72,7 +86,7 @@ export default function TagBrowser({ onClose }: { onClose?: () => void }) {
       .finally(() => {
         if (reqId === requestRef.current) setLoading(false)
       })
-  }, [query, retry])
+  }, [query, retry, source])
 
   const viewer = viewerId ? posts.find((p) => p.id === viewerId) || null : null
 
@@ -94,6 +108,16 @@ export default function TagBrowser({ onClose }: { onClose?: () => void }) {
             </button>
           )}
         </div>
+        <select
+          value={source}
+          onChange={(e) => setSource(e.target.value)}
+          aria-label="Search source"
+          className="mb-2 w-full cursor-pointer rounded-md border border-edge bg-retro-bg px-2 py-1 text-xs text-retro-fg focus:outline-none focus:border-retro-accent"
+        >
+          {SOURCE_OPTIONS.map((s) => (
+            <option key={s.id} value={s.id}>{s.label}</option>
+          ))}
+        </select>
         {owned.length === 0 ? (
           <p className={`${MUTED} text-xs`}>Own tags in the Tag Market first; they seed the picker.</p>
         ) : (

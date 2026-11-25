@@ -98,7 +98,7 @@ function createFetchBooru({ sources, httpGet, cache, blocked = () => false, dead
     }
   }
 
-  return async function fetchBooru({ tags, limit, allowReal, allowHentai, fresh, probe, page }) {
+  return async function fetchBooru({ tags, limit, allowReal, allowHentai, fresh, probe, page, source }) {
     const query = String(tags ?? '').trim()
     const n = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 100)
     if (!query || blocked(query)) {
@@ -113,7 +113,11 @@ function createFetchBooru({ sources, httpGet, cache, blocked = () => false, dead
 
     // READ the memo fetchBooru already writes if fresh isn't requested.
     // # ponytail: fresh=true bypasses 10-minute memo so idle loop gets new images
-    const memo = !fresh ? cache?.getFeedCache?.(query) : null
+    // A specific source was requested (the tag browser's source picker): the
+    // memo is per-query, not per-source, so skip it and narrow the pool to that
+    // one provider — otherwise a fast mirror would answer and imhentai (a slow
+    // phase-2 scraper) would never be reached.
+    const memo = !fresh && !source ? cache?.getFeedCache?.(query) : null
     if (memo && memo.length > 0) {
       metrics?.round({ totalMs: Date.now() - roundStart, resultCount: memo.length, fromCache: true, source: 'cache' })
       return { posts: memo, source: 'cache', ok: true, query, cached: true }
@@ -125,6 +129,7 @@ function createFetchBooru({ sources, httpGet, cache, blocked = () => false, dead
     // (mediaq serves both) queries only the sites the player enabled.
     const fetchOpts = { deterministic, allowReal: useReal, allowHentai: useHentai }
     const filtered = sources.filter((s) => {
+      if (source && s.id !== source) return false
       const cats = categoriesOf(s)
       if (cats.length === 0) return true
       // Include a provider if it serves AT LEAST ONE enabled category — a

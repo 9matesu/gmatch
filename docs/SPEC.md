@@ -401,6 +401,15 @@ product path.
   (dozens of old rows) could read "Loading media…" for the life of the session.
   A hard cap (`HARD_UNAVAILABLE_CAP_MS` = 30s) now applies when bytes are still
   expected; an explicit budget (a 5s story) still wins.
+- **The tag browser can pin a source (2026-11-25).** A source picker (All +
+  imhentai/tbib/xbooru/…) passes `source` through `fetchPosts` to the main
+  `createFetchBooru`, which narrows the pool to that provider and skips the
+  per-query memo — so imhentai (a slow phase-2 scraper a fast mirror would
+  otherwise beat) actually answers when selected.
+- **Delete logs the truth and retries a busy node (2026-11-25).**
+  `deletePostOnServer` logs `status outcome nodeBacked` for every delete and
+  retries once on 503/408/425/429, so a delete that "came back" is diagnosable
+  from `main.log` instead of silent.
 - **The tag browser trusts the main gate (2026-11-25).** The browser fetches with
   `silent:true`, and the renderer re-ran its stricter `sanitize()` on the main
   process's already-gated results — imhentai's small gallery covers were dropped,

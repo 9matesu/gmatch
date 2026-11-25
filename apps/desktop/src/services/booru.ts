@@ -59,6 +59,8 @@ export interface BooruRequest {
    * own pool from the feed or stuff the reshow ledger with unseen pictures.
    */
   silent?: boolean
+  /** Query one provider by id (tag browser source picker, e.g. 'imhentai'). */
+  source?: string
 }
 
 export interface BooruResponse {

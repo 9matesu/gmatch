@@ -1735,12 +1735,19 @@ export default function Home() {
       }
     } catch { /* outbox unavailable (private mode): fall through to the node */ }
     try {
-      const res = await orbitFetch(`/api/posts/${postId}`, { method: 'DELETE' }, identity)
-      const outcome = deleteOutcomeForStatus(res.status, { nodeBacked: nodePostIdsRef.current.has(postId) })
+      const nodeBacked = nodePostIdsRef.current.has(postId)
+      let res = await orbitFetch(`/api/posts/${postId}`, { method: 'DELETE' }, identity)
+      // A busy/waking node can answer 503/408/425/429 on a delete that would
+      // otherwise succeed: retry once before reporting failure.
+      if ([503, 408, 425, 429].includes(res.status)) {
+        await new Promise((r) => setTimeout(r, 300))
+        res = await orbitFetch(`/api/posts/${postId}`, { method: 'DELETE' }, identity)
+      }
+      const outcome = deleteOutcomeForStatus(res.status, { nodeBacked })
+      logger.warn(`[App] DELETE /api/posts/${postId} -> ${res.status} ${outcome} (nodeBacked=${nodeBacked})`)
       if (outcome === 'failed') {
         // The node never confirmed: keep the row so the user sees the truth
         // instead of a tile that reappears on the next refresh.
-        logger.warn('[App] DELETE /api/posts/:id failed', res.status)
         return 'failed'
       }
       if (outcome === 'local') {
