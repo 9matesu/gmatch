@@ -1230,9 +1230,18 @@ function GMatchFeedImpl({
                   </div>
                 </div>
 
+                {/* Written body sits ABOVE the media, directly under the author
+                    line, so the username + post data read as one block before
+                    the picture (the old card/image header is gone). */}
+                {post.caption ? (
+                  <p className="px-3 pt-1 pb-2 text-xs leading-snug text-retro-body whitespace-pre-wrap break-words">
+                    <Linkify text={post.caption} />
+                  </p>
+                ) : null}
+
                 {/* Media. A post with no bytes at all renders nothing here
                     (no empty frame, no "No preview"). The written body sits
-                    BELOW the image (see after the media block). */}
+                    ABOVE the image (see above). */}
                 {!post.url && !post.localPreviewUrl ? null : (() => {
                   const activeItem = multiMedia ? multiMedia[currentIdx] : null;
                   const activeUrl = activeItem ? activeItem.url : post.url;
@@ -1457,13 +1466,6 @@ function GMatchFeedImpl({
                     </div>
                   );
                 })()}
-
-                {/* Written body BELOW the image, smaller type. */}
-                {post.caption ? (
-                  <p className="px-3 pt-2 text-xs leading-snug text-retro-body whitespace-pre-wrap break-words">
-                    <Linkify text={post.caption} />
-                  </p>
-                ) : null}
 
                 {/* Action row: no fill, no separator — it sits directly under
                     the media so the whole tile reads as one object. */}
@@ -1743,6 +1745,13 @@ function GMatchFeedImpl({
             {/* Post detail (like the profile photo sidebar) with footer clearance
                 so the bottom nav never covers the last row. */}
             <div className="pb-24 space-y-3">
+              {/* Author + data, then the written body, both ABOVE the media —
+                  the same order as the timeline card. */}
+              {expandedPost.caption ? (
+                <p className="text-xs leading-snug text-retro-body whitespace-pre-wrap break-words">
+                  <Linkify text={expandedPost.caption} />
+                </p>
+              ) : null}
               {(() => {
                 const m = expandedPost.media?.[0];
                 const url = m?.url || expandedPost.url;
@@ -1763,11 +1772,6 @@ function GMatchFeedImpl({
                   </div>
                 );
               })()}
-              {expandedPost.caption ? (
-                <p className="text-xs leading-snug text-retro-body whitespace-pre-wrap break-words">
-                  <Linkify text={expandedPost.caption} />
-                </p>
-              ) : null}
               <div className="flex items-center gap-1">
                 <button type="button" onClick={() => toggleLike(expandedPost)} aria-label="Like post" className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer">
                   <Heart className={`w-4 h-4 stroke-[1.75] ${likedPosts[expandedPost.id] ? 'text-danger-fg fill-danger' : 'text-retro-muted hover:text-retro-fg'}`} />

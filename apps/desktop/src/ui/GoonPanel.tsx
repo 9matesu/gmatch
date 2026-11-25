@@ -554,11 +554,11 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                     className={GOON_IMAGE}
                     src={redgifsPlayable(cell.post.url)}
                     poster={cell.post.preview ? redgifsPlayable(cell.post.preview) : undefined}
-                    autoPlay={false}
+                    autoPlay
                     loop
                     muted
                     playsInline
-                    preload="metadata"
+                    preload="auto"
                     controls={reduceMotion}
                     onError={() => dropCell(i)}
                   />
@@ -718,11 +718,11 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               className={`${GOON_IMAGE} relative z-[3]`}
               src={redgifsPlayable(current.url)}
               poster={current.preview ? redgifsPlayable(current.preview) : undefined}
-              autoPlay={false}
+              autoPlay
               loop
               muted
               playsInline
-              preload="metadata"
+              preload="auto"
               controls={reduceMotion}
               onError={onImageError}
             />

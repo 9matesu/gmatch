@@ -25,6 +25,8 @@ vi.mock('../hooks/useObjectImage', () => ({
 vi.mock('../services/vault', () => ({
   useVaultUrl: () => null,
   useVaultHttpUrls: () => ({}),
+  vaultGet: async () => null,
+  vaultOptIn: () => false,
 }))
 
 import { ObjectImage } from './ObjectImage'

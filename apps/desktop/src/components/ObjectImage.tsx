@@ -6,7 +6,7 @@ import { isMediaVideo, resolveMediaUrl } from '../utils/media'
 import { resolveObjectRefId } from '../utils/objectRef'
 import { useObjectImage, evictObjectImage } from '../hooks/useObjectImage'
 import { NativeVideoPlayer } from './media/NativeVideoPlayer'
-import { useVaultUrl, useVaultHttpUrls } from '../services/vault'
+import { useVaultUrl, useVaultHttpUrls, vaultGet, vaultOptIn } from '../services/vault'
 import { resolveImage, devFetchable, cachedImageFor } from '../services/imageCache'
 
 interface IdentityLike {
@@ -244,6 +244,27 @@ export function ObjectImage({
   useEffect(() => { setShownSrc(null) }, [objectId, contentUrl])
   const renderSrc = shownSrc || src
 
+  // Vault flicker guard: for an opted-in http(s) source, hold the media
+  // invisible until the local vault lookup settles, so a remote frame never
+  // flashes before the local copy swaps in. The element stays mounted (its
+  // layout is reserved); only opacity is gated, and only for the few ms the
+  // local IPC takes — a no-copy image reveals as soon as the lookup returns.
+  const vaultEligible = !signed && /^https?:/i.test(baseSrc) && vaultOptIn()
+  const [vaultSettled, setVaultSettled] = useState(!vaultEligible)
+  useEffect(() => {
+    if (!vaultEligible) {
+      setVaultSettled(true)
+      return
+    }
+    let live = true
+    setVaultSettled(false)
+    void vaultGet(baseSrc)
+      .catch(() => null)
+      .finally(() => { if (live) setVaultSettled(true) })
+    return () => { live = false }
+  }, [vaultEligible, baseSrc])
+  const vaultPending = vaultEligible && !vaultSettled
+
   // A direct provider URL may fail while its IPC/vault copy is still being
   // resolved. When that resolution swaps `src` to the local copy, clear the
   // previous URL's error instead of leaving a good cached image hidden.
@@ -364,6 +385,7 @@ export function ObjectImage({
       controls={false}
       playsInline={playsInline}
       preload={preload}
+      style={vaultPending ? { opacity: 0 } : undefined}
       data-media-url={contentUrl || undefined}
       onLoadedData={(e) => {
         onLoad?.()
@@ -390,6 +412,7 @@ export function ObjectImage({
       loading={loading}
       decoding="async"
       fetchPriority={fetchPriority}
+      style={vaultPending ? { opacity: 0 } : undefined}
       data-media-url={contentUrl || undefined}
       onLoad={(e) => {
         onLoad?.()
