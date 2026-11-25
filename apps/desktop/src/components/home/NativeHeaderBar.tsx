@@ -126,7 +126,7 @@ export function NativeHeaderBar({
           <div className="flex items-center gap-0.5 ml-1 border-l border-edge pl-1.5">
             <button
               type="button"
-              onClick={window.gmatch.winMinimize}
+              onClick={() => window.gmatch?.winMinimize?.()}
               className="p-1.5 rounded-md hover:bg-glass-w10 hover:text-retro-fg transition-colors cursor-pointer"
               aria-label="Minimize window"
             >
@@ -134,7 +134,7 @@ export function NativeHeaderBar({
             </button>
             <button
               type="button"
-              onClick={window.gmatch.winToggleMaximize}
+              onClick={() => window.gmatch?.winToggleMaximize?.()}
               className="p-1.5 rounded-md hover:bg-glass-w10 hover:text-retro-fg transition-colors cursor-pointer"
               aria-label="Maximize window"
             >
@@ -142,7 +142,7 @@ export function NativeHeaderBar({
             </button>
             <button
               type="button"
-              onClick={window.gmatch.winClose}
+              onClick={() => window.gmatch?.winClose?.()}
               className="p-1.5 rounded-md hover:bg-retro-error hover:text-retro-fg transition-colors cursor-pointer"
               aria-label="Close window"
             >
