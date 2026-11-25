@@ -54,6 +54,7 @@ import { resolveObjectRefId } from "./utils/objectRef";
 import { reconcilePublishedPost } from "./utils/feedPublish";
 import { useStableCallback } from "./hooks/useStableCallback";
 import { PEER_ONLINE_EVENT } from "./utils/p2pSwarm";
+import { readCachedFeed, writeCachedFeed } from "./features/feed/feedSnapshotCache";
 import { localHeldMediaUrl } from "./utils/localMedia";
 import { GMatchDMs } from "./components/chat/GMatchDMs";
 import { toChatPeer, type ChatPeer } from "./components/chat/chatPeer";
@@ -1722,6 +1723,23 @@ export default function Home() {
    */
   const deletePostOnServer = useCallback(async (postId: string): Promise<'deleted' | 'local' | 'failed'> => {
     if (!identity) return 'failed'
+    // Purge every DURABLE local copy too. Removing only the React row is what
+    // made a deleted post "come back on every restart": the stale feed snapshot
+    // (`gmatch.feed.snapshot.v1:*`), the P2P gallery mirror and IndexedDB still
+    // held it, so the next boot re-hydrated it.
+    const purgeLocal = () => {
+      try {
+        const snap = readCachedFeed(identity.orbitId);
+        if (snap) writeCachedFeed(identity.orbitId, snap.posts.filter((p) => p.id !== postId));
+      } catch { /* cache unavailable */ }
+      try {
+        const g = JSON.parse(localStorage.getItem('orbit_p2p_gallery') || '[]');
+        if (Array.isArray(g)) {
+          localStorage.setItem('orbit_p2p_gallery', JSON.stringify(g.filter((x: any) => x?.id !== postId)));
+        }
+      } catch { /* private mode */ }
+      void deleteObject(postId).catch(() => { /* not in IndexedDB */ });
+    };
     // Local-only: an outbox row that never reached a node is this device's own
     // copy, so removing it IS the delete (no request, nothing to 404). A
     // `replicated` entry is on a node — deleting it locally without the node
@@ -1731,6 +1749,7 @@ export default function Home() {
       const entry = removeOutboxEntry(postId)
       if (entry && entry.state !== 'replicated') {
         setServerPosts(prev => prev.filter(p => p.id !== postId))
+        purgeLocal()
         return 'local'
       }
     } catch { /* outbox unavailable (private mode): fall through to the node */ }
@@ -1754,6 +1773,7 @@ export default function Home() {
         logger.warn('[App] DELETE /api/posts/:id unreachable; treating local post as removed', res.status)
       }
       setServerPosts(prev => prev.filter(p => p.id !== postId))
+      purgeLocal()
       return outcome
     } catch (err) {
       logger.warn('[App] DELETE /api/posts/:id threw', err)
