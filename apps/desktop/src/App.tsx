@@ -1722,11 +1722,14 @@ export default function Home() {
    */
   const deletePostOnServer = useCallback(async (postId: string): Promise<'deleted' | 'local' | 'failed'> => {
     if (!identity) return 'failed'
-    // Local-only: an outbox row is this device's own copy, so the delete is the
-    // removal. No network call, and nothing to 404.
+    // Local-only: an outbox row that never reached a node is this device's own
+    // copy, so removing it IS the delete (no request, nothing to 404). A
+    // `replicated` entry is on a node — deleting it locally without the node
+    // call is exactly why a deleted post "came back" on the next snapshot.
     try {
       const { removeOutboxEntry } = await import('./services/postOutbox')
-      if (removeOutboxEntry(postId)) {
+      const entry = removeOutboxEntry(postId)
+      if (entry && entry.state !== 'replicated') {
         setServerPosts(prev => prev.filter(p => p.id !== postId))
         return 'local'
       }
@@ -1850,7 +1853,10 @@ export default function Home() {
     if (!identity) return
     let cancelled = false
     const flush = async () => {
-      const { flushPostOutbox } = await import('./services/postOutbox')
+      const { flushPostOutbox, rearmMissingReplicated } = await import('./services/postOutbox')
+      // A post replicated to a retired host is not on THIS node: re-arm it so
+      // the flush registers it here instead of skipping it as replicated.
+      await rearmMissingReplicated(identity).catch(() => { })
       const summary = await flushPostOutbox(identity).catch(() => null)
       if (cancelled || !summary) return
       if (summary.registered > 0 || summary.replicated > 0) {

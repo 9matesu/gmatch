@@ -103,15 +103,46 @@ export function removeOutboxEntry(objectId: string): PostOutboxEntry | null {
   return found
 }
 
-export function setOutboxState(objectId: string, state: OutboxState): void {
+export function setOutboxState(objectId: string, state: OutboxState, force = false): void {
   const list = readAll();
   const found = list.find((e) => e.objectId === objectId);
   if (!found) return;
   // Monotonic: states only advance (retries never move replicated backwards).
-  if (rank[state] < rank[found.state]) return;
+  // `force` is the one exception: a re-arm deliberately moves a replicated entry
+  // back to pending when the current node does not hold the object.
+  if (!force && rank[state] < rank[found.state]) return;
   found.state = state;
   found.updatedAt = Date.now();
   writeAll(list);
+}
+
+/** Ids already re-armed this session (a re-arm costs one node probe each). */
+const rearmChecked = new Set<string>();
+
+/**
+ * Re-arm replicated entries whose object is NOT on the current node.
+ *
+ * A post replicated to a retired host (the old `fly.dev`) is marked `replicated`
+ * and `flushPostOutbox` skips it forever — so it never reaches THIS node and the
+ * timeline never shows it. Probe the current node once per entry; a 404 means the
+ * row is not here, so move it back to `pending` and let the normal flush register
+ * it locally. Bounded and session-idempotent.
+ */
+export async function rearmMissingReplicated(
+  identity: OrbitIdentityLike,
+  max = 50,
+): Promise<void> {
+  for (const e of listOutbox()) {
+    if (rearmChecked.size >= max) break;
+    if (e.state !== 'replicated' || rearmChecked.has(e.objectId)) continue;
+    rearmChecked.add(e.objectId);
+    try {
+      const res = await orbitFetch(`/api/objects/${e.objectId}`, {}, identity);
+      if (res.status === 404) setOutboxState(e.objectId, 'pending', true);
+    } catch {
+      /* node unreachable: leave it replicated, retry on the next boot */
+    }
+  }
 }
 
 function bumpAttempts(objectId: string): void {

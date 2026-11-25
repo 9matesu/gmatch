@@ -383,6 +383,24 @@ product path.
   then reloads once so `API_BASE` and the outbox target `http://127.0.0.1:8790`.
   This also covers a non-packaged run, where `server:state` returns `mode:'host'`
   with no `pausedReason`.
+- **A replicated post is re-armed onto THIS node (2026-11-25).** A post marked
+  `replicated` in `gmatch_post_outbox_v1` was replicated to a retired host
+  (`fly.dev`) and `flushPostOutbox` skipped it forever, so it never reached the
+  local node and never appeared in the timeline. On boot the flush now calls
+  `rearmMissingReplicated`: each `replicated` entry is probed once
+  (`GET /api/objects/:id`) and a 404 moves it back to `pending` (bounded, once
+  per session), so the normal flush registers it on `127.0.0.1:8790`.
+- **Deleting a replicated post deletes it on the node (2026-11-25).**
+  `deletePostOnServer` treated ANY outbox row as local-only and removed it
+  without a node call — but a `replicated` row IS on a node, so the row survived
+  and the next snapshot brought the post back ("deleted posts reappear"). Only a
+  `local`/`pending` entry is now a local delete; a `replicated` entry goes
+  through `DELETE /api/posts/:id` first.
+- **A stuck signed fetch gives up (2026-11-25).** `ObjectImage` had no ceiling
+  for a signed fetch still in flight, so a request queued behind the 3-slot pool
+  (dozens of old rows) could read "Loading media…" for the life of the session.
+  A hard cap (`HARD_UNAVAILABLE_CAP_MS` = 30s) now applies when bytes are still
+  expected; an explicit budget (a 5s story) still wins.
 - **Dead media rows hide and REAPPEAR when bytes arrive (2026-11-25).**
   `GMatchFeed` sets `hideUnavailable={true}` on timeline `ObjectImage`s and
   `visiblePosts` drops a row once `deadPosts` marks it, so legacy

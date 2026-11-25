@@ -61,6 +61,9 @@ export interface ObjectImageProps {
 
 /** Default strict-availability budget for unbounded surfaces. */
 const DEFAULT_UNAVAILABLE_TIMEOUT_MS = 6000
+/** Absolute ceiling for a signed fetch still in flight: after this the tile
+ *  gives up ("No preview") instead of loading forever behind the 3-slot pool. */
+const HARD_UNAVAILABLE_CAP_MS = 30_000
 
 const OBJECT_PATH = '/api/objects/'
 
@@ -251,23 +254,27 @@ export function ObjectImage({
   // Strict availability timeout: if media cannot be resolved or fails to load,
   // treat as unavailable so broken/loading containers collapse to 0 space.
   // A signed fetch that is still RUNNING is not "unavailable": the bytes can
-  // still arrive, and the hook owns that deadline. It may only time out when
-  // the caller set an explicit budget (a story must skip media that outlives
-  // the story) — otherwise every tile vanished mid-load, which reads as "the
-  // images disappeared".
+  // still arrive, and the hook owns that deadline. But it must not spin
+  // forever: a stuck/queued fetch (the 3-slot pool behind dozens of rows) gets a
+  // HARD CAP, after which the tile says "No preview" instead of "Loading…" for
+  // the life of the session. An explicit budget (a 5s story) still wins.
   const waitingForBytes = signed && !img.failed && !unresolvable
   const explicitBudget = unavailableTimeoutMs !== DEFAULT_UNAVAILABLE_TIMEOUT_MS
-  const budgetApplies = !waitingForBytes || explicitBudget
+  const budgetMs = explicitBudget
+    ? unavailableTimeoutMs
+    : waitingForBytes
+      ? Math.max(unavailableTimeoutMs, HARD_UNAVAILABLE_CAP_MS)
+      : unavailableTimeoutMs
   useEffect(() => {
-    if (src || hasError || !budgetApplies) return
+    if (src || hasError) return
     onLoadingChange?.(true)
     const timer = setTimeout(() => {
       setHasError(true)
       onMediaUnavailable?.()
       onLoadingChange?.(false)
-    }, unavailableTimeoutMs)
+    }, budgetMs)
     return () => clearTimeout(timer)
-  }, [src, hasError, budgetApplies, unavailableTimeoutMs, onMediaUnavailable, onLoadingChange])
+  }, [src, hasError, budgetMs, onMediaUnavailable, onLoadingChange])
 
   if (!src) {
     if (hideUnavailable && (signed ? img.failed || unresolvable : hasError)) return null

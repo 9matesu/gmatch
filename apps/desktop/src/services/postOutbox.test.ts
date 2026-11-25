@@ -17,8 +17,12 @@ import {
   pruneOutbox,
   flushPostOutbox,
   removeOutboxEntry,
+  rearmMissingReplicated,
   OUTBOX_KEY,
 } from './postOutbox';
+import { orbitFetch } from '../utils/api';
+
+vi.mock('../utils/api', () => ({ orbitFetch: vi.fn() }));
 
 const identity = { orbitId: 'me-1' } as never;
 
@@ -68,6 +72,22 @@ describe('postOutbox store (Phase 3b)', () => {
     expect(removeOutboxEntry('nope')).toBeNull();
     // the unrelated row is untouched
     expect(listOutbox().map((e) => e.objectId)).toEqual(['o1']);
+  });
+
+  it('rearmMissingReplicated moves a replicated entry back to pending when the node 404s', async () => {
+    enqueueOutbox({ objectId: 'rearm-1', postGroup: null, registerBody: regBody('rearm-1'), gossipInput: null });
+    setOutboxState('rearm-1', 'replicated');
+    (orbitFetch as unknown as { mockResolvedValue: (v: unknown) => void }).mockResolvedValue({ status: 404 });
+    await rearmMissingReplicated(identity);
+    expect(listOutbox()[0].state).toBe('pending');
+  });
+
+  it('rearmMissingReplicated leaves a replicated entry alone when the node holds it', async () => {
+    enqueueOutbox({ objectId: 'rearm-2', postGroup: null, registerBody: regBody('rearm-2'), gossipInput: null });
+    setOutboxState('rearm-2', 'replicated');
+    (orbitFetch as unknown as { mockResolvedValue: (v: unknown) => void }).mockResolvedValue({ status: 200 });
+    await rearmMissingReplicated(identity);
+    expect(listOutbox()[0].state).toBe('replicated');
   });
 });
 
