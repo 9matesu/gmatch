@@ -15,6 +15,7 @@ export function ProfileView({
   myUser,
   profilePics,
   feedPosts,
+  savedPosts,
   myCards,
   repostedPosts,
   followingIds,
@@ -42,6 +43,8 @@ export function ProfileView({
   myUser: User | undefined;
   profilePics: Record<string, string>;
   feedPosts: FeedPost[];
+  /** The posts this player saved — the "Saved" tab, read from the node. */
+  savedPosts: FeedPost[];
   myCards: OrbitObject[];
   repostedPosts: FeedPost[];
   followingIds: string[];
@@ -79,7 +82,7 @@ export function ProfileView({
         profilePic={profilePics[identity?.orbitId || '']}
         posts={feedPosts}
         cards={myCards as any}
-        savedPosts={feedPosts.filter((p) => p.is_saved)}
+        savedPosts={savedPosts}
         repostPosts={repostedPosts}
         // No `?? likes_received` fallback: that is a LIKES count rendered under
         // a "followers" label, which is why the number could disagree with the

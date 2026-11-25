@@ -114,12 +114,14 @@ export async function broadcastNewPost(db: D1Turso, objectId: string): Promise<v
 
 // Public feed. Supports ?following=1 (only authors the caller follows),
 // ?author_id=... (a single user's public profile posts),
+// ?saved=1 (only the posts the caller saved — the profile "Saved" tab),
 // ?q= search over captions + tags, ?sort=latest|trending (default latest),
 // ?tag= single tag filter, and ?limit/?offset pagination.
 posts.get('/', async (c) => {
   const db = c.env.DB
   const orbitId = c.get('orbitId')
   const following = c.req.query('following') === '1'
+  const savedOnly = c.req.query('saved') === '1'
   const authorId = (c.req.query('author_id') || '').trim()
   const q = (c.req.query('q') || '').trim().toLowerCase()
   const sort = c.req.query('sort') || 'latest'
@@ -132,6 +134,12 @@ posts.get('/', async (c) => {
 
   if (following) {
     where.push('EXISTS (SELECT 1 FROM Followers f WHERE f.follower_id = ? AND f.followee_id = o.owner_id AND f.accepted = 1)')
+    args.push(orbitId)
+  }
+  if (savedOnly) {
+    // The caller's OWN saved posts. Scoped by user_id, so one player's list
+    // never leaks into another's.
+    where.push('EXISTS (SELECT 1 FROM Saves s WHERE s.object_id = o.id AND s.user_id = ?)')
     args.push(orbitId)
   }
   if (authorId) {

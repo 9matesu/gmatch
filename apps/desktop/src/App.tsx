@@ -1305,6 +1305,32 @@ export default function Home() {
   const feedPostsRef = useRef<FeedPost[]>(feedPosts)
   useEffect(() => { feedPostsRef.current = feedPosts }, [feedPosts])
 
+  /**
+   * The posts this player saved — the profile "Saved" tab.
+   *
+   * It used to be `feedPosts.filter((p) => p.is_saved)`: the 50-row timeline
+   * snapshot. A post saved yesterday that fell out of the feed was therefore
+   * invisible, and "saving posts" looked broken. The node is the authority, so
+   * this is its own query (`?saved=1`), independent of what the feed happens to
+   * be showing.
+   */
+  const [savedPosts, setSavedPosts] = useState<FeedPost[]>([])
+  const loadSavedPosts = useCallback(async () => {
+    if (!identity) { setSavedPosts([]); return }
+    try {
+      const res = await orbitFetch('/api/posts?saved=1&limit=200&sort=latest', {}, identity)
+      if (!res.ok) return
+      const data = await res.json().catch(() => null)
+      if (Array.isArray(data?.posts)) setSavedPosts(data.posts as FeedPost[])
+    } catch { /* node unreachable: the tab keeps what it had */ }
+  }, [identity])
+
+  // Load them when the profile opens, so the tab is populated on arrival.
+  useEffect(() => {
+    if (mainView !== 'profile') return
+    void loadSavedPosts()
+  }, [mainView, loadSavedPosts])
+
 
   useEffect(() => {
     if (!selectedProfileUser) {
@@ -1601,12 +1627,13 @@ export default function Home() {
 
   const persistSave = useCallback((postId: string, saved: boolean) => {
     if (!identity) return
-    // Re-read the snapshot on success so `is_saved` lands and the profile
-    // "Saved" tab (which reads the server row) updates without a manual reload.
+    // Re-read the snapshot on success so `is_saved` lands, and re-read the
+    // saved list so the profile "Saved" tab (which reads the node with
+    // ?saved=1) updates without a manual reload.
     void orbitFetch(`/api/posts/${postId}/save`, { method: saved ? 'POST' : 'DELETE' }, identity)
-      .then((res) => { if (res.ok) { invalidateCache('/api/posts'); loadServerFeed() } })
+      .then((res) => { if (res.ok) { invalidateCache('/api/posts'); loadServerFeed(); void loadSavedPosts() } })
       .catch(() => { })
-  }, [identity, loadServerFeed])
+  }, [identity, loadServerFeed, loadSavedPosts])
 
   const persistComment = useCallback(async (postId: string, text: string, parentCommentId?: string | null) => {
     if (!identity) return null
@@ -3710,6 +3737,7 @@ export default function Home() {
                       myUser={myUser}
                       profilePics={profilePics}
                       feedPosts={feedPosts}
+                      savedPosts={savedPosts}
                       myCards={myCards}
                       repostedPosts={repostedPosts}
                       followingIds={followingIds}

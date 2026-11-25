@@ -489,6 +489,7 @@ export function GMatchProfile({
             {(savedPosts && savedPosts.length > 0 ? savedPosts : []).map((post) => (
               <div
                 key={post.id}
+                data-post-id={post.id}
                 onClick={() => {
                   playPress(700);
                   openPost(post);

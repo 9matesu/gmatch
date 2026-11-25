@@ -111,4 +111,47 @@ describe('GMatchProfile', () => {
     );
     expect(screen.getByText('3')).toBeInTheDocument();
   });
+
+  it('the Saved tab lists the saved posts it was given, not the feed snapshot', async () => {
+    // The tab used to be fed by `feedPosts.filter(p => p.is_saved)` — the
+    // 50-row timeline snapshot. A post saved yesterday that fell out of the
+    // feed was therefore invisible: "saving posts does not work". The tab
+    // takes its own list now, read from the node with ?saved=1.
+    const savedPost = {
+      id: 'saved-1',
+      url: '/api/objects/saved-1',
+      mime_type: 'image/png',
+      author_id: 'someone_else',
+      created_at: '2026-01-01T00:00:00.000Z',
+    } as any;
+
+    render(
+      <GMatchProfile
+        identity={fakeIdentity}
+        myUser={fakeUser}
+        posts={[]}
+        cards={[]}
+        savedPosts={[savedPost]}
+      />
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: /saved/i }));
+    expect(screen.queryByText('No saved posts')).not.toBeInTheDocument();
+    expect(document.querySelector('[data-post-id="saved-1"]')).toBeInTheDocument();
+  });
+
+  it('the Saved tab says so when there is nothing saved', async () => {
+    render(
+      <GMatchProfile
+        identity={fakeIdentity}
+        myUser={fakeUser}
+        posts={[]}
+        cards={[]}
+        savedPosts={[]}
+      />
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: /saved/i }));
+    expect(screen.getByText('No saved posts')).toBeInTheDocument();
+  });
 });

@@ -47,7 +47,7 @@ it('rejects name-bearing profile updates on a nameless user; allows bio-only sav
   expect(ok.status).toBe(200)
 })
 
-function makePngBlob(): Blob {
+function makePngBlob(seed = 0): Blob {
   const bytes = new Uint8Array([
     0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
     0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
@@ -59,12 +59,20 @@ function makePngBlob(): Blob {
     0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE,
     0x42, 0x60, 0x82,
   ])
-  return new Blob([bytes], { type: 'image/png' })
+  // The object store is CONTENT-ADDRESSED: two posts with identical bytes are
+  // the same object (the API answers 200 `reused` instead of 201). A fixture
+  // that needs two DISTINCT posts must therefore carry different bytes. The
+  // trailing bytes sit after the IEND chunk, which every PNG decoder ignores,
+  // so the image still decodes.
+  const out = new Uint8Array(bytes.length + (seed > 0 ? 2 : 0))
+  out.set(bytes, 0)
+  if (seed > 0) out.set([0x00, seed & 0xff], bytes.length)
+  return new Blob([out], { type: 'image/png' })
 }
 
-async function createPublicPost(env: any, identity: ReturnType<typeof createTestIdentity>, caption: string) {
+async function createPublicPost(env: any, identity: ReturnType<typeof createTestIdentity>, caption: string, seed = 0) {
   const formData = new FormData()
-  formData.append('image', makePngBlob(), 'card.png')
+  formData.append('image', makePngBlob(seed), 'card.png')
   formData.append('is_public', '1')
   formData.append('post_caption', caption)
   formData.append('location', 'Testville')
@@ -146,6 +154,40 @@ describe('Posts API (gMatch feed engagement)', () => {
 
     const unsave = await app.request(`/api/posts/${postId}/save`, { method: 'DELETE', headers: authHeaders(bob, 'DELETE', `/api/posts/${postId}/save`) }, env)
     expect(unsave.status).toBe(200)
+  })
+
+  it('GET /api/posts?saved=1 lists exactly the posts the caller saved', async () => {
+    // The profile "Saved" tab reads this. Without it the tab is structurally
+    // dead: the save writes a row, but nothing can ever list it.
+    const env = await createMockEnv()
+    await registerUser(env, alice)
+    await registerUser(env, bob)
+    const savedId = await createPublicPost(env, alice, 'a post bob saves', 1)
+    const otherId = await createPublicPost(env, alice, 'a post bob does NOT save', 2)
+
+    const save = await app.request(`/api/posts/${savedId}/save`, { method: 'POST', headers: authHeaders(bob, 'POST', `/api/posts/${savedId}/save`) }, env)
+    expect(save.status).toBe(200)
+
+    // The signature covers the PATHNAME only (the server signs
+    // `new URL(req.url).pathname`), so the query string is not signed.
+    const list = await app.request('/api/posts?saved=1&limit=200&sort=latest', { headers: authHeaders(bob, 'GET', '/api/posts') }, env)
+    expect(list.status).toBe(200)
+    const json: any = await list.json()
+    const ids = (json.posts || []).map((p: any) => p.id)
+    expect(ids).toContain(savedId)
+    expect(ids).not.toContain(otherId)
+
+    // Another caller's saved list must not leak into this one.
+    const asAlice = await app.request('/api/posts?saved=1&limit=200&sort=latest', { headers: authHeaders(alice, 'GET', '/api/posts') }, env)
+    const aliceJson: any = await asAlice.json()
+    expect((aliceJson.posts || []).map((p: any) => p.id)).not.toContain(savedId)
+
+    // Un-saving removes it from the list again.
+    const unsave = await app.request(`/api/posts/${savedId}/save`, { method: 'DELETE', headers: authHeaders(bob, 'DELETE', `/api/posts/${savedId}/save`) }, env)
+    expect(unsave.status).toBe(200)
+    const after = await app.request('/api/posts?saved=1&limit=200&sort=latest', { headers: authHeaders(bob, 'GET', '/api/posts') }, env)
+    const afterJson: any = await after.json()
+    expect((afterJson.posts || []).map((p: any) => p.id)).not.toContain(savedId)
   })
 
   it('comments: create, list, like, delete', async () => {

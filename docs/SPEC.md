@@ -436,6 +436,15 @@ product path.
   process's already-gated results — imhentai's small gallery covers were dropped,
   so the source read "offline" though it answered. The main process is the
   authority (blocklist + postFilter); the silent path now uses its posts as-is.
+- **The profile "Saved" tab reads the NODE, not the timeline (2026-11-25).** It was
+  fed by `feedPosts.filter((p) => p.is_saved)` — the 50-row TIMELINE snapshot. The
+  save itself always worked (the node had the row); the LIST came from the wrong
+  source, so any saved post that had fallen out of the feed was invisible and the
+  tab read "No saved posts" forever. `GET /api/posts?saved=1` is now a dedicated
+  query (`EXISTS … Saves s WHERE s.object_id = o.id AND s.user_id = ?`, so one
+  player's list never leaks into another's), `App.tsx` loads it when the profile
+  opens and after every save/un-save, and `ProfileView` passes it down instead of
+  filtering the feed.
 - **The clicker ban is a multi-select (2026-11-25).** The drop tray's ✕ toggles a
   tag into a per-drop selection and one "Ban N selected" button applies them all
   (`claimDropAntiTag` per tag), instead of banning one tag per click. The top-right
