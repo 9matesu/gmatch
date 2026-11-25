@@ -200,6 +200,26 @@ text overlays kept for caption hunts, §6).
   5-up/5-down window (past 5 + queue 5 + video posters, images AND videos) is
   prefetched so skip/back is instant; cache stats + Clear live in the left
   stats panel.
+- **The clicker cache is a real cache (2026-11-25).** It used to be
+  write-only: `advanceFeed` evicted the picture it had just cached, so every
+  picture was encrypted to disk and deleted moments later. The cache was
+  therefore permanently empty, the cache viewer had nothing to show, and the
+  BACK arrow re-downloaded the very picture the player had just seen. Moving
+  on is not rejecting: `advanceFeed` and `skipGrid` no longer evict (the
+  500MB LRU is the bound); a BROKEN square (`dropCell`) and an explicit
+  whole-image purge (`purgePost`) still do.
+- **The cache index is PERSISTED (2026-11-25).** The url → file map lived in
+  RAM, so the 500MB of `.enc` files on disk was unreachable after a restart
+  (every picture was re-downloaded) and unlistable. The map now lives next to
+  the bytes in `<userData>/imgcache/index.json` (newest-first, capped at 2000
+  entries); `init()` loads it and prunes entries whose `.enc` file is gone,
+  so a cached picture resolves from disk after a relaunch.
+- **Picture cache viewer (2026-11-25).** A "Cache" button in the clicker
+  header opens the list of pictures the device holds (newest first, with the
+  byte total). A tile renders from its local `gmcache://` url and clicking it
+  saves it to the gallery — the bytes are captured durably through the same
+  `persistKeepsake` route a drained foe takes, reading them from the encrypted
+  disk cache instead of the network. Read-only apart from that save.
 - **Renderer swarm RAM cache is bounded (2026-10-17):** `utils/p2pSwarm.ts`
   keeps at most 64 objects / 96MB of blob bytes in the JS heap (LRU, reads
   refresh recency). It used to be an unbounded `Map`, so every object seen

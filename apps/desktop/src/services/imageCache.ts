@@ -18,6 +18,8 @@
  */
 
 
+import type { CachedPicture } from '../types/gmatch-bridge'
+
 export interface ImageCacheStats {
   files: number
   bytes: number
@@ -27,6 +29,7 @@ export interface ImageCacheStats {
 interface Bridge {
   cacheImage?: (url: string) => Promise<{ local: string | null }>
   cacheStats?: () => Promise<{ files: number; bytes: number }>
+  cacheList?: () => Promise<{ items: CachedPicture[] }>
   clearCache?: () => Promise<{ files: number; bytes: number }>
   clearFeedCache?: () => Promise<void>
   evictImage?: (url: string) => Promise<{ ok: boolean }>
@@ -215,6 +218,24 @@ export function prefetchImages(urls: string[], limit = 11): void {
  */
 export async function resolveImageNow(url: string): Promise<string> {
   return resolveImage(url)
+}
+
+/**
+ * What the device holds, newest first.
+ *
+ * The cache viewer's data source. The list is the MAIN process's persisted
+ * index, so it survives a relaunch — the bytes live in the encrypted disk LRU
+ * and each row carries the local (gmcache://) url that serves them.
+ */
+export async function listCachedPictures(): Promise<CachedPicture[]> {
+  const b = bridge()
+  if (!b?.cacheList) return []
+  try {
+    const res = await b.cacheList()
+    return Array.isArray(res?.items) ? res.items : []
+  } catch {
+    return []
+  }
 }
 
 export async function imageCacheStats(): Promise<ImageCacheStats> {

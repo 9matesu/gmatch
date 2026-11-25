@@ -146,6 +146,9 @@ export interface GameState {
   goBack: () => boolean
   /** Grid mode: swap the whole board for a fresh one (session-only history). */
   skipGrid: () => void
+  /** Save a cached picture to the gallery (the cache viewer's action). The
+   *  bytes are captured durably, exactly like a drained foe. */
+  addGalleryImage: (url: string, tags?: string[]) => boolean
   /** "Never show this again": seen + bytes evicted + rarest content tags
    * learned as anti-tags (player intent beats algorithm: feed tags never
    * become excludes). */
@@ -1296,7 +1299,11 @@ export const useGame = create<GameState>((set, get) => ({
 
   advanceFeed: () => {
     const s = get()
-    if (s.current) void evictImage(s.current.url)
+    // NO eviction here. Moving on is not rejecting: the picture the player
+    // just saw stays in the encrypted disk cache, so the BACK arrow brings it
+    // back instantly and the cache viewer can still save it. The old code
+    // deleted the bytes right after caching them, which made the cache
+    // permanently empty and turned BACK into a re-download.
     if (s.queue.length > 0) {
       // Skipping is free but pays nothing — the beaten-or-not choice is the player's.
       // The skipped foe stays reachable via the back arrow at full HP.
@@ -1342,10 +1349,47 @@ export const useGame = create<GameState>((set, get) => ({
     return true
   },
 
+  /**
+   * Save a picture the device already holds (the cache viewer) to the
+   * gallery.
+   *
+   * The bytes are captured durably, exactly like a drained foe: the keep is
+   * only 'persisted' once the bytes are fetched, hashed and read back. The
+   * cache already holds them, so `persistKeepsake` reads them from the
+   * encrypted disk cache instead of the network.
+   */
+  addGalleryImage: (url, tags) => {
+    const s = get()
+    const src = String(url || '').trim()
+    if (!src) return false
+    if (s.gallery.some((g) => g.url === src)) return false
+    const now = Date.now()
+    // The clicker history knows the tags of a picture the player saw; use
+    // them when the caller has none (the cache index carries urls only).
+    const known = s.past.find((p) => p.url === src)
+    const tagList = (tags && tags.length ? tags : known?.tags ?? []).slice(0, 24)
+    const rarityBase = rarityBaseForPost(src)
+    const img: GalleryImage = {
+      id: `cache:${now}:${s.gallery.length}`,
+      url: src,
+      tags: tagList,
+      rarityBase,
+      clicks: 0,
+      rarity: imageRarity(rarityBase, s.gallery.length, 0),
+      boughtAt: now,
+      saveState: 'downloading',
+    }
+    kickKeepsakePersist(img)
+    set({ gallery: [...s.gallery, img] })
+    get().save()
+    return true
+  },
+
   skipGrid: () => {
     const s = get()
     if (!isGridMode(s.viewMode) || s.grid.length === 0) return
-    for (const c of s.grid) void evictImage(c.post.url)
+    // The skipped board stays reachable through the undo stack, so its bytes
+    // stay in the cache (the 500MB LRU is what bounds the cache).
     const gridPast = [...s.gridPast, s.grid].slice(-GRID_HISTORY_CAP)
     // Fresh board: every square refills from the queue head (fetch tops up).
     const target = gridSizeForMode(s.viewMode)

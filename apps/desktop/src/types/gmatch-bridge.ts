@@ -34,6 +34,18 @@ export interface FeedMetricsSummary {
   providers: Record<string, FeedProviderMetrics>
 }
 
+/** One picture in the encrypted picture cache (the clicker's cache). */
+export interface CachedPicture {
+  /** The remote url the picture came from. */
+  url: string
+  /** The local (gmcache://) url that serves the bytes from disk. */
+  local: string
+  mime: string
+  bytes: number
+  /** When it was cached (ms). Newest first. */
+  ts: number
+}
+
 /** The single source of truth for the preload bridge surface. */
 export interface GmatchBridge {
   booruFetch?: (req: BooruRequest) => Promise<BooruResponse>
@@ -47,6 +59,8 @@ export interface GmatchBridge {
   onMediaqProgress?: (cb: (p: { phase: string; message: string; percent?: number }) => void) => () => void
   cacheImage?: (url: string) => Promise<{ local: string | null }>
   cacheStats?: () => Promise<{ files: number; bytes: number }>
+  /** What the device holds, newest first: the clicker's picture cache. */
+  cacheList?: () => Promise<{ items: CachedPicture[] }>
   clearCache?: () => Promise<{ files: number; bytes: number }>
   /** Drops memoized feed lists after tag-intent changes (bytes untouched). */
   clearFeedCache?: () => Promise<{ cleared: number }>

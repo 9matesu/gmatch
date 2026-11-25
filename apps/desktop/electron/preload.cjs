@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld('gmatch', {
   },
   cacheImage: (url) => ipcRenderer.invoke('cache:image', url),
   cacheStats: () => ipcRenderer.invoke('cache:stats'),
+  // What the device holds, newest first (the cache viewer reads this).
+  cacheList: () => ipcRenderer.invoke('cache:list'),
   clearCache: () => ipcRenderer.invoke('cache:clear'),
   clearFeedCache: () => ipcRenderer.invoke('cache:clear-feed'),
   evictImage: (url) => ipcRenderer.invoke('cache:evict', url),

@@ -92,6 +92,13 @@ function get(key) {
   }
 }
 
+/** True when the bytes are on disk (no read). Used to prune the url index
+ *  against files the LRU already dropped. */
+function has(key) {
+  if (!dbPath) return false
+  return index.has(key.replace(/[^a-zA-Z0-9_-]/g, '_'))
+}
+
 function del(key) {
   if (!dbPath) return false
   const safeKey = key.replace(/[^a-zA-Z0-9_-]/g, '_')
@@ -120,4 +127,4 @@ function totalBytes() { return total }
 function size() { return index.size }
 function getMaxBytes() { return maxBytes }
 
-module.exports = { init, put, get, del, clear, setMaxBytes, totalBytes, size, getMaxBytes }
+module.exports = { init, put, get, has, del, clear, setMaxBytes, totalBytes, size, getMaxBytes }

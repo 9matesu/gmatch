@@ -3,6 +3,7 @@ import {
   ArrowsIn,
   ArrowsOut,
   FolderOpen,
+  HardDrive,
   Images,
   MagnifyingGlass,
   SidebarSimple,
@@ -18,6 +19,7 @@ import { useResizablePanel } from '../../hooks/useResizablePanel'
 import { PanelResizer } from '../../ui/PanelResizer'
 import IdleGalleryView from './IdleGalleryView'
 import TagBrowser from './TagBrowser'
+import { ClickerCacheView } from './ClickerCacheView'
 import { playPress } from '../../utils/sounds'
 import '../../ui/grid-animations.css'
 
@@ -61,6 +63,7 @@ export default function GridWorkspace({
   const [collapsed, setCollapsed] = useState<boolean>(readCollapsed)
   const [galleryOpen, setGalleryOpen] = useState(false)
   const [browserOpen, setBrowserOpen] = useState(false)
+  const [cacheOpen, setCacheOpen] = useState(false)
   const toggleCollapsed = () => {
     setCollapsed((v) => {
       try {
@@ -141,6 +144,16 @@ export default function GridWorkspace({
                 >
                   <MagnifyingGlass size={14} weight="bold" className="text-retro-accent" />
                   <span className="hidden sm:inline">Browse</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { playPress(740); setCacheOpen(true); }}
+                  title="Picture cache — the pictures you already saw, ready to save"
+                  aria-label="Picture cache"
+                  className="h-7 px-2 rounded-md border border-edge bg-glass-w8 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong transition cursor-pointer flex items-center gap-1.5 text-xs font-medium"
+                >
+                  <HardDrive size={14} weight="bold" className="text-retro-accent" />
+                  <span className="hidden sm:inline">Cache</span>
                 </button>
                 {onOpenSources && (
                   <button
@@ -289,6 +302,47 @@ export default function GridWorkspace({
               </button>
             </div>
             <TagBrowser />
+          </div>
+        </div>
+      )}
+
+      {/* Picture Cache Modal */}
+      {cacheOpen && (
+        <div
+          className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 p-3 sm:p-6 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Picture cache"
+          onClick={() => setCacheOpen(false)}
+        >
+          <div
+            className="relative flex h-full max-h-[90dvh] w-full max-w-4xl flex-col rounded-xl border border-edge bg-retro-panel p-5 shadow-xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-edge">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-retro-accent/15 text-retro-accent border border-retro-accent/30">
+                  <HardDrive size={16} weight="bold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-retro-fg tracking-wide ">
+                    Picture Cache
+                  </h3>
+                  <p className="text-xs text-retro-fg/40">Every picture you already saw, kept on disk</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCacheOpen(false)}
+                className="flex h-7 w-7 items-center justify-center rounded-lg border border-edge bg-glass-w5 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong transition cursor-pointer"
+                aria-label="Close picture cache"
+              >
+                <X size={14} weight="bold" />
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto pt-3 styled-scrollbar">
+              <ClickerCacheView toast={toast} />
+            </div>
           </div>
         </div>
       )}
