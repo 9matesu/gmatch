@@ -23,7 +23,10 @@ import { isMagnetUri } from './magnet';
  *     never be fired at the node as a path.
  *   - The id INSIDE a `urn:sha256:` IS the canonical object id and stays
  *     addressable — both the UUID form and the sha256-hex form.
- *   - A `magnet:` carries no id we know how to request.
+ *   - A `magnet:` carries the CONTENT HASH the bytes are stored under (legacy rows:
+ *     sha256(bytes).slice(0,40)). It is addressable LOCALLY - vault,
+ *     IndexedDB, swarm by hash - but still not a node path, so
+ *     isRequestableObjectId keeps refusing it.
  *
  * Two projections of the one parse:
  *   resolveObjectRefId()  → the id this ref addresses (resolves a urn)
@@ -43,6 +46,8 @@ export interface ParsedObjectRef {
 const OBJECT_PATH = '/api/objects/';
 
 /** `urn:sha256:<uuid>` or `urn:sha256:<64-hex>` — the id lives inside. */
+const MAGNET_BTIH_RE = /xt=urn:btih:([0-9a-f]{64}|[0-9a-f]{40})/i;
+
 const URN_ID_RE = /^urn:sha256:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{64})/i;
 
 /** Strip the `/api/objects/` mount from a path so the bare id remains. */
@@ -67,7 +72,10 @@ export function parseObjectRef(raw: string | null | undefined): ParsedObjectRef 
   if (urn) return { kind: 'urn', raw: trimmed, id: urn[1] };
 
   // A magnet is a descriptor with no addressable id.
-  if (isMagnetUri(trimmed)) return { kind: 'magnet', raw: trimmed, id: null };
+  if (isMagnetUri(trimmed)) {
+    const btih = MAGNET_BTIH_RE.exec(trimmed);
+    return { kind: 'magnet', raw: trimmed, id: btih ? btih[1] : null };
+  }
 
   // Any other urn: is a descriptor too, but one we cannot address.
   if (/^urn:/i.test(trimmed)) return { kind: 'urn', raw: trimmed, id: null };
@@ -84,7 +92,7 @@ export function parseObjectRef(raw: string | null | undefined): ParsedObjectRef 
 /**
  * The canonical object id a reference addresses, or null.
  *
- * Resolves BOTH `urn:sha256:` forms. Returns null for magnets, URLs and
+ * Resolves BOTH `urn:sha256:` forms. Returns null for URLs and
  * malformed descriptors — nothing is ever requested for those.
  */
 export function resolveObjectRefId(raw: string | null | undefined): string | null {

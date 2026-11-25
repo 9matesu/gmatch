@@ -353,8 +353,15 @@ async function readDurableObject(id: string): Promise<Blob | null> {
 
   // Fallback: IndexedDB (survives reload; dev-only path)
   try {
-    const { getObject } = await import('./storage')
-    const stored = await getObject(id)
+    const { getObject, getAllObjects } = await import('./storage')
+    let stored = await getObject(id)
+    // A legacy magnet btih is the 40-hex PREFIX of the sha256 the row is keyed
+    // by. Only a miss pays for the scan, and the store is small.
+    if (!stored && /^[0-9a-f]{40}$/i.test(id)) {
+      const all = await getAllObjects()
+      const hit = all.find((o) => String(o.id).toLowerCase().startsWith(id.toLowerCase()))
+      if (hit) stored = hit
+    }
     const data = stored?.data as ArrayBuffer | undefined
     if (stored && data && data.byteLength > 0) {
       return new Blob([data], { type: stored.mime_type || 'application/octet-stream' })

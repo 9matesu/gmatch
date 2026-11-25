@@ -68,8 +68,18 @@ test('N consecutive failed probes -> one restart, old process stopped first', as
   assert.deepStrictEqual(order, ['stop', 'start'], 'no second sidecar against :8790')
 })
 
-test('a crash restarts immediately (no debounce)', async () => {
+test('a crash with :8790 answering is adopted, not restarted', async () => {
+  // The adopted sidecar is not our child: a spawn would die on EADDRINUSE and
+  // burn the budget while the app is served fine.
   const { sup, calls } = harness(() => Promise.resolve(true))
+  sup.crashed(1)
+  await sleep(SIDECAR_BACKOFF_MS[0] + 200)
+  assert.strictEqual(calls.starts, 0, 'no spawn against a healthy :8790')
+  assert.strictEqual(calls.stops, 0, 'nothing to stop')
+})
+
+test('a crash with nobody answering restarts immediately (no debounce)', async () => {
+  const { sup, calls } = harness(() => Promise.resolve(false))
   sup.crashed(1)
   await sleep(SIDECAR_BACKOFF_MS[0] + 200)
   assert.strictEqual(calls.starts, 1)

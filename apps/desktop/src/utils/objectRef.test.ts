@@ -21,9 +21,16 @@ describe('objectRef — ONE parser for every media reference', () => {
     expect(resolveObjectRefId(`urn:sha256:${UUID}00000000000000000000000000`)).toBe(UUID);
   });
 
-  it('treats a magnet as a descriptor with no id', () => {
+  it('treats a magnet as a descriptor, but resolves the btih inside it', () => {
+    // The btih IS the content hash the bytes are stored under (legacy rows:
+    // sha256(bytes).slice(0,40)), so a magnet row can find bytes we already
+    // hold. It is still not a node path.
     expect(parseObjectRef('magnet:?xt=urn:btih:abc').kind).toBe('magnet');
     expect(resolveObjectRefId('magnet:?xt=urn:btih:abc')).toBeNull();
+    const btih40 = '68079ad0993de49691e5a4448c39d4889e7e00d6';
+    expect(resolveObjectRefId(`magnet:?xt=urn:btih:${btih40}&dn=x`)).toBe(btih40);
+    expect(resolveObjectRefId(`magnet:?xt=urn:btih:${HEX}&dn=x`)).toBe(HEX);
+    expect(isRequestableObjectId(`magnet:?xt=urn:btih:${btih40}`)).toBe(false);
   });
 
   it('treats a malformed urn as a descriptor with no id', () => {

@@ -28,7 +28,8 @@ const imageCache = require('./imageCache.cjs')
 
 const SCHEME = 'vault'
 const QUOTA_BYTES = 3 * 1024 * 1024 * 1024
-const HASH_RE = /^[0-9a-f]{64}$/i
+// 64-hex (current) or 40-hex (the legacy magnet btih = sha256(bytes).slice(0,40)).
+const HASH_RE = /^[0-9a-f]{40}([0-9a-f]{24})?$/i
 
 /** Store key for a by-hash put with no caller-provided name. */
 function localKey(hash) {
@@ -86,7 +87,10 @@ function loadManifest() {
         if (typeof e.hash === 'string' && HASH_RE.test(e.hash)) entry.hash = e.hash.toLowerCase()
         if (e.enc) entry.enc = 1
         manifest[storeKey] = entry
-        if (entry.hash) byHash.set(entry.hash, storeKey)
+        if (entry.hash) {
+          byHash.set(entry.hash, storeKey)
+          byHash.set(entry.hash.slice(0, 40), storeKey)
+        }
       }
     }
   } catch {
@@ -216,6 +220,7 @@ function bindContentHashes(want) {
     e.hash = hash
     changed = true
     if (!byHash.has(hash)) byHash.set(hash, storeKey)
+    if (!byHash.has(hash.slice(0, 40))) byHash.set(hash.slice(0, 40), storeKey)
   }
   if (changed) writeManifest()
 }
@@ -266,7 +271,9 @@ function init(userDataPath, storageKeyHex) {
 function stats() {
   return {
     files: Object.keys(manifest).length,
-    objects: byHash.size,
+    // Distinct content hashes, not index entries: a legacy 40-hex btih alias
+    // adds a second key per object without adding an object.
+    objects: Object.values(manifest).filter((e) => e && e.hash).length,
     bytes: totalBytes(),
     quota: QUOTA_BYTES,
     dir: Boolean(dir),

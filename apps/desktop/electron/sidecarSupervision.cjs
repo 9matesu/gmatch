@@ -42,18 +42,31 @@ function createSidecarSupervisor({ apiSidecar, log, onError }) {
     log(`sidecar: restart #${restarts} in ${delay}ms (${reason})`)
     restartTimer = setTimeout(() => {
       restartTimer = null
-      // A hung child still holding :8790 must be stopped first; otherwise
-      // startApi() either adopts it (still hung) or a new spawn dies with
-      // EADDRINUSE. Both read to the user as "the sidecar is dead again".
-      try {
-        if (apiSidecar.isRunning && apiSidecar.isRunning()) apiSidecar.stopApi()
-      } catch {
-        /* best effort */
-      }
+      // A HEALTHY sidecar that already answers on :8790 (the adopted one, not
+      // our child) must not be "restarted": the spawn dies with EADDRINUSE and
+      // burns the restart budget while the app is being served fine. That is
+      // what filled main.log with "crashed code=1" + "giving up after 5".
       void apiSidecar
-        .startApi()
-        .then(markHealthy)
-        .then(() => log('sidecar: restarted ok'))
+        .ping(2000)
+        .then((healthy) => {
+          if (healthy) {
+            markHealthy()
+            log(`sidecar: ${reason} ignored - :8790 is answering (adopted)`)
+            return null
+          }
+          // A hung child still holding :8790 must be stopped first; otherwise
+          // startApi() either adopts it (still hung) or a new spawn dies with
+          // EADDRINUSE.
+          try {
+            if (apiSidecar.isRunning && apiSidecar.isRunning()) apiSidecar.stopApi()
+          } catch {
+            /* best effort */
+          }
+          return apiSidecar
+            .startApi()
+            .then(markHealthy)
+            .then(() => log('sidecar: restarted ok'))
+        })
         .catch((e) => {
           log(`sidecar: restart failed: ${e && e.message ? e.message : e}`)
           void restart('restart-failed')
@@ -90,9 +103,23 @@ function createSidecarSupervisor({ apiSidecar, log, onError }) {
   return {
     markHealthy,
     crashed: (code) => {
-      log(`sidecar crashed code=${code}`)
-      // A crash is definitive — no debounce needed.
-      void restart('crash')
+      // A child that died on EADDRINUSE while a healthy sidecar serves :8790
+      // is not an outage: the app is talking to the adopted one.
+      void apiSidecar
+        .ping(1500)
+        .then((healthy) => {
+          if (healthy) {
+            markHealthy()
+            log(`sidecar crashed code=${code} but :8790 answers - adopted, no restart`)
+            return
+          }
+          log(`sidecar crashed code=${code}`)
+          void restart('crash')
+        })
+        .catch(() => {
+          log(`sidecar crashed code=${code}`)
+          void restart('crash')
+        })
     },
     startWatchdog,
     // Exposed for tests: drive probes without waiting 45s.

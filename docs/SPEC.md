@@ -334,6 +334,18 @@ product path.
   the list and the next refresh brought it straight back — "can't delete
   anything". A row that is not node-backed (a local/P2P mirror) still gets its
   tombstone: there is no server row to wait for.
+- **A magnet btih is a content hash, not a dead end (2026-11-25).** 39 of 50
+  rows in a real feed snapshot are `magnet:?xt=urn:btih:<40-hex>` (the legacy
+  "fake btih" = sha256(bytes).slice(0,40)). `objectRef` used to answer "no id"
+  for every magnet, so those rows were unresolvable and showed no image even
+  with the bytes on disk. Now the btih inside the descriptor IS the ref id
+  (still never a node path): the vault accepts 40- or 64-hex and indexes both
+  forms, IndexedDB resolves a 40-hex miss by prefix, and the tile keeps an
+  honest "No preview" when no bytes exist anywhere.
+- **A healthy sidecar is adopted, never re-spawned (2026-11-25).** A crash or a
+  restart with `:8790` already answering is adopted (the sidecar may be one a
+  previous launch left running, not our child); spawning anyway died with
+  EADDRINUSE and burned the restart budget while the app was served fine.
 - **Media has its own connection budget (2026-11-24).** Chromium opens six
   connections per host. Signed object streams keep the long 120s budget, and a
   profile grid used to start one per tile — all six sockets sat on media while

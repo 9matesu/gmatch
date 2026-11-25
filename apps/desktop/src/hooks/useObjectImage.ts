@@ -5,7 +5,7 @@ import { orbitFetch } from '../utils/api'
 import { getLocalObject, requestSwarmObject, PEER_ONLINE_EVENT } from '../utils/p2pSwarm'
 import { vaultProbe } from '../services/vault'
 import { resolveVideoMime, sniffFileHead } from '../utils/media'
-import { normalizeObjectId, isRequestableObjectId } from '../utils/objectRef'
+import { normalizeObjectId, isRequestableObjectId, parseObjectRef } from '../utils/objectRef'
 
 /**
  * Video detection for bytes in hand: trusts a concrete blob/stored MIME, but
@@ -212,10 +212,14 @@ function withObjectFetchSlot<T>(run: () => Promise<T>): Promise<T> {
 
 /** Local (P2P/vault/IndexedDB) → signed GET → swarm. Never throws. */
 async function resolveObject(cleanId: string, identity: IdentityLike): Promise<ResolvedObject> {
-  // A descriptor (magnet/urn/absolute URL) is not an id. Fail without touching
-  // the network: no request to 404 on, no orbit-object-404 to delete a live row,
-  // and nothing cached to evict a warm entry on the next story.
-  if (!isRequestableObjectId(cleanId)) {
+  // A descriptor (magnet/urn/absolute URL) is not a node id. A magnet still
+  // addresses bytes we may hold: its btih IS the content hash (legacy rows),
+  // so resolve it LOCALLY and never fire a request with the descriptor as a
+  // path (that 404s on the literal "?" and poisons the LRU).
+  const parsed = parseObjectRef(cleanId)
+  const localOnly = !isRequestableObjectId(cleanId)
+  const lookupId = localOnly ? (parsed.kind === 'magnet' ? parsed.id : null) : cleanId
+  if (!lookupId) {
     return { state: FAILED(cleanId), cache: false, awaitingSeeder: false }
   }
 
@@ -229,7 +233,7 @@ async function resolveObject(cleanId: string, identity: IdentityLike): Promise<R
   // bytes on disk under the old node URL, so look the object id up there before
   // asking the node (which keeps no media) or a peer (which may not exist).
   try {
-    const vault = await vaultProbe(cleanId)
+    const vault = await vaultProbe(lookupId)
     if (vault.state === 'local' && vault.local) {
       return commit({
         cardId: cleanId,
@@ -246,7 +250,7 @@ async function resolveObject(cleanId: string, identity: IdentityLike): Promise<R
 
   let localBlob: Blob | null = null
   try {
-    localBlob = await getLocalObject(cleanId)
+    localBlob = await getLocalObject(lookupId)
   } catch {
     localBlob = null
   }
@@ -259,6 +263,11 @@ async function resolveObject(cleanId: string, identity: IdentityLike): Promise<R
       isLink: false,
       linkUrl: null,
     })
+  }
+
+  // A descriptor has no node path: the local stores were the only honest shot.
+  if (localOnly) {
+    return { state: FAILED(cleanId), cache: false, awaitingSeeder: false }
   }
 
   // The signed object stream is the only long-held request in the app: run a
