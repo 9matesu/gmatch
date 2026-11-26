@@ -637,6 +637,32 @@
     0 0 0 3px rgba(255, 255, 255, 0.07);
 }
 
+/* One field, one box. A shell (a search pill or a wrapper) already draws the
+   border and background, so the field INSIDE it must not draw the base
+   border + raised fill on top — that is the "box inside the box" the input
+   never asked for. Two shapes of shell: a `.glass-field` wrapper, or any
+   field that declares a transparent background (`bg-transparent`). */
+.glass-field input,
+.glass-field textarea,
+.glass-field select,
+input.bg-transparent,
+textarea.bg-transparent,
+select.bg-transparent {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.glass-field input:focus,
+.glass-field textarea:focus,
+.glass-field select:focus,
+.glass-field input:focus-visible,
+.glass-field textarea:focus-visible,
+.glass-field select:focus-visible {
+  background: transparent;
+  border: 0;
+}
+
 .glass-nav-item {
   position: relative;
   background: rgba(255, 255, 255, calc(0.035 * var(--panel-alpha)));
