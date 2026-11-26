@@ -6,6 +6,24 @@ Every item below was requested, was already "implemented" in some form, and
 did not actually work in the running app. Each one is now built, tested and
 verified live.
 
+- **A peer's post loads from the peer, not from a node.** A `post.create`
+  operation carries the sha256 of its own bytes, and nothing in the media
+  ladder ever used it: the feed row knew only `/api/objects/<objectId>`. With
+  the node's data routes unavailable the picture simply failed, and the one
+  swarm fallback that ran asked by object id with no expected hash — so it
+  could accept whatever a peer sent and could not address bytes stored under
+  their content hash (the durable key). The content address now travels with
+  the row (`FeedPost.content_hash`) into `utils/contentAddressedMedia.ts`,
+  which tries local bytes under the object id and the content hash (each
+  hash-verified), then asks the swarm for the content hash with `expectedHash`,
+  then for the object-id alias with the same expectation — no `/api/objects`
+  call at all. Bytes that do not hash to the address are refused, from disk or
+  from a peer, and a legacy row with no content hash keeps the old ladder.
+  `services/socialFeedJoin.test.ts` runs the whole path with no node: A
+  publishes and seeds only the hash, B accepts the operation, projects the row
+  and pulls byte-identical verified media; a peer serving other bytes is
+  refused.
+
 - **The profile's "Saved" tab reads the NODE, not the timeline.** It was fed
   by `feedPosts.filter((p) => p.is_saved)` — the 50-row timeline snapshot — so
   a post saved days ago was invisible forever. `GET /api/posts?saved=1` is now

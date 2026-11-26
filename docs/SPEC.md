@@ -916,6 +916,25 @@ heat streak). Each +5% click power. Persist across prestige.
   (nothing deleted, nothing re-imported) and render from the link. An `owner_id` that
   contradicts the proven `relayedBy` sender is stored `owner_verified: false` and
   never borrows that user's directory name or avatar.
+- **A peer post is fetched from its CONTENT (2026-11-26).** A `post.create`
+  operation names two things: the object id its row is addressed by and the
+  sha256 of its bytes (`contentCid`, bound into the signed manifest). The feed
+  row keeps that hash (`FeedPost.content_hash`), and the media ladder resolves
+  a row that has one from the CONTENT — `utils/contentAddressedMedia.ts`: bytes
+  held locally under the object id or the content hash (each verified against
+  the hash), then the swarm asked for the content hash with `expectedHash`,
+  then for the object-id alias with the SAME expectation. No `/api/objects`
+  call is made for these rows: the node may not even carry the row, and media
+  stays with the peers (§12b). Bytes that do not hash to the address are never
+  returned — from disk or from a peer — so the earlier unverified
+  `requestSwarmObject(objectId, 5000)` fallback (which could accept anything a
+  peer sent, and could not address bytes stored only under their hash) is no
+  longer the way a peer's picture loads. A row WITHOUT a content hash keeps the
+  legacy ladder unchanged (local → signed GET → swarm).
+  `services/socialFeedJoin.test.ts` executes the whole path with no node:
+  A commits the operation and seeds only the hash, B accepts it, projects the
+  row, and pulls byte-identical media that verifies — while a peer serving
+  different bytes is refused.
 - Full specification documented in `docs/ARCHITECTURE-P2P.md`.
 
 ## 10e. Group chat, social graph and reports as peer operations (2026-10-22)

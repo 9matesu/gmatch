@@ -60,6 +60,7 @@ export const FeedTile = memo(function FeedTile({ post, identity, liked, likes, o
           <ObjectImage
             objectId={post.media?.[0]?.id}
             contentUrl={url}
+            contentHash={post.content_hash}
             identity={identity}
             mimeType={mime}
             className="h-full w-full object-cover"

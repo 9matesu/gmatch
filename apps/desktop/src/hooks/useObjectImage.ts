@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { orbitFetch } from '../utils/api'
-import { getLocalObject, requestSwarmObject, PEER_ONLINE_EVENT } from '../utils/p2pSwarm'
+import { getLocalObject, registerLocalObject, requestSwarmObject, PEER_ONLINE_EVENT } from '../utils/p2pSwarm'
 import { vaultProbe } from '../services/vault'
 import { resolveVideoMime, sniffFileHead } from '../utils/media'
 import { normalizeObjectId, isRequestableObjectId, parseObjectRef } from '../utils/objectRef'
+import { isContentHash, resolveContentAddressedMedia } from '../utils/contentAddressedMedia'
 
 /**
  * Video detection for bytes in hand: trusts a concrete blob/stored MIME, but
@@ -222,7 +223,11 @@ function withObjectFetchSlot<T>(run: () => Promise<T>): Promise<T> {
 }
 
 /** Local (P2P/vault/IndexedDB) → signed GET → swarm. Never throws. */
-async function resolveObject(cleanId: string, identity: IdentityLike): Promise<ResolvedObject> {
+async function resolveObject(
+  cleanId: string,
+  identity: IdentityLike,
+  contentHash?: string | null,
+): Promise<ResolvedObject> {
   // A descriptor (magnet/urn/absolute URL) is not a node id. A magnet still
   // addresses bytes we may hold: its btih IS the content hash (legacy rows),
   // so resolve it LOCALLY and never fire a request with the descriptor as a
@@ -230,7 +235,7 @@ async function resolveObject(cleanId: string, identity: IdentityLike): Promise<R
   const parsed = parseObjectRef(cleanId)
   const localOnly = !isRequestableObjectId(cleanId)
   const lookupId = localOnly ? (parsed.kind === 'magnet' ? parsed.id : null) : cleanId
-  if (!lookupId) {
+  if (!lookupId && !isContentHash(contentHash)) {
     return { state: FAILED(cleanId), cache: false, awaitingSeeder: false }
   }
 
@@ -238,6 +243,43 @@ async function resolveObject(cleanId: string, identity: IdentityLike): Promise<R
     cacheSet(cleanId, identity.orbitId, state)
     return { state, cache: true, awaitingSeeder: false }
   }
+
+  // A row that names its own CONTENT (a peer-replicated post carries the
+  // sha256 of its bytes) is resolved from that content: bytes held locally,
+  // then the swarm with the hash attached, so nothing unverified is ever
+  // rendered. The node's object route is deliberately not consulted — the row
+  // addresses content, and media lives with the peers (SPEC §12b). A row with
+  // no content hash keeps the entire legacy ladder below, unchanged.
+  if (isContentHash(contentHash)) {
+    const expected = contentHash.toLowerCase()
+    const blob = await resolveContentAddressedMedia(lookupId ?? null, expected)
+    if (!blob) return { state: FAILED(cleanId), cache: false, awaitingSeeder: false }
+    // Cache the bytes under BOTH names the row may be asked for: the object id
+    // alias (a remount by url is instant) and the content hash (the durable key
+    // peers address). The resolver proved the hash, so neither registration
+    // claims more than was verified.
+    try {
+      registerLocalObject(cleanId, blob)
+      if (expected !== normalizeCardId(cleanId)) registerLocalObject(expected, blob)
+    } catch {
+      /* cache alias best-effort */
+    }
+    void import('../utils/pendingTransfers')
+      .then(({ removePendingTransfer }) => removePendingTransfer(cleanId))
+      .catch(() => {})
+    return commit({
+      cardId: cleanId,
+      url: URL.createObjectURL(blob),
+      failed: false,
+      isVideo: await isVideoBlob(blob, ''),
+      isLink: false,
+      linkUrl: null,
+    })
+  }
+
+  // No content hash: the legacy ladder needs a requestable id (a descriptor
+  // with no id inside it has nothing to ask anyone for).
+  if (!lookupId) return { state: FAILED(cleanId), cache: false, awaitingSeeder: false }
 
   // P2P first; the network is only touched on a miss.
   // The encrypted vault is local storage too: a row that moved worlds keeps its
@@ -454,11 +496,15 @@ async function resolveObjectNetwork(
 }
 
 /** Dedupe entry point: concurrent callers share one resolution. */
-function resolveObjectOnce(cleanId: string, identity: IdentityLike): Promise<ResolvedObject> {
+function resolveObjectOnce(
+  cleanId: string,
+  identity: IdentityLike,
+  contentHash?: string | null,
+): Promise<ResolvedObject> {
   const key = pinKey(cleanId, identity.orbitId)
   const running = inflight.get(key)
   if (running) return running
-  const p = resolveObject(cleanId, identity).finally(() => inflight.delete(key))
+  const p = resolveObject(cleanId, identity, contentHash).finally(() => inflight.delete(key))
   inflight.set(key, p)
   return p
 }
@@ -496,9 +542,20 @@ function isDirectUrlLike(cardId: string): boolean {
 export function useObjectImage(
   cardId: string | null,
   identity: IdentityLike | null,
-  options?: { enabled?: boolean }
+  options?: {
+    enabled?: boolean
+    /**
+     * The sha256 of this row's bytes, when the caller knows it (a
+     * peer-replicated post carries it in the signed operation manifest). With
+     * a hash the row resolves from its CONTENT — local verified bytes, then
+     * the swarm with the hash attached — and never asks the node for media.
+     * Without one, the legacy ladder is unchanged.
+     */
+    contentHash?: string | null
+  }
 ): ObjectImageResult {
   const enabled = options?.enabled !== false
+  const contentHash = options?.contentHash ?? null
   // If cardId is already a direct URL (http, https, data, blob, or static endpoint)
   const isDirectUrl = Boolean(cardId && isDirectUrlLike(cardId))
 
@@ -588,7 +645,7 @@ export function useObjectImage(
     // await one fetch instead of racing (and orphaning blob URLs). The result
     // is committed to the LRU inside resolveObject, so a cancelled consumer
     // leaves a warm entry behind rather than a leak.
-    void resolveObjectOnce(cleanId, identity).then(({ state, awaitingSeeder }) => {
+    void resolveObjectOnce(cleanId, identity, contentHash).then(({ state, awaitingSeeder }) => {
       if (cancelled) return
       awaitingSeederRef.current = awaitingSeeder
       setImg(state)
@@ -599,7 +656,7 @@ export function useObjectImage(
     // `identity?.orbitId` (a string), not the identity object: an unstable
     // object from a caller re-ran this effect on every render, and each run
     // re-asked the vault over IPC. The id is all the cache key needs.
-  }, [cardId, identity?.orbitId, enabled, retryNonce])
+  }, [cardId, identity?.orbitId, enabled, retryNonce, contentHash])
 
   // Hold a pin for as long as this consumer is mounted, so the LRU can never
   // revoke the URL we are currently rendering.

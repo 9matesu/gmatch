@@ -28,6 +28,9 @@ describe('peer feed rows (L4.2)', () => {
       mime_type: 'image/jpeg',
       caption: 'hi',
       origin: 'peer',
+      // The row keeps the signed manifest's content address: the media ladder
+      // needs it to fetch from the swarm instead of a node (roadmap L4).
+      content_hash: 'c'.repeat(64),
       like_count: 0,
       comment_count: 0,
     })

@@ -133,6 +133,10 @@ export interface FeedPost {
   /** Where this row came from: a node's feed route or the local operation log
    *  (peer-replicated). Absent means the legacy server path. */
   origin?: 'server' | 'peer';
+  /** sha256 of the bytes, from a peer-replicated post's signed manifest. With
+   *  it the media resolves from its CONTENT (local verified bytes, then the
+   *  swarm with the hash attached), so the row does not depend on a node. */
+  content_hash?: string;
   /** Newest-first liker names for the "Liked by X and N others" line. */
   likers?: { user_id: string; display_name: string; pfp_url?: string | null }[];
   comment_count: number;
@@ -1262,6 +1266,7 @@ function GMatchFeedImpl({
                               <ObjectImage
                                 objectId={item.id}
                                 contentUrl={url}
+                                contentHash={post.content_hash}
                                 identity={identity}
                                 mimeType={mime}
                                 className="w-full h-auto max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
@@ -1326,6 +1331,7 @@ function GMatchFeedImpl({
                         <ObjectImage
                           objectId={post.id}
                           contentUrl={post.url}
+                          contentHash={post.content_hash}
                           identity={identity}
                           mimeType={post.mime_type}
                           className="w-full h-auto max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"

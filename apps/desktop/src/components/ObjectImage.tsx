@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { isMediaVideo, resolveMediaUrl } from '../utils/media'
 import { resolveObjectRefId } from '../utils/objectRef'
+import { isContentHash } from '../utils/contentAddressedMedia'
 import { useObjectImage, evictObjectImage } from '../hooks/useObjectImage'
 import { NativeVideoPlayer } from './media/NativeVideoPlayer'
 import { useVaultLookup, useVaultHttpUrls, vaultOptIn } from '../services/vault'
@@ -68,6 +69,14 @@ export interface ObjectImageProps {
    * picture.
    */
   thumb?: boolean
+  /**
+   * The sha256 of this row's bytes, when the caller knows it. A
+   * peer-replicated post carries it in its signed operation manifest; with it
+   * the media resolves from its CONTENT (local verified bytes, then the swarm
+   * with the hash attached) and the node's object route is never asked. The
+   * feed tile and the shared post sheet pass it through from the feed row.
+   */
+  contentHash?: string | null
 }
 
 /** Default strict-availability budget for unbounded surfaces. */
@@ -165,13 +174,15 @@ export function ObjectImage({
   onLoadingChange,
   unavailableTimeoutMs = DEFAULT_UNAVAILABLE_TIMEOUT_MS,
   thumb = false,
+  contentHash = null,
 }: ObjectImageProps) {
   const signed = needsSignedFetch(contentUrl, objectId)
   const effObjectId = extractObjectId(contentUrl, objectId)
   // A descriptor with no id at all (a bare `magnet:`) has NOTHING to request:
   // the hook can never resolve it, so the tile must say "No preview" instead
-  // of spinning on "Loading media..." forever. The post stays visible.
-  const unresolvable = signed && !effObjectId
+  // of spinning on "Loading media..." forever. The post stays visible. A row
+  // that names its content is still addressable by that hash.
+  const unresolvable = signed && !effObjectId && !isContentHash(contentHash)
 
   // Defer the authenticated fetch for signed images until the element is near
   // the viewport. Direct URLs rely on the browser's native `loading="lazy"`.
@@ -210,7 +221,10 @@ export function ObjectImage({
     }
   }, [shouldDefer, inView])
 
-  const img = useObjectImage(signed ? effObjectId : null, identity, { enabled: signed ? inView : true })
+  const img = useObjectImage(signed ? effObjectId : null, identity, {
+    enabled: signed ? inView : true,
+    contentHash,
+  })
 
   // vault:// has no in-browser form: prefer the localhost http URL (Range
   // capable, so <video> seeks) and fall back to the raw scheme URL the

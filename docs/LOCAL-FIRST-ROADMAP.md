@@ -348,9 +348,19 @@ deterministic post list (objectId identity so server/local rows dedupe against
 it, edited-head resolution, tombstone hiding, createdAt ordering with an
 operationId tiebreak, blocklist filtering of remote tags), and
 `hooks/usePeerFeedPosts.ts` merges those rows into the shell feed as
-`origin: 'peer'` with `sync_state` derived from the local log status. Media
-still resolves through `useObjectImage` (local vault/IndexedDB → signed GET →
-swarm with expectedHash), never a provider URL.
+`origin: 'peer'` with `sync_state` derived from the local log status.
+
+Media for those rows is now resolved from their CONTENT
+(`utils/contentAddressedMedia.ts`, `2026-11-26`): the operation's `contentCid`
+travels into the feed row (`FeedPost.content_hash`) and the media ladder tries
+local bytes held under the object id or the content hash (both hash-verified),
+then the swarm asking for the content hash with `expectedHash`, then the
+object-id alias with the same expectation. No `/api/objects` call is made for a
+row that names its content — the node may not carry it at all. Bytes that do
+not hash to the address are refused, from disk or from a peer. A row without a
+hash keeps the legacy ladder. `services/socialFeedJoin.test.ts` executes the
+full A→B path with no node at all (publish, accept, project, verified fetch,
+tampered-seeder refusal).
 
 Performance: the log now caches its entry list behind a process-wide revision
 counter, so replicating a wave no longer costs one full store scan per

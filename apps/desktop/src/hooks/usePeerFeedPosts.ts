@@ -26,6 +26,10 @@ export function projectedPostsToFeedPosts(posts: readonly ProjectedPost[], selfI
       author_avatar: null,
       url: `/api/objects/${post.id}`,
       mime_type: post.mimeType,
+      // The row's content address travels with it: the media ladder resolves
+      // these bytes by hash (verified) instead of asking a node that may not
+      // have the row at all (roadmap L4).
+      content_hash: post.contentCid,
       caption: post.caption,
       tags: post.tags,
       created_at: new Date(post.createdAt).toISOString(),

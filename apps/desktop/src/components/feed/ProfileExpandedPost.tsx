@@ -243,6 +243,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
             <ObjectImage
               contentUrl={post.localPreviewUrl || activeMedia?.url || post.url}
               objectId={activeMedia?.id || post.id}
+              contentHash={post.content_hash}
               identity={identity}
               mimeType={activeMedia?.mime || post.mime_type}
               alt=""
