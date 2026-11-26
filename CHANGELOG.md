@@ -6,6 +6,20 @@ Every item below was requested, was already "implemented" in some form, and
 did not actually work in the running app. Each one is now built, tested and
 verified live.
 
+- **A follow made offline survives a restart.** A follow was already a signed
+  operation, committed durably before any network call - but nothing read it
+  back: `followingIds` came from `GET /api/users/:id/following` alone. With the
+  node unreachable the list came back empty, so the follow was invisible on the
+  next launch: the feed re-suggested people you already follow and every
+  followed profile offered "Follow" again. `hooks/usePeerFollows.ts` projects
+  your own signed follows into what you follow and what your own removal
+  withdrew (a live follow always wins), and `mergeFollowing` resolves the two
+  sources: node list UNION operation follows MINUS withdrawn ones, so a stale
+  node row can neither hide a follow nor resurrect an unfollow.
+  `e2e/follow-offline.spec.ts` aborts both follow endpoints, follows a peer from
+  the empty feed's suggestions, reloads, and proves the suggestion stays gone
+  while an unfollowed peer is still offered.
+
 - **Bookmarking a peer's post sticks - it used to be a silent 404.** Saving a
   post was one call for every post: `POST /api/posts/:id/save`. A post
   replicated from a peer has no row on your node, so the node answered

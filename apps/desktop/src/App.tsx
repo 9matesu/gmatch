@@ -54,6 +54,7 @@ import { findUserById } from "./utils/userLookup";
 import { resolveObjectRefId } from "./utils/objectRef";
 import { reconcilePublishedPost } from "./utils/feedPublish";
 import { useStableCallback } from "./hooks/useStableCallback";
+import { mergeFollowing, usePeerFollows } from "./hooks/usePeerFollows";
 import { PEER_ONLINE_EVENT } from "./utils/p2pSwarm";
 import { readCachedFeed, writeCachedFeed } from "./features/feed/feedSnapshotCache";
 import { tombstonePost, readDeletedPostIds } from "./utils/deletedPosts";
@@ -1278,7 +1279,6 @@ export default function Home() {
   /** The post whose caption is being edited (the modal is root-level). */
   const [editingPost, setEditingPost] = useState<FeedPost | null>(null)
   const [editingPostSaving, setEditingPostSaving] = useState(false)
-  const [followingIds, setFollowingIds] = useState<string[]>([])
   const [pmMessagesByPeer, setPmMessagesByPeer] = useState<Record<string, ChatMessage[]>>({})
 
   const [feedSort, setFeedSort] = useState<FeedSort>(() => {
@@ -1547,13 +1547,30 @@ export default function Home() {
 
 
   // ─── Instagram-style follows ───
+  /**
+   * The node's own following list. It is NOT the whole answer: a follow is a
+   * signed operation, so a follow made while the node was unreachable is
+   * durable off-node while this list still comes back empty (or stale) on the
+   * next launch. `followingIds` below merges the two.
+   */
+  const [serverFollowingIds, setServerFollowingIds] = useState<string[]>([])
+  const peerFollows = usePeerFollows(identity?.orbitId)
+  /**
+   * Who this player follows: the node's rows UNION the follows carried by their
+   * own signed operations, MINUS the ones an operation unfollowed (the node's
+   * bookkeeping row can lag, or the unfollow may never have reached it).
+   */
+  const followingIds = useMemo(
+    () => mergeFollowing(serverFollowingIds, peerFollows),
+    [serverFollowingIds, peerFollows],
+  )
   const loadFollowing = useCallback(() => {
     if (!identity) return Promise.resolve()
     return orbitFetch(`/api/users/${identity.orbitId}/following`, {}, identity)
       .then(async (res) => {
         if (!res.ok) return
         const data = await res.json()
-        if (Array.isArray(data)) setFollowingIds(data.map((u: any) => u.id).filter(Boolean))
+        if (Array.isArray(data)) setServerFollowingIds(data.map((u: any) => u.id).filter(Boolean))
       })
       .catch(() => { })
   }, [identity])
@@ -1561,8 +1578,8 @@ export default function Home() {
   const toggleFollowUser = useCallback(async (userId: string) => {
     if (!identity || userId === identity.orbitId) return
     const wasFollowing = followingIds.includes(userId)
-    setFollowingIds(prev => wasFollowing ? prev.filter(id => id !== userId) : [...prev, userId])
-    const rollback = () => setFollowingIds(prev => wasFollowing ? [...prev, userId] : prev.filter(id => id !== userId))
+    setServerFollowingIds(prev => wasFollowing ? prev.filter(id => id !== userId) : [...prev, userId])
+    const rollback = () => setServerFollowingIds(prev => wasFollowing ? [...prev, userId] : prev.filter(id => id !== userId))
 
     // 1. The PEER graph: a follow is a signed operation, so the peers know
     // who I follow even when no node is reachable. This is the source of

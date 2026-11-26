@@ -453,9 +453,15 @@ node's 404, the local write, and the bookmark surviving a reload.
 Profile fields, follows and reports are operations too (`profile.update`,
 `follow.add`/`follow.remove`, `report.create`), consumed as follows: profile
 updates fold deterministically per actor and feed `rememberNames`, and a peer
-report surfaces in the author's notification centre. Follow operations are
-published and accepted, but still open is the READ side: `projectFollows` has
-no consumer, so the follower/following lists continue to come from the node.
+report surfaces in the author's notification centre. The follow graph's read
+side is local-first for MY OWN follows: `hooks/usePeerFollows.ts` projects my
+signed follows and the targets my own removals withdrew, and `followingIds` is
+the node list UNION the operation follows MINUS the withdrawn ones, so a follow
+made while the node was unreachable no longer vanishes on the next launch (and
+an operation-level unfollow masks the node's stale row). `e2e/follow-offline.spec.ts`
+pins it with both follow endpoints aborted: the empty feed's suggestions must
+keep excluding the person the operation followed after a reload. Still open:
+the FOLLOWER list (who follows me) still comes from the node.
 
 **Migration of existing content.** `services/socialPostImport.ts` turns the
 user's OWN public local posts into `post.create` operations, so the

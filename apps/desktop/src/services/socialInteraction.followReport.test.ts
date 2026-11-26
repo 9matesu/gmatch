@@ -11,7 +11,7 @@ import {
   publishReport,
   publishUnfollow,
 } from '../services/socialInteraction'
-import { projectFollows, projectReportsFor } from '../services/socialInteractionProjection'
+import { projectFollows, projectFollowState, projectReportsFor } from '../services/socialInteractionProjection'
 
 const PEER = restoreIdentity('22'.repeat(32), '33'.repeat(32))
 const ME = restoreIdentity('00'.repeat(32), '11'.repeat(32))
@@ -72,6 +72,33 @@ describe('the social graph as operations (L5/L7)', () => {
     expect(follows.get(ME.orbitId)?.has(PEER.orbitId) ?? false).toBe(false)
     // The undo is one-shot: there is no active follow left to remove.
     expect(activeFollowOperationId(await log.listAllOperations(), ME.orbitId, PEER.orbitId)).toBeNull()
+  })
+
+  it('remembers the unfollowed target so a stale node row can be masked', async () => {
+    const log = newLog()
+    await publishFollow(ME, PEER.orbitId, log)
+    const opId = activeFollowOperationId(await log.listAllOperations(), ME.orbitId, PEER.orbitId)!
+    await publishUnfollow(ME, opId, log)
+
+    // The node's own follower row can lag (or the unfollow never reached it),
+    // so the reader needs to know WHICH ids the operation withdrew, not just
+    // that they are absent from the active set.
+    const state = projectFollowState(await log.listAllOperations())
+    expect(state.following.get(ME.orbitId)?.has(PEER.orbitId) ?? false).toBe(false)
+    expect(state.removed.get(ME.orbitId)?.has(PEER.orbitId)).toBe(true)
+    expect(state.removed.get(PEER.orbitId)).toBeUndefined()
+  })
+
+  it('a re-follow is active again and no longer masked', async () => {
+    const log = newLog()
+    await publishFollow(ME, PEER.orbitId, log)
+    const opId = activeFollowOperationId(await log.listAllOperations(), ME.orbitId, PEER.orbitId)!
+    await publishUnfollow(ME, opId, log)
+    await publishFollow(ME, PEER.orbitId, log)
+
+    const state = projectFollowState(await log.listAllOperations())
+    expect(state.following.get(ME.orbitId)?.has(PEER.orbitId)).toBe(true)
+    expect(state.removed.get(ME.orbitId)?.has(PEER.orbitId) ?? false).toBe(false)
   })
 
   it('refuses to remove somebody else\'s follow', async () => {

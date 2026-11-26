@@ -87,6 +87,62 @@ export function projectReactions(entries: readonly LoggedOperation[]): Map<strin
 }
 
 /**
+ * The peer social graph, in both directions of intent: what each actor
+ * actively follows, AND which targets their own removal superseded.
+ *
+ * `removed` exists because the node keeps its own follower rows. A player who
+ * followed someone through the node and then unfollowed them off-node (or
+ * whose unfollow never reached the node) still has the stale node row; the
+ * operation is the newer intent, so a reader must be able to MASK it instead of
+ * resurrecting it. A later re-follow adds a fresh `follow.add`, which is active
+ * again — the caller resolves that by letting `following` win over `removed`.
+ */
+export interface ProjectedFollowState {
+  /** follower actor id -> the target ids they actively follow. */
+  following: Map<string, Set<string>>
+  /** follower actor id -> target ids whose add a removal superseded. */
+  removed: Map<string, Set<string>>
+}
+
+export function projectFollowState(entries: readonly LoggedOperation[]): ProjectedFollowState {
+  const operations = operationsOf(entries)
+
+  // add operation id -> what it claimed, so a removal can name it back.
+  const adds = new Map<string, { actorId: string; targetId: string }>()
+  for (const operation of operations) {
+    if (operation.type !== 'follow.add') continue
+    const targetId = (operation.payload as { targetId?: unknown }).targetId
+    if (typeof targetId !== 'string') continue
+    adds.set(operation.operationId, { actorId: operation.actorId, targetId })
+  }
+
+  const removedOperationIds = new Set<string>()
+  for (const operation of operations) {
+    if (operation.type !== 'follow.remove') continue
+    const ids = (operation.payload as { targetAddOperationIds?: unknown }).targetAddOperationIds
+    if (Array.isArray(ids)) for (const id of ids) if (typeof id === 'string') removedOperationIds.add(id)
+  }
+
+  const following = new Map<string, Set<string>>()
+  const withdrawn = new Map<string, Set<string>>()
+  for (const [operationId, { actorId, targetId }] of adds) {
+    const bucket = removedOperationIds.has(operationId) ? withdrawn : following
+    const set = bucket.get(actorId) ?? new Set<string>()
+    set.add(targetId)
+    bucket.set(actorId, set)
+  }
+  // A re-follow creates a FRESH add, so one target can be both withdrawn (by
+  // the old add) and active. The live follow is the intent: a target that is
+  // actively followed is not "removed", so the two sets are always disjoint.
+  for (const [actorId, withdrawnTargets] of withdrawn) {
+    const active = following.get(actorId)
+    if (!active) continue
+    for (const targetId of active) withdrawnTargets.delete(targetId)
+  }
+  return { following, removed: withdrawn }
+}
+
+/**
  * The peer social graph: follower id -> the ids they follow.
  *
  * A follow is active until some removal references its add operation. Only
@@ -94,24 +150,7 @@ export function projectReactions(entries: readonly LoggedOperation[]): Map<strin
  * their behalf).
  */
 export function projectFollows(entries: readonly LoggedOperation[]): Map<string, Set<string>> {
-  const operations = operationsOf(entries)
-  const removed = new Set<string>()
-  for (const operation of operations) {
-    if (operation.type !== 'follow.remove') continue
-    const ids = (operation.payload as { targetAddOperationIds?: unknown }).targetAddOperationIds
-    if (Array.isArray(ids)) for (const id of ids) if (typeof id === 'string') removed.add(id)
-  }
-  const out = new Map<string, Set<string>>()
-  for (const operation of operations) {
-    if (operation.type !== 'follow.add') continue
-    if (removed.has(operation.operationId)) continue
-    const targetId = (operation.payload as { targetId?: unknown }).targetId
-    if (typeof targetId !== 'string') continue
-    const followees = out.get(operation.actorId) ?? new Set<string>()
-    followees.add(targetId)
-    out.set(operation.actorId, followees)
-  }
-  return out
+  return projectFollowState(entries).following
 }
 
 /** A report about content, as the author sees it. */

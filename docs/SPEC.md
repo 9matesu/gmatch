@@ -1000,6 +1000,19 @@ heat streak). Each +5% click power. Persist across prestige.
   operation, a duplicate follow is refused, and following yourself is
   refused. The node's follower counts remain the node's bookkeeping; the
   operation is the graph that travels.
+- **My own follow list is local-first (2026-11-26).** Publishing a follow
+  operation was never the whole job: `followingIds` still came from
+  `GET /api/users/:id/following` alone, so a follow made while the node was
+  unreachable was durable in the log and invisible everywhere — gone on the
+  next launch, re-suggested by the feed, and "Follow" again on a profile the
+  player already follows. `hooks/usePeerFollows.ts` projects my own signed
+  follows into two disjoint sets (`projectFollowState`): the ids I follow, and
+  the ids my own removal withdrew (a live follow always wins over a withdrawn
+  one). `mergeFollowing` is the rule — the node list UNION the operation
+  follows MINUS the withdrawn ones — so the node's stale or missing
+  bookkeeping can neither hide a follow nor resurrect an unfollow.
+  `e2e/follow-offline.spec.ts` proves it with both follow endpoints aborted.
+  The FOLLOWER list (who follows me) still comes from the node.
 - **The Followers table is the ONLY follower count** (2026-11-08). The
   denormalized `Users.followers_count` / `Users.following_count` columns are
   gone (migration 058): every follow bumped them, every cascade delete and
