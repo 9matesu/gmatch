@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ImgHTMLAttributes } from 'react'
 import { cachedImageFor, resolveImage } from '../services/imageCache'
 import { resolveMediaUrl } from '../utils/media'
+import { thumbUrl } from '../utils/thumb'
 
 interface CachedImgProps extends ImgHTMLAttributes<HTMLImageElement> {
   src: string
@@ -8,6 +9,13 @@ interface CachedImgProps extends ImgHTMLAttributes<HTMLImageElement> {
   fallbackSrc?: string
   /** Fired true when the img starts loading, false once it has loaded/failed. */
   onLoadingChange?: (loading: boolean) => void
+  /**
+   * Render the SMALL cached copy (`gmcache://thumb/…`) instead of the
+   * full-size original. Dense grids (cache viewer, tag browser, gallery)
+   * should ask for this: a full-size booru is several MB of decoded bitmap
+   * per tile, and a screen of tiles is what made the GPU process eat 878 MB.
+   */
+  thumb?: boolean
 }
 
 /**
@@ -16,7 +24,7 @@ interface CachedImgProps extends ImgHTMLAttributes<HTMLImageElement> {
  * Viewport-gated via native IntersectionObserver to prevent 50+ concurrent
  * decodes/fetches when rendering long feeds.
  */
-export default function CachedImg({ src: rawSrc, fallbackSrc, onError, onLoadingChange, onLoad, ...rest }: CachedImgProps) {
+export default function CachedImg({ src: rawSrc, fallbackSrc, onError, onLoadingChange, onLoad, thumb, ...rest }: CachedImgProps) {
   // Normalize first: relative paths and bare object ids against the API base
   // (a raw uuid would fire a file:// request -> ERR_FILE_NOT_FOUND).
   const src = resolveMediaUrl(rawSrc)
@@ -25,7 +33,8 @@ export default function CachedImg({ src: rawSrc, fallbackSrc, onError, onLoading
   // already cached mounts straight on gmcache:// instead of flashing the
   // remote URL and swapping a frame later (the "instant image" path).
   const warm = isLocal ? src : cachedImageFor(src)
-  const [display, setDisplay] = useState<string>(warm ?? (isLocal ? src : ''))
+  const local = warm ?? (isLocal ? src : '')
+  const [display, setDisplay] = useState<string>(thumb ? thumbUrl(local) ?? '' : local)
   const [inView, setInView] = useState<boolean>(!!warm || rest.loading === 'eager')
   const imgRef = useRef<HTMLImageElement | null>(null)
 
@@ -66,19 +75,22 @@ export default function CachedImg({ src: rawSrc, fallbackSrc, onError, onLoading
     if (!inView) return
     let live = true
     if (/^(gmcache|idle-file|vault|blob|data):/i.test(src)) {
-      setDisplay(src)
+      setDisplay(thumb ? thumbUrl(src) ?? src : src)
       return
     }
     setDisplay(src)
     resolveImage(src)
       .then((local) => {
-        if (live && local) setDisplay(local)
+        if (!live || !local) return
+        // The local copy is what can be thumbnailed; until it lands the remote
+        // url is the only thing there is.
+        setDisplay(thumb ? thumbUrl(local) ?? local : local)
       })
       .catch(() => {})
     return () => {
       live = false
     }
-  }, [src, inView])
+  }, [src, inView, thumb])
 
   return (
     <img

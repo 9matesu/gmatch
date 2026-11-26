@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { ArrowClockwise, Download, HardDrive } from '@phosphor-icons/react'
 import { listCachedPictures } from '../../services/imageCache'
 import { useGame } from '../../game/store'
+import { thumbUrl } from '../../utils/thumb'
 import type { CachedPicture } from '../../types/gmatch-bridge'
 
 function fmtBytes(n: number): string {
@@ -10,6 +11,9 @@ function fmtBytes(n: number): string {
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`
   return `${(n / (1024 * 1024)).toFixed(1)} MB`
 }
+
+/** How many cached pictures the viewer mounts at once. */
+const CACHE_WINDOW = 60
 
 /**
  * The clicker's picture cache, newest first.
@@ -32,6 +36,10 @@ export function ClickerCacheView({
   const [items, setItems] = useState<CachedPicture[]>([])
   const [loading, setLoading] = useState(true)
   const [saved, setSaved] = useState<Record<string, boolean>>({})
+  // The cache can hold hundreds of pictures. Rendering them ALL mounts
+  // hundreds of <img> elements at once — the "load everything in a heap"
+  // behaviour. The viewer shows a bounded window and grows it on demand.
+  const [windowSize, setWindowSize] = useState(CACHE_WINDOW)
   const addGalleryImage = useGame((s) => s.addGalleryImage)
 
   const load = useCallback(async () => {
@@ -85,7 +93,7 @@ export function ClickerCacheView({
         <>
           <p className="text-2xs text-retro-muted">Click a picture to save it to your gallery.</p>
           <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6">
-            {items.map((p) => (
+            {items.slice(0, windowSize).map((p) => (
               <button
                 key={p.url}
                 type="button"
@@ -104,7 +112,11 @@ export function ClickerCacheView({
                   />
                 ) : (
                   <img
-                    src={p.local}
+                    // Thumbnail, not the original: the cache viewer can hold
+                    // hundreds of full-size pictures, and decoding them all
+                    // cost ~1 GB of bitmaps. The main process generates the
+                    // small copy on demand.
+                    src={thumbUrl(p.local) ?? p.local}
                     alt=""
                     loading="lazy"
                     decoding="async"
@@ -126,6 +138,15 @@ export function ClickerCacheView({
               </button>
             ))}
           </div>
+          {items.length > windowSize && (
+            <button
+              type="button"
+              onClick={() => setWindowSize((n) => n + CACHE_WINDOW)}
+              className="w-full rounded-md border border-edge bg-glass-w5 py-1.5 text-2xs font-semibold text-retro-fg transition hover:bg-glass-w10 cursor-pointer"
+            >
+              Show more ({items.length - windowSize} left)
+            </button>
+          )}
         </>
       )}
     </div>

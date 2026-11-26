@@ -430,7 +430,69 @@ function setFeedCache(query, posts) {
 /**
  * protocol.handle('gmcache') handler — serves RAM buffers keyed by the
  * sanitized filename. Unknown/evicted key → 404 (renderer falls back remote).
+ *
+ * `gmcache://thumb/<key>` serves a DOWNSCALED copy instead of the full-size
+ * picture. A gallery of 70 full-res boorus is ~1.2 GB of decoded bitmaps; a
+ * 360px thumbnail is ~0.2 MB and decodes in a fraction of the time, which is
+ * what the cache viewer, the tag browser and the gallery grids actually show.
+ * Thumbs are generated on demand in the main process (Electron's built-in
+ * `nativeImage`, no new dependency), kept in a small LRU, and never written to
+ * disk — the encrypted originals remain the only durable copy.
  */
+const THUMB_MAX_EDGE = 360
+const THUMB_LRU_MAX = 400
+const THUMB_MIME = 'image/jpeg'
+const thumbs = new Map()
+
+function thumbCacheGet(key) {
+  const hit = thumbs.get(key)
+  if (!hit) return null
+  // Refresh recency (Map keeps insertion order; a read moves it to the end).
+  thumbs.delete(key)
+  thumbs.set(key, hit)
+  return hit
+}
+
+function thumbCacheSet(key, buf) {
+  thumbs.set(key, buf)
+  while (thumbs.size > THUMB_LRU_MAX) {
+    const oldest = thumbs.keys().next().value
+    if (oldest === undefined) break
+    thumbs.delete(oldest)
+  }
+}
+
+/** Downscale picture bytes to a small JPEG. Returns null when not possible. */
+function makeThumb(buf, ext) {
+  // Videos and unknown blobs have no thumbnail: the caller falls through to the
+  // original bytes, so a <video> poster still works.
+  if (!/^(jpe?g|png|webp|gif|img)$/i.test(ext || '')) return null
+  let image = null
+  try {
+    const { nativeImage } = require('electron')
+    image = nativeImage.createFromBuffer(buf)
+  } catch {
+    return null
+  }
+  if (!image || image.isEmpty()) return null
+  const size = image.getSize()
+  const longest = Math.max(size.width, size.height)
+  if (!longest || longest <= THUMB_MAX_EDGE) {
+    // Already small enough: re-encoding would only cost CPU.
+    return buf
+  }
+  const ratio = THUMB_MAX_EDGE / longest
+  try {
+    return image.resize({
+      width: Math.max(1, Math.round(size.width * ratio)),
+      height: Math.max(1, Math.round(size.height * ratio)),
+      quality: 'good',
+    }).toJPEG(72)
+  } catch {
+    return null
+  }
+}
+
 async function serveImage(request) {
   try {
     if (request.method === 'OPTIONS') {
@@ -443,11 +505,31 @@ async function serveImage(request) {
       })
     }
     const u = new URL(request.url)
+    const wantsThumb = u.host === 'thumb'
     const key = path.basename(u.pathname || u.host || '')
     if (!key || key.includes('..')) return new Response('bad file', { status: 400 })
     const buf = mem.get(key)
     if (!buf) return new Response('miss', { status: 404 })
     const mime = Object.values(meta).find((m) => m.key === key)?.mime || EXT_MIME[key.split('.').pop()] || 'application/octet-stream'
+    if (wantsThumb) {
+      const ext = key.split('.').pop()
+      let thumb = thumbCacheGet(key)
+      if (!thumb) {
+        thumb = makeThumb(buf, ext)
+        if (thumb) thumbCacheSet(key, thumb)
+      }
+      if (thumb) {
+        return new Response(thumb, {
+          headers: {
+            'Content-Type': thumb === buf ? mime : THUMB_MIME,
+            'Cache-Control': 'no-store',
+            'Access-Control-Allow-Origin': '*',
+          },
+        })
+      }
+      // No thumbnail possible (a video): fall through and serve the original,
+      // so a poster/first frame still renders.
+    }
     // Range support: <video> seeking re-requests with Range; answering 200
     // every time makes a cached mp4 re-download the whole blob per seek.
     const range = request.headers.get('range')
@@ -491,6 +573,13 @@ function setMeta(url, entry) {
   return true
 }
 
+/** Test seam: plant bytes in the encrypted store under a key. */
+function putBytes(key, buf) {
+  if (!key || !buf) return false
+  if (!mem.put(key, buf)) return false
+  return true
+}
+
 /** Test seam (pure-ish helpers; heavy IO stays in cacheImage/serveImage). */
 module.exports = {
   SCHEME,
@@ -507,5 +596,5 @@ module.exports = {
   serveImage,
   capFor,
   // Test seam (pure-ish helpers; heavy IO stays in cacheImage/serveImage).
-  _test: { fnv1a, cacheFileName, normalizeQuery, destroyDiskCaches, capFor, setMeta, saveIndex },
+  _test: { fnv1a, cacheFileName, normalizeQuery, destroyDiskCaches, capFor, setMeta, putBytes, saveIndex },
 }

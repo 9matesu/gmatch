@@ -1060,6 +1060,10 @@ export default function IdleGalleryView({
                         alt={img.tags.slice(0, 3).join(' ') || 'gallery image'}
                         referrerPolicy="no-referrer"
                         loading="lazy"
+                        // A dense keepsake grid asks for the SMALL cached copy;
+                        // the full-size bytes are only fetched when a tile is
+                        // opened.
+                        thumb
                         data-keepsake-id={img.id}
                       />
                     )}
