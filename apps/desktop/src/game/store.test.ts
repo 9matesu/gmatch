@@ -505,6 +505,33 @@ describe('tick', () => {
     useGame.getState().tick(1000)
     expect(useGame.getState().caps).toHaveLength(1)
   })
+
+  /**
+   * The clock runs every second. It used to write `lastSeenAt` into the store
+   * on every tick, re-rendering the whole idle UI once a second even when
+   * nothing had changed (nobody even reads `lastSeenAt` — only `save()`
+   * serializes it). A tick with nothing to do must not touch the store.
+   */
+  it('writes nothing when no cap expired (no per-second re-render)', () => {
+    useGame.setState({ caps: [] })
+    let writes = 0
+    const unsub = useGame.subscribe(() => { writes += 1 })
+    useGame.getState().tick(1000)
+    useGame.getState().tick(1000)
+    useGame.getState().tick(1000)
+    unsub()
+    expect(writes).toBe(0)
+  })
+
+  it('still prunes an expired cap, in one write', () => {
+    useGame.setState({ caps: [{ capId: 'blue', expiresAt: Date.now() - 1 }] })
+    let writes = 0
+    const unsub = useGame.subscribe(() => { writes += 1 })
+    useGame.getState().tick(1000)
+    unsub()
+    expect(useGame.getState().caps).toHaveLength(0)
+    expect(writes).toBe(1)
+  })
 })
 
 describe('brainmelt', () => {

@@ -1537,18 +1537,19 @@ export const useGame = create<GameState>((set, get) => ({
    * Cap housekeeping only. The idle economy is gone: a tick used to add
    * passive pts/s (tag levels + gallery) and auto-click income, which made the
    * game play itself. Points now move on clicks alone, so the only thing left
-   * for the clock to do is expire legacy timed caps and keep `lastSeenAt`
-   * honest (the header shows presence from it).
+   * for the clock to do is expire legacy timed caps.
+   *
+   * It used to ALSO write `lastSeenAt` into the store on every tick — once a
+   * second, re-rendering the whole idle UI for a field nobody reads (only
+   * `save()` serializes it, and it already stamps `lastSeenAt`). A tick with
+   * nothing to expire now returns without touching the store.
    */
   tick: (dtMs = 1000) => {
     void dtMs
     const s = get()
-    const now = Date.now()
-    const live = activeCaps(s.caps, now)
-    set({
-      caps: live.length === s.caps.length ? s.caps : live,
-      lastSeenAt: now,
-    })
+    const live = activeCaps(s.caps, Date.now())
+    if (live.length === s.caps.length) return
+    set({ caps: live })
   },
   save: () => {
     const s = get()

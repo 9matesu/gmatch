@@ -1008,6 +1008,11 @@ what it lives in.
     software composition (`disableHardwareAcceleration`) and throttle hidden
     windows made the UI stall/go black on a real machine, so both were
     REVERTED: the GPU process is cheap compared with a frozen renderer.
+  - **An idle second costs nothing (2026-11-25):** the idle game's 1 s beat
+    still runs (it must expire legacy timed caps), but `tick()` only writes to
+    the store when a cap ACTUALLY expires. It used to stamp `lastSeenAt` every
+    second, re-rendering the whole idle UI for a field nothing reads — `save()`
+    already stamps it, and the save is the only reader.
   - **No retry storm (2026-11-24):** an `orbitFetch` timeout used to cost 30s +
     2 exponential retries (up to 90s each); with a dozen pollers this piled up
     into a renderer freeze. Normal API calls now time out in 8s with ONE short

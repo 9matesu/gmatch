@@ -74,6 +74,12 @@ verified live.
   try/catch around the sidecar's logging could never catch it — the main
   process died with "uncaught: Error: EPIPE: broken pipe, write". The guard
   now lives on the stream itself (`electron/stdio-guard.cjs`).
+- **The idle clock stops re-rendering the app every second.** `tick()` wrote
+  `lastSeenAt` into the zustand store on each 1 s beat, re-rendering the whole
+  idle UI for a field NOBODY reads (only `save()` serializes it, and it already
+  stamps it). A tick with no cap to expire now returns without touching the
+  store, so an idle app does no render work at all (`store.test.ts` pins both
+  halves: zero writes when nothing expired, exactly one when a cap does).
 
 ## Unreleased — gmatch 2.0: no hosted service; the own node is the world
 
