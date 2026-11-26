@@ -6,6 +6,24 @@ Every item below was requested, was already "implemented" in some form, and
 did not actually work in the running app. Each one is now built, tested and
 verified live.
 
+- **A post made while a friend is online actually reaches them.** The outbound
+  operation wave ran only on boot and on peer-online, so a `post.create` (or a
+  like, comment, edit, delete) appended while a peer was already connected sat
+  `committed` in the durable log until one of the two reconnected — you could
+  post in front of someone who never saw it, and the media was irrelevant
+  because the metadata never left the machine. The log already announces every
+  write, so `services/socialOpBroadcast.ts` now listens and hands the new entry
+  to the swarm immediately, coalescing a burst into one wave. The wave selects
+  only entries never handed out: broadcasting advances an entry to `sending`
+  and writes, and every write announces again, so a wider selection would
+  re-send on its own announcement forever (boot/peer-online waves keep the
+  wider selection, since retrying a stuck entry is what they are for). Delivery
+  is still only claimed on a peer's ACK. `e2e/post-two-peer.spec.ts` runs it on
+  the production path with two independent clients: A publishes while B is
+  online, B's operation log — which the node never stores — receives the signed
+  `post.create`, B projects the row and pulls byte-identical media by content
+  hash. With the subscriber disabled the operation never arrives.
+
 - **A peer's post loads from the peer, not from a node.** A `post.create`
   operation carries the sha256 of its own bytes, and nothing in the media
   ladder ever used it: the feed row knew only `/api/objects/<objectId>`. With

@@ -398,6 +398,7 @@ export function useP2P(identity: OrbitIdentity | null) {
     let teardownOperations: (() => void) | null = null
     void import('../services/socialOperationLog').then(async ({ sharedSocialOperationLog }) => {
       const { acceptInboundOperation, applyOperationAck, broadcastPendingOperations, broadcastRecentOperations } = await import('../services/socialOpTransport')
+      const { wireOperationBroadcast } = await import('../services/socialOpBroadcast')
       const operationLog = sharedSocialOperationLog()
       // Inbound: validate + authorize + durable append, then ACK the sender
       // (a duplicate is already durable here, so it is acked too). Never ack a
@@ -438,7 +439,17 @@ export function useP2P(identity: OrbitIdentity | null) {
       }
       broadcastAll()
       window.addEventListener(PEER_ONLINE_EVENT, broadcastAll)
+      // The waves above fire on boot and on peer-online only, so an operation
+      // committed while a peer was ALREADY online was never handed to the
+      // network — a post made in front of your friend did not reach them until
+      // one side reconnected. Every write announces itself on the durable log,
+      // so send the new entry now (coalesced, unsent-only; see the module).
+      const unwireBroadcast = wireOperationBroadcast({
+        log: operationLog,
+        sendOperation: (operation) => { sendSwarmFrame({ type: 'SWARM_OP', operation }) },
+      })
       teardownOperations = () => {
+        unwireBroadcast()
         window.removeEventListener(PEER_ONLINE_EVENT, broadcastAll)
         setSwarmOperationHandler(null)
         setSwarmOperationAckHandler(null)

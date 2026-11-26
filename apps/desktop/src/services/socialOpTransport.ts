@@ -153,8 +153,21 @@ export async function acceptInboundOperation(
 export async function broadcastPendingOperations(
   log: SocialOperationLog,
   sendOperation: (operation: Record<string, unknown>) => void,
+  options: {
+    /**
+     * Only entries that were NEVER handed to the network. An
+     * append-triggered wave must use this: broadcasting advances an entry to
+     * `sending` and writes, and every write announces a change, so selecting
+     * `sending` entries too would re-send on its own announcement. Boot and
+     * peer-online waves keep the wider selection (retrying a stuck `sending`
+     * entry is exactly what they are for).
+     */
+    onlyUnsent?: boolean
+  } = {},
 ): Promise<{ sent: number }> {
-  const pending = await log.listPendingOperations()
+  const pending = options.onlyUnsent
+    ? await log.listUnsentOperations()
+    : await log.listPendingOperations()
   for (const entry of pending) {
     try {
       sendOperation(entry.record)

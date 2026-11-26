@@ -362,6 +362,19 @@ hash keeps the legacy ladder. `services/socialFeedJoin.test.ts` executes the
 full A→B path with no node at all (publish, accept, project, verified fetch,
 tampered-seeder refusal).
 
+Delivery is live as of `2026-11-26` too: the outbound wave used to run only on
+boot and on peer-online, so an operation appended while a peer was ALREADY
+online was never handed to the network. `services/socialOpBroadcast.ts`
+subscribes to the durable log's change signal and broadcasts the new entry
+immediately (coalesced, `committed`-only so the wave's own writes cannot make
+it re-send; boot/peer-online waves still retry `sending` entries).
+`e2e/post-two-peer.spec.ts` is the executed acceptance: two independent
+contexts, A publishes while B is online, B's operation log receives the signed
+`post.create` and B pulls byte-identical media by content hash.
+
+Still open: offline read paths beyond the local log, and the
+migration/compatibility work below.
+
 Performance: the log now caches its entry list behind a process-wide revision
 counter, so replicating a wave no longer costs one full store scan per
 operation (previously O(n²) IndexedDB reads); any write from any instance

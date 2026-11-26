@@ -935,6 +935,24 @@ heat streak). Each +5% click power. Persist across prestige.
   A commits the operation and seeds only the hash, B accepts it, projects the
   row, and pulls byte-identical media that verifies — while a peer serving
   different bytes is refused.
+- **A post made NOW reaches a peer who is already online (2026-11-26).** The
+  outbound operation wave used to run only on boot and on `PEER_ONLINE`, so an
+  operation appended while a peer was already connected stayed `committed`
+  until one of the two reconnected — you could post in front of a friend who
+  never saw it. The durable log already announces every write
+  (`OPERATION_LOG_CHANGED_EVENT`, also raised for another window's write), so
+  `services/socialOpBroadcast.ts` subscribes to that signal and hands the new
+  entry to the swarm immediately, coalescing a burst into one wave. The wave
+  selects only entries never handed out (`listUnsentOperations`): broadcasting
+  advances an entry to `sending` and writes, and every write announces again,
+  so a wider selection would re-send on its own announcement forever.
+  Boot/peer-online waves keep the wider selection — retrying a stuck `sending`
+  entry is exactly what they are for. Delivery is still claimed only by a
+  peer's `SWARM_OP_ACK`; a broadcast is "handed to the network".
+  `e2e/post-two-peer.spec.ts` executes it: A publishes while B is online, B's
+  OPERATION LOG (which the node never stores) receives the signed
+  `post.create`, B projects the row and pulls byte-identical media by content
+  hash — and with the subscriber disabled the operation never arrives.
 - Full specification documented in `docs/ARCHITECTURE-P2P.md`.
 
 ## 10e. Group chat, social graph and reports as peer operations (2026-10-22)
