@@ -128,6 +128,28 @@ const DM_SEEN_KEY = 'gmatch_dm_seen_v1';
 const ROOM_SEEN_KEY = 'gmatch_room_seen_v1';
 /** Which conversation to restore on boot (also identity-scoped). */
 
+/**
+ * Normalize one feed row: a multi-image post carries its images in `media`,
+ * and the timeline needs them as `mediaUrls`.
+ *
+ * HOISTED ON PURPOSE. This used to be an inline arrow in the
+ * `useFeedController(...)` call below, so it was a NEW function identity on
+ * every render — and it is a dependency of the controller's projection memo.
+ * The timeline was therefore re-projected on every render, `feedPosts` got a
+ * new identity on every render, and App's profile effect (which depends on
+ * `feedPosts`) re-ran, cleared a state array and re-rendered: an infinite
+ * render loop that burned ~3 CPU cores at idle. A module-level function has
+ * one identity forever, so the projection only recomputes when the DATA
+ * changes.
+ */
+function normalizeFeedPost(p: FeedPost): FeedPost {
+  const media = (p as any).media
+  if (Array.isArray(media) && media.length > 1) {
+    return { ...p, mediaUrls: media.map((m: any) => m.url).filter(Boolean) }
+  }
+  return p
+}
+
 export default function Home() {
   useEffect(() => {
     runMigrations();
@@ -1279,13 +1301,7 @@ export default function Home() {
     deletedPostIds,
     archivedPostIds,
     feedSort,
-    normalizePost: (p: FeedPost) => {
-      const media = (p as any).media
-      if (Array.isArray(media) && media.length > 1) {
-        return { ...p, mediaUrls: media.map((m: any) => m.url).filter(Boolean) }
-      }
-      return p
-    },
+    normalizePost: normalizeFeedPost,
   })
   const {
     posts: feedPosts, status: feedStatus, restoredFromCache, hasMore: hasMoreFeed,
@@ -1336,15 +1352,29 @@ export default function Home() {
   }, [mainView, loadSavedPosts])
 
 
+  // Another player's profile: their own rows, with the timeline as a fallback
+  // while the node answers.
+  //
+  // BOTH branches keep the state value IDENTITY-STABLE. `setState([])` with a
+  // fresh array is a NEW value, so it re-renders the app even when the list
+  // did not change — and this effect used to depend on `feedPosts`, whose
+  // identity changed on every render (an inline `normalizePost` made the
+  // controller re-project the timeline every render). The clear then
+  // re-rendered the app, which re-projected the timeline, which re-ran this
+  // effect: an infinite render loop that burned ~3 CPU cores at idle.
   useEffect(() => {
     if (!selectedProfileUser) {
-      setSelectedProfilePosts([])
+      setSelectedProfilePosts((prev) => (prev.length === 0 ? prev : []))
       return
     }
 
     let cancelled = false
     const fallbackPosts = feedPosts.filter((post) => post.author_id === selectedProfileUser.id)
-    setSelectedProfilePosts(fallbackPosts)
+    setSelectedProfilePosts((prev) => (
+      prev.length === fallbackPosts.length && prev.every((post, i) => post === fallbackPosts[i])
+        ? prev
+        : fallbackPosts
+    ))
 
     if (!identity) return () => { cancelled = true }
 

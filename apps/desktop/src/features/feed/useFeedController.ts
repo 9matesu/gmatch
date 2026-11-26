@@ -86,6 +86,23 @@ export function useFeedController(input: FeedControllerInput): FeedController {
   const pushedRef = useRef<Map<string, PushedEntry<FeedPost>>>(new Map())
   const postsRef = useRef<FeedPost[]>([])
   /**
+   * The caller's `normalizePost`, read through a ref.
+   *
+   * It used to be a DEPENDENCY of the projection memo below. A caller that
+   * passes an inline arrow (a new identity on every render) therefore
+   * re-projected the whole timeline on every render, so `posts` got a new
+   * identity on every render too — and every effect that depends on the
+   * timeline re-ran on every render. In App that was an infinite loop: the
+   * profile effect cleared a state array, the clear re-rendered the app, and
+   * the app re-projected the timeline. The result was ~3 CPU cores burned at
+   * idle with no user interaction.
+   *
+   * A ref keeps the memo's dependencies to the DATA. The latest callback is
+   * still used whenever the projection actually recomputes.
+   */
+  const normalizePostRef = useRef(normalizePost)
+  normalizePostRef.current = normalizePost
+  /**
    * True while the timeline on screen came from the durable snapshot rather
    * than from a read this session. It is what makes the stale-first behaviour
    * honest: the UI can say "showing what you had" instead of implying the node
@@ -150,11 +167,11 @@ export function useFeedController(input: FeedControllerInput): FeedController {
     items, optimisticPosts, localPending, pinnedPosts, peerFeedPosts,
     serverPosts, repostedPosts, myProfilePosts,
     deletedPostIds, archivedPostIds, users, profilePics,
-    identity, myProfile, normalizePost,
+    identity, myProfile, normalizePost: normalizePostRef.current,
   }), [
     items, optimisticPosts, localPending, pinnedPosts, peerFeedPosts, serverPosts,
     repostedPosts, myProfilePosts, deletedPostIds, archivedPostIds, users,
-    profilePics, identity, myProfile, normalizePost,
+    profilePics, identity, myProfile,
   ])
 
   useEffect(() => { postsRef.current = posts }, [posts])
