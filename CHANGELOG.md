@@ -65,6 +65,10 @@ verified live.
   carries the row; the outbox now yields to it, and the local copy is synced
   after an edit so the pre-echo window and a pending re-register carry the new
   text too.
+- **The clicker's modals close on Escape.** The Keepsakes Gallery, the Tag
+  Browser and the Picture Cache are hand-rolled shells with no key handler, so
+  they could only be left with the mouse — a trap. One shared
+  `useEscapeClose` hook now covers all three.
 - **A closed stdout/stderr pipe no longer kills the app.** `console.log` into
   a closed pipe raises EPIPE as an async `'error'` EVENT on the stream, so the
   try/catch around the sidecar's logging could never catch it — the main

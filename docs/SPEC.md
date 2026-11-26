@@ -220,6 +220,11 @@ text overlays kept for caption hunts, §6).
   saves it to the gallery — the bytes are captured durably through the same
   `persistKeepsake` route a drained foe takes, reading them from the encrypted
   disk cache instead of the network. Read-only apart from that save.
+- **The clicker's modals close on Escape (2026-11-25).** The Keepsakes
+  Gallery, the Tag Browser and the Picture Cache are hand-rolled shells (a
+  wide custom header the kit's `Modal` does not have), so they carry their own
+  key handler — ONE shared `useEscapeClose` hook, three modals. Without it a
+  modal could only be left with the mouse: a trap.
 - **Renderer swarm RAM cache is bounded (2026-10-17):** `utils/p2pSwarm.ts`
   keeps at most 64 objects / 96MB of blob bytes in the JS heap (LRU, reads
   refresh recency). It used to be an unbounded `Map`, so every object seen

@@ -25,6 +25,26 @@ import '../../ui/grid-animations.css'
 
 const RIGHT_KEY = 'idle.right.collapsed.v1'
 
+/**
+ * Escape closes the clicker's modals.
+ *
+ * These three are hand-rolled shells (a wide custom header the kit's `Modal`
+ * does not have), so they need their own key handler — one hook, three
+ * modals. Without it a modal could only be left with the mouse: a trap.
+ */
+function useEscapeClose(open: boolean, onClose: () => void) {
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      e.preventDefault()
+      onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+}
+
 function readCollapsed(): boolean {
   try {
     return localStorage.getItem(RIGHT_KEY) === '1'
@@ -64,6 +84,9 @@ export default function GridWorkspace({
   const [galleryOpen, setGalleryOpen] = useState(false)
   const [browserOpen, setBrowserOpen] = useState(false)
   const [cacheOpen, setCacheOpen] = useState(false)
+  useEscapeClose(galleryOpen, () => setGalleryOpen(false))
+  useEscapeClose(browserOpen, () => setBrowserOpen(false))
+  useEscapeClose(cacheOpen, () => setCacheOpen(false))
   const toggleCollapsed = () => {
     setCollapsed((v) => {
       try {
