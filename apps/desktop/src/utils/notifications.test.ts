@@ -4,6 +4,9 @@ import {
   parseNotificationData,
   serverRowToAppNotification,
   deriveConversationNotifications,
+  derivePeerNotifications,
+  derivePeerReportNotifications,
+  peerNotificationSubject,
   mergeNotifications,
   unreadCountOf,
   unreadByTypeOf,
@@ -254,5 +257,53 @@ describe('merge / unread / latest', () => {
       { ...mk('c', '2026-10-18T10:00:00Z'), type: 'like', read: true },
     ]
     expect(unreadByTypeOf(items)).toEqual({ dm: 2 })
+  })
+})
+
+describe('derivePeerNotifications (the peer lane)', () => {
+  const report = {
+    operationId: 'op-1',
+    kind: 'report' as const,
+    targetType: 'post' as const,
+    targetId: 'post-9',
+    actorId: 'peer-1',
+    createdAt: 1_700_000_000_000,
+    note: 'not ok',
+  }
+
+  it('turns a peer event into a row that opens the report target', () => {
+    const [row] = derivePeerNotifications([report], { resolveName: () => 'Kenny' })
+    expect(row.key).toBe('local:peer-op-1')
+    expect(row.id).toBe('op-1')
+    expect(row.type).toBe('report')
+    expect(row.title).toBe('Kenny reported your post')
+    expect(row.body).toBe('not ok')
+    expect(row.target).toEqual({ postId: 'post-9' })
+    expect(row.read).toBe(false)
+  })
+
+  it('targets a comment when the report is about a comment', () => {
+    const [row] = derivePeerNotifications([{ ...report, targetType: 'comment', targetId: 'c-1' }])
+    expect(row.target).toEqual({ commentId: 'c-1' })
+  })
+
+  it('marks a row read from the durable read set (so the badge can clear)', () => {
+    const rows = derivePeerNotifications([report], { readIds: new Set(['op-1']) })
+    expect(rows[0].read).toBe(true)
+  })
+
+  it('shim: reports still derive through the same rule', () => {
+    const [row] = derivePeerReportNotifications([
+      { operationId: 'op-2', targetType: 'comment', targetId: 'c-2', reason: '', reporterId: 'peer-2', createdAt: 1 },
+    ])
+    expect(row.key).toBe('local:peer-op-2')
+    expect(row.body).toBeNull()
+  })
+
+  it('peerNotificationSubject extracts exactly the operation id', () => {
+    expect(peerNotificationSubject('local:peer-op-1')).toBe('op-1')
+    expect(peerNotificationSubject('dm:bob')).toBeNull()
+    expect(peerNotificationSubject('room:r1')).toBeNull()
+    expect(peerNotificationSubject('local:peer-')).toBeNull()
   })
 })

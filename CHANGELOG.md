@@ -6,6 +6,24 @@ Every item below was requested, was already "implemented" in some form, and
 did not actually work in the running app. Each one is now built, tested and
 verified live.
 
+- **A peer's report on your post now actually reaches you — and can be dismissed.**
+  Reports about peer-replicated content are signed operations that travel to the
+  AUTHOR (a mesh has no admin), and `hooks/usePeerReports.ts` already projected
+  them into the notification centre. But the row was only merged into the list
+  the BADGE counts; the panel draws server rows and courier rows separately, so
+  the peer row never appeared — the bell said "1" with nothing behind it, and
+  because a derived row has no node `read` flag and no chat seen stamp, that "1"
+  could never clear. The peer lane is now its own section ("From your peers"),
+  `hooks/useNotificationCenter.ts` exposes `peerItems`, and its read state is
+  durable and identity-scoped (`utils/peerNotifications.ts`, keyed by the
+  operation id) so tapping the row marks exactly it read and the badge follows.
+  "Mark all read" clears peer rows (alerts) but still leaves DMs/rooms alone (a
+  DM is a real unread message, cleared by opening it).
+  `utils/notifications.test.ts` pins the derivation and the read flag,
+  `peerNotifications.test.ts` the durable store, and `NotificationCenter.test.tsx`
+  the rendered row, its "From your peers" section, and that a peer-only inbox no
+  longer claims "No notifications".
+
 - **"Stored on N devices" is now real — a peer's signed receipt, not a guess.**
   The swarm has proved durable custody for a while: a seeding node mints a
   challenge when it serves bytes, the fetching node signs a receipt only after

@@ -58,6 +58,8 @@ export interface NotificationsPanelProps {
   onOpenTarget?: (target: NotificationTarget) => void;
   /** Courier-derived rows (DMs, sealed rooms) merged into the same list. */
   localItems?: AppNotification[];
+  /** Peer-lane rows (reports/interactions about my content). */
+  peerItems?: AppNotification[];
   onOpenLocalTarget?: (item: AppNotification) => void;
   onMarkLocalRead?: (keys: string[]) => void;
   onRespondInvite?: (inviteId: string, accept: boolean) => void;
@@ -97,6 +99,7 @@ export function NotificationsPanel({
   onMarkRead,
   onOpenTarget,
   localItems = [],
+  peerItems = [],
   onOpenLocalTarget,
   onMarkLocalRead,
   onRespondInvite,
@@ -156,18 +159,23 @@ export function NotificationsPanel({
           )}
         </span>
         <div className="flex items-center gap-1">
-          {items.length > 0 && (
+          {items.length > 0 || peerItems.length > 0 ? (
             <button
               type="button"
               onClick={() => {
                 playPress(700);
                 onMarkAllRead();
+                // Peer-lane rows are ALERTS, not unread messages, so "mark all
+                // read" clears them too. The courier lane (DMs/rooms) is
+                // deliberately left alone: a DM is a real unread message,
+                // cleared by opening the conversation, never dismissed.
+                if (peerItems.length > 0) onMarkLocalRead?.(peerItems.map((i) => i.key));
               }}
               className="glass-action px-2 py-0.5 rounded text-2xs cursor-pointer text-retro-muted hover:text-retro-fg"
             >
               Mark all read
             </button>
-          )}
+          ) : null}
           {onClose && (
             <button
               type="button"
@@ -232,6 +240,45 @@ export function NotificationsPanel({
           </div>
         )}
 
+        {/* Peer lane: signed operations about MY content (reports, soon
+            follows/likes/comments). These have no node row, so they were
+            counted by the badge but never rendered — the badge could not
+            clear. Tapping opens the post/comment and marks the row read
+            durably (the same handler the courier rows use). */}
+        {peerItems.length > 0 && (
+          <div className="mb-2 space-y-1">
+            <div className="px-3 py-1.5 text-xs font-medium text-retro-muted">From your peers</div>
+            {peerItems.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => {
+                  playPress(700);
+                  onMarkLocalRead?.([item.key]);
+                  onOpenTarget?.(item.target);
+                }}
+                className="glass-inset w-full p-3 rounded-lg flex items-start gap-3 text-left cursor-pointer hover:bg-glass-w8 transition-colors"
+              >
+                <div className="w-8 h-8 rounded-full glass-inset flex items-center justify-center shrink-0">
+                  {TYPE_ICONS[item.type] || <Bell className="w-4 h-4" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium text-retro-fg truncate">{item.title}</p>
+                    {!item.read && <span className="w-1.5 h-1.5 rounded-full bg-retro-accent shrink-0" />}
+                  </div>
+                  {item.body && (
+                    <p className="text-xs text-retro-muted mt-0.5 truncate">{item.body}</p>
+                  )}
+                  <time className="mt-1 block text-2xs text-retro-muted" dateTime={item.createdAt}>
+                    {formatAbsoluteTime(item.createdAt, { dateStyle: "short", timeStyle: "short" })}
+                  </time>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
         {openInvites.length > 0 && (
           <div className="mb-2 space-y-1">
             <div className="px-3 py-1.5 text-xs font-medium text-retro-muted">
@@ -285,7 +332,7 @@ export function NotificationsPanel({
           </div>
         )}
 
-        {items.length === 0 && openInvites.length === 0 && localItems.length === 0 ? (
+        {items.length === 0 && openInvites.length === 0 && localItems.length === 0 && peerItems.length === 0 ? (
           <div className="py-12 text-center space-y-2">
             <Bell className="w-6 h-6 mx-auto text-retro-muted" />
             <p className="text-xs font-medium text-retro-body">No notifications</p>

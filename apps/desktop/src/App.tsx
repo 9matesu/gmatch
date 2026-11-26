@@ -3740,6 +3740,7 @@ export default function Home() {
                   notifications: lobby.notifications,
                   invites: lobby.invites,
                   localItems: notificationCenter.localItems,
+                  peerItems: notificationCenter.peerItems,
                   unreadCount: notificationCenter.unreadCount,
                   unreadByType: notificationCenter.unreadByType,
                   latestTitle: notificationCenter.latest?.title,

@@ -469,8 +469,12 @@ node's 404, the local write, and the bookmark surviving a reload.
 Profile fields, follows and reports are operations too (`profile.update`,
 `follow.add`/`follow.remove`, `report.create`), consumed as follows: profile
 updates fold deterministically per actor and feed `rememberNames`, and a peer
-report surfaces in the author's notification centre. The follow graph's read
-side is local-first for MY OWN follows: `hooks/usePeerFollows.ts` projects my
+report surfaces in the author's notification centre as its own peer-lane row.
+That row used to be counted by the badge but never rendered (and could never be
+marked read, since it has no node flag and no chat stamp); it now renders in a
+"From your peers" section and its durable per-identity read set
+(`utils/peerNotifications.ts`, keyed by the operation id) lets it clear. The
+follow graph's read side is local-first for MY OWN follows: `hooks/usePeerFollows.ts` projects my
 signed follows and the targets my own removals withdrew, and `followingIds` is
 the node list UNION the operation follows MINUS the withdrawn ones, so a follow
 made while the node was unreachable no longer vanishes on the next launch (and

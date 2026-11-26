@@ -1473,7 +1473,7 @@ left-rail dock is gone. The trigger keeps
 `data-notifications-toggle="true"` — the E2E hook
 (`e2e/engagement-social.spec.ts`) and its "Mark all read" expectation still hold.
 
-### Two sources, one list
+### Three lanes, one list
 
 1. **Server rows** — the persistent `Notifications` table (`GET /api/notifications`,
    pushed over WS as `type: 'notification'`). Authoritative for anything that
@@ -1487,8 +1487,20 @@ left-rail dock is gone. The trigger keeps
    hook `hooks/useNotificationCenter.ts`). Reading the row is the same action as
    opening the conversation, and it emits a real `dm_read` receipt — so the
    notification is never a second, drift-prone copy of the message state.
+3. **Peer-lane rows** — signed operations about MY content (a `report.create`
+   today; the lane is built to carry follow/like/comment next). A mesh has no
+   admin, so a report travels to the AUTHOR, who is the one who can act on it.
+   These rows were **counted but never rendered** until 2026-11-26: they lived
+   only in the merged list the badge reads, while the panel drew server rows and
+   courier rows separately, so a report raised the badge and could never clear.
+   `peerItems` is now its own section ("From your peers") and its read state is
+   durable and identity-scoped (`utils/peerNotifications.ts`, keyed by the
+   operation id) because a derived row has no node `read` flag and no chat seen
+   stamp. Tapping a peer row opens its post/comment and marks it read; "Mark all
+   read" clears peer rows too (an alert) but deliberately leaves the courier lane
+   alone (a DM is a real unread message, cleared by opening it).
 
-`mergeNotifications` folds both into `AppNotification`s keyed by
+`mergeNotifications` folds all three into `AppNotification`s keyed by
 `notificationKey`; the unread badge and the per-type breakdown are computed
 **from the merged items**, never from a separate counter (`unreadCountOf`,
 `unreadByTypeOf`). Server list cap = the badge cap (50).

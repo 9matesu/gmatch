@@ -17,7 +17,9 @@ import { countChatUnread, countThreadUnread } from '../utils/chatUnread'
 import { countMentions, createMentionMatcher } from '../utils/mentions'
 import { saveSeen, readScopedJson, writeScopedJson } from '../utils/scopedSeen'
 import { useNotificationCenter } from './useNotificationCenter'
-import type { AppNotification } from '../utils/notifications'
+import { usePeerNotificationReads } from './usePeerNotificationReads'
+import { markPeerNotificationsRead } from '../utils/peerNotifications'
+import { peerNotificationSubject, type AppNotification } from '../utils/notifications'
 import type { useNotifications } from './useNotifications'
 import type { useLobby } from './useLobby'
 import { userFacingError } from '../utils/userError'
@@ -378,9 +380,14 @@ export function useAppChat(ctx: AppChatContext) {
   // Reports about my own content (peer lane): in a mesh the author is the
   // one who can act on a report, so it belongs in the same centre.
   const peerReports = usePeerReports(identity?.orbitId)
+  // The peer lane's durable read state. Without it a peer report counted toward
+  // the badge forever (its row is derived from the operation log, which does
+  // not change by being looked at).
+  const peerReadIds = usePeerNotificationReads(identity?.orbitId)
   const notificationCenter = useNotificationCenter({
     rows: lobby.notifications,
     peerReports,
+    peerReadIds,
     threads: courier.threads,
     dmSeen,
     rooms: courier.rooms,
@@ -419,9 +426,14 @@ export function useAppChat(ctx: AppChatContext) {
     handleSetMainView('messages')
   }, [courier.rooms, openRoomChat, stampDmSeen, users, toast])
 
-  // Mark the courier lanes read for the row(s) tapped.
+  // Mark the courier + peer lanes read for the row(s) tapped.
   const markLocalNotificationsRead = useCallback((keys: string[]) => {
     const now = Date.now()
+    // The peer lane is durable (localStorage) and keyed by the operation id.
+    const peerSubjects = keys
+      .map((key) => peerNotificationSubject(key))
+      .filter((id): id is string => !!id)
+    if (peerSubjects.length > 0) markPeerNotificationsRead(identity?.orbitId, peerSubjects)
     setDmSeen((prev) => {
       const next = { ...prev }
       let changed = false
@@ -444,7 +456,7 @@ export function useAppChat(ctx: AppChatContext) {
       if (changed) saveSeen(ROOM_SEEN_KEY, seenScopeRef.current, next)
       return changed ? next : prev
     })
-  }, [])
+  }, [identity?.orbitId])
 
 
 

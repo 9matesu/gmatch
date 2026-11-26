@@ -24,6 +24,8 @@ export interface NotificationCenterProps {
   invites?: MatchInviteItem[];
   /** Courier-derived rows (DMs, sealed rooms). */
   localItems?: AppNotification[];
+  /** Peer-lane rows (reports/interactions about my content). */
+  peerItems?: AppNotification[];
   /** Unified unread — derived from the merged items, never a second scalar. */
   unreadCount?: number;
   unreadByType?: Record<string, number>;
@@ -58,6 +60,7 @@ export function NotificationCenter(props: NotificationCenterProps) {
     notifications = [],
     invites = [],
     localItems = [],
+    peerItems = [],
     unreadCount = 0,
     unreadByType = {},
     latestTitle,
@@ -248,6 +251,7 @@ export function NotificationCenter(props: NotificationCenterProps) {
               unreadByType={unreadByType}
               invites={invites}
               localItems={localItems}
+              peerItems={peerItems}
               onMarkAllRead={onMarkAllRead}
               onMarkRead={onMarkRead}
               onOpenTarget={onOpenTarget}
