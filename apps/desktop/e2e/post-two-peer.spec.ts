@@ -161,6 +161,23 @@ test('a post made while a peer is online reaches that peer, with its media', asy
     expect(media.size).toBe(PNG_1x1.length)
     expect(media.sha).toBe(posted.contentHash)
 
+    // 3b. The receipt round trip completed: serving minted a challenge, B
+    //     persisted the bytes, read them BACK from its own store, and signed an
+    //     attestation. A's custody count is therefore 2 (A + B) — it was 1 (A
+    //     alone) before. This is the machine-level truth the "Stored on N
+    //     devices" line renders; the line itself is pinned by the
+    //     ProfileExpandedPost test.
+    await expect
+      .poll(
+        () =>
+          pageA.evaluate(async (hash: string) => {
+            const { durableCustodyHolders } = await import('/src/utils/p2pSwarm.ts')
+            return durableCustodyHolders(hash)
+          }, posted.contentHash!),
+        { timeout: 45_000, message: 'A never recorded B as a durable holder of the bytes' },
+      )
+      .toBe(2)
+
     // 4. And it is on B's screen, in B's own timeline.
     await pageB.goto('/#/feed')
     await expect(pageB.getByText(CAPTION)).toBeVisible({ timeout: 60_000 })

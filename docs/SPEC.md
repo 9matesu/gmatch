@@ -980,6 +980,23 @@ heat streak). Each +5% click power. Persist across prestige.
   never imported as a picture. A `content_hash` the row declares must match the
   bytes (mismatch skipped, never re-addressed); with none, the computed hash
   becomes the address. `services/socialPostImport.test.ts` pins every rule.
+- **Peer-confirmed durability is surfaced, and only a receipt gets you there
+  (2026-11-26).** The swarm already proved how many distinct identities durably
+  hold an object's bytes: the seeder mints a challenge on serve, the fetcher
+  signs a receipt only after reading the bytes back from its own persistent
+  store, and the seeder records a receipt that matches the challenge it minted.
+  That evidence was written to memory and IndexedDB and never shown.
+  `utils/p2pSwarm.ts` now emits `DURABLE_REPLICATION_EVENT` when a NEW
+  attestation lands, `hooks/useDurableCustody.ts` reads
+  `durableCustodyHolders(id)` (re-reading on that event), and
+  `utils/durableCustody.ts` turns the count into a claim — **silent at one
+  holder** (this node alone is not replication), `Stored on N devices` from two.
+  The post detail sheet renders it, keyed by the row's `content_hash` (the
+  object the bytes were addressed by). A HAVE, an in-flight download or an
+  online peer never reaches the label — a signature is the only way in.
+  `e2e/post-two-peer.spec.ts` asserts the machine truth (A's holder count goes
+  1 → 2 after B fetches and attests); `ProfileExpandedPost.test.tsx` pins the
+  rendered line and its silence at one holder.
 - Full specification documented in `docs/ARCHITECTURE-P2P.md`.
 
 ## 10e. Group chat, social graph and reports as peer operations (2026-10-22)

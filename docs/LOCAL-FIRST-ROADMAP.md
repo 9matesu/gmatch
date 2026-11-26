@@ -217,9 +217,14 @@ now persist to IndexedDB (`swarm_receipts`, capped, additive DB v3 upgrade)
 and are re-validated + reloaded on boot (`hydrateDurableReplications`), so
 replication evidence survives restarts. The swarm
 transport already bounds frames/objects and hash-verifies before persistence.
-Still open: authorization capabilities for private objects, streaming
-backpressure, UI surfacing of "peer-confirmed durable", and the
-multi-instance adversarial evidence.
+The evidence is now SURFACED, and only a receipt reaches the claim: a new
+attestation emits `DURABLE_REPLICATION_EVENT`, `hooks/useDurableCustody.ts`
+reads `durableCustodyHolders(id)` and re-reads on that signal, and
+`utils/durableCustody.ts` stays silent at one holder (this node alone is not
+replication) and says `Stored on N devices` from two. The post detail sheet
+renders it keyed by the row's `content_hash`; a HAVE, an in-flight download or
+an online peer never counts. Still open: authorization capabilities for private
+objects, streaming backpressure, and the multi-instance adversarial evidence.
 
 - [ ] Version swarm messages and bind every transfer to object CID/hash,
   manifest version, declared size, MIME, requester/owner identity, and an

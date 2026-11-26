@@ -6,6 +6,25 @@ Every item below was requested, was already "implemented" in some form, and
 did not actually work in the running app. Each one is now built, tested and
 verified live.
 
+- **"Stored on N devices" is now real — a peer's signed receipt, not a guess.**
+  The swarm has proved durable custody for a while: a seeding node mints a
+  challenge when it serves bytes, the fetching node signs a receipt only after
+  it reads those bytes back from its own persistent store, and the seeder keeps
+  a receipt that matches the challenge it minted. That evidence was written to
+  memory and to IndexedDB and then shown NOWHERE — a peer could confirm it held
+  your media and the app could not say so. `utils/p2pSwarm.ts` now emits
+  `DURABLE_REPLICATION_EVENT` when a new attestation lands,
+  `hooks/useDurableCustody.ts` reads the distinct-holder count and re-reads on
+  that signal, and `utils/durableCustody.ts` turns it into a claim that is
+  **silent at one holder** — this node alone is not replication — and
+  `Stored on N devices` from two. The post detail sheet shows it, keyed by the
+  row's `content_hash`. Nothing else counts: a HAVE, a download still in
+  flight or a peer that is merely online never reaches the label.
+  `e2e/post-two-peer.spec.ts` asserts the machine truth (the seeder's count goes
+  1 → 2 after the fetcher stores and attests) and
+  `ProfileExpandedPost.test.tsx` pins the rendered line and its silence at one
+  holder.
+
 - **A follow made offline survives a restart.** A follow was already a signed
   operation, committed durably before any network call - but nothing read it
   back: `followingIds` came from `GET /api/users/:id/following` alone. With the

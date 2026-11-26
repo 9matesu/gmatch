@@ -150,6 +150,25 @@ export function announcePeerOnline(peerId: string): void {
   }
 }
 
+/**
+ * Broadcast by the receipt roles whenever a NEW durable-custody attestation is
+ * recorded for an object we serve. Before this there was no live signal: the
+ * receipt landed in an in-memory map that nothing re-read, so the custody
+ * count changed silently and a surface showing it would have frozen on its
+ * first render. Detail carries the object id.
+ */
+export const DURABLE_REPLICATION_EVENT = 'orbit-durable-replication'
+
+function emitDurableReplication(id: string): void {
+  try {
+    if (typeof window !== 'undefined' && id) {
+      window.dispatchEvent(new CustomEvent(DURABLE_REPLICATION_EVENT, { detail: { id } }))
+    }
+  } catch {
+    /* event bus unavailable (tests/SSR) */
+  }
+}
+
 export interface LocalObjectMeta {
   ownerId?: string
   isPublic?: boolean
@@ -461,6 +480,9 @@ const moduleReceiptRoles = createSwarmReceiptRoles({
   readBack: confirmDurableHold,
   identity: () => receiptIdentity,
   onRecord: (id, entry) => {
+    // A new custody attestation landed: tell any surface that shows the
+    // custody of this object (the count is otherwise read-once).
+    emitDurableReplication(id)
     // Best-effort durable evidence: the session map keeps the receipt either
     // way; a failed write only costs restart survival, never correctness.
     // The distinct-holder list rides the same row (one row per object).

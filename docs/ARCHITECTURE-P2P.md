@@ -861,8 +861,13 @@ read-back, no signing identity) never do. Accepted receipts persist to
 IndexedDB (`orbit-gallery`/`swarm_receipts`, capped at 256) and are
 re-validated and reloaded on boot (`hydrateDurableReplications`), so
 "peer-confirmed durable" evidence survives restarts. The receipts are
-historical attestations (freshness was enforced at accept time); they are
-not yet surfaced in the UI.
+historical attestations (freshness was enforced at accept time), and they are
+now surfaced: `DURABLE_REPLICATION_EVENT` is emitted when a new attestation
+lands, `hooks/useDurableCustody.ts` reads `durableCustodyHolders(id)` for a row
+(its `content_hash`), and `utils/durableCustody.ts` turns the count into a
+claim — silent at one holder (this node alone is not replication), `Stored on
+N devices` from two. The post detail sheet shows it. A receipt is the ONLY way
+in: a HAVE, an in-flight download or an online peer never reaches the label.
 
 Pending swarm transfers persist (`gmatch_pending_transfers_v1`) and resume on
 boot and on `PEER_ONLINE_EVENT`, so an offline seeder is retried later rather

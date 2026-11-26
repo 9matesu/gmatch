@@ -11,6 +11,7 @@ import {
   ChevronRight,
   ZoomIn,
   ZoomOut,
+  ShieldCheck,
 } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { FeedPost, PostComment } from './GMatchFeed';
@@ -19,6 +20,8 @@ import { NativeVideoPlayer } from '../media/NativeVideoPlayer';
 import { isVideoPost, resolveMediaUrl } from '../../utils/media';
 import { timeAgo } from '../../utils/timeAgo';
 import { formatLikedBy } from '../../utils/likedBy';
+import { custodyStatus } from '../../utils/durableCustody';
+import { useDurableCustody } from '../../hooks/useDurableCustody';
 import { PostComments } from './PostComments';
 
 /**
@@ -65,6 +68,11 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
     post?.likers?.filter((l) => l.user_id !== identity?.orbitId),
     likeCount,
   );
+
+  // Peer-confirmed durability. Only a signed receipt that a peer read the bytes
+  // back from its own store counts, and only when it proves at least one OTHER
+  // device holds them (this node alone is not replication).
+  const custody = custodyStatus(useDurableCustody(post?.content_hash || post?.id));
 
   // Reset carousel/zoom whenever a different post is opened.
   useEffect(() => {
@@ -364,6 +372,18 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
       >
         {likedByLabel || `${likeCount.toLocaleString()} ${likeCount === 1 ? 'like' : 'likes'}`}
       </button>
+
+      {/* Peer-confirmed durability: a peer's signed receipt proved it stored
+          these bytes. Absent until that proof exists — never inferred. */}
+      {custody.label && (
+        <div
+          className="flex items-center gap-1 px-3 pb-2 text-2xs font-medium text-retro-muted"
+          aria-label="Media replication"
+        >
+          <ShieldCheck className="w-3.5 h-3.5 text-success-fg" />
+          <span>{custody.label}</span>
+        </div>
+      )}
 
       {/* Comments thread + composer, shared with the feed inline expansion. */}
       <PostComments
