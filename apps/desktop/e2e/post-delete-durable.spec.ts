@@ -16,12 +16,12 @@ import { seedApp } from './helpers'
  * page, and a delete that only hides a row is not a delete.
  *
  * The post is published through the app's OWN signed API (`orbitFetch` →
- * `POST /api/objects`), not through the composer: the composer's media picker
- * is a hover/click bubble that every e2e spec in this repo already fails on
- * (the "Post shared." toast lives inside the collapsed notification panel, so
- * it is never visible). What is under test here is the DELETE, so the publish
- * step must not be the flaky part. The delete itself goes through the real
- * profile UI.
+ * `POST /api/objects`), not through the composer. What is under test here is the
+ * DELETE, so the publish step must not be the flaky part; the composer journeys
+ * themselves are covered by `social.spec.ts` / `feed-latest.spec.ts`, which read
+ * the "Post shared." toast through the notification bell (`expectToast`) because
+ * the toast lives in that panel rather than in a floating overlay. The delete
+ * itself goes through the real profile UI.
  */
 
 test.use({ contextOptions: { serviceWorkers: 'block' } })

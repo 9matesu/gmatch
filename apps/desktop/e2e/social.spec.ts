@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { seedApp, firstRunOverlayKeys } from './helpers'
+import { seedApp, firstRunOverlayKeys, expectToast } from './helpers'
 import { generateIdentity } from '../src/identity.cjs'
 
 import { legalVersionKey } from '../src/legal/documents'
@@ -66,7 +66,7 @@ async function composePost(page: import('@playwright/test').Page, caption: strin
   await apply.click()
   await page.getByPlaceholder('Write a caption...').fill(caption)
   await page.getByRole('button', { name: 'Share', exact: true }).click()
-  await expect(page.getByText('Post shared.')).toBeVisible({ timeout: 20_000 })
+  await expectToast(page, 'Post shared.')
 }
 
 /** Profile stats render <div><span>{value}</span><span>{label}</span></div>. */

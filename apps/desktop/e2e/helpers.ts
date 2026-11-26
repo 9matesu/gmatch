@@ -1,3 +1,4 @@
+import { expect } from '@playwright/test'
 import { generateIdentity } from '../src/identity.cjs'
 import { legalVersionKey } from '../src/legal/documents'
 
@@ -145,6 +146,27 @@ export async function mockBooruFeed(page: import('@playwright/test').Page): Prom
   await page.route('**/__e2e__/**', async (route) => {
     await route.fulfill({ status: 200, contentType: 'image/png', body: PNG })
   })
+}
+
+/**
+ * Assert a toast appeared — where a toast actually lives.
+ *
+ * A toast does not float over the page: it lives in the notification centre (the
+ * bell), a left sidebar that mounts ONLY when opened, because the design keeps
+ * transient messages in one place instead of spamming a floating overlay. So
+ * opening the bell is exactly how a user reads a toast ("Post shared.", a
+ * purchase, a warning), and a journey that asserts one opens it, checks, closes.
+ *
+ * The auto-expire timer runs inside the centre, so a toast raised while the
+ * sidebar is closed waits in the store instead of aging out unseen.
+ */
+export async function expectToast(
+  page: import('@playwright/test').Page,
+  text: string,
+): Promise<void> {
+  await page.getByRole('button', { name: 'Notifications', exact: true }).first().click()
+  await expect(page.getByText(text).first()).toBeVisible({ timeout: 20_000 })
+  await page.getByRole('button', { name: 'Close notifications' }).click()
 }
 
 /**

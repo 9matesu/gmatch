@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { seedApp, firstRunOverlayKeys } from './helpers'
+import { seedApp, firstRunOverlayKeys, expectToast } from './helpers'
 import { generateIdentity } from '../src/identity.cjs'
 import { legalVersionKey } from '../src/legal/documents'
 
@@ -80,7 +80,7 @@ async function publishPost(page: Page, caption: string): Promise<void> {
   await apply.click()
   await page.getByPlaceholder('Write a caption...').fill(caption)
   await page.getByRole('button', { name: 'Share', exact: true }).click()
-  await expect(page.getByText('Post shared.')).toBeVisible({ timeout: 20_000 })
+  await expectToast(page, 'Post shared.')
   await page.waitForTimeout(3500) // outlast the 3s orbitFetch GET cache
 }
 

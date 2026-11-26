@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { seedApp } from './helpers'
+import { seedApp, expectToast } from './helpers'
 
 // "Set as OS wallpaper" and the domination remote effects.
 //
@@ -48,7 +48,7 @@ async function withAnImagePost(page: Page) {
   await page.getByRole('button', { name: 'Use this media', exact: true }).click()
   await page.getByPlaceholder('Write a caption...').fill('wallpaper source')
   await page.getByRole('button', { name: 'Share', exact: true }).click()
-  await expect(page.getByText('Post shared.')).toBeVisible({ timeout: 20_000 })
+  await expectToast(page, 'Post shared.')
   await page.waitForTimeout(3500) // outlast the 3s orbitFetch GET cache
 
   // The FEED card claims right-click for its own options sheet (GMatchFeed's

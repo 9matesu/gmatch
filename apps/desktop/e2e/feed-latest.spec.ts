@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { seedApp } from './helpers'
+import { seedApp, expectToast } from './helpers'
 
 test.use({ contextOptions: { serviceWorkers: 'block' } })
 
@@ -28,7 +28,7 @@ async function publishPost(page: import('@playwright/test').Page, caption: strin
   await use.click()
   await page.getByPlaceholder('Write a caption...').fill(caption)
   await page.getByRole('button', { name: 'Share', exact: true }).click()
-  await expect(page.getByText('Post shared.')).toBeVisible({ timeout: 20_000 })
+  await expectToast(page, 'Post shared.')
 }
 
 /** A feed tile that rendered media successfully: visible, never "No preview",
