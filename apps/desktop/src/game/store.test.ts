@@ -29,7 +29,6 @@ vi.stubGlobal('localStorage', {
 
 import { defaultSave, serialize, SAVE_KEY } from './save'
 import { setupTag } from './tags'
-import { getUserExcludes } from './tagFilter'
 import { fetchPosts, fetchPostsMulti } from '../services/booru'
 import type { BooruResponse } from '../services/booru'
 import { useGame, HISTORY_CAP, GRID_SIZE, gridSizeForMode, shufflePosts, __resetFeedRetryForTests, lastFeedRetryMs } from './store'
@@ -817,30 +816,8 @@ describe('3x3 grid mode', () => {
   })
 })
 
-describe('setup + user excludes (no hardcoded tags)', () => {
-  it('completeSetup commits 4 picks owned+selected and syncs excludes', () => {
-    const r = useGame
-      .getState()
-      .completeSetup(['bimbo', 'creampie', 'ahegao', 'doggystyle'], ['feet'])
-    expect(r.ok).toBe(true)
-    const s = useGame.getState()
-    expect(s.setupComplete).toBe(true)
-    expect(s.tags.map((t) => t.name)).toEqual(['bimbo', 'creampie', 'ahegao', 'doggystyle'])
-    expect(s.tags.every((t) => t.level === 1 && t.selected === true)).toBe(true)
-    expect(s.userExcludes).toEqual(['feet'])
-    expect(getUserExcludes()).toEqual(['feet'])
-  })
+describe('user excludes', () => {
 
-  it('completeSetup rejects wrong counts, dupes and blocked tags', () => {
-    expect(useGame.getState().completeSetup(['bimbo', 'creampie'], []).ok).toBe(false)
-    expect(
-      useGame.getState().completeSetup(['bimbo', 'bimbo', 'creampie', 'ahegao'], []).ok,
-    ).toBe(false)
-    expect(
-      useGame.getState().completeSetup(['bimbo', 'creampie', 'ahegao', 'loli'], []).ok,
-    ).toBe(false)
-    expect(useGame.getState().setupComplete).toBe(false)
-  })
 
   it('add/removeUserExclude round-trips, dupes refused', () => {
     expect(useGame.getState().addUserExclude(' Feet ')).toBe(true)

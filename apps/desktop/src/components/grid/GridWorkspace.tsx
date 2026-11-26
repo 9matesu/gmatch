@@ -12,7 +12,6 @@ import {
 import GoonPanel from '../../ui/GoonPanel'
 import ShopPanel from '../../ui/ShopPanel'
 import StatsPanel from '../../ui/StatsPanel'
-import { FeedTuneStep } from '../../firstRun/FeedTuneStep'
 import { useToast } from '../Toast'
 import { useGame } from '../../game/store'
 import { useResizablePanel } from '../../hooks/useResizablePanel'
@@ -76,7 +75,6 @@ export default function GridWorkspace({
   onSetWallpaper?: (url: string) => void
 }) {
   const ageVerified = useGame((s) => s.ageVerified)
-  const setupComplete = useGame((s) => s.setupComplete)
   const toasts = useGame((s) => s.toasts)
   const { toast } = useToast()
   const right = useResizablePanel('dock')
@@ -119,26 +117,12 @@ export default function GridWorkspace({
     useGame.getState().clearToasts()
   }, [toasts, toast])
 
-  // First feed pull once the player's own tags exist (was in old App.tsx).
+  // First feed pull once the age gate is passed. The clicker opens straight
+  // into the game: tags are added in the Tags tab, and fetchFeed falls back to
+  // the honest offline card until the player owns one.
   useEffect(() => {
-    if (ageVerified && setupComplete) void useGame.getState().fetchFeed()
-  }, [ageVerified, setupComplete])
-
-  if (!setupComplete) {
-    return (
-      <div className="relative flex h-full min-h-0 items-center justify-center overflow-hidden bg-surface-canvas p-4 sm:p-8">
-        <div className="glass-card flex max-h-full w-full max-w-2xl flex-col rounded-xl p-6 sm:p-8 space-y-5 overflow-y-auto styled-scrollbar">
-          <div className="shrink-0 text-center">
-            <h2 className="text-2xl font-black tracking-tighter text-retro-fg">Pick your pleasure</h2>
-            <p className="text-sm text-retro-muted mt-1.5">
-              Tap {4} pills to tune your feed. Nothing is fetched before that.
-            </p>
-          </div>
-          <FeedTuneStep onFinished={() => { /* fetchFeed fires off the setupComplete effect */ }} />
-        </div>
-      </div>
-    );
-  }
+    if (ageVerified) void useGame.getState().fetchFeed()
+  }, [ageVerified])
 
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-transparent p-3 sm:p-4 pb-[var(--island-clearance)]">

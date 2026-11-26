@@ -6,6 +6,17 @@ Every item below was requested, was already "implemented" in some form, and
 did not actually work in the running app. Each one is now built, tested and
 verified live.
 
+- **There is no clicker startup tag picker.** The clicker used to open behind a
+  "Feed tune" step that collected exactly 4 starter tags before the game would
+  run (`FeedTuneStep`, driven by `setupComplete`). The step, its store API
+  (`completeSetup` / `updateSetup` / `SETUP_TAG_COUNT`), the `setupComplete`
+  save flag, the Settings "Starter picks" recap and the `!setupComplete` gate in
+  `GridWorkspace` are all gone. The clicker opens straight into the game, and a
+  feed begins in ONE place — the Tags tab, whose custom-tag add is
+  validity-gated, live-probed and now starts the feed itself
+  (`addCustomTag` → `fetchFeed`), so the market/first fetch needs no separate
+  setup step. Drained-foe discovery (`discoverTags`) and bought tags still seed
+  a feed as before.
 - **The feed never shows a "No preview" post.** A row whose media bytes cannot
   be resolved used to sit in the timeline as an empty frame or a "No preview"
   strip. It is now dropped until its bytes actually exist — and the hide is

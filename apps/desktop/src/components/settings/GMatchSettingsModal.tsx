@@ -26,7 +26,6 @@ function VaultUsage() {
   return <span className="text-xs text-retro-muted">{label}</span>;
 }
 import { useGame, MAX_USER_EXCLUDES } from '../../game/store';
-import { FeedTuneStep } from '../../firstRun/FeedTuneStep';
 import { DeleteAccountSection } from './DeleteAccountSection';
 import { PasskeyManager } from '../PasskeyManager';
 import { UpdateSection } from './UpdateSection';
@@ -87,13 +86,10 @@ function FeedSettingsTab({
   toast?: (msg: string, type?: string) => void
   onNavigateTab?: (tab: SettingsTabId) => void
 }) {
-  const tags = useGame((s) => s.tags);
   const userExcludes = useGame((s) => s.userExcludes);
   const addUserExclude = useGame((s) => s.addUserExclude);
   const removeUserExclude = useGame((s) => s.removeUserExclude);
   const [draft, setDraft] = useState('');
-  const [showPicksEditor, setShowPicksEditor] = useState(false);
-  const owned = tags.filter((t) => t.level === 0 && t.selected !== false);
 
   const add = () => {
     const parts = draft
@@ -117,41 +113,10 @@ function FeedSettingsTab({
   return (
     <div className="space-y-6 animate-orbit-fade-in">
       <div className="p-4 bg-glass-w5 border border-edge rounded-lg space-y-3">
-        <h4 className="text-xs font-medium text-retro-fg">Starter picks</h4>
-        {owned.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5">
-            {owned.map((t) => (
-              <span
-                key={t.name}
-                className="inline-flex items-center rounded-full border border-edge bg-glass-w5 px-2.5 py-1 text-xs font-mono text-retro-fg"
-              >
-                {t.name}
-              </span>
-            ))}
-          </div>
-        ) : (
-          <p className="text-xs text-retro-muted">
-            No starter tags selected.
-          </p>
-        )}
+        <h4 className="text-xs font-medium text-retro-fg">Excluded tags</h4>
         <p className="text-xs text-retro-muted">
           Active excluded tags ({userExcludes.length}/{MAX_USER_EXCLUDES}).
         </p>
-        {showPicksEditor ? (
-          <FeedTuneStep onFinished={() => setShowPicksEditor(false)} />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setShowPicksEditor(true)}
-            className="px-3 py-1.5 rounded-lg border border-edge text-xs font-semibold text-retro-fg hover:bg-glass-w10 cursor-pointer active:scale-(--scale-press) transition-colors"
-          >
-            Change starter tags
-          </button>
-        )}
-      </div>
-
-      <div className="p-4 bg-glass-w5 border border-edge rounded-lg space-y-3">
-        <h4 className="text-xs font-medium text-retro-fg">Excluded tags</h4>
         <div className="flex gap-2">
           <input
             type="text"

@@ -34,9 +34,10 @@ separate economies, no bridge between them.
   shared recipes in `src/ui/styles.ts` (legacy goongrid.css deleted; only
   keyframes remain in `src/ui/grid-animations.css`).
 - Single 18+ gate: the shell's `AgeGateModal` (mirrored into the idle store).
-  Single onboarding: `firstRun/OnboardingFlow` includes the feed-tune step
-  (pick exactly 4 starter tags + excludes). Excludes editor lives in the
-  settings modal's Feed tab.
+  Single onboarding: `firstRun/OnboardingFlow` is profile-only (display name /
+  import). There is no startup feed picker: the clicker opens straight into the
+  game and tags are added in the Tags tab (the ONE place a feed begins).
+  Excludes editor lives in the settings modal.
 - Feed entry (1.6.8): the timeline opens with an inline composer strip (avatar
   + "Share something…" + Post) wired to the same Create Post modal — one click
   to write, no scroll. The shipping default is a 2-column grid; installs still
@@ -138,9 +139,9 @@ separate economies, no bridge between them.
   rarer in the feed), `weight` (feed bias).
   base/income derived from tag length + frequency (rarer tag = pricier = better).
 - Max 20 owned levels per tag. Owned tags list = the feed query (top 5 by level).
-- No hardcoded starter tags: the player picks exactly 4 on the setup screen
-  (validity-gated + live-probed); the market otherwise seeds from drained foes
-  (`discoverTags`), custom tags, and the Config tab.
+- No hardcoded starter tags and no startup picker: the Tags tab is the only
+  place a feed begins (custom tag add is validity-gated + live-probed); the
+  market otherwise seeds from drained foes (`discoverTags`) and bought tags.
 
 ## 4. Images & rarity (ORBIT card-valuation flavor)
 
@@ -303,13 +304,14 @@ product path.
   If the install is skipped or fails the app is unchanged (local sources only) —
   it never blocks boot or the feed.
 
-### 6b. Feed/market queries (user spec: player picks, no hardcodes)
+### 6b. Feed/market queries (no hardcodes, Tags tab is the entry point)
 
-- No hardcoded/default tags anywhere: the setup screen collects exactly 4
-  starter picks (owned level 1, feed-selected, free). Feed query = top-4 owned
-  tags round-robin, one tag per fetch; market query = top-3 owned tags.
-  Nothing owned → feed stays offline, market stays empty until setup picks,
-  custom tags, or drained-foe discovery seed it.
+- No hardcoded/default tags anywhere. A feed begins when the player adds a tag
+  in the Tags tab (custom tag, validity-gated + live-probed, owned level 1 and
+  feed-selected for free). Feed query = top-4 owned tags round-robin, one tag
+  per fetch; market query = top-3 owned tags. Nothing owned → the clicker shows
+  the honest offline card and the market stays empty until a tag is added or a
+  drained foe seeds one (`discoverTags`).
 
 ### 6c. Custom tags (user spec: free-form search → add when valid)
 
@@ -658,9 +660,10 @@ product path.
   first rendered from a local/P2P mirror (which carries no count) updates when the
   server row lands, instead of freezing the first value it ever saw. Only the
   user's own in-flight like outranks the post, and only until the post catches up.
-- Tags tab: owned pills toggle ON/OFF plus SOLO (feed only that one tag).
-  Gallery tab: text box filters keepsakes by tag substring.
-  Config tab: starter picks recap + extra excludes (add/remove, 100 max).
+- Tags tab: owned pills toggle ON/OFF plus SOLO (feed only that one tag); this
+  is also the single place a feed starts (add a custom tag). Gallery tab: text
+  box filters keepsakes by tag substring. Config tab: extra excludes
+  (add/remove, 100 max).
 - Keepsakes render from locally held bytes only: the Electron media vault on
   disk, or the IndexedDB object store when there is no bridge. A saved keep is
   identified by `sha256(bytes)` (`localRef`), images/videos are served over the
@@ -712,7 +715,7 @@ process enforce the same hard line, so the two must not drift — a parity
 test (`apps/desktop/src/game/blocklistParity.test.ts`) pins them against the
 same fixtures.
 
-Player excludes (setup screen + Config tab, 100 max, persisted) extend this
+Player excludes (Config tab, 100 max, persisted) extend this
 list at runtime: queries, post tags, and market discovery all respect them,
 using the same token-boundary rule.
 

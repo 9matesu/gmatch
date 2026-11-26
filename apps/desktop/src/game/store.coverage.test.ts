@@ -488,13 +488,6 @@ describe('setup / excludes edges', () => {
     expect(mem.has(SAVE_KEY)).toBe(true)
   })
 
-  it('completeSetup refuses a second time', () => {
-    expect(
-      useGame.getState().completeSetup(['bimbo', 'creampie', 'ahegao', 'doggystyle'], []).ok,
-    ).toBe(true)
-    const again = useGame.getState().completeSetup(['a', 'b', 'c', 'd'], [])
-    expect(again).toEqual({ ok: false, message: 'Setup already done.' })
-  })
 
   it('addUserExclude rejects blanks and over-long terms', () => {
     expect(useGame.getState().addUserExclude('   ')).toBe(false)

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { getSecureItem } from '../utils/secure-storage'
 import { clickGain, heatMultiplier, heatStreakAfter, isCrit } from './economy'
 import type { EconomyInput } from './economy'
-import { buyTag as buyTagLevel, deriveTagStats, discoverTags, feedQuery, mergeTags as mergeTagList, normalizeCustomTag, removeTag as removeTagList, setupTag, soloTag as soloTagList, toggleTag as toggleTagLevel, validateCustomTag } from './tags'
+import { buyTag as buyTagLevel, deriveTagStats, discoverTags, feedQuery, mergeTags as mergeTagList, normalizeCustomTag, removeTag as removeTagList, soloTag as soloTagList, toggleTag as toggleTagLevel, validateCustomTag } from './tags'
 import { buildRoundQueries, roundQueryKey, PILLS_PER_ROUND, RECENT_QUERY_DEPTH } from './queryBuilder'
 import { getUserExcludes, banTagsInBlocklist, isNoise, isQueryBlocked, rankTags, setUserExcludes } from './tagFilter'
 import { tagHitsAnyTerm } from '@orbit/shared'
@@ -114,8 +114,6 @@ export interface GameState {
    *  the main process on every query) AND in the runtime exclude list. */
   banTag: (tag: string) => Promise<boolean>
   dismissDrop: (id: string) => void
-  /** Player-picked starter tags + extra excludes (setup screen, one shot). */
-  setupComplete: boolean
   userExcludes: string[]
   coRules: { a: string; b: string; count: number }[]
   /** Player-owned feed sources (custom URLs / local folders, tried first). */
@@ -124,9 +122,6 @@ export interface GameState {
   addFolderSource: (folderId: string, folderPath: string, label?: string) => { added: boolean; message: string }
   removeCustomSource: (id: string) => void
   toggleCustomSource: (id: string) => void
-  completeSetup: (tags: string[], excludes: string[]) => { ok: boolean; message: string }
-  /** Re-run the setup picks after the first one (Settings → Feed / onboarding edit). */
-  updateSetup: (tags: string[], excludes: string[]) => { ok: boolean; message: string }
   addUserExclude: (raw: string) => boolean
   removeUserExclude: (term: string) => boolean
   buyTag: (name: string) => boolean
@@ -291,7 +286,6 @@ function freshData() {
     clicks: 0,
     crits: 0,
     tags: [] as OwnedTag[],
-    setupComplete: false,
     userExcludes: [] as string[],
     coRules: [] as { a: string; b: string; count: number }[],
     customSources: [] as CustomSource[],
@@ -342,10 +336,7 @@ function freshData() {
 /** Viewed-image history cap for the back arrow. */
 export const HISTORY_CAP = 50
 
-/** Setup screen: exactly this many starter tags, picked by the player. */
-export const SETUP_TAG_COUNT = 4
-
-/** Cap on player-excluded terms (setup screen + config tab). */
+/** Cap on player-excluded terms (Config tab). */
 export const MAX_USER_EXCLUDES = 100
 
 /**
@@ -1047,6 +1038,10 @@ export const useGame = create<GameState>((set, get) => ({
       achievements: prog.achievements,
       toasts: [...prog.toasts, { id: toastSeq++, msg: `Custom tag added: ${verdict.name}` }],
     })
+    // The Tags tab is now the ONE place a feed starts. Adding the first tag
+    // must pull a round immediately, or the clicker would sit on the offline
+    // card until something else happened to fetch.
+    void get().fetchFeed()
     return { added: true, message: `Added ${verdict.name} — steering the feed.` }
   },
 
@@ -1055,7 +1050,7 @@ export const useGame = create<GameState>((set, get) => ({
     if (s.fetching) return
     set({ fetching: true })
     // Player-owned tags only — no hardcoded seeds. Nothing owned: the market
-    // waits for setup picks, custom tags, or drained-foe discovery.
+    // waits for custom tags added in the Tags tab or drained-foe discovery.
     const owned = feedQuery(s.tags)
     if (owned.length === 0) {
       set({ fetching: false })
@@ -1575,7 +1570,6 @@ export const useGame = create<GameState>((set, get) => ({
       maxHeatStreak: Math.max(s.maxHeatStreak, s.heatStreak),
       backgroundUrl: s.backgroundUrl,
       viewMode: s.viewMode,
-      setupComplete: s.setupComplete,
       userExcludes: s.userExcludes,
       coRules: s.coRules,
       customSources: s.customSources,
@@ -1618,7 +1612,6 @@ export const useGame = create<GameState>((set, get) => ({
       shards: d.shards,
       prestigeCount: d.prestigeCount,
       tags,
-      setupComplete: d.setupComplete,
       userExcludes,
       coRules: d.coRules,
       customSources: d.customSources,
@@ -1647,52 +1640,6 @@ export const useGame = create<GameState>((set, get) => ({
   verifyAge: () => {
     set({ ageVerified: true })
     get().save()
-  },
-
-  completeSetup: (names, excludes) => {
-    if (get().setupComplete) return { ok: false, message: 'Setup already done.' }
-    return get().updateSetup(names, excludes)
-  },
-
-  updateSetup: (names, excludes) => {
-    const s = get()
-    // Validity gate only (no network): exactly SETUP_TAG_COUNT unique live
-    // probing happens on the setup screen before this is called.
-    const clean: string[] = []
-    for (const raw of names) {
-      const verdict = validateCustomTag(raw)
-      if (!verdict.ok) return { ok: false, message: `“${raw}” is not usable — pick another.` }
-      if (!clean.includes(verdict.name)) clean.push(verdict.name)
-    }
-    if (clean.length !== SETUP_TAG_COUNT) {
-      return { ok: false, message: `Pick exactly ${SETUP_TAG_COUNT} tags.` }
-    }
-    // Re-select starter tags without discarding purchased levels: keep any
-    // already-owned tag's level/stats (flipping feed selection), add fresh
-    // picks at level 1, and retain previously-owned (leveled) tags that are no
-    // longer starters as owned-but-unselected so income is never lost.
-    const prevTags = new Map(s.tags.map((t) => [t.name, t]))
-    const pickedNames = new Set(clean)
-    const picked: OwnedTag[] = clean.map((name) => {
-      const existing = prevTags.get(name)
-      return existing ? { ...existing, selected: true } : setupTag(name)
-    })
-    for (const t of s.tags) {
-      if (!pickedNames.has(t.name) && t.level > 0) picked.push({ ...t, selected: false })
-    }
-    setUserExcludes(excludes.slice(0, MAX_USER_EXCLUDES))
-    const next = { ...s, tags: picked, setupComplete: true, userExcludes: getUserExcludes() }
-    const prog = progress(next, s.xp)
-    set({
-      tags: picked,
-      setupComplete: true,
-      priorityTag: clean[clean.length - 1] ?? null,
-      userExcludes: next.userExcludes,
-      achievements: prog.achievements,
-      toasts: [...prog.toasts, { id: toastSeq++, msg: `Feed tuned: ${clean.join(', ')}` }],
-    })
-    get().save()
-    return { ok: true, message: `Feed tuned — ${clean.length} starters set.` }
   },
 
   addUserExclude: (raw) => {
