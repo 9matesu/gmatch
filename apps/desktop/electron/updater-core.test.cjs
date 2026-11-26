@@ -39,6 +39,13 @@ async function main() {
     'a public host may NOT serve the feed over http')
   assert.strictEqual(core.isPrivateFeedUrl('https://gmatch.pages.dev/release.json'), false)
 
+  // ---- parseDigest: GitHub's REAL colon form ----
+  assert.strictEqual(core.parseDigest(`sha256:${'c'.repeat(64)}`), 'c'.repeat(64),
+    'GitHub serves sha256:<hex>; the dash-only regex refused every real asset')
+  assert.strictEqual(core.parseDigest(`sha256-${'d'.repeat(64)}`), 'd'.repeat(64))
+  assert.strictEqual(core.parseDigest('sha256:abc'), null)
+  assert.strictEqual(core.parseDigest('md5:' + 'e'.repeat(64)), null)
+
   // ---- planCheck: site release.json shape ----
   const site = {
     file: 'gMatch-1.6.0-portable.exe',

@@ -20,10 +20,10 @@ Two topologies, chosen once per launch in Settings → Server
   friends. No cloud account, no telemetry, no hosted dependency — the machine
   you are sitting at IS the node.
 - **client (opt-in):** talks to someone else's node (a friend's machine, or any
-  `http(s)://host[:port]` you were given). There is no hosted data default: the
-  Cloudflare project at `gmatch.pages.dev` is only a directory/mail rendezvous,
-  so a packaged build with no stored mode starts its own server instead of
-  dialing a host that cannot hold a world.
+  `http(s)://host[:port]` you were given). There is no hosted data default and
+  no hosted rendezvous: the node a client is connected to is the directory and
+  the sealed-mail relay for its clients, so a packaged build with no stored mode
+  starts its own node instead of dialing a host that cannot hold a world.
 - **A stored client pointer is resolved, never assumed.** Two shapes, two rules,
   because provenance and reachability answer different questions. A pointer
   written by an **older app** carries no `v` stamp and is **not dialed at all**:
@@ -38,17 +38,18 @@ Two topologies, chosen once per launch in Settings → Server
   so Settings → Server explains which of the two happened and offers Reconnect /
   Forget it. No hostname list exists; nothing is deleted.
 
-## Running with no hosted world (2026-10-24)
+## Running with no hosted world or rendezvous (2026-10-24, host-free since 2026-11-26)
 
 There is no hosted full node, so the app is self-sufficient: **host mode is the
-default** and the bundled node is the world. The only shared infrastructure is
-the Cloudflare rendezvous at `gmatch.pages.dev` (a signed node directory plus
-sealed mail in D1), which can be disabled with `gmatch.central.url = none`.
-Nothing else in the client resolves to a hosted address — the API base falls
-back to `http://127.0.0.1:8790`, a stored node is kept only while it answers
-(the launch probe above; the renderer also drops a stored base that fails its
-own `/api/health` probe), and the server directory is read from the node you
-are on.
+default** and the bundled node is the world. There is no hosted rendezvous
+either — the node you are connected to serves the signed node directory and the
+sealed-mail relay for its clients, and gossips them onward. A shared hub is
+opt-in (`gmatch.central.url` / `VITE_CENTRAL_URL` pointing at a node you run)
+and defaults to `none`. Nothing else in the client resolves to a hosted
+address — the API base falls back to `http://127.0.0.1:8790`, a stored node is
+kept only while it answers (the launch probe above; the renderer also drops a
+stored base that fails its own `/api/health` probe), and the server directory is
+read from the node you are on.
 
 What the local node gives you, with no third party involved:
 
@@ -75,17 +76,17 @@ yours and your friend's must be reachable from each other:
    the sealed messages pass through it (it cannot read them) and the media and
    the signed operations travel **directly** between the two apps over WebRTC.
 
-**Updates from a page and from peers.** The public manifest is
-`https://gmatch.pages.dev/release.json`, staged from the shipped exe so its
-sha256 describes the bytes users download. A node can also serve
-`/release.json` and `/releases/<file>` from `userData/releases`: `npm run dist`
-ends with `stage:release`, which copies the built exe there and writes the
-manifest (version + sha256 + size), so the builder's own node serves the new
-build to its peers. The updater asks the node this install is connected to
-first, then the Pages manifest (skipped when it does not answer). The sha256
-in the manifest is what makes it safe: the updater verifies it and discards a
-mismatch. A plain-http feed is accepted only for a host on the user's own
-network (loopback or a private LAN address).
+**Updates from a release and from peers.** The public feed is the project's
+**GitHub Release**, whose asset carries a `digest` (`sha256:<hex>`) and a size.
+A node can also serve `/release.json` and `/releases/<file>` from
+`userData/releases`: `npm run dist` ends with `stage:release`, which copies the
+built exe there and writes the manifest (version + sha256 + size), so the
+builder's own node serves the new build to its peers. The updater asks every
+feed in parallel — the node this install is connected to and the GitHub Release
+(skipped when it does not answer). The sha256 in the manifest is what makes it
+safe: the updater verifies it and discards a mismatch. A plain-http feed is
+accepted only for a host on the user's own network (loopback or a private LAN
+address).
 
 **The honest limits.** Two nodes that are both unreachable from the public
 internet cannot meet — that is NAT, not architecture, and no client-side code
@@ -94,8 +95,8 @@ node or a TURN relay. And when the direct WebRTC channel is blocked, the
 swarm falls back to the node's WebSocket relay: the media still arrives, but
 it travels through that node in the clear (the chunks are hash-verified, not
 sealed — the DMs and the room messages stay sealed either way). The direct
-path is what keeps the media private from the node. When neither the Pages
-manifest nor the connected node answers, the updater says "no host answered"
+path is what keeps the media private from the node. When neither the GitHub
+Release nor the connected node answers, the updater says "no host answered"
 rather than pretend the app is current, and the artifact can still be copied
 by hand.
 
@@ -240,8 +241,9 @@ Two edges matter when debugging a user's "my keepsake is gone":
 
 ## Self-update (`electron/updater.cjs`, `updater-core.cjs`)
 
-Feed: the project site's `release.json` at
-`https://gmatch.pages.dev/release.json`, plus the manifest of the node this
+Feed: the project's GitHub Release
+(`https://api.github.com/repos/9matesu/gmatch/releases/latest`), plus the
+manifest of the node this
 install talks to when that node serves one. Both are asked on every check; the
 winner is the highest version among the hosts that answered. The manifest
 carries the absolute `downloadUrl` (the GitHub Release asset) plus the

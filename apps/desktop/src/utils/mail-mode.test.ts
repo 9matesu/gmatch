@@ -46,11 +46,15 @@ describe('courier-mode detection', () => {
     expect(slowFn).toHaveBeenCalledTimes(1)
   })
 
-  it('identifies the Cloudflare courier without probing', async () => {
-    const fetchFn = vi.fn() as unknown as typeof fetch
+  it('the retired Pages origin is NOT special-cased — it goes to the wire like any other host', async () => {
+    // The Pages origin used to run the blind courier. It is a STATIC release
+    // page now: there is no mailbox behind it. Short-circuiting it as a
+    // courier claimed a service that does not exist, so it is probed like
+    // anything else (and a stale pointer to it is dropped upstream).
+    const fetchFn = vi.fn(async () => new Response('{}', { status: 404 })) as unknown as typeof fetch
     expect(await detectMailMode('https://gmatch.pages.dev', fetchFn)).toBe('courier')
     expect(await detectMailMode('https://preview.gmatch.pages.dev/', fetchFn)).toBe('courier')
-    expect(fetchFn).not.toHaveBeenCalled()
+    expect(fetchFn).toHaveBeenCalledTimes(2)
   })
 
   it('loopback (bundled sidecar / dev node) is courier without probing', async () => {

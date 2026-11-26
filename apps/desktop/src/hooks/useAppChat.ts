@@ -28,7 +28,7 @@ import { findUserById } from '../utils/userLookup'
 import { toChatPeer, type ChatPeer } from '../components/chat/chatPeer'
 import { buildPreviewRows } from '../components/chat/RoomsPreview'
 import type { GroupMember } from '../components/chat/GroupMembersPopover'
-import { isKnownSiteCourier, cachedMailMode, detectMailMode } from '../utils/mail-mode'
+import { cachedMailMode, detectMailMode } from '../utils/mail-mode'
 import { useCourierDms } from './useCourierDms'
 import { usePeerReports } from './usePeerReports'
 import { ensureGroupRoom, mergeGroupMessages, roomIdForGroup, type GroupRoomOps } from '../services/groupRooms'
@@ -950,7 +950,7 @@ export function useAppChat(ctx: AppChatContext) {
   const deleteThread = useCallback(async (peerId: string) => {
     if (!identity) return
     const base = getApiBaseUrl()
-    const isCourier = courierActive || isKnownSiteCourier(base) || cachedMailMode(base) === 'courier'
+    const isCourier = courierActive || cachedMailMode(base) === 'courier'
     try {
       if (isCourier) {
         // Delete for me: tombstone every row so a later pull cannot restore a

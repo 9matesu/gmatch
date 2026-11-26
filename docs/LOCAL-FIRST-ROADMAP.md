@@ -9,16 +9,14 @@ run the narrow checks, then commit only the files in that slice.
 
 ## Current state and constraints
 
-- **No hosted world (2026-10-24).** The Fly full node and the Render courier
-  were retired. Nothing resolves to them any more: packaged installs start
-  their OWN node (host mode is the default), and the only shared piece is a
-  blind Cloudflare rendezvous at `gmatch.pages.dev` — a signed public-node
-  directory plus a sealed-mail relay in D1, with no content tables, accounts,
-  presence or TURN. The courier role is still "the node each client is
-  connected to": blind, stateless, only moving ciphertext. The end state is
-  **direct peer-to-peer** — no third-party host storing posts, media, comments,
-  likes, profiles or presence (SPEC §12b). Every route's fate is written down
-  in `docs/API-INVENTORY.md`.
+- **No hosted world or rendezvous (2026-11-26).** The Fly full node, the Render
+  courier and the Cloudflare-KV courier (`site/functions/`) were all retired.
+  Packaged installs start their OWN node (host mode is the default), and the
+  node each client is connected to serves the signed public-node directory and
+  the sealed-mail relay — the "courier role" is a capability of that node, not a
+  hosted origin. The end state is **direct peer-to-peer** — no third-party host
+  storing posts, media, comments, likes, profiles or presence (SPEC §12b). Every
+  route's fate is written down in `docs/API-INVENTORY.md`.
 - The desktop app still uses API nodes for feed reads and writes, comments,
   likes, profile/directory data, notifications, Lobby chat, and other social
   state. Public gossip replicates signed post metadata between hosts, but that
@@ -41,8 +39,9 @@ run the narrow checks, then commit only the files in that slice.
   sealed end to end since swarm-v1 (2026-10-22), including over the relay.
   Keep the existing DM envelope unless a concrete cryptographic defect is
   shown; do not silently change its wire format.
-- The central deployment is configured as a blind courier and returns 404 for
-  stateful routes. Do not make it a content host or open remote CORS as a
+- A node booted with `SITE_SERVICES` that omit the stateful services is a
+  courier shape and returns 404 for stateful routes. Do not make it a content
+  host or open remote CORS as a
   workaround. Reproduce API routing/configuration errors against a recorded
   runtime before changing them.
 - Do not remove, rewrite, or migrate user data destructively. Add versioned,
@@ -524,7 +523,22 @@ routes disabled.
 cross-platform test results, green required gates, and no unverified claims in
 UI or documentation.
 
-## Evidence log (2026-10-24, the Cloudflare rendezvous)
+## Evidence log (2026-11-26, the Cloudflare dependency is gone)
+
+- `site/functions/` (the Cloudflare-KV mailbox + directory) is deleted;
+  `deploy-pages.mjs` ships a static page only and refuses to run if a
+  `functions/` directory comes back.
+- `central.url` has no default (`utils/central.ts`); a stored or env
+  `*.gmatch.pages.dev` pointer is dropped (`isRetiredRendezvous`), never dialed.
+- `isKnownSiteCourier` is removed; `MailClient` opens one watch socket per
+  mailbox base and falls back to polling a box only after a socket dies twice
+  without ever opening.
+- The updater's public feed is the GitHub Releases API; `parseDigest` accepts
+  the real `sha256:<hex>` colon form (the dash-only regex refused every asset).
+- `site/release.json` and the page's hash blocks are regenerated from the
+  published GitHub asset (they had described a build that was never published).
+
+## Evidence log (2026-10-24, the Cloudflare rendezvous — superseded 2026-11-26)
 
 - The Render courier and the Fly full node were **removed from the code**:
   `isCourierApiUrl` now knows only `gmatch.pages.dev`; `DEFAULT_CENTRAL_URL`

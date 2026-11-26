@@ -3,18 +3,18 @@ import { sealApiRequest } from '@orbit/protocol';
 import { logger } from './logger';
 
 /**
- * Courier nodes are BLIND: `SITE_SERVICES` makes every route outside
- * directory/mail 404 at the edge (apps/api/src/serve.ts + site-services.ts).
- * They are a valid *directory*, never a valid *data* base — pointing the data
- * API at one turns every lobby/feed/users poll into a 404.
+ * The retired Pages origin is NOT a world and NOT a relay.
  *
- * The courier lives on the same Cloudflare Pages origin as the release page
- * (site/functions/api/[[path]].ts), including its preview subdomains.
+ * It once served the blind rendezvous on the same origin as the release
+ * page. That courier is gone: the origin is a static page now, so pointing
+ * the data API at it turns every lobby/feed/users poll into a 404. The
+ * matcher stays as a guard so an old pointer can never be dialed as a data
+ * base — it is dropped upstream (utils/central.ts), not used as a fallback.
  * Used by computeApiBase + the WS builder.
  */
 const COURIER_HOSTS = /(^|\.)gmatch\.pages\.dev$/;
 
-/** True for the Cloudflare courier origin (a directory, never a world). */
+/** True for the retired Pages origin (never a world, never a relay). */
 export function isCourierHost(url: string | null | undefined): boolean {
   if (!url?.trim()) return false;
   try {
@@ -73,7 +73,7 @@ function computeApiBase(): string {
 
   // Last resort (no preload/env/stored server, e.g. a browser build served
   // from a public host): the node on this machine. There is no hosted data
-  // fallback — the Cloudflare courier is a directory/mail relay only, and a
+  // fallback — the release page is a static page, never a relay, and a
   // dead address is worse than an honest "no node".
   return LOCAL_NODE_BASE
 }

@@ -242,17 +242,19 @@ export function ServersView({
 
 
   // There is no built-in world any more: a fresh install runs its OWN node
-  // (packaged sidecar) and finds others through the directory. A blind
-  // courier is a directory, never a destination (isCourierApiUrl guards the
-  // switch paths), so it is not listed as a row either.
+  // (packaged sidecar) and finds others through the directory. The retired
+  // Pages origin is a static release page, never a destination
+  // (isCourierApiUrl guards the switch paths), so it is not listed as a row
+  // either.
 
 
   // Mirror the connected server into the dev-proxy cookie so browser /api
-  // traffic follows it. A courier is a DIRECTORY, not a data node (it 404s
-  // every stateful route), so it is never written to `gmatch.api.url` — doing
-  // so pointed the data API at the courier and 404'd every lobby/feed poll,
-  // in dev and in the packaged app alike. A cookie left by an older build is
-  // expired here too: the dev proxy honours it and would keep answering 503.
+  // traffic follows it. The Pages origin is a STATIC PAGE, not a data node
+  // (it 404s every stateful route), so it is never written to
+  // `gmatch.api.url` — doing so pointed the data API at it and 404'd every
+  // lobby/feed poll, in dev and in the packaged app alike. A cookie left by
+  // an older build is expired here too: the dev proxy honours it and would
+  // keep answering 503.
   useEffect(() => {
     try {
       if (typeof document !== 'undefined' && document.cookie.includes('gmatch_server_url=')) {

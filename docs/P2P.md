@@ -51,9 +51,9 @@ Settings → Server instead of pretending to be connected.
 3. **Node directory.** A node in host mode re-registers itself every 15 min
    (`useServerHeartbeat` → `POST <directory>/api/servers`) with name,
    description, a LAN endpoint hint and optional counts. Rows go stale after
-   24 h. `GET https://gmatch.pages.dev/api/servers` returning `{"servers": []}`
-   is honest and normal: it means nobody is hosting a registered node right
-   now, not that discovery is broken.
+   24 h. The directory is the node you are connected to; an empty
+   `GET /api/servers` → `{"servers": []}` is honest and normal: it means nobody
+   is hosting a registered node right now, not that discovery is broken.
 4. **Peer-node hints.** `utils/peerNodes.ts` keeps a bounded localStorage hint
    (peer id → node URL) fed by beacons and the directory. Losing it costs one
    rediscovery, never a message.
@@ -185,8 +185,7 @@ hears the tombstone. Deletion is a request, not remote control.
 | `npm run test` | desktop 263 files / 1990 tests, API 102 files / 994 tests (1.6.5 gate) |
 | standalone `electron/*.test.cjs` | 21/21 PASS |
 | `node site/check.mjs` | OK |
-| live courier | `GET https://gmatch.pages.dev/api/health` → `{"mode":"courier","services":["mail","directory"]}`; stateful routes 404 |
-| live manifest | `GET https://gmatch.pages.dev/release.json` → 1.6.5 + sha256 of the CI asset |
+| live node | `GET <node>/api/health` reports this machine's node (full node); stateful routes answer |
 
 What is **not** proven here: real cross-internet NAT traversal between two
 networks. Same-machine processes exercise the protocol and the sealing, not
@@ -199,4 +198,9 @@ the internet.
   packaged builds exclude `node_modules`. Removed 2026-10-28
   (ADR-2026-10-28-01). `docs/NET.md` is kept as history.
 - **BitTorrent trackers, TURN relay, central signaling, `/api/pm`**: retired;
-  no route and no client path remains.
+  no route and no client path remains. (The *public WebTorrent trackers* are a
+  separate, current path — the rotating-infohash mesh rendezvous, §10d. The
+  entry above was about the old per-node wss trackers.)
+- **Hosted courier** (Cloudflare Pages `site/functions/`, KV-backed mailbox +
+  directory): removed 2026-11-26. The node each client is connected to is the
+  directory and the sealed-mail relay; a shared hub is opt-in.

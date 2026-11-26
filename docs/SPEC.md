@@ -1148,75 +1148,56 @@ what it lives in.
   hidden. A 503 from the release host is the free-tier dyno waking up — an
   error to retry, not a missing release.
 
-### 12b. No hosted WORLD — one hosted RENDEZVOUS (gmatch 2.1)
+### 12b. No hosted WORLD and no hosted RENDEZVOUS — the node is both
 
-**Amendment (2026-11-14).** gmatch 2.0 removed the hosted service *and* the
-rendezvous, which made "everyone signed in sees each other" impossible without
-both machines being publicly reachable. gmatch 2.1 splits the two again:
+**Decision (2026-11-26).** Two earlier attempts split the difference and each
+left a Cloudflare dependency behind. This settles it: **nothing hosted holds app
+state, and nothing hosted relays for the app.**
 
-- **No hosted world.** Still true: no third party stores a profile, a post, a
-  like, a presence row or a media byte. Each install keeps its own node, and
-  media never leaves the peers.
-- **One hosted rendezvous, and it is blind.** `site/functions/api/[[path]].ts`
-  (Cloudflare Pages, project `gmatch`) serves sealed mail (`PUT/GET
-  /api/mail/:token`, TTL 120 s), the server directory (`GET/POST
-  /api/servers`) and `GET /api/health`. Storage is **KV**: envelopes the host
-  cannot open, and directory rows (a name + an address). No D1, no Durable
-  Object, no WebSocket — the client polls every 20 s, so the egress budget is a
-  few hundred bytes per peer.
-- **`central.url` defaults to that rendezvous** (`utils/central.ts`). The old
-  `isRetiredCourier` drop is gone: the host answers `/api/health` again.
-  `none`/`off`/`0` still switches it off, and the app keeps working from the
-  node you are on.
-- **Why it is safe to point everyone at it:** the courier learns *who* is asking
-  for *which* mailbox and the size of the envelope — metadata, not content.
-  Presence is derived client-side from signed beacons with a 60 s TTL, so the
-  host stores no roster at all.
-
-Everything below is the gmatch 2.0 text, kept because the *world* is still
-host-free.
-
----
-
-### (gmatch 2.0) No hosted service — the own node is the world
-
-**Decision (2026-11-07): there is no hosted service of any kind.** The end
-state is **direct peer-to-peer**: no third-party host stores posts, media,
-comments, likes, profiles, presence — and no third-party host holds a mailbox
-or a directory row either.
-
-- A packaged install starts its **own** full node (local Bun sidecar). That is
-  the default world and the only one the app assumes.
-- `https://gmatch.pages.dev` is a **static release page** only: the download
-  page, the legal pages and `release.json`. The hosted courier function and its
-  D1 database were removed (the D1 was emptied, then deleted). `/api/*` on
-  that origin returns the page, never courier JSON, and a client that still
-  points there fails loudly instead of talking to a stale rendezvous.
-- There is **no built-in world row** in Servers: joining is a node code from a
-  friend or a row published in the directory. A hub/directory is never a
-  destination.
-- What remains shared is a **rendezvous**: the directory (who exists and where)
-  and sealed mail (signalling, DMs, presence beacons). Both are replaceable;
-  the app keeps working with `gmatch.central.url = none` — which is the
-  **default** since gmatch 2.0 (`apps/desktop/src/utils/central.ts`). A shared
-  hub is opt-in: set `gmatch.central.url` / `VITE_CENTRAL_URL` to a node you
-  run.
-- A pointer to the retired hosted rendezvous (`*.gmatch.pages.dev`) is dropped
-  instead of dialed (`isRetiredCourier` in `central.ts`), so an old install
-  cannot keep talking to a service that no longer exists.
+- **No hosted world.** No third party stores a profile, a post, a like, a
+  presence row or a media byte. Each install keeps its own node, and media never
+  leaves the peers.
+- **No hosted rendezvous either.** The node a client is connected to **is** the
+  directory and the sealed-mail relay for its clients: it serves
+  `PUT/GET /api/mail/:token` (TTL 120 s), `GET/POST /api/servers` and
+  `GET /api/health`, and it gossips the directory to the nodes that know it
+  (§10d, wave 2). `gmatch.central.url` defaults to **none**
+  (`utils/central.ts`): the app runs from the node you are on.
+- **The Pages origin is a STATIC release page.** gmatch 2.0 removed the
+  D1-backed courier; gmatch 2.1 reintroduced a Cloudflare-KV one
+  (`site/functions/`) and pointed every install at it. That too is gone
+  (2026-11-26): `site/functions/` is deleted, `deploy-pages.mjs` refuses to
+  publish a function, and `/api/*` on that origin returns the page. A client
+  that still carries a pointer to it **drops** it (`isRetiredRendezvous` in
+  `central.ts`, `isCourierApiUrl` in `api.ts`) instead of dialing a service
+  that no longer exists.
+- **A shared hub is opt-in** (`gmatch.central.url` / `VITE_CENTRAL_URL` → a node
+  you run), only to bridge two networks that cannot reach each other.
+  `none`/`off`/`0` is the default state.
+- **Why it is free and scalable:** a static page is CDN-cached and costs
+  nothing at any population; discovery and mail ride the nodes the peers
+  already run plus the public WebTorrent trackers (§10d). There is no account,
+  no quota and no bill that grows with users.
+- **A node without a WebSocket is still reachable, and no host is
+  special-cased.** `MailClient` opens one watch socket per mailbox base and
+  falls back to polling that box (every 20 s) only after a socket dies **twice
+  without ever opening** — a proxy that drops the upgrade, not a node that went
+  away. The old "known page courier → poll" short-circuit is deleted: it named
+  a service that does not exist.
 
 Consequences that are already implemented:
-- The updater asks **one** public feed (`gmatch.pages.dev/release.json`) and the
-  manifest of the node this install talks to, when that node serves one. A host
-  that does not answer is skipped instead of blocking the check.
+- The updater asks the **GitHub Release** for this project
+  (`/repos/9matesu/gmatch/releases/latest`) and the manifest of the node this
+  install talks to, when that node serves one. A host that does not answer is
+  skipped instead of blocking the check. A published asset digest is
+  `sha256:<hex>` (colon form) and is verified before anything is installed.
 - `site/releases/` is **local staging only** (gitignored): the published
   artifact lives in its GitHub Release and the site links it by absolute URL
   with the hash in `release.json`. A site artifact carrying every historical
   exe is a build-context problem, not a convenience.
-- The release feed itself is still a single origin. When it is gone, the
-  artifact has to be served by the node (or by the user), and until then the
-  updater says "no host answered" honestly rather than pretend the app is up
-  to date.
+- The release feed is still a single upstream. When it is gone, the artifact has
+  to be served by the node (or by the user), and until then the updater says
+  "no host answered" honestly rather than pretend the app is up to date.
 
 ## 13. Servers (directory, federation, admin) — v1.1+
 ADR-002 (`docs/ADR-002-servers.md`) é canônico; resumo de operação:

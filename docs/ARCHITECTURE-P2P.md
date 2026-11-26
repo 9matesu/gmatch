@@ -17,10 +17,12 @@ not a world, never a data base.
 
 A packaged install runs a **full node**: it stores the world it serves
 (profiles, posts, objects, presence) and is the directory, the mail relay and
-the swarm rendezvous for its clients. The **courier** is the same code with
-`SITE_SERVICES` set (the Pages rendezvous): blind and stateless, holding only
+the swarm rendezvous for its clients. The **courier** shape is the same code
+with `SITE_SERVICES` set: blind and stateless, holding only
 sealed envelopes and relayed swarm frames, with every other route 404 at the
-edge. The two are one codebase with one env flag, not two deployments.
+edge. The two are one codebase with one env flag, not two deployments. No
+hosted courier is deployed any more (since 2026-11-26) — the courier shape is a
+capability a node can run, not an origin the app assumes.
 
 The courier role moved from "one central host" to "the node each client is
 connected to":
@@ -267,17 +269,17 @@ DM round trip was dead in a two-instance run (`e2e/courier-two-instance.spec.ts`
 unmasked and green). `MailClient` accepts `extraBases` (bounded to 4,
 deduped): `useCourierDms` always passes the node the client is connected to
 when it differs from the mail base; each distinct base gets a watch socket
-(known page couriers poll instead) and is drained (with ack) on every pull.
+(a base behind a WS-dropping proxy falls back to polling) and is drained (with
+ack) on every pull.
 One server piece was required for browser contexts: `serve.ts`'s fast-path
 `/api/health` now answers with CORS headers — without them a cross-origin
 client's health probe is unreadable, courier mode is never detected, and no
 beacon is ever broadcast.
 
-### The release feed (2026-10-24)
+### The release feed (2026-10-24, host-free since 2026-11-26)
 
-`release.json` is served by the Cloudflare Pages project
-(`https://gmatch.pages.dev`, staged by `site/deploy-pages.mjs`) and, when it
-publishes one, by the node this install is connected to:
+The manifest is served by the node this install is connected to (and by the
+project's GitHub Release, which is where the artifact actually lives):
 
 | route | what |
 |---|---|
@@ -287,12 +289,14 @@ publishes one, by the node this install is connected to:
 The node directory is `userData/releases` on a packaged install (empty by
 default). `npm run dist` ends with `stage:release`, which copies the built
 exe there and writes the manifest — so the builder's own node serves the new
-build to everyone who joined it. The updater asks, in order: the node this
-install is connected to, then the Pages manifest (skipped when it does not
-answer within its budget). The manifest's sha256 is what makes the
-download safe: the updater verifies it and discards a mismatch, and a plain
-http feed is accepted only for a host on the user's own network (loopback or
-a private LAN address) — never for a public one.
+build to everyone who joined it. The updater asks every feed in parallel: the
+node this install is connected to, and the public feed — the project's **GitHub
+Releases API** (`/repos/9matesu/gmatch/releases/latest`), whose asset carries a
+`digest` (`sha256:<hex>`) and a `size` for verification. A host that does not
+answer is skipped instead of blocking the check. The manifest's sha256 is what
+makes the download safe: the updater verifies it and discards a mismatch, and a
+plain http feed is accepted only for a host on the user's own network (loopback
+or a private LAN address) — never for a public one.
 
 ### Group chat is a sealed room (2026-10-22)
 

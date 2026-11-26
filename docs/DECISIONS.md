@@ -97,6 +97,12 @@
 
 ## ADR-2026-10-25-01 — No hosted data base: Cloudflare is a meeting point (accepted, supersedes ADR-1.5.5-06)
 
+> **Superseded by ADR-2026-11-07-01.** The "one hosted rendezvous" this ADR kept
+> was removed on 2026-11-07; gmatch 2.1 reinstated a Cloudflare-KV courier in
+> `site/functions/`, and that too was deleted on 2026-11-26 (the courier shape is
+> now a capability a node can run, not an origin the app assumes). The text below
+> records the 2026-10-25 position; read it as history.
+
 - Every install runs its own node (bundled Bun sidecar, host mode by default).
   The only hosted component is the Cloudflare Pages courier
   (`gmatch.pages.dev`): a signed public-node directory and a sealed-mail relay

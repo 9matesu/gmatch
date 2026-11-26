@@ -63,32 +63,43 @@ describe('MailClient (blind courier)', () => {
     expect(sockets[0].sent.join()).not.toContain(bob.publicKeyHex)
   })
 
-  it('polls the Cloudflare courier instead of holding a websocket', async () => {
+  it('a base whose websocket never opens falls back to polling it', async () => {
     vi.useFakeTimers()
     try {
       const fetchImpl = makeFetch(async () => okJson({ envelopes: [] }))
-      const sockets: FakeSocket[] = []
-      const c = new MailClient({
-        apiBase: 'https://gmatch.pages.dev',
-        identity: bob,
-        fetchImpl,
-        onMail: () => {},
-        webSocketFactory: () => {
-          const s = new FakeSocket()
-          sockets.push(s)
-          return s
-        },
-      })
+      const { c, sockets } = client({ apiBase: 'http://no-ws.test', fetchImpl })
       c.start()
-      // No socket: pages.dev has no shared live state across isolates.
-      expect(sockets).toHaveLength(0)
+      expect(sockets).toHaveLength(1)
+      // A proxy that drops the upgrade: the socket dies without ever opening.
+      sockets[0].emitClose()
+      await vi.advanceTimersByTimeAsync(5_000) // backoff -> one more attempt
+      expect(sockets).toHaveLength(2)
+      sockets[1].emitClose()
       await vi.advanceTimersByTimeAsync(0)
-      expect(fetchImpl).toHaveBeenCalledTimes(1)
+      // Two failed attempts: this node offers the HTTP mailbox only.
+      expect(fetchImpl).toHaveBeenCalled()
+      const before = (fetchImpl as unknown as { mock: { calls: unknown[] } }).mock.calls.length
       await vi.advanceTimersByTimeAsync(20_000)
-      expect(fetchImpl).toHaveBeenCalledTimes(2)
+      expect((fetchImpl as unknown as { mock: { calls: unknown[] } }).mock.calls.length).toBeGreaterThan(before)
+      // No third socket: the base is poll-only now.
+      expect(sockets).toHaveLength(2)
       c.stop()
-      await vi.advanceTimersByTimeAsync(60_000)
-      expect(fetchImpl).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a socket that OPENED and then dropped is retried, not downgraded to polling', async () => {
+    vi.useFakeTimers()
+    try {
+      const fetchImpl = makeFetch(async () => okJson({ envelopes: [] }))
+      const { c, sockets } = client({ apiBase: 'http://busy.test', fetchImpl })
+      c.start()
+      sockets[0].emitOpen() // a real node: it talked to us
+      sockets[0].emitClose()
+      await vi.advanceTimersByTimeAsync(5_000)
+      expect(sockets).toHaveLength(2)
+      c.stop()
     } finally {
       vi.useRealTimers()
     }
@@ -329,7 +340,7 @@ describe('MailClient multi-base mailboxes (receiver drains every legitimate box)
     return { seen, fetchImpl }
   }
 
-  it('pull drains the node box AND the rendezvous box, acking on both', async () => {
+  it('pull drains the node box AND the hub box, acking on both', async () => {
     const { seal1to1 } = await import('@orbit/protocol')
     const nodeEnv = seal1to1('mail to my node box', 'mail', alice, bob)
     const { seen, fetchImpl } = multiFetch((url) =>
@@ -337,10 +348,10 @@ describe('MailClient multi-base mailboxes (receiver drains every legitimate box)
         ? okJson({ envelopes: [nodeEnv] })
         : okJson({ envelopes: [] }),
     )
-    const { c } = client({ apiBase: 'https://gmatch.pages.dev', extraBases: ['http://node:8790'], fetchImpl })
+    const { c } = client({ apiBase: 'https://hub.test', extraBases: ['http://node:8790'], fetchImpl })
     await c.pull()
     expect(seen.filter((u) => u === `http://node:8790/api/mail/${BOB_TOKEN}`)).toHaveLength(1)
-    expect(seen.filter((u) => u === `https://gmatch.pages.dev/api/mail/${BOB_TOKEN}`)).toHaveLength(1)
+    expect(seen.filter((u) => u === `https://hub.test/api/mail/${BOB_TOKEN}`)).toHaveLength(1)
     expect(seen.find((u) => u === `http://node:8790/api/mail/${BOB_TOKEN}/ack`)).toBeTruthy()
   })
 
@@ -351,15 +362,13 @@ describe('MailClient multi-base mailboxes (receiver drains every legitimate box)
     expect(seen.filter((u) => u === `http://node:8790/api/mail/${BOB_TOKEN}`)).toHaveLength(1)
   })
 
-  it('watch opens one socket per distinct non-courier base; the page courier polls', async () => {
-    const { c, sockets } = client({ apiBase: 'https://gmatch.pages.dev', extraBases: ['http://node:8790'], fetchImpl: makeFetch(async () => okJson({ envelopes: [] })) })
+  it('watch opens one socket per distinct mailbox base', async () => {
+    const { c, sockets } = client({ apiBase: 'http://a.test', extraBases: ['http://node:8790'], fetchImpl: makeFetch(async () => okJson({ envelopes: [] })) })
     c.start()
-    // pages.dev is a known site courier (poll); node:8790 is not — it gets
-    // exactly one watch socket.
-    expect(sockets).toHaveLength(1)
+    expect(sockets).toHaveLength(2)
     sockets[0].emitOpen()
     const watchFrame = JSON.parse(sockets[0].sent[0])
-    void watchFrame
+    expect(watchFrame).toEqual({ type: 'watch', tokens: [BOB_TOKEN] })
   })
 
   it('stop() closes every watch socket', async () => {

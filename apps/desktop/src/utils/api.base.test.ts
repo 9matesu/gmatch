@@ -14,7 +14,7 @@ globalThis.localStorage = {
 } as Storage
 
 /**
- * The Cloudflare courier is a blind directory/mail relay and can never be a
+ * The retired Pages origin was a blind directory/mail relay and can never be a
  * data base. An ordinary node (local or a friend's) is joinable.
  */
 describe('api base without a hosted fallback', () => {

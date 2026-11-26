@@ -23,9 +23,16 @@ function parsePortableName(name) {
   return m ? m[1] : null
 }
 
-/** GitHub asset digest field: 'sha256-<hex64>' -> lowercase hex | null */
+/**
+ * GitHub asset digest field -> lowercase hex | null.
+ *
+ * GitHub serves `"digest": "sha256:<hex64>"` (COLON). An older npm-era shape
+ * used `sha256-<hex64>` (DASH), so both are accepted. The dash-only regex made
+ * every real asset hash parse to null, which read as "unverified" and refused
+ * every update.
+ */
 function parseDigest(d) {
-  const m = /^sha256-([0-9a-f]{64})$/i.exec(String(d || ''))
+  const m = /^sha256[-:]([0-9a-f]{64})$/i.exec(String(d || ''))
   return m ? m[1].toLowerCase() : null
 }
 
@@ -61,11 +68,14 @@ function shaFromReleaseJson(meta, version) {
 }
 
 /**
- * Normalize the site release.json ({ file, version, sha256, downloadUrl? })
- * into a download plan source. The public site publishes the manifest derived
- * from the shipped artifact; the download URL may point at the GitHub Release.
+ * Normalize a release manifest ({ file, version, sha256, downloadUrl? }) into a
+ * download plan source. Both the site's `release.json` and the node's own
+ * manifest use this shape. The download URL is usually absolute (the GitHub
+ * Release asset); when it is not, it is resolved against the feed that served
+ * the manifest (`base`) — a manifest with no absolute URL and no base is not
+ * a usable source, so it resolves to null instead of inventing a host.
  */
-function parseSiteRelease(meta, base = 'https://gmatch.pages.dev') {
+function parseSiteRelease(meta, base = '') {
   if (!meta || typeof meta !== 'object') return null
   const urlHint = String(meta.downloadUrl || '')
   const name = String(meta.file || '') || decodeURIComponent(urlHint.split('/').pop() || '')
@@ -73,7 +83,10 @@ function parseSiteRelease(meta, base = 'https://gmatch.pages.dev') {
   if (!/^\d+(\.\d+)*$/.test(version) || !/\.exe$/i.test(name)) return null
   const rel = `/releases/${name.replace(/[^\w.-]/g, '')}`
   let url = String(meta.downloadUrl || '')
-  if (!/^https?:\/\//i.test(url)) url = base + rel
+  if (!/^https?:\/\//i.test(url)) {
+    if (!base) return null
+    url = base.replace(/\/+$/, '') + rel
+  }
   return { version, name, url, digest: shaField(meta.sha256), sizeBytes: sizeField(meta.sizeBytes) }
 }
 

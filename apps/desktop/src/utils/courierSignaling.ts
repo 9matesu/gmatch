@@ -246,9 +246,10 @@ export async function sendCourierSignal(
   )
 
   try {
-    // Sealed mail is relayed by the courier (Cloudflare by default), so the
-    // signal reaches a peer on ANY world. Only a deployment that disabled the
-    // directory falls back to the peer's node / our node.
+    // Sealed mail is relayed by the node this client is connected to (the hub,
+    // when one is configured), so the
+    // signal reaches a peer on ANY world. With no hub configured the base is
+    // this machine's node.
     const base = (getCentralApiUrl() || opts?.base || getApiBaseUrl()).replace(/\/+$/, '')
     const url = `${base}/api/mail/${token}`
     const res = await fetchImpl(url, {

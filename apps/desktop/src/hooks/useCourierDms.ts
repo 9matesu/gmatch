@@ -7,7 +7,7 @@ import { deliveryToken } from '@orbit/protocol'
 import { rotateEpoch, peerAddressToken, type EpochState } from '../utils/handleRotation'
 import { getSecureItem, setSecureItem } from '../utils/secure-storage'
 import { RoomManager, type Room, type RoomMessage } from '../utils/rooms'
-import { detectMailMode, staticMailMode, cachedMailMode, isKnownSiteCourier, type MailMode } from '../utils/mail-mode'
+import { detectMailMode, staticMailMode, cachedMailMode, type MailMode } from '../utils/mail-mode'
 import { getApiBaseUrl } from '../utils/api'
 import { getCentralApiUrl } from '../utils/central'
 import { logger } from '../utils/logger'
@@ -17,9 +17,11 @@ import { activeTypists, pruneTypingState } from '../utils/dmTyping'
 import { resolveNodeAddress } from '../utils/serverAddress'
 
 /**
- * Where sealed mail is relayed. The Cloudflare courier is the default
- * (directory origin): two peers on different worlds still share one mailbox
- * relay. A deployment that disables the directory falls back to its own node.
+ * Where sealed mail is relayed. The node this client is connected to is the
+ * relay: two peers on the SAME node share one mailbox, and a peer on another
+ * node is reached through the node its beacon names. A shared hub is opt-in
+ * (`gmatch.central.url`) for bridging two networks that cannot reach each
+ * other; without one, the client's own node is the relay.
  */
 function mailBase(): string {
   return (getCentralApiUrl() || getApiBaseUrl()).replace(/\/+$/, '')
@@ -27,10 +29,10 @@ function mailBase(): string {
 
 /**
  * Mailboxes besides the primary this client must drain: the node we are
- * CONNECTED to, when the primary is the rendezvous courier. A peer who
- * learned our node from a signed beacon drops envelopes into THAT node's
- * mailbox (ARCHITECTURE-P2P §10d) — a receiver that drains only the
- * rendezvous never sees mail addressed to its own node's box.
+ * CONNECTED to, when the primary is an opt-in hub. A peer who learned our
+ * node from a signed beacon drops envelopes into THAT node's mailbox
+ * (ARCHITECTURE-P2P §10d) — a receiver that drains only the hub never sees
+ * mail addressed to its own node's box.
  */
 function extraMailBases(): string[] {
   const node = getApiBaseUrl().replace(/\/+$/, '')
@@ -80,11 +82,11 @@ export interface CourierDeps {
  */
 export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps = {}) {
   const [mode, setMode] = useState<MailMode>(() => {
-    // Known courier hosts / the loopback sidecar run current code: start in
-    // courier mode right away so no legacy fetch fires before the probe
-    // resolves. A bare/relative base still waits for the wire probe.
+    // The loopback sidecar runs current code: start in courier mode right
+    // away so no legacy fetch fires before the probe resolves. A bare/relative
+    // base still waits for the wire probe.
     const base = mailBase()
-    if (isKnownSiteCourier(base) || staticMailMode(base)) return 'courier'
+    if (staticMailMode(base)) return 'courier'
     return cachedMailMode(base) || 'legacy'
   })
   const [threads, setThreads] = useState<Record<string, DmMessage[]>>({})

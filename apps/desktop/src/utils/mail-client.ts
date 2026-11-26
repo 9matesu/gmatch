@@ -11,7 +11,6 @@ import {
 } from '@orbit/protocol'
 import { watchedTokens, isEpoch, type EpochState } from './handleRotation'
 import { wsUrlForBase } from './api'
-import { isKnownSiteCourier } from './mail-mode'
 
 /**
  * Blind-courier mail client (plan Phase 3.1).
@@ -60,9 +59,14 @@ export interface MailClientDeps {
 
 const BACKOFF_BASE_MS = 1000
 const BACKOFF_MAX_MS = 60_000
-/** Courier polling: the Cloudflare relay has no shared socket state, so the
- *  client asks for its box on a slow timer instead of holding a WS. */
+/** Fallback polling cadence for a base that cannot hold a WebSocket. */
 const POLL_INTERVAL_MS = 20_000
+/**
+ * How many times a base's watch socket may die WITHOUT ever opening before it
+ * is treated as HTTP-mailbox-only. One is a blip; two in a row is a proxy that
+ * drops the upgrade.
+ */
+const WS_FAIL_LIMIT = 2
 /** Bounded receiver fan-out: at most this many mailbox bases are drained. */
 const MAX_MAIL_BASES = 4
 
@@ -93,10 +97,13 @@ export class MailClient {
   /** Rotating session epochs (wave 2 C2): cur is this boot's, prev drains
    * one boot of overlap. Persisted by the caller via secure-storage. */
   epoch: EpochState = { cur: '', prev: '' }
-  /** One watch socket per mailbox base (a full node can push; the page
-   *  courier cannot). */
+  /** One watch socket per mailbox base. A node can push; a base behind a
+   *  proxy that drops the upgrade cannot, so it falls back to polling. */
   private sockets = new Map<string, MailSocket>()
   private reconnectAttempts = new Map<string, number>()
+  /** Bases whose watch socket never opens: drained by polling instead. */
+  private pollBases = new Set<string>()
+  private wsFailures = new Map<string, number>()
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private reconnectBase: string | null = null
   private closed = false
@@ -149,24 +156,14 @@ export class MailClient {
     return watchedTokens(this.token, this.epoch, this.deps.identity.publicKeyHex)
   }
 
-  /** Open the anonymous watch channels (one per non-courier mailbox base).
-   *  Idempotent. Bases that are known page couriers (stateless across
-   *  isolates, no shared socket state) poll their boxes instead. */
+  /** Open the anonymous watch channels (one per mailbox base). Idempotent.
+   *  A base whose socket cannot be established falls back to polling its box
+   *  (`noteWsFailure`), so a node behind a WS-dropping proxy still receives
+   *  mail. */
   start(): void {
     if (this.started || this.closed) return
     this.started = true
-    let anyPollBase = false
-    for (const base of this.bases()) {
-      if (isKnownSiteCourier(base)) {
-        anyPollBase = true
-        continue
-      }
-      this.connect(base)
-    }
-    if (anyPollBase) {
-      void this.pull()
-      this.startPolling()
-    }
+    for (const base of this.bases()) this.connect(base)
   }
 
   stop(): void {
@@ -212,18 +209,28 @@ export class MailClient {
   }
 
   private connect(base: string): void {
-    if (this.closed || this.sockets.has(base)) return
+    if (this.closed) return
+    if (this.pollBases.has(base)) {
+      // Already known to be HTTP-mailbox-only: keep draining it.
+      void this.pull()
+      this.startPolling()
+      return
+    }
+    if (this.sockets.has(base)) return
     let sock: MailSocket
     try {
       sock = this.socketFactory()(this.wsUrl(base))
     } catch (e) {
       this.log(`[mail] socket create failed (${base}): ${(e as Error).message}`)
-      this.scheduleReconnect(base)
+      this.noteWsFailure(base)
       return
     }
     this.sockets.set(base, sock)
+    let opened = false
     sock.onopen = () => {
+      opened = true
       this.reconnectAttempts.delete(base)
+      this.wsFailures.delete(base)
       sock.send(JSON.stringify({ type: 'watch', tokens: this.watchedTokens() }))
       // Anything that arrived while disconnected is fetched once on connect.
       void this.pull()
@@ -239,8 +246,34 @@ export class MailClient {
     }
     sock.onclose = () => {
       this.sockets.delete(base)
+      // A socket that never opened proves nothing about liveness: the
+      // upgrade may be blocked. A socket that DID open and then dropped is a
+      // live node that went away — retry the socket.
+      if (!opened) {
+        this.noteWsFailure(base)
+        return
+      }
       this.scheduleReconnect(base)
     }
+  }
+
+  /**
+   * A watch socket that died without opening. After `WS_FAIL_LIMIT` such
+   * deaths the base is drained by polling: the node offers the HTTP mailbox
+   * only, and holding a socket is pointless.
+   */
+  private noteWsFailure(base: string): void {
+    if (this.closed) return
+    const failures = (this.wsFailures.get(base) ?? 0) + 1
+    this.wsFailures.set(base, failures)
+    if (failures >= WS_FAIL_LIMIT) {
+      this.log(`[mail] no websocket on ${base} — polling its box`)
+      this.pollBases.add(base)
+      void this.pull()
+      this.startPolling()
+      return
+    }
+    this.scheduleReconnect(base)
   }
 
   private scheduleReconnect(base: string): void {

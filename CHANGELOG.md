@@ -148,6 +148,32 @@ verified live.
      the peer's key, and the peer was still invisible. The mesh now reports the
      peer and the roster admits it, with the same trust as a peer the node
      listed. A peer with no proven key is not shown.
+- **No Cloudflare dependency is left.** The blind rendezvous that gmatch 2.1 put
+  on Cloudflare Pages — a KV-backed mailbox + directory in `site/functions/` —
+  is deleted, and the page is static again (CDN-cached, zero cost at any
+  population). What that changes:
+  - **`central.url` has no default.** It used to point at that origin. The node
+    you are connected to IS the directory and the sealed-mail relay; a shared
+    hub is opt-in (`gmatch.central.url` / `VITE_CENTRAL_URL`) and points at a
+    node you run.
+  - **A stored `*.gmatch.pages.dev` pointer is DROPPED, never dialed**
+    (`isRetiredRendezvous` in `utils/central.ts`), stored or from the env.
+  - **`isKnownSiteCourier` is gone.** It claimed a courier that no longer exists
+    and short-circuited the mail-mode probe for that host. `MailClient` opens
+    one watch socket per mailbox base and falls back to polling a box only after
+    a socket dies **twice without ever opening** — a proxy that drops the
+    upgrade, not a node that went away. `deploy-pages.mjs` ships no function, no
+    `wrangler.toml` and no KV binding, and refuses to run if `site/functions/`
+    comes back.
+  - **The updater asks the GitHub Release, and its digest parses.** GitHub
+    serves `"digest":"sha256:<hex>"` (COLON) and the parser only accepted
+    `sha256-<hex>` (DASH), so every real asset hash read as `null` and every
+    update was refused as unverified — it could never have installed anything.
+    Both forms are accepted now.
+  - **The site manifest is honest again.** `release.json` described a build that
+    was never published (different hash AND size from the GitHub asset), so a
+    download verification would fail. The manifest and the page's hash blocks
+    were regenerated from the published bytes, and `site/check.mjs` passes.
 
 ## Unreleased — gmatch 2.0: no hosted service; the own node is the world
 

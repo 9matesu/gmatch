@@ -13,13 +13,14 @@ const { createHash } = require('node:crypto')
 const { spawn } = require('node:child_process')
 const core = require('./updater-core.cjs')
 
-// The canonical public release feed is the project's own Pages site
-// (release.json is generated from the shipped exe, so the sha256 describes the
-// bytes users download). It is the ONLY hosted feed: there is no second
-// deployment to keep alive, and the node this install talks to can still
-// serve release.json to its peers (resolved at check time, below).
+// The canonical public release feed is the project's GitHub Releases API.
+// GitHub's asset carries a `digest` (`sha256:<hex>`) and a `size`, so the
+// download is verified against the published bytes and nothing else is
+// trusted. This is the ONLY hosted feed: there is no second deployment to keep
+// alive, and the node this install talks to can still serve release.json to its
+// peers (resolved at check time, below).
 const RELEASE_FEEDS = [
-  { url: 'https://gmatch.pages.dev/release.json', base: 'https://gmatch.pages.dev' },
+  { url: 'https://api.github.com/repos/9matesu/gmatch/releases/latest', base: 'https://api.github.com' },
 ]
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
 const FIRST_CHECK_DELAY_MS = 12 * 1000
@@ -120,7 +121,8 @@ function createUpdater({ app, webContents, log = () => {}, spawnFn = spawn, feed
   }
   // The release feed, resolved AT CHECK TIME: the node this install talks
   // to can serve the artifact to its peers, and the user can switch worlds
-  // between two checks. Then the public Pages manifest (skipped when down).
+  // between two checks. Then the public GitHub Releases API (skipped when
+  // down).
   const resolveFeeds = () => {
     if (injectedFeeds) return injectedFeeds
     if (process.env.GMATCH_RELEASE_URL) {
