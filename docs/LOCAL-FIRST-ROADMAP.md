@@ -437,8 +437,25 @@ durable log instead of calling a node that does not own the post
 (`persistLike` → `likePersistenceRoute` → `persistPeerLike`); server posts keep
 the node path. The comment box write path is live for peer-replicated posts
 too: a signed `comment.create`/`comment.delete` in the durable log, replicated
-like every other operation (`persistPeerComment`). Still open: profile/follow
-operations and moderation reports. The import surface is live (below).
+like every other operation (`persistPeerComment`).
+
+Bookmarks follow the same split, with a different half: a peer-replicated post
+has no node row, so `POST /api/posts/:id/save` answers `404 Post not found` and
+the save used to vanish (icon hollow, nothing on reload, never in the Saved
+tab). A save is the reader's own private intent, not a shared signal, so unlike
+a like it is NOT gossiped: `savePersistenceRoute` sends a peer post to
+`utils/peerSaves.ts`, a durable identity-scoped store, and the peer projection
+folds `is_saved` back into the row (`applySavesToFeedPosts`). The profile Saved
+tab merges the node query (`?saved=1`) with the locally-bookmarked peer rows.
+`e2e/save-peer-post.spec.ts` pins the whole path on a genuine peer row: the
+node's 404, the local write, and the bookmark surviving a reload.
+
+Profile fields, follows and reports are operations too (`profile.update`,
+`follow.add`/`follow.remove`, `report.create`), consumed as follows: profile
+updates fold deterministically per actor and feed `rememberNames`, and a peer
+report surfaces in the author's notification centre. Follow operations are
+published and accepted, but still open is the READ side: `projectFollows` has
+no consumer, so the follower/following lists continue to come from the node.
 
 **Migration of existing content.** `services/socialPostImport.ts` turns the
 user's OWN public local posts into `post.create` operations, so the

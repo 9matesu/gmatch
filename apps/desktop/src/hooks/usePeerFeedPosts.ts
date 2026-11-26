@@ -6,6 +6,7 @@ import type { LoggedOperation } from '../services/socialOperationLog'
 import { projectPosts, type ProjectedPost } from '../services/socialFeedProjection'
 import { projectReactions, reactionKey, type ProjectedReaction } from '../services/socialInteractionProjection'
 import { usePeerProjection } from './usePeerProjection'
+import { readPeerSavedIds } from '../utils/peerSaves'
 
 /**
  * Peer-replicated feed rows (roadmap L4.2): the visible half of the operation
@@ -70,9 +71,23 @@ export function applyReactionsToFeedPosts(
   })
 }
 
+/**
+ * Fold the LOCAL bookmarks into the peer rows: a peer post has no node row, so
+ * its save is kept on this device (`utils/peerSaves.ts`) and the row must carry
+ * it back so the Saved tab and the bookmark icon agree without a reload.
+ */
+export function applySavesToFeedPosts(
+  rows: readonly FeedPost[],
+  savedIds: ReadonlySet<string>,
+): FeedPost[] {
+  if (savedIds.size === 0) return rows as FeedPost[]
+  return rows.map((row) => (savedIds.has(row.id) ? { ...row, is_saved: true } : row))
+}
+
 function readProjection(entries: readonly LoggedOperation[], selfId?: string | null): FeedPost[] {
   const rows = projectedPostsToFeedPosts(projectPosts(entries), selfId)
-  return applyReactionsToFeedPosts(rows, projectReactions(entries), selfId)
+  const liked = applyReactionsToFeedPosts(rows, projectReactions(entries), selfId)
+  return applySavesToFeedPosts(liked, readPeerSavedIds(selfId))
 }
 
 export function usePeerFeedPosts(selfId?: string | null): FeedPost[] {

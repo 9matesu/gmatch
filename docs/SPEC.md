@@ -470,6 +470,19 @@ product path.
   player's list never leaks into another's), `App.tsx` loads it when the profile
   opens and after every save/un-save, and `ProfileView` passes it down instead of
   filtering the feed.
+- **Bookmarking a peer-replicated post is durable, not a silent 404
+  (2026-11-26).** Every save used to be `POST /api/posts/:id/save`, but a
+  peer-replicated post has no `Objects` row, so the node answered `404 Post not
+  found`: the icon stayed hollow and the bookmark was gone on the next launch.
+  `savePersistenceRoute` now splits on the row's origin the same way likes and
+  comments do, and the peer half is deliberately LOCAL rather than a signed
+  operation — a bookmark is the reader's private intent with no shared signal,
+  unlike a like's public count, so it is never gossiped. `utils/peerSaves.ts`
+  keeps the ids durably per identity (switching accounts never shows another's
+  bookmarks) and announces every real change, the peer projection folds
+  `is_saved` back into the row (`applySavesToFeedPosts`), and the profile Saved
+  tab merges the node `?saved=1` query with the locally-bookmarked peer rows.
+  Proven by `e2e/save-peer-post.spec.ts` (node 404 -> local write -> reload).
 - **The clicker ban is a multi-select (2026-11-25).** The drop tray's ✕ toggles a
   tag into a per-drop selection and one "Ban N selected" button applies them all
   (`claimDropAntiTag` per tag), instead of banning one tag per click. The top-right

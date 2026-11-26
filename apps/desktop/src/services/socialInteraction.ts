@@ -54,6 +54,21 @@ export function commentPersistenceRoute(
   return post?.origin === 'peer' ? 'peer-operation' : 'server'
 }
 
+/**
+ * Where a save must be persisted.
+ *
+ * Same split as a like, but the peer half is a LOCAL durable store, not a
+ * signed operation: a bookmark is private intent with no shared signal, so
+ * unlike a like it is never gossiped. A peer-replicated post has no node row,
+ * so `POST /api/posts/:id/save` 404s it; the id lands in `utils/peerSaves.ts`
+ * instead and the Saved tab merges it back.
+ */
+export function savePersistenceRoute(
+  post: { origin?: 'server' | 'peer' } | null | undefined,
+): 'local-store' | 'server' {
+  return post?.origin === 'peer' ? 'local-store' : 'server'
+}
+
 /** Persist a like as a signed operation (peer-replicated posts). */
 export async function persistPeerLike(
   identity: OrbitIdentityLike,

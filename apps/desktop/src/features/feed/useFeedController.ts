@@ -45,6 +45,9 @@ export interface FeedController {
   /** The caller's own profile rows (node snapshot + local/P2P mirrors), so a
    *  delete can tell a node-backed post from a local-only one. */
   myProfilePosts: FeedPost[]
+  /** Peer-replicated rows projected from the durable log (with the LOCAL
+   *  bookmark flag folded in), independent of any node read. */
+  peerPosts: FeedPost[]
   status: FeedStatus
   /** True while the timeline came from the durable snapshot (this device's own
    *  last read) rather than a live node response. */
@@ -267,7 +270,7 @@ export function useFeedController(input: FeedControllerInput): FeedController {
   }, [])
 
   return {
-    posts, serverPosts, myProfilePosts, status, restoredFromCache, hasMore, loadingMore,
+    posts, serverPosts, myProfilePosts, peerPosts: peerFeedPosts, status, restoredFromCache, hasMore, loadingMore,
     load, refresh, loadMore, resolvePostById,
     setServerPosts, setOptimisticPosts, setPinnedPosts, setRepostedPosts, setMyProfilePosts,
     removePost, pushPost, reset,

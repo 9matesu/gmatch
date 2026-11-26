@@ -6,7 +6,23 @@ Every item below was requested, was already "implemented" in some form, and
 did not actually work in the running app. Each one is now built, tested and
 verified live.
 
-- **Your older posts can be shared with peers — one button, on purpose.**
+- **Bookmarking a peer's post sticks - it used to be a silent 404.** Saving a
+  post was one call for every post: `POST /api/posts/:id/save`. A post
+  replicated from a peer has no row on your node, so the node answered
+  `404 Post not found`, the bookmark icon stayed hollow, and the save was gone
+  on the next launch - and the profile's Saved tab could never list such a post.
+  `savePersistenceRoute` now splits on the row's origin exactly like likes and
+  comments already did. The peer half is deliberately LOCAL, not a signed
+  operation: a bookmark is the reader's private intent with no shared signal
+  (a like's count is public and travels), so it lives in a durable,
+  identity-scoped store (`utils/peerSaves.ts`) and the peer projection folds
+  `is_saved` back into the row. The Saved tab merges the node query with the
+  locally-bookmarked peer rows. `e2e/save-peer-post.spec.ts` builds a genuine
+  peer row (signed `post.create` from another identity, bytes seeded, nothing
+  registered on the node), pins the node's 404, saves through the real button,
+  and asserts the bookmark survives a reload.
+
+- **Your older posts can be shared with peers - one button, on purpose.**
   Everything published before the local-first path existed lives only as a row
   on your node, so no peer can address it and it disappears from the feed the
   moment the node stops answering. The roadmap described a

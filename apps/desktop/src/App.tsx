@@ -1334,16 +1334,29 @@ export default function Home() {
    * this is its own query (`?saved=1`), independent of what the feed happens to
    * be showing.
    */
-  const [savedPosts, setSavedPosts] = useState<FeedPost[]>([])
+  const [serverSavedPosts, setServerSavedPosts] = useState<FeedPost[]>([])
   const loadSavedPosts = useCallback(async () => {
-    if (!identity) { setSavedPosts([]); return }
+    if (!identity) { setServerSavedPosts([]); return }
     try {
       const res = await orbitFetch('/api/posts?saved=1&limit=200&sort=latest', {}, identity)
       if (!res.ok) return
       const data = await res.json().catch(() => null)
-      if (Array.isArray(data?.posts)) setSavedPosts(data.posts as FeedPost[])
+      if (Array.isArray(data?.posts)) setServerSavedPosts(data.posts as FeedPost[])
     } catch { /* node unreachable: the tab keeps what it had */ }
   }, [identity])
+
+  /**
+   * The profile "Saved" tab: node saves PLUS the local bookmarks of
+   * peer-replicated posts. The node query stays authoritative for node rows (a
+   * post saved yesterday still lists after it falls out of the 50-row window);
+   * a peer post has no node row at all, so its bookmark comes from this
+   * device's store, already folded into `feed.peerPosts` (`is_saved`).
+   */
+  const savedPosts = useMemo(() => {
+    const seen = new Set(serverSavedPosts.map((p) => p.id))
+    const localSaved = feed.peerPosts.filter((p) => p.is_saved && !seen.has(p.id))
+    return localSaved.length === 0 ? serverSavedPosts : [...localSaved, ...serverSavedPosts]
+  }, [serverSavedPosts, feed.peerPosts])
 
   // Load them when the profile opens, so the tab is populated on arrival.
   useEffect(() => {
@@ -1661,12 +1674,23 @@ export default function Home() {
 
   const persistSave = useCallback((postId: string, saved: boolean) => {
     if (!identity) return
-    // Re-read the snapshot on success so `is_saved` lands, and re-read the
-    // saved list so the profile "Saved" tab (which reads the node with
-    // ?saved=1) updates without a manual reload.
-    void orbitFetch(`/api/posts/${postId}/save`, { method: saved ? 'POST' : 'DELETE' }, identity)
-      .then((res) => { if (res.ok) { invalidateCache('/api/posts'); loadServerFeed(); void loadSavedPosts() } })
-      .catch(() => { })
+    // A peer-replicated post has no node row, so `POST /api/posts/:id/save`
+    // answers 404 and the save used to vanish. A bookmark is the reader's own
+    // private intent (unlike a like's public count), so it is NOT gossiped: it
+    // is kept in this device's durable, identity-scoped store and the peer
+    // projection folds it back in. Server posts keep the node path.
+    void import('./services/socialInteraction').then(async ({ savePersistenceRoute }) => {
+      if (savePersistenceRoute(feedPostsRef.current.find((p) => p.id === postId)) === 'local-store') {
+        const { setPeerSaved } = await import('./utils/peerSaves')
+        setPeerSaved(identity.orbitId, postId, saved)
+        return
+      }
+      const res = await orbitFetch(`/api/posts/${postId}/save`, { method: saved ? 'POST' : 'DELETE' }, identity)
+      // Re-read the snapshot so `is_saved` lands, and re-read the saved list so
+      // the profile "Saved" tab (which reads the node with ?saved=1) updates
+      // without a manual reload.
+      if (res.ok) { invalidateCache('/api/posts'); loadServerFeed(); void loadSavedPosts() }
+    }).catch(() => { /* offline node: the tab keeps what it had */ })
   }, [identity, loadServerFeed, loadSavedPosts])
 
   const persistComment = useCallback(async (postId: string, text: string, parentCommentId?: string | null) => {

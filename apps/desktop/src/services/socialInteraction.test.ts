@@ -10,6 +10,7 @@ import {
   publishCommentDelete,
   publishReactionAdd,
   publishReactionRemove,
+  savePersistenceRoute,
 } from './socialInteraction'
 import { projectComments, projectReactions, reactionKey } from './socialInteractionProjection'
 
@@ -69,6 +70,15 @@ describe('signed social state (L5.1)', () => {
     expect(likePersistenceRoute({ origin: 'server' })).toBe('server')
     expect(likePersistenceRoute(undefined)).toBe('server')
     expect(likePersistenceRoute(null)).toBe('server')
+  })
+
+  it('routes a save to the LOCAL store only for peer content', () => {
+    // A peer post has no node row (the node 404s the save), so its bookmark is
+    // kept on this device — and NOT gossiped, unlike a like.
+    expect(savePersistenceRoute({ origin: 'peer' })).toBe('local-store')
+    expect(savePersistenceRoute({ origin: 'server' })).toBe('server')
+    expect(savePersistenceRoute(undefined)).toBe('server')
+    expect(savePersistenceRoute(null)).toBe('server')
   })
 
   it('persists a peer like as a signed operation (and un-likes it)', async () => {
