@@ -202,6 +202,7 @@ export default function TagBrowser({ onClose }: { onClose?: () => void }) {
                     alt={p.tags.slice(0, 3).join(' ') || 'booru post'}
                     referrerPolicy="no-referrer"
                     loading="lazy"
+                    thumb
                   />
                 )}
               </button>
