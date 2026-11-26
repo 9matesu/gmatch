@@ -1265,6 +1265,15 @@ function createWindow() {
   win.on('moved', persistBounds)
   win.on('resized', persistBounds)
   win.removeMenu()
+  // Close = minimize to tray (gMatch lives in the tray). Only an explicit
+  // quit (tray "Sair", session end, updater restart) sets isQuitting and
+  // lets the close through.
+  win.on('close', (e) => {
+    if (!isQuitting) {
+      e.preventDefault()
+      win.minimize()
+    }
+  })
   // Energy: a hidden/minimized window must not keep compositing. Chromium's
   // background throttling is disabled globally here (a throttled window used
   // to come back with a stale frame), so it is switched ON only while the
