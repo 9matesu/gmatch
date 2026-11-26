@@ -183,10 +183,20 @@ export function projectFeed(input: FeedProjectionInput): FeedPost[] {
     (p) => !deletedPostIds.has(p.id) && !seenServerIds.has(p.id),
   )
 
+  // The outbox is the render source for the window BEFORE the node echoes a
+  // post back. Once the node carries the row, the NODE is the authority: the
+  // local copy still holds the post as it was published (its old caption, its
+  // old counts), and a stale local copy that SHADOWS the node's row made
+  // "Edit post" look like it did nothing — the server had the new caption and
+  // the tile still showed the old one. Same rule as the optimistic rows.
+  const localPendingVisible = localPending.filter(
+    (p) => !deletedPostIds.has(p.id) && !seenServerIds.has(p.id),
+  )
+
   // One row per post: the local (durable) copy and the session optimistic copy
   // describe the same id, and without this a fresh publish rendered twice.
   const merged = [
-    ...optimisticVisible, ...localPending, ...pinnedVisible, ...peerVisible,
+    ...optimisticVisible, ...localPendingVisible, ...pinnedVisible, ...peerVisible,
     ...serverVisible, ...repostedPosts, ...localPublicPosts, ...myProfileVisible,
   ]
   const seen = new Set<string>()

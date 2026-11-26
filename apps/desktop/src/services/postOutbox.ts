@@ -87,6 +87,29 @@ export function enqueueOutbox(entry: {
 }
 
 /**
+ * Sync the local outbox copy of a post with an edited caption.
+ *
+ * The outbox copy is what the tile renders BEFORE the node echoes the post
+ * back, and a pending re-register would push its `registerBody` to the node.
+ * After the author edits the caption on the node, the local copy still carries
+ * the old text — so the pre-echo window showed the old caption and a
+ * re-register could push it back. Returns false when the object was never
+ * outboxed (a post published elsewhere).
+ */
+export function updateOutboxCaption(objectId: string, caption: string): boolean {
+  const list = readAll();
+  const found = list.find((e) => e.objectId === objectId);
+  if (!found) return false;
+  const body = { ...(found.registerBody || {}) };
+  body.caption = caption;
+  body.post_caption = caption;
+  found.registerBody = body;
+  found.updatedAt = Date.now();
+  writeAll(list);
+  return true;
+}
+
+/**
  * Remove one object from the outbox and report what it was.
  *
  * Deleting a post that only exists locally (a publish that never reached the

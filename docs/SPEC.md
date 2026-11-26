@@ -548,6 +548,17 @@ product path.
   current post heads (the create plus the edits no other edit superseded), and
   the manifest is unchanged — a caption edit does not touch the bytes. The
   caption is capped at 2000 chars on both sides.
+- **The NODE row wins over the local outbox copy (2026-11-25).** The durable
+  publish outbox is the render source for the window BEFORE the node echoes a
+  post back, so it carries the post as it was PUBLISHED — its old caption, its
+  old counts. It was merged BEFORE the node's row and was never deduped
+  against the node's ids (unlike the optimistic and pinned rows), so the stale
+  local copy SHADOWED the node's edited row: the server held the new caption
+  and the tile still showed the old one — "Edit post" looked like it did
+  nothing. The projection now yields the local copy once the node carries the
+  row (`!seenServerIds.has(p.id)`), and `updateOutboxCaption` syncs the local
+  copy after an edit so the pre-echo window and a pending re-register carry
+  the new text too.
 - **Vault no longer flickers on open (2026-11-25).** For an opted-in `http(s)`
   source, `ObjectImage` holds the media at `opacity:0` until the local vault
   lookup settles (a fast IPC), so a remote frame never flashes before the local

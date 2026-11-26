@@ -3534,6 +3534,14 @@ export default function Home() {
       const next = result.caption ?? '';
       setServerPosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, caption: next } : p)));
       setMyProfilePosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, caption: next } : p)));
+      // The local outbox copy of the post still carries the old caption. It is
+      // what the tile renders BEFORE the node echoes the row back, and a
+      // re-register would push that old text to the node — so it is synced
+      // here, in the same place the node's copy is applied.
+      try {
+        const { updateOutboxCaption } = await import('./services/postOutbox');
+        updateOutboxCaption(post.id, next);
+      } catch { /* the outbox is best-effort: the node already has the edit */ }
       setEditingPost(null);
       toast('Post updated.', 'success');
     } catch {

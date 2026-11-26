@@ -18,6 +18,7 @@ import {
   flushPostOutbox,
   removeOutboxEntry,
   rearmMissingReplicated,
+  updateOutboxCaption,
   OUTBOX_KEY,
 } from './postOutbox';
 import { orbitFetch } from '../utils/api';
@@ -58,6 +59,26 @@ describe('postOutbox store (Phase 3b)', () => {
     setOutboxState('o1', 'replicated');
     pruneOutbox(0, Date.now() + 1);
     expect(listOutbox().map((e) => e.objectId)).toEqual(['o2']);
+  });
+
+  it('updateOutboxCaption syncs the local copy with an edited caption', () => {
+    // The local outbox copy of a post is what the tile renders BEFORE the node
+    // echoes it back. After the author edits the caption on the node, the local
+    // copy must carry the new text too — otherwise the pre-echo window (and a
+    // re-register) shows the old caption.
+    enqueueOutbox({
+      objectId: 'o1', postGroup: null,
+      registerBody: { ...regBody('o1'), caption: 'old', post_caption: 'old' },
+      gossipInput: null,
+    });
+    expect(updateOutboxCaption('o1', 'new')).toBe(true);
+    const body = listOutbox()[0].registerBody as Record<string, unknown>;
+    expect(body.caption).toBe('new');
+    expect(body.post_caption).toBe('new');
+  });
+
+  it('updateOutboxCaption is a no-op for an object that was never outboxed', () => {
+    expect(updateOutboxCaption('nope', 'x')).toBe(false);
   });
 
   it('removeOutboxEntry removes a local-only row and reports what it was', () => {

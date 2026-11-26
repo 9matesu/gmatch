@@ -57,6 +57,14 @@ verified live.
   on its handler, and the menu never claims an outcome. Editing a caption is
   owner-only: a node post is edited with `PATCH /api/posts/:id`, a
   peer-replicated post with the protocol's `post.edit` operation.
+- **An edited caption actually shows up.** The server had the new caption and
+  the tile still showed the old one: the durable publish outbox — the render
+  source for the window BEFORE the node echoes a post back — was merged ahead
+  of the node's row and never deduped against the node's ids, so the stale
+  local copy shadowed the edited row. The node is the authority once it
+  carries the row; the outbox now yields to it, and the local copy is synced
+  after an edit so the pre-echo window and a pending re-register carry the new
+  text too.
 - **A closed stdout/stderr pipe no longer kills the app.** `console.log` into
   a closed pipe raises EPIPE as an async `'error'` EVENT on the stream, so the
   try/catch around the sidecar's logging could never catch it — the main

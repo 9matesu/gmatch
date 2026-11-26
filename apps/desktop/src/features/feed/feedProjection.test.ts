@@ -71,6 +71,33 @@ describe('projectFeed', () => {
     expect(rows.map((r) => r.id)).toEqual(['new', 'old'])
   })
 
+  it('keeps a local outbox post while the node has not indexed it yet', () => {
+    // The outbox is the render source for the window BEFORE the node echoes
+    // the post back. It must still render there.
+    const rows = projectFeed({
+      ...base,
+      serverPosts: [],
+      localPending: [post('mine-1', { author_id: 'self', caption: 'from the outbox' })],
+    })
+    expect(rows.map((r) => r.id)).toEqual(['mine-1'])
+    expect(rows[0].caption).toBe('from the outbox')
+  })
+
+  it('lets the node row win over the local outbox copy once the node has it', () => {
+    // The caption-edit bug: the local outbox copy of a post shadowed the
+    // node's edited row, so "Edit post" looked like it did nothing — the
+    // server had the new caption and the tile still showed the old one.
+    // The node is the authority for node-hosted content; the outbox only
+    // covers the window before the node carries the row.
+    const rows = projectFeed({
+      ...base,
+      serverPosts: [post('mine-1', { author_id: 'self', caption: 'edited' })],
+      localPending: [post('mine-1', { author_id: 'self', caption: 'stale' })],
+    })
+    expect(rows.map((r) => r.id)).toEqual(['mine-1'])
+    expect(rows[0].caption).toBe('edited')
+  })
+
   it('keeps my own local posts when the node snapshot is empty (offline / timeout)', () => {
     // The "go to profile, come back, everything is gone" bug: the local posts
     // stayed in myProfilePosts but the node snapshot was empty (a timed-out
