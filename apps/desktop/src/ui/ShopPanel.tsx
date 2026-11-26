@@ -83,30 +83,11 @@ function TagsTab() {
     const afford = !maxed && points >= cost
 
     return (
-      <span key={t.name} className="relative inline-flex group">
-        <button
-          type="button"
-          onClick={() => {
-            playPress(740)
-            if (mergeSel && isOwned) {
-              if (mergeSel === t.name) setMergeSel(null)
-              else { mergeTags(mergeSel, t.name); setMergeSel(null) }
-            } else if (!mergeSel) {
-              if (isOwned) toggleTag(t.name)
-              else buyTag(t.name)
-            }
-          }}
-          onDoubleClick={() => {
-            if (isOwned) { setMergeSel(mergeSel === t.name ? null : t.name) }
-          }}
-          onContextMenu={(e) => {
-            if (isOwned) { e.preventDefault(); soloTag(t.name) }
-          }}
-          title={
-            isOwned
-              ? `${t.name} · Lv${t.level} · Lv${t.level} owned · click ${on ? 'OFF' : 'ON'} · right-click = solo · double-click = pick for merge`
-              : `${t.name} · buy for ${formatNum(cost)} pts`
-          }
+      // The pill is a plain container, NOT a button: it holds two real buttons
+      // (the tag action and its delete). A <button> inside a <button> is
+      // invalid HTML and React logs a hydration error for it.
+      <span key={t.name} className="relative inline-flex max-w-full group">
+        <div
           className={`inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition duration-150 ${
             on
               ? 'border-retro-accent/50 bg-retro-accent/15 text-retro-fg'
@@ -115,30 +96,56 @@ function TagsTab() {
                 : 'border-dashed border-edge-strong bg-transparent text-retro-muted hover:border-retro-accent/40 hover:text-retro-fg'
           } ${!isOwned && !afford ? 'opacity-40' : ''} ${mergeSel === t.name ? 'ring-1 ring-retro-accent' : ''}`}
         >
-          <span
-            className={`h-1.5 w-1.5 shrink-0 rounded-full transition-colors ${
-              on
-                ? 'bg-success'
-                : isOwned
-                  ? 'bg-glass-w20'
-                  : afford
-                    ? 'bg-retro-accent'
-                    : 'bg-glass-w20'
-            }`}
-            aria-hidden="true"
-          />
-          <span className="truncate font-medium">{t.name}</span>
+          <button
+            type="button"
+            onClick={() => {
+              playPress(740)
+              if (mergeSel && isOwned) {
+                if (mergeSel === t.name) setMergeSel(null)
+                else { mergeTags(mergeSel, t.name); setMergeSel(null) }
+              } else if (!mergeSel) {
+                if (isOwned) toggleTag(t.name)
+                else buyTag(t.name)
+              }
+            }}
+            onDoubleClick={() => {
+              if (isOwned) { setMergeSel(mergeSel === t.name ? null : t.name) }
+            }}
+            onContextMenu={(e) => {
+              if (isOwned) { e.preventDefault(); soloTag(t.name) }
+            }}
+            title={
+              isOwned
+                ? `${t.name} · Lv${t.level} · Lv${t.level} owned · click ${on ? 'OFF' : 'ON'} · right-click = solo · double-click = pick for merge`
+                : `${t.name} · buy for ${formatNum(cost)} pts`
+            }
+            className="inline-flex min-w-0 cursor-pointer items-center gap-1.5"
+          >
+            <span
+              className={`h-1.5 w-1.5 shrink-0 rounded-full transition-colors ${
+                on
+                  ? 'bg-success'
+                  : isOwned
+                    ? 'bg-glass-w20'
+                    : afford
+                      ? 'bg-retro-accent'
+                      : 'bg-glass-w20'
+              }`}
+              aria-hidden="true"
+            />
+            <span className="truncate font-medium">{t.name}</span>
+          </button>
           {isOwned && (
             <button
               type="button"
               aria-label={`Delete ${t.name}`}
-              onClick={(e) => { e.stopPropagation(); deleteTag(t.name) }}
-              className="-mr-1 hidden shrink-0 rounded p-0.5 text-retro-muted hover:text-danger-fg group-hover:inline-flex"
+              onClick={() => deleteTag(t.name)}
+              className="-mr-1 hidden shrink-0 cursor-pointer rounded p-0.5 text-retro-muted hover:text-danger-fg group-hover:inline-flex"
             >
               <X className="h-3 w-3" />
             </button>
           )}
-        </button>
+        </div>
       </span>
     )
   }

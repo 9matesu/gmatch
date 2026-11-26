@@ -213,14 +213,20 @@ export function watchApiNetwork(
   })
   page.on('console', (msg) => {
     if (msg.type() !== 'error') return
+    const text = msg.text()
     // Chromium logs one "Failed to load resource: NNN" console error per
     // non-2xx response. That duplicates the `response` handler above, which
     // records the same failure with method + URL and honours `allow`. Keeping
     // it would make every allowed probe (e.g. the /api/pm mail-mode 404) an
     // unfilterable failure. Real console errors still surface here.
-    if (msg.text().startsWith('Failed to load resource')) return
+    if (text.startsWith('Failed to load resource')) return
+    // A third-party transport socket being down is not an /api failure — the
+    // same rule the request handlers above already apply ("booru mirrors and
+    // P2P peers are allowed to be down"). Public WebRTC trackers die; our own
+    // node socket rides /api/... and still surfaces.
+    if (/^WebSocket connection to 'wss?:\/\//.test(text) && !/\/api\//.test(text)) return
     const at = msg.location()
-    errors.push(`console: ${msg.text()}${at?.url ? ` (${at.url})` : ''}`)
+    errors.push(`console: ${text}${at?.url ? ` (${at.url})` : ''}`)
   })
   page.on('pageerror', (err) => errors.push(`pageerror: ${err.message}`))
 

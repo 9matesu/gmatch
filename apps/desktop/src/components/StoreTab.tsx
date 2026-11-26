@@ -588,29 +588,32 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                       videoClassName="w-full h-full object-cover"
                     />
                   </div>
-                  <div className="p-2">
+                  <div className="p-2 pb-0">
                     <div className="text-xs font-bold text-retro-fg truncate">{l.card?.name || 'Unnamed Card'}</div>
                     <div className="text-2xs capitalize text-retro-muted">{l.card?.rarity}</div>
-                    {/* Credit the seller. The name is joined server-side: the
-                        local `users` roster is capped at 100 rows and filtered
-                        to 24h freshness, so it cannot name a stranger. */}
-                    <div className="mt-0.5 flex items-center gap-1 text-2xs text-retro-muted min-w-0">
-                      <span className="shrink-0">by</span>
-                      {l.sellerId === identity?.orbitId ? (
-                        <span className="truncate font-medium text-retro-body">you</span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => onOpenOwner?.(l.sellerId)}
-                          className="min-w-0 truncate text-left font-medium text-retro-body hover:text-retro-accent hover:underline cursor-pointer"
-                          aria-label={`Open profile of ${l.sellerName || 'seller'}`}
-                        >
-                          {l.sellerName || `User_${l.sellerId.slice(0, 6)}`}
-                        </button>
-                      )}
-                    </div>
                   </div>
                 </button>
+                {/* Credit the seller. The name is joined server-side: the
+                    local `users` roster is capped at 100 rows and filtered
+                    to 24h freshness, so it cannot name a stranger. This row is
+                    a SIBLING of the view-card button on purpose: a button
+                    nested in a button is invalid HTML (React warns on
+                    hydration), so the profile link lives outside it. */}
+                <div className="px-2 pt-0.5 flex items-center gap-1 text-2xs text-retro-muted min-w-0">
+                  <span className="shrink-0">by</span>
+                  {l.sellerId === identity?.orbitId ? (
+                    <span className="truncate font-medium text-retro-body">you</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onOpenOwner?.(l.sellerId)}
+                      className="min-w-0 truncate text-left font-medium text-retro-body hover:text-retro-accent hover:underline cursor-pointer"
+                      aria-label={`Open profile of ${l.sellerName || 'seller'}`}
+                    >
+                      {l.sellerName || `User_${l.sellerId.slice(0, 6)}`}
+                    </button>
+                  )}
+                </div>
                 <div className="flex items-center justify-between gap-1.5 px-2 pb-2">
                   <span className="text-xs font-mono font-bold text-info-fg tabular-nums">{formatGc(l.price)} g$</span>
                   {l.sellerId === identity?.orbitId ? (

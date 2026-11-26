@@ -174,6 +174,17 @@ verified live.
     was never published (different hash AND size from the GitHub asset), so a
     download verification would fail. The manifest and the page's hash blocks
     were regenerated from the published bytes, and `site/check.mjs` passes.
+- **No more `<button>` inside a `<button>`.** The clicker's owned-tag pill
+  wrapped its delete control in the tag button, and the Store's market tile
+  wrapped the seller's profile link in the view-card button. Both are invalid
+  HTML, so React logged a hydration error on boot — which the E2E network
+  guard correctly treated as a failure. Both now use real SIBLING buttons
+  (`ShopPanel.tsx`, `StoreTab.tsx`), pinned by tests that assert
+  `button button` finds nothing and by the live-clicker E2E assertion.
+  The guard also stopped counting a DOWN third-party WebSocket (a public
+  WebRTC tracker) as an app failure, which is the same rule it already applied
+  to down booru mirrors and P2P peers; the node's own `/api/...` socket still
+  surfaces.
 
 ## Unreleased — gmatch 2.0: no hosted service; the own node is the world
 

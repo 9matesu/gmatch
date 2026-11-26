@@ -68,6 +68,10 @@ test.describe('dev API node', () => {
     await expect(page.getByRole('button', { name: /attack the current foe/i })).toBeVisible({
       timeout: 20_000,
     })
+    // Invalid <button> inside a <button> makes React log a hydration error,
+    // which the network guard counts as a failure. Pin the markup, not just
+    // the console.
+    expect(await page.locator('button button').count(), 'nested buttons in the clicker').toBe(0)
     await page.goto('/#/lobby')
     await page.waitForLoadState('networkidle')
 

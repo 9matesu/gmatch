@@ -73,6 +73,9 @@ describe('StoreTab credits card owners', () => {
     // The seller is credited by name, and the control is labelled for a11y.
     expect(screen.getByText('Ada')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Open profile of Ada' })).toBeTruthy()
+    // The profile link is a SIBLING of the view-card button: a button inside a
+    // button is invalid HTML and React warns about it on hydration.
+    expect(document.querySelector('button button')).toBeNull()
   })
 
   it('falls back to a readable handle when the owner has no display name', async () => {

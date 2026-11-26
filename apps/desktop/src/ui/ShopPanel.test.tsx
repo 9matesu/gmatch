@@ -39,4 +39,22 @@ describe('ShopPanel category separation tags (REAL / HENTAI)', () => {
     await userEvent.click(realBtn)
     expect(useGame.getState().allowReal).toBe(true)
   })
+
+  it('renders an owned tag as sibling buttons, never a button inside a button', () => {
+    useGame.setState({
+      allowReal: true,
+      allowHentai: true,
+      points: 1000,
+      tags: [{ name: 'gangbang', level: 1, base: 10, income: 1, weight: 1, selected: true }],
+    })
+    const { container } = render(<ShopPanel />)
+
+    // The pill is a container with two REAL sibling buttons (the tag action
+    // and its delete). Nesting a <button> in a <button> is invalid HTML and
+    // React logs a hydration error for it — which the network guard treats as
+    // a failure.
+    expect(container.querySelector('button button')).toBeNull()
+    expect(screen.getByRole('button', { name: 'gangbang' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Delete gangbang' })).toBeInTheDocument()
+  })
 })
