@@ -5,7 +5,6 @@ import {
   serverRowToAppNotification,
   deriveConversationNotifications,
   derivePeerNotifications,
-  derivePeerReportNotifications,
   peerNotificationSubject,
   mergeNotifications,
   unreadCountOf,
@@ -292,12 +291,49 @@ describe('derivePeerNotifications (the peer lane)', () => {
     expect(rows[0].read).toBe(true)
   })
 
-  it('shim: reports still derive through the same rule', () => {
-    const [row] = derivePeerReportNotifications([
-      { operationId: 'op-2', targetType: 'comment', targetId: 'c-2', reason: '', reporterId: 'peer-2', createdAt: 1 },
+  it('opens both the post and the comment for a comment target', () => {
+    const [row] = derivePeerNotifications([
+      { ...report, targetType: 'comment', targetId: 'c-1', postId: 'post-9' },
     ])
-    expect(row.key).toBe('local:peer-op-2')
+    expect(row.target).toEqual({ postId: 'post-9', commentId: 'c-1' })
+  })
+
+  it('a follow opens the follower profile and says so', () => {
+    const [row] = derivePeerNotifications([
+      { operationId: 'op-f', kind: 'follow', targetType: 'user', targetId: 'peer-1', actorId: 'peer-1', createdAt: 1 },
+    ], { resolveName: () => 'Kenny' })
+    expect(row.type).toBe('follow')
+    expect(row.title).toBe('Kenny started following you')
+    expect(row.target).toEqual({ userId: 'peer-1' })
     expect(row.body).toBeNull()
+  })
+
+  it('a like names the right thing and opens it', () => {
+    const [onPost] = derivePeerNotifications([
+      { operationId: 'op-l1', kind: 'like', targetType: 'post', targetId: 'post-9', actorId: 'p', createdAt: 1 },
+    ], { resolveName: () => 'Kenny' })
+    expect(onPost.title).toBe('Kenny liked your post')
+    expect(onPost.target).toEqual({ postId: 'post-9' })
+
+    const [onComment] = derivePeerNotifications([
+      { operationId: 'op-l2', kind: 'like', targetType: 'comment', targetId: 'c-1', postId: 'post-9', actorId: 'p', createdAt: 1 },
+    ], { resolveName: () => 'Kenny' })
+    expect(onComment.title).toBe('Kenny liked your comment')
+    expect(onComment.target).toEqual({ postId: 'post-9', commentId: 'c-1' })
+  })
+
+  it('a comment carries its text; a reply opens its own comment', () => {
+    const [comment] = derivePeerNotifications([
+      { operationId: 'op-c', kind: 'comment', targetType: 'post', targetId: 'post-9', actorId: 'p', createdAt: 1, note: 'nice' },
+    ], { resolveName: () => 'Kenny' })
+    expect(comment.title).toBe('Kenny commented on your post')
+    expect(comment.body).toBe('nice')
+
+    const [reply] = derivePeerNotifications([
+      { operationId: 'op-r', kind: 'reply', targetType: 'comment', targetId: 'c-new', postId: 'post-9', actorId: 'p', createdAt: 1 },
+    ], { resolveName: () => 'Kenny' })
+    expect(reply.title).toBe('Kenny replied to your comment')
+    expect(reply.target).toEqual({ postId: 'post-9', commentId: 'c-new' })
   })
 
   it('peerNotificationSubject extracts exactly the operation id', () => {

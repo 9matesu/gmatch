@@ -32,7 +32,7 @@ import { buildPreviewRows } from '../components/chat/RoomsPreview'
 import type { GroupMember } from '../components/chat/GroupMembersPopover'
 import { cachedMailMode, detectMailMode } from '../utils/mail-mode'
 import { useCourierDms } from './useCourierDms'
-import { usePeerReports } from './usePeerReports'
+import { usePeerAttention } from './usePeerAttention'
 import { ensureGroupRoom, mergeGroupMessages, roomIdForGroup, type GroupRoomOps } from '../services/groupRooms'
 import { usePresence } from '../game/presenceStore'
 import { DOM_ACTION_CONSENT } from '../utils/dominationMesh'
@@ -377,16 +377,17 @@ export function useAppChat(ctx: AppChatContext) {
     },
     [identity?.orbitId, nameRoster],
   )
-  // Reports about my own content (peer lane): in a mesh the author is the
-  // one who can act on a report, so it belongs in the same centre.
-  const peerReports = usePeerReports(identity?.orbitId)
+  // Peer lane: reports, follows, likes, comments and replies aimed at my own
+  // content. In a mesh the author is the one who can act, so they belong in
+  // the same centre.
+  const peerEvents = usePeerAttention(identity?.orbitId)
   // The peer lane's durable read state. Without it a peer report counted toward
   // the badge forever (its row is derived from the operation log, which does
   // not change by being looked at).
   const peerReadIds = usePeerNotificationReads(identity?.orbitId)
   const notificationCenter = useNotificationCenter({
     rows: lobby.notifications,
-    peerReports,
+    peerEvents,
     peerReadIds,
     threads: courier.threads,
     dmSeen,
@@ -1361,7 +1362,6 @@ export function useAppChat(ctx: AppChatContext) {
     dmUnreadByPeer,
     dmMentionByPeer,
     resolveNotifyName,
-    peerReports,
     notificationCenter,
     openLocalNotification,
     markLocalNotificationsRead,

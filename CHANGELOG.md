@@ -6,23 +6,33 @@ Every item below was requested, was already "implemented" in some form, and
 did not actually work in the running app. Each one is now built, tested and
 verified live.
 
-- **A peer's report on your post now actually reaches you — and can be dismissed.**
-  Reports about peer-replicated content are signed operations that travel to the
-  AUTHOR (a mesh has no admin), and `hooks/usePeerReports.ts` already projected
-  them into the notification centre. But the row was only merged into the list
-  the BADGE counts; the panel draws server rows and courier rows separately, so
-  the peer row never appeared — the bell said "1" with nothing behind it, and
-  because a derived row has no node `read` flag and no chat seen stamp, that "1"
-  could never clear. The peer lane is now its own section ("From your peers"),
-  `hooks/useNotificationCenter.ts` exposes `peerItems`, and its read state is
-  durable and identity-scoped (`utils/peerNotifications.ts`, keyed by the
-  operation id) so tapping the row marks exactly it read and the badge follows.
-  "Mark all read" clears peer rows (alerts) but still leaves DMs/rooms alone (a
-  DM is a real unread message, cleared by opening it).
-  `utils/notifications.test.ts` pins the derivation and the read flag,
-  `peerNotifications.test.ts` the durable store, and `NotificationCenter.test.tsx`
-  the rendered row, its "From your peers" section, and that a peer-only inbox no
-  longer claims "No notifications".
+- **Peer activity aimed at you actually reaches you - and can be dismissed.**
+  A report, a follow, a like, a comment and a reply about peer-replicated
+  content are signed operations that travel between the peers, and the AUTHOR of
+  the content is the one who can act (a mesh has no admin and no central
+  like/comment service), so they belong in the author's notification centre.
+  Those rows were only merged into the list the BADGE counts, while the panel
+  draws server rows and courier rows separately, so the peer row never appeared -
+  the bell said "1" with nothing behind it, and because a derived row has no node
+  `read` flag and no chat seen stamp, that "1" could never clear. The peer lane is
+  now its own section ("From your peers") fed by
+  `hooks/usePeerAttention.ts` over `projectPeerAttentionFor`
+  (`services/socialInteractionProjection.ts`), which tells the truth: an
+  operation you authored is never news to you, a withdrawn like or an undone
+  follow is not an event, and a tombstoned post/comment has nothing to say. A
+  follow opens the follower's profile; a reply and a comment-targeted
+  like/report carry BOTH the post and the comment, because a comment id alone
+  lands the deep link nowhere. `hooks/useNotificationCenter.ts` exposes
+  `peerItems`, and the read state is durable and identity-scoped
+  (`utils/peerNotifications.ts`, keyed by the operation id) so tapping a row
+  marks exactly it read and the badge follows. "Mark all read" clears peer rows
+  (alerts) but still leaves DMs/rooms alone (a DM is a real unread message,
+  cleared by opening it).
+  `utils/notifications.test.ts` pins every title/target and the read flag,
+  `peerNotifications.test.ts` / `usePeerNotificationReads.test.tsx` the durable
+  store, `socialInteraction.peerAttention.test.ts` the projection rules, and
+  `NotificationCenter.test.tsx` the rendered row, its "From your peers" section,
+  and that a peer-only inbox no longer claims "No notifications".
 
 - **"Stored on N devices" is now real — a peer's signed receipt, not a guess.**
   The swarm has proved durable custody for a while: a seeding node mints a

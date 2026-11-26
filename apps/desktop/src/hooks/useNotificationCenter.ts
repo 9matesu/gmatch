@@ -3,13 +3,14 @@
 import { useMemo } from 'react'
 import {
   deriveConversationNotifications,
-  derivePeerReportNotifications,
+  derivePeerNotifications,
   mergeNotifications,
   serverRowToAppNotification,
   unreadByTypeOf,
   unreadCountOf,
   type AppNotification,
   type DmMessageLike,
+  type PeerAttentionEvent,
   type RoomMessageLike,
   type ServerNotificationRow,
 } from '../utils/notifications'
@@ -19,9 +20,10 @@ import {
  *
  * It merges the lanes the app actually has — server rows (likes, comments,
  * replies, mentions, follows, card/match events), courier-derived rows (DMs,
- * sealed rooms) and peer-lane rows (signed operations about my content, e.g. a
- * report) — into one newest-first list, and derives the unread badge from
- * that list. There is deliberately no second unread scalar: the badge cannot
+ * sealed rooms) and peer-lane rows (signed operations about my content: a
+ * report, a follow, a like, a comment, a reply) — into one newest-first list,
+ * and derives the unread badge from that list. There is deliberately no second
+ * unread scalar: the badge cannot
  * disagree with what the open centre shows, which is exactly what broke when the
  * WebSocket frame path updated the list but not the counter.
  *
@@ -43,15 +45,8 @@ export interface NotificationCenterInput {
   resolveName?: (peerId: string, payloadName?: string) => string
   /** Monotonic clock for mutable courier stores (rooms/threads). */
   version?: number
-  /** Reports about my own content (peer lane, signed operations). */
-  peerReports?: ReadonlyArray<{
-    operationId: string
-    targetType: 'post' | 'comment'
-    targetId: string
-    reason: string
-    reporterId: string
-    createdAt: number
-  }> | null
+  /** Peer-lane events about my own content (signed operations). */
+  peerEvents?: ReadonlyArray<PeerAttentionEvent> | null
   /** Durable read ids for the peer lane (`utils/peerNotifications.ts`). */
   peerReadIds?: ReadonlySet<string> | null
 }
@@ -71,7 +66,7 @@ export interface NotificationCenter {
 export function useNotificationCenter(input: NotificationCenterInput): NotificationCenter {
   const {
     rows,
-    peerReports,
+    peerEvents,
     peerReadIds,
     threads,
     dmSeen,
@@ -106,12 +101,12 @@ export function useNotificationCenter(input: NotificationCenterInput): Notificat
     [threads, dmSeen, rooms, roomMessages, roomSeen, selfId, selfName, resolveName, version],
   )
 
-  // The peer lane: reports about my own content. Kept separate from the
-  // conversation lane, but merged into the SAME list — the badge and the list
-  // must never tell different stories.
+  // The peer lane: reports, follows, likes, comments and replies about my own
+  // content. Kept separate from the conversation lane, but merged into the SAME
+  // list — the badge and the list must never tell different stories.
   const peerItems = useMemo(
-    () => derivePeerReportNotifications(peerReports ?? [], { resolveName, readIds: peerReadIds }),
-    [peerReports, resolveName, peerReadIds],
+    () => derivePeerNotifications(peerEvents ?? [], { resolveName, readIds: peerReadIds }),
+    [peerEvents, resolveName, peerReadIds],
   )
 
   const items = useMemo(

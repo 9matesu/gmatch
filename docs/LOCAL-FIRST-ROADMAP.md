@@ -470,10 +470,16 @@ Profile fields, follows and reports are operations too (`profile.update`,
 `follow.add`/`follow.remove`, `report.create`), consumed as follows: profile
 updates fold deterministically per actor and feed `rememberNames`, and a peer
 report surfaces in the author's notification centre as its own peer-lane row.
-That row used to be counted by the badge but never rendered (and could never be
-marked read, since it has no node flag and no chat stamp); it now renders in a
-"From your peers" section and its durable per-identity read set
-(`utils/peerNotifications.ts`, keyed by the operation id) lets it clear. The
+The lane now carries every interaction aimed at my content or at me — follow,
+like, comment, reply and report — projected by
+`projectPeerAttentionFor` (`services/socialInteractionProjection.ts`) with the
+honest rules (never notify yourself, a withdrawn like/undone follow is not an
+event, a tombstoned post/comment says nothing, a comment target carries its
+post) and fed by `hooks/usePeerAttention.ts`. Those rows used to be counted by
+the badge but never rendered (and could never be marked read, since they have
+no node flag and no chat stamp); they now render in a "From your peers" section
+and the durable per-identity read set (`utils/peerNotifications.ts`, keyed by
+the operation id) lets them clear. The
 follow graph's read side is local-first for MY OWN follows: `hooks/usePeerFollows.ts` projects my
 signed follows and the targets my own removals withdrew, and `followingIds` is
 the node list UNION the operation follows MINUS the withdrawn ones, so a follow

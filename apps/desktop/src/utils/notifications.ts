@@ -324,27 +324,61 @@ export function peerNotificationSubject(key: string): string | null {
   return subject || null;
 }
 
+/** What a peer attention event is about. */
+export type PeerAttentionKind = 'report' | 'follow' | 'like' | 'comment' | 'reply'
+
 /** One peer-lane row, before it becomes an {@link AppNotification}. */
 export interface PeerAttentionEvent {
   operationId: string
-  /** `report` (about my content) — the lane grows to follow/like/comment. */
-  kind: 'report'
-  targetType: 'post' | 'comment'
-  /** What a tap should open: the post or comment the event is about. */
+  kind: PeerAttentionKind
+  /** `user` for a follow (open the actor's profile), else the content. */
+  targetType: 'post' | 'comment' | 'user'
+  /** What a tap should open: a post, a comment, or a profile id. */
   targetId: string
+  /** The post a comment target belongs to, so the deep link can open it. */
+  postId?: string
   actorId: string
   createdAt: number
-  /** A report's reason. */
+  /** A report's reason, or a comment's text. */
   note?: string
+}
+
+function peerTitle(event: PeerAttentionEvent, name: string): string {
+  switch (event.kind) {
+    case 'report':
+      return `${name} reported your ${event.targetType}`
+    case 'follow':
+      return `${name} started following you`
+    case 'like':
+      return `${name} liked your ${event.targetType === 'comment' ? 'comment' : 'post'}`
+    case 'comment':
+      return `${name} commented on your post`
+    case 'reply':
+      return `${name} replied to your comment`
+    default:
+      return `${name} interacted with your content`
+  }
+}
+
+function peerTarget(event: PeerAttentionEvent): NotificationTarget {
+  if (event.targetType === 'post') return { postId: event.targetId }
+  if (event.targetType === 'comment') {
+    // A comment id alone lands nowhere: the deep link needs the post too.
+    return event.postId
+      ? { postId: event.postId, commentId: event.targetId }
+      : { commentId: event.targetId }
+  }
+  // A follow has no content: the follower's profile is the only honest place.
+  return { userId: event.targetId }
 }
 
 /**
  * Peer-lane rows about MY content.
  *
- * In a mesh there is no central moderator: a report travels as a signed
- * operation to the peers, and the AUTHOR of the content is the one who can
- * act on it. So the report shows up in the author's notification centre —
- * not as "an admin will handle it" (nobody is an admin of a mesh).
+ * In a mesh there is no central moderator and no central like/comment service:
+ * a report, a follow, a like and a comment all travel as signed operations to
+ * the peers, and the AUTHOR of the content is the one who can act on them, so
+ * they belong in the author's notification centre.
  *
  * `readIds` is the durable per-identity read set (`utils/peerNotifications.ts`):
  * a peer row has no node flag and no chat stamp, so without it the row counted
@@ -363,52 +397,21 @@ export function derivePeerNotifications(
   const readIds = args.readIds
   return events.map((event) => {
     const name = resolveName(event.actorId)
-    const title = event.kind === 'report'
-      ? `${name} reported your ${event.targetType}`
-      : `${name} interacted with your ${event.targetType}`
     return {
       key: `${PEER_KEY_PREFIX}${event.operationId}`,
       id: event.operationId,
       source: 'local',
       type: event.kind,
-      title,
+      title: peerTitle(event, name),
       body: event.note?.trim() || null,
       createdAt: new Date(event.createdAt).toISOString(),
       read: Boolean(readIds?.has(event.operationId)),
       actorId: event.actorId,
       actorName: name,
-      target: event.targetType === 'post'
-        ? { postId: event.targetId }
-        : { commentId: event.targetId },
+      target: peerTarget(event),
       marks: [],
     }
   })
-}
-
-/**
- * Back-compat shim: the report projection produced a `ProjectedReport`, whose
- * shape {@link PeerAttentionEvent} now generalizes. Kept as a thin adapter so
- * callers that already hold reports keep working.
- */
-export function derivePeerReportNotifications(
-  reports: ReadonlyArray<{ operationId: string; targetType: 'post' | 'comment'; targetId: string; reason: string; reporterId: string; createdAt: number }>,
-  args: {
-    resolveName?: (peerId: string, payloadName?: string) => string
-    readIds?: ReadonlySet<string> | null
-  } = {},
-): AppNotification[] {
-  return derivePeerNotifications(
-    reports.map((report) => ({
-      operationId: report.operationId,
-      kind: 'report' as const,
-      targetType: report.targetType,
-      targetId: report.targetId,
-      actorId: report.reporterId,
-      createdAt: report.createdAt,
-      note: report.reason,
-    })),
-    args,
-  )
 }
 
 export function mergeNotifications(

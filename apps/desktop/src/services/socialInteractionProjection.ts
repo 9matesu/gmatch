@@ -1,6 +1,7 @@
 "use client";
 
 import type { SocialOperation } from '@orbit/protocol'
+import type { PeerAttentionEvent } from '../utils/notifications'
 import type { LoggedOperation } from './socialOperationLog'
 
 /**
@@ -193,6 +194,155 @@ export function projectReportsFor(entries: readonly LoggedOperation[], authorId:
     })
   }
   return out.sort((a, b) => a.createdAt - b.createdAt)
+}
+
+/**
+ * The peer notification lane: signed operations OTHER actors aimed at MY
+ * content or at me — a follow, a like, a comment, a reply, a report.
+ *
+ * Pure and deterministic, derived only from ACCEPTED operations. The rules are
+ * the honest ones:
+ *  - never notify yourself (an operation the viewer authored is not news);
+ *  - a like or a follow a removal superseded is not an event;
+ *  - a tombstoned post/comment is nothing to notify about;
+ *  - the row opens what it is ABOUT: a follow opens the actor's profile, and
+ *    a reply opens both its post and its comment (a comment id alone lands the
+ *    deep link nowhere).
+ */
+export function projectPeerAttentionFor(
+  entries: readonly LoggedOperation[],
+  selfId: string,
+): PeerAttentionEvent[] {
+  if (!selfId) return []
+  const operations = operationsOf(entries)
+
+  // Tombstones hide the operation they target.
+  const deletedOperationIds = new Set<string>()
+  for (const operation of operations) {
+    if (operation.type !== 'comment.delete' && operation.type !== 'post.delete') continue
+    const target = (operation.payload as { targetOperationId?: unknown }).targetOperationId
+    if (typeof target === 'string') deletedOperationIds.add(target)
+  }
+
+  // Authorship (the "is this mine?" test) and where a comment lives.
+  const postAuthor = new Map<string, string>()
+  const deletedPosts = new Set<string>()
+  const commentAuthor = new Map<string, string>()
+  const commentPost = new Map<string, string>()
+  const deletedComments = new Set<string>()
+  for (const operation of operations) {
+    if (operation.type === 'post.create') {
+      if (!postAuthor.has(operation.objectId)) postAuthor.set(operation.objectId, operation.actorId)
+      if (deletedOperationIds.has(operation.operationId)) deletedPosts.add(operation.objectId)
+      continue
+    }
+    if (operation.type !== 'comment.create') continue
+    if (!commentAuthor.has(operation.objectId)) commentAuthor.set(operation.objectId, operation.actorId)
+    if (deletedOperationIds.has(operation.operationId)) {
+      deletedComments.add(operation.objectId)
+      continue
+    }
+    const postId = (operation.payload as { postId?: unknown }).postId
+    if (typeof postId === 'string') commentPost.set(operation.objectId, postId)
+  }
+
+  // Withdrawn likes / undone follows announce nothing.
+  const withdrawn = new Set<string>()
+  for (const operation of operations) {
+    if (operation.type !== 'reaction.remove' && operation.type !== 'follow.remove') continue
+    const ids = (operation.payload as { targetAddOperationIds?: unknown }).targetAddOperationIds
+    if (Array.isArray(ids)) for (const id of ids) if (typeof id === 'string') withdrawn.add(id)
+  }
+
+  const isMinePost = (postId: string): boolean =>
+    postAuthor.get(postId) === selfId && !deletedPosts.has(postId)
+  const isMineComment = (commentId: string): boolean =>
+    commentAuthor.get(commentId) === selfId && !deletedComments.has(commentId)
+
+  const out: PeerAttentionEvent[] = []
+  for (const operation of operations) {
+    // An operation I authored is not news to me.
+    if (operation.actorId === selfId) continue
+    const base = { operationId: operation.operationId, actorId: operation.actorId, createdAt: operation.createdAt }
+
+    switch (operation.type) {
+      case 'follow.add': {
+        const targetId = (operation.payload as { targetId?: unknown }).targetId
+        if (targetId !== selfId || withdrawn.has(operation.operationId)) break
+        out.push({ ...base, kind: 'follow', targetType: 'user', targetId: operation.actorId })
+        break
+      }
+
+      case 'report.create': {
+        const payload = operation.payload as { targetType?: unknown; targetId?: unknown; reason?: unknown }
+        if (payload.targetType !== 'post' && payload.targetType !== 'comment') break
+        if (typeof payload.targetId !== 'string') break
+        const mine = payload.targetType === 'post'
+          ? isMinePost(payload.targetId)
+          : isMineComment(payload.targetId)
+        if (!mine) break
+        out.push({
+          ...base,
+          kind: 'report',
+          targetType: payload.targetType,
+          targetId: payload.targetId,
+          postId: payload.targetType === 'comment' ? commentPost.get(payload.targetId) : undefined,
+          note: typeof payload.reason === 'string' ? payload.reason : '',
+        })
+        break
+      }
+
+      case 'reaction.add': {
+        if (withdrawn.has(operation.operationId)) break
+        const payload = operation.payload as { targetType?: unknown; targetId?: unknown }
+        if (typeof payload.targetId !== 'string') break
+        if (payload.targetType === 'post') {
+          if (!isMinePost(payload.targetId)) break
+          out.push({ ...base, kind: 'like', targetType: 'post', targetId: payload.targetId })
+        } else if (payload.targetType === 'comment') {
+          if (!isMineComment(payload.targetId)) break
+          out.push({
+            ...base,
+            kind: 'like',
+            targetType: 'comment',
+            targetId: payload.targetId,
+            postId: commentPost.get(payload.targetId),
+          })
+        }
+        break
+      }
+
+      case 'comment.create': {
+        if (deletedOperationIds.has(operation.operationId)) break
+        const payload = operation.payload as { postId?: unknown; parentCommentId?: unknown; body?: unknown }
+        if (typeof payload.postId !== 'string') break
+        if (deletedPosts.has(payload.postId)) break
+        const note = typeof payload.body === 'string' ? payload.body : undefined
+        const parentId = typeof payload.parentCommentId === 'string' ? payload.parentCommentId : null
+        if (parentId) {
+          // A reply is news to the comment's author, not to the post's.
+          if (!isMineComment(parentId)) break
+          out.push({
+            ...base,
+            kind: 'reply',
+            targetType: 'comment',
+            targetId: operation.objectId,
+            postId: payload.postId,
+            note,
+          })
+        } else {
+          if (!isMinePost(payload.postId)) break
+          out.push({ ...base, kind: 'comment', targetType: 'post', targetId: payload.postId, note })
+        }
+        break
+      }
+
+      default:
+        break
+    }
+  }
+
+  return out.sort((a, b) => a.createdAt - b.createdAt || (a.operationId < b.operationId ? -1 : 1))
 }
 
 /** Comment threads per post. Deleted comments are hidden; a reply whose

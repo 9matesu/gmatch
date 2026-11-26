@@ -1042,8 +1042,11 @@ heat streak). Each +5% click power. Persist across prestige.
   peer-replicated content is a signed `report.create` operation, so it
   reaches the AUTHOR of that content through the mesh. The author is the one
   who can act on it, and the report shows up in their notification centre
-  ("X reported your post"). Node-hosted content keeps the node's moderation
-  queue — the node that hosts the content moderates it.
+  ("X reported your post"). The same peer lane carries every other interaction
+  aimed at my content — a follow, a like, a comment, a reply (§15 lane 3), all
+  projected from the accepted operations with no central service in between.
+  Node-hosted content keeps the node's moderation queue - the node that hosts
+  the content moderates it.
 
 ## 10f. Card & store economy — what actually exists (2026-11-08)
 
@@ -1487,16 +1490,28 @@ left-rail dock is gone. The trigger keeps
    hook `hooks/useNotificationCenter.ts`). Reading the row is the same action as
    opening the conversation, and it emits a real `dm_read` receipt — so the
    notification is never a second, drift-prone copy of the message state.
-3. **Peer-lane rows** — signed operations about MY content (a `report.create`
-   today; the lane is built to carry follow/like/comment next). A mesh has no
-   admin, so a report travels to the AUTHOR, who is the one who can act on it.
+3. **Peer-lane rows** — signed operations OTHER actors aimed at MY content or at
+   me: a `report.create`, a `follow.add`, a `reaction.add` (a like), a
+   `comment.create` (a comment on my post, or a reply to my comment). A mesh has
+   no admin and no central like/comment service, so those events travel as
+   signed operations between the peers and the AUTHOR is the one who can act on
+   them — the only place they can be shown is this lane.
+   `services/socialInteractionProjection.ts` `projectPeerAttentionFor` derives
+   the rows from ACCEPTED operations with honest rules: an operation I authored
+   is never news to me, a withdrawn like (`reaction.remove` naming its add) and
+   an undone follow are not events, and a tombstoned post/comment has nothing to
+   say. The row opens what it is ABOUT — a follow opens the actor's profile, a
+   reply and a comment-targeted like/report carry BOTH `postId` and `commentId`
+   (a comment id alone lands the deep link nowhere).
+   `hooks/usePeerAttention.ts` (over the shared `usePeerProjection` lifecycle)
+   reads it and re-reads on every log change and peer-online signal.
    These rows were **counted but never rendered** until 2026-11-26: they lived
    only in the merged list the badge reads, while the panel drew server rows and
-   courier rows separately, so a report raised the badge and could never clear.
+   courier rows separately, so a peer row raised the badge and could never clear.
    `peerItems` is now its own section ("From your peers") and its read state is
    durable and identity-scoped (`utils/peerNotifications.ts`, keyed by the
    operation id) because a derived row has no node `read` flag and no chat seen
-   stamp. Tapping a peer row opens its post/comment and marks it read; "Mark all
+   stamp. Tapping a peer row opens its target and marks it read; "Mark all
    read" clears peer rows too (an alert) but deliberately leaves the courier lane
    alone (a DM is a real unread message, cleared by opening it).
 
@@ -1532,9 +1547,11 @@ left-rail dock is gone. The trigger keeps
 - **Explicit reads only.** Opening the centre does not mark anything read.
   Tapping a row marks that row (and, for courier rows, emits the read receipt);
   "Mark all read" marks all. This avoids claiming a read that did not happen and
-  avoids a server round-trip per dropdown open. "Mark all read" clears the
-  server rows only: a courier row is a real unread **message**, so it is cleared
-  by opening the conversation, never dismissed like an alert.
+  avoids a server round-trip per dropdown open. "Mark all read" clears server
+  rows AND peer rows (both are alerts, and a peer row's read state is the durable
+  per-identity set keyed by operation id); it deliberately leaves the courier
+  lane alone — a courier row is a real unread **message**, so it is cleared by
+  opening the conversation, never dismissed like an alert.
 - **Backgrounded window.** A courier DM/room message that arrives while
   `document.hidden` raises an OS notification with the **sender name only** (no
   message body — a sealed DM must not land on a lock screen), tagged per
@@ -1551,7 +1568,10 @@ left-rail dock is gone. The trigger keeps
   and match events). Courier DMs have no durable relay, so a DM that a peer
   never delivered is simply not there — the UI never claims guaranteed offline
   delivery, and the two systems stay consistent by deriving local rows rather
-  than by syncing anything.
+  than by syncing anything. Peer-lane rows are the exception on the durable
+  side: they are derived from the **operation log on disk**, so a follow/like/
+  comment a peer did deliver survives a restart and still shows (its read state
+  does too).
 - Not built (features do not exist, so nothing is fabricated): friend requests,
   post emoji reactions (posts have `like` only), watch-party invites, and
   office-side `system` events.
@@ -1567,10 +1587,15 @@ left-rail dock is gone. The trigger keeps
 - `MAX_PER_THREAD = 2000` truncates DM history, and multi-machine swarm delivery
   remains unverified (§10d).
 
-**Tests:** `utils/notifications.test.ts` (merge/derive/counts),
-`utils/scopedSeen.test.ts` (scoping + legacy migration),
+**Tests:** `utils/notifications.test.ts` (merge/derive/counts + every peer-lane
+title/target), `utils/scopedSeen.test.ts` (scoping + legacy migration),
+`utils/peerNotifications.test.ts` + `hooks/usePeerNotificationReads.test.tsx`
+(durable, identity-scoped peer read state),
+`services/socialInteraction.peerAttention.test.ts` (the projection: self is not
+news, withdrawn like/undone follow are silent, tombstoned content is silent,
+comment targets carry their post),
 `components/notifications/NotificationCenter.test.tsx` (single toggle hook,
-badge, inbox affordance, courier rows), and the API suite
+badge, inbox affordance, courier and peer rows), and the API suite
 `routes/posts-notifications.test.ts` (comment/reply/mention/comment-like
 coverage, self-notification guards, cross-post parent rejection, bounded
 idempotency).

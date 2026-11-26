@@ -13,7 +13,7 @@ import { PEER_SAVES_CHANGED_EVENT } from '../utils/peerSaves'
  * The read side of the peer operation log: re-read the whole log whenever it
  * changes OR a peer comes online, and keep the result in state.
  *
- * usePeerFeedPosts, usePeerCommentsByPost and usePeerReports each carried their
+ * usePeerFeedPosts, usePeerCommentsByPost and usePeerAttention each carried their
  * own copy of this lifecycle (alive flag, two listeners, matching cleanup) —
  * identical apart from the projection call. One hook keeps the freshness rule
  * (and the cancellation) in a single place; a new peer projection reuses it.
