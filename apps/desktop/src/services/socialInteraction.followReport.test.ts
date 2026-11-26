@@ -11,10 +11,11 @@ import {
   publishReport,
   publishUnfollow,
 } from '../services/socialInteraction'
-import { projectFollows, projectFollowState, projectReportsFor } from '../services/socialInteractionProjection'
+import { projectFollowEdgesFor, projectFollows, projectFollowState, projectReportsFor } from '../services/socialInteractionProjection'
 
 const PEER = restoreIdentity('22'.repeat(32), '33'.repeat(32))
 const ME = restoreIdentity('00'.repeat(32), '11'.repeat(32))
+const OTHER = restoreIdentity('44'.repeat(32), '55'.repeat(32))
 
 function memoryBackend(): OperationLogBackend & { store: Map<string, LoggedOperation> } {
   const store = new Map<string, LoggedOperation>()
@@ -142,5 +143,65 @@ describe('the social graph as operations (L5/L7)', () => {
     await peerPostIn(log)
     await publishComment(ME, { postId: 'post-1', parentCommentId: null, body: 'hi', commentId: 'c1' }, log)
     expect(projectReportsFor(await log.listAllOperations(), PEER.orbitId)).toHaveLength(0)
+  })
+})
+
+describe('the follow edges around one profile (both tabs, local-first)', () => {
+  it('reads who follows me and who I follow from the operations alone', async () => {
+    const log = newLog()
+    await publishFollow(PEER, ME.orbitId, log)
+    await publishFollow(ME, OTHER.orbitId, log)
+
+    const mine = projectFollowEdgesFor(await log.listAllOperations(), ME.orbitId)
+    expect([...mine.followers]).toEqual([PEER.orbitId])
+    expect([...mine.following]).toEqual([OTHER.orbitId])
+    expect(mine.withdrawnFollowers.size).toBe(0)
+    expect(mine.withdrawnFollowing.size).toBe(0)
+
+    const theirs = projectFollowEdgesFor(await log.listAllOperations(), PEER.orbitId)
+    expect(theirs.followers).toHaveLength(0)
+    expect([...theirs.following]).toEqual([ME.orbitId])
+  })
+
+  it('an unfollow masks the follower row the node may still list', async () => {
+    const log = newLog()
+    await publishFollow(PEER, ME.orbitId, log)
+    const opId = activeFollowOperationId(await log.listAllOperations(), PEER.orbitId, ME.orbitId)!
+    await publishUnfollow(PEER, opId, log)
+
+    const edges = projectFollowEdgesFor(await log.listAllOperations(), ME.orbitId)
+    expect(edges.followers.size).toBe(0)
+    expect([...edges.withdrawnFollowers]).toEqual([PEER.orbitId])
+  })
+
+  it('masks the people I unfollowed from my following tab', async () => {
+    const log = newLog()
+    await publishFollow(ME, PEER.orbitId, log)
+    const opId = activeFollowOperationId(await log.listAllOperations(), ME.orbitId, PEER.orbitId)!
+    await publishUnfollow(ME, opId, log)
+
+    const edges = projectFollowEdgesFor(await log.listAllOperations(), ME.orbitId)
+    expect(edges.following.size).toBe(0)
+    expect([...edges.withdrawnFollowing]).toEqual([PEER.orbitId])
+  })
+
+  it('a re-follow is active again and no longer masked', async () => {
+    const log = newLog()
+    await publishFollow(PEER, ME.orbitId, log)
+    const opId = activeFollowOperationId(await log.listAllOperations(), PEER.orbitId, ME.orbitId)!
+    await publishUnfollow(PEER, opId, log)
+    await publishFollow(PEER, ME.orbitId, log)
+
+    const edges = projectFollowEdgesFor(await log.listAllOperations(), ME.orbitId)
+    expect([...edges.followers]).toEqual([PEER.orbitId])
+    expect(edges.withdrawnFollowers.size).toBe(0)
+  })
+
+  it('an empty target has no edges at all', () => {
+    const edges = projectFollowEdgesFor([], '')
+    expect(edges.followers.size).toBe(0)
+    expect(edges.following.size).toBe(0)
+    expect(edges.withdrawnFollowers.size).toBe(0)
+    expect(edges.withdrawnFollowing.size).toBe(0)
   })
 })

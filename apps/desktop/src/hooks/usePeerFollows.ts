@@ -1,10 +1,15 @@
 "use client";
 
 import { usePeerProjection } from './usePeerProjection'
-import { projectFollowState } from '../services/socialInteractionProjection'
+import {
+  projectFollowEdgesFor,
+  projectFollowState,
+  type ProjectedFollowEdges,
+} from '../services/socialInteractionProjection'
+import { mergeFollowIds } from '../utils/followList'
 
 /**
- * My own follows, read from the peer operation log.
+ * The social graph, read from the peer operation log.
  *
  * A follow is a signed operation, so it is durable off-node — but nothing read
  * it back: `followingIds` came from `GET /api/users/:id/following` alone. A
@@ -13,6 +18,10 @@ import { projectFollowState } from '../services/socialInteractionProjection'
  * though the operation was sitting in the durable log: the feed re-suggested
  * people the player already follows and every followed profile showed
  * "Follow" again. This is the read half of the peer graph.
+ *
+ * Two views, one log: `usePeerFollows` is MY OWN list (the feed's
+ * `followingIds`), and `usePeerFollowEdges` is the two tabs of ONE profile,
+ * own or somebody else's.
  */
 export interface PeerFollowView {
   /** Ids I actively follow, per my own signed operations. */
@@ -53,11 +62,33 @@ export function mergeFollowing(
   serverIds: readonly string[],
   peer: PeerFollowView,
 ): string[] {
-  const merged = new Set(serverIds)
-  // Order matters: mask what my own operations withdrew FIRST, then union what
-  // they added. Even though the projection keeps the two sets disjoint, a live
-  // follow must always win over a stale removal.
-  for (const id of peer.removed) merged.delete(id)
-  for (const id of peer.following) merged.add(id)
-  return [...merged]
+  return mergeFollowIds(serverIds, { added: peer.following, removed: peer.removed })
+}
+
+const EMPTY_EDGES: ProjectedFollowEdges = {
+  followers: new Set(),
+  following: new Set(),
+  withdrawnFollowers: new Set(),
+  withdrawnFollowing: new Set(),
+}
+
+/**
+ * The follow edges around ONE profile — its Followers and Following tabs — read
+ * from the peer log.
+ *
+ * The modal rendered the node's two lists verbatim, so a follow made while the
+ * node was unreachable never appeared on the profile that should show it, and an
+ * unfollow that stayed off-node left a row that could not be removed. This is the
+ * same local-first read the feed's `followingIds` already gets, scoped to the
+ * profile being looked at (own or somebody else's).
+ *
+ * `targetId` doubles as the log-read gate: no id means no profile, so the hook
+ * holds the empty value instead of flashing edges for nobody.
+ */
+export function usePeerFollowEdges(targetId?: string | null): ProjectedFollowEdges {
+  return usePeerProjection<ProjectedFollowEdges>(
+    (entries) => (targetId ? projectFollowEdgesFor(entries, targetId) : EMPTY_EDGES),
+    targetId,
+    EMPTY_EDGES,
+  )
 }

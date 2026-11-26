@@ -6,6 +6,25 @@ Every item below was requested, was already "implemented" in some form, and
 did not actually work in the running app. Each one is now built, tested and
 verified live.
 
+- **The profile's Followers/Following tabs tell the truth about the peer graph.**
+  Both tabs rendered the node's `Followers` table verbatim, so a follow made
+  while the node was unreachable existed in the durable operation log and nowhere
+  else — invisible on the very profile that should show it — while an unfollow
+  that stayed off-node left a row nothing could remove. `projectFollowEdgesFor`
+  (`services/socialInteractionProjection.ts`) now derives the four edges around
+  ONE profile (who follows them, who they follow, and the two masked sets) from
+  the accepted operations, `hooks/usePeerFollows.ts` exposes it as
+  `usePeerFollowEdges` over the shared log-read lifecycle, and
+  `utils/followList.ts` holds the merge rules: the node's order is kept,
+  operations ADD what the node does not know and MASK what it still lists (a live
+  follow beats a stale withdrawal), and an id that exists ONLY as an operation
+  still gets a row — named from the roster, or the shared `generateFallbackName`,
+  never a truncated hash. The Follow button follows `followingIds` (already the
+  merged own-follow list), so a lagging per-row node flag cannot contradict it.
+  `utils/followList.test.ts` pins both merge rules,
+  `socialInteraction.followReport.test.ts` the four edges (including the re-follow
+  that clears a mask), and `FollowersFollowingModal.test.tsx` drives the wired
+  modal with the node unreachable.
 - **Peer activity aimed at you actually reaches you - and can be dismissed.**
   A report, a follow, a like, a comment and a reply about peer-replicated
   content are signed operations that travel between the peers, and the AUTHOR of

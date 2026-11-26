@@ -27,6 +27,23 @@ import { ObjectImage } from '../ObjectImage';
 import { isVideoPost } from '../../utils/media';
 import { saveUserProfile } from '../../utils/profile';
 import { profileShareUrl, orbitFetch, invalidateCache } from '../../utils/api';
+import { mergeFollowIds } from '../../utils/followList';
+import { usePeerFollowEdges } from '../../hooks/usePeerFollows';
+
+/**
+ * The ids a follower/following JSON answer carries.
+ *
+ * A failed request is treated as an EMPTY list on purpose: the tab that opens
+ * from this counter merges the same way (an unreachable node contributes
+ * nothing), so the number and the rows cannot disagree about what the node
+ * knows.
+ */
+function followerIdsFrom(rows: unknown): string[] {
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .map((row) => (row as { id?: unknown } | null)?.id)
+    .filter((id): id is string => typeof id === 'string');
+}
 
 export function GMatchProfile({
   identity,
@@ -219,8 +236,8 @@ export function GMatchProfile({
     });
   };
 
-  const [liveFollowersCount, setLiveFollowersCount] = useState<number | null>(null);
-  const [liveFollowingCount, setLiveFollowingCount] = useState<number | null>(null);
+  const [liveFollowerIds, setLiveFollowerIds] = useState<string[] | null>(null);
+  const [liveFollowingIds, setLiveFollowingIds] = useState<string[] | null>(null);
 
   useEffect(() => {
     const targetId = isSelf ? identity?.orbitId : myUser?.id;
@@ -240,8 +257,8 @@ export function GMatchProfile({
         const followers = followersRes && followersRes.ok ? await followersRes.json() : null;
         const following = followingRes && followingRes.ok ? await followingRes.json() : null;
         if (!cancelled) {
-          if (Array.isArray(followers)) setLiveFollowersCount(followers.length);
-          if (Array.isArray(following)) setLiveFollowingCount(following.length);
+          setLiveFollowerIds(followerIdsFrom(followers));
+          if (!isSelf) setLiveFollowingIds(followerIdsFrom(following));
         }
       } catch {
         /* ignore */
@@ -267,10 +284,28 @@ export function GMatchProfile({
     };
   }, [identity, identity?.orbitId, myUser?.id, isSelf]);
 
-  const effectiveFollowersCount = liveFollowersCount ?? followersCount ?? myUser?.followers_count ?? 0;
+  // The node's counters are bookkeeping, and a follow signed while the node was
+  // unreachable never reached its table. The number above a tab merges the SAME
+  // operations the tab lists, so the count cannot disagree with the rows the
+  // modal shows for the same profile.
+  const peerEdges = usePeerFollowEdges(isSelf ? identity?.orbitId : myUser?.id);
+  const mergedFollowerCount = liveFollowerIds
+    ? mergeFollowIds(liveFollowerIds, {
+        added: peerEdges.followers,
+        removed: peerEdges.withdrawnFollowers,
+      }).length
+    : null;
+  const mergedFollowingCount = liveFollowingIds
+    ? mergeFollowIds(liveFollowingIds, {
+        added: peerEdges.following,
+        removed: peerEdges.withdrawnFollowing,
+      }).length
+    : null;
+
+  const effectiveFollowersCount = mergedFollowerCount ?? followersCount ?? myUser?.followers_count ?? 0;
   const effectiveFollowingCount = isSelf
     ? followingIds.length
-    : (liveFollowingCount ?? followingCount ?? myUser?.following_count ?? 0);
+    : (mergedFollowingCount ?? followingCount ?? myUser?.following_count ?? 0);
 
   const stats = [
     { label: 'posts', value: displayPosts.length, onClick: () => setProfileTab('posts') },

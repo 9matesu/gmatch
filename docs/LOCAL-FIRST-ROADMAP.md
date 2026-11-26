@@ -486,8 +486,14 @@ the node list UNION the operation follows MINUS the withdrawn ones, so a follow
 made while the node was unreachable no longer vanishes on the next launch (and
 an operation-level unfollow masks the node's stale row). `e2e/follow-offline.spec.ts`
 pins it with both follow endpoints aborted: the empty feed's suggestions must
-keep excluding the person the operation followed after a reload. Still open:
-the FOLLOWER list (who follows me) still comes from the node.
+keep excluding the person the operation followed after a reload. The profile's
+own tabs now read the same graph: `projectFollowEdgesFor` gives the four edges
+around ONE profile (who follows them, who they follow, and the two masked sets),
+`usePeerFollowEdges` reads it over the shared lifecycle, and `utils/followList.ts`
+merges it into rows — the node's order kept, operations adding what the node
+never received and masking what it still lists, and an operation-only id named
+from the roster instead of a hash fragment. `FollowersFollowingModal.test.tsx`
+drives that with the node unreachable.
 
 **Migration of existing content.** `services/socialPostImport.ts` turns the
 user's OWN public local posts into `post.create` operations, so the

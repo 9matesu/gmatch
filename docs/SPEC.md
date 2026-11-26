@@ -1029,7 +1029,21 @@ heat streak). Each +5% click power. Persist across prestige.
   follows MINUS the withdrawn ones — so the node's stale or missing
   bookkeeping can neither hide a follow nor resurrect an unfollow.
   `e2e/follow-offline.spec.ts` proves it with both follow endpoints aborted.
-  The FOLLOWER list (who follows me) still comes from the node.
+- **The profile's two follow tabs are local-first too (2026-11-26).** The
+  Followers/Following modal rendered the node's two lists verbatim, so a follow
+  made while the node was unreachable was invisible on the very profile that
+  should show it (and an unfollow that stayed off-node left a row that could not
+  be removed). `projectFollowEdgesFor` (`services/socialInteractionProjection.ts`,
+  read by `hooks/usePeerFollows.ts` `usePeerFollowEdges`) turns the same log into
+  the four edges around ONE profile: who follows them, who they follow, and the
+  two masked sets a stale node row has to lose. `utils/followList.ts` holds the
+  two pure rules: `mergeFollowIds` (node order kept, operations ADD what the node
+  does not know and MASK what it still lists, a live follow beating a withdrawal)
+  and `mergeFollowRows` (a node row keeps its own `score`/`matches_won`/`tags`;
+  an id that exists ONLY as an operation gets a row named from the roster, or the
+  shared `generateFallbackName`, never a truncated hash). The Follow button's
+  truth is `followingIds` — already the merged own-follow list — so the node's
+  per-row flag cannot disagree with it.
 - **The Followers table is the ONLY follower count** (2026-11-08). The
   denormalized `Users.followers_count` / `Users.following_count` columns are
   gone (migration 058): every follow bumped them, every cascade delete and

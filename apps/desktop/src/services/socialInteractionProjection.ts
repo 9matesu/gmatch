@@ -154,6 +154,55 @@ export function projectFollows(entries: readonly LoggedOperation[]): Map<string,
   return projectFollowState(entries).following
 }
 
+/**
+ * The follow edges around ONE player — the two tabs of their profile.
+ *
+ * The node's `Followers`/`Following` tables are bookkeeping that can lag behind
+ * what the peers actually signed: a follow made while the node was unreachable
+ * never reached it, and an unfollow that stayed off-node leaves a stale row
+ * behind. The operation log is the newer intent, so a reader needs BOTH sides
+ * of it: the ids to ADD and the ids to MASK.
+ */
+export interface ProjectedFollowEdges {
+  /** Actors with an ACTIVE follow of this player. */
+  followers: Set<string>
+  /** Who this player actively follows. */
+  following: Set<string>
+  /** Actors whose follow of this player a removal superseded (mask a node row). */
+  withdrawnFollowers: Set<string>
+  /** Who this player unfollowed, per their own operations (mask a node row). */
+  withdrawnFollowing: Set<string>
+}
+
+export function projectFollowEdgesFor(
+  entries: readonly LoggedOperation[],
+  targetId: string,
+): ProjectedFollowEdges {
+  const edges: ProjectedFollowEdges = {
+    followers: new Set(),
+    following: new Set(),
+    withdrawnFollowers: new Set(),
+    withdrawnFollowing: new Set(),
+  }
+  if (!targetId) return edges
+
+  const { following, removed } = projectFollowState(entries)
+  for (const id of following.get(targetId) ?? []) edges.following.add(id)
+  for (const id of removed.get(targetId) ?? []) edges.withdrawnFollowing.add(id)
+  for (const [actorId, targets] of following) {
+    if (targets.has(targetId)) edges.followers.add(actorId)
+  }
+  for (const [actorId, targets] of removed) {
+    if (targets.has(targetId)) edges.withdrawnFollowers.add(actorId)
+  }
+  // A live follow always wins over a withdrawn one: a re-follow creates a fresh
+  // add, and the projection keeps the per-actor sets disjoint — this loop only
+  // guarantees the merged reader cannot resurrect a mask it should ignore.
+  for (const id of edges.followers) edges.withdrawnFollowers.delete(id)
+  for (const id of edges.following) edges.withdrawnFollowing.delete(id)
+  return edges
+}
+
 /** A report about content, as the author sees it. */
 export interface ProjectedReport {
   operationId: string
