@@ -6,6 +6,24 @@ Every item below was requested, was already "implemented" in some form, and
 did not actually work in the running app. Each one is now built, tested and
 verified live.
 
+- **Your older posts can be shared with peers — one button, on purpose.**
+  Everything published before the local-first path existed lives only as a row
+  on your node, so no peer can address it and it disappears from the feed the
+  moment the node stops answering. The roadmap described a
+  `services/socialPostImport.ts` that was never written. It exists now:
+  Settings → Preferences → "Share my existing posts" turns your own public feed
+  posts into signed `post.create` operations and seeds their bytes locally
+  first, so a peer that receives the operation has a seeder. It never runs at
+  boot and never deletes or re-uploads anything. Each row is gated exactly like
+  a fresh publish (stories, avatars, chat attachments and private rows stay
+  out), skipped when it is tombstoned or already in the log, and its bytes must
+  actually be readable — local swarm/vault first, otherwise this node, whose
+  answer for a row it does not hold is a `p2p` JSON descriptor that the import
+  refuses so descriptor text is never imported as a picture. A declared
+  `content_hash` must match the bytes (a mismatch is skipped, never
+  re-addressed); with none, the computed hash becomes the address.
+  `socialPostImport.test.ts` pins all ten rules.
+
 - **A post made while a friend is online actually reaches them.** The outbound
   operation wave ran only on boot and on peer-online, so a `post.create` (or a
   like, comment, edit, delete) appended while a peer was already connected sat

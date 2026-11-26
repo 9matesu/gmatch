@@ -438,7 +438,7 @@ durable log instead of calling a node that does not own the post
 the node path. The comment box write path is live for peer-replicated posts
 too: a signed `comment.create`/`comment.delete` in the durable log, replicated
 like every other operation (`persistPeerComment`). Still open: profile/follow
-operations, moderation reports, and the import surface.
+operations and moderation reports. The import surface is live (below).
 
 **Migration of existing content.** `services/socialPostImport.ts` turns the
 user's OWN public local posts into `post.create` operations, so the
@@ -446,6 +446,21 @@ local-first feed is not born empty. Guardrails: own posts only, idempotent by
 objectId, capped per run, additive only (it never touches the post, its bytes
 or the vault), and **opt-in** — re-publishing old content to peers is a
 visible decision, so nothing calls it automatically at boot.
+
+Implemented (2026-11-26), one click in Settings → Preferences
+(`components/settings/ImportPostsSection.tsx`). Each candidate is gated exactly
+like a fresh publish (`shouldEmitSocialOperation`: public feed post, never a
+story/avatar/chat/private row), skipped when a tombstone or the log already
+carries its object id, and its bytes must be READABLE: local swarm/vault first,
+otherwise the node — and a node that does not physically hold the row answers
+with a `p2p` DESCRIPTOR, which the import refuses on `content-type` so
+descriptor text is never imported as a picture. A `content_hash` the node
+declares must match the bytes (a mismatch is skipped and never re-addressed);
+with no declared hash the computed one becomes the address. Verified bytes are
+seeded under the object id AND the hash BEFORE the operation is committed, so a
+peer that receives the operation has a seeder. `services/socialPostImport.test.ts`
+pins all of it (own-public-only, idempotency, tombstone, hash mismatch,
+descriptor refusal, node fallback, per-run cap).
 - [ ] Model comments/replies, reactions, follows, profile fields, and
   moderation reports as authorized signed operations with stable IDs and
   explicit deletion/edit behavior.

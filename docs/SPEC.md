@@ -953,6 +953,20 @@ heat streak). Each +5% click power. Persist across prestige.
   OPERATION LOG (which the node never stores) receives the signed
   `post.create`, B projects the row and pulls byte-identical media by content
   hash — and with the subscriber disabled the operation never arrives.
+- **Old posts can be shared with peers in one opt-in step (2026-11-26).** A post
+  published before local-first lives only as a node row, so no peer can address
+  it and it vanishes from the feed when the node stops answering.
+  `services/socialPostImport.ts` (Settings → Preferences, one button) turns the
+  player's OWN public feed posts into signed `post.create` operations and seeds
+  their bytes locally first. It is opt-in and additive — nothing runs at boot,
+  nothing is deleted or re-uploaded. Each row is gated like a fresh publish
+  (never a story/avatar/chat/private row), skipped when a tombstone or the log
+  already has its object id, and its bytes must be readable: local swarm/vault
+  first, otherwise this node — whose answer for a row it does not physically
+  hold is a `p2p` DESCRIPTOR, refused on `content-type` so descriptor text is
+  never imported as a picture. A `content_hash` the row declares must match the
+  bytes (mismatch skipped, never re-addressed); with none, the computed hash
+  becomes the address. `services/socialPostImport.test.ts` pins every rule.
 - Full specification documented in `docs/ARCHITECTURE-P2P.md`.
 
 ## 10e. Group chat, social graph and reports as peer operations (2026-10-22)

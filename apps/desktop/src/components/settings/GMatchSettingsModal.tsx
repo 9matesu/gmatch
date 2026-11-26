@@ -31,6 +31,7 @@ import { DeleteAccountSection } from './DeleteAccountSection';
 import { PasskeyManager } from '../PasskeyManager';
 import { UpdateSection } from './UpdateSection';
 import { CommunitySection } from './CommunitySection';
+import { ImportPostsSection } from './ImportPostsSection';
 import { BlocklistSection } from './BlocklistSection';
 import { CacheViewer } from './CacheViewer';
 import {
@@ -960,6 +961,9 @@ export function GMatchSettingsModal({
 
             {/* Community invite: node setting with a constant fallback. */}
             {activeTab === 'preferences' && <CommunitySection toast={toast} />}
+
+            {/* Opt-in migration: share posts published before local-first. */}
+            {activeTab === 'preferences' && <ImportPostsSection identity={identity} toast={toast} />}
 
             {/* ──────── 2. ACCOUNT & SECURITY ──────── */}
             {activeTab === 'account' && (
