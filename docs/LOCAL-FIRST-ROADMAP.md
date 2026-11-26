@@ -372,6 +372,17 @@ it re-send; boot/peer-online waves still retry `sending` entries).
 contexts, A publishes while B is online, B's operation log receives the signed
 `post.create` and B pulls byte-identical media by content hash.
 
+The **L4 acceptance itself is now executed** (2026-11-26):
+`e2e/feed-offline-local-first.spec.ts` aborts `/api/posts**` and
+`/api/objects**`, then reloads and asserts (a) a peer-replicated row renders
+WITH its media (the bytes come from the content-addressed ladder, not from a
+signed object fetch - the decoded `naturalWidth` is the proof), (b) a post made
+through the real composer while those routes stay dead still shows, and (c) it
+is still there after a second reload, with its outbox entry honestly `local` or
+`pending` rather than pretending the node took it. The local log is the only
+thing that could carry either row across the reload, since the node stores no
+operations.
+
 Still open: offline read paths beyond the local log, and the
 migration/compatibility work below.
 
