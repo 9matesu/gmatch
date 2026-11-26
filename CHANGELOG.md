@@ -18,6 +18,21 @@ verified live.
   (`hideUnavailable` on `ObjectImage`) and the grid
   (`FeedGrid`'s `onMediaReady`/`onMediaDead`) feed the same set.
   `GMatchFeed.missing-media.test.tsx` pins the hide and the promote-on-peer-online.
+- **One media balloon, fixed size, for every media input — including the avatar.**
+  `MediaPickerPanel` was content-sized, so switching panes resized and moved it
+  under the pointer; the navbar Post bubble opened on hover and closed on
+  mouse-leave, so moving onto a tab could dismiss what you were about to click.
+  The panel is now a fixed footprint (`h-[560px]` default, `h-[420px]` compact,
+  body the only scroller), the bubble opens on CLICK and closes on a pick / its
+  close button / Escape / an outside pointerdown (the trigger excluded, so a
+  second click toggles), and the profile-photo modal (`ProfilePicModal`) is the
+  SAME picker plus a crop/apply step — it launches the picker on open (one click
+  to a keepsake), keeps Camera as a capture surface, and the dead bespoke hidden
+  `<input type=file>` avatar path (`pfpInputRef` / `handleSetProfilePic` in
+  `App.tsx` + `GlobalModals.tsx`) is gone. A new `--z-picker: 65` token puts the
+  balloon above the profile-photo lightbox (60) it is opened from.
+  `CommandIsland.test.tsx` pins stay-open-on-pane-switch plus
+  outside-click/Escape close, and `ProfilePicModal.test.tsx` the auto-open picker.
 
 - **The profile's Followers/Following tabs tell the truth about the peer graph.**
   Both tabs rendered the node's `Followers` table verbatim, so a follow made

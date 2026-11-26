@@ -107,6 +107,10 @@
   --z-dropdown: 40;
   --z-modal: 50;
   --z-lightbox: 60;
+  /* The media picker is the ONE balloon every media input opens, including one
+     opened from inside a lightbox (the profile-photo modal, z-lightbox). It must
+     sit above a lightbox but below a toast. */
+  --z-picker: 65;
   --z-toast: 70;
   --z-system: 80;
 

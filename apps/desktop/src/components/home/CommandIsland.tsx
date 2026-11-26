@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   House,
   SquaresFour,
@@ -69,7 +69,7 @@ export interface CommandIslandProps {
   displayName?: string;
   profilePic?: string;
   onOpenCreatePost?: () => void;
-  /** A media pick from the hover bubble goes straight into the post creator
+  /** A media pick from the Post bubble goes straight into the post creator
    *  pre-attached. Omitted → the bubble is not offered (tests / embeds). */
   onPickMedia?: (sel: MediaSelection) => void;
   onOpenSettings?: () => void;
@@ -131,52 +131,42 @@ export function CommandIsland({
 }: CommandIslandProps) {
   const [satelliteOpen, setSatelliteOpen] = useState<boolean>(readSatelliteOpen);
   const [postPickerOpen, setPostPickerOpen] = useState(false);
-  // Hover opens this bubble ~180ms after the pointer lands, so a CLICK that
-  // follows has usually already been served by the hover. A toggle then closed
-  // exactly what the pointer had just revealed: the button read as "does
-  // nothing" (and the e2e composer hung on a tab that was never there). A
-  // click after a hover-open keeps it open; the next one closes.
-  const hoverOpened = useRef(false);
-  const hoverTimer = useRef<number | null>(null);
-  const leaveTimer = useRef<number | null>(null);
+  // The media balloon is STABLE: a click opens it, it stays put while the player
+  // switches panes, and only an explicit pick / close / Escape / outside click
+  // dismisses it. It used to open on hover and close on mouse-leave, so moving
+  // the pointer onto a tab could dismiss the very thing about to be clicked.
+  const pickerTriggerRef = useRef<HTMLDivElement | null>(null);
+  const pickerBubbleRef = useRef<HTMLDivElement | null>(null);
   const communityUrl = useCommunityInvite();
 
-  // Hover-intent open / grace close — the SAME bubble a click toggles, so
-  // hover and click are one flow, never two different modals.
-  const openPickerSoon = () => {
-    if (!onPickMedia) return;
-    if (leaveTimer.current) { window.clearTimeout(leaveTimer.current); leaveTimer.current = null; }
-    if (hoverTimer.current) window.clearTimeout(hoverTimer.current);
-    hoverTimer.current = window.setTimeout(() => {
-      hoverOpened.current = true;
-      setPostPickerOpen(true);
-    }, 180);
-  };
-  const closePickerSoon = () => {
-    if (hoverTimer.current) { window.clearTimeout(hoverTimer.current); hoverTimer.current = null; }
-    if (leaveTimer.current) window.clearTimeout(leaveTimer.current);
-    leaveTimer.current = window.setTimeout(() => {
-      hoverOpened.current = false;
-      setPostPickerOpen(false);
-    }, 260);
-  };
-  /** Every close goes through here, so the hover flag cannot go stale. */
-  const closePicker = () => {
-    hoverOpened.current = false;
-    setPostPickerOpen(false);
-  };
+  /** Every close goes through here. */
+  const closePicker = useCallback(() => setPostPickerOpen(false), []);
   const togglePicker = () => {
     playPress(900);
-    if (hoverTimer.current) { window.clearTimeout(hoverTimer.current); hoverTimer.current = null; }
-    if (leaveTimer.current) { window.clearTimeout(leaveTimer.current); leaveTimer.current = null; }
-    // A click that follows a hover-open must not undo it.
-    if (hoverOpened.current) {
-      hoverOpened.current = false;
-      setPostPickerOpen(true);
-      return;
-    }
     setPostPickerOpen((v) => !v);
   };
+
+  // Outside click + Escape. The trigger is excluded so a second click on the
+  // Post button toggles rather than closing and instantly re-opening.
+  useEffect(() => {
+    if (!postPickerOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target as Node | null;
+      if (!target) return;
+      if (pickerBubbleRef.current?.contains(target)) return;
+      if (pickerTriggerRef.current?.contains(target)) return;
+      closePicker();
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closePicker();
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [postPickerOpen, closePicker]);
 
   const toggleSatellite = () => {
     playPress(760);
@@ -283,15 +273,14 @@ export function CommandIsland({
 
         <div className="h-4 w-[1px] bg-glass-w10 mx-0.5 shrink-0" />
 
-        {/* Center: THE Post button — one focal point in the island. Hover OR
-            click open the SAME media-picker bubble (never two different
-            modals); a pick flows into the composer pre-attached. The balance
-            counter is gone: the g$ ledger lives in the Vault, not the chrome. */}
+        {/* Center: THE Post button — one focal point in the island. A CLICK
+            opens the SAME media-picker balloon (never two different modals);
+            a pick flows into the composer pre-attached. The balance counter is
+            gone: the g$ ledger lives in the Vault, not the chrome. */}
         {onOpenCreatePost && (
           <div
+            ref={pickerTriggerRef}
             className="relative shrink-0"
-            onMouseEnter={openPickerSoon}
-            onMouseLeave={closePickerSoon}
             onKeyDown={(e) => { if (e.key === 'Escape') closePicker(); }}
           >
             <button
@@ -300,7 +289,7 @@ export function CommandIsland({
               aria-label="Create a post"
               aria-haspopup={onPickMedia ? 'dialog' : undefined}
               aria-expanded={onPickMedia ? postPickerOpen : undefined}
-              title="Create a post — hover or click for the media picker"
+              title="Create a post — opens the media picker"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-retro-accent text-retro-accent-text hover:bg-retro-accent-hover hover:-translate-y-0.5 hover: active:scale-95 active:translate-y-0 transition text-xs font-bold tracking-wide"
             >
               <Plus className="w-3.5 h-3.5" weight="bold" />
@@ -588,11 +577,10 @@ export function CommandIsland({
           center — the same spot as the Post button it belongs to. */}
         {postPickerOpen && onPickMedia && (
           <div
+            ref={pickerBubbleRef}
             role="dialog"
             aria-label="Pick post media"
-            className="fixed bottom-[calc(1.25rem+60px)] left-1/2 -translate-x-1/2 z-[var(--z-modal)] w-[340px] max-w-[calc(100vw-1.5rem)] animate-orbit-pop origin-bottom"
-            onMouseEnter={() => { if (leaveTimer.current) { window.clearTimeout(leaveTimer.current); leaveTimer.current = null; } }}
-            onMouseLeave={closePickerSoon}
+            className="fixed bottom-[calc(1.25rem+60px)] left-1/2 -translate-x-1/2 z-[var(--z-picker)] w-[340px] max-w-[calc(100vw-1.5rem)] animate-orbit-pop origin-bottom"
           >
             <MediaPickerPanel
               compact

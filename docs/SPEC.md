@@ -42,13 +42,25 @@ separate economies, no bridge between them.
   to write, no scroll. The shipping default is a 2-column grid; installs still
   on the old `'1'` default migrate once (`gmatch.feed_cols_migrated.v1`) and the
   column picker owns the choice afterwards.
-- Single media picker (2026-10-18): every media entry point (create post /
-  story, profile photo, card forge, Domination wallpaper/game_bg/popup_video)
-  opens the shared `MediaPickerModal` (`src/components/media/`) — Browse
-  (idle keepsakes, tag-filterable), Upload (drop/paste), URL (preview +
-  validate). Contract in `picker.ts` (`MediaSelection`, `selectionToFile`):
-  keepsake/loopback URLs are fetched to real Files before upload, popup_video
-  stays URL-only (a local File has no URL a remote peer could open).
+- Single media picker (2026-10-18, unified balloon 2026-11-26): every media
+  entry point (create post / story, profile photo, card forge, Domination
+  wallpaper/game_bg/popup_video) opens the shared `MediaPickerModal`
+  (`src/components/media/`) — Browse (idle keepsakes, tag-filterable), Upload
+  (drop/paste), URL (preview + validate). Contract in `picker.ts`
+  (`MediaSelection`, `selectionToFile`): keepsake/loopback URLs are fetched to
+  real Files before upload, popup_video stays URL-only (a local File has no URL
+  a remote peer could open). The panel is a **fixed-size balloon** (one width
+  and height per mode — `h-[560px]` default, `h-[420px]` compact — with the body
+  as the only scroller), so switching panes never resizes or moves it under the
+  pointer. The navbar Post bubble opens on CLICK only (hover-open/leave-close is
+  gone: moving onto a tab could dismiss the thing about to be clicked) and closes
+  on a pick / its close button / Escape / an outside pointerdown — the trigger is
+  excluded so a second click on Post toggles. Profile photo (`ProfilePicModal`)
+  is the SAME picker plus a crop/apply step: opening it launches the picker
+  immediately (one click to a keepsake), Camera stays as a capture surface, and
+  the old bespoke hidden `<input type=file>` avatar path is removed. The picker
+  sits at its own `--z-picker: 65`, above the profile-photo lightbox (60) it is
+  opened from.
 - One booru client: the idle feed fetches in the Electron main via IPC
   (`apps/desktop/src/services/booru.ts`, SPEC §6). The social feed never asks a
   booru for media — peer uploads travel over the swarm

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { CommandIsland } from './CommandIsland'
 
 // The sidebar/footer chrome was replaced by the island; these tests pin that
@@ -149,12 +149,11 @@ describe('CommandIsland post button (footer, centered, one picker flow)', () => 
     expect(screen.queryByLabelText(/Balance:/)).toBeNull();
   });
 
-  it('clicking Post toggles the SAME media-picker bubble hover shows (one flow, no second modal)', () => {
-    vi.useFakeTimers();
+  it('clicking Post toggles the media-picker bubble (one flow, no second modal)', () => {
     const onPickMedia = vi.fn();
     render(<CommandIsland mainView="feed" setMainView={vi.fn()} onOpenCreatePost={vi.fn()} onPickMedia={onPickMedia} />);
 
-    // Click toggles the bubble — the same dialog hover opens.
+    // Click toggles the bubble.
     fireEvent.click(screen.getByLabelText('Create a post'));
     const dialog = screen.getByRole('dialog', { name: 'Pick post media' });
     // The bubble must not live inside the dock: the island translates itself by
@@ -165,36 +164,30 @@ describe('CommandIsland post button (footer, centered, one picker flow)', () => 
     // A second click closes it again.
     fireEvent.click(screen.getByLabelText('Create a post'));
     expect(screen.queryByRole('dialog', { name: 'Pick post media' })).toBeNull();
-    vi.useRealTimers();
   });
 
-  it('a click after a hover-open keeps the bubble open (the button must not eat its own reveal)', () => {
-    vi.useFakeTimers();
+  it('the bubble is STABLE: leaving the trigger or switching panes keeps it open', () => {
     render(<CommandIsland mainView="feed" setMainView={vi.fn()} onOpenCreatePost={vi.fn()} onPickMedia={vi.fn()} />);
-    const button = screen.getByLabelText('Create a post');
-    // The pointer lands, the 180ms intent timer fires, THEN the click arrives.
-    fireEvent.mouseEnter(button.parentElement!);
-    act(() => { vi.advanceTimersByTime(250); });
+    fireEvent.click(screen.getByLabelText('Create a post'));
     expect(screen.getByRole('dialog', { name: 'Pick post media' })).toBeInTheDocument();
-    fireEvent.click(button);
-    // Regression: a toggle closed exactly what hover had just revealed, so the
-    // Post button read as "does nothing" and the e2e composer hung on a tab
-    // that was never rendered.
+    // Hovering out (the old close trigger) must NOT dismiss it.
+    fireEvent.mouseLeave(screen.getByLabelText('Create a post').parentElement!);
     expect(screen.getByRole('dialog', { name: 'Pick post media' })).toBeInTheDocument();
-    // The NEXT click still closes it (the hover flag was consumed).
-    fireEvent.click(button);
-    expect(screen.queryByRole('dialog', { name: 'Pick post media' })).toBeNull();
-    vi.useRealTimers();
+    // Clicking a pane tab keeps it open — the trap this slice removes.
+    fireEvent.click(screen.getByText('Paste URL'));
+    expect(screen.getByRole('dialog', { name: 'Pick post media' })).toBeInTheDocument();
   });
 
-  it('hover pops the bubble after the intent delay and a pick is handed over', () => {
-    vi.useFakeTimers();
-    const onPickMedia = vi.fn();
-    render(<CommandIsland mainView="feed" setMainView={vi.fn()} onOpenCreatePost={vi.fn()} onPickMedia={onPickMedia} />);
-
-    fireEvent.mouseEnter(screen.getByLabelText('Create a post').parentElement!);
-    act(() => { vi.advanceTimersByTime(250); });
+  it('closes on an outside pointerdown and on Escape', () => {
+    render(<CommandIsland mainView="feed" setMainView={vi.fn()} onOpenCreatePost={vi.fn()} onPickMedia={vi.fn()} />);
+    fireEvent.click(screen.getByLabelText('Create a post'));
     expect(screen.getByRole('dialog', { name: 'Pick post media' })).toBeInTheDocument();
-    vi.useRealTimers();
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole('dialog', { name: 'Pick post media' })).toBeNull();
+
+    fireEvent.click(screen.getByLabelText('Create a post'));
+    expect(screen.getByRole('dialog', { name: 'Pick post media' })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Pick post media' })).toBeNull();
   });
 });

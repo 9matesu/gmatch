@@ -84,14 +84,12 @@ export interface GlobalModalsProps {
   toast: (text: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
 
   storyFileInputRef: React.RefObject<HTMLInputElement | null>;
-  pfpInputRef: React.RefObject<HTMLInputElement | null>;
-  handleSetProfilePic: (file: File) => Promise<void>;
 
   lobby: any;
 }
 
 export function GlobalModals(props: GlobalModalsProps) {
-  const { identity, users, profilePics, settings, updateSettings, setMyProfile, stories, activeVirusHack, setActiveHacks, followingIds, items, identityModalMode, setIdentityModalMode, exportIdentity, loginWithExportedId, clearIdentity, handleFullConfigDownload, handleFullConfigRestore, showHelpModal, setShowHelpModal, showFlashModal, setShowFlashModal, showSettingsModal, setShowSettingsModal, settingsInitialTab = 'preferences', showCreatePostModal, setShowCreatePostModal, createPostInitialData, setCreatePostInitialData, showStoryModal, setShowStoryModal, followersModalState, setFollowersModalState, showCoffee, manualCoffeeOpen, triggerReason, dismissCoffee, setManualCoffeeOpen, handleSetMainView, setMainView, setDmMinimized, setPmPeer, setSelectedProfileUser, setSelectedIds, setExpandedItemId, setStoryViewerUserId, loadUsers, loadGallery, loadStories, loadServerFeed, toggleFollowUser, toast, pfpInputRef, handleSetProfilePic, lobby } = props;
+  const { identity, users, profilePics, settings, updateSettings, setMyProfile, stories, activeVirusHack, setActiveHacks, followingIds, items, identityModalMode, setIdentityModalMode, exportIdentity, loginWithExportedId, clearIdentity, handleFullConfigDownload, handleFullConfigRestore, showHelpModal, setShowHelpModal, showFlashModal, setShowFlashModal, showSettingsModal, setShowSettingsModal, settingsInitialTab = 'preferences', showCreatePostModal, setShowCreatePostModal, createPostInitialData, setCreatePostInitialData, showStoryModal, setShowStoryModal, followersModalState, setFollowersModalState, showCoffee, manualCoffeeOpen, triggerReason, dismissCoffee, setManualCoffeeOpen, handleSetMainView, setMainView, setDmMinimized, setPmPeer, setSelectedProfileUser, setSelectedIds, setExpandedItemId, setStoryViewerUserId, loadUsers, loadGallery, loadStories, loadServerFeed, toggleFollowUser, toast, lobby } = props;
 
 
 
@@ -135,17 +133,6 @@ export function GlobalModals(props: GlobalModalsProps) {
       {showHelpModal && (
         <HelpModal onClose={() => setShowHelpModal(false)} />
       )}
-
-      <input
-        ref={pfpInputRef}
-        type="file"
-        accept="image/*"
-        onChange={(e) => {
-          const file = e.target.files?.[0]
-          if (file) handleSetProfilePic(file)
-        }}
-        className="hidden"
-      />
 
       {showStoryModal && (
         <CreatePostModal

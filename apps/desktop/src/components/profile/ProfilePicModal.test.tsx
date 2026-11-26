@@ -78,14 +78,22 @@ describe('ProfilePicModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('opens the shared media picker automatically (one avatar flow)', async () => {
+    render(
+      <ProfilePicModal isOpen={true} currentPfp="" onClose={vi.fn()} onSave={vi.fn()} />
+    );
+    // No bespoke upload/URL tab strip: the unified picker is already open, so
+    // choosing a profile photo is the same gesture as every other media input.
+    expect(await screen.findByRole('dialog', { name: 'Pick a profile photo' })).toBeInTheDocument();
+  });
+
   it('applies a URL picked through the shared media picker', async () => {
     const onSave = vi.fn();
     const onClose = vi.fn();
     render(
       <ProfilePicModal isOpen={true} currentPfp="" onClose={onClose} onSave={onSave} />
     );
-    // The pick tab hosts the shared picker (B7): open it, use the URL pane.
-    await userEvent.click(screen.getByRole('button', { name: /choose from your media/i }));
+    // The picker is open on mount; the URL pane is one click away.
     await userEvent.click(await screen.findByRole('button', { name: 'Paste URL' }));
     const urlInput = screen.getByPlaceholderText('https://…');
     await userEvent.type(urlInput, 'https://example.com/avatar.jpg');

@@ -255,7 +255,15 @@ export function MediaPickerPanel({
   return (
     <div
       aria-label={options.title ?? 'Pick media'}
-      className={`bg-surface-raised border border-edge rounded-xl w-full max-w-lg max-h-(--max-h-panel) flex flex-col shadow-2xl overflow-hidden text-retro-fg ${compact ? 'max-h-(--max-h-sheet) text-xs' : ''}`}
+      // A FIXED footprint, not a content-sized box: the balloon keeps the same
+      // width and height on every pane, so switching tabs never resizes it or
+      // moves the controls under the pointer. The body is the only part that
+      // scrolls.
+      className={`bg-surface-raised border border-edge rounded-xl w-full max-w-lg flex flex-col shadow-2xl overflow-hidden text-retro-fg ${
+        compact
+          ? 'h-[420px] max-h-(--max-h-sheet) text-xs'
+          : 'h-[560px] max-h-(--max-h-panel)'
+      }`}
     >
       <div className={`flex items-center justify-between ${compact ? 'px-3 py-2' : 'px-4 py-2.5'} border-b border-edge`}>
         <h2 className="text-base font-black tracking-tight">{options.title ?? 'Pick media'}</h2>
@@ -477,12 +485,12 @@ export function MediaPickerModal({
 }) {
   return (
     <div
-      className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 select-none font-sans"
+      className="fixed inset-0 z-[var(--z-picker)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 select-none font-sans"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div role="dialog" aria-modal="true" className="contents">
+      <div role="dialog" aria-modal="true" aria-label={options.title ?? 'Pick media'} className="contents">
         <MediaPickerPanel options={options} onPick={onPick} onClose={onClose} />
       </div>
     </div>

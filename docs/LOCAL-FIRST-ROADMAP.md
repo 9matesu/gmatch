@@ -642,6 +642,14 @@ UI or documentation.
   so every hidden row is re-checked (the media ladder is unchanged: local vault
   → local swarm store → signed `GET /api/objects/:id` → swarm peers, resolved by
   content hash for peer rows). Text-only rows are untouched.
+- **The media picker is one fixed-size balloon.** `MediaPickerPanel` takes a
+  fixed footprint per mode (default `h-[560px]`, compact `h-[420px]`, body the
+  only scroller) so a pane switch cannot resize or move it; the navbar Post
+  bubble is click-only (hover open/leave-close removed) and closes on
+  pick/close/Escape/outside pointerdown; `ProfilePicModal` reuses the same picker
+  with a crop/apply step and the bespoke hidden-file avatar path is deleted; a
+  `--z-picker` (65) layer keeps the balloon above the lightbox it opens from.
+  `CommandIsland.test.tsx` and `ProfilePicModal.test.tsx` pin the behaviour.
 
 ## Evidence log (2026-10-24, the Cloudflare rendezvous — superseded 2026-11-26)
 

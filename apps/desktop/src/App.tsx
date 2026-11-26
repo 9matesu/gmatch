@@ -1271,8 +1271,6 @@ export default function Home() {
     if (typeof window === 'undefined') return {}
     try { return JSON.parse(getSecureItem('goonmatch_pfps') || '{}') } catch { return {} }
   })
-  const pfpInputRef = useRef<HTMLInputElement>(null)
-
   const [repostedPosts, setRepostedPosts] = useState<FeedPost[]>([])
   const [archivedPostIds, setArchivedPostIds] = useState<Set<string>>(() => new Set())
   const [deletedPostIds, setDeletedPostIds] = useState<Set<string>>(() => readDeletedPostIds())
@@ -2273,81 +2271,6 @@ export default function Home() {
     lobby,
     sendChatMessage,
   })
-
-  const handleSetProfilePic = async (file: File) => {
-    if (!identity) return
-    toast('Updating profile picture…', 'info')
-
-    try {
-      // 1. Generate a lightweight 256x256 thumbnail data URL via canvas
-      const thumbDataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => {
-          const img = new Image()
-          img.onload = () => {
-            const canvas = document.createElement('canvas')
-            const size = Math.min(img.width, img.height)
-            const sx = (img.width - size) / 2
-            const sy = (img.height - size) / 2
-            canvas.width = Math.min(256, size)
-            canvas.height = Math.min(256, size)
-            const ctx = canvas.getContext('2d')
-            if (!ctx) {
-              resolve(reader.result as string)
-              return
-            }
-            ctx.drawImage(img, sx, sy, size, size, 0, 0, canvas.width, canvas.height)
-            resolve(canvas.toDataURL('image/jpeg', 0.85))
-          }
-          img.onerror = () => resolve(reader.result as string)
-          img.src = reader.result as string
-        }
-        reader.onerror = reject
-        reader.readAsDataURL(file)
-      })
-
-      // 2. Optimistically apply locally right away
-      setProfilePics(prev => {
-        const next = { ...prev, [identity.orbitId]: thumbDataUrl }
-        try { setSecureItem('goonmatch_pfps', JSON.stringify(next)) } catch { }
-        return next
-      })
-
-      // 3. Persist via the shared profile path: data URL persists directly.
-      const res = await saveUserProfile(identity, {
-        display_name: myProfile?.displayName || identity.orbitId.slice(0, 8),
-        pfp_url: thumbDataUrl,
-      })
-
-      if (!res.ok) {
-        toast(res.error || 'Failed to save profile picture to server', 'error')
-        return
-      }
-
-      // Reflect the server-side ref locally so peers see the same URL.
-      // This is the value that must stick: update BOTH caches (profilePics
-      // + myProfile/orbit_pfp_url) with the server ref, never the local
-      // data: thumbnail (which 404s for peers and bloats the secure store).
-      setProfilePics((prev) => {
-        if (typeof res.pfpUrl !== 'string') return prev
-        const next = { ...prev, [identity.orbitId]: res.pfpUrl as string }
-        try { setSecureItem('goonmatch_pfps', JSON.stringify(next)) } catch { }
-        return next
-      })
-      if (typeof res.pfpUrl === 'string' && res.pfpUrl) {
-        const serverPfp = res.pfpUrl as string
-        setMyProfile((prev) => (prev.pfpUrl === serverPfp ? prev : { ...prev, pfpUrl: serverPfp }))
-        try { setSecureItem('orbit_pfp_url', serverPfp) } catch { }
-        try { localStorage.setItem('orbit_pfp_url', serverPfp) } catch { }
-      }
-
-      toast('Profile picture updated.', 'success')
-      loadUsers()
-      void lobby.refresh()
-    } catch {
-      toast('Failed to update profile picture', 'error')
-    }
-  }
 
   const { isIdle } = useIdle(settings.idleTimeout, settings.idleEnabled);
 
@@ -4478,8 +4401,6 @@ export default function Home() {
                 toggleFollowUser={toggleFollowUser}
                 toast={toast}
                 storyFileInputRef={storyFileInputRef}
-                pfpInputRef={pfpInputRef}
-                handleSetProfilePic={handleSetProfilePic}
                 lobby={lobby}
               />
               <OnboardingFlow
