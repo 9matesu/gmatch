@@ -1376,6 +1376,9 @@ export function GMatchDMs({
                                       alt="Attached image"
                                       className="max-w-64 sm:max-w-72 max-h-64 rounded-lg object-contain hover:opacity-90 transition-opacity"
                                       videoClassName="max-w-64 sm:max-w-72 max-h-64 rounded-lg object-contain hover:opacity-90 transition-opacity"
+                                      // Attachments are shown at ≤256px: a bounded
+                                      // thumbnail, not the original.
+                                      thumb
                                     />
                                   </button>
                                 )}

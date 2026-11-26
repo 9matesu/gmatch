@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type ImgHTMLAttributes } from 'react'
 import { cachedImageFor, resolveImage } from '../services/imageCache'
 import { resolveMediaUrl } from '../utils/media'
 import { thumbUrl } from '../utils/thumb'
+import { isThumbEligible } from '../utils/mediaThumb'
+import { useMediaThumb } from '../hooks/useMediaThumb'
 
 interface CachedImgProps extends ImgHTMLAttributes<HTMLImageElement> {
   src: string
@@ -10,10 +12,12 @@ interface CachedImgProps extends ImgHTMLAttributes<HTMLImageElement> {
   /** Fired true when the img starts loading, false once it has loaded/failed. */
   onLoadingChange?: (loading: boolean) => void
   /**
-   * Render the SMALL cached copy (`gmcache://thumb/…`) instead of the
-   * full-size original. Dense grids (cache viewer, tag browser, gallery)
-   * should ask for this: a full-size booru is several MB of decoded bitmap
-   * per tile, and a screen of tiles is what made the GPU process eat 878 MB.
+   * Render a SMALL copy instead of the full-size original. Two owners, one
+   * decision: `gmcache://` pictures use the main-process thumbnailer
+   * (`gmcache://thumb/<key>`); `blob:` / `vault://` / loopback media get a
+   * bounded renderer thumbnail (`utils/mediaThumb.ts`). Dense grids (cache
+   * viewer, tag browser, gallery) should ask for this: a full-size booru is
+   * several MB of decoded bitmap per tile.
    */
   thumb?: boolean
 }
@@ -34,13 +38,38 @@ export default function CachedImg({ src: rawSrc, fallbackSrc, onError, onLoading
   // remote URL and swapping a frame later (the "instant image" path).
   const warm = isLocal ? src : cachedImageFor(src)
   const local = warm ?? (isLocal ? src : '')
-  const [display, setDisplay] = useState<string>(thumb ? thumbUrl(local) ?? '' : local)
+  const [display, setDisplay] = useState<string>(local)
   const [inView, setInView] = useState<boolean>(!!warm || rest.loading === 'eager')
   const imgRef = useRef<HTMLImageElement | null>(null)
 
+  // Thumbnail ladder. `display` stays the RAW source; the small copy is derived
+  // at render time so the two owners never disagree about which url is shown.
+  // Generation is viewport-gated too: an offscreen tile must not spend a decode
+  // on a thumbnail nobody is looking at.
+  const cacheThumb = thumb ? thumbUrl(display) : undefined
+  const cacheThumbed = Boolean(cacheThumb && cacheThumb !== display)
+  const generated = useMediaThumb(display || null, Boolean(thumb) && inView)
+  const paintSrc = !thumb
+    ? display
+    : cacheThumbed
+      ? (cacheThumb as string)
+      : generated.url ?? display
+  // An eligible thumbnail still owed: paint nothing rather than decode the
+  // full-size original and swap a frame later.
+  const thumbPending = Boolean(
+    thumb && inView && display && !cacheThumbed && isThumbEligible(display) && generated.pending,
+  )
+  const [thumbFailed, setThumbFailed] = useState(false)
+  useEffect(() => {
+    // Reset on a different SOURCE, never on the painted url: resetting when the
+    // paint changes would re-arm the failed thumbnail and loop forever.
+    setThumbFailed(false)
+  }, [display])
+  const finalSrc = thumbFailed ? display : paintSrc
+
   // Consumers (the story ring avatars) need to know "still decoding" vs
-  // "painted" — without this a caller literally cannot tell an empty box from
-  // a loaded picture.
+  // "painted" — without this a caller literally cannot tell an empty box from a
+  // loaded picture.
   const notifyRef = useRef(onLoadingChange)
   notifyRef.current = onLoadingChange
   useEffect(() => {
@@ -75,27 +104,27 @@ export default function CachedImg({ src: rawSrc, fallbackSrc, onError, onLoading
     if (!inView) return
     let live = true
     if (/^(gmcache|idle-file|vault|blob|data):/i.test(src)) {
-      setDisplay(thumb ? thumbUrl(src) ?? src : src)
+      setDisplay(src)
       return
     }
     setDisplay(src)
     resolveImage(src)
-      .then((local) => {
-        if (!live || !local) return
-        // The local copy is what can be thumbnailed; until it lands the remote
-        // url is the only thing there is.
-        setDisplay(thumb ? thumbUrl(local) ?? local : local)
+      .then((cached) => {
+        if (!live || !cached) return
+        // The local copy is what the thumbnailers can address; until it lands
+        // the remote url is the only thing there is.
+        setDisplay(cached)
       })
       .catch(() => {})
     return () => {
       live = false
     }
-  }, [src, inView, thumb])
+  }, [src, inView])
 
   return (
     <img
       ref={imgRef}
-      src={display || undefined}
+      src={thumbPending ? undefined : finalSrc || undefined}
       decoding="async"
       {...rest}
       onLoad={(e) => {
@@ -103,6 +132,11 @@ export default function CachedImg({ src: rawSrc, fallbackSrc, onError, onLoading
         onLoad?.(e)
       }}
       onError={(e) => {
+        // A failed THUMBNAIL is not a failed picture: drop to the full original.
+        if (thumb && !thumbFailed && paintSrc && paintSrc !== display) {
+          setThumbFailed(true)
+          return
+        }
         notifyRef.current?.(false)
         if (fallbackSrc && e.currentTarget.src !== fallbackSrc) {
           e.currentTarget.src = fallbackSrc

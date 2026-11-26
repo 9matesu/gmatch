@@ -306,6 +306,7 @@ export function YourMatchTab({
                           identity={identity}
                           className="w-full h-full object-cover"
                           videoClassName="pointer-events-none w-full h-full object-cover"
+                          thumb
                         />
                       ) : (
                         <div className="w-full h-full bg-retro-border" />

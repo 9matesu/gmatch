@@ -213,7 +213,7 @@ export function ExploreSearchModal({
                   <div className="w-10 h-10 rounded-xl bg-glass-w20 overflow-hidden shrink-0 flex items-center justify-center relative">
                     {p.url ? (
                       <>
-                        <ObjectImage contentUrl={p.url} identity={identity} alt="" className="w-full h-full object-cover" />
+                        <ObjectImage contentUrl={p.url} identity={identity} alt="" className="w-full h-full object-cover" thumb />
                         {isMediaVideo(p.url) && (
                           <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-retro-fg pointer-events-none">
                             <Play className="w-3.5 h-3.5 fill-white" />

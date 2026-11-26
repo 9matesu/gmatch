@@ -586,6 +586,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                       alt={l.card?.name || 'market card'}
                       className="w-full h-full object-cover"
                       videoClassName="w-full h-full object-cover"
+                      thumb
                     />
                   </div>
                   <div className="p-2 pb-0">

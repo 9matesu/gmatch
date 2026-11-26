@@ -527,6 +527,8 @@ export function UserProfileModal({
                         mimeType={(post as any).mime_type}
                         alt={post.caption || ''}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        // Dense profile grid: bounded thumbnails only.
+                        thumb
                       />
                     </button>
                   ))}
@@ -558,6 +560,7 @@ export function UserProfileModal({
                         mimeType={(card as any).mime_type}
                         alt=""
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        thumb
                       />
                     </div>
                   ))}

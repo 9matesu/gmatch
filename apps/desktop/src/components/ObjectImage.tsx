@@ -8,6 +8,8 @@ import { useObjectImage, evictObjectImage } from '../hooks/useObjectImage'
 import { NativeVideoPlayer } from './media/NativeVideoPlayer'
 import { useVaultLookup, useVaultHttpUrls, vaultOptIn } from '../services/vault'
 import { resolveImage, devFetchable, cachedImageFor } from '../services/imageCache'
+import { thumbUrl } from '../utils/thumb'
+import { useMediaThumb } from '../hooks/useMediaThumb'
 
 interface IdentityLike {
   orbitId: string
@@ -57,6 +59,15 @@ export interface ObjectImageProps {
    * story keeps the stage spinning for longer than the story itself lasts.
    */
   unavailableTimeoutMs?: number
+  /**
+   * Dense-grid mode: render a BOUNDED thumbnail instead of decoding the
+   * full-size original. The clicker's disk cache already has a native
+   * thumbnailer (`gmcache://thumb/<key>`); `blob:` / `vault://` / loopback
+   * media get a renderer-generated one (`utils/mediaThumb.ts`). The opened
+   * post, the viewer and the single foe never pass this — they want the real
+   * picture.
+   */
+  thumb?: boolean
 }
 
 /** Default strict-availability budget for unbounded surfaces. */
@@ -153,6 +164,7 @@ export function ObjectImage({
   onLoadSize,
   onLoadingChange,
   unavailableTimeoutMs = DEFAULT_UNAVAILABLE_TIMEOUT_MS,
+  thumb = false,
 }: ObjectImageProps) {
   const signed = needsSignedFetch(contentUrl, objectId)
   const effObjectId = extractObjectId(contentUrl, objectId)
@@ -252,6 +264,27 @@ export function ObjectImage({
   const [shownSrc, setShownSrc] = useState<string | null>(null)
   useEffect(() => { setShownSrc(null) }, [objectId, contentUrl])
   const renderSrc = shownSrc || src
+
+  // ---- Thumbnail ladder (dense grids only) --------------------------------
+  // 1. `gmcache://<key>` -> the main process's native resize, synchronously.
+  // 2. `blob:` / `vault://` / loopback http -> a bounded renderer thumbnail.
+  // 3. anything else (a remote provider url) -> untouched: thumbnailing it
+  //    would download the bytes twice to save memory already spent.
+  const thumbCandidate = thumb && !isVideo
+  const gmcacheThumb = thumbCandidate && src.startsWith('gmcache://') ? thumbUrl(src) : null
+  const rendererThumb = useMediaThumb(src, thumbCandidate)
+  const thumbSrc = gmcacheThumb || rendererThumb.url
+  const [thumbFailed, setThumbFailed] = useState(false)
+  useEffect(() => { setThumbFailed(false) }, [src])
+  // While an eligible thumbnail is still owed, paint NOTHING: rendering the
+  // full-size original would decode the very bitmap this mode exists to avoid,
+  // and then swap it a frame later.
+  const thumbPending = Boolean(thumbCandidate && !thumbFailed && !thumbSrc && rendererThumb.pending)
+  const paintSrc = thumbPending
+    ? null
+    : thumbCandidate && !thumbFailed && thumbSrc
+      ? thumbSrc
+      : renderSrc
 
   // Vault flicker guard: for an opted-in http(s) source, hold the media
   // invisible until the local vault lookup settles, so a remote frame never
@@ -401,7 +434,7 @@ export function ObjectImage({
 
   return (
     <img
-      src={renderSrc}
+      src={paintSrc ?? undefined}
       alt={alt}
       className={className}
       loading={loading}
@@ -412,10 +445,16 @@ export function ObjectImage({
       onLoad={(e) => {
         onLoad?.()
         onLoadSize?.(e.currentTarget.naturalWidth, e.currentTarget.naturalHeight)
-        setShownSrc(src)
+        setShownSrc(paintSrc)
         onLoadingChange?.(false)
       }}
       onError={(_e) => {
+        // A failed THUMBNAIL is not a failed picture: drop to the full original
+        // instead of declaring the media unavailable.
+        if (thumbSrc && !thumbFailed) {
+          setThumbFailed(true)
+          return
+        }
         onError?.()
         setHasError(true)
         if (signed && effObjectId) evictObjectImage(effObjectId)

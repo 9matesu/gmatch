@@ -102,14 +102,29 @@ verified live.
     (and switched off, with an explicit repaint, before it can be seen again)
     — the global default stays as it was, because a permanently throttled
     window used to come back with a stale frame.
-- **Thumbnails instead of full-size pictures.** The dense grids (picture
-  cache viewer, tag browser, keepsake gallery) mounted every tile at full
-  resolution — the 309-megapixel spike above. The main process now serves a
-  ≤360px copy on demand (`gmcache://thumb/<key>`, generated with Electron's
-  built-in `nativeImage`, kept in a bounded RAM LRU), and the grids ask for
-  it. The encrypted originals stay the only durable copy; full-size bytes are
-  fetched only when a picture is opened. The cache viewer also mounts a
-  bounded window (60 tiles + "Show more") instead of the whole cache at once.
+- **Thumbnails instead of full-size pictures — on every dense grid.** The
+  grids mounted every tile at full resolution — the 309-megapixel spike above.
+  Two halves, one ladder:
+  - **`gmcache://` media** (the clicker's encrypted disk cache) is served as a
+    ≤360px copy by the MAIN process on demand (`gmcache://thumb/<key>`,
+    generated with Electron's built-in `nativeImage`, kept in a bounded RAM
+    LRU). The encrypted originals stay the only durable copy.
+  - **`blob:` / `vault://` / loopback-http media** (keepsakes, signed object
+    fetches, gallery tiles) has no server-side resizer, so the RENDERER
+    generates the small copy once (`utils/mediaThumb.ts`: one decode, resize on
+    the longest edge, a bounded 48-entry LRU of small blobs, revoke-on-evict,
+    in-flight dedupe and a 60 s failure TTL). A tile whose thumbnail is still
+    being made paints NOTHING rather than decoding the full-size original and
+    swapping a frame later; a thumbnail that FAILS drops to the full original
+    (a broken thumbnail is not a broken picture). Remote `http(s)` sources are
+    deliberately NOT thumbnailed — that would download the bytes twice — they
+    become `gmcache://` once cached and take the native path. A runtime with no
+    `createImageBitmap` (a test/embedded environment) skips the gate entirely
+    and renders immediately. The grids ask for the small copy — feed tiles,
+    profile posts and cards, DM attachments, market tiles, search results and
+    the match cards — and the viewer/opened post/single foe still get the real
+    picture. The cache viewer also mounts a bounded window (60 tiles + "Show
+    more") instead of the whole cache at once.
 - **ONE roster owns "who is online".** Four discovery stacks found peers — the
   node roster, the swarm `PRESENCE` frame, the `PROFILE` frame and the tracker
   mesh — and each kept its own bookkeeping, so a peer was described differently

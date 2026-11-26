@@ -67,6 +67,8 @@ export const FeedTile = memo(function FeedTile({ post, identity, liked, likes, o
             hideUnavailable
             onLoadSize={onMediaLoad}
             onMediaUnavailable={onMediaUnavailable}
+            // Grid tile: a bounded thumbnail, never the full-size bitmap.
+            thumb
           />
         ) : (
           <img

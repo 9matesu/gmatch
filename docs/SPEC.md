@@ -1068,6 +1068,25 @@ what it lives in.
   originals remain the only durable copy; the full-size bytes are fetched
   only when a picture is opened. The cache viewer also mounts a BOUNDED
   window (60 tiles, "Show more") instead of the whole cache at once.
+  - **The renderer half of the same ladder (2026-11-26).** `gmcache://` is not
+    the only media a grid renders: keepsakes, signed object fetches and
+    gallery tiles arrive as `blob:` / `vault://` / loopback-http URLs with no
+    server-side resizer, so they still reached Chromium at full resolution.
+    `utils/mediaThumb.ts` generates those small copies in the renderer — ONE
+    decode, resized on the longest edge, a bounded 48-entry LRU of small blobs
+    (revoke-on-evict, in-flight dedupe, 60 s failure TTL), pinned while a tile
+    is mounted so eviction never blanks it. `ObjectImage thumb` and
+    `CachedImg thumb` run the ladder (native first, renderer second) and both
+    the feed tiles, the profile posts/cards grids, DM attachments, market
+    tiles, search results and match cards ask for it; the opened post, the
+    viewer and the single foe still get the real picture. While an eligible
+    thumbnail is still being made the tile paints NOTHING (never the
+    full-size bitmap it exists to avoid); a thumbnail that FAILS drops to the
+    full original, because a broken thumbnail is not a broken picture. Remote
+    `http(s)` is intentionally NOT eligible — downloading it twice would cost
+    more than it saves; it becomes `gmcache://` once cached and takes the
+    native path. A runtime without `createImageBitmap` skips the gate and
+    renders the original immediately (`canGenerateThumbs()`).
 - **An idle second costs nothing (2026-11-25):** the idle game's 1 s beat
     still runs (it must expire legacy timed caps), but `tick()` only writes to
     the store when a cap ACTUALLY expires. It used to stamp `lastSeenAt` every
