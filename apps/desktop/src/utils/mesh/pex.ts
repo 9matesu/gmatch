@@ -16,6 +16,10 @@ export interface MeshPeer {
   orbitId: string;
   /** Node the peer lives on, when the beacon said one. */
   nodeUrl?: string;
+  /** The peer's Ed25519 public key, from the signed HELLO. */
+  pubKeyHex?: string;
+  /** The peer's X25519 encryption public key, from the signed HELLO. */
+  encPubHex?: string;
   /** Last time we verified it (ms). */
   at: number;
 }
@@ -33,14 +37,18 @@ export function createPexTable(): PexTable {
 }
 
 const ORBIT_RE = /^[0-9a-f]{64}$/;
+/** Ed25519 and X25519 public keys are both 32 bytes = 64 hex chars. */
+const KEY_RE = /^[0-9a-f]{64}$/;
 
 function validPeer(value: unknown): MeshPeer | null {
   if (!value || typeof value !== 'object') return null;
   const row = value as Record<string, unknown>;
   if (typeof row.orbitId !== 'string' || !ORBIT_RE.test(row.orbitId)) return null;
   const nodeUrl = typeof row.nodeUrl === 'string' && /^https?:\/\//i.test(row.nodeUrl) ? row.nodeUrl : undefined;
+  const pubKeyHex = typeof row.pubKeyHex === 'string' && KEY_RE.test(row.pubKeyHex) ? row.pubKeyHex : undefined;
+  const encPubHex = typeof row.encPubHex === 'string' && KEY_RE.test(row.encPubHex) ? row.encPubHex : undefined;
   const at = typeof row.at === 'number' && Number.isFinite(row.at) ? row.at : Date.now();
-  return { orbitId: row.orbitId, nodeUrl, at };
+  return { orbitId: row.orbitId, nodeUrl, pubKeyHex, encPubHex, at };
 }
 
 /** Add one verified peer. Returns false when the id is already known. */

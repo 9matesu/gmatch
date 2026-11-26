@@ -110,6 +110,44 @@ verified live.
   it. The encrypted originals stay the only durable copy; full-size bytes are
   fetched only when a picture is opened. The cache viewer also mounts a
   bounded window (60 tiles + "Show more") instead of the whole cache at once.
+- **ONE roster owns "who is online".** Four discovery stacks found peers — the
+  node roster, the swarm `PRESENCE` frame, the `PROFILE` frame and the tracker
+  mesh — and each kept its own bookkeeping, so a peer was described differently
+  depending on who found it, and the tracker-mesh path had no way in at all (the
+  only roster writer was a closure trapped inside the WebSocket effect). They
+  now write through one store (`utils/peerRoster.ts`): one map, one merge rule
+  ("an empty field never erases; a real field always wins"), one change event.
+  The store owns the node-roster merge (and reports who just came online), the
+  24h ghost sweep, the persistence (online peers first, so a late joiner is not
+  pushed out) and the hydration (a peer we already know is never overwritten, so
+  a world switch cannot replace a live peer with its stale copy). The duplicate
+  peer comparator is gone — the shared one is a strict superset.
+- **The torrent-style mesh actually connects, and its peers are VISIBLE.** The
+  tracker path (rotating infohash → public tracker → WebRTC → signed HELLO →
+  PEX) was broken in three places and looked alive the whole time, because it
+  carried bytes over a DataChannel nobody could see in the roster:
+  1. **the offer id never matched** — the wire carries it as 20 binary
+     characters while the mesh keyed its pending offers by the 40-char hex id,
+     so the tracker's answer named an offer the mesh did not know and the
+     connection was silently never made;
+  2. **the wire was not the reference protocol** — the tracker runs the
+     reference `bittorrent-tracker` protocol, and our announce deviated from it
+     in four ways that all fail silently (the tracker simply never answers):
+     the SDP travels as an OBJECT (`{type,sdp}`), never base64 and never a JSON
+     string; an inbound offer/answer arrives SINGULAR (`offer` / `answer`),
+     never as an array; an answer MUST carry `to_peer_id` (the server parser
+     throws without it and drops the message, so the peer that offered never
+     hears back); and the tracker peer id must be stable for the session — a
+     fresh id per announce made the tracker see a new peer every time, so the
+     answer to our own offer could not be routed back to us. The answer rides
+     its own announce and goes back through the socket that delivered the
+     offer. (The tracker ignores the `numwant` we send: it derives the peer
+     count from the number of offers we publish — publishing an offer is what
+     gets us peers.)
+  3. **a verified peer had no way into the roster** — the signed HELLO proved
+     the peer's key, and the peer was still invisible. The mesh now reports the
+     peer and the roster admits it, with the same trust as a peer the node
+     listed. A peer with no proven key is not shown.
 
 ## Unreleased — gmatch 2.0: no hosted service; the own node is the world
 

@@ -4,12 +4,12 @@ import { User, OrbitObject, generateFallbackName } from '@orbit/shared';
 import { parseBareSwarmAnnounce, parseSwarmEnvelope, type SwarmAnnounce, type SwarmMessage } from '@orbit/protocol';
 import { saveObject, getObject } from '../utils/storage';
 import { getApiBaseUrl, getApiWebSocketUrl, isCourierHost, orbitFetch, subscribeApiBase } from '../utils/api';
-import { mergeRoster } from '../utils/peerRoster';
-import { presenceBucket } from '../utils/compare';
+import { PeerRoster } from '../utils/peerRoster';
+import { areUsersStructurallyEqual } from '../utils/compare';
 import { logger } from '../utils/logger';
 import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, hydrateDurableReplications, announcePeerOnline, PEER_ONLINE_EVENT, announceHeldObjects, setSwarmReceiptIdentity, setSwarmOperationHandler, setSwarmOperationAckHandler, sendSwarmFrame } from '../utils/p2pSwarm';
 import { broadcastPresence, fetchPresenceRosterFrom } from '../services/courierPresence';
-import { startMesh, type MeshHandle } from '../utils/mesh/mesh';
+import { startMesh, meshPeerAsUser, type MeshHandle } from '../utils/mesh/mesh';
 import { readSettings } from './useSettings';
 import { knownNodes, rememberKnownNode, rememberPeerNode } from '../utils/peerNodes';
 import { broadcastMeshFrame, onMeshMessage, connectToPeerMesh, setMeshIceFailureHandler, MESH_BACKPRESSURE_HIGH_BYTES } from '../utils/courierSignaling';
@@ -98,43 +98,8 @@ export function routeInboundFrame(
   return false
 }
 
-function arePeersStructurallyEqual(a: User[], b: User[]): boolean {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    if (
-      a[i].id !== b[i].id ||
-      a[i].display_name !== b[i].display_name ||
-      a[i].online !== b[i].online ||
-      a[i].score !== b[i].score ||
-      JSON.stringify(a[i].tags || []) !== JSON.stringify(b[i].tags || [])
-    ) {
-      return false;
-    }
-    // `last_seen` too, bucketed: the swarm re-stamps it on every PRESENCE
-    // frame while `online` stays true, and a frozen timestamp pins the profile
-    // modal to Offline even though the peer is plainly in the roster. 15s is
-    // well inside the 60s freshness window so no transition is missed.
-    if (presenceBucket(a[i].last_seen) !== presenceBucket(b[i].last_seen)) return false;
-  }
-  return true;
-}
-
 /** The same 24h window the storage hydration uses: entries unseen for longer
  *  are ghosts and are dropped (plan B1). Pure so it is unit-testable. */
-export function pruneStalePeers(map: Map<string, User>, now = Date.now()): number {
-  const cutoff = now - 24 * 60 * 60 * 1000;
-  let dropped = 0;
-  for (const [id, p] of map) {
-    const t = p.last_seen ? new Date(p.last_seen).getTime() : 0;
-    // A peer with no timestamp at all cannot be aged; keep it (hydration
-    // already drops timestamp-less ancient ghosts at boot).
-    if (t > 0 && t < cutoff) {
-      map.delete(id);
-      dropped++;
-    }
-  }
-  return dropped;
-}
 
 // Module-level so it can be referenced from the WebSocket effect without
 // ordering issues and keeps a stable identity (not memoized in the hook).
@@ -168,6 +133,18 @@ function transmitOverWebSocket(socket: WebSocket | null, queue: SwarmAnnounce[],
 export function useP2P(identity: OrbitIdentity | null) {
   const [peers, setPeers] = useState<User[]>([]);
 
+  // THE roster: one owner for "who is online". Every discovery stack (the
+  // node roster, the swarm PRESENCE frame, a PROFILE frame and the tracker
+  // mesh) writes through it, so a peer is described the same way whoever
+  // found it. See utils/peerRoster.ts.
+  const rosterRef = useRef<PeerRoster | null>(null);
+  if (!rosterRef.current) rosterRef.current = new PeerRoster();
+  const roster: PeerRoster = rosterRef.current;
+  useEffect(
+    () => roster.subscribe((next) => setPeers((prev) => (areUsersStructurallyEqual(prev, next) ? prev : next))),
+    [roster],
+  );
+
   // Mesh discovery: announce a rotating infohash on public trackers so peers
   // on other machines can find this one. The node relay stays the floor.
   const meshRef = useRef<MeshHandle | null>(null);
@@ -184,6 +161,17 @@ export function useP2P(identity: OrbitIdentity | null) {
         encryptionPubHex: identity.encryptionPubHex,
       },
       communityKey: () => readSettings().meshCommunityKey,
+      // A tracker peer that completed the signed HELLO handshake is a
+      // VERIFIED peer: its orbitId is the hash of the key it proved it owns.
+      // It used to carry bytes over the DataChannel and stay invisible —
+      // the roster had no way to hear about it, because the only roster
+      // writer was a closure trapped inside the WebSocket effect.
+      onPeer: (peer) => {
+        const user = meshPeerAsUser(peer);
+        if (!user) return;
+        const result = roster.upsert(user);
+        if (result.becameOnline) announcePeerOnline(peer.orbitId);
+      },
     }).then((mesh) => {
       if (dead) { mesh.stop(); return; }
       meshRef.current = mesh;
@@ -199,7 +187,7 @@ export function useP2P(identity: OrbitIdentity | null) {
       meshRef.current?.stop();
       meshRef.current = null;
     };
-  }, [identity]);
+  }, [identity, roster]);
   // v1 replication receipts: this node signs durable-custody attestations for
   // objects it fetches, and validates receipts for objects it serves.
   useEffect(() => {
@@ -239,7 +227,6 @@ export function useP2P(identity: OrbitIdentity | null) {
     }
   });
 
-  const peerMapRef = useRef<Map<string, User>>(new Map());
   // Committed API-base generation: bumped on every seamless world switch so
   // the connection effect below re-runs (cleanup closes the old socket, the
   // new run dials the new base). The app shell never remounts.
@@ -331,7 +318,7 @@ export function useP2P(identity: OrbitIdentity | null) {
     // refresh re-confirms who is actually there. Memory is preserved.
     const runBase = getApiBaseUrl();
     if (lastBaseRef.current && lastBaseRef.current !== runBase) {
-      for (const [id, u] of peerMapRef.current) peerMapRef.current.set(id, { ...u, online: false });
+      roster.markAllOffline();
     }
     lastBaseRef.current = runBase;
 
@@ -460,36 +447,18 @@ export function useP2P(identity: OrbitIdentity | null) {
 
     // Load saved known peers from storage on mount. Entries unseen for over
     // 24h are dropped so ancient ghosts never resurrect; the rest hydrate as
-    // offline until the roster/swarm confirms them fresh.
+    // offline until the roster/swarm confirms them fresh. A peer we already
+    // know is NOT overwritten — a world switch must not replace a live
+    // online peer with its stale persisted copy.
     try {
       const savedPeers = localStorage.getItem('orbit_p2p_known_peers');
-      if (savedPeers) {
-        const parsed: User[] = JSON.parse(savedPeers);
-        const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-        for (const p of parsed) {
-          if (!p || p.id === selfUser.id) continue;
-          const t = p.last_seen ? new Date(p.last_seen).getTime() : 0;
-          if (t > 0 && t < cutoff) continue;
-          peerMapRef.current.set(p.id, { ...p, online: false });
-        }
-      }
+      if (savedPeers) roster.hydrate(JSON.parse(savedPeers));
     } catch {}
-
-    const updatePeersList = () => {
-      const allPeers = Array.from(peerMapRef.current.values());
-      setPeers(prev => arePeersStructurallyEqual(prev, allPeers) ? prev : allPeers);
-      try {
-        const onlineOrKnown = allPeers.slice(0, 30);
-        localStorage.setItem('orbit_p2p_known_peers', JSON.stringify(onlineOrKnown));
-      } catch {}
-    };
-
-    updatePeersList();
 
     // Periodic ghost sweep (plan B1): the map used to grow for the whole
     // session. Hourly is plenty — entries die at 24h unseen.
     const pruneTimer = setInterval(() => {
-      if (pruneStalePeers(peerMapRef.current) > 0) updatePeersList();
+      roster.prune();
     }, 60 * 60 * 1000);
 
     /**
@@ -511,15 +480,9 @@ export function useP2P(identity: OrbitIdentity | null) {
       if (!isSelf) {
         logger.log('[ORBIT Network Swarm] Discovered remote peer:', data.user.display_name || data.user.id, 'Type:', data.type);
 
-        const prevSeen = peerMapRef.current.get(data.user.id);
-        peerMapRef.current.set(data.user.id, {
-          ...data.user,
-          online: true,
-          last_seen: new Date().toISOString(),
-        });
-        updatePeersList();
+        const sighting = roster.upsert(data.user);
         // Offline seeder coming back: wake failed P2P tiles so they retry.
-        if (!prevSeen || !prevSeen.online) announcePeerOnline(data.user.id);
+        if (sighting.becameOnline) announcePeerOnline(data.user.id);
       }
 
       if (data.type === 'PRESENCE') {
@@ -711,15 +674,8 @@ export function useP2P(identity: OrbitIdentity | null) {
 
             if (rawData.type === 'PROFILE' && rawData.user && rawData.user.id) {
               const profile = rawData.user;
-              const existing = peerMapRef.current.get(profile.id);
-              if (existing) {
-                peerMapRef.current.set(profile.id, {
-                  ...existing,
-                  ...profile,
-                  online: true,
-                  last_seen: new Date().toISOString(),
-                });
-                updatePeersList();
+              if (roster.get(profile.id)) {
+                roster.upsert(profile);
               }
               if (typeof window !== 'undefined') {
                 try { window.dispatchEvent(new CustomEvent('orbit-profilesync')); } catch {}
@@ -835,32 +791,28 @@ export function useP2P(identity: OrbitIdentity | null) {
           // NOTE: an empty roster is a valid signal (everyone left) — it
           // still runs so leavers decay to offline instead of lingering.
           if (!Array.isArray(users)) return
-          const wasOnline = new Set(
-            [...peerMapRef.current.entries()]
-              .filter(([, p]) => p?.online)
-              .map(([id]) => id),
-          )
-          if (mergeRoster(peerMapRef.current, users, selfUserRef.current.id)) updatePeersList()
+          // The roster owns the merge AND the transition detection: it returns
+          // the peers that just came online, so there is no second "was this
+          // peer online before?" bookkeeping here.
+          const newlyOnline = roster.mergeServerRoster(users, selfUserRef.current.id);
           // Freshly-online roster members may be seeders for failed P2P
           // tiles — wake them to retry.
-          for (const u of users) {
-            if (u?.id && u.id !== selfUserRef.current.id && !wasOnline.has(u.id)) {
-              announcePeerOnline(u.id)
-              const pubKey = u.publicKey || (u as any).public_key
-              const encKey = u.encryptionPubKey || (u as any).encryption_pub_key
-              if (courierOnlyWs && pubKey && encKey) {
-                // Transport selection (P0): every roster arrival gets one
-                // deadline-bounded direct attempt. The node's relay carries
-                // the frames meanwhile; failure schedules a backoff retry.
-                swarmTransportRegistry.startDirectAttempt(u.id)
-                void connectToPeerMesh({ id: u.id, public_key: pubKey, encryption_pub_key: encKey }, identity)
-                  .then(() => swarmTransportRegistry.markDirectValidated(u.id))
-                  .catch((err) => swarmTransportRegistry.markDirectFailed(
-                    u.id,
-                    err instanceof Error ? err.message : 'direct connect failed',
-                    true,
-                  ))
-              }
+          for (const u of newlyOnline) {
+            announcePeerOnline(u.id)
+            const pubKey = u.publicKey || (u as any).public_key
+            const encKey = u.encryptionPubKey || (u as any).encryption_pub_key
+            if (courierOnlyWs && pubKey && encKey) {
+              // Transport selection (P0): every roster arrival gets one
+              // deadline-bounded direct attempt. The node's relay carries
+              // the frames meanwhile; failure schedules a backoff retry.
+              swarmTransportRegistry.startDirectAttempt(u.id)
+              void connectToPeerMesh({ id: u.id, public_key: pubKey, encryption_pub_key: encKey }, identity)
+                .then(() => swarmTransportRegistry.markDirectValidated(u.id))
+                .catch((err) => swarmTransportRegistry.markDirectFailed(
+                  u.id,
+                  err instanceof Error ? err.message : 'direct connect failed',
+                  true,
+                ))
             }
           }
         })
@@ -879,7 +831,7 @@ export function useP2P(identity: OrbitIdentity | null) {
           swarmTransportRegistry.markDirectFailed(peerId, 'direct attempt deadline', true)
         }
       }
-      for (const [peerId, peer] of peerMapRef.current) {
+      for (const [peerId, peer] of roster.entries()) {
         if (peerId === selfUserRef.current.id || !peer?.online) continue
         const phase = swarmTransportRegistry.phaseFor(peerId)
         if (phase === 'idle' || phase === 'failed') {
@@ -1093,7 +1045,7 @@ export function useP2P(identity: OrbitIdentity | null) {
       senderName: resolveDisplayName({
         selfId: selfUser.id,
         senderId: selfUser.id,
-        roster: peerMapRef.current,
+        roster: roster.asMap(),
         fallback: selfUser.display_name,
       }),
       text,

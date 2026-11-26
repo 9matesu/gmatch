@@ -809,6 +809,56 @@ heat streak). Each +5% click power. Persist across prestige.
 - **Presence & Discovery:** Ephemeral signed beacons (`PresenceBeacon`) broadcast to public
   presence token `sha256Hex('orbit-global-presence-v1')`. Client compiles and verifies in-memory
   roster with 60s TTL and 120s drop threshold. Zero presence state stored on server.
+- **ONE roster owns "who is online" (2026-11-26).** Four discovery stacks find peers — the
+  node roster (`GET /api/users/online`), the swarm `PRESENCE` frame, the `PROFILE` frame and
+  the tracker mesh (a signed HELLO) — and they all write through ONE store
+  (`utils/peerRoster.ts` → `PeerRoster`): one map, one merge rule, one change event. The
+  rule is "an EMPTY incoming field never erases what we already know; a field that carries
+  a value always wins", so a roster row with no name cannot blank a name learned from a
+  beacon. A call IS a sighting: the peer is here NOW, so `upsert` owns the `online` flag and
+  stamps `last_seen` itself; `markOffline` is the only way to say "gone". The store also owns
+  the node-roster merge and returns the peers that just came online (the caller no longer
+  keeps a second "was this peer online before?" set), the 24h ghost sweep, the persistence
+  (online peers first, capped at 30, so a late joiner is never pushed out) and the hydration
+  (a peer we already know is never overwritten — a world switch cannot replace a live peer
+  with its stale persisted copy). The duplicate `arePeersStructurallyEqual` is gone: the
+  shared `areUsersStructurallyEqual` (`utils/compare.ts`) is a strict superset of it.
+- **The tracker mesh connects, and its peers are VISIBLE (2026-11-26).** The torrent-style
+  path (rotating infohash → public tracker → WebRTC → signed HELLO → PEX) was broken in three
+  places and looked alive the whole time, because it carried bytes over a DataChannel nobody
+  could see in the roster:
+  1. **The offer id never matched.** The tracker wire carries `offer_id` as 20 BINARY
+     characters (the tracker compares bytes) while the mesh keys its pending-offer map by the
+     40-char hex id. The tracker echoes the id it was given, so the answer named an offer the
+     mesh did not know and the connection was silently never made. `canonicalId()`
+     reconciles the two forms.
+  2. **The wire was not the reference protocol.** The tracker runs the reference
+     `bittorrent-tracker` protocol, and our announce deviated from it in four ways
+     that all fail SILENTLY (the tracker simply never answers):
+     - the SDP travels as an OBJECT (`{type,sdp}`) — never base64, never a JSON
+       string. The server passes the offer through untouched, so a base64 string
+       reaches the peer as a string and the peer drops it;
+     - an inbound offer/answer arrives SINGULAR (`offer` / `answer`), never as an
+       `offers` / `answers` array;
+     - an answer MUST carry `to_peer_id`: the server parser throws
+       `invalid \`to_peer_id\` (required with \`answer\`)` and drops the message, so the peer
+       that offered never hears back;
+     - the tracker peer id must be STABLE for the session: a fresh id per announce made the
+       tracker see a new peer every time, so the answer to our own offer could not be routed
+       back to us.
+     The answer rides its OWN announce (the tracker relays it to `to_peer_id` and never
+     answers an answer), and it goes back through the socket that delivered the offer.
+     Note what the tracker does with `numwant`: it IGNORES the field we send and
+     derives the peer count from the number of offers we publish
+     (`numwant = min(offers.length, 82)`) — so publishing an offer is what gets us
+     peers, and a client that publishes none is never given any.
+  3. **A verified peer had no way into the roster.** The mesh completed a signed HELLO (so it
+     had PROVED the peer's key) but the only roster writer was a closure trapped inside the
+     WebSocket effect. The mesh now reports the peer (`meshPeerAsUser`) and the roster admits
+     it — the same trust as a peer the node listed. A peer with no proven key is not shown.
+  Unanswered connections are dropped after 90 s (each open `RTCPeerConnection` is a socket and
+  an encoder nobody uses), one offer is published per announce cycle (reference `numwant` ≤ 5,
+  `OFFER_TIMEOUT` 50 s, announce interval 30 s).
 - **Signaling over Courier:** WebRTC signaling (SDP offer/answer, ICE) sealed with X25519 ECIES
   and routed as `kind: 'signal'` envelopes via `/api/mail/:token`.
 - **Swarm Media Distribution:** Media divided into 5 KiB legacy / 4 KiB sealed
