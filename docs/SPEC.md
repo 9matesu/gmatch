@@ -1008,11 +1008,31 @@ what it lives in.
     software composition (`disableHardwareAcceleration`) and throttle hidden
     windows made the UI stall/go black on a real machine, so both were
     REVERTED: the GPU process is cheap compared with a frozen renderer.
-  - **An idle second costs nothing (2026-11-25):** the idle game's 1 s beat
+  - **Thumbnails, not full-size pictures (2026-11-25).** A dense grid (picture
+  cache viewer, tag browser, keepsake gallery) used to mount every tile at
+  full resolution: 70 pictures decoded to ~309 megapixels (~1.2 GB of
+  bitmaps, an 878 MB GPU process). The main process now serves a small copy
+  on demand — `gmcache://thumb/<key>`, a ≤360px JPEG generated with
+  Electron's built-in `nativeImage` and kept in a bounded RAM LRU — and the
+  dense grids ask for it (`CachedImg thumb`, `utils/thumb.ts`). The encrypted
+  originals remain the only durable copy; the full-size bytes are fetched
+  only when a picture is opened. The cache viewer also mounts a BOUNDED
+  window (60 tiles, "Show more") instead of the whole cache at once.
+- **An idle second costs nothing (2026-11-25):** the idle game's 1 s beat
     still runs (it must expire legacy timed caps), but `tick()` only writes to
     the store when a cap ACTUALLY expires. It used to stamp `lastSeenAt` every
     second, re-rendering the whole idle UI for a field nothing reads — `save()`
     already stamps it, and the save is the only reader.
+- **No always-on burn (2026-11-25).** The watch theater used to stay mounted
+  (CSS-hidden) on every screen, so a room's 250 ms sync tick and its stream
+  `<video>` ran on the Feed, the Clicker and the Vault; it is now mounted ONLY
+  while the Watch tab is open (the room lives in the store, so leaving the
+  tab is not leaving the room — returning re-syncs to the live frame). Grids
+  no longer autoplay: a tag-browser tile shows its poster and plays only
+  under the pointer, and timeline videos show their first frame until the
+  player presses play. A hidden/minimized window enables Chromium's
+  background throttling (and repaints on return), and the shared `useNow`
+  clock stops while the document is hidden.
   - **No retry storm (2026-11-24):** an `orbitFetch` timeout used to cost 30s +
     2 exponential retries (up to 90s each); with a dozen pollers this piled up
     into a renderer freeze. Normal API calls now time out in 8s with ONE short

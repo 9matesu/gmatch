@@ -1265,6 +1265,18 @@ function createWindow() {
   win.on('moved', persistBounds)
   win.on('resized', persistBounds)
   win.removeMenu()
+  // Energy: a hidden/minimized window must not keep compositing. Chromium's
+  // background throttling is disabled globally here (a throttled window used
+  // to come back with a stale frame), so it is switched ON only while the
+  // window is genuinely hidden/minimized — and switched OFF, with an explicit
+  // repaint, before it can be seen again.
+  const setThrottled = (on) => {
+    try { win.webContents.setBackgroundThrottling(on) } catch { /* best effort */ }
+  }
+  win.on('hide', () => setThrottled(true))
+  win.on('minimize', () => setThrottled(true))
+  win.on('show', () => { setThrottled(false); try { win.webContents.invalidate() } catch { /* best effort */ } })
+  win.on('restore', () => { setThrottled(false); try { win.webContents.invalidate() } catch { /* best effort */ } })
   // Boot timeline anchors. The renderer's own marks (first paint, hydration)
   // arrive over IPC and land on the same clock.
   win.webContents.on('did-finish-load', () => {

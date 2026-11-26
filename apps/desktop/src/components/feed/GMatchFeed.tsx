@@ -1268,7 +1268,7 @@ function GMatchFeedImpl({
                                 videoClassName="w-full max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
                                 controls={true}
                                 alwaysShowControls={true}
-                                autoPlay={true}
+                                autoPlay={false}
                                 muted={true}
                                 loop={true}
                                 hideUnavailable={false}
@@ -1282,7 +1282,7 @@ function GMatchFeedImpl({
                                 videoClassName="w-full max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
                                 controls={true}
                                 alwaysShowControls={true}
-                                autoPlay={true}
+                                autoPlay={false}
                                 muted={true}
                                 loop={true}
                                 onExpand={() => toggleExpand(post)}
@@ -1308,7 +1308,7 @@ function GMatchFeedImpl({
                             videoClassName="w-full max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
                             controls={true}
                             alwaysShowControls={true}
-                            autoPlay={true}
+                            autoPlay={false}
                             muted={true}
                             loop={true}
                             onExpand={() => toggleExpand(post)}
@@ -1332,7 +1332,7 @@ function GMatchFeedImpl({
                           videoClassName="w-full max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
                           controls={true}
                           alwaysShowControls={true}
-                          autoPlay={true}
+                          autoPlay={false}
                           muted={true}
                           loop={true}
                           hideUnavailable={false}
@@ -1346,7 +1346,7 @@ function GMatchFeedImpl({
                           videoClassName="w-full max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
                           controls={true}
                           alwaysShowControls={true}
-                          autoPlay={true}
+                          autoPlay={false}
                           muted={true}
                           loop={true}
                           onExpand={() => toggleExpand(post)}

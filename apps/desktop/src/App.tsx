@@ -4500,18 +4500,16 @@ export default function Home() {
               )}
             </div>
 
-            {/* Watch theater: ALWAYS mounted (hidden off-tab) so an opened
-                room keeps playing in the background. In a ROOM it is the
-                whole shell (video bleeds behind the transparent header, the
-                island recedes to a hover sliver). BROWSING (no room open)
-                it stays a normal tab: content constrained between the
-                header and the pill bar, island fully visible. */}
-            {settings.watchPartyEnabled && identity && (
-              <div className={mainView === 'watch'
-                ? (watchRoomOpen
+            {/* Watch theater: mounted ONLY while the Watch tab is open. It used
+                to stay mounted forever (CSS-hidden) so a room's 250 ms sync
+                tick and its stream <video> kept running on the Feed, the
+                Clicker and the Vault — pure idle burn. The room lives in the
+                watch-party store, not in this component, so unmounting is NOT
+                leaving: coming back re-syncs to the room's live frame. */}
+            {settings.watchPartyEnabled && identity && mainView === 'watch' && (
+              <div className={watchRoomOpen
                     ? `absolute inset-0 left-0 ${chatOpen ? 'md:right-[min(720px,40vw)]' : 'right-0'} z-20 flex flex-col min-h-0 overflow-hidden`
-                    : `absolute top-9 bottom-[var(--island-clearance)] left-0 ${chatOpen ? 'md:right-[min(720px,40vw)]' : 'right-0'} z-20 flex flex-col min-h-0 overflow-hidden`)
-                : 'hidden'}>
+                    : `absolute top-9 bottom-[var(--island-clearance)] left-0 ${chatOpen ? 'md:right-[min(720px,40vw)]' : 'right-0'} z-20 flex flex-col min-h-0 overflow-hidden`}>
                 <WatchPartyView identity={identity} profilePics={profilePics} />
               </div>
             )}

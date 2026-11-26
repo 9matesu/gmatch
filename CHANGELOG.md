@@ -80,6 +80,36 @@ verified live.
   stamps it). A tick with no cap to expire now returns without touching the
   store, so an idle app does no render work at all (`store.test.ts` pins both
   halves: zero writes when nothing expired, exactly one when a cap does).
+- **The app stops burning CPU while you are NOT using it.** Measured on a
+  3-hour session: renderer ~495 s CPU, main ~433 s, GPU process 878 MB RAM,
+  and 70 pictures decoded to 309 megapixels (~1.2 GB of bitmaps). Four causes,
+  four fixes:
+  - the **watch theater stayed mounted (CSS-hidden) on every screen**, so a
+    room's 250 ms sync tick and its stream `<video>` ran on the Feed, the
+    Clicker and the Vault. It is now mounted only while the Watch tab is
+    open — the room lives in the store, so leaving the tab is not leaving the
+    room, and returning re-syncs to the live frame;
+  - **grids autoplayed videos**: a tag-browser tile played its clip and every
+    timeline video started decoding on its own. A tile now shows its poster
+    and plays only under the pointer; a timeline video shows its first frame
+    until the player presses play (the clip the player explicitly opens still
+    plays by itself);
+  - **every countdown owned a private 1 s timer**. `useNow` is now ONE shared
+    clock for the whole app: it starts with the first subscriber, stops with
+    the last, and is paused while the window is hidden;
+  - **a hidden/minimized window kept compositing**. Chromium's background
+    throttling is now enabled exactly while the window is hidden/minimized
+    (and switched off, with an explicit repaint, before it can be seen again)
+    — the global default stays as it was, because a permanently throttled
+    window used to come back with a stale frame.
+- **Thumbnails instead of full-size pictures.** The dense grids (picture
+  cache viewer, tag browser, keepsake gallery) mounted every tile at full
+  resolution — the 309-megapixel spike above. The main process now serves a
+  ≤360px copy on demand (`gmcache://thumb/<key>`, generated with Electron's
+  built-in `nativeImage`, kept in a bounded RAM LRU), and the grids ask for
+  it. The encrypted originals stay the only durable copy; full-size bytes are
+  fetched only when a picture is opened. The cache viewer also mounts a
+  bounded window (60 tiles + "Show more") instead of the whole cache at once.
 
 ## Unreleased — gmatch 2.0: no hosted service; the own node is the world
 

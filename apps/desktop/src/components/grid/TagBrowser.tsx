@@ -180,15 +180,19 @@ export default function TagBrowser({ onClose }: { onClose?: () => void }) {
                 className="group relative aspect-square cursor-pointer overflow-hidden rounded-lg border border-edge bg-retro-bg"
               >
                 {p.kind === 'video' ? (
+                  // No autoplay: a gallery of decoders is the single largest
+                  // GPU/energy cost in the app. The tile shows its POSTER and
+                  // only decodes while the pointer is over it.
                   <video
                     className="block h-full w-full object-cover"
                     src={redgifsPlayable(p.url)}
                     poster={p.preview ? redgifsPlayable(p.preview) : undefined}
-                    autoPlay
                     loop
                     muted
                     playsInline
-                    preload="auto"
+                    preload="none"
+                    onMouseEnter={(e) => { void e.currentTarget.play().catch(() => {}) }}
+                    onMouseLeave={(e) => { e.currentTarget.pause() }}
                   />
                 ) : (
                   <CachedImg
