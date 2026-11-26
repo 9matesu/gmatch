@@ -631,6 +631,18 @@ UI or documentation.
 - `site/release.json` and the page's hash blocks are regenerated from the
   published GitHub asset (they had described a build that was never published).
 
+## Evidence log (2026-11-26, the media surface: no empty previews, one balloon)
+
+- **The feed hides a row it cannot show, reversibly.** A post whose media bytes
+  are not held locally or by any online peer used to occupy a slot as an empty
+  frame or a "No preview" strip. `GMatchFeed` now keeps a `deadPosts` set: a
+  terminal miss (`onMediaUnavailable` / `FeedGrid`'s `onMediaDead`) hides the
+  row, and the state is reversed the moment bytes exist — the same row's
+  `onLoad` (`onMediaReady`) promotes it, and `PEER_ONLINE_EVENT` clears the set
+  so every hidden row is re-checked (the media ladder is unchanged: local vault
+  → local swarm store → signed `GET /api/objects/:id` → swarm peers, resolved by
+  content hash for peer rows). Text-only rows are untouched.
+
 ## Evidence log (2026-10-24, the Cloudflare rendezvous — superseded 2026-11-26)
 
 - The Render courier and the Fly full node were **removed from the code**:

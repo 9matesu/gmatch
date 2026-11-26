@@ -50,6 +50,7 @@ import CachedImg from '../../ui/CachedImg';
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer';
 import { isVideoPost } from '../../utils/media';
 import { vaultPin, vaultBridge } from '../../services/vault';
+import { PEER_ONLINE_EVENT } from '../../utils/p2pSwarm';
 
 /** Sibling item MIME types for render-time video detection (see isVideoPost). */
 function siblingMimesFor(post: FeedPost): string[] {
@@ -590,11 +591,37 @@ function GMatchFeedImpl({
   // memos so the minute tick behind relative timestamps only re-ranks the
   // "for you" order — the "latest" order does not depend on the clock at all.
   //
-  // Universal posting: a post is content the moment it exists. Every renderable
-  // row shows; media that has no bytes yet renders "No preview" (bounded by
-  // ObjectImage's cap), never a hidden row and never an endless spinner. Hiding
-  // text-less rows is what made a fresh post vanish from its author's timeline.
+  // A row is shown as soon as it EXISTS (text is content), but a row whose media
+  // bytes cannot be resolved must not sit in the timeline as an empty frame or a
+  // "No preview" strip: it is hidden until its bytes are actually available.
+  //
+  // The hide is REVERSIBLE, which is the whole point: the tile reports a terminal
+  // miss (`onMediaUnavailable`) and the id joins `deadPosts`; the moment the SAME
+  // row's media loads (`onLoad`) it is promoted back. A peer coming online can
+  // deliver bytes that were absent, so the hidden set is cleared then too — a
+  // re-check, never a one-way tombstone.
   const hiddenCount = useMemo(() => countHidden(posts), [posts]);
+  const [deadPosts, setDeadPosts] = useState<Set<string>>(() => new Set());
+  const hidePost = useCallback((id: string) => {
+    setDeadPosts((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+  }, []);
+  const promotePost = useCallback((id: string) => {
+    setDeadPosts((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }, []);
+  useEffect(() => {
+    // Bytes can only arrive from a peer that just connected: give every hidden
+    // row another chance. A row whose bytes are still absent re-hides after the
+    // same bounded probe (useObjectImage owns the retry TTL), so this is a
+    // re-check, not a flip-flop.
+    const onPeerOnline = () => setDeadPosts((prev) => (prev.size ? new Set() : prev));
+    window.addEventListener(PEER_ONLINE_EVENT, onPeerOnline);
+    return () => window.removeEventListener(PEER_ONLINE_EVENT, onPeerOnline);
+  }, []);
   /** How many rows the projection actually produced — the count the empty copy
    *  needs, computed once instead of re-deriving it inside the memo. */
   const visiblePostCount = useMemo(
@@ -602,8 +629,8 @@ function GMatchFeedImpl({
     [posts],
   );
   const visiblePosts = useMemo(
-    () => posts.filter((p) => !p.is_archived && isRenderable(p) && !isPostDeleted(p.id)),
-    [posts],
+    () => posts.filter((p) => !p.is_archived && isRenderable(p) && !isPostDeleted(p.id) && !deadPosts.has(p.id)),
+    [posts, deadPosts],
   );
 
   // Hold the reader's place when rows arrive above them.
@@ -1114,6 +1141,8 @@ function GMatchFeedImpl({
                likeCounts={likeCounts}
                onToggleLike={toggleLike}
                onOpen={toggleExpand}
+               onMediaReady={promotePost}
+               onMediaDead={hidePost}
              />
            ) : (
              <>
@@ -1276,7 +1305,9 @@ function GMatchFeedImpl({
                                 autoPlay={false}
                                 muted={true}
                                 loop={true}
-                                hideUnavailable={false}
+                                hideUnavailable
+                                onMediaUnavailable={() => hidePost(post.id)}
+                                onLoad={() => promotePost(post.id)}
                                 onExpand={() => toggleExpand(post)}
                                 onDoubleTapLike={() => handleDoubleTap(post)}
                               />
@@ -1341,7 +1372,9 @@ function GMatchFeedImpl({
                           autoPlay={false}
                           muted={true}
                           loop={true}
-                          hideUnavailable={false}
+                          hideUnavailable
+                          onMediaUnavailable={() => hidePost(post.id)}
+                          onLoad={() => promotePost(post.id)}
                           onExpand={() => toggleExpand(post)}
                           onDoubleTapLike={() => handleDoubleTap(post)}
                           />

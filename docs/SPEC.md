@@ -606,39 +606,18 @@ product path.
   did not. The viewer is muted + `preload="auto"` (with `controls`, so the
   sound can be turned on by hand), and both tag-browser videos resolve their
   URL through `redgifsPlayable` like the clicker does.
-- **Posting is universal: every post shows (2026-11-25).** The text-less hiding
-  rule (a row with no words was hidden until its bytes resolved) made a fresh
-  post vanish from its author's own timeline, and a descriptor post whose bytes
-  were not local could never promote (its tile never mounted). Now every
-  renderable row shows immediately; media with no bytes renders "No preview"
-  (bounded by `ObjectImage`'s 30s cap), never a hidden row and never an endless
-  spinner. The `deadPosts`/`mediaReady` probe machinery is gone.
-- **A closed sidecar log pipe is not a crash (2026-11-25).** `apiSidecar.cjs`
-  logged child stdout/stderr with `console.*` and no error handling, so a closed
-  pipe threw an uncaught `EPIPE: broken pipe` (seen as "broken pipe" on delete).
-  The log write is wrapped and the pipes swallow stream errors.
-- **A closed stdout/stderr pipe does not kill the app (2026-11-25).** The fix
-  above was INCOMPLETE: writing to a broken pipe does not throw at the call
-  site, node emits an async `'error'` EVENT on the stream, so the `try/catch`
-  around the log write could never catch it — the main process still died with
-  `uncaught: Error: EPIPE: broken pipe, write` (live in `main.log`). The guard
-  now lives on the stream itself (`electron/stdio-guard.cjs`, installed at
-  boot): EPIPE/ECONNRESET are swallowed, any other error is still reported.
-- **SQLITE_BUSY waits instead of 503 (2026-11-25).** The sidecar set WAL but no
-  `busy_timeout`, so a concurrent writer (RateLimits/Users) returned
-  `SQLITE_BUSY` → a 503 that made a DELETE which actually applied read as "could
-  not delete" (the row vanished on the next refresh). `serve.ts` now sets
-  `PRAGMA busy_timeout = 5000`.
-- **Dead media rows hide and REAPPEAR when bytes arrive (2026-11-25).**
-  `GMatchFeed` sets `hideUnavailable={true}` on timeline `ObjectImage`s and
-  `visiblePosts` drops a row once `deadPosts` marks it, so legacy
-  `magnet:`/`p2p` posts without local or online-peer bytes no longer fill the
-  timeline with empty frames. The state is **reversible**: `promoteMedia` clears
-  `dead` (a local read, a signed fetch, or a peer that came online with the
-  bytes), and a feed-level re-check on `PEER_ONLINE_EVENT` re-promotes a hidden
-  row whose bytes are now held locally — so a post that "appeared then vanished"
-  comes back the moment its bytes exist. A one-way `deadPosts` set used to hide a
-  post for the rest of the session even after its bytes landed.
+- **A row with no preview bytes is HIDDEN, reversibly (2026-11-26).** Text is
+  content, so a text-only or captioned row always shows; but a row whose MEDIA
+  bytes cannot be resolved is not left in the timeline as an empty frame or a
+  "No preview" strip — it is dropped until its bytes actually exist. The hide is
+  REVERSIBLE, which is the whole point: the tile reports a terminal miss
+  (`onMediaUnavailable`) and the id joins `deadPosts`; the same row's media
+  loading (`onLoad`) promotes it straight back, and a peer coming online
+  (`PEER_ONLINE_EVENT`) clears the hidden set so every row is re-checked (a
+  peer can deliver bytes that were absent). This supersedes the earlier "every
+  row shows immediately and renders No preview" rule: that change stopped a
+  fresh post vanishing, but it also left a row with dead bytes sitting there as
+  an empty card — the no-preview strip a picture network must never show.
 - **The grid measures local-object posts too (2026-11-25).** `FeedGrid` only
   laid out posts whose aspect ratio was known, and the ratio probe ran for
   `^https?:` URLs only — so `vault:`/`magnet:`/`p2p`/`/api/objects` posts never

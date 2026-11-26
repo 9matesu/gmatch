@@ -1,7 +1,12 @@
 // @vitest-environment jsdom
+// A row whose media bytes cannot be resolved is HIDDEN from the timeline — it
+// must not sit there as an empty frame or a "No preview" strip. The hide is
+// reversible: the row comes back the moment its bytes are available (a peer
+// that just came online can deliver them), so it is a re-check, not a tombstone.
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, fireEvent } from '@testing-library/react';
 import { GMatchFeed } from './GMatchFeed';
+import { PEER_ONLINE_EVENT } from '../../utils/p2pSwarm';
 
 vi.mock('../../utils/sounds', () => ({
   playPress: vi.fn(),
@@ -33,7 +38,7 @@ global.IntersectionObserver = vi.fn().mockImplementation((cb) => ({
   disconnect: vi.fn(),
 })) as any;
 
-describe('GMatchFeed missing media (universal)', () => {
+describe('GMatchFeed missing media', () => {
   const identity = { orbitId: 'my-user-id', sign: vi.fn() } as any;
   const posts: any[] = [
     {
@@ -48,13 +53,24 @@ describe('GMatchFeed missing media (universal)', () => {
     },
   ];
 
-  it('keeps the post visible even when its media is unavailable', () => {
-    render(
-      <GMatchFeed identity={identity} posts={posts} stories={[]} users={[]} feedSort="latest" />,
-    );
-    expect(screen.getByText('My own post without local bytes')).toBeInTheDocument();
+  const renderFeed = () =>
+    render(<GMatchFeed identity={identity} posts={posts} stories={[]} users={[]} feedSort="latest" />);
+
+  it('hides the row once its media reports a terminal miss', () => {
+    const { container } = renderFeed();
+    expect(container.querySelector('article')).not.toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'missing media' }));
-    // The tile reports the miss; the row (author, caption, counts) stays.
-    expect(screen.getAllByText('My own post without local bytes').length).toBeGreaterThan(0);
+    // No media -> no row: no empty frame, no "No preview" strip.
+    expect(container.querySelector('article')).toBeNull();
+  });
+
+  it('promotes the row back when a peer comes online (reversible hide)', () => {
+    const { container } = renderFeed();
+    fireEvent.click(screen.getByRole('button', { name: 'missing media' }));
+    expect(container.querySelector('article')).toBeNull();
+    act(() => {
+      window.dispatchEvent(new Event(PEER_ONLINE_EVENT));
+    });
+    expect(container.querySelector('article')).not.toBeNull();
   });
 });

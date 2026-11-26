@@ -6,6 +6,19 @@ Every item below was requested, was already "implemented" in some form, and
 did not actually work in the running app. Each one is now built, tested and
 verified live.
 
+- **The feed never shows a "No preview" post.** A row whose media bytes cannot
+  be resolved used to sit in the timeline as an empty frame or a "No preview"
+  strip. It is now dropped until its bytes actually exist — and the hide is
+  REVERSIBLE, not a tombstone: the tile reports a terminal miss
+  (`onMediaUnavailable`) and the id joins `GMatchFeed`'s `deadPosts`; the same
+  row's media loading (`onLoad`) promotes it straight back, and a peer coming
+  online (`PEER_ONLINE_EVENT`) clears the hidden set so every row is re-checked
+  (a peer can deliver bytes that were absent). Text-only and captioned rows are
+  untouched — words are content, so they always show. Both the timeline
+  (`hideUnavailable` on `ObjectImage`) and the grid
+  (`FeedGrid`'s `onMediaReady`/`onMediaDead`) feed the same set.
+  `GMatchFeed.missing-media.test.tsx` pins the hide and the promote-on-peer-online.
+
 - **The profile's Followers/Following tabs tell the truth about the peer graph.**
   Both tabs rendered the node's `Followers` table verbatim, so a follow made
   while the node was unreachable existed in the durable operation log and nowhere

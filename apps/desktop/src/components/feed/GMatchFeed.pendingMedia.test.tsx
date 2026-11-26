@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-// Universal posting: a post is content the moment it exists. A text-less row
-// shows immediately; its media renders "No preview" until bytes arrive (bounded
-// by ObjectImage), never a hidden row and never an endless spinner.
+// Text is content: a text-only or captioned row shows immediately regardless of
+// media. A row whose media BYTES cannot be resolved is hidden instead (see
+// GMatchFeed.missing-media.test.tsx) — it never renders "No preview".
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { GMatchFeed } from './GMatchFeed';
