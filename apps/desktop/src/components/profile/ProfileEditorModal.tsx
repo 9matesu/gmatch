@@ -120,6 +120,9 @@ export function ProfileEditorModal({
         for (const t of after) clearRemovedProfileTag(t);
         try {
           localStorage.setItem('orbit_tags', JSON.stringify([...tags]));
+          localStorage.setItem('orbit_display_name', name.trim());
+          localStorage.setItem('orbit_bio', bio?.trim() ?? '');
+          localStorage.setItem('orbit_website', website?.trim() ?? '');
         } catch { /* private mode */ }
       } else {
         // A save with no local key cannot be signed, so nothing reaches the

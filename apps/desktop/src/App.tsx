@@ -244,17 +244,24 @@ export default function Home() {
   }, []);
 
   const { identity, isLoaded, createIdentity, exportIdentity, loginWithExportedId, clearIdentity } = useIdentity();
-  const [myProfile, setMyProfile] = useState(() => {
-    if (typeof window === 'undefined') return { displayName: '', tags: [] as string[], isAdmin: false, pfpUrl: '' }
+  const [myProfile, setMyProfile] = useState<{ displayName: string; tags: string[]; isAdmin: boolean; pfpUrl: string; bio?: string; website?: string }>(() => {
+    if (typeof window === 'undefined') return { displayName: '', tags: [] as string[], isAdmin: false, pfpUrl: '', bio: '', website: '' }
     try {
       const localName = localStorage.getItem('orbit_display_name') || ''
       const localTags = JSON.parse(localStorage.getItem('orbit_tags') || '[]')
       // Read through the secure mirror first (DPAPI mode), falling back to
       // plaintext localStorage for pre-migration installs / browser dev.
       const localPfp = getSecureItem(pfpUrlKey()) || localStorage.getItem(pfpUrlKey()) || ''
-      return { displayName: localName, tags: Array.isArray(localTags) ? localTags : [], isAdmin: false, pfpUrl: localPfp }
+      return {
+        displayName: localName,
+        tags: Array.isArray(localTags) ? localTags : [],
+        isAdmin: false,
+        pfpUrl: localPfp,
+        bio: localStorage.getItem('orbit_bio') || '',
+        website: localStorage.getItem('orbit_website') || '',
+      }
     } catch {
-      return { displayName: '', tags: [] as string[], isAdmin: false, pfpUrl: '' }
+      return { displayName: '', tags: [] as string[], isAdmin: false, pfpUrl: '', bio: '', website: '' }
     }
   });
   // Idle game loop (merged from gmatch App): load save, tick economy, autosave.

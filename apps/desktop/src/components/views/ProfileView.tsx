@@ -8,7 +8,7 @@ import { GMatchProfile } from '../profile/GMatchProfile';
 import type { FeedPost, PostComment } from '../feed/GMatchFeed';
 
 type ToastFn = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
-type MyProfileState = { displayName: string; tags: string[]; isAdmin: boolean; pfpUrl: string };
+type MyProfileState = { displayName: string; tags: string[]; isAdmin: boolean; pfpUrl: string; bio?: string; website?: string };
 
 export function ProfileView({
   identity,
