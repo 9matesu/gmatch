@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   candidateLeaksIp,
   defaultIceConfig,
@@ -148,6 +148,22 @@ describe('turnCredentials + config', () => {
 
   it('env contract unchanged: turnCredentials({}) is still null', () => {
     expect(turnCredentials({})).toBeNull()
+  })
+
+  it('falls back to a TURN relay saved in Settings (localStorage) when no env is set', () => {
+    const store = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => { store.set(k, v) },
+      removeItem: (k: string) => { store.delete(k) },
+    })
+    expect(turnCredentials({})).toBeNull()
+    store.set('gmatch.turn.v1', JSON.stringify({ url: 'turn:relay.example:3478', username: 'u', credential: 'p' }))
+    expect(turnCredentials({})).toEqual({ url: 'turn:relay.example:3478', username: 'u', credential: 'p' })
+    // Env stays authoritative over the stored relay.
+    expect(turnCredentials({ NEXT_PUBLIC_TURN_URL: 'turn:env', NEXT_PUBLIC_TURN_USERNAME: 'e', NEXT_PUBLIC_TURN_CREDENTIAL: 'x' }))
+      .toEqual({ url: 'turn:env', username: 'e', credential: 'x' })
+    vi.unstubAllGlobals()
   })
 
   it('Vite VITE_TURN_* reaches the renderer where process.env does not', () => {

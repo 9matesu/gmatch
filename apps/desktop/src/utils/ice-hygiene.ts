@@ -90,6 +90,25 @@ export function normalizeTurnEnv(env: Record<string, string | undefined>): Recor
   return out
 }
 
+/** Runtime TURN the user saved in Settings (localStorage). Env stays
+ *  authoritative; this is the fallback so a CGNAT pair can add a relay without
+ *  a rebuild. A stored relay forces the zero-exposure relay posture, same as
+ *  env. */
+function storedTurn(): { url: string; username: string; credential: string } | null {
+  try {
+    if (typeof localStorage === 'undefined') return null
+    const raw = localStorage.getItem('gmatch.turn.v1')
+    if (!raw) return null
+    const p = JSON.parse(raw) as { url?: unknown; username?: unknown; credential?: unknown }
+    const url = typeof p.url === 'string' ? p.url.trim() : ''
+    const username = typeof p.username === 'string' ? p.username : ''
+    const credential = typeof p.credential === 'string' ? p.credential : ''
+    return url && username && credential ? { url, username, credential } : null
+  } catch {
+    return null
+  }
+}
+
 /** TURN env lookup shared by both P2P stacks (renderer + dev tools). */
 export function turnCredentials(env: Record<string, string | undefined> = {}): { url: string; username: string; credential: string } | null {
   const e = normalizeTurnEnv(env)
@@ -97,7 +116,7 @@ export function turnCredentials(env: Record<string, string | undefined> = {}): {
   const username = e.NEXT_PUBLIC_TURN_USERNAME
   const credential = e.NEXT_PUBLIC_TURN_CREDENTIAL
   if (url && username && credential) return { url, username, credential }
-  return null
+  return storedTurn()
 }
 
 /**

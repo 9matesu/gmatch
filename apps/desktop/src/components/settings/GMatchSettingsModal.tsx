@@ -32,6 +32,7 @@ import { UpdateSection } from './UpdateSection';
 import { CommunitySection } from './CommunitySection';
 import { ImportPostsSection } from './ImportPostsSection';
 import { RecacheMediaSection } from './RecacheMediaSection';
+import { TurnSection } from './TurnSection';
 import { MediaqSection } from './MediaqSection';
 import { BlocklistSection } from './BlocklistSection';
 import { CacheViewer } from './CacheViewer';
@@ -934,6 +935,9 @@ export function GMatchSettingsModal({
 
             {/* Opt-in legacy measure: fetch keepsakes that predate local bytes. */}
             {activeTab === 'preferences' && <RecacheMediaSection toast={toast} />}
+
+            {/* Cross-NAT: add a TURN relay at runtime (CGNAT pairs, USA-Brazil). */}
+            {activeTab === 'preferences' && <TurnSection toast={toast} />}
 
             {/* Optional content provider: one-click install; the clicker works
                 on local sources the whole time, with or without it. */}
