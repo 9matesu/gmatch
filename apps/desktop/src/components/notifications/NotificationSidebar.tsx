@@ -43,6 +43,7 @@ export function NotificationSidebar({
         <div className="flex-1 overflow-y-auto p-3 styled-scrollbar">
           <NotificationCenter
             defaultOpen
+            sidebar
             {...(notifications ?? {
               onMarkAllRead: () => {},
               onMarkRead: () => {},

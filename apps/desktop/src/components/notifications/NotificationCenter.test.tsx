@@ -50,6 +50,12 @@ describe('NotificationCenter (header)', () => {
     expect(document.querySelectorAll('[data-notifications-toggle="true"]')).toHaveLength(1);
   });
 
+  it('in sidebar mode renders no bell and shows the inbox in-flow', () => {
+    renderCenter({ sidebar: true, defaultOpen: true });
+    expect(document.querySelector('[data-notifications-toggle="true"]')).toBeNull();
+    expect(screen.getByRole('region', { name: 'Notification centre' })).toBeInTheDocument();
+  });
+
   it('shows the unread badge and the newest unread title in the collapsed line', () => {
     renderCenter({ unreadCount: 3, latestTitle: 'Bob liked your post' });
     expect(screen.getByText('Bob liked your post')).toBeInTheDocument();

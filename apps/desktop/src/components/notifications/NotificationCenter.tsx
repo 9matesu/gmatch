@@ -41,6 +41,8 @@ export interface NotificationCenterProps {
   onOpenBabecock?: () => void;
   /** Open the list by default (the left sidebar renders it expanded). */
   defaultOpen?: boolean;
+  /** Rendered inside the left sidebar: no bell/preview, panel in-flow. */
+  sidebar?: boolean;
 }
 
 /**
@@ -73,6 +75,7 @@ export function NotificationCenter(props: NotificationCenterProps) {
     onRespondBabecock,
     onOpenBabecock,
   defaultOpen = false,
+  sidebar = false,
   } = props;
 
   const mediaq = useMediaqInstall();
@@ -125,38 +128,40 @@ export function NotificationCenter(props: NotificationCenterProps) {
 
   return (
     <div
-      className="relative flex items-center"
+      className={sidebar ? 'relative flex w-full flex-col' : 'relative flex items-center'}
       style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
     >
-      {/* RareUI notification bell: the swing-on-new + rolling count badge.
-          Same toggle contract as before — data-notifications-toggle, the full
-          aria-label and the Escape-focus ref all live on this button. */}
-      <NotificationBell
-        ref={triggerRef as never}
-        count={unreadCount}
-        max={99}
-        size={32}
-        color="red"
-        data-notifications-toggle="true"
-        onClick={() => setExpanded((v) => !v)}
-        aria-expanded={expanded}
-        aria-label={`Notifications${unreadCount > 0 ? `: ${unreadCount} unread` : ''}${preview ? `. ${preview}` : ''}. Activate to ${expanded ? 'collapse' : 'expand'}.`}
-        title="Notifications"
-        className="shrink-0 bg-glass-w8 text-retro-fg hover:bg-glass-w10"
-      />
-      {/* Dynamic only: the newest unread title. The permanent "Notifications"
-          label is gone  it never changed, so it was chrome, not information. */}
-      {preview && (
-        <span aria-live="polite" className="min-w-0 truncate text-xs text-retro-fg/80 px-2">
-          {preview}
-        </span>
+      {/* The sidebar supplies its own header, so the bell + preview are header-only. */}
+      {!sidebar && (
+        <>
+          <NotificationBell
+            ref={triggerRef as never}
+            count={unreadCount}
+            max={99}
+            size={32}
+            color="red"
+            data-notifications-toggle="true"
+            onClick={() => setExpanded((v) => !v)}
+            aria-expanded={expanded}
+            aria-label={`Notifications${unreadCount > 0 ? `: ${unreadCount} unread` : ''}${preview ? `. ${preview}` : ''}. Activate to ${expanded ? 'collapse' : 'expand'}.`}
+            title="Notifications"
+            className="shrink-0 bg-glass-w8 text-retro-fg hover:bg-glass-w10"
+          />
+          {preview && (
+            <span aria-live="polite" className="min-w-0 truncate text-xs text-retro-fg/80 px-2">
+              {preview}
+            </span>
+          )}
+        </>
       )}
 
       {expanded && (
         <div
           role="region"
           aria-label="Notification centre"
-          className="absolute left-1/2 -translate-x-1/2 top-full mt-1 w-[min(420px,92vw)] max-h-(--max-h-sheet) flex flex-col bg-retro-bg/95 border border-edge rounded-lg shadow-2xl backdrop-blur-md z-[var(--z-dropdown)] overflow-hidden"
+          className={sidebar
+            ? 'relative flex w-full max-h-none flex-col overflow-visible'
+            : 'absolute left-1/2 -translate-x-1/2 top-full mt-1 w-[min(420px,92vw)] max-h-(--max-h-sheet) flex flex-col bg-retro-bg/95 border border-edge rounded-lg shadow-2xl backdrop-blur-md z-[var(--z-dropdown)] overflow-hidden'}
         >
           {/* Active mediaq setup: the install survives the modal being closed
               ("Send to background"), so its progress lives here too. */}
