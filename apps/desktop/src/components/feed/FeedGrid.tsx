@@ -117,7 +117,7 @@ export function FeedGrid({ posts, identity, onOpen, likedPosts, likeCounts, onTo
   return (
     <div ref={ref} className="w-full" data-testid="feed-grid">
       {rows.map((row) => (
-        <div key={row.ids.join('-')} className="flex w-full" style={{ gap: 4, height: row.height, marginBottom: 4 }}>
+        <div key={row.ids[0]} className="flex w-full" style={{ gap: 4, height: row.height, marginBottom: 4 }}>
           {row.ids.map((id) => {
             const post = byId.get(id)
             if (!post) return null

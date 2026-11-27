@@ -83,6 +83,16 @@ describe('createMediaThumbStore', () => {
     expect(deps.createUrl).not.toHaveBeenCalled()
   })
 
+  it('does not re-fetch a source that needs no thumbnail on every remount', async () => {
+    const load = vi.fn(async () => new Blob(['tiny'], { type: 'image/jpeg' }))
+    const deps = makeDeps({ load, render: vi.fn(async () => null) })
+    const store = createMediaThumbStore(deps)
+    expect(await store.get('blob:tiny')).toBeNull()
+    expect(await store.get('blob:tiny')).toBeNull()
+    expect(load).toHaveBeenCalledTimes(1)
+    expect(deps.render).toHaveBeenCalledTimes(1)
+  })
+
   it('answers null (and falls back) when loading or rendering throws', async () => {
     const load = vi.fn(async () => { throw new Error('boom') })
     const store = createMediaThumbStore(makeDeps({ load }))

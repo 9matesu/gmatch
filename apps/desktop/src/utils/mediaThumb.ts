@@ -160,7 +160,14 @@ export function createMediaThumbStore(deps: MediaThumbDeps, opts: MediaThumbOpti
       try {
         const blob = await deps.load(src)
         const thumb = await deps.render(blob, maxPx)
-        if (!thumb) return null
+        if (!thumb) {
+          // "Not worth a thumbnail" is as stable a verdict as a failure (small
+          // image, gif, no decoder). Remember it briefly: a tile re-mounted on
+          // a grid refresh must not re-fetch and re-decode the same bytes just
+          // to reach the same answer — that is a visible stutter.
+          failedUntil.set(src, now() + failTtlMs)
+          return null
+        }
         const url = deps.createUrl(thumb)
         urls.set(src, url)
         evictOverflow(src)

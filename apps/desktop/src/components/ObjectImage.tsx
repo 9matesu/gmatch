@@ -274,13 +274,6 @@ export function ObjectImage({
   const proxied = devFetchable(baseSrc)
   const src = vaultSrc || cachedDirectUrl || proxied || baseSrc
 
-  // Vault/cached swaps used to blank the tile for a frame (the <img> reloaded
-  // from the remote URL to the local one). Keep showing the last loaded source
-  // until the new one actually loads, so opening a post never blinks.
-  const [shownSrc, setShownSrc] = useState<string | null>(null)
-  useEffect(() => { setShownSrc(null) }, [objectId, contentUrl])
-  const renderSrc = shownSrc || src
-
   // ---- Thumbnail ladder (dense grids only) --------------------------------
   // 1. `gmcache://<key>` -> the main process's native resize, synchronously.
   // 2. `blob:` / `vault://` / loopback http -> a bounded renderer thumbnail.
@@ -290,24 +283,54 @@ export function ObjectImage({
   const gmcacheThumb = thumbCandidate && src.startsWith('gmcache://') ? thumbUrl(src) : null
   const rendererThumb = useMediaThumb(src, thumbCandidate)
   const thumbSrc = gmcacheThumb || rendererThumb.url
-  const [thumbFailed, setThumbFailed] = useState(false)
-  useEffect(() => { setThumbFailed(false) }, [src])
-  // While an eligible thumbnail is still owed, paint NOTHING: rendering the
-  // full-size original would decode the very bitmap this mode exists to avoid,
-  // and then swap it a frame later.
+  // A failed thumbnail is tied to the SOURCE it failed for. A state flag reset
+  // in an effect left one render with `thumbFailed` still true and the full
+  // original painted — a full-size decode flash on every swap.
+  const [thumbFailedSrc, setThumbFailedSrc] = useState<string | null>(null)
+  const thumbFailed = thumbFailedSrc !== null && thumbFailedSrc === src
+  // While an eligible thumbnail is still owed, paint NOTHING new: rendering
+  // the full-size original would decode the very bitmap this mode exists to
+  // avoid, and then swap it a frame later.
   const thumbPending = Boolean(thumbCandidate && !thumbFailed && !thumbSrc && rendererThumb.pending)
-  const paintSrc = thumbPending
+  const desiredSrc = thumbPending
     ? null
     : thumbCandidate && !thumbFailed && thumbSrc
       ? thumbSrc
-      : renderSrc
+      : src
+
+  // Keep the last successfully painted source on screen until its replacement
+  // has actually decoded. Writing the new url into the DOM directly blanks an
+  // <img> immediately; a hidden probe lets us swap only when the bytes exist.
+  // While a grid thumbnail is regenerating `desiredSrc` is null and `shownSrc`
+  // is the previous SMALL thumbnail, so the transition never decodes a full
+  // bitmap. The probe is a same-url second decode, not a second network fetch.
+  const [shownSrc, setShownSrc] = useState<string | null>(null)
+  useEffect(() => { setShownSrc(null) }, [objectId, contentUrl])
+  useEffect(() => {
+    if (!desiredSrc || isVideo || shownSrc === desiredSrc) return
+    let live = true
+    const probe = new Image()
+    probe.decoding = 'async'
+    const swap = () => { if (live) setShownSrc(desiredSrc) }
+    probe.onload = swap
+    // An unloadable replacement still has to reach the visible <img> so the
+    // thumbnail fallback / "No preview" path can report the truth.
+    probe.onerror = swap
+    probe.src = desiredSrc
+    return () => {
+      live = false
+      probe.onload = null
+      probe.onerror = null
+    }
+  }, [desiredSrc, isVideo, shownSrc])
+  const paintSrc = shownSrc || desiredSrc
 
   // Vault flicker guard: for an opted-in http(s) source, hold the media
-  // invisible until the local vault lookup settles, so a remote frame never
-  // flashes before the local copy swaps in. The element stays mounted (its
-  // layout is reserved); only opacity is gated, and only for the few ms the
-  // local IPC takes — a no-copy image reveals as soon as the lookup returns.
-  const vaultPending = vaultEligible && !vault.settled
+  // invisible until the LOCAL copy is painted — "lookup settled" only means we
+  // know its url, so revealing there let the remote frame flash for a frame.
+  // A lookup with no local copy reveals immediately (the remote IS the answer).
+  const vaultSwapPending = Boolean(vaultSrc) && !isVideo && desiredSrc !== null && shownSrc !== desiredSrc
+  const vaultPending = vaultEligible && (!vault.settled || vaultSwapPending)
 
   // A direct provider URL may fail while its IPC/vault copy is still being
   // resolved. When that resolution swaps `src` to the local copy, clear the
@@ -396,7 +419,7 @@ export function ObjectImage({
     if (controls) {
       return (
         <NativeVideoPlayer
-          src={renderSrc}
+          src={src}
           className={videoClassName || className}
           videoClassName={videoClassName}
           natural={natural}
@@ -409,7 +432,6 @@ export function ObjectImage({
           onDoubleTapLike={onDoubleTapLike}
           onLoadedData={() => {
             onLoad?.()
-            setShownSrc(src)
             onLoadingChange?.(false)
           }}
           onError={(_e) => {
@@ -425,7 +447,7 @@ export function ObjectImage({
 
   return (
     <video
-      src={renderSrc}
+      src={src}
       className={videoClassName || className}
       muted={muted}
       autoPlay={autoPlay}
@@ -438,7 +460,6 @@ export function ObjectImage({
       onLoadedData={(e) => {
         onLoad?.()
         onLoadSize?.(e.currentTarget.videoWidth, e.currentTarget.videoHeight)
-        setShownSrc(src)
         onLoadingChange?.(false)
       }}
       onError={(_e) => {
@@ -472,7 +493,7 @@ export function ObjectImage({
         // A failed THUMBNAIL is not a failed picture: drop to the full original
         // instead of declaring the media unavailable.
         if (thumbSrc && !thumbFailed) {
-          setThumbFailed(true)
+          setThumbFailedSrc(src)
           return
         }
         onError?.()
