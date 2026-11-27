@@ -481,9 +481,9 @@ export function GMatchProfile({
               <div
                 key={post.id}
                 data-post-id={post.id}
-                onClick={(e) => {
+                onClick={() => {
                   playPress(700);
-                  openPost(post, e.currentTarget.getBoundingClientRect());
+                  openPost(post);
                 }}
                 className="relative aspect-square bg-surface-canvas overflow-hidden cursor-pointer group"
               >
@@ -530,9 +530,9 @@ export function GMatchProfile({
               <div
                 key={post.id}
                 data-post-id={post.id}
-                onClick={(e) => {
+                onClick={() => {
                   playPress(700);
-                  openPost(post, e.currentTarget.getBoundingClientRect());
+                  openPost(post);
                 }}
                 className="relative aspect-square bg-surface-canvas overflow-hidden cursor-pointer group"
               >
@@ -571,9 +571,9 @@ export function GMatchProfile({
             {(repostPosts && repostPosts.length > 0 ? repostPosts : []).map((post) => (
               <div
                 key={post.id}
-                onClick={(e) => {
+                onClick={() => {
                   playPress(700);
-                  openPost(post, e.currentTarget.getBoundingClientRect());
+                  openPost(post);
                 }}
                 className="relative aspect-square bg-surface-canvas overflow-hidden cursor-pointer group"
               >

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useLayoutEffect } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import type { OrbitIdentity } from '@orbit/crypto'
 import type { OrbitObject } from '@orbit/shared'
 import { orbitFetch } from '../utils/api'
@@ -36,8 +36,6 @@ interface ImageViewerProps {
   onDelete?: (item: OrbitObject) => void
   onSetWallpaper?: (url: string) => void
   onToggleFavorite?: (item: OrbitObject) => Promise<boolean>
-  /** The clicked image's rect: the viewer FLIP-morphs from it. */
-  originRect?: { left: number; top: number; width: number; height: number } | null
 }
 
 export function ImageViewer({
@@ -49,7 +47,6 @@ export function ImageViewer({
   onDelete,
   onSetWallpaper,
   onToggleFavorite,
-  originRect,
 }: ImageViewerProps) {
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
@@ -59,29 +56,6 @@ export function ImageViewer({
   const dragStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null)
   const didDragRef = useRef(false)
   const touchStartRef = useRef<{ x: number; y: number } | null>(null)
-  // FLIP: morph the stage from the clicked image's rect to fullscreen.
-  const stageRef = useRef<HTMLDivElement>(null)
-  useLayoutEffect(() => {
-    const el = stageRef.current
-    if (!el || !originRect) return
-    if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
-    const target = el.getBoundingClientRect()
-    if (!target.width || !target.height) return
-    const dx = originRect.left - target.left
-    const dy = originRect.top - target.top
-    const sx = originRect.width / target.width
-    const sy = originRect.height / target.height
-    el.style.transition = 'none'
-    el.style.transformOrigin = 'top left'
-    el.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`
-    el.style.opacity = '0.5'
-    const raf = requestAnimationFrame(() => {
-      el.style.transition = 'transform .28s cubic-bezier(.16,1,.3,1), opacity .2s ease'
-      el.style.transform = ''
-      el.style.opacity = ''
-    })
-    return () => cancelAnimationFrame(raf)
-  }, [itemId, originRect])
 
   const navIdx = items.findIndex((i) => i.id === itemId)
   const activeItem = navIdx >= 0 ? items[navIdx] : null
@@ -259,7 +233,6 @@ export function ImageViewer({
 
   return (
     <div
-      ref={stageRef}
       className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex flex-col justify-between p-2 sm:p-4 md:p-6 pb-[calc(0.5rem+var(--island-clearance))] sm:pb-[calc(1rem+var(--island-clearance))] md:pb-[calc(1.5rem+var(--island-clearance))] overflow-hidden select-none font-sans animate-orbit-fade-in"
       onClick={() => {
         if (!didDragRef.current) onClose()

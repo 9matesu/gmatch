@@ -1264,10 +1264,10 @@ function GMatchFeedImpl({
                         aria-expanded={expanded}
                         aria-label={expanded ? 'Post image, expanded' : 'Expand post'}
                         className={`w-full ${isCurrentVideo ? '' : 'cursor-pointer'}`}
-                        onClick={(e) => {
+                        onClick={() => {
                           if (!isCurrentVideo) {
                             playPress(700);
-                            window.dispatchEvent(new CustomEvent('gmatch-open-image', { detail: { id: post.id, rect: e.currentTarget.getBoundingClientRect() } }));
+                            window.dispatchEvent(new CustomEvent('gmatch-open-image', { detail: { id: post.id, authorName: post.author_name, url: post.localPreviewUrl || post.url } }));
                           }
                         }}
                         onKeyDown={(e) => {

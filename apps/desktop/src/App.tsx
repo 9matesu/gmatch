@@ -507,13 +507,22 @@ export default function Home() {
   const [groupPickerOpen, setGroupPickerOpen] = useState(false)
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null)
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
-  const [imageOrigin, setImageOrigin] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
-  // Clicking an expanded post's image opens the fullscreen ImageViewer, morphing
-  // from the clicked image's rect (FLIP).
+  // Clicking a post opens the fullscreen ImageViewer with JUST that post (not
+  // the whole vault), named from the post's author.
   useEffect(() => {
     const onOpen = (e: Event) => {
-      const d = (e as CustomEvent<{ id?: string; rect?: { left: number; top: number; width: number; height: number } }>).detail;
-      if (d?.id) { setImageOrigin(d.rect ?? null); setExpandedItemId(d.id); }
+      const d = (e as CustomEvent<{ id?: string; authorName?: string; url?: string }>).detail;
+      if (!d?.id) return;
+      setSpectateViewerItems([{
+        id: d.id,
+        owner_id: '',
+        content_url: d.url || '',
+        display_name: d.authorName || '',
+        size_bytes: 0,
+        mime_type: '',
+        created_at: '',
+      } as OrbitObject]);
+      setExpandedItemId(d.id);
     };
     window.addEventListener('gmatch-open-image', onOpen);
     return () => window.removeEventListener('gmatch-open-image', onOpen);
@@ -4179,8 +4188,7 @@ export default function Home() {
                     itemId={expandedItemId}
                     items={spectateViewerItems ?? allViewerItems}
                     identity={identity}
-                    originRect={imageOrigin}
-                    onClose={() => { setExpandedItemId(null); setSpectateViewerItems(null); setImageOrigin(null) }}
+                    onClose={() => { setExpandedItemId(null); setSpectateViewerItems(null) }}
                     onNavigate={(id) => setExpandedItemId(id)}
                     onDelete={handleDelete}
                     onSetWallpaper={handleSetWallpaper}
