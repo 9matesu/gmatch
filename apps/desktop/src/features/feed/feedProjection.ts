@@ -107,11 +107,15 @@ export function projectFeed(input: FeedProjectionInput): FeedPost[] {
   // Local public objects -> rows. An unverified owner claim is a relay, not a
   // proof: it may not borrow another user's directory name or avatar.
   const seenServerIds = new Set(serverVisible.map((p) => p.id))
+  // Local objects whose owner claim was NOT verified: they may never borrow a
+  // directory name/avatar, so the live-name pass must skip them.
+  const unverifiedIds = new Set<string>()
   const localPublicPosts: FeedPost[] = items
     .filter((obj) => (obj.is_public === 1 || obj.is_public === true) && !deletedPostIds.has(obj.id) && !seenServerIds.has(obj.id))
     .map((obj) => {
       const isSelf = !!selfId && obj.owner_id === selfId
       const unverified = obj.owner_verified === false
+      if (unverified) unverifiedIds.add(obj.id)
       const authorUser = !isSelf && !unverified && obj.owner_id
         ? findUserById(users, obj.owner_id)
         : null
@@ -199,9 +203,10 @@ export function projectFeed(input: FeedProjectionInput): FeedPost[] {
     ...optimisticVisible, ...localPendingVisible, ...pinnedVisible, ...peerVisible,
     ...serverVisible, ...repostedPosts, ...localPublicPosts, ...myProfileVisible,
   ]
-  // Live name/avatar: a row authored by ME always shows the CURRENT profile,
-  // whatever source it came from (the server snapshot froze the old name). One
-  // pass, so every source is covered and an already-correct row is unchanged.
+  // Live name/avatar: a row always shows the CURRENT name/avatar of its author
+  // — MY profile for my rows, the directory for a known peer — whatever source
+  // the row came from (the server snapshot froze the old name). One pass, so
+  // every source is covered and an already-correct row is unchanged.
   const seen = new Set<string>()
   const out: FeedPost[] = []
   for (const p of merged) {
@@ -213,9 +218,22 @@ export function projectFeed(input: FeedProjectionInput): FeedPost[] {
         author_name: myProfile.displayName || 'You',
         author_avatar: profilePics[selfId] || p.author_avatar,
       })
-    } else {
-      out.push(p)
+      continue
     }
+    if (unverifiedIds.has(p.id)) {
+      out.push(p)
+      continue
+    }
+    const author = p.author_id ? findUserById(users, p.author_id) : null
+    if (author) {
+      out.push({
+        ...p,
+        author_name: author.display_name || p.author_name,
+        author_avatar: author.pfp_url || p.author_avatar,
+      })
+      continue
+    }
+    out.push(p)
   }
   return out
 }

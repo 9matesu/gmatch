@@ -70,6 +70,14 @@ describe('projectFeed', () => {
     expect(rows[0].author_name).toBe('Me')
   })
 
+  it('shows the directory name on a known peer row (live rename)', () => {
+    const rows = projectFeed({
+      ...base,
+      serverPosts: [post('peer', { author_id: 'peer-1', author_name: 'Stale Name' })],
+    })
+    expect(rows[0].author_name).toBe('Peer One')
+  })
+
   it('lets a fresh publish outrank the server snapshot until the node indexes it', () => {
     const rows = projectFeed({
       ...base,
