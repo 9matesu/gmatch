@@ -11,6 +11,10 @@ composes the kit from the same module and re-exports `MOTION`. Components consum
 `text-gray-*`, `p-[13px]` and numeric inline padding across `src`; the few
 legacy exceptions (HP fill, crit flash, rarity, generated art) are scoped by
 file + smell + exact value in `check-ui-tokens.allowlist.json` with a reason.
+The last high-traffic surfaces (card tile/detail/forge, store, share/identity/
+camera/search/slideshow modals, profile grids and admin primitives) now compose
+`tokens.ts` recipes and `ui/kit` primitives; only game semantics (holo foil,
+card accent, art placeholder, 18+ gate, no-preview hide) stay literal.
 
 Reviewed absorption of the Antigravity "Social-Native Gaming HUD" plan
 (2026-09-12): cyber-slate canvas + electric-blue interactive accent + floating

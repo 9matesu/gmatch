@@ -43,6 +43,7 @@ export const PADDING = {
   1: 'p-1',
   1.5: 'p-1.5',
   2: 'p-2',
+  2.5: 'p-2.5',
   3: 'p-3',
   3.5: 'p-3.5',
   4: 'p-4',
@@ -52,9 +53,12 @@ export const PADDING = {
   10: 'p-10',
   12: 'p-12',
 } as const
-export const PADDING_SM = { 3: 'sm:p-3', 4: 'sm:p-4', 6: 'sm:p-6' } as const
+export const PADDING_SM = { 1.5: 'sm:p-1.5', 3: 'sm:p-3', 4: 'sm:p-4', 6: 'sm:p-6' } as const
+export const PADDING_MD = { 6: 'md:p-6' } as const
 export const PADDING_X = { 0: 'px-0', 1: 'px-1', 1.5: 'px-1.5', 2: 'px-2', 2.5: 'px-2.5', 3: 'px-3', 4: 'px-4', 5: 'px-5', 6: 'px-6' } as const
-export const PADDING_Y = { 0: 'py-0', 1: 'py-1', 1.5: 'py-1.5', 2: 'py-2', 3: 'py-3', 4: 'py-4' } as const
+export const PADDING_X_SM = { 4: 'sm:px-4' } as const
+export const PADDING_X_MD = { 6: 'md:px-6' } as const
+export const PADDING_Y = { 0: 'py-0', 1: 'py-1', 1.5: 'py-1.5', 2: 'py-2', 2.5: 'py-2.5', 3: 'py-3', 4: 'py-4' } as const
 export const GAP = { 0: 'gap-0', 0.5: 'gap-0.5', 1: 'gap-1', 1.5: 'gap-1.5', 2: 'gap-2', 2.5: 'gap-2.5', 3: 'gap-3', 4: 'gap-4', 5: 'gap-5' } as const
 export type PaddingStep = keyof typeof PADDING
 export function spaceVar(step: SpaceStep): string {
@@ -105,6 +109,7 @@ export const SHADOW = {
   surface: 'shadow-surface',
   control: 'shadow-control',
   xs: 'shadow-xs',
+  sm: 'shadow-sm',
   inset: 'shadow-inner',
   modal: 'shadow-xl',
   sheet: 'shadow-2xl',
@@ -213,6 +218,7 @@ export const COLOR = {
   accent: 'text-retro-accent',
   accentBg: 'bg-retro-accent',
   accentHover: 'hover:bg-retro-accent-hover',
+  hoverAccent: 'hover:text-retro-accent',
   onAccent: 'text-retro-accent-text',
   fg: 'text-retro-fg',
   fgSoft: 'text-retro-fg/90',
@@ -230,9 +236,12 @@ export const COLOR = {
   interactive: 'bg-surface-interactive',
   interactiveSoft: 'bg-surface-interactive/60',
   interactiveStrong: 'bg-surface-interactive/90',
+  /** Selected-row fill for dense admin lists. */
+  selectionBg: 'bg-retro-selection',
   /** Chrome hover roles — one each, so call sites stop re-typing them. */
   hoverFg: 'hover:text-retro-fg',
   hoverBody: 'hover:text-retro-body',
+  hoverEdgeStrong: 'hover:border-edge-strong',
   accentEdge: 'border-retro-accent',
   hoverW5: 'hover:bg-glass-w5',
   hoverW10: 'hover:bg-glass-w10',
@@ -241,6 +250,10 @@ export const COLOR = {
   focusAccent: 'focus:border-retro-accent/60',
   /** Label ON media (image/video scrim): the only white text in the shell. */
   onMedia: 'text-white',
+  /** Icon fill that accompanies `onMedia` (play glyph over a poster). */
+  onMediaFill: 'fill-white',
+  /** Hover veil on media tiles — on the picture, never on a dialog root. */
+  mediaVeil: 'bg-black/50',
 } as const
 export const STATUS = {
   danger: 'text-retro-error',
@@ -455,6 +468,14 @@ export const CHROME = {
   subCaption: classes(TYPE.body, COLOR.muted),
   /** Monospaced metadata line. */
   metaMono: classes(MONO, TYPE.caption, COLOR.muted),
+  /** Modal plate for surfaces that own a custom z-layer or a bespoke body. */
+  overlayPanel: classes(COLOR.surfaceRaised, 'border', COLOR.edge, RADIUS.panel, SHADOW.modal),
+  /** Compact dashboard/stat tile: one hairline, one plate, one padding step. */
+  statTile: classes(RECIPE.card, COLOR.panel, PADDING[3.5]),
+  /** Dense list row inside a panel. */
+  rowTile: classes(RECIPE.card, COLOR.interactiveSoft, PADDING_X[3], PADDING_Y[1.5]),
+  /** Short uppercase section label above a list or grid. */
+  sectionLabel: classes(TYPE.body, WEIGHT.bold, COLOR.fg, TRACKING.wide),
 } as const
 
 /**

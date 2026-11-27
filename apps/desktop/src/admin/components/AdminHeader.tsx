@@ -4,6 +4,8 @@ import { cn } from "../../lib/utils";
 import { Menu, Search, RefreshCw,  User, LogOut, ChevronDown, Settings } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { resolveMediaUrl } from "../../utils/media";
+import { Button, Input } from "../../ui/kit";
+import { classes, COLOR, GAP, ICON, MOTION, PADDING, PADDING_X, PADDING_X_MD, PADDING_Y, RADIUS, STATUS, TYPE, WEIGHT } from "../../ui/tokens";
 
 interface AdminHeaderProps {
   isMobile: boolean;
@@ -68,101 +70,109 @@ export function AdminHeader({
 
   return (
     <header className={cn(
-      "h-14 border-b border-edge px-4 md:px-6 flex items-center justify-between shrink-0 glass-toolbar border-0 border-b border-edge rounded-none sticky top-0 z-30",
+      classes("h-14 border-b glass-toolbar flex items-center justify-between shrink-0 sticky top-0 z-[var(--z-dropdown)]", COLOR.edge, PADDING_X_MD[6], 'rounded-none'),
       isMobile && "px-3"
     )}>
-      <div className="flex items-center gap-3 min-w-0">
+      <div className={classes('flex items-center min-w-0', GAP[3])}>
         {isMobile && (
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={onToggleSidebar}
-            className="p-1.5 rounded hover:bg-glass-w10 text-retro-fg transition-colors lg:hidden"
+            className={PADDING[1.5]}
             aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
             aria-expanded={sidebarOpen}
           >
-            <Menu className="w-5 h-5" />
-          </button>
+            <Menu className={ICON.lg} />
+          </Button>
         )}
 
         <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-md md:max-w-lg lg:max-w-xl">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-retro-muted pointer-events-none" />
-          <input
+          <Search className={classes('absolute left-3 top-1/2 -translate-y-1/2', ICON.md, COLOR.muted, 'pointer-events-none')} />
+          <Input
             ref={searchRef}
             type="search"
             value={searchQuery}
             onChange={handleSearchChange}
             onKeyDown={handleKeyDown}
             placeholder={searchPlaceholder}
-            className="w-full bg-surface-raised border border-edge pl-10 pr-10 py-1.5 text-xs text-retro-fg placeholder:text-retro-muted rounded-md outline-none focus:border-retro-accent/60"
+            className="pl-10 pr-10"
             aria-label="Search"
             autoComplete="off"
           />
         </form>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className={classes('flex items-center', GAP[2])}>
         {onRefresh && (
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             onClick={onRefresh}
             disabled={isLoading}
-            className="p-2 rounded border border-edge bg-surface-interactive hover:bg-glass-w10 text-retro-fg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className={PADDING[2]}
             aria-label="Refresh data"
             aria-busy={isLoading}
           >
-            <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
-          </button>
+            <RefreshCw className={cn(ICON.md, isLoading && "animate-spin")} />
+          </Button>
         )}
 
         <div className="relative" ref={userMenuRef}>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => setUserMenuOpen(!userMenuOpen)}
-            className="flex items-center gap-2 p-1.5 rounded hover:bg-glass-w10 transition-colors"
+            className={classes('flex items-center', GAP[2], PADDING[1.5])}
             aria-expanded={userMenuOpen}
             aria-haspopup="true"
           >
-            <div className="w-7 h-7 rounded-full bg-info/20 border border-info/30 flex items-center justify-center">
+            <div className={classes('w-7 h-7', RADIUS.pill, STATUS.infoBg, 'border', STATUS.infoEdge, 'flex items-center justify-center')}>
               {user?.avatar ? (
-                <img src={resolveMediaUrl(user.avatar)} alt="" className="w-full h-full rounded-full object-cover" />
+                <img src={resolveMediaUrl(user.avatar)} alt="" className={classes('w-full h-full', RADIUS.pill, 'object-cover')} />
               ) : (
-                <User className="w-4 h-4 text-info-fg" />
+                <User className={classes(ICON.md, STATUS.info)} />
               )}
             </div>
-            <span className="hidden sm:block text-xs font-bold text-retro-fg max-w-[120px] truncate">
+            <span className={classes('hidden sm:block', TYPE.body, WEIGHT.bold, COLOR.fg, 'max-w-[120px] truncate')}>
               {user?.name || "Administrator"}
             </span>
-            <ChevronDown className={cn("w-3.5 h-3.5 text-retro-muted transition-transform", userMenuOpen && "rotate-180")} />
-          </button>
+            <ChevronDown className={cn(classes(ICON.sm, COLOR.muted), userMenuOpen && "rotate-180", MOTION.transition.transform)} />
+          </Button>
 
           {userMenuOpen && (
-            <div className="absolute right-0 top-full mt-2 z-50 min-w-[200px] bg-surface-elevated border border-edge rounded-lg shadow-lg overflow-hidden animate-orbit-pop">
-              <div className="px-3 py-2 border-b border-edge">
-                <p className="text-xs font-bold text-retro-fg truncate">{user?.name || "Administrator"}</p>
-                <p className="text-2xs text-retro-muted truncate font-mono">Admin Console</p>
+            <div className={classes('absolute right-0 top-full mt-2 z-[var(--z-dropdown)] min-w-[200px] bg-surface-elevated border', COLOR.edge, RADIUS.control, 'shadow-lg overflow-hidden', MOTION.keyframe.pop)}>
+              <div className={classes(PADDING_X[3], PADDING_Y[2], 'border-b', COLOR.edge)}>
+                <p className={classes(TYPE.body, WEIGHT.bold, COLOR.fg, 'truncate')}>{user?.name || "Administrator"}</p>
+                <p className={classes(TYPE.caption, COLOR.muted, 'truncate font-mono')}>Admin Console</p>
               </div>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 onClick={() => {
                   setUserMenuOpen(false);
                   onNavigateTab?.("settings");
                 }}
-                className="w-full px-3 py-2 text-left text-xs text-retro-fg hover:bg-glass-w10 transition-colors flex items-center gap-2"
+                className={classes('w-full text-left', TYPE.body, COLOR.fg, COLOR.hoverW10, 'flex items-center', GAP[2])}
               >
-                <Settings className="w-3.5 h-3.5" />
+                <Settings className={ICON.sm} />
                 Settings
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="ghost"
                 onClick={() => {
                   setUserMenuOpen(false);
                   onSignOut?.();
                 }}
-                className="w-full px-3 py-2 text-left text-xs text-danger-fg hover:bg-danger/10 transition-colors flex items-center gap-2"
+                className={classes('w-full text-left', TYPE.body, STATUS.danger, STATUS.dangerHoverBg, 'flex items-center', GAP[2])}
               >
-                <LogOut className="w-3.5 h-3.5" />
+                <LogOut className={ICON.sm} />
                 Sign Out
-              </button>
+              </Button>
             </div>
           )}
         </div>

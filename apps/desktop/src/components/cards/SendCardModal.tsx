@@ -4,6 +4,7 @@ import type { OrbitIdentity } from '@orbit/crypto';
 import type { CanonicalCard } from '../../utils/cardCollection';
 import { transferCard } from '../../utils/cardCollection';
 import { Modal, Button } from '../../ui/kit';
+import { classes, CHROME, COLOR, FEEDBACK, GAP, ICON, RECIPE, TYPE, WEIGHT } from '../../ui/tokens';
 
 interface SendCardModalProps {
   isOpen: boolean;
@@ -55,13 +56,13 @@ export function SendCardModal({
 
   return (
     <Modal title={`Gift a card to ${recipientName}`} onClose={onClose} maxWidth="max-w-lg">
-      <p className="text-xs text-retro-muted">
+      <p className={FEEDBACK.description}>
         Select a card from your collection to send as a gift. The card will be permanently transferred to {recipientName}.
       </p>
 
       <div className="max-h-80 overflow-y-auto space-y-2 pr-1 styled-scrollbar">
         {ownedCards.length === 0 ? (
-          <div className="py-8 text-center text-xs text-retro-muted border border-dashed border-edge rounded-lg">
+          <div className={classes(FEEDBACK.centerCompact, RECIPE.card, 'border-dashed')}>
             No cards in your collection to gift.
           </div>
         ) : (
@@ -70,21 +71,21 @@ export function SendCardModal({
             return (
               <div
                 key={card.id}
-                className="flex items-center justify-between p-3 rounded-lg bg-glass-w8 border border-edge hover:border-edge-strong transition-colors"
+                className={classes(CHROME.rowTile, 'flex items-center justify-between', 'hover:border-edge-strong')}
               >
-                <div className="flex flex-col gap-1 min-w-0 pr-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-retro-fg truncate">
+                <div className={classes('flex flex-col min-w-0 pr-2', GAP[1])}>
+                  <div className={classes('flex items-center', GAP[2])}>
+                    <span className={classes(TYPE.body, WEIGHT.semibold, COLOR.fg, 'truncate')}>
                       {card.name || 'Untitled Card'}
                     </span>
-                    <span className="text-2xs uppercase font-mono px-1.5 py-0.5 rounded bg-glass-w12 text-warning-fg border border-edge">
+                    <span className={classes(CHROME.warningPill, 'uppercase')}>
                       {card.rarity}
                     </span>
                   </div>
                   {card.tags && card.tags.length > 0 && (
-                    <div className="flex items-center gap-1 overflow-hidden">
-                      <Tag className="w-2.5 h-2.5 text-retro-muted shrink-0" />
-                      <span className="text-2xs text-retro-muted truncate">
+                    <div className={classes('flex items-center overflow-hidden', GAP[1])}>
+                      <Tag className={classes(ICON.sm, COLOR.muted, 'shrink-0')} />
+                      <span className={classes(TYPE.caption, COLOR.muted, 'truncate')}>
                         {card.tags.join(', ')}
                       </span>
                     </div>
@@ -97,7 +98,7 @@ export function SendCardModal({
                   disabled={Boolean(sendingId)}
                   onClick={() => handleSend(card)}
                 >
-                  <Gift className="w-3 h-3" />
+                  <Gift className={ICON.sm} />
                   <span>{isSending ? 'Sending…' : 'Send as gift'}</span>
                 </Button>
               </div>

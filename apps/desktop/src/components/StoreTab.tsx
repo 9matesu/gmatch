@@ -7,7 +7,11 @@ import type { OrbitIdentity } from '@orbit/crypto';
 import type { ActiveHackSession } from './home/CommandIsland';
 import { playPress } from '../utils/sounds';
 import { formatCount } from '../ui/format';
-import { PageHeader } from '../ui/kit';
+import { Button, PageHeader } from '../ui/kit';
+import {
+  classes, CHROME, COLOR, FEEDBACK, GAP, ICON, MONO, MOTION, PADDING, PADDING_X,
+  PADDING_Y, RADIUS, RECIPE, STATUS, TRACKING, TYPE, WEIGHT,
+} from '../ui/tokens';
 import type { CanonicalCard } from '../utils/cardCollection';
 import { TargetSelectorModal } from './hacks/TargetSelectorModal';
 import { ObjectImage } from './ObjectImage';
@@ -398,9 +402,9 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
         title="Store"
         meta={arsenalOnly ? 'Deploy cyber hacks.' : undefined}
         action={
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-interactive border border-edge rounded-lg">
-            <Coins className="w-3.5 h-3.5 text-retro-accent" />
-            <span className="text-sm font-medium font-mono text-retro-fg tabular-nums">g$ {formatCount(points)}</span>
+          <div className={classes(RECIPE.card, PADDING_X[3], PADDING_Y[1.5], COLOR.interactive)}>
+            <Coins className={classes(ICON.sm, COLOR.accent)} />
+            <span className={classes(TYPE.sub, WEIGHT.medium, MONO, COLOR.fg, 'tabular-nums')}>g$ {formatCount(points)}</span>
           </div>
         }
       />
@@ -408,72 +412,65 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
       {/* Economy Dashboard */}
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
 
-        <div className="solid-panel backdrop-blur-md p-3.5">
-          <div className="flex items-center gap-1.5 text-retro-muted text-2xs font-semibold uppercase tracking-wider">
-            <Layers className="w-3.5 h-3.5" />
+        <div className={CHROME.statTile}>
+          <div className={classes('flex items-center', GAP[1.5], COLOR.muted, TYPE.caption, WEIGHT.semibold, 'uppercase', TRACKING.wider)}>
+            <Layers className={ICON.sm} />
             Portfolio Value
           </div>
-          <div className="mt-1 text-lg font-bold font-mono tabular-nums text-retro-fg">{formatGc(portfolioValue)}</div>
-          <div className="text-2xs text-retro-muted mt-0.5">{portfolio.length} card{portfolio.length === 1 ? '' : 's'}</div>
+          <div className={classes('mt-1', TYPE.title, WEIGHT.bold, MONO, 'tabular-nums', COLOR.fg)}>{formatGc(portfolioValue)}</div>
+          <div className={classes(TYPE.caption, COLOR.muted, 'mt-0.5')}>{portfolio.length} card{portfolio.length === 1 ? '' : 's'}</div>
         </div>
 
-        <div className="solid-panel backdrop-blur-md border border-warning/20 p-3.5">
-          <div className="flex items-center gap-1.5 text-warning-fg text-2xs font-semibold uppercase tracking-wider">
-            <Sparkles className="w-3.5 h-3.5" />
+        <div className={classes(CHROME.statTile, STATUS.warningEdgeSoft)}>
+          <div className={classes('flex items-center', GAP[1.5], STATUS.warning, TYPE.caption, WEIGHT.semibold, 'uppercase', TRACKING.wider)}>
+            <Sparkles className={ICON.sm} />
             Cashout Value
           </div>
-          <div className="mt-1 text-lg font-bold font-mono tabular-nums text-warning-fg">{formatGc(cashoutEstimate)}</div>
-          <div className="text-2xs text-retro-muted mt-0.5">{(cashoutRate / 100).toFixed(1)}% rate</div>
+          <div className={classes('mt-1', TYPE.title, WEIGHT.bold, MONO, 'tabular-nums', STATUS.warning)}>{formatGc(cashoutEstimate)}</div>
+          <div className={classes(TYPE.caption, COLOR.muted, 'mt-0.5')}>{(cashoutRate / 100).toFixed(1)}% rate</div>
 
           {cashingOutAll && cashoutProgress ? (
-            <div className="mt-2.5 flex items-center gap-2 text-xs text-warning-fg font-medium">
-              <span className="w-3 h-3 border border-warning border-t-transparent rounded-full animate-spin" />
+            <div className={classes('mt-2.5 flex items-center', GAP[2], TYPE.body, STATUS.warning, WEIGHT.medium)}>
+              <span className={RECIPE.spinner} />
               Cashing out {cashoutProgress.done}/{cashoutProgress.total}…
             </div>
           ) : confirmCashoutAll ? (
-            <div className="mt-2.5 space-y-2">
-              <p className="text-xs text-retro-body font-medium">
+            <div className={classes('mt-2.5 space-y-2')}>
+              <p className={classes(TYPE.body, COLOR.body, WEIGHT.medium)}>
                 Cash out {cashableCount} card{cashableCount === 1 ? '' : 's'} for ~{formatGc(cashoutEstimate)}?
                 {skippedCount > 0 && (
-                  <span className="text-retro-muted"> ({skippedCount} listed skipped)</span>
+                  <span className={COLOR.muted}> ({skippedCount} listed skipped)</span>
                 )}
               </p>
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => void handleCashOutAll()}
-                  className="px-2.5 py-1.5 rounded bg-warning text-retro-accent-text text-xs font-bold cursor-pointer transition-colors hover:bg-warning"
-                >
+              <div className={classes('flex items-center', GAP[1.5])}>
+                <Button type="button" variant="secondary" onClick={() => void handleCashOutAll()}>
                   Confirm
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConfirmCashoutAll(false)}
-                  className="px-2.5 py-1.5 rounded bg-surface-interactive border border-edge text-retro-body text-xs font-medium cursor-pointer transition-colors hover:text-retro-fg"
-                >
+                </Button>
+                <Button type="button" variant="ghost" onClick={() => setConfirmCashoutAll(false)}>
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           ) : (
-            <button
+            <Button
               type="button"
+              variant="secondary"
               onClick={() => {
                 playPress(780);
                 setConfirmCashoutAll(true);
               }}
               disabled={cashableCount === 0}
-              className="mt-2.5 w-full px-2.5 py-1.5 rounded bg-warning/15 hover:bg-warning/25 disabled:opacity-40 text-warning-fg text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+              className={classes('mt-2.5 w-full', 'flex items-center justify-center', GAP[1.5], STATUS.warning)}
             >
-              <Coins className="w-3 h-3" />
+              <Coins className={ICON.sm} />
               Cash Out All
-            </button>
+            </Button>
           )}
         </div>
 
-        <div className="solid-panel backdrop-blur-md p-3.5 col-span-2 lg:col-span-1">
-          <div className="text-retro-muted text-2xs font-semibold uppercase tracking-wider mb-1.5">Rarity Mix</div>
-          <div className="flex flex-wrap gap-1.5">
+        <div className={classes(CHROME.statTile, 'col-span-2 lg:col-span-1')}>
+          <div className={classes(COLOR.muted, TYPE.caption, WEIGHT.semibold, 'uppercase', TRACKING.wider, 'mb-1.5')}>Rarity Mix</div>
+          <div className={classes('flex flex-wrap', GAP[1.5])}>
             {RARITY_ORDER.map((r) => {
               const count = rarityDist[r] || 0;
               const tier = RARITY_TIERS[r];
@@ -497,46 +494,42 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
       {!arsenalOnly && (
       <>
       {/* Most valuable cards */}
-      <section className="solid-panel backdrop-blur-md p-4">
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <h3 className="text-xs font-bold text-retro-fg tracking-wider">Most valuable cards</h3>
+      <section className={CHROME.statTile}>
+        <div className={classes('flex items-center justify-between', GAP[2], 'mb-3')}>
+          <h3 className={CHROME.sectionLabel}>Most valuable cards</h3>
           {onOpenCardCollection && (
-            <button
-              type="button"
-              onClick={onOpenCardCollection}
-              className="px-2.5 py-1.5 text-xs font-medium border border-edge text-retro-fg hover:bg-surface-interactive cursor-pointer rounded-lg transition-colors whitespace-nowrap"
-            >
+            <Button type="button" variant="secondary" onClick={onOpenCardCollection} className="whitespace-nowrap">
               View collection
-            </button>
+            </Button>
           )}
         </div>
         {portfolio.length === 0 ? (
-          <p className="text-xs text-retro-muted">No cards yet.</p>
+          <p className={FEEDBACK.description}>No cards yet.</p>
         ) : (
-          <div className="space-y-1.5">
+          <div className={classes('space-y-1.5')}>
             {[...portfolio].sort((a, b) => b.value - a.value).slice(0, 8).map((c, i) => {
               const tier = RARITY_TIERS[c.rarity as keyof typeof RARITY_TIERS];
               return (
-                <div key={c.id} className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg bg-surface-interactive border border-edge">
-                  <span className="text-xs font-mono text-retro-muted tabular-nums w-5 shrink-0">#{i + 1}</span>
+                <div key={c.id} className={classes(CHROME.rowTile, 'flex items-center', GAP[2.5])}>
+                  <span className={classes(TYPE.body, MONO, COLOR.muted, 'tabular-nums w-5 shrink-0')}>#{i + 1}</span>
                   {tier && (
                     <span
-                      className="text-2xs font-bold px-1.5 py-0.5 rounded border uppercase tracking-wide shrink-0"
+                      className={classes(TYPE.caption, WEIGHT.bold, PADDING_X[1.5], 'py-0.5', RADIUS.chip, 'border uppercase shrink-0', TRACKING.wide)}
                       style={{ color: tier.accentColor, borderColor: `${tier.accentColor}66`, backgroundColor: `${tier.accentColor}14` }}
                     >
                       {tier.label}
                     </span>
                   )}
-                  <span className="min-w-0 flex-1 truncate text-xs text-retro-body">
+                  <span className={classes('min-w-0 flex-1 truncate', TYPE.body, COLOR.body)}>
                     {c.name || `${c.id.slice(0, 12)}…`}
                   </span>
                   {c.ownerId !== identity?.orbitId && c.ownerName && (
-                    <span className="hidden sm:inline max-w-[8rem] shrink-0 truncate text-2xs text-retro-muted">
+                    <span className={classes('hidden sm:inline max-w-[8rem] shrink-0 truncate', TYPE.caption, COLOR.muted)}>
                       by {c.ownerName}
                     </span>
                   )}
-                  <span className="text-xs font-bold font-mono tabular-nums text-retro-fg shrink-0">{formatGc(c.value)}</span>
-                  <span className="text-2xs font-mono tabular-nums text-warning-fg shrink-0">→ {formatGc(computeCashoutPayout(c.value, cashoutRate))}</span>
+                  <span className={classes(TYPE.body, WEIGHT.bold, MONO, 'tabular-nums', COLOR.fg, 'shrink-0')}>{formatGc(c.value)}</span>
+                  <span className={classes(TYPE.caption, MONO, 'tabular-nums', STATUS.warning, 'shrink-0')}>→ {formatGc(computeCashoutPayout(c.value, cashoutRate))}</span>
                 </div>
               );
             })}
@@ -545,17 +538,17 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
       </section>
 
       {/* Inventory (read-only) */}
-      <section className="solid-panel backdrop-blur-md p-4">
-        <h3 className="text-xs font-bold text-retro-fg tracking-wider mb-3">Inventory</h3>
+      <section className={CHROME.statTile}>
+        <h3 className={classes(CHROME.sectionLabel, 'mb-3')}>Inventory</h3>
         {(() => {
           const owned = storeItems.filter((item) => (inventory[item.id] || 0) > 0);
-          if (owned.length === 0) return <p className="text-xs text-retro-muted">Nothing owned.</p>;
+          if (owned.length === 0) return <p className={FEEDBACK.description}>Nothing owned.</p>;
           return (
-            <div className="space-y-1.5">
+            <div className={classes('space-y-1.5')}>
               {owned.map((item) => (
-                <div key={item.id} className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg bg-surface-interactive border border-edge">
-                  <span className="min-w-0 flex-1 truncate text-xs text-retro-body">{item.name}</span>
-                  <span className="text-xs font-mono tabular-nums text-retro-muted shrink-0">×{inventory[item.id]}</span>
+                <div key={item.id} className={classes(CHROME.rowTile, 'flex items-center', GAP[2.5])}>
+                  <span className={classes('min-w-0 flex-1 truncate', TYPE.body, COLOR.body)}>{item.name}</span>
+                  <span className={classes(TYPE.body, MONO, 'tabular-nums', COLOR.muted, 'shrink-0')}>×{inventory[item.id]}</span>
                 </div>
               ))}
             </div>
@@ -564,17 +557,17 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
       </section>
 
       {/* Community Market — Steam-style buy/sell between players */}
-      <section className="solid-panel backdrop-blur-md p-4">
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <h3 className="text-xs font-bold text-retro-fg tracking-wider">Community Market</h3>
-          <span className="text-2xs text-retro-muted">{marketListings.length} open listing{marketListings.length === 1 ? '' : 's'}</span>
+      <section className={CHROME.statTile}>
+        <div className={classes('flex items-center justify-between', GAP[2], 'mb-3')}>
+          <h3 className={CHROME.sectionLabel}>Community Market</h3>
+          <span className={classes(TYPE.caption, COLOR.muted)}>{marketListings.length} open listing{marketListings.length === 1 ? '' : 's'}</span>
         </div>
         {marketListings.length === 0 ? (
-          <p className="text-xs text-retro-muted">Nothing listed.</p>
+          <p className={FEEDBACK.description}>Nothing listed.</p>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          <div className={classes('grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4', GAP[3])}>
             {marketListings.map((l) => (
-              <div key={l.listingId} className="rounded-lg border border-edge bg-surface-interactive overflow-hidden flex flex-col">
+              <div key={l.listingId} className={classes(RECIPE.card, COLOR.interactiveSoft, 'overflow-hidden flex flex-col')}>
                 <button
                   type="button"
                   onClick={() => setMarketCardId(l.cardId)}
@@ -593,9 +586,9 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                       thumb
                     />
                   </div>
-                  <div className="p-2 pb-0">
-                    <div className="text-xs font-bold text-retro-fg truncate">{l.card?.name || 'Unnamed Card'}</div>
-                    <div className="text-2xs capitalize text-retro-muted">{l.card?.rarity}</div>
+                  <div className={classes(PADDING[2], 'pb-0')}>
+                    <div className={classes(TYPE.body, WEIGHT.bold, COLOR.fg, 'truncate')}>{l.card?.name || 'Unnamed Card'}</div>
+                    <div className={classes(TYPE.caption, 'capitalize', COLOR.muted)}>{l.card?.rarity}</div>
                   </div>
                 </button>
                 {/* Credit the seller. The name is joined server-side: the
@@ -604,34 +597,35 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                     a SIBLING of the view-card button on purpose: a button
                     nested in a button is invalid HTML (React warns on
                     hydration), so the profile link lives outside it. */}
-                <div className="px-2 pt-0.5 flex items-center gap-1 text-2xs text-retro-muted min-w-0">
+                <div className={classes(PADDING_X[2], 'pt-0.5 flex items-center', GAP[1], TYPE.caption, COLOR.muted, 'min-w-0')}>
                   <span className="shrink-0">by</span>
                   {l.sellerId === identity?.orbitId ? (
-                    <span className="truncate font-medium text-retro-body">you</span>
+                    <span className={classes('truncate', WEIGHT.medium, COLOR.body)}>you</span>
                   ) : (
                     <button
                       type="button"
                       onClick={() => onOpenOwner?.(l.sellerId)}
-                      className="min-w-0 truncate text-left font-medium text-retro-body hover:text-retro-accent hover:underline cursor-pointer"
+                      className={classes('min-w-0 truncate text-left', WEIGHT.medium, COLOR.body, COLOR.hoverAccent, 'hover:underline cursor-pointer', MOTION.transition.micro)}
                       aria-label={`Open profile of ${l.sellerName || 'seller'}`}
                     >
                       {l.sellerName || `User_${l.sellerId.slice(0, 6)}`}
                     </button>
                   )}
                 </div>
-                <div className="flex items-center justify-between gap-1.5 px-2 pb-2">
-                  <span className="text-xs font-mono font-bold text-info-fg tabular-nums">{formatGc(l.price)} g$</span>
+                <div className={classes('flex items-center justify-between', GAP[1.5], PADDING_X[2], 'pb-2')}>
+                  <span className={classes(TYPE.body, MONO, WEIGHT.bold, STATUS.info, 'tabular-nums')}>{formatGc(l.price)} g$</span>
                   {l.sellerId === identity?.orbitId ? (
-                    <span className="px-2 py-1 rounded bg-retro-interactive text-retro-muted text-2xs font-bold" title="This is your own listing. Cancel it from your card page instead">Yours</span>
+                    <span className={classes(PADDING_X[2], PADDING_Y[1], RADIUS.chip, COLOR.interactive, COLOR.muted, TYPE.caption, WEIGHT.bold)} title="This is your own listing. Cancel it from your card page instead">Yours</span>
                   ) : (
-                    <button
+                    <Button
                       type="button"
+                      variant="info"
+                      size="sm"
                       disabled={buyingCardId !== null}
                       onClick={() => void buyListing(l)}
-                      className="px-2 py-1 rounded bg-info/20 hover:bg-info/30 disabled:opacity-40 text-info-fg text-2xs font-bold cursor-pointer transition-colors"
                     >
                       {buyingCardId === l.cardId ? '…' : 'Buy'}
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -644,7 +638,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
 
       {/* Store Items Grid (arsenal mode only: hack buy/deploy) */}
       {arsenalOnly && (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className={classes('grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3', GAP[4])}>
         {filteredItems.map((item) => {
           const count = inventory[item.id] || 0;
           const canAfford = points >= item.cost;
@@ -652,43 +646,44 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
           return (
             <div
               key={item.id}
-              className="relative solid-panel backdrop-blur-md p-4 flex flex-col justify-between transition-colors border-danger/30"
+              className={classes(CHROME.statTile, 'flex flex-col justify-between', STATUS.dangerEdge)}
             >
-              <div className="space-y-2">
+              <div className={classes('space-y-2')}>
                 <div className="flex items-start justify-between">
-                  <div className="p-2.5 rounded-lg border bg-danger/10 border-danger/20 text-danger-fg">
-                    {item.id === 'item-hack-deny' && <EyeOff className="w-5 h-5" />}
-                    {item.id === 'item-hack-mobile' && <Flame className="w-5 h-5" />}
-                    {item.id === 'item-flash-drop' && <Zap className="w-5 h-5 text-retro-warning" />}
+                  <div className={classes(PADDING[2.5], RADIUS.control, 'border', STATUS.dangerBg, STATUS.dangerEdge, STATUS.danger)}>
+                    {item.id === 'item-hack-deny' && <EyeOff className={ICON.lg} />}
+                    {item.id === 'item-hack-mobile' && <Flame className={ICON.lg} />}
+                    {item.id === 'item-flash-drop' && <Zap className={classes(ICON.lg, STATUS.warning)} />}
                   </div>
 
                   {item.badge && (
-                    <span className="text-2xs font-medium px-2 py-0.5 rounded border bg-danger/10 text-danger-fg border-danger/20">
+                    <span className={classes(TYPE.caption, WEIGHT.medium, PADDING_X[2], 'py-0.5', RADIUS.chip, 'border', STATUS.dangerBg, STATUS.danger, STATUS.dangerEdge)}>
                       {item.badge}
                     </span>
                   )}
                 </div>
 
                 <div>
-                  <h4 className="text-sm font-medium text-retro-fg">{item.name}</h4>
-                  <p className="text-xs text-retro-muted mt-1">{item.desc}</p>
+                  <h4 className={classes(TYPE.sub, WEIGHT.medium, COLOR.fg)}>{item.name}</h4>
+                  <p className={classes(FEEDBACK.description, 'mt-1')}>{item.desc}</p>
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-edge mt-3 flex items-center justify-between gap-2">
-                <span className="text-sm font-medium font-mono tabular-nums text-danger-fg">
+              <div className={classes('pt-3 border-t mt-3 flex items-center justify-between', COLOR.edge, GAP[2])}>
+                <span className={classes(TYPE.sub, WEIGHT.medium, MONO, 'tabular-nums', STATUS.danger)}>
                   g$ {formatCount(item.cost)}
                 </span>
 
-                <button
+                <Button
                   type="button"
+                  variant="danger"
                   onClick={() => handleBuy(item)}
                   disabled={!canAfford || buying === item.id}
-                  className="px-3 py-1.5 bg-danger/15 hover:bg-danger/20 disabled:opacity-40 text-danger-fg text-xs font-medium rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
+                  className={classes('flex items-center', GAP[1.5])}
                 >
-                  <ShieldAlert className="w-3.5 h-3.5" />
+                  <ShieldAlert className={ICON.sm} />
                   <span>{buying === item.id ? 'Deploying...' : (item.id === 'item-flash-drop' && count > 0 ? 'Fire' : 'Deploy')}</span>
-                </button>
+                </Button>
               </div>
             </div>
           );

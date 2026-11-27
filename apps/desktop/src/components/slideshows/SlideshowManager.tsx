@@ -8,6 +8,8 @@ import type { OrbitObject } from '@orbit/shared';
 import type { FeedPost } from '../feed/GMatchFeed';
 import { SlideshowPlayer, type ResolvedItem } from './SlideshowPlayer';
 import { logger } from '../../utils/logger'
+import { Button, Input, Select } from '../../ui/kit'
+import { classes, CHROME, COLOR, FEEDBACK, GAP, ICON, PADDING, RADIUS, STATUS, TRACKING, TYPE, WEIGHT } from '../../ui/tokens'
 import {
   Play,
   Trash2,
@@ -169,138 +171,139 @@ export function SlideshowManager({
   };
 
   return (
-    <div className="bg-surface-raised border border-edge rounded-xl p-4 space-y-4">
+    <div className={classes(COLOR.surfaceRaised, 'border', COLOR.edge, RADIUS.panel, PADDING[4], 'space-y-4')}>
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Film className="w-4 h-4 text-retro-muted" />
-          <h2 className="text-xs font-bold text-retro-fg tracking-wider">Slideshows</h2>
+        <div className={classes('flex items-center', GAP[2])}>
+          <Film className={classes(ICON.md, COLOR.muted)} />
+          <h2 className={CHROME.sectionLabel}>Slideshows</h2>
         </div>
-        <div className="flex items-center gap-2">
-          <button
+        <div className={classes('flex items-center', GAP[2])}>
+          <Button
             type="button"
+            variant="secondary"
             onClick={() => { setCreating((v) => !v); setSelected(new Set()); }}
-            className="px-3 py-1.5 text-xs font-semibold text-retro-body bg-surface-interactive border border-edge rounded-lg hover:border-edge cursor-pointer flex items-center gap-1.5 transition-colors"
+            className={classes('flex items-center', GAP[1.5])}
           >
-            {creating ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+            {creating ? <X className={ICON.sm} /> : <Plus className={ICON.sm} />}
             {creating ? 'Cancel' : 'New'}
-          </button>
+          </Button>
           {onClose && (
-            <button type="button" onClick={onClose} aria-label="Close slideshow manager" className="p-1.5 rounded-lg text-retro-muted hover:text-retro-fg hover:bg-surface-interactive cursor-pointer">
-              <X className="w-4 h-4" />
-            </button>
+            <Button type="button" variant="ghost" onClick={onClose} aria-label="Close slideshow manager" className={PADDING[1.5]}>
+              <X className={ICON.md} />
+            </Button>
           )}
         </div>
       </div>
 
       {creating && (
-        <div className="space-y-3 border-t border-edge pt-3">
-          <input
+        <div className={classes('space-y-3 border-t', COLOR.edge, 'pt-3')}>
+          <Input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Slideshow title (optional)"
-            className="w-full bg-retro-bg border border-edge px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted rounded-lg outline-none focus:border-retro-accent"
           />
 
-          <div className="flex flex-wrap items-center gap-1">
+          <div className={classes('flex flex-wrap items-center', GAP[1])}>
             {(Object.keys(sourceLabel) as Source[]).map((s) => (
-              <button
+              <Button
                 key={s}
                 type="button"
+                variant={source === s ? 'secondary' : 'ghost'}
                 onClick={() => { setSource(s); setSelected(new Set()); }}
-                className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer border ${
-                  source === s ? 'bg-surface-interactive text-retro-fg border-edge' : 'text-retro-muted hover:text-retro-body border-transparent'
-                }`}
               >
                 {sourceLabel[s]}
-              </button>
+              </Button>
             ))}
           </div>
 
           <div>
-            <p className="text-xs text-retro-muted mb-2">
+            <p className={classes(FEEDBACK.description, 'mb-2')}>
               {selected.size} selected · {candidates.length} available
             </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-56 overflow-y-auto styled-scrollbar">
+            <div className={classes('grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4', GAP[2], 'max-h-56 overflow-y-auto styled-scrollbar')}>
               {candidates.map((c) => {
                 const isSelected = selected.has(c.id);
                 return (
-                  <button
+                  <Button
                     key={c.id}
                     type="button"
+                    variant={isSelected ? 'secondary' : 'ghost'}
                     onClick={() => toggleSelect(c.id)}
-                    className={`flex items-center gap-2 px-2 py-2 rounded-lg border text-left cursor-pointer transition-colors ${
-                      isSelected ? 'bg-surface-interactive border-retro-accent text-retro-fg' : 'bg-surface-interactive/40 border-edge text-retro-muted hover:text-retro-body border-transparent'
-                    }`}
+                    className={classes('flex items-center text-left', GAP[2], PADDING[2], isSelected ? 'border-retro-accent' : 'border-edge')}
                   >
-                    {c.kind === 'post' ? <ImageIcon className="w-3.5 h-3.5 shrink-0" /> : <Film className="w-3.5 h-3.5 shrink-0" />}
-                    <span className="text-xs truncate">{c.label}</span>
-                  </button>
+                    {c.kind === 'post' ? <ImageIcon className={classes(ICON.sm, 'shrink-0')} /> : <Film className={classes(ICON.sm, 'shrink-0')} />}
+                    <span className={classes(TYPE.body, 'truncate')}>{c.label}</span>
+                  </Button>
                 );
               })}
               {candidates.length === 0 && (
-                <p className="col-span-full text-xs text-retro-muted">No {sourceLabel[source]} available to select.</p>
+                <p className={classes('col-span-full', FEEDBACK.description)}>No {sourceLabel[source]} available to select.</p>
               )}
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <label className="text-xs text-retro-muted flex items-center gap-2">
+          <div className={classes('flex items-center', GAP[3])}>
+            <label className={classes(TYPE.body, COLOR.muted, 'flex items-center', GAP[2])}>
               Interval
-              <select
+              <Select
                 value={intervalMs}
                 onChange={(e) => setIntervalMs(Number(e.target.value))}
-                className="bg-surface-interactive border border-edge text-retro-body text-xs rounded-lg px-2 py-1 outline-none cursor-pointer"
               >
                 <option value={2000}>2s</option>
                 <option value={5000}>5s</option>
                 <option value={8000}>8s</option>
                 <option value={15000}>15s</option>
-              </select>
+              </Select>
             </label>
-            <button
+            <Button
               type="button"
+              variant="primary"
               onClick={create}
               disabled={saving}
-              className="ml-auto px-4 py-1.5 bg-retro-accent text-retro-accent-text font-bold text-xs uppercase tracking-wider rounded-lg cursor-pointer disabled:opacity-40 hover:bg-retro-accent-hover transition-colors"
+              className={classes('ml-auto', WEIGHT.bold, 'uppercase', TRACKING.wider)}
             >
               {saving ? 'Saving…' : 'Create Slideshow'}
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
-      <div className="space-y-2 border-t border-edge pt-3">
+      <div className={classes('space-y-2 border-t', COLOR.edge, 'pt-3')}>
         {loading ? (
-          <p className="text-xs text-retro-muted">Loading…</p>
+          <p className={FEEDBACK.description}>Loading…</p>
         ) : list.length === 0 ? (
-          <p className="text-xs text-retro-muted">No slideshows yet. Create one from your gallery cards or posts.</p>
+          <p className={FEEDBACK.description}>No slideshows yet. Create one from your gallery cards or posts.</p>
         ) : (
           list.map((s) => (
-            <div key={s.id} className="flex items-center justify-between gap-2 bg-surface-interactive/40 border border-edge rounded-lg px-3 py-2">
+            <div key={s.id} className={classes(CHROME.rowTile, 'flex items-center justify-between', GAP[2])}>
               <div className="min-w-0">
-                <p className="text-xs font-semibold text-retro-fg truncate">{s.title || 'Untitled slideshow'}</p>
-                <p className="text-xs text-retro-muted">
+                <p className={classes(TYPE.body, WEIGHT.semibold, COLOR.fg, 'truncate')}>{s.title || 'Untitled slideshow'}</p>
+                <p className={FEEDBACK.description}>
                   {sourceLabel[s.source]} · {s.item_count} item{s.item_count === 1 ? '' : 's'}
                 </p>
               </div>
-              <div className="flex items-center gap-1 shrink-0">
-                <button
+              <div className={classes('flex items-center', GAP[1], 'shrink-0')}>
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={() => play(s)}
                   aria-label="Play slideshow"
-                  className="p-1.5 rounded-lg text-retro-body hover:text-retro-fg hover:bg-surface-interactive cursor-pointer"
+                  className={PADDING[1.5]}
                 >
-                  <Play className="w-4 h-4" />
-                </button>
-                <button
+                  <Play className={ICON.md} />
+                </Button>
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={() => remove(s.id)}
                   aria-label="Delete slideshow"
-                  className="p-1.5 rounded-lg text-retro-muted hover:text-danger-fg hover:bg-surface-interactive cursor-pointer"
+                  className={classes(PADDING[1.5], STATUS.danger)}
                 >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                  <Trash2 className={ICON.md} />
+                </Button>
               </div>
             </div>
           ))

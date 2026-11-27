@@ -8,6 +8,10 @@ import { computeCardRarity, RARITY_TIERS, formatGc, parseTags } from '@orbit/sha
 import type { User } from '@orbit/shared'
 import { useNow } from '../../hooks/useNow'
 import { Heart, Clock, Gift, Check } from 'lucide-react'
+import {
+  classes, COLOR, GAP, ICON, MONO, MOTION, PADDING, PADDING_X,
+  RADIUS, SHADOW, TRACKING, TYPE, WEIGHT,
+} from '../../ui/tokens'
 
 interface IdentityLike {
   orbitId: string
@@ -129,9 +133,12 @@ export function CardTile({
           ? `perspective(1000px) rotateX(${tilt.rotateX.toFixed(2)}deg) rotateY(${tilt.rotateY.toFixed(2)}deg) scale3d(1.02, 1.02, 1.02)`
           : undefined,
       } as React.CSSProperties}
-      className={`holo-card group relative select-none cursor-pointer transition-transform duration-150 ease-out active:scale-(--scale-press-sm) rounded-xl border border-edge bg-retro-bg overflow-hidden shadow-xs hover:border-edge-strong ${
-        selected ? 'ring-2 ring-retro-accent shadow-xl z-10' : ''
-      }`}
+      className={classes(
+        'holo-card group relative select-none cursor-pointer',
+        MOTION.transition.transform, 'active:scale-(--scale-press-sm)',
+        RADIUS.panel, 'border', COLOR.edge, COLOR.canvas, 'overflow-hidden', SHADOW.xs, COLOR.hoverEdgeStrong,
+        selected && classes('ring-2 ring-retro-accent', SHADOW.modal, 'z-[var(--z-dropdown)]'),
+      )}
       onMouseMove={handleMouseMove}
       onClick={() => {
         if (onSelect) onSelect(item.id)
@@ -150,14 +157,14 @@ export function CardTile({
       }}
     >
       <div className="holo-sheen" />
-      <div className="holo-card-inner flex flex-col h-full rounded-[6px] overflow-hidden" style={{ boxShadow: `inset 0 0 0 1.5px ${accent}66` }}>
+      <div className={classes('holo-card-inner flex flex-col h-full', RADIUS.chip, 'overflow-hidden')} style={{ boxShadow: `inset 0 0 0 1.5px ${accent}66` }}>
         {/* Top Badges */}
-        <div className="absolute top-2 left-2 z-20 flex flex-wrap items-center gap-1">
-          <span className={`text-2xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md border backdrop-blur-xs ${rarity.badgeClass}`}>
+        <div className={classes('absolute top-2 left-2 flex flex-wrap items-center', GAP[1], 'z-[var(--z-dropdown)]')}>
+          <span className={classes(TYPE.caption, WEIGHT.semibold, 'uppercase', TRACKING.wider, PADDING_X[2], 'py-0.5', RADIUS.chip, 'border backdrop-blur-xs', rarity.badgeClass)}>
             {rarity.label}
           </span>
           {frameType !== 'chrome' && (
-            <span className={`text-2xs font-medium uppercase tracking-wider px-1.5 py-0.5 rounded-md border font-mono backdrop-blur-xs ${
+            <span className={classes(TYPE.caption, WEIGHT.medium, 'uppercase', TRACKING.wider, PADDING_X[1.5], 'py-0.5', RADIUS.chip, 'border', MONO, 'backdrop-blur-xs',
               frameType === 'holo'
                 ? 'bg-chrome-lav/90 text-chrome-lav border-chrome-lav/60'
                 : frameType === 'carbon'
@@ -165,23 +172,23 @@ export function CardTile({
                 : frameType === 'neon'
                 ? 'bg-info/90 text-info-fg border-info/80'
                 : 'bg-black/80 text-retro-fg border-edge'
-            }`}>
+            )}>
               {frameType}
             </span>
           )}
           {isReceived && (
-            <span className="text-2xs font-medium px-1.5 py-0.5 bg-black/75 text-chrome-lav rounded-md border border-chrome-lav/30 flex items-center gap-1 backdrop-blur-xs">
-              <Gift className="w-2.5 h-2.5 text-chrome-lav" />
+            <span className={classes(TYPE.caption, WEIGHT.medium, PADDING_X[1.5], 'py-0.5', RADIUS.chip, COLOR.scrim, 'text-chrome-lav border border-chrome-lav/30 flex items-center', GAP[1], 'backdrop-blur-xs')}>
+              <Gift className={classes(ICON.sm, 'text-chrome-lav')} />
               <span>RECEIVED</span>
             </span>
           )}
         </div>
 
         {/* Top-Right Badges: Expiry Timer & Select Checkbox */}
-        <div className="absolute top-2 right-2 z-20 flex items-center gap-1">
+        <div className={classes('absolute top-2 right-2 flex items-center', GAP[1], 'z-[var(--z-dropdown)]')}>
           {minsLeft !== null && minsLeft > 0 && (
-            <span className="text-2xs font-mono font-medium px-1.5 py-0.5 bg-black/75 text-warning-fg rounded-md border border-warning/30 backdrop-blur-xs flex items-center gap-1">
-              <Clock className="w-2.5 h-2.5" />
+            <span className={classes(TYPE.caption, MONO, WEIGHT.medium, PADDING_X[1.5], 'py-0.5', RADIUS.chip, COLOR.scrim, 'text-warning-fg border border-warning/30 backdrop-blur-xs flex items-center', GAP[1])}>
+              <Clock className={ICON.sm} />
               <span>{minsLeft > 60 ? `${Math.floor(minsLeft / 60)}h` : `${minsLeft}m`}</span>
             </span>
           )}
@@ -191,13 +198,13 @@ export function CardTile({
               e.stopPropagation()
               onSelect?.(item.id)
             }}
-            className={`w-5 h-5 rounded-md border flex items-center justify-center transition ${
+            className={classes('w-5 h-5 flex items-center justify-center', RADIUS.chip, 'border', MOTION.transition.micro,
               selected
-                ? 'bg-surface-interactive border-edge text-retro-fg shadow-md'
-                : 'bg-black/60 border-edge opacity-0 group-hover:opacity-100 text-transparent hover:border-edge'
-            }`}
+                ? classes(COLOR.interactive, COLOR.edge, COLOR.fg, SHADOW.large)
+                : classes(COLOR.scrim, COLOR.edge, 'opacity-0 group-hover:opacity-100 text-transparent hover:border-edge'),
+            )}
           >
-            <Check className="w-3 h-3 stroke-[3]" />
+            <Check className={classes(ICON.sm, 'stroke-[3]')} />
           </div>
         </div>
 
@@ -210,23 +217,23 @@ export function CardTile({
             height={210}
             isVideo={isVid}
           />
-          {isVid && <MediaBadge className="absolute bottom-1.5 right-1.5 z-10" />}
+          {isVid && <MediaBadge className="absolute bottom-1.5 right-1.5 z-[var(--z-dropdown)]" />}
         </div>
 
         {/* Card Info Footer */}
-        <div className="p-2.5 bg-retro-bg border-t border-edge flex flex-col gap-1">
-          <div className="flex items-center justify-between gap-1.5">
-            <div className="min-w-0 flex-1 text-xs font-semibold text-retro-fg truncate" title={cardTitle}>
+        <div className={classes(PADDING[2.5], COLOR.canvas, 'border-t', COLOR.edge, 'flex flex-col', GAP[1])}>
+          <div className={classes('flex items-center justify-between', GAP[1.5])}>
+            <div className={classes('min-w-0 flex-1', TYPE.body, WEIGHT.semibold, COLOR.fg, 'truncate')} title={cardTitle}>
               {cardTitle}
             </div>
             {hasValuation && (
-              <div className="shrink-0 text-2xs font-mono font-bold tabular-nums tracking-tight" style={{ color: accent }}>
+              <div className={classes('shrink-0', TYPE.caption, MONO, WEIGHT.bold, 'tabular-nums', TRACKING.tight)} style={{ color: accent }}>
                 {formatGc(cardValue)}
               </div>
             )}
           </div>
 
-          <div className="flex items-center justify-between gap-2 text-2xs font-mono text-retro-muted">
+          <div className={classes('flex items-center justify-between', GAP[2], TYPE.caption, MONO, COLOR.muted)}>
             {ownerLabel && (
               <span className="truncate">
                 by{' '}
@@ -237,28 +244,28 @@ export function CardTile({
                       e.stopPropagation()
                       onOpenOwnerProfile(item.owner_id)
                     }}
-                    className="inline font-medium cursor-pointer hover:underline hover:text-retro-fg transition-colors"
+                    className={classes('inline', WEIGHT.medium, 'cursor-pointer hover:underline', COLOR.hoverFg, MOTION.transition.micro)}
                     title={`View ${ownerLabel}`}
                   >
                     {ownerLabel}
                   </button>
                 ) : (
-                  <span className="font-medium text-retro-fg">{ownerLabel}</span>
+                  <span className={classes(WEIGHT.medium, COLOR.fg)}>{ownerLabel}</span>
                 )}
               </span>
             )}
-            <span className="shrink-0 flex items-center gap-1 font-bold text-retro-fg">
-              <Heart className="w-2.5 h-2.5 fill-danger text-danger-fg" />
+            <span className={classes('shrink-0 flex items-center', GAP[1], WEIGHT.bold, COLOR.fg)}>
+              <Heart className={classes(ICON.sm, 'fill-danger text-danger-fg')} />
               <span>{likes}</span>
             </span>
           </div>
 
           {itemTags.length > 0 && (
-            <div className="flex flex-wrap gap-1 pt-0.5 overflow-hidden">
+            <div className={classes('flex flex-wrap overflow-hidden pt-0.5', GAP[1])}>
               {itemTags.map((tag) => (
                 <span
                   key={tag}
-                  className="text-2xs font-mono font-medium px-1.5 py-0.5 rounded bg-retro-panel border border-edge text-retro-muted truncate max-w-[90px]"
+                  className={classes(TYPE.caption, MONO, WEIGHT.medium, PADDING_X[1.5], 'py-0.5', RADIUS.chip, 'bg-retro-panel border', COLOR.edge, COLOR.muted, 'truncate max-w-[90px]')}
                   style={{ color: accent }}
                 >
                   #{tag}
@@ -271,3 +278,4 @@ export function CardTile({
     </div>
   )
 }
+

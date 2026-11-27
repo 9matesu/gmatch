@@ -4,6 +4,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { playPress } from '../../utils/sounds';
 import { Camera, X, RefreshCw, Check, AlertCircle, Upload } from 'lucide-react';
 import { logger } from '../../utils/logger';
+import { Button } from '../../ui/kit';
+import { classes, CHROME, COLOR, GAP, ICON, MOTION, PADDING, RADIUS, RECIPE, SHADOW, STATUS, TRACKING, TYPE, WEIGHT } from '../../ui/tokens';
 
 export function LiveCameraModal({
   isOpen,
@@ -159,53 +161,45 @@ export function LiveCameraModal({
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 animate-orbit-fade-in select-none"
+      className={classes(RECIPE.modalOverlay, 'p-0 sm:p-4 select-none')}
       onClick={onClose}
     >
       <div
-        className="bg-surface-raised text-retro-fg w-full max-w-lg rounded-none sm:rounded-xl border border-edge shadow-2xl overflow-hidden flex flex-col h-full sm:h-auto max-h-dvh sm:max-h-(--max-h-dialog)"
+        className={classes(CHROME.overlayPanel, COLOR.fg, 'w-full max-w-lg overflow-hidden flex flex-col h-full sm:h-auto max-h-dvh sm:max-h-(--max-h-dialog)')}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-4 bg-surface-raised border-b border-edge flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Camera className="w-5 h-5 text-retro-fg" />
-            <h3 className="text-sm font-black text-retro-fg tracking-tight">Camera snapshot</h3>
+        <div className={classes(PADDING[4], COLOR.surfaceRaised, 'border-b', COLOR.edge, 'flex items-center justify-between')}>
+          <div className={classes('flex items-center', GAP[2])}>
+            <Camera className={classes(ICON.lg, COLOR.fg)} />
+            <h3 className={classes(TYPE.body, WEIGHT.heading, COLOR.fg, TRACKING.tight)}>Camera snapshot</h3>
           </div>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={onClose}
             aria-label="Close camera"
-            className="p-1 rounded-full text-retro-muted hover:text-retro-fg hover:bg-surface-interactive cursor-pointer transition-colors"
+            className={classes(RADIUS.pill, PADDING[1])}
           >
-            <X className="w-5 h-5" />
-          </button>
+            <X className={ICON.md} />
+          </Button>
         </div>
 
         {/* Viewfinder Viewport */}
         <div className="relative aspect-square w-full bg-retro-bg flex items-center justify-center overflow-hidden">
           {cameraError ? (
-            <div className="p-6 text-center space-y-3 bg-surface-canvas text-retro-fg w-full h-full flex flex-col items-center justify-center">
-              <AlertCircle className="w-12 h-12 text-danger-fg mx-auto" />
-              <p className="text-xs text-retro-body font-medium leading-relaxed max-w-xs mx-auto">
+            <div className={classes(PADDING[6], 'text-center space-y-3', COLOR.canvasSurface, COLOR.fg, 'w-full h-full flex flex-col items-center justify-center')}>
+              <AlertCircle className={classes('w-12 h-12', STATUS.danger, 'mx-auto')} />
+              <p className={classes(TYPE.body, COLOR.body, WEIGHT.medium, 'leading-relaxed max-w-xs mx-auto')}>
                 {cameraError}
               </p>
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={startCamera}
-                  className="px-4 py-2 bg-surface-raised text-retro-fg text-xs font-bold rounded-xl cursor-pointer hover:bg-glass-w12"
-                >
-                  Try Again
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="px-4 py-2 bg-surface-elevated text-retro-fg text-xs font-bold rounded-xl cursor-pointer hover:bg-glass-w20 flex items-center gap-1.5"
-                >
-                  <Upload className="w-3.5 h-3.5" />
+              <div className={classes('flex', GAP[2], 'pt-2')}>
+                <Button type="button" variant="secondary" onClick={startCamera}>Try Again</Button>
+                <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()} className={classes('flex items-center', GAP[1.5])}>
+                  <Upload className={ICON.sm} />
                   <span>Upload File</span>
-                </button>
+                </Button>
               </div>
             </div>
           ) : capturedPhoto ? (
@@ -239,57 +233,51 @@ export function LiveCameraModal({
         </div>
 
         {/* Action Controls Footer */}
-        <div className="p-4 bg-surface-raised border-t border-edge flex items-center justify-around gap-4">
+        <div className={classes(PADDING[4], COLOR.surfaceRaised, 'border-t', COLOR.edge, 'flex items-center justify-around', GAP[4])}>
           {capturedPhoto ? (
             <>
-              <button
-                type="button"
-                onClick={handleRetake}
-                className="flex-1 py-3 bg-surface-interactive hover:bg-retro-accent-hover text-retro-fg rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors border border-edge"
-              >
-                <RefreshCw className="w-4 h-4" />
+              <Button type="button" variant="secondary" onClick={handleRetake} className={classes('flex-1', 'flex items-center justify-center', GAP[2], 'py-3')}>
+                <RefreshCw className={ICON.md} />
                 <span>Retake</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmPhoto}
-                className="flex-1 py-3 bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text rounded-xl text-xs font-black flex items-center justify-center gap-2 cursor-pointer transition shadow-md"
-              >
-                <Check className="w-4 h-4" />
+              </Button>
+              <Button type="button" variant="primary" onClick={handleConfirmPhoto} className={classes('flex-1', 'flex items-center justify-center', GAP[2], 'py-3', WEIGHT.heading)}>
+                <Check className={ICON.md} />
                 <span>Attach to Post</span>
-              </button>
+              </Button>
             </>
           ) : (
             <>
-              <button
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={() => fileInputRef.current?.click()}
-                className="p-3 bg-surface-interactive hover:bg-retro-accent-hover text-retro-fg rounded-full cursor-pointer transition-colors border border-edge"
+                className={classes(RADIUS.pill, COLOR.hoverAccent, PADDING[3])}
                 title="Upload Photo File"
               >
-                <Upload className="w-5 h-5" />
-              </button>
+                <Upload className={ICON.lg} />
+              </Button>
 
-              {/* Shutter Button */}
+              {/* Shutter Button — camera chrome, not a shell button. */}
               <button
                 type="button"
                 onClick={handleTakeSnapshot}
                 disabled={!!cameraError || isStarting}
                 aria-label="Take photo"
-                className="w-16 h-16 rounded-full bg-retro-accent p-1 cursor-pointer hover:scale-105 active:scale-95 transition-transform shadow-xl disabled:opacity-30"
+                className={classes('w-16 h-16', RADIUS.pill, COLOR.accentBg, PADDING[1], 'cursor-pointer hover:scale-105 active:scale-95', MOTION.transition.transform, SHADOW.modal, 'disabled:opacity-30')}
               >
-                <div className="w-full h-full rounded-full border-2 border-edge bg-surface-raised flex items-center justify-center" />
+                <div className={classes('w-full h-full', RADIUS.pill, 'border-2', COLOR.edge, COLOR.surfaceRaised, 'flex items-center justify-center')} />
               </button>
 
-              <button
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={handleFlipCamera}
                 disabled={!!cameraError || isStarting}
-                className="p-3 bg-surface-interactive hover:bg-retro-accent-hover text-retro-fg rounded-full cursor-pointer transition-colors border border-edge"
+                className={classes(RADIUS.pill, COLOR.hoverAccent, PADDING[3])}
                 title="Flip Camera"
               >
-                <RefreshCw className="w-5 h-5" />
-              </button>
+                <RefreshCw className={ICON.lg} />
+              </Button>
             </>
           )}
         </div>
@@ -297,3 +285,4 @@ export function LiveCameraModal({
     </div>
   );
 }
+

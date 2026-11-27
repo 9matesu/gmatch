@@ -2,6 +2,8 @@
 
 import type { ComponentType } from "react";
 import { cn } from "../../lib/utils";
+import { Button } from "../../ui/kit";
+import { classes, COLOR, GAP, ICON, PADDING, PADDING_X, PADDING_Y, RADIUS, SHADOW, TYPE, WEIGHT } from "../../ui/tokens";
 
 /**
  * One tab definition: a stable id, the visible label, and an icon.
@@ -38,7 +40,7 @@ export function SubTabBar({ tabs, active, onChange, className }: SubTabBarProps)
     <div
       role="tablist"
       className={cn(
-        "flex flex-wrap gap-1 bg-surface-raised border border-edge rounded-xl p-1",
+        classes('flex flex-wrap', GAP[1], COLOR.surfaceRaised, 'border', COLOR.edge, RADIUS.panel, PADDING[1]),
         className,
       )}
     >
@@ -46,27 +48,23 @@ export function SubTabBar({ tabs, active, onChange, className }: SubTabBarProps)
         const Icon = tab.icon;
         const isActive = active === tab.id;
         return (
-          <button
+          <Button
             key={tab.id}
             type="button"
             role="tab"
             aria-selected={isActive}
+            variant={isActive ? 'primary' : 'ghost'}
             onClick={() => onChange(tab.id)}
-            className={cn(
-              "px-3 py-1.5 text-xs font-bold rounded-lg transition flex items-center gap-1.5 cursor-pointer",
-              isActive
-                ? "bg-retro-accent text-retro-accent-text shadow-sm"
-                : "text-retro-muted hover:text-retro-fg",
-            )}
+            className={classes(PADDING_X[3], PADDING_Y[1.5], TYPE.body, WEIGHT.bold, 'flex items-center', GAP[1.5], isActive && SHADOW.sm)}
           >
-            <Icon className="w-3.5 h-3.5" />
+            <Icon className={ICON.sm} />
             {tab.label}
             {typeof tab.badge === "number" && tab.badge > 0 && (
-              <span className="ml-1 px-1.5 py-0.2 bg-glass-w10 text-retro-muted rounded-full text-2xs tabular-nums">
+              <span className={classes('ml-1', PADDING_X[1.5], 'py-0.2', COLOR.glassW8, COLOR.muted, RADIUS.pill, TYPE.caption, 'tabular-nums')}>
                 {tab.badge}
               </span>
             )}
-          </button>
+          </Button>
         );
       })}
     </div>

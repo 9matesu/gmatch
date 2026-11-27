@@ -15,6 +15,11 @@ import { ObjectImage } from '../ObjectImage';
 import { orbitFetch, postShareUrl } from '../../utils/api';
 import { userFacingError } from '../../utils/userError';
 import { copyText } from '../../utils/clipboard';
+import { Button, Input } from '../../ui/kit';
+import {
+  classes, CHROME, COLOR, FEEDBACK, GAP, ICON, MOTION, PADDING, PADDING_X,
+  RADIUS, RECIPE, TRACKING, TYPE, WEIGHT,
+} from '../../ui/tokens';
 
 // Last 8 share targets, per device (no server state until a real
 // cross-device need shows up). Cleared on logout via USER_STORAGE_KEYS.
@@ -159,107 +164,109 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
 
   return (
     <div
-      className={`fixed inset-0 ${zIndexClass} bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 pb-[var(--island-clearance)] sm:p-4 animate-orbit-fade-in`}
+      className={classes(RECIPE.modalOverlay, zIndexClass, 'items-end sm:items-center', 'p-0 pb-[var(--island-clearance)] sm:p-4')}
     >
       <div
-        className="bg-glass backdrop-blur-2xl w-full max-w-lg rounded-xl border border-edge shadow-2xl overflow-hidden flex flex-col max-h-[calc(88vh-var(--island-clearance))] mb-[var(--island-clearance)] sm:mb-0 animate-orbit-slide-up"
+        className={classes(CHROME.overlayPanel, 'w-full max-w-lg overflow-hidden flex flex-col max-h-[calc(88vh-var(--island-clearance))] mb-[var(--island-clearance)] sm:mb-0', MOTION.keyframe.slideUp)}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="p-4 border-b border-edge flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Send className="w-5 h-5 text-retro-fg" />
-            <h3 className="text-sm font-extrabold text-retro-fg">Share post</h3>
+        <div className={classes(PADDING[4], 'border-b', COLOR.edge, 'flex items-center justify-between')}>
+          <div className={classes('flex items-center', GAP[2])}>
+            <Send className={classes(ICON.lg, COLOR.fg)} />
+            <h3 className={classes(TYPE.body, WEIGHT.heading, COLOR.fg)}>Share post</h3>
           </div>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={onClose}
             aria-label="Close share dialog"
-            className="p-1 rounded-full text-retro-muted hover:text-retro-fg cursor-pointer"
+            className={classes(RADIUS.pill, PADDING[1])}
           >
-            <X className="w-5 h-5" />
-          </button>
+            <X className={ICON.md} />
+          </Button>
         </div>
 
         {/* Post Mini Preview */}
-        <div className="p-3 bg-surface-interactive border-b border-edge flex items-center gap-3">
+        <div className={classes(PADDING[3], COLOR.interactive, 'border-b', COLOR.edge, 'flex items-center', GAP[3])}>
           <ObjectImage
             contentUrl={post.url}
             identity={identity}
             mimeType={post.mime_type}
             alt=""
-            className="w-20 h-20 rounded-xl object-cover border border-edge shrink-0"
+            className={classes('w-20 h-20 object-cover border', COLOR.edge, RADIUS.panel, 'shrink-0')}
           />
           <div className="min-w-0">
-            <span className="text-xs font-bold text-retro-fg block truncate">{post.author_name}</span>
-            <p className="text-xs text-retro-muted truncate">{post.caption || 'Post'}</p>
+            <span className={classes(TYPE.body, WEIGHT.bold, COLOR.fg, 'block truncate')}>{post.author_name}</span>
+            <p className={classes(FEEDBACK.description, 'truncate')}>{post.caption || 'Post'}</p>
           </div>
         </div>
 
         {/* Message Attachment Input */}
-        <div className="p-3 border-b border-edge">
-          <input
+        <div className={classes(PADDING[3], 'border-b', COLOR.edge)}>
+          <Input
             type="text"
             value={shareMessage}
             onChange={(e) => setShareMessage(e.target.value)}
             placeholder="Write a message to attach..."
-            className="w-full bg-surface-interactive border border-edge rounded-xl px-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent"
           />
         </div>
 
         {recents.length > 0 && (
-          <div className="px-3 pt-3 flex items-center gap-2 overflow-x-auto styled-scrollbar">
-            <span className="text-2xs font-bold uppercase tracking-wider text-retro-muted shrink-0">Recent</span>
+          <div className={classes(PADDING_X[3], 'pt-3 flex items-center', GAP[2], 'overflow-x-auto styled-scrollbar')}>
+            <span className={classes(TYPE.caption, WEIGHT.bold, 'uppercase', TRACKING.wider, COLOR.muted, 'shrink-0')}>Recent</span>
             {recents.map((r) => (
-              <button
+              <Button
                 key={r.id}
                 type="button"
+                variant="secondary"
                 onClick={() => (r.kind === 'user' ? void handleSendDirectShare(r.id, r.name) : void handleSendGroupShare(r.id, r.name))}
                 disabled={!!sentTargets[r.id] || !!pendingTargets[r.id]}
-                className="shrink-0 flex items-center gap-1.5 px-2 py-1 rounded-full border border-edge text-xs text-retro-body hover:bg-glass-w5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                className={classes(RADIUS.pill, 'shrink-0', TYPE.body, COLOR.body)}
               >
                 {profilePics[r.id] ? (
-                  <img src={resolveMediaUrl(profilePics[r.id])} alt="" className="w-4 h-4 rounded-full object-cover" />
+                  <img src={resolveMediaUrl(profilePics[r.id])} alt="" className={classes('w-4 h-4', RADIUS.pill, 'object-cover')} />
                 ) : (
-                  <span className="w-4 h-4 rounded-full bg-glass-w10 flex items-center justify-center text-2xs">{r.name.slice(0, 1).toUpperCase()}</span>
+                  <span className={classes('w-4 h-4', RADIUS.pill, COLOR.glassW8, 'flex items-center justify-center', TYPE.caption)}>{r.name.slice(0, 1).toUpperCase()}</span>
                 )}
                 <span className="max-w-[110px] truncate">{r.name}</span>
-              </button>
+              </Button>
             ))}
           </div>
         )}
 
         {/* Search Filter */}
-        <div className="p-3 border-b border-edge">
+        <div className={classes(PADDING[3], 'border-b', COLOR.edge)}>
           <div className="relative">
-            <Search className="w-4 h-4 text-retro-muted absolute left-3 top-2.5" />
-            <input
+            <Search className={classes(ICON.md, COLOR.muted, 'absolute left-3 top-2.5')} />
+            <Input
               type="text"
               value={shareSearch}
               onChange={(e) => setShareSearch(e.target.value)}
               placeholder="Search friends or groups..."
-              className="w-full bg-surface-interactive border border-edge rounded-xl pl-9 pr-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent"
+              className="pl-9"
             />
           </div>
         </div>
 
         {/* Destinations List */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-4 max-h-72">
+        <div className={classes('flex-1 overflow-y-auto', PADDING[3], 'space-y-4 max-h-72')}>
           {/* Fake preset groups removed (P3.5 dead-end sweep): they never
               existed server-side, so sharing to them was theater. Real groups
               live in the Messages view. */}
           {followingIds.length === 0 && groups.length === 0 && (
-            <div className="py-8 text-center space-y-1.5">
-              <p className="text-xs font-semibold text-retro-fg">Nothing to send to yet</p>
-              <p className="text-xs text-retro-muted">
+            <div className={classes(FEEDBACK.centerCompact)}>
+              <p className={classes(FEEDBACK.title)}>Nothing to send to yet</p>
+              <p className={classes(FEEDBACK.description)}>
                 Follow friends or join a group first, or copy the link below.
               </p>
             </div>
           )}
 
           {/* Friends Section */}
-          <div className="space-y-1.5">
-            <span className="text-2xs font-bold uppercase tracking-wider text-retro-muted px-1">Direct Friends &amp; Peers</span>
+          <div className={classes('space-y-1.5')}>
+            <span className={classes(TYPE.caption, WEIGHT.bold, 'uppercase', TRACKING.wider, COLOR.muted, PADDING_X[1])}>Direct Friends &amp; Peers</span>
             {followingIds
               .filter((fId) => (userNames[fId] || fId).toLowerCase().includes(shareSearch.toLowerCase()))
               .map((fId) => {
@@ -269,43 +276,39 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
               return (
                 <div
                   key={fId}
-                  className="p-2.5 rounded-xl hover:bg-glass-w5 flex items-center justify-between border border-transparent hover:border-edge transition-colors"
+                  className={classes(PADDING[2.5], RADIUS.panel, COLOR.hoverW5, 'flex items-center justify-between border border-transparent', COLOR.hoverEdgeStrong, MOTION.transition.micro)}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-glass-w20 overflow-hidden border border-edge flex items-center justify-center text-xs font-bold">
+                  <div className={classes('flex items-center', GAP[3])}>
+                    <div className={classes('w-10 h-10', RADIUS.pill, COLOR.glassW20, 'overflow-hidden border', COLOR.edge, 'flex items-center justify-center', TYPE.body, WEIGHT.bold)}>
                       {profilePics[fId] ? (
                         <img src={resolveMediaUrl(profilePics[fId])} alt="" className="w-full h-full object-cover" />
                       ) : (
                         fId.substring(0, 2).toUpperCase()
                       )}
                     </div>
-                    <div>
-                       <span className="text-xs font-bold text-retro-fg block truncate max-w-[160px]">{name}</span>
-                      <span className="text-2xs text-retro-muted">Direct Message</span>
+                    <div className="min-w-0">
+                       <span className={classes(TYPE.body, WEIGHT.bold, COLOR.fg, 'block truncate max-w-[160px]')}>{name}</span>
+                      <span className={classes(TYPE.caption, COLOR.muted)}>Direct Message</span>
                     </div>
                   </div>
 
-                  <button
+                  <Button
                     type="button"
-                     onClick={() => void handleSendDirectShare(fId, name)}
+                    variant={isSent ? 'secondary' : 'primary'}
+                    onClick={() => void handleSendDirectShare(fId, name)}
                     disabled={isSent || isPending || !identity}
                     title={!identity ? 'Log in to share' : undefined}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition disabled:cursor-not-allowed ${
-                      isSent
-                        ? 'bg-surface-interactive text-retro-muted border border-edge'
-                        : 'bg-retro-bg hover:bg-surface-elevated text-retro-fg disabled:opacity-40'
-                    }`}
                   >
                     {isSent ? 'Sent' : isPending ? 'Sending…' : 'Send'}
-                  </button>
+                  </Button>
                 </div>
               );
             })}
           </div>
 
           {groups.length > 0 && (
-            <div className="space-y-1.5">
-              <span className="text-2xs font-bold uppercase tracking-wider text-retro-muted px-1">Groups</span>
+            <div className={classes('space-y-1.5')}>
+              <span className={classes(TYPE.caption, WEIGHT.bold, 'uppercase', TRACKING.wider, COLOR.muted, PADDING_X[1])}>Groups</span>
               {groups
                 .filter((g) => g.name.toLowerCase().includes(shareSearch.toLowerCase()))
                 .map((g) => {
@@ -314,30 +317,26 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
                   return (
                     <div
                       key={g.id}
-                      className="p-2.5 rounded-xl hover:bg-glass-w5 flex items-center justify-between border border-transparent hover:border-edge transition-colors"
+                      className={classes(PADDING[2.5], RADIUS.panel, COLOR.hoverW5, 'flex items-center justify-between border border-transparent', COLOR.hoverEdgeStrong, MOTION.transition.micro)}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-glass-w20 overflow-hidden border border-edge flex items-center justify-center text-xs font-bold">
+                      <div className={classes('flex items-center', GAP[3])}>
+                        <div className={classes('w-10 h-10', RADIUS.panel, COLOR.glassW20, 'overflow-hidden border', COLOR.edge, 'flex items-center justify-center', TYPE.body, WEIGHT.bold)}>
                           {g.name.slice(0, 1).toUpperCase()}
                         </div>
                         <div>
-                          <span className="text-xs font-bold text-retro-fg block truncate max-w-[160px]">{g.name}</span>
-                          <span className="text-2xs text-retro-muted">{g.member_count} members</span>
+                          <span className={classes(TYPE.body, WEIGHT.bold, COLOR.fg, 'block truncate max-w-[160px]')}>{g.name}</span>
+                          <span className={classes(TYPE.caption, COLOR.muted)}>{g.member_count} members</span>
                         </div>
                       </div>
-                      <button
+                      <Button
                         type="button"
+                        variant={isSent ? 'secondary' : 'primary'}
                         onClick={() => void handleSendGroupShare(g.id, g.name)}
                         disabled={isSent || isPending || !identity}
                         title={!identity ? 'Log in to share' : undefined}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition disabled:cursor-not-allowed ${
-                          isSent
-                            ? 'bg-surface-interactive text-retro-muted border border-edge'
-                            : 'bg-retro-bg hover:bg-surface-elevated text-retro-fg disabled:opacity-40'
-                        }`}
                       >
                         {isSent ? 'Sent' : isPending ? 'Sending…' : 'Send'}
-                      </button>
+                      </Button>
                     </div>
                   );
                 })}
@@ -346,17 +345,14 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
         </div>
 
         {/* Modal Bottom Actions */}
-        <div className="p-3 border-t border-edge bg-surface-interactive flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleCopyLink}
-            className="flex-1 py-2 bg-surface-raised hover:bg-surface-elevated text-retro-fg border border-edge rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
-          >
-            <Link2 className="w-4 h-4" />
+        <div className={classes(PADDING[3], 'border-t', COLOR.edge, COLOR.interactive, 'flex items-center', GAP[2])}>
+          <Button type="button" variant="secondary" onClick={handleCopyLink} className={classes('flex-1', 'flex items-center justify-center', GAP[1.5])}>
+            <Link2 className={ICON.md} />
             <span>Copy Link</span>
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="secondary"
             onClick={() => {
               if (navigator.share) {
                 navigator.share({
@@ -367,11 +363,11 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
                 handleCopyLink();
               }
             }}
-            className="flex-1 py-2 bg-surface-raised hover:bg-surface-elevated text-retro-fg border border-edge rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+            className={classes('flex-1', 'flex items-center justify-center', GAP[1.5])}
           >
-            <Share2 className="w-4 h-4" />
+            <Share2 className={ICON.md} />
             <span>More Options</span>
-          </button>
+          </Button>
         </div>
       </div>
     </div>

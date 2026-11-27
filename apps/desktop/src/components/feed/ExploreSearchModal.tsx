@@ -7,6 +7,11 @@ import type { OrbitIdentity } from '@orbit/crypto';
 import type { FeedPost } from './GMatchFeed';
 import { ObjectImage } from '../ObjectImage';
 import { isMediaVideo, resolveMediaUrl } from '../../utils/media';
+import { Button, Input } from '../../ui/kit';
+import {
+  classes, CHROME, COLOR, FEEDBACK, GAP, ICON, MONO, MOTION, PADDING, PADDING_X, PADDING_Y,
+  RADIUS, RECIPE, TRACKING, TYPE, WEIGHT,
+} from '../../ui/tokens';
 
 interface PeerUser {
   id: string;
@@ -85,61 +90,50 @@ export function ExploreSearchModal({
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-start sm:items-center justify-center p-0 sm:p-4 font-sans select-none animate-orbit-fade-in"
+      className={classes(RECIPE.modalOverlay, 'items-start sm:items-center font-sans select-none')}
       onClick={onClose}
     >
       <div
-        className="bg-surface-raised w-full sm:max-w-lg h-full sm:h-[80vh] max-h-(--max-h-panel) rounded-none sm:rounded-xl border border-edge shadow-2xl overflow-hidden flex flex-col text-retro-fg animate-orbit-pop"
+        className={classes(CHROME.overlayPanel, 'w-full sm:max-w-lg h-full sm:h-[80vh] max-h-(--max-h-panel) overflow-hidden flex flex-col', COLOR.fg, MOTION.keyframe.pop)}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-4 py-3 border-b border-edge flex items-center justify-between bg-surface-raised shrink-0">
-          <div className="flex items-center gap-2">
-            <Search className="w-5 h-5 text-retro-fg" />
-            <h3 className="text-base font-black tracking-tight">Explore gMatch</h3>
+        <div className={classes(RECIPE.cardHeader, COLOR.surfaceRaised, 'shrink-0')}>
+          <div className={classes('flex items-center', GAP[2])}>
+            <Search className={classes(ICON.lg, COLOR.fg)} />
+            <h3 className={classes(TYPE.base, WEIGHT.heading, TRACKING.tight)}>Explore gMatch</h3>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close search"
-            className="p-1.5 rounded-full text-retro-muted hover:text-retro-fg hover:bg-glass-w10 cursor-pointer transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <Button type="button" variant="ghost" size="sm" onClick={onClose} aria-label="Close search" className={classes(RADIUS.pill, PADDING[1.5])}>
+            <X className={ICON.md} />
+          </Button>
         </div>
 
         {/* Search Input */}
-        <div className="p-3 border-b border-edge bg-surface-interactive shrink-0">
-          <div className="flex items-center gap-2 bg-surface-raised border border-edge rounded-xl px-3 py-2 focus-within:ring-2 focus-within:ring-info/30">
-            <Search className="w-4 h-4 text-retro-muted shrink-0" />
-            <input
+        <div className={classes(PADDING[3], 'border-b', COLOR.edge, COLOR.interactive, 'shrink-0')}>
+          <div className={classes('flex items-center', GAP[2], COLOR.surfaceRaised, 'border', COLOR.edge, RADIUS.panel, PADDING_X[3], PADDING_Y[2], 'focus-within:ring-2 focus-within:ring-info/30')}>
+            <Search className={classes(ICON.md, COLOR.muted, 'shrink-0')} />
+            <Input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               autoFocus
+              bare
               placeholder="Search people, captions, tags..."
-              className="w-full bg-transparent focus:outline-none text-xs placeholder:text-retro-muted"
             />
             {query && (
-              <button
-                type="button"
-                onClick={() => setQuery('')}
-                className="text-retro-muted hover:text-retro-fg cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setQuery('')} className={PADDING[1]} aria-label="Clear search">
+                <X className={ICON.md} />
+              </Button>
             )}
           </div>
         </div>
 
         {/* Results */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-5 styled-scrollbar">
+        <div className={classes('flex-1 overflow-y-auto', PADDING[3], 'space-y-5 styled-scrollbar')}>
           {/* Users */}
           {matchedUsers.length > 0 && (
-            <div className="space-y-1">
-              <span className="text-2xs font-black uppercase tracking-wider text-retro-muted px-1">
-                People
-              </span>
+            <div className={classes('space-y-1', TRACKING.tight)}>
+              <span className={classes(TYPE.caption, WEIGHT.heading, 'uppercase', TRACKING.wider, COLOR.muted, PADDING_X[1])}>People</span>
               {matchedUsers.map((u) => {
                 const id = u.id || u.orbitId || '';
                 const isSelf = identity && id === identity.orbitId;
@@ -147,18 +141,18 @@ export function ExploreSearchModal({
                 return (
                   <div
                     key={id}
-                    className="flex items-center justify-between p-2 rounded-xl hover:bg-glass-w5 transition-colors group"
+                    className={classes('flex items-center justify-between', PADDING[2], RADIUS.panel, COLOR.hoverW5, MOTION.transition.micro, 'group')}
                   >
                     <button
                       type="button"
-                      className="flex items-center gap-3 cursor-pointer min-w-0 flex-1"
+                      className={classes('flex items-center', GAP[3], 'cursor-pointer min-w-0 flex-1')}
                       onClick={() => {
                         playPress(750);
                         onSelectUser?.(id);
                         onClose();
                       }}
                     >
-                      <div className="w-10 h-10 rounded-full bg-glass-w20 overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold">
+                      <div className={classes('w-10 h-10', RADIUS.pill, COLOR.glassW20, 'overflow-hidden shrink-0 flex items-center justify-center', TYPE.body, WEIGHT.bold)}>
                         {pfp ? (
                           <img src={resolveMediaUrl(pfp)} alt="" className="w-full h-full object-cover" />
                         ) : (
@@ -166,27 +160,29 @@ export function ExploreSearchModal({
                         )}
                       </div>
                       <div className="min-w-0">
-                        <span className="text-xs font-bold text-retro-fg block truncate">
+                        <span className={classes(TYPE.body, WEIGHT.bold, COLOR.fg, 'block truncate')}>
                            {u.display_name?.trim() || 'Unknown User'}
                         </span>
-                        <span className="text-2xs text-retro-muted block font-mono truncate">
+                        <span className={classes(TYPE.caption, COLOR.muted, 'block font-mono truncate')}>
                           {id.slice(0, 14)}...
                         </span>
                       </div>
                     </button>
                     {!isSelf && onStartPm && (
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={() => {
                           playPress(800);
                           onStartPm({ id, display_name: u.display_name });
                           onClose();
                         }}
-                        className="p-2 text-retro-muted hover:text-retro-fg rounded-xl hover:bg-glass-w10 transition-colors cursor-pointer shrink-0"
+                        className={PADDING[2]}
                         title="Message"
                       >
-                        <MessageCircle className="w-4 h-4" />
-                      </button>
+                        <MessageCircle className={ICON.md} />
+                      </Button>
                     )}
                   </div>
                 );
@@ -196,45 +192,43 @@ export function ExploreSearchModal({
 
           {/* Posts */}
           {matchedPosts.length > 0 && (
-            <div className="space-y-1">
-              <span className="text-2xs font-black uppercase tracking-wider text-retro-muted px-1">
-                Posts
-              </span>
+            <div className={classes('space-y-1', TRACKING.tight)}>
+              <span className={classes(TYPE.caption, WEIGHT.heading, 'uppercase', TRACKING.wider, COLOR.muted, PADDING_X[1])}>Posts</span>
               {matchedPosts.slice(0, 8).map((p) => (
                 <button
                   type="button"
                   key={p.id}
-                  className="flex items-center gap-3 p-2 rounded-xl hover:bg-glass-w5 transition-colors cursor-pointer"
+                  className={classes('flex items-center', GAP[3], PADDING[2], RADIUS.panel, COLOR.hoverW5, MOTION.transition.micro, 'cursor-pointer')}
                   onClick={() => {
                     playPress(700);
                     onOpenPost?.(p);
                     onClose();
                   }}
                 >
-                  <div className="w-10 h-10 rounded-xl bg-glass-w20 overflow-hidden shrink-0 flex items-center justify-center relative">
+                  <div className={classes('w-10 h-10', RADIUS.panel, COLOR.glassW20, 'overflow-hidden shrink-0 flex items-center justify-center relative')}>
                     {p.url ? (
                       <>
                         <ObjectImage contentUrl={p.url} identity={identity} alt="" className="w-full h-full object-cover" thumb />
                         {isMediaVideo(p.url) && (
-                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-retro-fg pointer-events-none">
-                            <Play className="w-3.5 h-3.5 fill-white" />
+                          <div className={classes('absolute inset-0', COLOR.mediaVeil, 'flex items-center justify-center', COLOR.fg, 'pointer-events-none')}>
+                            <Play className={classes(ICON.sm, COLOR.onMediaFill)} />
                           </div>
                         )}
                       </>
                     ) : (
-                      <ImageIcon className="w-4 h-4 text-retro-muted" />
+                      <ImageIcon className={classes(ICON.md, COLOR.muted)} />
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-bold text-retro-fg block truncate">{p.author_name}</span>
+                    <div className={classes('flex items-center', GAP[1.5])}>
+                      <span className={classes(TYPE.body, WEIGHT.bold, COLOR.fg, 'block truncate')}>{p.author_name}</span>
                       {isMediaVideo(p.url) && (
-                        <span className="px-1 py-0.2 rounded bg-black/60 border border-edge text-2xs font-mono text-retro-accent uppercase tracking-wider">
+                        <span className={classes(PADDING_X[1], 'py-0.2', RADIUS.chip, COLOR.scrim, 'border', COLOR.edge, TYPE.caption, MONO, COLOR.accent, 'uppercase', TRACKING.wider)}>
                           Video
                         </span>
                       )}
                     </div>
-                    {p.caption && <p className="text-xs text-retro-muted truncate">{p.caption}</p>}
+                    {p.caption && <p className={classes(FEEDBACK.description, 'truncate')}>{p.caption}</p>}
                   </div>
                 </button>
               ))}
@@ -243,25 +237,24 @@ export function ExploreSearchModal({
 
           {/* Tags */}
           {matchedTags.length > 0 && (
-            <div className="space-y-1.5">
-              <span className="text-2xs font-black uppercase tracking-wider text-retro-muted px-1">
-                Tags
-              </span>
-              <div className="flex flex-wrap gap-1.5 px-1">
+            <div className={classes('space-y-1.5', TRACKING.tight)}>
+              <span className={classes(TYPE.caption, WEIGHT.heading, 'uppercase', TRACKING.wider, COLOR.muted, PADDING_X[1])}>Tags</span>
+              <div className={classes('flex flex-wrap', GAP[1.5], PADDING_X[1])}>
                 {matchedTags.map((t) => (
-                  <button
+                  <Button
                     key={t}
                     type="button"
+                    variant="secondary"
                     onClick={() => {
                       playPress(650);
                       setQuery('#' + t);
                       toast?.(`Showing posts tagged #${t}`, 'info');
                     }}
-                    className="px-2.5 py-1 rounded-full bg-surface-interactive hover:bg-glass-w12 text-xs font-bold text-retro-body flex items-center gap-1 cursor-pointer transition-colors border border-edge"
+                    className={classes(RADIUS.pill, TYPE.body, WEIGHT.bold, COLOR.body, 'flex items-center', GAP[1])}
                   >
-                    <Hash className="w-3 h-3 text-retro-muted" />
+                    <Hash className={classes(ICON.sm, COLOR.muted)} />
                     {t}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -269,25 +262,29 @@ export function ExploreSearchModal({
 
           {/* Empty state */}
           {q && matchedUsers.length === 0 && matchedPosts.length === 0 && matchedTags.length === 0 && (
-            <div className="py-14 text-center space-y-2">
-              <div className="w-12 h-12 rounded-full bg-surface-interactive flex items-center justify-center mx-auto text-retro-muted">
-                <Users className="w-6 h-6" />
+            <div className={classes(FEEDBACK.center)}>
+              <div className={classes('w-12 h-12', RADIUS.pill, COLOR.interactive, 'flex items-center justify-center mx-auto', COLOR.muted)}>
+                <Users className={ICON.lg} />
               </div>
-              <p className="text-sm font-bold text-retro-fg">No results for &ldquo;{query}&rdquo;</p>
-              <p className="text-xs text-retro-muted">Try searching a different name, caption or tag.</p>
+              <div>
+                <p className={classes(TYPE.sub, WEIGHT.bold, COLOR.fg)}>No results for &ldquo;{query}&rdquo;</p>
+                <p className={FEEDBACK.description}>Try searching a different name, caption or tag.</p>
+              </div>
             </div>
           )}
 
           {/* Prompt */}
           {!q && (
-            <div className="py-14 text-center space-y-2">
-              <div className="w-12 h-12 rounded-full bg-surface-interactive flex items-center justify-center mx-auto text-retro-muted">
-                <Search className="w-6 h-6" />
+            <div className={classes(FEEDBACK.center)}>
+              <div className={classes('w-12 h-12', RADIUS.pill, COLOR.interactive, 'flex items-center justify-center mx-auto', COLOR.muted)}>
+                <Search className={ICON.lg} />
               </div>
-              <p className="text-sm font-bold text-retro-fg">Discover the network</p>
-              <p className="text-xs text-retro-muted max-w-xs mx-auto">
-                Search players, posts and tags across gMatch to find your next match, card or obsession.
-              </p>
+              <div>
+                <p className={classes(TYPE.sub, WEIGHT.bold, COLOR.fg)}>Discover the network</p>
+                <p className={classes(FEEDBACK.description, 'max-w-xs mx-auto')}>
+                  Search players, posts and tags across gMatch to find your next match, card or obsession.
+                </p>
+              </div>
             </div>
           )}
         </div>

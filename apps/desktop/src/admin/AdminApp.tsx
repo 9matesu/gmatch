@@ -17,6 +17,8 @@ import { SettingsTab } from "./components/tabs/SettingsTab";
 import { ZoomModal, useZoomModal } from "../components/CardZoomModalHost";
 import { TAB_REGISTRY, LEGACY_TAB_MAP, getTabBadge } from "../utils/adminTabs";
 import { useAdminWebSocket } from "../hooks/useAdminWebSocket";
+import { Button, Input } from "../ui/kit";
+import { classes, COLOR, FEEDBACK, GAP, MONO, PADDING, PADDING_X, PADDING_Y, RADIUS, STATUS, TRACKING, TYPE, WEIGHT } from "../ui/tokens";
 import type { OrbitIdentity } from "@orbit/crypto";
 import type {  AdminState, TabId } from "../utils/adminTypes";
 
@@ -351,71 +353,76 @@ export default function AdminPageClient({ identity: appIdentity }: { identity?: 
   // Passcode gate view
   if (!pinVerified) {
     return (
-      <div className="min-h-screen bg-retro-bg text-retro-fg flex items-center justify-center p-4 font-sans">
+      <div className={classes('min-h-screen', COLOR.canvas, COLOR.fg, 'flex items-center justify-center', PADDING[4], 'font-sans')}>
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60" />
-          <div className="absolute top-1/4 left-1/4 w-48 h-48 rounded-full bg-retro-accent/3 blur-3xl" />
+          <div className={classes('absolute top-1/4 left-1/4 w-48 h-48', RADIUS.pill, COLOR.accentBg, 'blur-3xl')} />
         </div>
-        <div className="relative z-10 w-full max-w-sm glass-panel p-6 space-y-4">
-          <div className="flex items-center justify-between border-b border-edge pb-3">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-retro-accent" />
-              <h1 className="text-sm font-bold text-retro-fg tracking-wider">Admin Operations</h1>
+        <div className={classes('relative z-[var(--z-dropdown)] w-full max-w-sm glass-panel', PADDING[6], 'space-y-4')}>
+          <div className={classes('flex items-center justify-between border-b', COLOR.edge, 'pb-3')}>
+            <div className={classes('flex items-center', GAP[2])}>
+              <span className={classes('w-2 h-2', RADIUS.pill, COLOR.accentBg)} />
+              <h1 className={classes(TYPE.body, WEIGHT.bold, COLOR.fg, TRACKING.wider)}>Admin Operations</h1>
             </div>
 
           </div>
 
-          <p className="text-xs text-retro-muted leading-relaxed">
+          <p className={FEEDBACK.description}>
             Enter the secret administrative passcode to access the moderation console.
           </p>
 
           {(Boolean(import.meta.env.DEV) || (typeof window !== 'undefined' && (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1'))) && (
-            <div className="flex items-center justify-between text-xs bg-warning/10 border border-warning/20 text-warning-fg px-2.5 py-1.5 rounded">
-              <span>Dev mode: default passcode is <code className="font-mono font-bold bg-black/30 px-1 py-0.5 rounded">admin</code></span>
-              <button
+            <div className={classes('flex items-center justify-between', TYPE.body, STATUS.warningBg, STATUS.warningEdge, STATUS.warning, PADDING_X[2.5], PADDING_Y[1.5], RADIUS.chip)}>
+              <span>Dev mode: default passcode is <code className={classes(MONO, WEIGHT.bold, COLOR.scrim, PADDING_X[1], 'py-0.5', RADIUS.chip)}>admin</code></span>
+              <Button
                 type="button"
+                variant="link"
+                size="sm"
                 onClick={() => setPin('admin')}
-                className="text-2xs font-bold underline hover:text-retro-fg cursor-pointer ml-2 shrink-0"
+                className={classes(TYPE.caption, WEIGHT.bold, 'underline ml-2 shrink-0')}
               >
                 Use admin
-              </button>
+              </Button>
             </div>
           )}
 
-          <form onSubmit={handleVerifyPin} className="space-y-3">
+          <form onSubmit={handleVerifyPin} className={classes('space-y-3')}>
             <div>
-              <input
+              <Input
                 type="password"
                 value={pin}
                 onChange={(e) => setPin(e.target.value)}
                 placeholder="Secret Passcode"
                 autoFocus
-                className="w-full bg-surface-raised border border-edge focus:border-retro-accent/60 px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted rounded-md outline-none font-mono"
+                className={MONO}
               />
             </div>
 
-            <button
+            <Button
               type="submit"
+              variant="primary"
               disabled={verifyingPin || !pin.trim()}
-              className="w-full py-2 bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text font-bold text-xs rounded-md uppercase tracking-wider transition-colors disabled:opacity-40 cursor-pointer"
+              className={classes('w-full', WEIGHT.bold, 'uppercase', TRACKING.wider)}
             >
               {verifyingPin ? "Verifying..." : "Unlock Admin Console"}
-            </button>
+            </Button>
           </form>
 
-          <div className="text-2xs text-retro-muted font-mono text-center pt-1 space-y-0.5">
+          <div className={classes(TYPE.caption, COLOR.muted, MONO, 'text-center pt-1 space-y-0.5')}>
             <div>Target: {getApiBaseUrl()}</div>
-            <div className="flex items-center justify-center gap-1.5">
-              <span>Signed as: <span className="font-mono">{identity?.orbitId || "No identity. Sign in first."}</span></span>
+            <div className={classes('flex items-center justify-center', GAP[1.5])}>
+              <span>Signed as: <span className={MONO}>{identity?.orbitId || "No identity. Sign in first."}</span></span>
               {identity?.orbitId && (
-                <button
+                <Button
                   type="button"
+                  variant="link"
+                  size="sm"
                   onClick={() => { void navigator.clipboard.writeText(identity.orbitId) }}
-                  className="text-retro-accent hover:text-retro-fg underline cursor-pointer"
+                  className="underline"
                   title="Copy your Orbit ID (needed for ADMIN_ORBIT_ID)"
                 >
                   Copy
-                </button>
+                </Button>
               )}
             </div>
           </div>

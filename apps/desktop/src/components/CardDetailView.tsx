@@ -8,6 +8,11 @@ import type { OrbitIdentity } from '@orbit/crypto';
 import { computeCashoutPayout, clampCashoutRateBps, DEFAULT_CASHOUT_RATE_BPS, formatGc } from '@orbit/shared';
 import { CardArtwork } from './cards/CardArtwork';
 import { isMediaVideo } from '../utils/media';
+import { Button, Input } from '../ui/kit';
+import {
+  classes, CHROME, COLOR, FEEDBACK, GAP, ICON, MONO, PADDING, PADDING_X, PADDING_Y,
+  RADIUS, RECIPE, STATUS, TYPE, WEIGHT,
+} from '../ui/tokens';
 
 interface CardRecord {
   id: string;
@@ -188,11 +193,11 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
 
   if (loading) {
     return (
-      <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70">
-        <div className="glass-card p-8 max-w-2xl w-full mx-4">
+      <div className={RECIPE.modalOverlay}>
+        <div className={classes(CHROME.overlayPanel, PADDING[8], 'max-w-2xl w-full mx-4')}>
           <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-surface-elevated rounded w-3/4"></div>
-            <div className="h-64 bg-surface-elevated rounded"></div>
+            <div className={classes('h-8 bg-surface-elevated w-3/4', RADIUS.control)}></div>
+            <div className={classes('h-64 bg-surface-elevated', RADIUS.control)}></div>
           </div>
         </div>
       </div>
@@ -201,16 +206,16 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
 
   if (error || !card) {
     return (
-      <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70">
-        <div className="glass-card p-8 max-w-2xl w-full mx-4">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-black tracking-tight text-retro-fg">Card details</h2>
-            <button onClick={onClose} aria-label="Close card details" className="glass-action glass-action-danger h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer">
-              <X className="w-6 h-6" />
-            </button>
+      <div className={RECIPE.modalOverlay}>
+        <div className={classes(CHROME.overlayPanel, PADDING[8], 'max-w-2xl w-full mx-4')}>
+          <div className={classes('flex items-center justify-between mb-4', GAP[2])}>
+            <h2 className={classes(TYPE.base, WEIGHT.heading, 'tracking-tight', COLOR.fg)}>Card details</h2>
+            <Button variant="danger" size="sm" onClick={onClose} aria-label="Close card details" className="h-8 w-8 p-0">
+              <X className={ICON.lg} />
+            </Button>
           </div>
           <div className="text-center py-8">
-            <p className="text-danger-fg">{error || 'Card not found'}</p>
+            <p className={STATUS.danger}>{error || 'Card not found'}</p>
           </div>
         </div>
       </div>
@@ -220,22 +225,22 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
   const statusLabel = card.marketStatus === 'none' ? 'Not Listed' : card.marketStatus === 'cashed_out' ? 'Cashed Out' : card.marketStatus === 'listed' ? 'On Market' : card.marketStatus;
 
   return (
-    <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 p-4 overflow-y-auto" onClick={onClose}>
-      <div className="glass-card max-w-2xl w-full max-h-(--max-h-dialog) flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        <div className="glass-header flex items-center justify-between px-5 py-4 shrink-0">
+    <div className={classes(RECIPE.modalOverlay, 'overflow-y-auto')} onClick={onClose}>
+      <div className={classes(CHROME.overlayPanel, 'max-w-2xl w-full max-h-(--max-h-dialog) flex flex-col overflow-hidden')} onClick={(e) => e.stopPropagation()}>
+        <div className={classes(RECIPE.cardHeader, 'shrink-0')}>
           <div className="min-w-0">
-            <h2 className="text-lg font-bold text-retro-fg truncate">{card.name || 'Unnamed Card'}</h2>
-            <p className="text-xs text-retro-muted mt-0.5">
+            <h2 className={classes(TYPE.title, WEIGHT.bold, COLOR.fg, 'truncate')}>{card.name || 'Unnamed Card'}</h2>
+            <p className={classes(TYPE.body, COLOR.muted, 'mt-0.5')}>
               {new Date(card.createdAt).toLocaleDateString()} · <span className="capitalize">{statusLabel}</span>
             </p>
           </div>
-          <button onClick={onClose} aria-label="Close card details" className="glass-action glass-action-danger h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer">
-            <X className="w-5 h-5" />
-          </button>
+          <Button variant="danger" size="sm" onClick={onClose} aria-label="Close card details" className="h-8 w-8 p-0">
+            <X className={ICON.md} />
+          </Button>
         </div>
 
         {/* Content */}
-        <div className="p-5 space-y-4 overflow-y-auto">
+        <div className={classes(PADDING[5], 'space-y-4 overflow-y-auto')}>
           {/* The card as a tall card, Pokemon-style holo (react-holo-card-effect). */}
           <div className="flex justify-center">
             <CardArtwork
@@ -248,22 +253,22 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
           </div>
 
           {/* Compact stat row */}
-          <div className="flex items-center gap-2 flex-wrap text-xs">
-            <span className="glass-inset px-2.5 py-1.5 rounded-full capitalize text-retro-fg font-semibold">
-              <Tag className="w-3.5 h-3.5 inline mr-1 text-retro-muted" />{card.rarity}
+          <div className={classes('flex items-center flex-wrap', GAP[2], TYPE.body)}>
+            <span className={classes(CHROME.badge, 'capitalize', WEIGHT.semibold)}>
+              <Tag className={classes(ICON.sm, 'inline mr-1', COLOR.muted)} />{card.rarity}
             </span>
-            <span className="glass-inset px-2.5 py-1.5 rounded-full text-retro-fg font-semibold">
-              <TrendingUp className="w-3.5 h-3.5 inline mr-1 text-retro-muted" />{formatGc(card.value ?? 0)} g$
+            <span className={classes(CHROME.badge, WEIGHT.semibold)}>
+              <TrendingUp className={classes(ICON.sm, 'inline mr-1', COLOR.muted)} />{formatGc(card.value ?? 0)} g$
             </span>
-            <span className="glass-inset px-2.5 py-1.5 rounded-full text-retro-fg font-semibold">
-              <Heart className="w-3.5 h-3.5 inline mr-1 text-retro-muted" />{card.likeCount}
+            <span className={classes(CHROME.badge, WEIGHT.semibold)}>
+              <Heart className={classes(ICON.sm, 'inline mr-1', COLOR.muted)} />{card.likeCount}
             </span>
             {card.creatorId && (
               <button
                 type="button"
                 onClick={() => onOpenProfile?.(card.creatorId)}
                 disabled={!onOpenProfile}
-                className={`glass-inset ml-auto px-2.5 py-1.5 rounded-full text-xs font-mono text-retro-muted ${onOpenProfile ? 'cursor-pointer' : 'cursor-default'}`}
+                className={classes('glass-inset ml-auto', PADDING_X[2.5], PADDING_Y[1.5], RADIUS.pill, TYPE.body, MONO, COLOR.muted, onOpenProfile ? 'cursor-pointer' : 'cursor-default')}
                 title="View creator"
               >
                 by {card.creatorId.slice(0, 8)}…
@@ -273,11 +278,11 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
 
           {(card.description || card.caption || (card.tags && card.tags.length > 0)) && (
             <div className="space-y-2">
-              {(card.caption || card.description) && <p className="text-sm text-retro-body">{card.caption || card.description}</p>}
+              {(card.caption || card.description) && <p className={FEEDBACK.description}>{card.caption || card.description}</p>}
               {card.tags && card.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
+                <div className={classes('flex flex-wrap', GAP[1.5])}>
                   {card.tags.map((tag) => (
-                    <span key={tag} className="text-2xs rounded-full border px-2 py-0.5" style={{ borderColor: `${card.accentColor || '#9FE3FF'}88`, color: card.accentColor || '#9FE3FF' }}>
+                    <span key={tag} className={classes(TYPE.caption, RADIUS.pill, 'border', PADDING_X[2], 'py-0.5')} style={{ borderColor: `${card.accentColor || '#9FE3FF'}88`, color: card.accentColor || '#9FE3FF' }}>
                       #{tag}
                     </span>
                   ))}
@@ -288,75 +293,79 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
 
           {/* Market actions */}
           {canBuy && (
-            <div className="glass-inset flex items-center justify-between gap-3 p-4">
+            <div className={classes('glass-inset flex items-center justify-between', GAP[3], PADDING[4])}>
               <div>
-                <div className="text-2xs uppercase tracking-wider text-retro-muted font-bold">Community market price</div>
-                <div className="text-lg font-black font-mono text-info-fg tabular-nums">{formatGc(listingPrice ?? 0)} g$</div>
+                <div className={classes(TYPE.caption, 'uppercase', 'tracking-wider', COLOR.muted, WEIGHT.bold)}>Community market price</div>
+                <div className={classes(TYPE.title, WEIGHT.heading, MONO, STATUS.info, 'tabular-nums')}>{formatGc(listingPrice ?? 0)} g$</div>
               </div>
-              <button
+              <Button
                 type="button"
+                variant="primary"
                 disabled={buying}
                 onClick={() => void handleBuy()}
-                className="glass-action glass-action-primary px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer"
+                className="px-5 uppercase tracking-wider"
               >
                 {buying ? 'Buying…' : 'Buy Now'}
-              </button>
+              </Button>
             </div>
           )}
 
           {isOwner && card.marketStatus === 'cashed_out' && (
-            <div className="text-xs text-retro-fg font-semibold flex items-center gap-2">
-              <Coins className="w-4 h-4" /> This card was cashed out for g$.
+            <div className={classes(TYPE.body, COLOR.fg, WEIGHT.semibold, 'flex items-center', GAP[2])}>
+              <Coins className={ICON.md} /> This card was cashed out for g$.
             </div>
           )}
 
           {isOwner && card.marketStatus !== 'cashed_out' && (
-            <div className="space-y-3 pt-3 border-t border-edge">
-              <div className="flex gap-3">
+            <div className={classes('space-y-3 pt-3 border-t', COLOR.edge)}>
+              <div className={classes('flex', GAP[3])}>
                 {card.marketStatus === 'none' && (
                   <>
-                    <button
+                    <Button
                       type="button"
+                      variant="primary"
                       disabled={marketBusy || !/^\d+$/.test(listPrice) || Number(listPrice) <= 0}
                       onClick={() => { void mutateCard('list', { price: Number(listPrice) }, `Listed for ${formatGc(Number(listPrice))} g$`) }}
-                      className="glass-action glass-action-primary flex-1 py-2 px-4 rounded-lg font-semibold cursor-pointer disabled:opacity-40"
+                      className="flex-1"
                     >
                       List for Sale
-                    </button>
+                    </Button>
                     {onGiftCard && (
-                      <button
+                      <Button
                         type="button"
+                        variant="secondary"
                         disabled={marketBusy}
                         onClick={() => onGiftCard(card)}
-                        className="glass-action flex-1 py-2 px-4 rounded-lg font-semibold cursor-pointer disabled:opacity-40 flex items-center justify-center gap-1.5"
+                        className={classes('flex-1', 'flex items-center justify-center', GAP[1.5])}
                       >
-                        <Gift className="w-3.5 h-3.5 text-warning-fg" />
+                        <Gift className={classes(ICON.sm, STATUS.warning)} />
                         <span>Gift Card</span>
-                      </button>
+                      </Button>
                     )}
                   </>
                 )}
                 {card.marketStatus === 'listed' && (
                   <>
-                    <div className="flex-1 text-xs text-info-fg font-semibold self-center">
+                    <div className={classes('flex-1', TYPE.body, STATUS.info, WEIGHT.semibold, 'self-center')}>
                       Listed for {formatGc(listingPrice ?? (Number(listPrice) > 0 ? Number(listPrice) : 0))} g$
                     </div>
-                    <button
+                    <Button
                       type="button"
+                      variant="danger"
                       disabled={marketBusy}
                       onClick={() => { void mutateCard('cancel', undefined, 'Listing cancelled') }}
-                      className="glass-action glass-action-danger flex-1 py-2 px-4 rounded-lg font-semibold cursor-pointer disabled:opacity-40"
+                      className="flex-1"
                     >
                       Cancel Listing
-                    </button>
+                    </Button>
                   </>
                 )}
               </div>
 
               {card.marketStatus === 'none' && (
-                <div className="flex items-center gap-2">
-                  <label className="text-xs text-retro-muted" htmlFor="card-list-price">List price (g$)</label>
-                  <input
+                <div className={classes('flex items-center', GAP[2])}>
+                  <label className={classes(TYPE.body, COLOR.muted)} htmlFor="card-list-price">List price (g$)</label>
+                  <Input
                     id="card-list-price"
                     name="list price"
                     type="number"
@@ -364,46 +373,35 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
                     aria-label="List price in g$"
                     value={listPrice}
                     onChange={(e) => setListPrice(e.target.value)}
-                    className="glass-field flex-1 px-3 py-2 text-xs font-mono"
+                    className={classes('flex-1', MONO)}
                   />
                 </div>
               )}
 
               {card.marketStatus === 'none' && (
-                <div className="glass-inset p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm">
-                      <div className="text-retro-muted text-xs mb-0.5">Cash out value</div>
-                      <div className="font-bold text-retro-fg">
+                <div className={classes('glass-inset', PADDING[4])}>
+                  <div className={classes('flex items-center justify-between', GAP[3])}>
+                    <div className={TYPE.sub}>
+                      <div className={classes(COLOR.muted, TYPE.body, 'mb-0.5')}>Cash out value</div>
+                      <div className={classes(WEIGHT.bold, COLOR.fg)}>
                         {formatGc(computeCashoutPayout(card.value ?? 0, cashoutRate))}
-                        <span className="ml-2 text-2xs text-retro-muted font-mono">({(cashoutRate / 100).toFixed(1)}% rate)</span>
+                        <span className={classes('ml-2', TYPE.caption, COLOR.muted, MONO)}>({(cashoutRate / 100).toFixed(1)}% rate)</span>
                       </div>
                     </div>
                     {confirmCashout ? (
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          disabled={cashingOut}
-                          onClick={handleCashOut}
-                          className="glass-action glass-action-primary disabled:opacity-50 py-2 px-3 rounded-lg text-xs font-bold cursor-pointer"
-                        >
+                      <div className={classes('flex items-center', GAP[2])}>
+                        <Button type="button" variant="primary" disabled={cashingOut} onClick={handleCashOut}>
                           {cashingOut ? 'Cashing out…' : 'Confirm'}
-                        </button>
-                        <button type="button" onClick={() => setConfirmCashout(false)} className="glass-action text-xs px-3 py-1.5 rounded-lg cursor-pointer">
-                          Cancel
-                        </button>
+                        </Button>
+                        <Button type="button" variant="secondary" onClick={() => setConfirmCashout(false)}>Cancel</Button>
                       </div>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={() => setConfirmCashout(true)}
-                        className="glass-action glass-action-primary py-2 px-4 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Coins className="w-3.5 h-3.5" /> Cash Out Card
-                      </button>
+                      <Button type="button" variant="primary" onClick={() => setConfirmCashout(true)} className={classes('flex items-center', GAP[1.5])}>
+                        <Coins className={ICON.sm} /> Cash Out Card
+                      </Button>
                     )}
                   </div>
-                  <p className="text-2xs text-retro-muted mt-2">
+                  <p className={classes(TYPE.caption, COLOR.muted, 'mt-2')}>
                     Listing sells it to another player for g$; cashing out burns it for a fixed payout instead.
                   </p>
                 </div>

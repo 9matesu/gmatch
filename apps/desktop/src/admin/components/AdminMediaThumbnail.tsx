@@ -6,6 +6,8 @@ import { isMediaVideo, resolveMediaUrl } from "../../utils/media";
 import { cn } from "../../lib/utils";
 import type { OrbitIdentity } from "@orbit/crypto";
 import type React from "react";
+import { Button } from "../../ui/kit";
+import { classes, COLOR, ICON, MONO, RECIPE, STATUS, TYPE } from "../../ui/tokens";
 
 interface AdminMediaThumbnailProps {
   objectId?: string | null;
@@ -43,18 +45,19 @@ export function AdminMediaThumbnail({
   const canOpen = Boolean(url && !objectImage.failed);
 
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
       disabled={!canOpen}
-      className={cn("rounded border border-edge bg-retro-bg overflow-hidden relative group shrink-0", className)}
+      className={classes(RECIPE.card, COLOR.canvas, 'overflow-hidden relative group shrink-0 p-0', className)}
       onClick={() => canOpen && onZoom?.(url, isVideo, title, subtitle || "Media")}
     >
       {objectImage.isLink ? (
         <div className="w-full h-full flex items-center justify-center">
-          <LinkIcon className="w-5 h-5 text-info-fg" />
+          <LinkIcon className={classes(ICON.lg, STATUS.info)} />
         </div>
       ) : !canOpen ? (
-        <div className="w-full h-full flex items-center justify-center text-2xs font-mono text-retro-muted">
+        <div className={classes('w-full h-full flex items-center justify-center', TYPE.caption, MONO, COLOR.muted)}>
           {fallbackLabel}
         </div>
       ) : isVideo ? (
@@ -63,6 +66,6 @@ export function AdminMediaThumbnail({
         <img src={url} alt="" className={cn("w-full h-full object-cover", imageClassName)} />
       )}
       {badge}
-    </button>
+    </Button>
   );
 }

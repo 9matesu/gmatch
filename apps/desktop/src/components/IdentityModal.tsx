@@ -4,6 +4,11 @@ import React, { useEffect, useState } from "react";
 import type { OrbitIdentity } from "@orbit/crypto";
 import type { ExportedIdentityPayload } from "../hooks/useIdentity";
 import { DropZone } from "./DropZone";
+import { Button, Textarea } from "../ui/kit";
+import {
+  classes, CHROME, COLOR, GAP, ICON, MOTION, PADDING,
+  RADIUS, RECIPE, STATUS, TRACKING, TYPE, WEIGHT,
+} from "../ui/tokens";
 import {
   KeyRound,
   Download,
@@ -179,147 +184,144 @@ export function IdentityModal({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 select-none font-sans"
-    >
+    <div className={classes(RECIPE.modalOverlay, 'select-none font-sans')}>
       <div
-        className="bg-surface-raised border border-edge w-full max-w-lg rounded-lg shadow-xl overflow-hidden animate-orbit-pop flex flex-col"
+        className={classes(CHROME.overlayPanel, 'w-full max-w-lg overflow-hidden flex flex-col', MOTION.keyframe.pop)}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-edge">
-          <div className="flex items-center gap-2">
-            <KeyRound className="w-4 h-4 text-retro-muted" />
-            <h2 className="text-sm font-medium text-retro-fg">
+        <div className={classes(RECIPE.modalHeader)}>
+          <div className={classes('flex items-center', GAP[2])}>
+            <KeyRound className={classes(ICON.md, COLOR.muted)} />
+            <h2 className={classes(TYPE.body, WEIGHT.medium, COLOR.fg)}>
               {mode === "export" && "Identity & Keys"}
               {mode === "login" && "Log In / Restore"}
               {mode === "logout" && "Sign Out"}
             </h2>
           </div>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={onClose}
             aria-label="Close identity dialog"
-            className="text-retro-muted hover:text-retro-fg p-1 rounded cursor-pointer"
+            className={PADDING[1]}
           >
-            <X className="w-4 h-4" />
-          </button>
+            <X className={ICON.md} />
+          </Button>
         </div>
 
-        {/* Tab switcher */}
-        <div className="flex border-b border-edge p-1 gap-0.5">
-          <button
+        {/* Tab switcher — one recipe for all three modes, danger only on Log Out. */}
+        <div className={classes('flex border-b', COLOR.edge, PADDING[1], GAP[0.5])}>
+          <Button
             type="button"
+            variant={mode === "export" ? "secondary" : "ghost"}
             onClick={() => setMode("export")}
-            className={`flex-1 py-1.5 text-center rounded text-xs font-medium flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
-              mode === "export" ? "bg-surface-interactive text-retro-fg" : "text-retro-muted hover:text-retro-fg"
-            }`}
+            className={classes('flex-1', TYPE.body, WEIGHT.medium)}
           >
-            <KeyRound className="w-3.5 h-3.5" />
+            <KeyRound className={ICON.sm} />
             <span>Export</span>
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant={mode === "login" ? "secondary" : "ghost"}
             onClick={() => setMode("login")}
-            className={`flex-1 py-1.5 text-center rounded text-xs font-medium flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
-              mode === "login" ? "bg-surface-interactive text-retro-fg" : "text-retro-muted hover:text-retro-fg"
-            }`}
+            className={classes('flex-1', TYPE.body, WEIGHT.medium)}
           >
-            <UploadCloud className="w-3.5 h-3.5" />
+            <UploadCloud className={ICON.sm} />
             <span>Log In</span>
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant={mode === "logout" ? "danger" : "ghost"}
             onClick={() => setMode("logout")}
-            className={`flex-1 py-1.5 text-center rounded text-xs font-medium flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
-              mode === "logout" ? "bg-retro-error/15 text-retro-error" : "text-retro-muted hover:text-retro-error"
-            }`}
+            className={classes('flex-1', TYPE.body, WEIGHT.medium)}
           >
-            <LogOut className="w-3.5 h-3.5" />
+            <LogOut className={ICON.sm} />
             <span>Log Out</span>
-          </button>
+          </Button>
         </div>
 
-        <div className="p-4 space-y-4 max-h-(--max-h-sheet) overflow-y-auto styled-scrollbar">
+        <div className={classes(PADDING[4], 'space-y-4 max-h-(--max-h-sheet) overflow-y-auto styled-scrollbar')}>
           {mode === "export" && (
             <div className="space-y-4">
-              <div className="p-3 bg-surface-interactive border border-edge rounded-lg space-y-1">
-                <div className="text-xs font-medium text-retro-muted">Your Orbit ID</div>
-                <div className="font-mono text-xs text-retro-body break-all select-all">
+              <div className={classes(PADDING[3], COLOR.interactive, 'border', COLOR.edge, RADIUS.control, 'space-y-1')}>
+                <div className={classes(TYPE.body, WEIGHT.medium, COLOR.muted)}>Your Orbit ID</div>
+                <div className={classes('font-mono', TYPE.body, COLOR.body, 'break-all select-all')}>
                   {identity?.orbitId || "Not loaded"}
                 </div>
               </div>
 
-              <div className="p-3 bg-retro-warning/5 border border-retro-warning/20 rounded-lg text-xs text-retro-fg leading-relaxed flex items-start gap-2">
-                <ShieldCheck className="w-4 h-4 text-retro-warning shrink-0 mt-0.5" />
+              <div className={classes(PADDING[3], STATUS.warningBg, STATUS.warningEdge, RADIUS.control, TYPE.body, COLOR.fg, 'leading-relaxed flex items-start', GAP[2])}>
+                <ShieldCheck className={classes(ICON.md, STATUS.warning, 'shrink-0 mt-0.5')} />
                 <div>
-                  <strong className="font-medium text-retro-warning">Secret key:</strong> Anyone with this key can access your profile, cards, and rank.
+                  <strong className={classes(WEIGHT.medium, STATUS.warning)}>Secret key:</strong> Anyone with this key can access your profile, cards, and rank.
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label htmlFor="identity-backup-key" className="text-xs font-medium text-retro-muted block">
+              <div className={classes('space-y-1.5')}>
+                <label htmlFor="identity-backup-key" className={classes(TYPE.body, WEIGHT.medium, COLOR.muted, 'block')}>
                   Encoded backup key
                 </label>
-                <textarea
+                <Textarea
                   id="identity-backup-key"
                   readOnly
                   value={encodedString}
                   rows={3}
-                  className="w-full bg-surface-interactive border border-edge p-2.5 text-xs font-mono text-retro-body rounded-lg outline-none select-all resize-none"
+                  className="select-all"
                 />
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-2">
-                <button
+              <div className={classes('flex flex-col sm:flex-row', GAP[2])}>
+                <Button
                   type="button"
+                  variant="secondary"
                   onClick={() => void handleCopyKey(encodedString, "Secret key string")}
-                  className="flex-1 py-2.5 px-3 bg-surface-interactive border border-edge text-retro-body font-medium text-xs rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5 hover:border-edge-strong"
+                  className={classes('flex-1', 'flex items-center justify-center', GAP[1.5], COLOR.hoverEdgeStrong)}
                 >
-                  {copied ? <><Check className="w-3.5 h-3.5 text-retro-online" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy key</>}
-                </button>
+                  {copied ? <><Check className={classes(ICON.sm, 'text-retro-online')} /> Copied</> : <><Copy className={ICON.sm} /> Copy key</>}
+                </Button>
 
-                <button
+                <Button
                   type="button"
+                  variant="secondary"
                   onClick={handleDownloadKeyfile}
-                  className="flex-1 py-2.5 px-3 bg-surface-interactive border border-edge text-retro-body font-medium text-xs rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5 hover:border-edge-strong"
+                  className={classes('flex-1', 'flex items-center justify-center', GAP[1.5], COLOR.hoverEdgeStrong)}
                 >
-                  <FileJson className="w-3.5 h-3.5" />
+                  <FileJson className={ICON.sm} />
                   <span>Download .json</span>
-                </button>
+                </Button>
               </div>
 
-              <div className="border-t border-edge pt-3 space-y-2">
-                <div className="text-xs font-medium text-retro-muted">
-                  Full backup
-                </div>
-                <p className="text-xs text-retro-muted leading-relaxed">
+              <div className={classes('border-t', COLOR.edge, 'pt-3 space-y-2')}>
+                <div className={classes(TYPE.body, WEIGHT.medium, COLOR.muted)}>Full backup</div>
+                <p className={classes(TYPE.body, COLOR.muted, 'leading-relaxed')}>
                   Back up identity, settings, card collection, stash, and friends in one file.
                 </p>
-                <button
+                <Button
                   type="button"
+                  variant="secondary"
                   disabled={configDownloading}
                   onClick={() => void handleFullConfigDownload()}
-                  className="w-full py-2.5 px-3 bg-surface-interactive border border-edge text-retro-body font-medium text-xs rounded-lg transition-colors cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2 hover:border-edge-strong"
+                  className={classes('w-full', 'flex items-center justify-center', GAP[2], COLOR.hoverEdgeStrong)}
                 >
-                  <Download className="w-3.5 h-3.5" />
+                  <Download className={ICON.sm} />
                   <span>{configDownloading ? "Preparing..." : "Download full backup"}</span>
-                </button>
+                </Button>
               </div>
             </div>
           )}
 
           {mode === "login" && (
             <div className="space-y-4">
-              <p className="text-xs text-retro-muted leading-relaxed">
+              <p className={classes(TYPE.body, COLOR.muted, 'leading-relaxed')}>
                 Paste your secret key or drop your saved key file to restore your account.
               </p>
 
-              <textarea
+              <Textarea
                 value={keyInput}
                 onChange={(event) => setKeyInput(event.target.value)}
                 placeholder="Paste backup key string, private key, or JSON..."
                 rows={4}
-                className="w-full bg-surface-interactive border border-edge p-3 text-xs font-mono text-retro-fg placeholder:text-retro-muted rounded-lg outline-none focus:border-retro-accent resize-none"
               />
 
               <DropZone
@@ -328,19 +330,15 @@ export function IdentityModal({
                   if (files[0]) handleFileUpload(files[0]);
                 }}
               >
-                <div className="p-3 text-center">
-                  <div className="text-xs font-medium text-retro-body">
-                    Drop .json keyfile or click to browse
-                  </div>
+                <div className={classes(PADDING[3], 'text-center', TYPE.body, WEIGHT.medium, COLOR.body)}>
+                  Drop .json keyfile or click to browse
                 </div>
               </DropZone>
 
-              <div className="border-t border-edge pt-3 space-y-2">
-                <div className="text-xs font-medium text-retro-muted">
-                  Restore full backup
-                </div>
-                <p className="text-xs text-retro-muted leading-relaxed">
-                  Drop a <span className="text-retro-accent font-mono">.goon-config.json</span> backup to restore everything.
+              <div className={classes('border-t', COLOR.edge, 'pt-3 space-y-2')}>
+                <div className={classes(TYPE.body, WEIGHT.medium, COLOR.muted)}>Restore full backup</div>
+                <p className={classes(TYPE.body, COLOR.muted, 'leading-relaxed')}>
+                  Drop a <span className={classes(COLOR.accent, 'font-mono')}>.goon-config.json</span> backup to restore everything.
                 </p>
                 <DropZone
                   compact
@@ -348,56 +346,46 @@ export function IdentityModal({
                     if (files[0]) void handleFullConfigRestore(files[0]);
                   }}
                 >
-                  <div className={`p-3 text-center border rounded-lg ${configRestoring ? "border-retro-accent/30 bg-glass-w5" : "border-edge"}`}>
-                    <div className="text-xs font-medium text-retro-accent">
+                  <div className={classes(PADDING[3], 'text-center border', RADIUS.control, configRestoring ? classes('border-retro-accent/30', COLOR.glassW5) : COLOR.edge)}>
+                    <div className={classes(TYPE.body, WEIGHT.medium, COLOR.accent)}>
                       {configRestoring ? "Restoring..." : "Drop .goon-config.json here"}
                     </div>
                   </div>
                 </DropZone>
               </div>
 
-              <button
+              <Button
                 type="button"
+                variant="primary"
                 disabled={submitting || !keyInput.trim()}
                 onClick={() => handleLoginSubmit()}
-                className="w-full py-2.5 bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text font-medium text-xs rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                className="w-full"
               >
                 {submitting ? "Restoring..." : "Restore & Log In"}
-              </button>
+              </Button>
             </div>
           )}
 
           {mode === "logout" && (
-            <div className="space-y-4 text-center py-2">
-              <div className="w-10 h-10 rounded-lg bg-retro-error/15 border border-retro-error/30 flex items-center justify-center text-retro-error mx-auto">
-                <AlertTriangle className="w-5 h-5" />
+            <div className={classes('space-y-4 text-center py-2')}>
+              <div className={classes('w-10 h-10', RADIUS.control, STATUS.dangerBg, STATUS.dangerEdge, 'flex items-center justify-center', STATUS.danger, 'mx-auto')}>
+                <AlertTriangle className={ICON.lg} />
               </div>
 
-              <div className="space-y-1">
-                <h3 className="text-sm font-medium text-retro-fg">
-                  Sign out?
-                </h3>
-                <p className="text-xs text-retro-muted max-w-sm mx-auto leading-relaxed">
+              <div className={classes('space-y-1', TRACKING.tight)}>
+                <h3 className={classes(TYPE.body, WEIGHT.medium, COLOR.fg)}>Sign out?</h3>
+                <p className={classes(TYPE.body, COLOR.muted, 'max-w-sm mx-auto leading-relaxed')}>
                   This wipes your local secret keys and creates a fresh anonymous identity. Export your key first if you want to log back in later.
                 </p>
               </div>
 
-              <div className="flex gap-2 pt-2 max-w-sm mx-auto">
-                <button
-                  type="button"
-                  onClick={() => setMode("export")}
-                  className="flex-1 py-2.5 bg-glass-w8 border border-edge text-retro-fg font-medium text-xs rounded-lg transition-colors cursor-pointer hover:bg-glass-w12 active:scale-(--scale-press)"
-                >
+              <div className={classes('flex', GAP[2], 'pt-2 max-w-sm mx-auto')}>
+                <Button type="button" variant="secondary" onClick={() => setMode("export")} className="flex-1">
                   Export key first
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleConfirmLogout}
-                  className="flex-1 py-2.5 bg-retro-error/15 border border-retro-error/40 text-retro-error font-semibold text-xs rounded-lg transition-colors cursor-pointer hover:bg-retro-error/25 active:scale-(--scale-press)"
-                >
+                </Button>
+                <Button type="button" variant="danger" onClick={handleConfirmLogout} className="flex-1">
                   Sign out
-                </button>
+                </Button>
               </div>
             </div>
           )}

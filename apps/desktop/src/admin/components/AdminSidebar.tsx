@@ -3,6 +3,8 @@
 
 import { cn } from "../../lib/utils";
 import { X } from "lucide-react";
+import { Button } from "../../ui/kit";
+import { classes, COLOR, GAP, ICON, MOTION, PADDING, PADDING_X, PADDING_Y, RADIUS, STATUS, TRACKING, TYPE, WEIGHT } from "../../ui/tokens";
 
 interface AdminSidebarProps {
   activeTab: string;
@@ -47,30 +49,32 @@ export function AdminSidebar({
       role="navigation"
       aria-label="Admin navigation"
     >
-      <div className="p-4 border-b border-edge flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-retro-accent" />
+      <div className={classes(PADDING[4], 'border-b', COLOR.edge, 'flex items-center justify-between')}>
+        <div className={classes('flex items-center', GAP[2])}>
+          <span className={classes('w-2.5 h-2.5', RADIUS.pill, COLOR.accentBg)} />
           <div className="min-w-0">
-            <div className="text-xs font-black tracking-tight text-retro-fg uppercase truncate">gMatch Admin</div>
-            <div className="text-2xs font-mono text-retro-muted">Moderation Console</div>
+            <div className={classes(TYPE.body, WEIGHT.heading, TRACKING.tight, COLOR.fg, 'uppercase truncate')}>gMatch Admin</div>
+            <div className={classes(TYPE.caption, 'font-mono', COLOR.muted)}>Moderation Console</div>
           </div>
         </div>
         {onClose && (
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={onClose}
-            className="p-1.5 rounded hover:bg-glass-w10 text-retro-muted hover:text-retro-fg transition-colors lg:hidden"
+            className={PADDING[1.5]}
             aria-label="Close sidebar"
           >
-            <X className="w-4 h-4" />
-          </button>
+            <X className={ICON.md} />
+          </Button>
         )}
       </div>
 
-      <nav className="flex-1 overflow-y-auto p-3 space-y-3" role="list">
+      <nav className={classes('flex-1 overflow-y-auto', PADDING[3], 'space-y-3')} role="list">
         {sections.map((section, _sectionIndex) => (
-          <div key={section} className="space-y-1">
-            <div className="px-3 py-2 text-2xs font-black uppercase tracking-[0.2em] text-retro-faint">
+          <div key={section} className={classes('space-y-1', TRACKING.tight)}>
+            <div className={classes(PADDING_X[3], PADDING_Y[2], TYPE.caption, WEIGHT.heading, 'uppercase', TRACKING.wider, COLOR.faint)}>
               {section}
             </div>
             {tabs
@@ -79,47 +83,43 @@ export function AdminSidebar({
                 const active = activeTab === tab.id;
                 const Icon = tab.icon;
                 return (
-                  <button
+                  <Button
                     key={tab.id}
                     type="button"
+                    variant={active ? 'secondary' : 'ghost'}
                     onClick={() => onTabChange(tab.id)}
-                    className={cn(
-                      "w-full flex items-center justify-between px-3 py-2.5 text-xs font-bold rounded-lg transition cursor-pointer",
-                      active
-                        ? "bg-retro-accent/15 text-retro-accent border border-retro-accent/30"
-                        : "text-retro-muted hover:text-retro-fg hover:bg-glass-w5 border border-transparent"
-                    )}
+                    className={classes('w-full flex items-center justify-between', PADDING_X[3], PADDING_Y[2.5], TYPE.body, WEIGHT.bold, active ? COLOR.accent : COLOR.muted)}
                     role="listitem"
                     aria-current={active ? "page" : undefined}
                   >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <Icon className={cn("w-4 h-4 shrink-0", active ? "text-retro-accent" : "text-retro-muted")} />
+                    <div className={classes('flex items-center min-w-0', GAP[2.5])}>
+                      <Icon className={cn(ICON.md, 'shrink-0', active ? COLOR.accent : COLOR.muted)} />
                       <span className="truncate">{tab.label}</span>
                     </div>
                     {tab.badge && (
                       <span className={cn(
-                        "text-2xs px-1.5 py-0.5 rounded-full font-mono font-bold",
-                        active ? "bg-retro-selection text-retro-accent" : "bg-glass-w8 text-retro-muted",
-                        tab.id === "reports" && tab.badge && Number(tab.badge) > 0 && "bg-danger text-retro-fg"
+                        classes(TYPE.caption, PADDING_X[1.5], 'py-0.5', RADIUS.pill, 'font-mono', WEIGHT.bold),
+                        active ? classes(COLOR.selectionBg, COLOR.accent) : classes(COLOR.glassW8, COLOR.muted),
+                        tab.id === "reports" && tab.badge && Number(tab.badge) > 0 && classes(STATUS.dangerBg, STATUS.dangerFg)
                       )}>
                         {tab.badge}
                       </span>
                     )}
-                  </button>
+                  </Button>
                 );
               })}
           </div>
         ))}
       </nav>
 
-      <div className="p-4 border-t border-edge space-y-2">
-        <div className="flex items-center justify-between text-2xs font-mono text-retro-muted">
+      <div className={classes(PADDING[4], 'border-t', COLOR.edge, 'space-y-2')}>
+        <div className={classes('flex items-center justify-between', TYPE.caption, 'font-mono', COLOR.muted)}>
           <span>Admin Status:</span>
-          <span className="text-success-fg font-bold uppercase tracking-wider">Active</span>
+          <span className={classes(STATUS.success, WEIGHT.bold, 'uppercase', TRACKING.wider)}>Active</span>
         </div>
         <a
           href="/"
-          className="w-full block text-center py-2 bg-surface-interactive hover:bg-glass-w10 text-retro-fg rounded font-bold text-xs transition-colors"
+          className={classes('w-full block text-center', PADDING_Y[2], COLOR.interactive, COLOR.hoverW10, COLOR.fg, RADIUS.chip, WEIGHT.bold, TYPE.body, MOTION.transition.micro)}
         >
           Return to App
         </a>

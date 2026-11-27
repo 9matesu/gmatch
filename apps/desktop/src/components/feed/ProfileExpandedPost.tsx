@@ -23,7 +23,7 @@ import { custodyStatus } from '../../utils/durableCustody';
 import { useDurableCustody } from '../../hooks/useDurableCustody';
 import { PostComments } from './PostComments';
 import {
-  classes, COLOR, GAP, ICON, PADDING, PADDING_X, PADDING_Y,
+  classes, COLOR, GAP, ICON, MOTION, PADDING, PADDING_X, PADDING_X_SM, PADDING_Y,
   RADIUS, STATUS, TRACKING, TRANSITION, TYPE, WEIGHT,
 } from '../../ui/tokens';
 
@@ -31,8 +31,8 @@ import {
  *  the right-click menu and the durability label contract are untouched. */
 const ARTICLE = classes('mt-2 overflow-hidden animate-orbit-slide-up', RADIUS.panel, 'border', COLOR.edge, COLOR.panelGlass, COLOR.fg);
 const ACTION_ICON = classes(
-  'p-1.5 cursor-pointer transition-transform duration-150 active:scale-(--scale-press)',
-  RADIUS.chip, COLOR.hoverW10,
+  'p-1.5 cursor-pointer active:scale-(--scale-press)',
+  MOTION.transition.transform, RADIUS.chip, COLOR.hoverW10,
 );
 const CAROUSEL_ARROW = classes(
   'absolute top-1/2 -translate-y-1/2 p-2 cursor-pointer',
@@ -259,7 +259,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
         {/* Double Tap Heart Pop */}
         {doubleTapAnimation && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 animate-orbit-pop">
-            <Heart className={classes('w-28 h-28 fill-white drop-shadow-2xl opacity-90 animate-pulse', COLOR.fg)} />
+            <Heart className={classes('w-28 h-28 drop-shadow-2xl opacity-90 animate-pulse', COLOR.fg, COLOR.onMediaFill)} />
           </div>
         )}
 
@@ -316,7 +316,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
       </div>
 
       {/* Action Bar — same icons, order, colors and padding as the standard card. */}
-      <div className={classes(PADDING_X[3], 'sm:px-4', 'pt-2.5', PADDING_Y[3])}>
+      <div className={classes(PADDING_X[3], PADDING_X_SM[4], 'pt-2.5', PADDING_Y[3])}>
         <div className="flex items-center justify-between">
           <div className={classes('flex items-center', GAP[1])}>
             <button

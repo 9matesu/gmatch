@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { cn } from "../../lib/utils";
 import { AdminSidebar } from "./AdminSidebar";
 import { AdminHeader } from "./AdminHeader";
+import { classes, COLOR, MOTION, PADDING, PADDING_MD } from "../../ui/tokens";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -73,14 +74,14 @@ export function AdminLayout({
           <>
             {sidebarOpen && (
               <div
-                className="fixed inset-0 z-[var(--z-dropdown)] bg-black/70 animate-orbit-fade-in lg:hidden"
+                className={classes('fixed inset-0 z-[var(--z-dropdown)]', COLOR.scrim, MOTION.keyframe.fadeIn, 'lg:hidden')}
                 onClick={() => setSidebarOpen(false)}
                 aria-hidden="true"
               />
             )}
             <AdminSidebar
               className={cn(
-                "fixed inset-y-0 left-0 z-50 w-72 transform transition-transform duration-300 ease-out lg:static lg:translate-x-0",
+                classes("fixed inset-y-0 left-0 z-[var(--z-dropdown)] w-72 transform", MOTION.transition.enter, "lg:static lg:translate-x-0"),
                 sidebarOpen ? "translate-x-0" : "-translate-x-full"
               )}
               activeTab={activeTab}
@@ -98,7 +99,7 @@ export function AdminLayout({
         )}
 
         <section aria-label="Admin workspace" className="flex-1 overflow-y-auto min-w-0 lg:ml-0">
-          <div className="p-4 md:p-6 space-y-6">
+          <div className={classes(PADDING[4], PADDING_MD[6], 'space-y-6')}>
             {children}
           </div>
         </section>

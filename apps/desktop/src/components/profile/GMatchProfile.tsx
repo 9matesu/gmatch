@@ -31,9 +31,10 @@ import { profileShareUrl, orbitFetch, invalidateCache } from '../../utils/api';
 import { mergeFollowIds } from '../../utils/followList';
 import { usePeerFollowEdges } from '../../hooks/usePeerFollows';
 import {
-  classes, COLOR, GAP, ICON, MONO, PADDING, PADDING_X, PADDING_Y,
-  PRESENCE, RADIUS, SHADOW, TRACKING, TRANSITION, TYPE, WEIGHT,
+  classes, COLOR, GAP, ICON, MONO, MOTION, PADDING, PADDING_X, PADDING_Y,
+  PADDING_SM, PRESENCE, RADIUS, SHADOW, TRACKING, TRANSITION, TYPE, WEIGHT,
 } from '../../ui/tokens';
+import { Button } from '../../ui/kit';
 
 /**
  * SURFACE + TYPOGRAPHY recipes for the repeated profile chrome. Every value is
@@ -45,23 +46,19 @@ const PROFILE_ROOT = classes(
   'w-full font-sans select-none overflow-hidden animate-orbit-fade-in',
   COLOR.canvasSurface, 'border', COLOR.edge, RADIUS.panel, COLOR.fg, SHADOW.modal,
 );
-const PROFILE_HEADER = classes(COLOR.surfaceRaised, 'border-b', COLOR.edge, PADDING[4], 'sm:p-6', 'flex flex-col', GAP[4]);
-const ACTION_BTN = classes(
-  'flex-1 py-2 px-3 border cursor-pointer', RADIUS.control,
-  COLOR.interactive, COLOR.edge, COLOR.body, WEIGHT.medium, TYPE.body, TRANSITION.micro,
-);
-const ICON_ACTION_BTN = classes('p-2 border cursor-pointer', RADIUS.control, COLOR.interactive, COLOR.edge, COLOR.body, TRANSITION.micro);
+const PROFILE_HEADER = classes(COLOR.surfaceRaised, 'border-b', COLOR.edge, PADDING[4], PADDING_SM[6], 'flex flex-col', GAP[4]);
 const TAB_BTN = classes(
   'py-1.5 px-3 flex items-center justify-center cursor-pointer',
   GAP[1.5], TYPE.body, WEIGHT.medium, RADIUS.chip, TRANSITION.micro,
 );
 const GRID_CELL = classes('relative aspect-square overflow-hidden cursor-pointer group', COLOR.canvasSurface);
+const CELL_IMG = classes('w-full h-full object-cover group-hover:scale-105', MOTION.transition.transform);
 const CELL_GRID = classes('grid grid-cols-3 sm:gap-1', GAP[0.5]);
 const EMPTY_CELL = classes('col-span-3 py-16 text-center', TYPE.body, COLOR.muted);
-const VIDEO_CHIP = classes('absolute top-1.5 right-1.5 p-1 pointer-events-none z-10', COLOR.scrim, 'backdrop-blur-xs', RADIUS.chip, COLOR.fg);
+const VIDEO_CHIP = classes('absolute top-1.5 right-1.5 p-1 pointer-events-none z-[var(--z-dropdown)]', COLOR.scrim, 'backdrop-blur-xs', RADIUS.chip, COLOR.fg);
 const CELL_SCRIM = classes(
-  'absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity',
-  'flex items-center justify-center z-10', COLOR.fg, TYPE.body, WEIGHT.medium,
+  'absolute inset-0 opacity-0 group-hover:opacity-100', MOTION.transition.fade,
+  'flex items-center justify-center z-[var(--z-dropdown)]', COLOR.fg, TYPE.body, WEIGHT.medium, COLOR.mediaVeil,
 );
 
 /**
@@ -359,7 +356,7 @@ export function GMatchProfile({
       {/* Profile Header */}
       <div className={PROFILE_HEADER}>
         {/* Avatar & Stats */}
-        <div className={classes('flex items-center gap-5 sm:gap-6')}>
+        <div className={classes('flex items-center', GAP[5], 'sm:gap-6')}>
           {/* Avatar */}
           <button
             type="button"
@@ -384,7 +381,7 @@ export function GMatchProfile({
                 objectId={pfp?.includes('/api/objects/') ? pfp.slice(pfp.indexOf('/api/objects/') + 13).split(/[?#]/)[0] : null}
                 identity={identity}
                 alt={displayName}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                className={CELL_IMG}
                 loading="eager"
                 fetchPriority="high"
                 hideUnavailable
@@ -396,8 +393,8 @@ export function GMatchProfile({
               </div>
             )}
             {isSelf && (
-              <div className={classes('absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center', COLOR.scrimSoft)}>
-                <Camera className={classes('w-5 h-5', COLOR.fg)} />
+              <div className={classes('absolute inset-0 opacity-0 group-hover:opacity-100 flex items-center justify-center', MOTION.transition.fade, COLOR.scrimSoft)}>
+                <Camera className={classes(ICON.lg, COLOR.fg)} />
               </div>
             )}
           </button>
@@ -410,7 +407,7 @@ export function GMatchProfile({
                 className="flex flex-col cursor-pointer"
                 onClick={(stat as any).onClick}
               >
-                <span className={classes('sm:text-base', TYPE.sub, WEIGHT.semibold, COLOR.fg, MONO)}>
+                <span className={classes(TYPE.base, WEIGHT.semibold, COLOR.fg, MONO)}>
                   {stat.value}
                 </span>
                 <span className={classes(TYPE.body, COLOR.muted)}>{stat.label}</span>
@@ -444,7 +441,7 @@ export function GMatchProfile({
               rel="noopener noreferrer"
               className={classes(TYPE.body, COLOR.accent, 'hover:underline flex items-center', GAP[1])}
             >
-              <ExternalLink className="w-3 h-3" />
+              <ExternalLink className={ICON.sm} />
               <span>{website.replace(/^https?:\/\//, '')}</span>
             </a>
           )}
@@ -452,25 +449,28 @@ export function GMatchProfile({
 
         {/* Action Buttons */}
         <div className={classes('flex items-center', GAP[2])}>
-          <button
+          <Button
             type="button"
+            variant="secondary"
             onClick={() => { playPress(800); setShowEditor(true); }}
-            className={ACTION_BTN}
+            className="flex-1"
           >
             Edit profile
-          </button>
+          </Button>
 
-          <button
+          <Button
             type="button"
+            variant="secondary"
             onClick={handleShareProfile}
-            className={classes(ACTION_BTN, 'flex items-center justify-center', GAP[1.5])}
+            className={classes('flex-1', 'flex items-center justify-center', GAP[1.5])}
           >
             <Share2 className={ICON.sm} />
             <span>Share</span>
-          </button>
+          </Button>
 
-          <button
+          <Button
             type="button"
+            variant="secondary"
             onClick={() => { playPress(750); onOpenSettings?.(); }}
             title="Settings"
             // The command island renders a Settings button that is mounted on
@@ -478,10 +478,10 @@ export function GMatchProfile({
             // on one screen are indistinguishable to a screen reader, so this
             // one names its surface. Behaviour is unchanged.
             aria-label="Profile settings"
-            className={ICON_ACTION_BTN}
+            className={PADDING[2]}
           >
             <Settings className={ICON.md} />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -491,24 +491,22 @@ export function GMatchProfile({
           const Icon = tab.icon;
           const isActive = profileTab === tab.id;
           return (
-            <button
+            <Button
               key={tab.id}
               type="button"
+              variant={isActive ? 'secondary' : 'ghost'}
               onClick={() => { playPress(750); setProfileTab(tab.id as any); }}
-              className={classes(TAB_BTN, isActive
-                ? classes(COLOR.glassW12, COLOR.fg)
-                : classes(COLOR.muted, COLOR.hoverBody),
-              )}
+              className={classes(TAB_BTN, isActive ? COLOR.fg : COLOR.muted)}
             >
               <Icon className={ICON.md} />
               <span className="hidden sm:inline">{tab.label}</span>
-            </button>
+            </Button>
           );
         })}
       </div>
 
       {/* Grid */}
-      <div className={classes(PADDING[1], 'sm:p-1.5')}>
+      <div className={classes(PADDING[1], PADDING_SM[1.5])}>
         {profileTab === 'posts' && (
           <div className={CELL_GRID}>
             {expandedNode}
@@ -528,24 +526,24 @@ export function GMatchProfile({
                   identity={identity}
                   mimeType={post.mime_type}
                   alt=""
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
-                  videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
+                  className={CELL_IMG}
+                  videoClassName={CELL_IMG}
                   muted
                   autoPlay={false}
                   playsInline
                 />
                 {videoPostIds.has(post.id) && (
                   <div className={VIDEO_CHIP}>
-                    <Play className="w-3 h-3 fill-white" />
+                    <Play className={classes(ICON.sm, COLOR.onMediaFill)} />
                   </div>
                 )}
                 <div className={classes(CELL_SCRIM, GAP[4])}>
-                  <div className="flex items-center gap-1">
-                    <Heart className="w-4 h-4 fill-white" />
+                  <div className={classes('flex items-center', GAP[1])}>
+                    <Heart className={classes(ICON.md, COLOR.onMediaFill)} />
                     <span>{post.like_count || 0}</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <MessageCircle className="w-4 h-4 fill-white" />
+                  <div className={classes('flex items-center', GAP[1])}>
+                    <MessageCircle className={classes(ICON.md, COLOR.onMediaFill)} />
                     <span>{post.comment_count || 0}</span>
                   </div>
                 </div>
@@ -577,19 +575,19 @@ export function GMatchProfile({
                   identity={identity}
                   mimeType={post.mime_type}
                   alt=""
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
-                  videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
+                  className={CELL_IMG}
+                  videoClassName={CELL_IMG}
                   muted
                   autoPlay={false}
                   playsInline
                 />
                 {videoPostIds.has(post.id) && (
                   <div className={VIDEO_CHIP}>
-                    <Play className="w-3 h-3 fill-white" />
+                    <Play className={classes(ICON.sm, COLOR.onMediaFill)} />
                   </div>
                 )}
                 <div className={CELL_SCRIM}>
-                  <Bookmark className="w-5 h-5 fill-white" />
+                  <Bookmark className={classes(ICON.lg, COLOR.onMediaFill)} />
                 </div>
               </div>
             ))}
@@ -618,15 +616,15 @@ export function GMatchProfile({
                   identity={identity}
                   mimeType={post.mime_type}
                   alt=""
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
-                  videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
+                  className={CELL_IMG}
+                  videoClassName={CELL_IMG}
                   muted
                   autoPlay={false}
                   playsInline
                 />
                 {videoPostIds.has(post.id) && (
                   <div className={VIDEO_CHIP}>
-                    <Play className="w-3 h-3 fill-white" />
+                    <Play className={classes(ICON.sm, COLOR.onMediaFill)} />
                   </div>
                 )}
                 <div className={classes(CELL_SCRIM, PRESENCE.currentText)}>
@@ -656,15 +654,15 @@ export function GMatchProfile({
                   identity={identity}
                   mimeType={card.mime_type}
                   alt=""
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
-                  videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150"
+                  className={CELL_IMG}
+                  videoClassName={CELL_IMG}
                   muted
                   autoPlay={false}
                   playsInline
                 />
                 {videoCardIds.has(card.id) && (
                   <div className={VIDEO_CHIP}>
-                    <Play className="w-3 h-3 fill-white" />
+                    <Play className={classes(ICON.sm, COLOR.onMediaFill)} />
                   </div>
                 )}
               </div>

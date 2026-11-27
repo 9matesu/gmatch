@@ -13,6 +13,11 @@ import { createCardFromMedia, type CanonicalCard, type CardCreationMetadata } fr
 import { useCropper } from '../hooks/useCropper';
 import { isCropableImage } from './CropModal';
 import { playPress } from '../utils/sounds';
+import { Button, Input, Textarea } from '../ui/kit';
+import {
+  classes, CHROME, COLOR, GAP, ICON, MONO, MOTION, PADDING, PADDING_X, PADDING_Y,
+  RADIUS, RECIPE, STATUS, TRACKING, TYPE, WEIGHT,
+} from '../ui/tokens';
 
 const MAX_TAGS = 8;
 
@@ -217,94 +222,95 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0,
   };
 
   return (
-    <div className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6">
-      <div className="glass-surface w-full max-w-5xl max-h-[92dvh] overflow-y-auto rounded-xl p-4 sm:p-6 text-retro-fg">
-        <div className="flex items-start justify-between gap-4 mb-5">
+    <div className={classes(RECIPE.modalOverlay, 'p-3 sm:p-6')}>
+      <div className={classes(CHROME.overlayPanel, 'w-full max-w-5xl max-h-[92dvh] overflow-y-auto', PADDING[4], 'sm:p-6', COLOR.fg)}>
+        <div className={classes('flex items-start justify-between', GAP[4], 'mb-5')}>
           <div>
-            <div className="flex items-center gap-2 text-retro-accent text-2xs font-black uppercase tracking-[0.18em]">
-              <Sparkles className="w-4 h-4" /> Card Forge
+            <div className={classes('flex items-center', GAP[2], COLOR.accent, TYPE.caption, WEIGHT.heading, 'uppercase', TRACKING.wider)}>
+              <Sparkles className={ICON.md} /> Card Forge
             </div>
-            <h2 className="text-xl sm:text-2xl font-black mt-1">Create a unique card</h2>
+            <h2 className={classes(TYPE.display, 'sm:text-2xl', WEIGHT.heading, 'mt-1')}>Create a unique card</h2>
           </div>
-          <button type="button" onClick={onClose} className="glass-button p-2 rounded-xl text-retro-muted hover:text-retro-fg" aria-label="Close card creator">
-            <X className="w-5 h-5" />
-          </button>
+          <Button type="button" variant="ghost" size="sm" onClick={onClose} className="p-2" aria-label="Close card creator">
+            <X className={ICON.md} />
+          </Button>
         </div>
 
         {cardsNeeded > 0 && (
-          <div className="mb-4 rounded-xl border border-retro-warning/30 bg-retro-warning/10 px-3 py-2 text-xs text-retro-warning">
+          <div className={classes(RADIUS.panel, STATUS.warningEdgeSoft, STATUS.warningBg, PADDING_X[3], PADDING_Y[2], TYPE.body, STATUS.warning, 'mb-4')}>
             Quick Play needs {cardsNeeded} more card{cardsNeeded === 1 ? '' : 's'}.
           </div>
         )}
 
         <div className="grid lg:grid-cols-[minmax(220px,0.7fr)_minmax(0,1.3fr)] gap-5">
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-full max-w-[270px] aspect-[3/4.2] rounded-xl p-1.5 transition" style={{ background: `linear-gradient(135deg, #9FE3FF, rgba(255,255,255,.55), #9FE3FF)`, boxShadow: '0 18px 50px #9FE3FF44' }}>
-              <div className="relative w-full h-full overflow-hidden rounded-xl bg-surface-canvas flex flex-col">
-                <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-white/20 via-transparent to-transparent z-10" />
+          <div className={classes('flex flex-col items-center', GAP[3])}>
+            <div className={classes('w-full max-w-[270px] aspect-[3/4.2]', RADIUS.panel, PADDING[1.5], MOTION.transition.quick)} style={{ background: `linear-gradient(135deg, #9FE3FF, rgba(255,255,255,.55), #9FE3FF)`, boxShadow: '0 18px 50px #9FE3FF44' }}>
+              <div className={classes('relative w-full h-full overflow-hidden', RADIUS.panel, 'bg-surface-canvas flex flex-col')}>
+                <div className={classes('absolute inset-0 pointer-events-none bg-gradient-to-br from-white/20 via-transparent to-transparent z-[var(--z-dropdown)]')} />
                 <div className="aspect-[3/3.1] bg-black/30 overflow-hidden flex items-center justify-center">
                   {previewUrl ? (isVideo ? <video src={previewUrl} className="w-full h-full object-cover" autoPlay muted loop playsInline /> : <img src={previewUrl} alt="Card preview" className="w-full h-full object-cover" />) : <ImagePlus className="w-10 h-10 text-retro-muted" />}
                 </div>
-                <div className="p-3 flex-1 flex flex-col justify-between">
+                <div className={classes(PADDING[3], 'flex-1 flex flex-col justify-between')}>
                   <div>
-                    <div className="text-2xs uppercase tracking-[0.18em] text-retro-muted">Chrome edition</div>
-                    <div className="text-base font-black truncate mt-1">{name.trim() || 'Your Card Name'}</div>
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {(tags.length ? tags : ['your-tags']).map((tag) => <span key={tag} className="text-2xs rounded-full border px-1.5 py-0.5" style={{ borderColor: '#9FE3FF88', color: '#9FE3FF' }}>#{tag}</span>)}
+                    <div className={classes(TYPE.caption, 'uppercase', TRACKING.wider, COLOR.muted)}>Chrome edition</div>
+                    <div className={classes(TYPE.base, WEIGHT.heading, 'truncate mt-1')}>{name.trim() || 'Your Card Name'}</div>
+                    <div className={classes('flex flex-wrap mt-2', GAP[1])}>
+                      {(tags.length ? tags : ['your-tags']).map((tag) => <span key={tag} className={classes(TYPE.caption, RADIUS.pill, 'border', PADDING_X[1.5], 'py-0.5')} style={{ borderColor: '#9FE3FF88', color: '#9FE3FF' }}>#{tag}</span>)}
                     </div>
                   </div>
-                  <div className="mt-4 flex items-end justify-between gap-2">
-                    <span className="text-2xs text-retro-muted line-clamp-2">{description.trim() || 'Polished silver edge'}</span>
-                    <span className="text-2xs font-mono font-bold" style={{ color: '#9FE3FF' }}>VALUE TBD</span>
+                  <div className={classes('mt-4 flex items-end justify-between', GAP[2])}>
+                    <span className={classes(TYPE.caption, COLOR.muted, 'line-clamp-2')}>{description.trim() || 'Polished silver edge'}</span>
+                    <span className={classes(TYPE.caption, MONO, WEIGHT.bold)} style={{ color: '#9FE3FF' }}>VALUE TBD</span>
                   </div>
                 </div>
               </div>
             </div>
-            <span className="text-2xs text-retro-muted">Live preview</span>
+            <span className={classes(TYPE.caption, COLOR.muted)}>Live preview</span>
           </div>
 
           <div className="space-y-4">
             <DropZone onFiles={handleFiles} onPasteUrl={handlePasteUrl} onPayloadDrop={handlePayloadDrop} compact={false} accept="image/jpeg, image/png, image/webp, image/avif, image/gif, video/mp4, video/webm, video/quicktime, video/ogg, video/*" multiple={false}>
-              <div className="space-y-2 py-2">
-                <ImagePlus className="w-7 h-7 mx-auto text-retro-accent" />
-                <p className="text-sm text-retro-body">Drop an image or video, browse, or paste a URL</p>
-                <p className="text-2xs text-retro-muted">Or drag a keepsake in from the Gallery panel. The original media stays private until you share or play it.</p>
+              <div className={classes('space-y-2 py-2')}>
+                <ImagePlus className={classes('w-7 h-7 mx-auto', COLOR.accent)} />
+                <p className={classes(TYPE.sub, COLOR.body)}>Drop an image or video, browse, or paste a URL</p>
+                <p className={classes(TYPE.caption, COLOR.muted)}>Or drag a keepsake in from the Gallery panel. The original media stays private until you share or play it.</p>
               </div>
             </DropZone>
 
-            <button
+            <Button
               type="button"
+              variant="secondary"
               onClick={() => void openMediaPicker().then((sel) => { if (sel) void takePickerSelection(sel); })}
-              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-edge text-xs font-semibold text-retro-muted hover:text-retro-fg hover:border-retro-accent hover:bg-glass-w8 cursor-pointer transition"
+              className={classes('w-full', COLOR.hoverAccent)}
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className={ICON.sm} />
               Pick from your media, this device, or a link
-            </button>
+            </Button>
 
-            <div className="grid sm:grid-cols-2 gap-3">
-              <label className="space-y-1.5 sm:col-span-2">
-                <span className="text-2xs font-bold uppercase tracking-wider text-retro-muted">Card name *</span>
-                <input value={name} onChange={(event) => setName(event.target.value.slice(0, 80))} placeholder="Give a unique name to this nice card" className="w-full px-3 py-2.5 text-sm" autoFocus />
+            <div className={classes('grid sm:grid-cols-2', GAP[3])}>
+              <label className={classes('space-y-1.5 sm:col-span-2')}>
+                <span className={classes(TYPE.caption, WEIGHT.bold, 'uppercase', TRACKING.wider, COLOR.muted)}>Card name *</span>
+                <Input value={name} onChange={(event) => setName(event.target.value.slice(0, 80))} placeholder="Give a unique name to this nice card" className="py-2.5" autoFocus />
               </label>
-              <label className="space-y-1.5 sm:col-span-2">
-                <span className="text-2xs font-bold uppercase tracking-wider text-retro-muted">Description</span>
-                <textarea value={description} onChange={(event) => setDescription(event.target.value.slice(0, 240))} placeholder="What's all that about? Describe your gooning material if you feel like so." rows={3} className="w-full px-3 py-2.5 text-sm resize-none" />
+              <label className={classes('space-y-1.5 sm:col-span-2')}>
+                <span className={classes(TYPE.caption, WEIGHT.bold, 'uppercase', TRACKING.wider, COLOR.muted)}>Description</span>
+                <Textarea value={description} onChange={(event) => setDescription(event.target.value.slice(0, 240))} placeholder="What's all that about? Describe your gooning material if you feel like so." rows={3} className="py-2.5" />
               </label>
-              <div className="sm:col-span-2 space-y-1.5">
-                <span className="text-2xs font-bold uppercase tracking-wider text-retro-muted">Tags <span className="normal-case font-normal">({tags.length}/{MAX_TAGS}). Comma or space separated</span></span>
-                <div className="flex gap-2">
-                  <div className="relative flex-1"><Tag className="absolute left-3 top-3 w-4 h-4 text-retro-muted" /><input value={tagInput} maxLength={MAX_TAGS * 25} onChange={(event) => setTagInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ',') { event.preventDefault(); addTag(); } }} onBlur={() => { if (tagInput.trim()) addTag(); }} placeholder="futa, bbc, BWNO, hentai" className="w-full pl-9 pr-3 py-2.5 text-sm" /></div>
-                  <button type="button" onClick={addTag} disabled={tags.length >= MAX_TAGS || !tagInput.trim()} className="glass-button px-3 rounded-xl disabled:opacity-40" aria-label="Add tag"><Plus className="w-4 h-4" /></button>
+              <div className={classes('sm:col-span-2 space-y-1.5')}>
+                <span className={classes(TYPE.caption, WEIGHT.bold, 'uppercase', TRACKING.wider, COLOR.muted)}>Tags <span className="normal-case font-normal">({tags.length}/{MAX_TAGS}). Comma or space separated</span></span>
+                <div className={classes('flex', GAP[2])}>
+                  <div className="relative flex-1"><Tag className={classes('absolute left-3 top-3', ICON.md, COLOR.muted)} /><Input value={tagInput} maxLength={MAX_TAGS * 25} onChange={(event) => setTagInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ',') { event.preventDefault(); addTag(); } }} onBlur={() => { if (tagInput.trim()) addTag(); }} placeholder="futa, bbc, BWNO, hentai" className="pl-9 py-2.5" /></div>
+                  <Button type="button" variant="secondary" onClick={addTag} disabled={tags.length >= MAX_TAGS || !tagInput.trim()} aria-label="Add tag"><Plus className={ICON.md} /></Button>
                 </div>
-                <div className="flex flex-wrap gap-1.5 min-h-6">{tags.map((tag) => <button type="button" key={tag} onClick={() => setTags((current) => current.filter((item) => item !== tag))} className="glass-button rounded-full px-2 py-1 text-2xs text-retro-body">#{tag} x</button>)}</div>
+                <div className={classes('flex flex-wrap min-h-6', GAP[1.5])}>{tags.map((tag) => <Button type="button" key={tag} variant="ghost" size="sm" onClick={() => setTags((current) => current.filter((item) => item !== tag))} className={classes(RADIUS.pill, TYPE.caption, COLOR.body)}>#{tag} x</Button>)}</div>
               </div>
             </div>
 
-            {creating && <div className="space-y-1"><div className="flex justify-between text-2xs text-retro-muted"><span>Forging card...</span><span>{progress}%</span></div><div className="h-1.5 rounded-full bg-black/30 overflow-hidden"><div className="h-full bg-retro-accent transition" style={{ width: `${progress}%` }} /></div></div>}
-            {error && <div className="rounded-xl border border-retro-error/30 bg-retro-error/10 px-3 py-2 text-xs text-retro-error">{error}</div>}
-            <div className="flex justify-end gap-2 pt-1">
-              <button type="button" onClick={onClose} className="glass-button px-4 py-2.5 rounded-xl text-xs font-bold">Cancel</button>
-              <button type="button" onClick={handleCreate} disabled={!canCreate} className="accent-control px-4 py-2.5 rounded-xl text-xs font-black disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2">{creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />} {creating ? 'Creating...' : 'Create Card'}</button>
+            {creating && <div className={classes('space-y-1', TYPE.caption, COLOR.muted)}><div className="flex justify-between"><span>Forging card...</span><span>{progress}%</span></div><div className={classes('h-1.5', RECIPE.hpBar)}><div className="h-full bg-retro-accent transition" style={{ width: `${progress}%` }} /></div></div>}
+            {error && <div className={classes(RADIUS.panel, STATUS.dangerEdge, STATUS.dangerBg, PADDING_X[3], PADDING_Y[2], TYPE.body, STATUS.danger)}>{error}</div>}
+            <div className={classes('flex justify-end', GAP[2], 'pt-1')}>
+              <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+              <Button type="button" variant="primary" onClick={handleCreate} disabled={!canCreate} className={classes('flex items-center', GAP[2], WEIGHT.heading)}>{creating ? <Loader2 className={classes(ICON.md, 'animate-spin')} /> : <Sparkles className={ICON.md} />} {creating ? 'Creating...' : 'Create Card'}</Button>
             </div>
           </div>
         </div>

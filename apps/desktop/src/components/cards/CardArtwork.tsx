@@ -3,6 +3,7 @@
 import { HoloCard } from 'react-holo-card-effect/dist/index.js'
 import { Loader2 } from 'lucide-react'
 import { useObjectImage } from '../../hooks/useObjectImage'
+import { classes, COLOR, GAP, MONO, PADDING_X, TYPE } from '../../ui/tokens'
 
 interface IdentityLike {
   orbitId: string
@@ -64,7 +65,13 @@ export function CardArtwork({
         ) : !img.url ? (
           <div
             role="status"
-            className="absolute inset-0 z-0 flex flex-col items-center justify-center gap-2 bg-[#211799] px-3 text-center text-2xs font-mono text-retro-muted"
+            className={classes(
+              'absolute inset-0 z-0 flex flex-col items-center justify-center',
+              GAP[2], PADDING_X[3], 'text-center',
+              TYPE.caption, MONO, COLOR.muted,
+              // Card-art placeholder colour: game semantics, not shell chrome.
+              'bg-[#211799]',
+            )}
           >
             <Loader2 className="h-4 w-4 animate-spin" aria-label="Loading card art" />
             <span>{img.failed ? 'No preview' : 'Loading card art…'}</span>
