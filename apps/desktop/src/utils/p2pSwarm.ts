@@ -50,7 +50,11 @@ export type {
  * costs one re-read — never data. Bounded by entries AND bytes, oldest first.
  */
 const RAM_LIMIT_ENTRIES = 256
-const RAM_LIMIT_BYTES = 192 * 1024 * 1024
+// Kept well under the 256 MB renderer heap (electron/main.cjs js-flags): the
+// swarm shares that heap with React + decoded images, so a 192 MB cache left
+// too little headroom under heavy posting. An eviction only costs one re-read
+// from the vault/IndexedDB — never data.
+const RAM_LIMIT_BYTES = 96 * 1024 * 1024
 const localObjects = new Map<string, Blob>()
 let localObjectBytes = 0
 

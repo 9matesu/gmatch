@@ -65,9 +65,17 @@ export function httpUrlOrUndefined(value: string | null | undefined): string | u
  * relies on the swarm, which is the existing durable path.
  */
 const REGISTER_ATTACH_CAP = 1 * 1024 * 1024
+/**
+ * The immediate (non-durable) register can carry far more: it does NOT go
+ * through the localStorage outbox, so the ~5 MB origin budget does not apply.
+ * Attaching up to 8 MB here is what puts a large image on the always-on NODE,
+ * so the other users can still load it after the author closes the app —
+ * "images always delivered" instead of swarm-only.
+ */
+const IMMEDIATE_ATTACH_CAP = 8 * 1024 * 1024
 
-async function attachBytes(file: File): Promise<Record<string, unknown> | undefined> {
-  if (file.size > REGISTER_ATTACH_CAP) return undefined
+async function attachBytes(file: File, cap: number): Promise<Record<string, unknown> | undefined> {
+  if (file.size > cap) return undefined
   const b64 = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => {
@@ -183,7 +191,7 @@ export async function forgeMediaLocally(
     recipients: options.recipients || null,
     ...(contentUrl ? { content_url: contentUrl } : {}),
     ...(sourceUrl ? { source_url: sourceUrl } : {}),
-    ...(await attachBytes(file)),
+    ...(await attachBytes(file, options.durable ? REGISTER_ATTACH_CAP : IMMEDIATE_ATTACH_CAP)),
   }
 
   const gossipable = (options.isPublic ?? true) && !options.isStory && !options.isAvatar && !options.isChat
