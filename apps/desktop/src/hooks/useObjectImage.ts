@@ -253,7 +253,7 @@ async function resolveObject(
   if (isContentHash(contentHash)) {
     const expected = contentHash.toLowerCase()
     const blob = await resolveContentAddressedMedia(lookupId ?? null, expected)
-    if (!blob) return { state: FAILED(cleanId), cache: false, awaitingSeeder: false }
+    if (!blob) return commit(FAILED(cleanId))
     // Cache the bytes under BOTH names the row may be asked for: the object id
     // alias (a remount by url is instant) and the content hash (the durable key
     // peers address). The resolver proved the hash, so neither registration
@@ -279,7 +279,7 @@ async function resolveObject(
 
   // No content hash: the legacy ladder needs a requestable id (a descriptor
   // with no id inside it has nothing to ask anyone for).
-  if (!lookupId) return { state: FAILED(cleanId), cache: false, awaitingSeeder: false }
+  if (!lookupId) return commit(FAILED(cleanId))
 
   // P2P first; the network is only touched on a miss.
   // The encrypted vault is local storage too: a row that moved worlds keeps its
@@ -320,7 +320,7 @@ async function resolveObject(
 
   // A descriptor has no node path: the local stores were the only honest shot.
   if (localOnly) {
-    return { state: FAILED(cleanId), cache: false, awaitingSeeder: false }
+    return commit(FAILED(cleanId))
   }
 
   // The signed object stream is the only long-held request in the app: run a
@@ -472,7 +472,9 @@ async function resolveObjectNetwork(
       void import('../utils/pendingTransfers')
         .then(({ enqueuePendingTransfer }) => enqueuePendingTransfer(cleanId, hash))
         .catch(() => {})
-      return { state: FAILED(cleanId), cache: false, awaitingSeeder: false }
+      // Cache the dead state: a view switch must not re-run the 5s swarm ask
+      // for bytes nobody has. A PEER_ONLINE retry still re-resolves it.
+      return commit(FAILED(cleanId))
     }
     return commit({
       cardId: cleanId,
