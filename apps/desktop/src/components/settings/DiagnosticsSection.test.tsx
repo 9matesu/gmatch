@@ -83,7 +83,8 @@ describe('DiagnosticsSection', () => {
     expect(logged.peers).toBe(3)
     expect(logged.metrics).toBeTruthy()
     expect(await screen.findByText(/HTTP 200/)).toBeTruthy()
-    expect(screen.getByText(/"db_ready": true/)).toBeTruthy()
+    // DEV shows the console group, not the raw <pre> dump (non-dev only).
+    expect(screen.queryByText(/"db_ready": true/)).toBeNull()
   })
 
   it('reports a failed fix inline instead of claiming success', async () => {

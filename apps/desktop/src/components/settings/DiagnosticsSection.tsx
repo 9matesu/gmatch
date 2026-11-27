@@ -389,7 +389,8 @@ export function DiagnosticsSection({
         })}
       </div>
 
-      {summary && (
+      {/* Dev prints a console group instead; the raw dump is for non-dev. */}
+      {summary && !import.meta.env.DEV && (
         <div className="space-y-1.5">
           <div className="text-2xs font-medium uppercase tracking-wider text-retro-muted">
             Last diagnosis (raw)
