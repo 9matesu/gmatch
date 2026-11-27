@@ -720,7 +720,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               decorative effect — the object-contain image is the whole stage. */}
           {isMotion && current ? (
             <video
-              className={`${GOON_IMAGE} relative z-[3]`}
+              className={`${GOON_IMAGE} relative z-[3] ${reduceMotion ? '' : 'pointer-events-none'}`}
               src={redgifsPlayable(current.url)}
               poster={current.preview ? redgifsPlayable(current.preview) : undefined}
               autoPlay
