@@ -128,9 +128,8 @@ describe('GMatchFeed video player on timeline', () => {
     const expandBtn = screen.getByTitle(/expand to lightbox/i);
     await userEvent.click(expandBtn);
 
-    // Inline expand (image only), not a lightbox modal or side sheet.
-    expect(document.querySelector('[data-expanded="true"]')).not.toBeNull();
-    expect(screen.queryByPlaceholderText(/add a comment\.\.\./i)).not.toBeInTheDocument();
+    // Inline expand (image + caption + actions + comments), not a lightbox modal.
+    expect(document.querySelector('[data-expanded-post]')).not.toBeNull();
   });
 
   it('routes a legacy vault:// video repost through ObjectImage (localhost http), never raw vault:// or signed post-id fetch', async () => {

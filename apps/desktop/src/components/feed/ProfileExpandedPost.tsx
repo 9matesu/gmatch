@@ -9,8 +9,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  ZoomIn,
-  ZoomOut,
+  Maximize,
   ShieldCheck,
 } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
@@ -31,7 +30,7 @@ import { PostComments } from './PostComments';
  * same wired action bar and comment thread — but rendered as an <article> in
  * the page flow under the grid instead of a fixed overlay dialog.
  */
-export function ProfileExpandedPost({ post, onClose, identity, profilePics = {}, isLiked = false, isSaved = false, likeCount = 0, comments = [], commentsLoading = false, onToggleLike, onToggleSave, onAddComment, onToggleCommentLike, onReportComment, onOpenShare, onOptionsClick, onOpenLikers, onSelectUser, onAvatarClick, onOpenNetwork }: {
+export function ProfileExpandedPost({ post, onClose, identity, profilePics = {}, isLiked = false, isSaved = false, likeCount = 0, comments = [], commentsLoading = false, onToggleLike, onToggleSave, onAddComment, onToggleCommentLike, onReportComment, onOpenShare, onOptionsClick, onOpenLikers, onSelectUser, onAvatarClick, onOpenNetwork, onFullscreen }: {
   post: FeedPost;
   onClose: () => void;
   identity: OrbitIdentity | null;
@@ -58,8 +57,9 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
   onSelectUser?: (userId: string) => void;
   onAvatarClick?: (userId: string) => void;
   onOpenNetwork?: (userId: string) => void;
+  /** Open the image in the fullscreen lightbox. */
+  onFullscreen?: (post: FeedPost) => void;
 }) {
-  const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [doubleTapAnimation, setDoubleTapAnimation] = useState(false);
 
@@ -74,9 +74,8 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
   // device holds them (this node alone is not replication).
   const custody = custodyStatus(useDurableCustody(post?.content_hash || post?.id));
 
-  // Reset carousel/zoom whenever a different post is opened.
+  // Reset carousel whenever a different post is opened.
   useEffect(() => {
-    setZoomLevel(1);
     setActiveMediaIndex(0);
     setDoubleTapAnimation(false);
   }, [post?.id]);
@@ -123,11 +122,6 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
     setTimeout(() => setDoubleTapAnimation(false), 700);
   };
 
-  const handleZoomToggle = () => {
-    playPress(700);
-    setZoomLevel((prev) => (prev === 1 ? 1.8 : prev === 1.8 ? 2.6 : 1));
-  };
-
   const handleAuthorClick = () => {
     if (!post) return;
     if (onOpenNetwork) {
@@ -172,7 +166,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
           </div>
           <div>
             <div className="flex items-center gap-1">
-              <span className="text-xs font-semibold text-retro-fg hover:underline">{post.author_name}</span>
+              <span className="text-sm font-semibold text-retro-fg hover:underline">{post.author_name}</span>
             </div>
             <span className="text-2xs text-retro-muted font-medium block">
               {post.location ? `${post.location} · ` : ''}{timeAgo(post.created_at)}
@@ -212,18 +206,12 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
               onDoubleTapLike={handleDoubleTap}
             />
           ) : (
-            <div
-              className="w-full h-full flex items-center justify-center transition-transform duration-300 ease-out cursor-zoom-in motion-safe:transition-transform motion-reduce:transition-none"
-              style={{ transform: `scale(${zoomLevel})` }}
-              onClick={handleZoomToggle}
-            >
-              <img
-                src={post.localPreviewUrl}
-                alt={post.caption || ''}
-                className="w-full h-full object-contain max-h-(--max-h-sheet)"
-                draggable={false}
-              />
-            </div>
+            <img
+              src={post.localPreviewUrl}
+              alt={post.caption || ''}
+              className="w-full h-full object-contain max-h-(--max-h-sheet)"
+              draggable={false}
+            />
           )
         ) : activeMedia && isExpandedMediaVideo(activeMedia.url, activeMedia.mime) ? (
           <ObjectImage
@@ -243,28 +231,32 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
             onDoubleTapLike={handleDoubleTap}
           />
         ) : (
-          <div
-            className="w-full h-full flex items-center justify-center transition-transform duration-300 ease-out cursor-zoom-in motion-safe:transition-transform motion-reduce:transition-none"
-            style={{ transform: `scale(${zoomLevel})` }}
-            onClick={handleZoomToggle}
-          >
-            <ObjectImage
-              contentUrl={post.localPreviewUrl || activeMedia?.url || post.url}
-              objectId={activeMedia?.id || post.id}
-              contentHash={post.content_hash}
-              identity={identity}
-              mimeType={activeMedia?.mime || post.mime_type}
-              alt=""
-              hideUnavailable
-              className="w-full h-full object-contain max-h-(--max-h-sheet)"
-              muted={false}
-              autoPlay={false}
-              controls={false}
-              loop
-              playsInline
-            />
-          </div>
+          <ObjectImage
+            contentUrl={post.localPreviewUrl || activeMedia?.url || post.url}
+            objectId={activeMedia?.id || post.id}
+            contentHash={post.content_hash}
+            identity={identity}
+            mimeType={activeMedia?.mime || post.mime_type}
+            alt=""
+            hideUnavailable
+            className="w-full h-full object-contain max-h-(--max-h-sheet)"
+            muted={false}
+            autoPlay={false}
+            controls={false}
+            loop
+            playsInline
+          />
         )}
+
+        {/* Fullscreen: open the image in the lightbox. */}
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onFullscreen?.(post); }}
+          aria-label="Fullscreen"
+          className="absolute top-3 right-3 z-10 p-2 rounded-full bg-black/60 text-retro-fg hover:bg-black/80 cursor-pointer"
+        >
+          <Maximize className="w-4 h-4" />
+        </button>
 
         {/* Double Tap Heart Pop */}
         {doubleTapAnimation && (
@@ -318,18 +310,6 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
           </>
         )}
 
-        {/* Zoom controls pill */}
-        <div className="absolute top-3 left-3 flex items-center gap-1 bg-black/60 backdrop-blur-md rounded-full px-2.5 py-1 text-retro-fg text-2xs font-medium border border-edge">
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); handleZoomToggle(); }}
-            aria-label={zoomLevel > 1 ? 'Zoom out' : 'Zoom in'}
-            className="flex items-center gap-1 hover:text-retro-fg cursor-pointer"
-          >
-            {zoomLevel > 1 ? <ZoomOut className="w-3.5 h-3.5" /> : <ZoomIn className="w-3.5 h-3.5" />}
-            <span className="font-mono">{Math.round(zoomLevel * 100)}%</span>
-          </button>
-        </div>
       </div>
 
       {/* Action Bar */}

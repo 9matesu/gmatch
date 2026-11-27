@@ -119,7 +119,7 @@ describe('GMatchFeed author header', () => {
     fireEvent.click(mediaBox);
 
     // Inline expand: the media wrapper reports expanded; no side sheet / dialog.
-    expect(card.querySelector('[data-expanded="true"]')).not.toBeNull();
+    expect(card.querySelector('[data-expanded-post]')).not.toBeNull();
     expect(document.querySelector('aside[role="complementary"]')).toBeNull();
     expect(screen.queryByRole('dialog')).toBeNull();
   });
