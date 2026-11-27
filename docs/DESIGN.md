@@ -1,8 +1,16 @@
 # gMatch Design System v1.2 (Monochrome Slate HUD)
 
 One design system for every tab, page, modal, button, settings and admin panel.
-Convergence contract — tokens already exist in `src/globals.css` (@theme) and
-`src/ui/styles.ts`; components consume them, they never re-inline equivalents.
+Convergence contract — raw values live ONLY in `src/globals.css` (@theme).
+`src/ui/tokens.ts` is the SINGLE typed source of token names (spacing, layout,
+radius, shadow, type, colour roles, button variants/sizes, wordmark, class
+recipes). `src/ui/styles.ts` re-exports it for existing imports and adds only
+the game-semantic literals; `src/ui/kit.tsx` composes the kit from the same
+module. Components consume these names, they never re-inline equivalents.
+`node apps/desktop/scripts/check-ui-tokens.mjs` gates raw `#hex`, `rgb(`,
+`text-gray-*`, `p-[13px]` and numeric inline padding across `src`; the few
+legacy exceptions (HP fill, crit flash, rarity, generated art) are scoped by
+file + smell + exact value in `check-ui-tokens.allowlist.json` with a reason.
 
 Reviewed absorption of the Antigravity "Social-Native Gaming HUD" plan
 (2026-09-12): cyber-slate canvas + electric-blue interactive accent + floating
@@ -79,7 +87,7 @@ A dialog uses `z-[var(--z-modal)]` — never `z-system`: 18 of them sat on the
 - NO backdrop saturate/filter tricks; `backdrop-blur` allowed ONLY on
   `.command-island` and scrims.
 
-## Buttons (ui/styles.ts is the only factory)
+## Buttons (ui/tokens.ts is the only factory; styles.ts re-exports it)
 primary `BTN + BTN_PRIMARY` · secondary `BTN` · small `BTN + BTN_SMALL` ·
 destructive `BTN + BTN_DANGER` · icon-only: bare `p-1.5 rounded-md
 hover:bg-glass-w10` + `aria-label`, NO border/blur wrapper · toggle = one pill

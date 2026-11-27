@@ -1,0 +1,133 @@
+{
+  "version": 1,
+  "note": "Known pre-existing raw values. Each entry is scoped to one file AND one exact matched value, so a newly introduced raw value in the same file still fails the guard. Reasons reference docs/DESIGN.md 'Exemptions' (game semantics) or the specific pre-existing surface.",
+  "entries": [
+    {
+      "file": "admin/components/tabs/SettingsTab.tsx",
+      "why": "admin Sparkline series colours — runtime data colour, docs/DESIGN.md exemptions",
+      "smells": {
+        "hex-color": ["#67e8f9", "#34d399", "#a855f7", "#38bdf8", "#f59e0b"]
+      }
+    },
+    {
+      "file": "App.tsx",
+      "why": "2px avatar/story ring hairline, pre-existing",
+      "smells": { "arbitrary-padding": ["p-[2px]"] }
+    },
+    {
+      "file": "components/Avatar.tsx",
+      "why": "generated avatar palette — docs/DESIGN.md exemptions",
+      "smells": {
+        "hex-color": ["#27272a", "#3f3f46", "#52525b", "#71717a", "#a1a1aa", "#d4d4d8", "#e4e4e7", "#18181b"]
+      }
+    },
+    {
+      "file": "components/BabecockPanel.tsx",
+      "why": "canvas raster fill — computed paint, not a class (docs/DESIGN.md exemptions)",
+      "smells": { "hex-color": ["#0b0e14"] }
+    },
+    {
+      "file": "components/CardBack.tsx",
+      "why": "card-back artwork gradients — game semantics",
+      "smells": { "raw-rgb": ["rgba(168, 85, 247, 0.15)", "rgba(255,255,255,0.03)"] }
+    },
+    {
+      "file": "components/CardDetailView.tsx",
+      "why": "card accent #9FE3FF — user-editable card payload (docs/DESIGN.md exemptions)",
+      "smells": { "hex-color": ["#9FE3FF"] }
+    },
+    {
+      "file": "components/cards/CardArtwork.tsx",
+      "why": "card artwork placeholder — game semantics",
+      "smells": { "hex-color": ["#211799"] }
+    },
+    {
+      "file": "components/CreateCardModal.tsx",
+      "why": "card forge preview + accent — user-editable card payload",
+      "smells": {
+        "hex-color": ["#9FE3FF", "#9FE3FF44", "#9FE3FF88"],
+        "raw-rgb": ["rgba(255,255,255,.55)"]
+      }
+    },
+    {
+      "file": "components/domination/ActionModal.tsx",
+      "why": "domination colour picker default — card accent payload",
+      "smells": { "hex-color": ["#9FE3FF"] }
+    },
+    {
+      "file": "components/domination/DominationEffects.tsx",
+      "why": "domination effect runtime colour + card accent — game semantics",
+      "smells": { "hex-color": ["#9FE3FF"], "raw-rgb": ["rgba(0,0,0,0.1)"] }
+    },
+    {
+      "file": "components/feed/GMatchFeed.tsx",
+      "why": "2px story ring hairline, pre-existing",
+      "smells": { "arbitrary-padding": ["p-[2px]"] }
+    },
+    {
+      "file": "components/feed/ProfileExpandedPost.tsx",
+      "why": "1px avatar ring hairline, pre-existing",
+      "smells": { "arbitrary-padding": ["p-[1px]"] }
+    },
+    {
+      "file": "components/GMatchStories.tsx",
+      "why": "story ring hairlines (1.5/2/2.5px), pre-existing",
+      "smells": { "arbitrary-padding": ["p-[2px]", "p-[2.5px]", "p-[1.5px]"] }
+    },
+    {
+      "file": "components/profile/FollowersFollowingModal.tsx",
+      "why": "2px story ring hairline, pre-existing",
+      "smells": { "arbitrary-padding": ["p-[2px]"] }
+    },
+    {
+      "file": "components/rare/bounce-sidebar.tsx",
+      "why": "vendored rare component brand colour, pre-existing",
+      "smells": { "hex-color": ["#FC4C01"] }
+    },
+    {
+      "file": "components/rare/notification-bell.tsx",
+      "why": "vendored rare component brand palette, pre-existing",
+      "smells": {
+        "hex-color": ["#FF3B30", "#FF453A", "#FF9500", "#FF9F0A", "#34C759", "#30D158", "#007AFF", "#0A84FF", "#AF52DE", "#BF5AF2", "#000"]
+      }
+    },
+    {
+      "file": "components/ui/EmojiReaction.tsx",
+      "why": "emoji reaction content badge colours, pre-existing",
+      "smells": { "hex-color": ["#F4F4F9", "#262626"] }
+    },
+    {
+      "file": "components/views/MessagesView.tsx",
+      "why": "3px avatar ring hairline, pre-existing",
+      "smells": { "arbitrary-padding": ["p-[3px]"] }
+    },
+    {
+      "file": "services/offlineSvg.ts",
+      "why": "offline SVG placeholder gradient — SPEC §6 fallback, generated art",
+      "smells": {
+        "hex-color": ["#1a0b2e", "#ff2d78", "#7b2ff7", "#0a0a0f"],
+        "raw-rgb": ["rgba(255,255,255,0.85)", "rgba(255,255,255,0.5)"]
+      }
+    },
+    {
+      "file": "ui/DamageTint.tsx",
+      "why": "crit/hit flash — game semantics, do not tokenize",
+      "smells": { "raw-rgb": ["rgba(251,191,36,0.85)", "rgba(244,63,94,0.55)", "rgba(244,63,94,0.8)", "rgba(190,18,60,0.45)"] }
+    },
+    {
+      "file": "utils/cardCollection.ts",
+      "why": "card accent #9FE3FF — user-editable card payload",
+      "smells": { "hex-color": ["#9FE3FF"] }
+    },
+    {
+      "file": "utils/dominationMesh.ts",
+      "why": "domination effect accent — game semantics",
+      "smells": { "hex-color": ["#9FE3FF"] }
+    },
+    {
+      "file": "utils/gameAds.ts",
+      "why": "GAME_AD_TEMPLATES brand gradients — docs/DESIGN.md exemptions",
+      "smells": { "hex-color": ["#5865F2", "#7289da", "#4752C4", "#f09433", "#dc2743", "#bc1888"] }
+    }
+  ]
+}

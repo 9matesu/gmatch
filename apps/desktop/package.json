@@ -14,6 +14,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "e2e:clean": "node scripts/clean-e2e-state.mjs",
+    "check:ui-tokens": "node scripts/check-ui-tokens.mjs",
     "icon": "node scripts/make-icon.cjs",
     "dist": "npm run icon && npm run stage:api && npm run build && electron-builder --win portable --config.directories.output=release && npm run stage:release",
     "pack": "electron-builder --win portable",

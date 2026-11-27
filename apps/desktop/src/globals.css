@@ -212,6 +212,25 @@
   --space-10: 40px;
   --space-12: 48px;
 
+  /* Common UI layout. Each value is copied from a width the shell already
+     shipped (max-w-6xl = 72rem, the SideSheet's 420px / 92vw), never a new
+     size. `grid-feed-cols` names the 2-column feed default from SPEC. */
+  --layout-content: 72rem;
+  --layout-sheet: 420px;
+  --layout-sheet-max: 92vw;
+  --grid-feed-cols: 2;
+
+  /* Elevation ramps: the SAME box-shadows the glass materials already used,
+     promoted to names so the common UI kit never re-inlines one. */
+  --shadow-panel: 0 12px 32px rgba(0, 0, 0, 0.32);
+  --shadow-panel-strong: 0 12px 32px rgba(0, 0, 0, 0.38);
+  --shadow-toolbar: 0 8px 24px rgba(0, 0, 0, 0.32);
+  --shadow-surface: 0 20px 48px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 -1px 0 rgba(0, 0, 0, 0.42);
+  --shadow-control: 0 2px 6px rgba(0, 0, 0, 0.25);
+
+  /* Heading weight: h1-h6 and module titles already carried 700. */
+  --weight-heading: 700;
+
   /* Sidebar/chart stubs for shadcn compat */
   --color-sidebar-ring: #ffffff;
   --color-sidebar-border: #27272a;
@@ -345,7 +364,7 @@
 
   /* Typography hierarchy */
   h1, h2, h3, h4, h5, h6 {
-    font-weight: 700;
+    font-weight: var(--weight-heading);
     line-height: 1.1;
     letter-spacing: -0.01em;
   }
@@ -382,7 +401,7 @@
   background: var(--color-glass);
   border: 1px solid var(--color-edge);
   border-radius: var(--radius-lg);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.38);
+  box-shadow: var(--shadow-panel-strong);
 }
 
 
@@ -393,7 +412,7 @@
   background: var(--color-surface-raised);
   border: 1px solid var(--color-edge);
   border-radius: var(--radius-lg);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
+  box-shadow: var(--shadow-toolbar);
 }
 
 /* Shared Figma-style glass controls: one depth language for navigation and
@@ -401,10 +420,7 @@
 .glass-surface {
   background: var(--color-glass);
   border: 1px solid var(--color-edge);
-  box-shadow:
-    0 20px 48px rgba(0, 0, 0, 0.34),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.42);
+  box-shadow: var(--shadow-surface);
 }
 
 
@@ -415,7 +431,7 @@
   background: var(--color-surface-raised);
   border: 1px solid var(--color-edge);
   color: var(--color-retro-muted);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--shadow-control);
   transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1),
     color 150ms ease, border-color 150ms ease, box-shadow 150ms ease,
     background 150ms ease;
@@ -956,7 +972,7 @@ select.bg-transparent {
   background: var(--color-glass);
   border: 1px solid var(--color-edge);
   border-radius: var(--radius-lg);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
+  box-shadow: var(--shadow-panel);
 }
 
 
@@ -1112,7 +1128,7 @@ select.bg-transparent {
 
 .module-title {
   font-size: 0.8125rem;
-  font-weight: 700;
+  font-weight: var(--weight-heading);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--color-retro-fg);
