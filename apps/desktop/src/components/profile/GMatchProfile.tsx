@@ -476,6 +476,7 @@ export function GMatchProfile({
       <div className="p-1 sm:p-1.5">
         {profileTab === 'posts' && (
           <div className="grid grid-cols-3 gap-0.5 sm:gap-1">
+            {expandedNode}
             {displayPosts.map((post) => (
               <div
                 key={post.id}
@@ -641,9 +642,6 @@ export function GMatchProfile({
           </div>
         )}
       </div>
-
-      {/* Inline expansion for the clicked grid post (no modal) */}
-      {expandedNode}
 
       {/* Profile Picture Modal */}
       {showPfpModal && (

@@ -7,7 +7,6 @@ import { playPress, playMsgReceive } from '../../utils/sounds';
 import { orbitFetch, postShareUrl } from '../../utils/api';
 import { copyText } from '../../utils/clipboard';
 import { ProfileExpandedPost } from './ProfileExpandedPost';
-import { SideSheet } from '../../ui/kit';
 import { SharePostModal } from './SharePostModal';
 import { PostContextMenu } from './PostContextMenu';
 import { PostLikersModal } from './PostLikersModal';
@@ -276,18 +275,11 @@ export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
 
   const userNames = Object.fromEntries(users.map((u) => [u.id, u.display_name || '']));
 
-  // The open post renders in a SideSheet ("ao lado", never pushing the grid
-  // down). Share/options/likers stay true overlays and render wherever the
-  // consumer mounts `modals`. zIndexClass lifts the sheet above a host
-  // overlay (e.g. UserProfileModal at z-system).
+  // The open post renders INLINE inside the grid as a full-row card (col-span-3),
+  // not a side sheet: image + caption + actions + comments, like an expanded
+  // post. Share/options/likers stay true overlays (`modals`).
   const expandedNode = activePost ? (
-    <SideSheet
-      open
-      onClose={closePost}
-      title={activePost.author_name || 'Post'}
-      width="w-[480px] max-w-[94vw]"
-      zIndexClass={zIndexClass}
-    >
+    <article className="col-span-3 w-full bg-retro-panel border border-edge rounded-xl overflow-hidden animate-orbit-pop">
       <ProfileExpandedPost
         post={activePost}
         onClose={closePost}
@@ -323,7 +315,7 @@ export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
           : undefined
       }
       />
-    </SideSheet>
+    </article>
   ) : null;
 
   const modals = (
