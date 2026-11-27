@@ -9,7 +9,6 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  Maximize,
   ShieldCheck,
 } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
@@ -30,7 +29,7 @@ import { PostComments } from './PostComments';
  * same wired action bar and comment thread — but rendered as an <article> in
  * the page flow under the grid instead of a fixed overlay dialog.
  */
-export function ProfileExpandedPost({ post, onClose, identity, profilePics = {}, isLiked = false, isSaved = false, likeCount = 0, comments = [], commentsLoading = false, onToggleLike, onToggleSave, onAddComment, onToggleCommentLike, onReportComment, onOpenShare, onOptionsClick, onOpenLikers, onSelectUser, onAvatarClick, onOpenNetwork, onFullscreen }: {
+export function ProfileExpandedPost({ post, onClose, identity, profilePics = {}, isLiked = false, isSaved = false, likeCount = 0, comments = [], commentsLoading = false, onToggleLike, onToggleSave, onAddComment, onToggleCommentLike, onReportComment, onOpenShare, onOptionsClick, onOpenLikers, onSelectUser, onAvatarClick, onOpenNetwork }: {
   post: FeedPost;
   onClose: () => void;
   identity: OrbitIdentity | null;
@@ -57,8 +56,6 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
   onSelectUser?: (userId: string) => void;
   onAvatarClick?: (userId: string) => void;
   onOpenNetwork?: (userId: string) => void;
-  /** Open the image in the fullscreen lightbox. */
-  onFullscreen?: (post: FeedPost) => void;
 }) {
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [doubleTapAnimation, setDoubleTapAnimation] = useState(false);
@@ -186,9 +183,10 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
         </div>
       </div>
 
-      {/* Media: carousel + zoom, capped for inline flow (not a dialog). */}
+      {/* Media. Click opens the fullscreen ImageViewer; double-click still likes. */}
       <div
-        className="relative bg-retro-bg flex items-center justify-center overflow-hidden min-h-[280px]"
+        className="relative bg-retro-bg flex items-center justify-center overflow-hidden min-h-[280px] cursor-pointer"
+        onClick={() => { if (post.id) window.dispatchEvent(new CustomEvent('gmatch-open-image', { detail: { id: post.id } })); }}
         onDoubleClick={handleDoubleTap}
       >
         {post.localPreviewUrl ? (
@@ -247,16 +245,6 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
             playsInline
           />
         )}
-
-        {/* Fullscreen: open the image in the lightbox. */}
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onFullscreen?.(post); }}
-          aria-label="Fullscreen"
-          className="absolute top-3 right-3 z-10 p-2 rounded-full bg-black/60 text-retro-fg hover:bg-black/80 cursor-pointer"
-        >
-          <Maximize className="w-4 h-4" />
-        </button>
 
         {/* Double Tap Heart Pop */}
         {doubleTapAnimation && (

@@ -1679,7 +1679,6 @@ function GMatchFeedImpl({
                     onOpenLikers={(id) => setLikersModalPostId(id)}
                     onAvatarClick={handleAvatarClick}
                     onSelectUser={handleAvatarClick}
-                    onFullscreen={(p) => { const u = p.localPreviewUrl || p.url; if (u) window.open(u, '_blank'); }}
                   />
                 )}
               </article>

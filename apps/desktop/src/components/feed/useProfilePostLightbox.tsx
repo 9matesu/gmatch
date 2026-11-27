@@ -306,7 +306,6 @@ export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
       onOpenLikers={(postId) => setLikersPostId(postId)}
       onSelectUser={handleAvatar}
       onAvatarClick={handleAvatar}
-      onFullscreen={(p) => { const u = p.localPreviewUrl || p.url; if (u) window.open(u, '_blank'); }}
       onOpenNetwork={
         onOpenNetwork
           ? (uId) => {

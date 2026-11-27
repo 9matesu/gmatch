@@ -498,6 +498,15 @@ export default function Home() {
   const [groupPickerOpen, setGroupPickerOpen] = useState(false)
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null)
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+  // Clicking an expanded post's image opens the fullscreen ImageViewer.
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const id = (e as CustomEvent<{ id?: string }>).detail?.id;
+      if (id) setExpandedItemId(id);
+    };
+    window.addEventListener('gmatch-open-image', onOpen);
+    return () => window.removeEventListener('gmatch-open-image', onOpen);
+  }, []);
   const [storyViewerUserId, setStoryViewerUserId] = useState<string | null>(null);
   const [spectateViewerItems, setSpectateViewerItems] = useState<OrbitObject[] | null>(null);
   const [viewerMessage, setViewerMessage] = useState<ChatMessage | null>(null);
