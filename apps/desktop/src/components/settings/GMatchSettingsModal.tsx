@@ -32,6 +32,7 @@ import { UpdateSection } from './UpdateSection';
 import { CommunitySection } from './CommunitySection';
 import { ImportPostsSection } from './ImportPostsSection';
 import { RecacheMediaSection } from './RecacheMediaSection';
+import { MediaqSection } from './MediaqSection';
 import { BlocklistSection } from './BlocklistSection';
 import { CacheViewer } from './CacheViewer';
 import {
@@ -113,7 +114,7 @@ function FeedSettingsTab({
 
   return (
     <div className="space-y-6 animate-orbit-fade-in">
-      <div className="p-4 bg-glass-w5 border border-edge rounded-lg space-y-3">
+      <div className="p-4 bg-glass-w5 border border-edge rounded-lg field-stack">
         <h4 className="text-xs font-medium text-retro-fg">Excluded tags</h4>
         <p className="text-xs text-retro-muted">
           Active excluded tags ({userExcludes.length}/{MAX_USER_EXCLUDES}).
@@ -567,7 +568,7 @@ export function GMatchSettingsModal({
                   </div>
 
                   {/* Display Toggles */}
-                  <div className="space-y-3 pt-2 border-t border-edge divide-y divide-edge">
+                  <div className="field-stack pt-2 border-t border-edge divide-y divide-edge">
                     {([
                       {
                         label: 'Auto-Refresh Heartbeat Sync',
@@ -655,10 +656,10 @@ export function GMatchSettingsModal({
                     state was a constant `false`). Three of them are live
                     settings the app reads; the only way to change them was a
                     modal nobody could open. They live here now. */}
-                <div className="p-4 bg-glass-w5 border border-edge rounded-lg space-y-3">
+                <div className="p-4 bg-glass-w5 border border-edge rounded-lg field-stack">
                   <h4 className="text-xs font-medium text-retro-fg">Media & notifications</h4>
 
-                  <div className="space-y-3 divide-y divide-edge">
+                  <div className="field-stack divide-y divide-edge">
                     {([
                       {
                         label: 'Hide notification content',
@@ -709,7 +710,7 @@ export function GMatchSettingsModal({
                 </div>
 
                 {/* Wallpaper & Background Section */}
-                <div className="p-4 bg-glass-w5 border border-edge rounded-lg space-y-3">
+                <div className="p-4 bg-glass-w5 border border-edge rounded-lg field-stack">
                   <button
                     type="button"
                     onClick={() => setWallpaperExpanded(!wallpaperExpanded)}
@@ -832,7 +833,7 @@ export function GMatchSettingsModal({
                 </div>
 
                 {/* Local media vault (opt-in): gallery keeps + card bytes on disk */}
-                <div className="p-4 bg-glass-w5 border border-edge rounded-lg space-y-3">
+                <div className="p-4 bg-glass-w5 border border-edge rounded-lg field-stack">
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <h4 className="text-xs font-medium text-retro-fg">Local media vault</h4>
@@ -875,7 +876,7 @@ export function GMatchSettingsModal({
 
             {/* Mesh: who this install announces itself to. */}
             {activeTab === 'preferences' && (
-              <div className="p-4 bg-glass-w5 border border-edge rounded-lg space-y-3">
+              <div className="p-4 bg-glass-w5 border border-edge rounded-lg field-stack">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-xs font-medium text-retro-fg">Mesh discovery</div>
@@ -934,11 +935,15 @@ export function GMatchSettingsModal({
             {/* Opt-in legacy measure: fetch keepsakes that predate local bytes. */}
             {activeTab === 'preferences' && <RecacheMediaSection toast={toast} />}
 
+            {/* Optional content provider: one-click install; the clicker works
+                on local sources the whole time, with or without it. */}
+            {activeTab === 'preferences' && <MediaqSection onClose={onClose} toast={toast} />}
+
             {/* ──────── 2. ACCOUNT & SECURITY ──────── */}
             {activeTab === 'account' && (
               <div className="space-y-6 animate-orbit-fade-in">
                 {/* Orbit ID Display */}
-                <div className="p-4 bg-glass-w5 border border-edge rounded-lg space-y-3">
+                <div className="p-4 bg-glass-w5 border border-edge rounded-lg field-stack">
                   <div className="flex items-center justify-between">
                     <span className="text-2xs font-medium uppercase tracking-wider text-retro-muted">
                       Cryptographic Identity Key
@@ -969,7 +974,7 @@ export function GMatchSettingsModal({
                 </div>
 
                 {/* Legal Terms */}
-                <div className="p-4 bg-glass-w5 border border-edge rounded-lg space-y-3">
+                <div className="p-4 bg-glass-w5 border border-edge rounded-lg field-stack">
                   <button
                     type="button"
                     onClick={() => { playPress(700); setShowLegalCenter(true); }}
@@ -1017,7 +1022,7 @@ export function GMatchSettingsModal({
                 </div>
 
                 {/* Active Session & Log Out */}
-                <div className="p-4 bg-glass-w5 border border-edge rounded-lg space-y-3">
+                <div className="p-4 bg-glass-w5 border border-edge rounded-lg field-stack">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                       <h4 className="text-xs font-semibold text-retro-fg">Active session</h4>

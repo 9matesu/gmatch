@@ -9,6 +9,7 @@ import { useRef, useState } from 'react'
 import { Download, Flag, ListVideo, Loader2, Play, Plus, X } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { Button, Textarea } from '../../ui/kit'
+import { ContextMenu, type ContextMenuItem } from '../ui/ContextMenu'
 import {
   CHROME,
   COLOR,
@@ -108,6 +109,7 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
   const canAdd = isHost || !party.lockVideo
   const canControl = canControlParty(party, identity.orbitId)
   const dragId = useRef<string | null>(null)
+  const [queueMenu, setQueueMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
 
   const submit = async (queueOnly: boolean) => {
     const urls = parseLines(text)
@@ -205,10 +207,40 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
             if (src) moveQueueEntry(party.id, src, '')
           }}
         >
-          {party.queue.map((q, i) => (
+          {party.queue.map((q, i) => {
+            // Every queue row has a context built from the SAME handlers its
+            // buttons use — right-click is a shortcut, not a second path.
+            const contextItems: ContextMenuItem[] = []
+            if (isHost && q.status === 'proposed') contextItems.push({
+              label: 'Approve suggestion', icon: <Play className="w-3.5 h-3.5" />,
+              onSelect: () => queueOp(party.id, 'approve', q.id),
+            })
+            if (canControl && q.id !== party.current && q.status !== 'proposed' && q.status !== 'unavailable') contextItems.push({
+              label: 'Play now', icon: <Play className="w-3.5 h-3.5" />,
+              onSelect: () => queueOp(party.id, 'play', q.id),
+            })
+            if (canControl) contextItems.push({
+              label: 'Remove from queue', icon: <X className="w-3.5 h-3.5" />, danger: true,
+              onSelect: () => queueOp(party.id, 'remove', q.id),
+            })
+            if (canControl && q.status !== 'unavailable') contextItems.push({
+              label: 'Flag as unavailable', icon: <Flag className="w-3.5 h-3.5" />,
+              onSelect: () => queueOp(party.id, 'flag', q.id),
+            })
+            if (canControl && q.status === 'unavailable') contextItems.push({
+              label: 'Mark available again', icon: <Flag className="w-3.5 h-3.5" />,
+              onSelect: () => queueOp(party.id, 'unflag', q.id),
+            })
+            return (
             <li
               key={q.id}
               draggable={canControl}
+              onContextMenu={(e) => {
+                if (contextItems.length === 0) return
+                e.preventDefault()
+                e.stopPropagation()
+                setQueueMenu({ x: e.clientX, y: e.clientY, items: contextItems })
+              }}
               onDragStart={(e) => { dragId.current = q.id; if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move' }}
               onDragOver={(e) => { if (dragId.current && dragId.current !== q.id) e.preventDefault() }}
               onDrop={(e) => {
@@ -292,8 +324,18 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
                 </button>
               )}
             </li>
-          ))}
+            )
+          })}
         </ul>
+      )}
+      {queueMenu && (
+        <ContextMenu
+          x={queueMenu.x}
+          y={queueMenu.y}
+          title="Queue item"
+          items={queueMenu.items}
+          onDismiss={() => setQueueMenu(null)}
+        />
       )}
       {party.queue.length === 0 && !adding && <p className={cx('px-3 pb-2', TYPE.caption, COLOR.muted)}>Empty.</p>}
       {canControl && party.queue.length > 0 && (

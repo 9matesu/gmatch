@@ -98,7 +98,7 @@ function createFetchBooru({ sources, httpGet, cache, blocked = () => false, dead
     }
   }
 
-  return async function fetchBooru({ tags, limit, allowReal, allowHentai, fresh, probe, page, source }) {
+  const fetchBooru = async function fetchBooru({ tags, limit, allowReal, allowHentai, fresh, probe, page, source }) {
     const query = String(tags ?? '').trim()
     const n = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 100)
     if (!query || blocked(query)) {
@@ -251,6 +251,15 @@ function createFetchBooru({ sources, httpGet, cache, blocked = () => false, dead
     metrics?.round({ totalMs: Date.now() - roundStart, resultCount: 0, source: null, fallback: usedSlow })
     return { posts: [], source: null, ok: false, timedOut: Date.now() >= deadline }
   }
+
+  /**
+   * A provider that has just become available (mediaq finished installing and
+   * its local server started) must not sit out a stale failure cooldown: the
+   * clicker should pick it up on the very next fetch. The search mechanism owns
+   * its health map, so the install path only hands it an id to forget.
+   */
+  fetchBooru.clearCooldown = (id) => { if (id) unhealthyUntil.delete(id) }
+  return fetchBooru
 }
 
 module.exports = {

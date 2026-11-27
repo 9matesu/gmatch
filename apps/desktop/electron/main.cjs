@@ -1362,6 +1362,9 @@ app.whenReady().then(async () => {
     sidecar: mediaqSidecar,
     getUserData: () => app.getPath('userData'),
     mainLog,
+    // A newly installed/started mediaq must be available to the clicker on the
+    // very next fetch, not after a stale source cooldown expires.
+    onReady: () => { if (typeof fetchBooru.clearCooldown === 'function') fetchBooru.clearCooldown('mediaq') },
   })
   // Start the mediaq sidecar if the one-shot setup suite has installed it. Off
   // (installed=false) this is a cheap no-op; a failure leaves mediaq off, never

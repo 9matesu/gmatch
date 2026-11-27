@@ -83,6 +83,7 @@ export function WorldRow({
   onJoin,
   joinDisabled,
   menuItems,
+  onContextMenu,
 }: {
   server: DirectoryServer
   state: WorldRowState
@@ -91,6 +92,8 @@ export function WorldRow({
   onJoin?: () => void
   joinDisabled?: boolean
   menuItems: ReactNode
+  /** Right-click opens the same actions in the shared context menu. */
+  onContextMenu?: (e: React.MouseEvent<HTMLLIElement>) => void
 }) {
   const status = state.status
   const current = status === 'Current'
@@ -156,6 +159,7 @@ export function WorldRow({
       )}
       aria-current={current || undefined}
       aria-busy={status === 'Connecting' || undefined}
+      onContextMenu={onContextMenu}
     >
       {/* The connected world keeps a colour rail so "where am I" never needs
           reading a label. */}

@@ -11,7 +11,7 @@
  * semantics (HP/rarity/crit) stay in ui/styles.ts, not in this kit.
  */
 import {
-  useEffect, useId, useRef,
+  useEffect, useId, useRef, useState,
   type ButtonHTMLAttributes,
   type ComponentProps,
   type ReactNode,
@@ -41,6 +41,81 @@ export type { ButtonVariant, ButtonSize, CardTone } from './tokens'
 /** The motion preset is part of the kit's public surface: surfaces consume
  *  MOTION (not a duration literal) when they need a shell transition. */
 export { MOTION } from './tokens'
+
+// ─── Overlay priority (one stack, one Escape owner) ─────────────────────────
+
+interface OverlayEntry {
+  id: number
+  close: () => void
+}
+
+/**
+ * Every overlay opts into ONE stack. Mount order IS priority: the newest layer
+ * is painted above older ones and owns Escape, so a dialog opened on top of
+ * another dialog is reachable and one Escape closes only that top layer. A
+ * layer is removed on unmount, so nothing sticky is left to trap the pointer.
+ *
+ * The z-index is derived from the mount sequence as `calc(<base> + <n>)`: no
+ * raw 3-digit literal, and the base stays the token owned by globals.css.
+ */
+const overlayStack: OverlayEntry[] = []
+let overlaySeq = 0
+let escapeOwnerInstalled = false
+
+function handleOverlayEscape(e: KeyboardEvent) {
+  if (e.key !== 'Escape') return
+  const top = overlayStack[overlayStack.length - 1]
+  if (!top) return
+  // Capture phase + stopPropagation: the event never reaches the lower layers'
+  // own handlers, so one Escape cannot dismiss the whole stack at once.
+  e.preventDefault()
+  e.stopPropagation()
+  top.close()
+}
+
+function ensureEscapeOwner() {
+  if (escapeOwnerInstalled || typeof window === 'undefined') return
+  window.addEventListener('keydown', handleOverlayEscape, true)
+  escapeOwnerInstalled = true
+}
+
+function releaseEscapeOwner() {
+  if (!escapeOwnerInstalled || overlayStack.length || typeof window === 'undefined') return
+  window.removeEventListener('keydown', handleOverlayEscape, true)
+  escapeOwnerInstalled = false
+}
+
+export interface OverlayLayer {
+  /** Inline z-index value for the overlay root. */
+  zIndex: string
+}
+
+/**
+ * Register an overlay for the lifetime of `active`. Callers apply `zIndex` to
+ * their root; Escape is owned centrally and only ever closes the top layer.
+ */
+export function useOverlayLayer(active: boolean, onClose: () => void, base = 'var(--z-modal)'): OverlayLayer {
+  const closeRef = useRef(onClose)
+  closeRef.current = onClose
+  const [priority, setPriority] = useState(0)
+
+  useEffect(() => {
+    if (!active) return
+    overlaySeq += 1
+    const id = overlaySeq
+    overlayStack.push({ id, close: () => closeRef.current() })
+    setPriority(id)
+    ensureEscapeOwner()
+    return () => {
+      const i = overlayStack.findIndex((o) => o.id === id)
+      if (i >= 0) overlayStack.splice(i, 1)
+      if (!overlayStack.length) overlaySeq = 0
+      releaseEscapeOwner()
+    }
+  }, [active])
+
+  return { zIndex: `calc(${base} + ${priority})` }
+}
 
 // ─── Button ─────────────────────────────────────────────────────────────────
 
@@ -176,6 +251,7 @@ export function Modal({
   maxWidth = DIALOG_WIDTH.sm,
   dismissable = false,
   initialFocusRef,
+  zIndexBase = 'var(--z-modal)',
 }: {
   title: ReactNode
   onClose: () => void
@@ -187,9 +263,13 @@ export function Modal({
   /** Element to focus on open (e.g. a form input). Defaults to the first
    *  focusable in the dialog. */
   initialFocusRef?: React.RefObject<HTMLElement | null>
+  /** Token expression this dialog stacks from. A modal opened inside a
+   *  lightbox can opt into a higher base without a raw z-index literal. */
+  zIndexBase?: string
 }) {
   const dialogRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
+  const { zIndex } = useOverlayLayer(true, onClose, zIndexBase)
 
   useEffect(() => {
     const prevActive = document.activeElement as HTMLElement | null
@@ -202,26 +282,24 @@ export function Modal({
       target?.focus()
     }
 
+    // Escape is owned by the overlay stack (top layer only). This handler is
+    // the Tab focus trap; it deliberately leaves Escape alone.
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        onClose()
-      } else if (e.key === 'Tab' && el) {
-        const focusable = Array.from(
-          el.querySelectorAll<HTMLElement>(
-            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-          )
+      if (e.key !== 'Tab' || !el) return
+      const focusable = Array.from(
+        el.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
         )
-        if (focusable.length === 0) return
-        const first = focusable[0]
-        const last = focusable[focusable.length - 1]
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault()
-          last.focus()
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault()
-          first.focus()
-        }
+      )
+      if (focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
       }
     }
     window.addEventListener('keydown', onKey)
@@ -229,11 +307,12 @@ export function Modal({
       window.removeEventListener('keydown', onKey)
       prevActive?.focus()
     }
-  }, [onClose, initialFocusRef])
+  }, [initialFocusRef])
 
   return (
     <div
       className={RECIPE.modalOverlay}
+      style={{ zIndex }}
       onClick={dismissable ? onClose : undefined}
     >
       <div
@@ -272,28 +351,27 @@ export function SideSheet({
   title,
   children,
   width = LAYOUT.sheet,
-  zIndexClass = 'z-[var(--z-modal)]',
+  zIndexClass,
+  zIndexBase = 'var(--z-modal)',
 }: {
   open: boolean
   onClose: () => void
   title: ReactNode
   children: ReactNode
   width?: string
-  /** Stacking override when the sheet is hosted inside a higher-z overlay. */
+  /** Explicit stacking class when the sheet is hosted inside a higher-z
+   *  overlay. Omit it and the overlay priority manager owns the layer. */
   zIndexClass?: string
+  zIndexBase?: string
 }) {
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose])
+  const { zIndex } = useOverlayLayer(open, onClose, zIndexBase)
 
   if (!open) return null
   return (
-    <div className={classes('fixed inset-0', zIndexClass, RECIPE.sheetOverlay)}>
+    <div
+      className={classes('fixed inset-0', zIndexClass, RECIPE.sheetOverlay)}
+      style={zIndexClass ? undefined : { zIndex }}
+    >
       {/* Click-catcher for the page area BESIDE the sheet. It is a SIBLING of
           the aside, so it never covers the sheet itself, and it is the only
           element that owns the outside-click handler. The overlay used to

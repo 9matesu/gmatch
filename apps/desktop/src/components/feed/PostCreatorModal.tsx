@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { playPress } from '../../utils/sounds';
 import { useCropper } from '../../hooks/useCropper';
 import { isCropableImage } from '../CropModal';
@@ -36,6 +36,7 @@ export function PostCreatorModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const tagInputRef = useRef<HTMLInputElement>(null);
   const { crop, cropper } = useCropper();
+  const [publishError, setPublishError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -76,11 +77,14 @@ export function PostCreatorModal({
   };
 
   const handlePublish = async () => {
+    setPublishError(null);
     if (tags.length === 0) {
+      setPublishError('Tags must be added before uploading post!');
       toast?.('Tags must be added before uploading post!', 'error');
       return;
     }
     if (media.length === 0) {
+      setPublishError('Please select at least 1 image or video to post!');
       toast?.('Please select at least 1 image or video to post!', 'error');
       return;
     }
@@ -88,6 +92,7 @@ export function PostCreatorModal({
     if (onPublish) {
       const ok = await onPublish(media, caption, tags);
       if (!ok) {
+        setPublishError('Failed to upload post. Try again.');
         toast?.('Failed to upload post. Try again.', 'error');
         return;
       }
@@ -123,6 +128,13 @@ export function PostCreatorModal({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {publishError && (
+          <div role="alert" className="px-4 py-2 border-b border-danger/40 bg-danger/10 text-xs text-danger-fg flex items-center justify-between gap-2">
+            <span>{publishError}</span>
+            <button type="button" onClick={() => setPublishError(null)} className="cursor-pointer underline underline-offset-2">Dismiss</button>
+          </div>
+        )}
 
         {/* Form Content */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4">

@@ -19,7 +19,9 @@ export interface MediaqInstallState {
   message: string
   openModal: () => void
   closeModal: () => void
-  start: () => void
+  /** `showModal=false` installs inline (Settings); progress still lives in this
+   *  store, so the notification centre and the setup modal stay in sync. */
+  start: (showModal?: boolean) => void
   cancel: () => void
   reset: () => void
 }
@@ -55,9 +57,9 @@ export const useMediaqInstall = create<MediaqInstallState>((set) => ({
   message: '',
   openModal: () => set({ open: true }),
   closeModal: () => set({ open: false }), // background; the install continues
-  start: () => {
+  start: (showModal = true) => {
     ensureProgressListener()
-    set({ open: true, status: 'installing', percent: null, message: 'Starting…' })
+    set({ open: showModal, status: 'installing', percent: null, message: 'Starting…' })
     const g = window.gmatch
     if (!g?.mediaqInstall) {
       set({ status: 'error', message: 'mediaq setup needs the gMatch desktop app' })

@@ -1,20 +1,20 @@
 "use client";
 
-import React, { useEffect } from 'react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { User, OrbitObject } from '@orbit/shared';
 import {
-  Star,
+  ArrowUp,
+  CheckSquare,
+  Clipboard,
   Copy,
   ExternalLink,
-  Scissors,
-  Clipboard,
-  CheckSquare,
   RefreshCw,
-  ArrowUp,
-  Trash2,
+  Scissors,
   Search,
+  Star,
+  Trash2,
 } from 'lucide-react';
+import { ContextMenu, type ContextAction } from './ui/ContextMenu';
 import { MediaContextMenu } from './ContextMenuMedia';
 import { isMediaVideo } from '../utils/media';
 
@@ -54,52 +54,27 @@ export interface ContextOverlayProps {
   onSearchText?: (text: string) => void;
 }
 
-export function ContextOverlay({
-  contextMenu,
-  onDismiss,
-  identity,
-  friendsIds,
-  toast,
-  onViewProfile,
-  onToggleContact,
-  onSendCard,
-  onCopyId,
-  onSendPm,
-  onBlockUser,
-  onOpenLightbox,
-  onDownloadItem,
-  onCopyImageLink,
-  onToggleFavorite,
-  onDeleteItem,
-  onRepostItem,
-  onAddToStory,
-  onRemoveFromInbox,
-  onReportUser,
-  onReportItem,
-  onRepostImage,
-  onSetWallpaper,
-  onSearchText,
-}: ContextOverlayProps) {
-  useEffect(() => {
-    if (!contextMenu) return;
+const icon = (Icon: typeof Star) => <Icon className="w-3.5 h-3.5" />;
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onDismiss();
-    };
-    const handleScroll = () => onDismiss();
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('scroll', handleScroll, true);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('scroll', handleScroll, true);
-    };
-  }, [contextMenu, onDismiss]);
+/**
+ * The single right-click overlay. Media delegates to the data-driven media
+ * menu; every other kind is now BUILT as the same `ContextAction[]` data and
+ * rendered by the one shared primitive. No surface hand-rolls rows any more.
+ */
+export function ContextOverlay(props: ContextOverlayProps) {
+  const {
+    contextMenu, onDismiss, identity, friendsIds, toast,
+    onViewProfile, onToggleContact, onSendCard, onCopyId, onSendPm,
+    onBlockUser, onOpenLightbox, onDownloadItem, onCopyImageLink,
+    onToggleFavorite, onDeleteItem, onRepostItem, onAddToStory,
+    onRemoveFromInbox, onReportUser, onReportItem, onRepostImage,
+    onSetWallpaper, onSearchText,
+  } = props;
 
   if (!contextMenu) return null;
 
-  // Media is the one menu every surface needs (feed, chat, cards, gallery), and
-  // the one that takes parameters. It is DATA: see MediaContextMenu below.
+  // Media is the one menu every surface needs (feed, chat, cards, gallery),
+  // and the one that takes parameters. It is DATA: see MediaContextMenu.
   if (contextMenu.type === 'media') {
     return (
       <MediaContextMenu
@@ -112,590 +87,184 @@ export function ContextOverlay({
     );
   }
 
-  const menuWidth = 220;
-  const menuHeight = contextMenu.type === 'item' ? 320 : contextMenu.type === 'user' ? 280 : 220;
-  const left = typeof window !== 'undefined'
-    ? Math.max(8, Math.min(contextMenu.x, window.innerWidth - menuWidth - 12))
-    : contextMenu.x;
-  const top = typeof window !== 'undefined'
-    ? Math.max(8, Math.min(contextMenu.y, window.innerHeight - menuHeight - 12))
-    : contextMenu.y;
+  const actions: ContextAction[] = [];
+  let title: string | undefined;
+
+  if (contextMenu.type === 'input') {
+    const { element, hasSelection } = contextMenu.data as {
+      element?: HTMLInputElement | HTMLTextAreaElement | HTMLElement | null
+      hasSelection?: boolean
+    };
+    title = 'Edit';
+    actions.push(
+      {
+        label: 'Cut', icon: icon(Scissors), hint: 'Ctrl+X', disabled: !hasSelection,
+        onSelect: () => {
+          if (element) { element.focus(); document.execCommand('cut'); toast('Cut to clipboard', 'info'); }
+        },
+      },
+      {
+        label: 'Copy', icon: icon(Copy), hint: 'Ctrl+C', disabled: !hasSelection,
+        onSelect: () => {
+          if (element) { element.focus(); document.execCommand('copy'); toast('Copied to clipboard', 'info'); }
+        },
+      },
+      {
+        label: 'Paste', icon: icon(Clipboard), hint: 'Ctrl+V',
+        onSelect: async () => {
+          try {
+            const text = await navigator.clipboard.readText();
+            if (element && text) {
+              element.focus();
+              // insertText goes through the native editing path, which React's
+              // value tracker observes (manual splicing + synthetic input is
+              // deduped and ignored) — keep the manual fallback for engines
+              // that refuse execCommand.
+              const ok = document.execCommand('insertText', false, text);
+              if (!ok) {
+                const input = element as HTMLInputElement | HTMLTextAreaElement;
+                const start = input.selectionStart ?? 0;
+                const end = input.selectionEnd ?? 0;
+                const val = input.value ?? '';
+                input.value = val.slice(0, start) + text + val.slice(end);
+                input.selectionStart = input.selectionEnd = start + text.length;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+              }
+              toast('Pasted', 'info');
+            }
+          } catch {
+            toast('Could not read the clipboard', 'warning');
+          }
+        },
+      },
+      {
+        label: 'Select All', icon: icon(CheckSquare), hint: 'Ctrl+A', separatorBefore: true,
+        onSelect: () => { if (element) { element.focus(); (element as HTMLInputElement).select?.(); } },
+      },
+    );
+    if (element && (element as HTMLInputElement).value) {
+      actions.push({
+        label: 'Clear', icon: icon(Trash2), danger: true,
+        onSelect: () => {
+          (element as HTMLInputElement).value = '';
+          element.dispatchEvent(new Event('input', { bubbles: true }));
+        },
+      });
+    }
+  } else if (contextMenu.type === 'selection') {
+    const { text } = contextMenu.data as { text: string };
+    title = `“${text.slice(0, 18)}”`;
+    actions.push({
+      label: 'Copy', icon: icon(Copy), hint: 'Ctrl+C',
+      onSelect: () => { void navigator.clipboard.writeText(text); toast('Copied to clipboard', 'info'); },
+    });
+    if (onSearchText) {
+      actions.push({ label: 'Search on gMatch', icon: icon(Search), onSelect: () => onSearchText(text) });
+    }
+    actions.push({
+      label: 'Select All', icon: icon(CheckSquare), hint: 'Ctrl+A',
+      onSelect: () => window.getSelection()?.selectAllChildren(document.body),
+    });
+  } else if (contextMenu.type === 'link') {
+    const { href } = contextMenu.data as { href: string };
+    title = 'Link';
+    actions.push(
+      {
+        label: 'Open Link', icon: icon(ExternalLink),
+        onSelect: () => { window.open(href, '_blank', 'noopener,noreferrer'); },
+      },
+      {
+        label: 'Copy Link Address', icon: icon(Copy),
+        onSelect: () => { void navigator.clipboard.writeText(href); toast('Link copied to clipboard', 'info'); },
+      },
+    );
+  } else if (contextMenu.type === 'general') {
+    title = 'gMatch';
+    actions.push(
+      {
+        label: 'Reload', icon: icon(RefreshCw), hint: 'Ctrl+R',
+        onSelect: () => {
+          const g = (window as unknown as { gmatch?: { winReload?: () => void } }).gmatch;
+          if (g?.winReload) g.winReload();
+          else window.location.reload();
+        },
+      },
+      {
+        label: 'Copy Page URL', icon: icon(Copy),
+        onSelect: () => { void navigator.clipboard.writeText(window.location.href); toast('Page URL copied', 'info'); },
+      },
+      {
+        label: 'Scroll to Top', icon: icon(ArrowUp),
+        onSelect: () => window.scrollTo({ top: 0, behavior: 'smooth' }),
+      },
+    );
+  } else if (contextMenu.type === 'user') {
+    const user = contextMenu.data as User;
+    title = `User: ${user.display_name || 'Peer'}`;
+    if (onViewProfile) actions.push({ label: 'View Full Profile', onSelect: () => onViewProfile(user) });
+    if (onToggleContact) {
+      actions.push({
+        label: friendsIds.includes(user.id) ? 'Remove Contact' : 'Add Contact',
+        icon: icon(Star),
+        onSelect: () => onToggleContact(user.id),
+      });
+    }
+    if (onSendCard) actions.push({ label: 'Send Image', onSelect: () => onSendCard(user.id) });
+    if (onCopyId) actions.push({ label: 'Copy GMatch ID', onSelect: () => onCopyId(user.id) });
+    if (onSendPm) actions.push({ label: 'Send PM', onSelect: () => onSendPm(user) });
+    if (onBlockUser) actions.push({ label: 'Block User', danger: true, onSelect: () => onBlockUser(user.id) });
+    if (onReportUser) {
+      actions.push({
+        label: 'Report User', danger: true, separatorBefore: true,
+        onSelect: () => onReportUser(user.id, user.display_name?.trim() || 'Unknown User'),
+      });
+    }
+  } else if (contextMenu.type === 'item') {
+    const item = contextMenu.data as OrbitObject & { owner_name?: string };
+    title = 'Keepsake';
+    const owner = item.owner_id === identity?.orbitId;
+    if (onOpenLightbox) actions.push({ label: 'Open Lightbox', onSelect: () => onOpenLightbox(item.id) });
+    if (onDownloadItem) actions.push({ label: 'Download Image', onSelect: () => onDownloadItem(item) });
+    if (onCopyImageLink) actions.push({ label: 'Copy Image Link', onSelect: () => onCopyImageLink(item.id) });
+    if (onSetWallpaper && (item.content_url || item.id)) {
+      const itemUrl = item.content_url || `/api/objects/${item.id}`;
+      const itemMime = item.mime_type || (isMediaVideo(itemUrl) ? 'video/mp4' : 'image/jpeg');
+      actions.push(
+        { label: 'Set as app background', onSelect: () => onSetWallpaper(itemUrl, 'app', itemMime) },
+        { label: 'Set as OS wallpaper', onSelect: () => onSetWallpaper(itemUrl, 'os', itemMime) },
+      );
+    }
+    if (onToggleFavorite) {
+      actions.push({
+        label: 'Star / Favorite',
+        onSelect: async () => { if (await onToggleFavorite(item)) toast('Updated starred status', 'success'); },
+      });
+    }
+    if (owner && onRepostItem) actions.push({ label: 'Repost to Feed', onSelect: () => onRepostItem(item) });
+    if (owner && onAddToStory) actions.push({ label: 'Add to Story', onSelect: () => onAddToStory(item) });
+    if (owner && onDeleteItem) {
+      actions.push({ label: 'Delete Image', danger: true, separatorBefore: true, onSelect: () => onDeleteItem(item) });
+    } else if (!owner && onRemoveFromInbox) {
+      actions.push({ label: 'Remove from Inbox', danger: true, separatorBefore: true, onSelect: () => onRemoveFromInbox(item) });
+    }
+    if (onReportItem) {
+      actions.push({
+        label: 'Report Image', danger: true, separatorBefore: true,
+        onSelect: () => {
+          if (item.owner_id) onReportItem(item.owner_id, item.owner_name?.trim() || 'Unknown User', item.id);
+        },
+      });
+    }
+  }
 
   return (
-    <div
-      className="fixed inset-0 z-[var(--z-lightbox)] bg-black/10 select-none"
-      onClick={onDismiss}
-      onContextMenu={(e) => {
-        e.preventDefault();
-        onDismiss();
-      }}
-    >
-      <div
-        // A context menu should be a menu: without this it is an anonymous
-        // div, so assistive tech announces nothing and no test can target it.
-        role="menu"
-        aria-label="Context menu"
-        data-testid="context-menu"
-        className="fixed bg-retro-panel/95 backdrop-blur-md border border-edge rounded-xl shadow-2xl p-1.5 w-56 text-xs z-[var(--z-lightbox)] space-y-0.5 animate-orbit-fade-in text-retro-fg"
-        style={{ top, left }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* ─── INPUT / TEXTAREA CONTEXT MENU ─── */}
-        {contextMenu.type === 'input' && (() => {
-          const { element, hasSelection } = contextMenu.data;
-
-          return (
-            <>
-              <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-edge/40 mb-1">
-                Edit
-              </div>
-
-              {/* Cut */}
-              <button
-                type="button"
-                disabled={!hasSelection}
-                onClick={() => {
-                  if (element) {
-                    element.focus();
-                    document.execCommand('cut');
-                    toast('Cut to clipboard', 'info');
-                  }
-                  onDismiss();
-                }}
-                className={`w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer ${
-                  !hasSelection ? 'opacity-40 pointer-events-none' : ''
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Scissors className="w-3.5 h-3.5" />
-                  <span>Cut</span>
-                </div>
-                <span className="text-2xs text-retro-muted font-mono">Ctrl+X</span>
-              </button>
-
-              {/* Copy */}
-              <button
-                type="button"
-                disabled={!hasSelection}
-                onClick={() => {
-                  if (element) {
-                    element.focus();
-                    document.execCommand('copy');
-                    toast('Copied to clipboard', 'info');
-                  }
-                  onDismiss();
-                }}
-                className={`w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer ${
-                  !hasSelection ? 'opacity-40 pointer-events-none' : ''
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Copy className="w-3.5 h-3.5" />
-                  <span>Copy</span>
-                </div>
-                <span className="text-2xs text-retro-muted font-mono">Ctrl+C</span>
-              </button>
-
-              {/* Paste */}
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    const text = await navigator.clipboard.readText();
-                    if (element && text) {
-                      element.focus();
-                      // insertText goes through the native editing path, which
-                      // React's value tracker observes (manual value splicing
-                      // + synthetic 'input' gets deduped and ignored).
-                      const ok = document.execCommand('insertText', false, text);
-                      if (!ok) {
-                        const start = element.selectionStart || 0;
-                        const end = element.selectionEnd || 0;
-                        const val = element.value || '';
-                        element.value = val.slice(0, start) + text + val.slice(end);
-                        element.selectionStart = element.selectionEnd = start + text.length;
-                        element.dispatchEvent(new Event('input', { bubbles: true }));
-                      }
-                      toast('Pasted', 'info');
-                    }
-                  } catch {
-                    toast('Could not read the clipboard', 'warning');
-                  }
-                  onDismiss();
-                }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <Clipboard className="w-3.5 h-3.5" />
-                  <span>Paste</span>
-                </div>
-                <span className="text-2xs text-retro-muted font-mono">Ctrl+V</span>
-              </button>
-
-              <div className="my-1 border-t border-edge/50" />
-
-              {/* Select All */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (element) {
-                    element.focus();
-                    element.select();
-                  }
-                  onDismiss();
-                }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <CheckSquare className="w-3.5 h-3.5 text-retro-muted" />
-                  <span>Select All</span>
-                </div>
-                <span className="text-2xs text-retro-muted font-mono">Ctrl+A</span>
-              </button>
-
-              {/* Clear */}
-              {element && element.value && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    element.value = '';
-                    element.dispatchEvent(new Event('input', { bubbles: true }));
-                    onDismiss();
-                  }}
-                  className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer text-retro-error"
-                >
-                  <div className="flex items-center gap-2">
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Clear</span>
-                  </div>
-                </button>
-              )}
-            </>
-          );
-        })()}
-
-        {/* ─── TEXT SELECTION CONTEXT MENU ─── */}
-        {contextMenu.type === 'selection' && (() => {
-          const { text } = contextMenu.data;
-
-          return (
-            <>
-              <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-edge/40 mb-1 truncate">
-                &ldquo;{text.slice(0, 18)}&rdquo;
-              </div>
-
-              {/* Copy */}
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(text);
-                  toast('Copied to clipboard', 'info');
-                  onDismiss();
-                }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <Copy className="w-3.5 h-3.5 text-retro-accent" />
-                  <span>Copy</span>
-                </div>
-                <span className="text-2xs text-retro-muted font-mono">Ctrl+C</span>
-              </button>
-
-              {/* Search on gMatch */}
-              {onSearchText && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onSearchText(text);
-                    onDismiss();
-                  }}
-                  className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer"
-                >
-                  <div className="flex items-center gap-2">
-                    <Search className="w-3.5 h-3.5 text-retro-muted" />
-                    <span>Search on gMatch</span>
-                  </div>
-                </button>
-              )}
-
-              {/* Select All */}
-              <button
-                type="button"
-                onClick={() => {
-                  window.getSelection()?.selectAllChildren(document.body);
-                  onDismiss();
-                }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <CheckSquare className="w-3.5 h-3.5 text-retro-muted" />
-                  <span>Select All</span>
-                </div>
-                <span className="text-2xs text-retro-muted font-mono">Ctrl+A</span>
-              </button>
-            </>
-          );
-        })()}
-
-        {/* ─── LINK CONTEXT MENU ─── */}
-        {contextMenu.type === 'link' && (() => {
-          const { href } = contextMenu.data;
-
-          return (
-            <>
-              <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-edge/40 mb-1 truncate">
-                Link
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  window.open(href, '_blank', 'noopener,noreferrer');
-                  onDismiss();
-                }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <ExternalLink className="w-3.5 h-3.5 text-retro-accent" />
-                  <span>Open Link</span>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(href);
-                  toast('Link copied to clipboard', 'info');
-                  onDismiss();
-                }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <Copy className="w-3.5 h-3.5 text-retro-muted" />
-                  <span>Copy Link Address</span>
-                </div>
-              </button>
-            </>
-          );
-        })()}
-
-        {/* ─── GENERAL / BACKGROUND CONTEXT MENU ─── */}
-        {contextMenu.type === 'general' && (
-          <>
-            <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-edge/40 mb-1">
-              gMatch
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                const g = (window as unknown as { gmatch?: { winReload?: () => void } }).gmatch
-                if (g?.winReload) g.winReload()
-                else window.location.reload()
-                onDismiss();
-              }}
-              className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <RefreshCw className="w-3.5 h-3.5 text-retro-accent" />
-                <span>Reload</span>
-              </div>
-              <span className="text-2xs text-retro-muted font-mono">Ctrl+R</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                navigator.clipboard.writeText(window.location.href);
-                toast('Page URL copied', 'info');
-                onDismiss();
-              }}
-              className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <Copy className="w-3.5 h-3.5 text-retro-muted" />
-                <span>Copy Page URL</span>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-                onDismiss();
-              }}
-              className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <ArrowUp className="w-3.5 h-3.5 text-retro-muted" />
-                <span>Scroll to Top</span>
-              </div>
-            </button>
-          </>
-        )}
-
-        {/* ─── USER CONTEXT MENU ─── */}
-        {contextMenu.type === 'user' && (
-          <>
-            <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-edge/40 mb-1">
-              User: {contextMenu.data.display_name || 'Peer'}
-            </div>
-
-            {onViewProfile && (
-              <button
-                type="button"
-                onClick={() => {
-                  onViewProfile(contextMenu.data);
-                  onDismiss();
-                }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg transition-colors font-bold cursor-pointer"
-              >
-                View Full Profile
-              </button>
-            )}
-
-            {onToggleContact && (
-              <button
-                type="button"
-                onClick={() => {
-                  onToggleContact(contextMenu.data.id);
-                  onDismiss();
-                }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-bold cursor-pointer"
-              >
-                <span>{friendsIds.includes(contextMenu.data.id) ? 'Remove Contact' : 'Add Contact'}</span>
-                <Star className="w-3 h-3 fill-current text-retro-accent" />
-              </button>
-            )}
-
-            {onSendCard && (
-              <button
-                type="button"
-                onClick={() => {
-                  onSendCard(contextMenu.data.id);
-                  onDismiss();
-                }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg text-retro-accent font-bold transition-colors cursor-pointer"
-              >
-                Send Image
-              </button>
-            )}
-
-            {onCopyId && (
-              <button
-                type="button"
-                onClick={() => {
-                  onCopyId(contextMenu.data.id);
-                  onDismiss();
-                }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg text-retro-muted transition-colors cursor-pointer"
-              >
-                Copy GMatch ID
-              </button>
-            )}
-
-            {onSendPm && (
-              <button
-                type="button"
-                onClick={() => {
-                  onSendPm(contextMenu.data);
-                  onDismiss();
-                }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg text-chrome-lav font-bold transition-colors cursor-pointer"
-              >
-                Send PM
-              </button>
-            )}
-
-            {onBlockUser && (
-              <button
-                type="button"
-                onClick={() => {
-                  onBlockUser(contextMenu.data.id);
-                  onDismiss();
-                }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg text-retro-warning transition-colors cursor-pointer"
-              >
-                Block User
-              </button>
-            )}
-
-            {onReportUser && (
-              <button
-                type="button"
-                onClick={() => {
-                  onReportUser(contextMenu.data.id, contextMenu.data.display_name?.trim() || 'Unknown User');
-                  onDismiss();
-                }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg text-retro-error font-bold transition-colors cursor-pointer"
-              >
-                Report User
-              </button>
-            )}
-          </>
-        )}
-
-        {/* ─── ITEM CONTEXT MENU ─── */}
-        {contextMenu.type === 'item' && (
-          <>
-            <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-edge/40 mb-1">
-              Keepsake
-            </div>
-
-            {onOpenLightbox && (
-              <button
-                type="button"
-                onClick={() => {
-                  onOpenLightbox(contextMenu.data.id);
-                  onDismiss();
-                }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg transition-colors font-bold cursor-pointer"
-              >
-                Open Lightbox
-              </button>
-            )}
-
-            {onDownloadItem && (
-              <button
-                type="button"
-                onClick={() => {
-                  onDownloadItem(contextMenu.data);
-                  onDismiss();
-                }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg transition-colors cursor-pointer"
-              >
-                Download Image
-              </button>
-            )}
-
-            {onCopyImageLink && (
-              <button
-                type="button"
-                onClick={() => {
-                  onCopyImageLink(contextMenu.data.id);
-                  onDismiss();
-                }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg transition-colors cursor-pointer"
-              >
-                Copy Image Link
-              </button>
-            )}
-
-            {onSetWallpaper && (contextMenu.data.content_url || contextMenu.data.id) && (() => {
-              const itemUrl = contextMenu.data.content_url || `/api/objects/${contextMenu.data.id}`;
-              const itemMime = contextMenu.data.mime_type || (isMediaVideo(itemUrl) ? 'video/mp4' : 'image/jpeg');
-              return (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onSetWallpaper(itemUrl, 'app', itemMime);
-                      onDismiss();
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg transition-colors cursor-pointer"
-                  >
-                    Set as app background
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onSetWallpaper(itemUrl, 'os', itemMime);
-                      onDismiss();
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg transition-colors cursor-pointer"
-                  >
-                    Set as OS wallpaper
-                  </button>
-                </>
-              );
-            })()}
-
-            {onToggleFavorite && (
-              <button
-                type="button"
-                onClick={async () => {
-                  const ok = await onToggleFavorite(contextMenu.data);
-                  if (ok) toast('Updated starred status', 'success');
-                  onDismiss();
-                }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg text-retro-accent transition-colors cursor-pointer"
-              >
-                Star / Favorite
-              </button>
-            )}
-
-            {contextMenu.data.owner_id === identity?.orbitId && onRepostItem && (
-              <button
-                type="button"
-                onClick={() => {
-                  onRepostItem(contextMenu.data);
-                  onDismiss();
-                }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg transition-colors cursor-pointer"
-              >
-                Repost to Feed
-              </button>
-            )}
-
-            {contextMenu.data.owner_id === identity?.orbitId && onAddToStory && (
-              <button
-                type="button"
-                onClick={() => {
-                  onAddToStory(contextMenu.data);
-                  onDismiss();
-                }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg transition-colors cursor-pointer"
-              >
-                Add to Story
-              </button>
-            )}
-
-            {contextMenu.data.owner_id === identity?.orbitId ? (
-              onDeleteItem && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onDeleteItem(contextMenu.data);
-                    onDismiss();
-                  }}
-                  className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg text-retro-error transition-colors cursor-pointer"
-                >
-                  Delete Image
-                </button>
-              )
-            ) : (
-              onRemoveFromInbox && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onRemoveFromInbox(contextMenu.data);
-                    onDismiss();
-                  }}
-                  className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg text-retro-warning transition-colors cursor-pointer"
-                >
-                  Remove from Inbox
-                </button>
-              )
-            )}
-
-            {onReportItem && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (contextMenu.data.owner_id) {
-                    onReportItem(contextMenu.data.owner_id, contextMenu.data.owner_name?.trim() || 'Unknown User', contextMenu.data.id);
-                  }
-                  onDismiss();
-                }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg text-retro-error font-bold transition-colors cursor-pointer"
-              >
-                Report Image
-              </button>
-            )}
-          </>
-        )}
-      </div>
-    </div>
+    <ContextMenu
+      x={contextMenu.x}
+      y={contextMenu.y}
+      title={title}
+      items={actions}
+      onDismiss={onDismiss}
+    />
   );
 }
 

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback, Fragment } from 'react';
 import { playPress } from '../../utils/sounds';
 import { EmojiReaction } from '../ui/EmojiReaction';
+import { ContextMenu, type ContextMenuItem } from '../ui/ContextMenu';
 import { resolveMediaUrl } from '../../utils/media';
 import { GroupMembersPopover, type GroupMember } from './GroupMembersPopover';
 import {
@@ -240,6 +241,8 @@ export function GMatchDMs({
 }) {
   const [inputText, setInputText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  // One menu for every message: opened at the cursor, clamped to the viewport.
+  const [messageMenu, setMessageMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
   const [pendingAttachment, setPendingAttachment] = useState<{ id: string; url: string; isVideo: boolean } | null>(null);
   const messageStreamRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -1345,6 +1348,41 @@ export function GMatchDMs({
                           const replyTarget = findMessage(msg.replyToId);
                           const isLast = msg.id === block[block.length - 1].id;
                           const showActions = actionFor === msg.id && !msg.deletedAt;
+                          // RIGHT-CLICK CONTEXT — the same handlers the action
+                          // row uses, gated the same way. No second logic path.
+                          const ctxItems: ContextMenuItem[] = [];
+                          if (msg.text && !msg.deletedAt) ctxItems.push({
+                            label: 'Copy text', icon: <Copy className="w-3.5 h-3.5" />,
+                            onSelect: () => copyMessage(msg.text),
+                          });
+                          if (!msg.deletedAt && onSendPm && activePmPeer) ctxItems.push({
+                            label: 'Reply', icon: <Reply className="w-3.5 h-3.5" />,
+                            onSelect: () => setReplyingTo(msg),
+                          });
+                          if (msg.attachmentUrl && !msg.attachmentMime?.startsWith('video/')) ctxItems.push({
+                            label: 'Copy image', icon: <Copy className="w-3.5 h-3.5" />,
+                            onSelect: () => void copyAttachmentImage(msg),
+                          });
+                          if (msg.attachmentUrl && onOpenImage) ctxItems.push({
+                            label: 'Open image', icon: <ImagePlus className="w-3.5 h-3.5" />,
+                            onSelect: () => onOpenImage(msg),
+                          });
+                          if (isOwn && !msg.deletedAt && onEditMessage && activePmPeer) ctxItems.push({
+                            label: 'Edit message', icon: <Edit2 className="w-3.5 h-3.5" />, separatorBefore: true,
+                            onSelect: () => setEditingMessage({ id: msg.id, text: msg.text }),
+                          });
+                          if (isOwn && onDeleteForEveryone && activePmPeer) ctxItems.push({
+                            label: 'Delete for everyone', icon: <Trash2 className="w-3.5 h-3.5" />, danger: true,
+                            onSelect: () => void handleDeleteForEveryone(msg),
+                          });
+                          if (onDeleteMessage && activePmPeer) ctxItems.push({
+                            label: 'Delete for me', icon: <Trash className="w-3.5 h-3.5" />, danger: true,
+                            onSelect: () => onDeleteMessage(msg.id, activePmPeer.orbitId),
+                          });
+                          if (onReportMessage) ctxItems.push({
+                            label: 'Report message', icon: <Flag className="w-3.5 h-3.5" />, danger: true,
+                            onSelect: () => onReportMessage(msg.id),
+                          });
                           return (
                             <div key={msg.id} data-message-row={msg.id} className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-full`}>
                               {replyTarget && (
@@ -1357,6 +1395,13 @@ export function GMatchDMs({
                                 id={`chat-msg-${msg.id}`}
                                 data-message-id={msg.id}
                                 onClick={() => setActionFor(showActions ? null : msg.id)}
+                                onContextMenu={(e) => {
+                                  if (ctxItems.length === 0) return
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  setActionFor(null)
+                                  setMessageMenu({ x: e.clientX, y: e.clientY, items: ctxItems })
+                                }}
                                 className={`w-fit max-w-full px-3.5 py-2.5 rounded-2xl text-field sm:text-sm leading-relaxed select-text cursor-pointer break-words whitespace-pre-wrap motion-safe:animate-orbit-fade-in hover: ${block.length > 1 ? 'mt-0.5' : ''} ${
                                   highlightedMessage === msg.id ? 'ring-2 ring-retro-accent/70' : ''
                                 } ${
@@ -1731,6 +1776,15 @@ export function GMatchDMs({
           inviteUnavailableReason={inviteUnavailableReason}
         />
       </div>
+      {messageMenu && (
+        <ContextMenu
+          x={messageMenu.x}
+          y={messageMenu.y}
+          title="Message"
+          items={messageMenu.items}
+          onDismiss={() => setMessageMenu(null)}
+        />
+      )}
     </div>
   );
 }

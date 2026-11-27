@@ -1,16 +1,20 @@
 "use client";
 
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useOverlayLayer } from '../../ui/kit';
 
 /**
- * One context menu, every surface.
+ * ONE context menu, every surface.
  *
- * A menu is DATA, not markup: `{ id, label, icon, params, run }`. Any action
- * that needs input (a file name, a target, a strength) declares `params` and
- * the menu grows the control itself — callers never hand-roll a dropdown.
+ * A menu is DATA, not markup: `items` carry a label, an optional icon, the
+ * danger/disabled flags and ONE handler (`onSelect`). Actions that need input
+ * (a file name, a target, a strength) declare `params` and the menu grows the
+ * control itself — callers never hand-roll a dropdown. The menu opens at the
+ * cursor and clamps itself to the viewport after layout.
  *
- * `run` receives the param values. Menus are dismissed after a run unless the
- * action says `keepOpen`.
+ * `actions`/`run` remain accepted as a compatibility alias for older callers;
+ * new code uses `items`/`onSelect`. Menus are dismissed after a selection
+ * unless the item says `keepOpen`.
  */
 
 export type ContextParamValue = string | boolean;
@@ -21,8 +25,8 @@ export type ContextParam =
   | { id: string; label: string; type: 'toggle'; value: boolean };
 
 export interface ContextAction {
-  id: string;
-  label: string;
+  id?: string;
+  label: React.ReactNode;
   icon?: React.ReactNode;
   /** Right-aligned hint (a key, a value). */
   hint?: string;
@@ -33,16 +37,21 @@ export interface ContextAction {
   params?: ContextParam[];
   /** Keep the menu open after running (for toggles/tunables). */
   keepOpen?: boolean;
-  run: (params: Record<string, ContextParamValue>) => void | Promise<void>;
+  /** The one handler. `run` is the legacy alias and is equally supported. */
+  onSelect?: (params: Record<string, ContextParamValue>) => void | Promise<void>;
+  run?: (params: Record<string, ContextParamValue>) => void | Promise<void>;
 }
 
-function initialValues(actions: ContextAction[]): Record<string, Record<string, ContextParamValue>> {
+/** Public name for a menu row — an item is an action with a selection handler. */
+export type ContextMenuItem = ContextAction;
+
+function initialValues(items: ContextAction[]): Record<string, Record<string, ContextParamValue>> {
   const out: Record<string, Record<string, ContextParamValue>> = {};
-  for (const a of actions) {
+  for (const a of items) {
     if (!a.params?.length) continue;
     const row: Record<string, ContextParamValue> = {};
     for (const p of a.params) row[p.id] = p.type === 'toggle' ? p.value : p.type === 'select' ? p.value : (p.value ?? '');
-    out[a.id] = row;
+    out[a.id as string] = row;
   }
   return out;
 }
@@ -52,27 +61,53 @@ export interface ContextMenuProps {
   y: number;
   title?: React.ReactNode;
   subtitle?: React.ReactNode;
-  actions: ContextAction[];
+  /** The canonical prop: one item per row. */
+  items?: ContextMenuItem[];
+  /** Legacy alias; use `items`. */
+  actions?: ContextMenuItem[];
   onDismiss: () => void;
   width?: number;
+  /** Explicit stacking class for a menu hosted inside a higher-z overlay. */
+  zIndexClass?: string;
 }
 
-export function ContextMenu({ x, y, title, subtitle, actions, onDismiss, width = 236 }: ContextMenuProps) {
+export function ContextMenu({
+  x,
+  y,
+  title,
+  subtitle,
+  items,
+  actions,
+  onDismiss,
+  width = 236,
+  zIndexClass,
+}: ContextMenuProps) {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [values, setValues] = useState(() => initialValues(actions));
+  const normalized = useMemo(
+    () => (items ?? actions ?? []).map((a, i) => ({ ...a, id: a.id ?? `item-${i}` })),
+    [items, actions],
+  );
+  const [values, setValues] = useState(() => initialValues(normalized));
   const [pos, setPos] = useState({ left: x, top: y });
+  const { zIndex } = useOverlayLayer(true, onDismiss, 'var(--z-lightbox)');
 
-  // Dismiss like a native menu: Esc, outside click, scroll, resize, blur.
+  // Reset param state if the caller swaps the menu contents while it is open.
+  useEffect(() => setValues(initialValues(normalized)), [normalized]);
+
+  // Dismiss like a native menu: outside pointer-down, scroll, resize, blur.
+  // Escape is owned by the overlay stack so it closes only this top layer.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onDismiss(); } };
+    const onPointerDown = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) onDismiss();
+    };
     const onScroll = () => onDismiss();
-    window.addEventListener('keydown', onKey, true);
+    window.addEventListener('mousedown', onPointerDown, true);
     window.addEventListener('scroll', onScroll, true);
     window.addEventListener('resize', onScroll);
     window.addEventListener('blur', onScroll);
     return () => {
-      window.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('mousedown', onPointerDown, true);
       window.removeEventListener('scroll', onScroll, true);
       window.removeEventListener('resize', onScroll);
       window.removeEventListener('blur', onScroll);
@@ -89,26 +124,39 @@ export function ContextMenu({ x, y, title, subtitle, actions, onDismiss, width =
       left: Math.max(8, Math.min(x, window.innerWidth - w - 10)),
       top: Math.max(8, Math.min(y, window.innerHeight - h - 10)),
     });
-  }, [x, y, openId, actions.length]);
+  }, [x, y, openId, normalized.length]);
 
   const setValue = (actionId: string, paramId: string, v: ContextParamValue) =>
     setValues((prev) => ({ ...prev, [actionId]: { ...prev[actionId], [paramId]: v } }));
 
-  const run = async (a: ContextAction) => {
-    try {
-      await a.run(values[a.id] ?? {});
-    } finally {
+  const run = (a: ContextAction) => {
+    const finish = () => {
       if (!a.keepOpen) {
         setOpenId(null);
         onDismiss();
       }
+    };
+    const handler = a.onSelect ?? a.run;
+    try {
+      const result = handler?.(values[a.id as string] ?? {});
+      // A synchronous handler closes the menu in the same tick (a menu must
+      // never linger after its action fired); an async one waits for the work.
+      if (result && typeof (result as Promise<void>).then === 'function') {
+        void (result as Promise<void>).then(finish, finish);
+      } else {
+        finish();
+      }
+    } catch {
+      finish();
     }
   };
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-lightbox)]"
+      className={`fixed inset-0 ${zIndexClass ?? ''}`}
+      style={{ zIndex }}
       onClick={onDismiss}
+      onMouseDown={onDismiss}
       onContextMenu={(e) => { e.preventDefault(); onDismiss(); }}
     >
       <div
@@ -119,6 +167,7 @@ export function ContextMenu({ x, y, title, subtitle, actions, onDismiss, width =
         className="fixed bg-retro-panel/95 backdrop-blur-md border border-edge rounded-xl shadow-2xl p-1.5 text-xs animate-orbit-fade-in text-retro-fg max-h-[min(70vh,32rem)] overflow-y-auto styled-scrollbar"
         style={{ top: pos.top, left: pos.left, width }}
         onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
       >
         {(title || subtitle) && (
           <div className="px-2.5 py-1 mb-1 border-b border-edge/40">
@@ -127,7 +176,7 @@ export function ContextMenu({ x, y, title, subtitle, actions, onDismiss, width =
           </div>
         )}
 
-        {actions.map((a) => {
+        {normalized.map((a) => {
           const expanded = openId === a.id;
           return (
             <React.Fragment key={a.id}>
@@ -139,7 +188,7 @@ export function ContextMenu({ x, y, title, subtitle, actions, onDismiss, width =
                 aria-expanded={a.params?.length ? expanded : undefined}
                 onClick={() => {
                   if (a.disabled) return;
-                  if (a.params?.length) { setOpenId(expanded ? null : a.id); return; }
+                  if (a.params?.length) { setOpenId(expanded ? null : a.id as string); return; }
                   void run(a);
                 }}
                 className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between gap-2 transition-colors font-medium cursor-pointer disabled:opacity-40 disabled:cursor-default ${
@@ -156,14 +205,14 @@ export function ContextMenu({ x, y, title, subtitle, actions, onDismiss, width =
               {expanded && a.params && (
                 <div className="mx-1 mb-1 mt-0.5 p-2 rounded-lg bg-surface-canvas/60 border border-edge/60 space-y-1.5">
                   {a.params.map((p) => {
-                    const v = values[a.id]?.[p.id];
+                    const v = values[a.id as string]?.[p.id];
                     if (p.type === 'select') {
                       return (
                         <label key={p.id} className="block">
                           <span className="block text-2xs text-retro-muted mb-0.5">{p.label}</span>
                           <select
                             value={String(v ?? '')}
-                            onChange={(e) => setValue(a.id, p.id, e.target.value)}
+                            onChange={(e) => setValue(a.id as string, p.id, e.target.value)}
                             className="w-full bg-retro-panel border border-edge rounded-md px-2 py-1 text-xs text-retro-fg outline-none"
                           >
                             {p.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -178,7 +227,7 @@ export function ContextMenu({ x, y, title, subtitle, actions, onDismiss, width =
                           <input
                             type="checkbox"
                             checked={Boolean(v)}
-                            onChange={(e) => setValue(a.id, p.id, e.target.checked)}
+                            onChange={(e) => setValue(a.id as string, p.id, e.target.checked)}
                             className="accent-[var(--color-retro-accent)]"
                           />
                         </label>
@@ -191,7 +240,7 @@ export function ContextMenu({ x, y, title, subtitle, actions, onDismiss, width =
                           type="text"
                           value={String(v ?? '')}
                           placeholder={p.placeholder}
-                          onChange={(e) => setValue(a.id, p.id, e.target.value)}
+                          onChange={(e) => setValue(a.id as string, p.id, e.target.value)}
                           className="w-full bg-retro-panel border border-edge rounded-md px-2 py-1 text-xs text-retro-fg outline-none"
                         />
                       </label>

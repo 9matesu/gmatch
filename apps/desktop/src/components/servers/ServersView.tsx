@@ -7,7 +7,7 @@
 // hosts no world is infrastructure, not a destination, so it is not a row.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import { Lock, Globe, ShieldCheck, RefreshCw, Pencil, Check, X, Search, Share2, ArrowLeft, ChevronRight, Plus, Trash2, Loader2, Copy } from 'lucide-react'
 import { generateIdentity } from '@orbit/crypto'
 import { getCentralApiUrl, setCentralApiUrl } from '../../utils/central'
@@ -24,6 +24,7 @@ import { decodeNodeMask } from '../../utils/nodeMask'
 import { buildNodeCode } from '../../utils/nodeShare'
 import { PromptDialog } from '../PromptDialog'
 import { Button, Checkbox, Input, Modal } from '../../ui/kit'
+import { ContextMenu } from '../ui/ContextMenu'
 import { AddWorldDialog } from './AddWorldDialog'
 import { GroupsDialog } from './GroupsDialog'
 import { WorldRow, WorldMenuItem, formatDomain, formatRelativeTime } from './WorldRow'
@@ -216,6 +217,8 @@ export function ServersView({
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  // Right-click uses the ONE shared menu, fed by the same row actions.
+  const [rowContext, setRowContext] = useState<{ at: { x: number; y: number }; actions: Array<{ label: string; icon?: React.ReactNode; danger?: boolean; run: () => void }> } | null>(null)
   // Device-local mesh labels: UI grouping only, never a network or authority.
   const [labels, setLabels] = useState<LocalMeshLabel[]>(() => readLabels())
   const saveLabels = (next: LocalMeshLabel[]) => { setLabels(next); writeLabels(next) }
@@ -1259,6 +1262,45 @@ export function ServersView({
     const isOwn = isOwnNode(s)
     const state = rowStateFor(s, { connecting: connectingId === s.id })
 
+    // ONE list of actions drives both the ⋯ popover and the right-click menu.
+    // They can never drift because there is only one definition.
+    type RowAction = { label: string; icon?: ReactNode; title?: string; danger?: boolean; run: () => void }
+    const rowActions: RowAction[] = []
+    if (isCurrentServer && identity) rowActions.push({
+      label: 'Open dashboard', icon: <Globe className="w-3 h-3" />, title: 'Members, invites and settings',
+      run: () => { playPress(700); setOpenMenuId(null); setActiveTab('hub') },
+    })
+    if (isCurrentServer && node?.isAdmin) rowActions.push({
+      label: 'Server settings', icon: <Pencil className="w-3 h-3" />, title: 'Server settings',
+      run: () => { openEditor(); setOpenMenuId(null); setActiveTab('hub') },
+    })
+    if (isCurrentServer && serverMode === 'host') rowActions.push({
+      label: 'Copy share code', icon: <Share2 className="w-3 h-3" />, title: 'Copy node code',
+      run: () => {
+        setOpenMenuId(null)
+        playPress(820)
+        void window.gmatch?.serverState?.()
+          .then((st) => void shareServer(st?.lanUrls?.[0] || '', serverName))
+          .catch(() => void shareServer('', serverName))
+      },
+    })
+    if (!isCurrentServer && s.endpoint_hint) rowActions.push({
+      label: 'Copy server code', icon: <Share2 className="w-3 h-3" />, title: 'Copy node code',
+      run: () => { playPress(820); void shareServer(s.endpoint_hint || '', s.name); setOpenMenuId(null) },
+    })
+    if (isMyServer && !isCurrentServer) rowActions.push({
+      label: s.is_private ? 'Make public' : 'Make private', icon: <Lock className="w-3 h-3" />,
+      run: () => { playPress(740); void setPrivate(s, !s.is_private); setOpenMenuId(null) },
+    })
+    if (isMyServer && !isCurrentServer) rowActions.push({
+      label: 'unregister', icon: <Trash2 className="w-3 h-3" />,
+      run: () => { void unregister(s); setOpenMenuId(null) },
+    })
+    if (!isCurrentServer && !isMyServer) rowActions.push({
+      label: 'Delete / Forget', icon: <Trash2 className="w-3 h-3" />, danger: true,
+      run: () => { setDeleteTarget(s); setDeleteError(''); setDeletePasscode(''); setOpenMenuId(null) },
+    })
+
     return (
       <WorldRow
         key={s.id}
@@ -1270,70 +1312,16 @@ export function ServersView({
         // ready to connect. Whatever path remains lives in the row menu.
         joinDisabled={!!connectingId || state.status === 'Unavailable'}
         onJoin={() => { playPress(620); if (isMyServer || isOwn) void switchTo(s); else void join(s) }}
-        menuItems={
-          <>
-            {isCurrentServer && identity && (
-              <WorldMenuItem
-                icon={<Globe className="w-3 h-3" />}
-                label="Open dashboard"
-                title="Members, invites and settings"
-                onClick={() => { playPress(700); setOpenMenuId(null); setActiveTab('hub') }}
-              />
-            )}
-            {isCurrentServer && node?.isAdmin && (
-              <WorldMenuItem
-                icon={<Pencil className="w-3 h-3" />}
-                label="Server settings"
-                title="Server settings"
-                onClick={() => { openEditor(); setOpenMenuId(null); setActiveTab('hub') }}
-              />
-            )}
-            {isCurrentServer && serverMode === 'host' && (
-              <WorldMenuItem
-                icon={<Share2 className="w-3 h-3" />}
-                label="Copy share code"
-                title="Copy node code"
-                onClick={() => {
-                  setOpenMenuId(null)
-                  playPress(820)
-                  void window.gmatch?.serverState?.()
-                    .then((st) => void shareServer(st?.lanUrls?.[0] || '', serverName))
-                    .catch(() => void shareServer('', serverName))
-                }}
-              />
-            )}
-            {!isCurrentServer && s.endpoint_hint && (
-              <WorldMenuItem
-                icon={<Share2 className="w-3 h-3" />}
-                label="Copy server code"
-                title="Copy node code"
-                onClick={() => { playPress(820); void shareServer(s.endpoint_hint || '', s.name); setOpenMenuId(null) }}
-              />
-            )}
-            {isMyServer && !isCurrentServer && (
-              <WorldMenuItem
-                icon={<Lock className="w-3 h-3" />}
-                label={s.is_private ? 'Make public' : 'Make private'}
-                onClick={() => { playPress(740); void setPrivate(s, !s.is_private); setOpenMenuId(null) }}
-              />
-            )}
-            {isMyServer && !isCurrentServer && (
-              <WorldMenuItem
-                icon={<Trash2 className="w-3 h-3" />}
-                label="unregister"
-                onClick={() => { void unregister(s); setOpenMenuId(null) }}
-              />
-            )}
-            {!isCurrentServer && !isMyServer && (
-              <WorldMenuItem
-                icon={<Trash2 className="w-3 h-3" />}
-                label="Delete / Forget"
-                danger
-                onClick={() => { setDeleteTarget(s); setDeleteError(''); setDeletePasscode(''); setOpenMenuId(null) }}
-              />
-            )}
-          </>
-        }
+        menuItems={rowActions.map((a, i) => (
+          <WorldMenuItem key={`${a.label}-${i}`} icon={a.icon} label={a.label} title={a.title} danger={a.danger} onClick={a.run} />
+        ))}
+        onContextMenu={(e) => {
+          if (rowActions.length === 0) return
+          e.preventDefault()
+          e.stopPropagation()
+          setOpenMenuId(null)
+          setRowContext({ at: { x: e.clientX, y: e.clientY }, actions: rowActions })
+        }}
       />
     )
   }
@@ -2051,9 +2039,20 @@ export function ServersView({
               )}
 
               {serverRows.length > 0 && (
-                <ul className="divide-y divide-edge-subtle" aria-label="Servers" onKeyDown={onRowListKeyDown}>
+                <ul className="dense-list divide-y divide-edge-subtle" aria-label="Servers" onKeyDown={onRowListKeyDown}>
                   {serverRows.map((s) => renderRow(s))}
                 </ul>
+              )}
+              {rowContext && (
+                <ContextMenu
+                  x={rowContext.at.x}
+                  y={rowContext.at.y}
+                  title="Server"
+                  items={rowContext.actions.map((a) => ({
+                    label: a.label, icon: a.icon, danger: a.danger, onSelect: a.run,
+                  }))}
+                  onDismiss={() => setRowContext(null)}
+                />
               )}
 
               {/* Device-local labels are not servers and never join the list;

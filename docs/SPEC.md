@@ -308,7 +308,16 @@ product path.
   and "Send to background"; backgrounded, the install keeps running and its
   progress shows as a card in the notification centre (`NotificationCenter`).
   If the install is skipped or fails the app is unchanged (local sources only) —
-  it never blocks boot or the feed.
+  it never blocks boot or the feed. Settings → Preferences also offers the SAME
+  one-click install (`components/settings/MediaqSection.tsx`): it drives the
+  shared install store with `showModal=false`, so the bar, Cancel and "Send to
+  background" work inline and the install keeps running after Settings closes.
+  The clicker's provider is optional and category-aware (`real` + `hentai` from
+  one `ContentProvider`); when mediaq is absent its transport failure just cools
+  that one provider and the round falls back to local mirrors. Once the sidecar
+  answers, the install/start path clears mediaq's failure cooldown
+  (`fetchBooru.clearCooldown`) so the very next clicker fetch uses it without a
+  restart or a wait.
 
 ### 6b. Feed/market queries (no hardcodes, Tags tab is the entry point)
 

@@ -7,11 +7,12 @@ import { CardArtwork } from '../cards/CardArtwork'
 import { computeCardRarity, RARITY_TIERS, formatGc, parseTags } from '@orbit/shared'
 import type { User } from '@orbit/shared'
 import { useNow } from '../../hooks/useNow'
-import { Heart, Clock, Gift, Check } from 'lucide-react'
+import { Check, Clock, Eye, Gift, Heart, Maximize2 } from 'lucide-react'
 import {
   classes, COLOR, GAP, ICON, MONO, MOTION, PADDING, PADDING_X,
   RADIUS, SHADOW, TRACKING, TYPE, WEIGHT,
 } from '../../ui/tokens'
+import { ContextMenu, type ContextMenuItem } from '../ui/ContextMenu'
 
 interface IdentityLike {
   orbitId: string
@@ -108,6 +109,17 @@ export function CardTile({
   const [tilt, setTilt] = useState({ rotateX: 0, rotateY: 0 })
   const [mousePos, setMousePos] = useState({ x: 50, y: 50 })
   const [isHovered, setIsHovered] = useState(false)
+  const [menuAt, setMenuAt] = useState<{ x: number; y: number } | null>(null)
+
+  // Cards have a context too: right-click opens the same shared menu at the
+  // cursor, with only the actions this card actually supports.
+  const cardItems: ContextMenuItem[] = []
+  if (onClick) cardItems.push({ label: 'Open card', icon: <Eye className="w-3.5 h-3.5" />, onSelect: onClick })
+  if (onDoubleClick) cardItems.push({ label: 'Expand card', icon: <Maximize2 className="w-3.5 h-3.5" />, onSelect: onDoubleClick })
+  if (onOpenOwnerProfile) {
+    cardItems.push({ label: `View ${ownerLabel || 'owner'}`, onSelect: () => onOpenOwnerProfile(item.owner_id) })
+  }
+  if (onSelect) cardItems.push({ label: 'Select card', icon: <Check className="w-3.5 h-3.5" />, onSelect: () => onSelect(item.id) })
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!cardRef.current) return
@@ -140,6 +152,12 @@ export function CardTile({
         selected && classes('ring-2 ring-retro-accent', SHADOW.modal, 'z-[var(--z-dropdown)]'),
       )}
       onMouseMove={handleMouseMove}
+      onContextMenu={(e) => {
+        if (cardItems.length === 0) return
+        e.preventDefault()
+        e.stopPropagation()
+        setMenuAt({ x: e.clientX, y: e.clientY })
+      }}
       onClick={() => {
         if (onSelect) onSelect(item.id)
         onClick?.()
@@ -278,6 +296,15 @@ export function CardTile({
           )}
         </div>
       </div>
+      {menuAt && (
+        <ContextMenu
+          x={menuAt.x}
+          y={menuAt.y}
+          title="Card"
+          items={cardItems}
+          onDismiss={() => setMenuAt(null)}
+        />
+      )}
     </div>
   )
 }

@@ -71,6 +71,33 @@ describe('Modal shell', () => {
     expect(dialog.className).toContain('overflow-y-auto')
   })
 
+  it('stacks a newly opened modal above the older one and Escape closes only the top', async () => {
+    const user = userEvent.setup()
+    function StackHarness() {
+      const [first, setFirst] = useState(true)
+      const [second, setSecond] = useState(false)
+      return (
+        <>
+          <button type="button" onClick={() => setSecond(true)}>Open second</button>
+          {first && <Modal title="First" onClose={() => setFirst(false)}><button type="button">first body</button></Modal>}
+          {second && <Modal title="Second" onClose={() => setSecond(false)}><button type="button">second body</button></Modal>}
+        </>
+      )
+    }
+    render(<StackHarness />)
+    await user.click(screen.getByRole('button', { name: 'Open second' }))
+    const lower = screen.getByRole('dialog', { name: 'First' }).parentElement as HTMLElement
+    const upper = screen.getByRole('dialog', { name: 'Second' }).parentElement as HTMLElement
+    const priority = (el: HTMLElement) => Number(/\+ (\d+)\)/.exec(el.style.zIndex)?.[1] ?? 0)
+    expect(priority(upper)).toBeGreaterThan(priority(lower))
+
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog', { name: 'Second' })).toBeNull()
+    expect(screen.getByRole('dialog', { name: 'First' })).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog', { name: 'First' })).toBeNull()
+  })
+
   it('returns focus to the trigger on close', async () => {
     const user = userEvent.setup()
     render(<Harness />)

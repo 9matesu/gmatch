@@ -209,8 +209,8 @@ export function ProfileEditorModal({
             </Button>
           </div>
 
-          {/* Form Fields */}
-          <div className="space-y-3">
+          {/* Form Fields — one fluid rhythm from the --space-* scale. */}
+          <div className="field-stack">
             <div>
               <label htmlFor="profile-name" className={classes(TYPE.body, WEIGHT.medium, COLOR.body, 'block mb-1.5')}>Name</label>
               <Input

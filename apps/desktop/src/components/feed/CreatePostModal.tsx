@@ -72,6 +72,11 @@ export function CreatePostModal({
   const [tags, setTags] = useState(initialTags || '');
   const [aspectRatio, setAspectRatio] = useState<'square' | 'portrait' | 'landscape'>('square');
   const [uploading, setUploading] = useState(false);
+  /** Posting outcome, shown INLINE as well as toasted — the user must never
+   *  be left guessing whether a post landed. */
+  const [publishStatus, setPublishStatus] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
+  const closeTimerRef = useRef<number | null>(null);
+  useEffect(() => () => { if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current); }, []);
   /** Typed link to post as a shared anchor (not media). */
   const [linkUrl, setLinkUrl] = useState('');
 
@@ -344,16 +349,30 @@ function addLinkToCaption(raw: string): void {
     playPress(720);
   };
 
+  /** One place owns "the post landed" — inline banner, toast, then close on
+   *  the next beat so the banner is actually readable. */
+  const finishSuccess = (message: string) => {
+    setPublishStatus({ kind: 'success', message });
+    toast?.(message, 'success');
+    if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = window.setTimeout(() => onClose(), 600);
+  };
+  const failPublish = (message: string, type: 'error' | 'warning' = 'error') => {
+    setPublishStatus({ kind: 'error', message });
+    toast?.(message, type);
+  };
+
   const handleShare = async () => {
     if (!identity) {
-      toast?.('Please sign in to share posts', 'error');
+      failPublish('Please sign in to share posts');
       return;
     }
     if (mediaList.length === 0 && !caption.trim()) {
-      toast?.('Write something, or add a photo', 'warning');
+      failPublish('Write something, or add a photo', 'warning');
       return;
     }
 
+    setPublishStatus(null);
     setUploading(true);
     playPress(880);
 
@@ -379,7 +398,7 @@ function addLinkToCaption(raw: string): void {
           throw new Error(err?.error || 'Could not publish the post');
         }
         const data = await res.json();
-        toast?.('Post shared.', 'success');
+        finishSuccess('Post shared.');
         onPostCreated?.({
           id: data.id,
           author_id: identity.orbitId,
@@ -398,7 +417,6 @@ function addLinkToCaption(raw: string): void {
           is_liked: false,
           is_saved: false,
         });
-        onClose();
         return;
       }
 
@@ -554,7 +572,7 @@ function addLinkToCaption(raw: string): void {
       const objectId = primaryId || 'post_' + Math.random().toString(36).substring(2, 9);
  
       playPress(800);
-      toast?.(mode === 'story' ? 'Added to your story.' : 'Post shared.', 'success');
+      finishSuccess(mode === 'story' ? 'Added to your story.' : 'Post shared.');
 
       onPostCreated?.({
         id: objectId,
@@ -575,9 +593,10 @@ function addLinkToCaption(raw: string): void {
         is_saved: false,
       });
 
-      onClose();
     } catch (err: any) {
-      toast?.(err?.message || 'Failed to share post', 'error');
+      // The modal stays open and says what went wrong — no guessing, no
+      // silent loss of the caption/media the user just assembled.
+      failPublish(err?.message || 'Failed to share post');
     } finally {
       setUploading(false);
     }
@@ -636,6 +655,20 @@ function addLinkToCaption(raw: string): void {
             {uploading ? 'Sharing...' : (mode === 'story' ? 'Share Story' : 'Share')}
           </Button>
         </div>
+
+        {/* Posting outcome — inline, not only in the header notification
+            centre. An error keeps the modal open with its content intact. */}
+        {publishStatus && (
+          <div
+            role={publishStatus.kind === 'error' ? 'alert' : 'status'}
+            className={`flex items-center justify-between gap-2 px-4 py-2 border-b text-xs ${publishStatus.kind === 'error' ? 'border-danger/40 bg-danger/10 text-danger-fg' : 'border-success/40 bg-success/10 text-success-fg'}`}
+          >
+            <span>{publishStatus.message}</span>
+            {publishStatus.kind === 'error' && (
+              <button type="button" onClick={() => setPublishStatus(null)} className="cursor-pointer underline underline-offset-2">Dismiss</button>
+            )}
+          </div>
+        )}
 
         {/* Mode Selector Tabs */}
         <div className="flex items-center border-b border-edge px-3 pt-2 pb-2 gap-1.5 text-xs">

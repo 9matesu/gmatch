@@ -67,6 +67,32 @@ test('a legacy source with a singular `category` still routes (backward compat)'
   assert.equal(r.source, 'tbib')
 })
 
+test('a finished install clears the cooldown so mediaq is used at once', async () => {
+  let calls = 0
+  const mq = createMediaqProvider({
+    baseUrl: 'http://x',
+    postJson: async () => {
+      calls += 1
+      if (calls === 1) throw new Error('HTTP 503') // not up yet
+      return { items: [mqItem({ tags: ['alpha'], thumb_url: 'https://img/a.jpg' })] }
+    },
+  })
+  const local = { id: 'tbib', kind: 'dapi', category: 'hentai', fetch: async () => [] }
+  const fetchBooru = createFetchBooru({ sources: [local, mq], httpGet: async () => '' })
+
+  const before = await fetchBooru({ tags: 'alpha', limit: 10, allowReal: true, allowHentai: true })
+  assert.equal(before.ok, false)
+  assert.equal(calls, 1)
+
+  // The installer hands the search mechanism the id to forget once its server
+  // is healthy; no stale cooldown may hold the new provider back.
+  fetchBooru.clearCooldown('mediaq')
+  const after = await fetchBooru({ tags: 'alpha', limit: 10, allowReal: true, allowHentai: true })
+  assert.equal(after.ok, true)
+  assert.equal(after.source, 'mediaq')
+  assert.equal(calls, 2)
+})
+
 test('the mechanism records metrics when a sink is provided', async () => {
   const events = []
   const metrics = {

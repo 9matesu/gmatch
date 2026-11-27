@@ -2,7 +2,7 @@
 // mediaq setup suite IPC: status, one-shot install (streams progress), cancel,
 // start. The installer owns the network/uv work; this only bridges it to the
 // renderer and owns the AbortController that `mediaq:cancel` triggers.
-module.exports = function registerMediaqHandlers({ ipcMain, installer, sidecar, getUserData, mainLog }) {
+module.exports = function registerMediaqHandlers({ ipcMain, installer, sidecar, getUserData, mainLog, onReady }) {
   let current = null // AbortController for the in-flight install, if any
 
   ipcMain.handle('mediaq:status', async () => {
@@ -44,11 +44,16 @@ module.exports = function registerMediaqHandlers({ ipcMain, installer, sidecar, 
     try {
       const { bin } = await installer.installMediaqSuite({ userData: getUserData(), onProgress: send, signal })
       // Start it immediately so the provider (localhost:8765) answers.
+      let started = false
       try {
         await sidecar.startMediaq({ mediaqBin: bin, onLog: (l) => mainLog && mainLog('[mediaq] ' + l) })
+        started = true
       } catch (err) {
         send({ phase: 'warn', message: 'installed, but the server did not start: ' + String((err && err.message) || err) })
       }
+      // Forget any failure cooldown so the clicker uses the new source on its
+      // next fetch instead of waiting out the old one.
+      if (started && onReady) onReady()
       send({ phase: 'done', percent: 100, message: 'mediaq is ready' })
       return { ok: true, bin }
     } catch (err) {
@@ -80,6 +85,7 @@ module.exports = function registerMediaqHandlers({ ipcMain, installer, sidecar, 
       const st = await installer.mediaqStatus({ userData: getUserData() })
       if (!st.bin) return { ok: false, error: 'not-installed' }
       await sidecar.startMediaq({ mediaqBin: st.bin, onLog: (l) => mainLog && mainLog('[mediaq] ' + l) })
+      if (onReady) onReady()
       return { ok: true, base: sidecar.BASE }
     } catch (err) {
       return { ok: false, error: String((err && err.message) || err) }

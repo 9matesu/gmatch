@@ -63,7 +63,7 @@ export function MediaqSetupModal() {
 
         <div className="flex flex-wrap justify-end gap-2">
           {(status === 'idle' || status === 'error' || status === 'cancelled') && (
-            <Button variant="primary" onClick={start}>
+            <Button variant="primary" onClick={() => start()}>
               {status === 'idle' ? 'Install media suite' : status === 'error' ? 'Retry' : 'Install'}
             </Button>
           )}
