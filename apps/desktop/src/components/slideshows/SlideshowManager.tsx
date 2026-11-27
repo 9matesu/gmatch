@@ -185,7 +185,7 @@ export function SlideshowManager({
             {creating ? 'Cancel' : 'New'}
           </button>
           {onClose && (
-            <button type="button" onClick={onClose} className="p-1.5 rounded-lg text-retro-muted hover:text-retro-fg hover:bg-surface-interactive cursor-pointer">
+            <button type="button" onClick={onClose} aria-label="Close slideshow manager" className="p-1.5 rounded-lg text-retro-muted hover:text-retro-fg hover:bg-surface-interactive cursor-pointer">
               <X className="w-4 h-4" />
             </button>
           )}

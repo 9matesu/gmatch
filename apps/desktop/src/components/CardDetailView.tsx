@@ -205,7 +205,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
         <div className="glass-card p-8 max-w-2xl w-full mx-4">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-black tracking-tight text-retro-fg">Card details</h2>
-            <button onClick={onClose} className="glass-action glass-action-danger h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer">
+            <button onClick={onClose} aria-label="Close card details" className="glass-action glass-action-danger h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer">
               <X className="w-6 h-6" />
             </button>
           </div>

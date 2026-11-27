@@ -151,7 +151,7 @@ function ProfileStep(props: Props & { onDone: () => void }) {
               value={secretKey}
               onChange={(e) => setSecretKey(e.target.value)}
               placeholder="Paste your exported secret key"
-              className="w-full bg-retro-panel border border-edge rounded-lg px-3 py-2 text-xs font-mono text-retro-fg placeholder:text-retro-muted outline-none focus:border-edge transition-colors"
+              className="w-full bg-retro-panel border border-edge rounded-lg px-3 py-2 text-xs font-mono text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent transition-colors"
             />
           </div>
           <div className="space-y-1.5">
@@ -163,7 +163,7 @@ function ProfileStep(props: Props & { onDone: () => void }) {
               onChange={(e) => setName(e.target.value)}
               placeholder="Leave blank to use existing name"
               maxLength={30}
-              className="w-full bg-retro-panel border border-edge rounded-lg px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-edge transition-colors"
+              className="w-full bg-retro-panel border border-edge rounded-lg px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent transition-colors"
             />
           </div>
         </div>
@@ -181,7 +181,7 @@ function ProfileStep(props: Props & { onDone: () => void }) {
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. AnonGooner"
               maxLength={30}
-              className="flex-1 bg-retro-panel border border-edge rounded-lg px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-edge transition-colors"
+              className="flex-1 bg-retro-panel border border-edge rounded-lg px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent transition-colors"
             />
             <button
               type="button"

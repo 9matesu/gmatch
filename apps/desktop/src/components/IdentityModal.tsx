@@ -198,6 +198,7 @@ export function IdentityModal({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close identity dialog"
             className="text-retro-muted hover:text-retro-fg p-1 rounded cursor-pointer"
           >
             <X className="w-4 h-4" />

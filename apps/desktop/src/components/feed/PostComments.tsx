@@ -266,7 +266,7 @@ export function PostComments({
             }}
             placeholder={replyTo ? `Reply to ${replyTo.author_name || 'user'}…` : 'Add a comment...'}
             aria-label={replyTo ? `Reply to ${replyTo.author_name || 'user'}` : 'Add a comment'}
-            className="flex-1 bg-retro-panel border border-edge rounded-md px-3.5 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-edge transition-colors"
+            className="flex-1 bg-retro-panel border border-edge rounded-md px-3.5 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent transition-colors"
           />
           <button
             type="button"

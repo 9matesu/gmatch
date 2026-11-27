@@ -153,7 +153,7 @@ export function RankingsPanel({
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search players"
             aria-label="Search players"
-            className="w-full bg-surface-interactive border border-edge rounded-md pl-8 pr-3 py-1.5 text-xs text-retro-fg outline-none focus:border-edge placeholder:text-retro-muted"
+            className="w-full bg-surface-interactive border border-edge rounded-md pl-8 pr-3 py-1.5 text-xs text-retro-fg outline-none focus:border-retro-accent placeholder:text-retro-muted"
           />
         </div>
         <button

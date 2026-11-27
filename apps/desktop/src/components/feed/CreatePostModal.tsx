@@ -591,7 +591,7 @@ function addLinkToCaption(raw: string): void {
                   placeholder={mediaList.length === 0 ? 'What is happening?!' : 'Write a caption...'}
                   rows={3}
                   maxLength={1000}
-                  className="w-full bg-retro-bg border border-edge rounded-lg p-3 text-xs text-retro-fg focus:outline-none focus:border-edge transition-colors placeholder:text-retro-muted resize-none"
+                  className="w-full bg-retro-bg border border-edge rounded-lg p-3 text-xs text-retro-fg focus:outline-none focus:border-retro-accent transition-colors placeholder:text-retro-muted resize-none"
                 />
                 <div className="text-right text-2xs font-mono text-retro-muted mt-0.5">
                   {caption.length}/1000
@@ -614,6 +614,7 @@ function addLinkToCaption(raw: string): void {
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close"
             className="p-1.5 text-retro-muted hover:text-retro-fg rounded-md cursor-pointer hover:bg-glass-w12 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -699,7 +700,7 @@ function addLinkToCaption(raw: string): void {
                     }}
                     placeholder="Paste a link to share…"
                     aria-label="Link to share"
-                    className="w-full bg-retro-bg border border-edge rounded-lg pl-9 pr-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted focus:outline-none focus:border-edge"
+                    className="w-full bg-retro-bg border border-edge rounded-lg pl-9 pr-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted focus:outline-none focus:border-retro-accent"
                   />
                 </div>
                 <button

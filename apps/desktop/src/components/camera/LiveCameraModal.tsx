@@ -175,6 +175,7 @@ export function LiveCameraModal({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close camera"
             className="p-1 rounded-full text-retro-muted hover:text-retro-fg hover:bg-surface-interactive cursor-pointer transition-colors"
           >
             <X className="w-5 h-5" />
@@ -274,6 +275,7 @@ export function LiveCameraModal({
                 type="button"
                 onClick={handleTakeSnapshot}
                 disabled={!!cameraError || isStarting}
+                aria-label="Take photo"
                 className="w-16 h-16 rounded-full bg-retro-accent p-1 cursor-pointer hover:scale-105 active:scale-95 transition-transform shadow-xl disabled:opacity-30"
               >
                 <div className="w-full h-full rounded-full border-2 border-edge bg-surface-raised flex items-center justify-center" />

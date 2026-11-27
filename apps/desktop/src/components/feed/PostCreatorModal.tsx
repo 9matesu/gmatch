@@ -117,6 +117,7 @@ export function PostCreatorModal({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close"
             className="p-1 rounded-full text-retro-muted hover:text-retro-fg cursor-pointer"
           >
             <X className="w-5 h-5" />

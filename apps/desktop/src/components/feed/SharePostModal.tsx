@@ -174,6 +174,7 @@ export function SharePostModal({ post, onClose, followingIds = [], profilePics =
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close share dialog"
             className="p-1 rounded-full text-retro-muted hover:text-retro-fg cursor-pointer"
           >
             <X className="w-5 h-5" />

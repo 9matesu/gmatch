@@ -110,6 +110,12 @@ describe('CardDetailView marketplace actions (P3.1–3.3)', () => {
     expect(screen.queryByRole('button', { name: /^transfer$/i })).toBeNull()
   })
 
+  it('the error state close button has an accessible name', async () => {
+    mockFetch({ '/api/cards/c-1': () => json({ error: 'missing' }, false) })
+    render(<CardDetailView cardId="c-1" identity={identity} onClose={vi.fn()} toast={vi.fn()} />)
+    expect(await screen.findByRole('button', { name: 'Close card details' })).toBeTruthy()
+  })
+
   it('server error surfaces an error toast and does NOT fake success', async () => {
     mockFetch({ '/list': () => json({ error: 'you do not own this card' }, false) })
     const toast = vi.fn()

@@ -310,6 +310,7 @@ export function FormModal<T extends Record<string, unknown>>({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close"
             className="p-1 rounded hover:bg-glass-w10 text-retro-muted hover:text-retro-fg transition-colors"
           >
             <X className="w-4 h-4" />
@@ -516,6 +517,7 @@ export function DetailModal({ isOpen, onClose, title, subtitle, children, data, 
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close"
             className="p-1 rounded hover:bg-glass-w10 text-retro-muted hover:text-retro-fg transition-colors"
           >
             <X className="w-4 h-4" />

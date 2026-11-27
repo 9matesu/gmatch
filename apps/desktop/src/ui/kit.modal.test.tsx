@@ -58,6 +58,19 @@ describe('Modal shell', () => {
     expect(document.activeElement).toBe(focusable[0])
   })
 
+  it('caps its height and scrolls so a tall dialog cannot push controls off-screen', () => {
+    render(
+      <Modal title="Tall" onClose={vi.fn()}>
+        <button type="button">Cancel</button>
+      </Modal>,
+    )
+    const dialog = screen.getByRole('dialog')
+    // jsdom has no layout: pin the rule that keeps the centred dialog inside
+    // a short viewport instead of letting it grow past the top of the window.
+    expect(dialog.className).toContain('max-h-full')
+    expect(dialog.className).toContain('overflow-y-auto')
+  })
+
   it('returns focus to the trigger on close', async () => {
     const user = userEvent.setup()
     render(<Harness />)

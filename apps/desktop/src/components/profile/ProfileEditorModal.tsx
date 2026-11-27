@@ -161,6 +161,7 @@ export function ProfileEditorModal({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close profile editor"
             className="p-1 text-retro-muted hover:text-retro-body rounded cursor-pointer"
           >
             <X className="w-5 h-5" />

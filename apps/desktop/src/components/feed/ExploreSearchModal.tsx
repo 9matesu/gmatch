@@ -101,6 +101,7 @@ export function ExploreSearchModal({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close search"
             className="p-1.5 rounded-full text-retro-muted hover:text-retro-fg hover:bg-glass-w10 cursor-pointer transition-colors"
           >
             <X className="w-5 h-5" />

@@ -226,6 +226,7 @@ export function AttachmentUploadModal({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close"
             className="text-retro-muted hover:text-retro-body p-1 rounded-md cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -282,7 +283,7 @@ export function AttachmentUploadModal({
                   value={urlInput}
                   onChange={(e) => handleUrl(e.target.value)}
                   placeholder="Paste image or video link (e.g. https://...)"
-                  className="flex-1 bg-surface-interactive border border-edge rounded-xl px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-black"
+                  className="flex-1 bg-surface-interactive border border-edge rounded-xl px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent"
                 />
               </div>
               {urlInput && (

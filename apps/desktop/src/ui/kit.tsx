@@ -130,6 +130,8 @@ export function CardHeader({
  * Focus-trapped (Tab cycles, focus restored on close), Escape closes, and the
  * backdrop click dismisses ONLY with `dismissable` — typed input is never lost
  * to a stray click. Sits at the --z-modal layer with island clearance.
+ * The dialog caps its height to the overlay and scrolls: a centred dialog that
+ * outgrew a short viewport used to push its own close button off-screen.
  */
 export function Modal({
   title,
@@ -204,7 +206,7 @@ export function Modal({
         aria-modal="true"
         aria-labelledby={titleId}
         onClick={(e) => e.stopPropagation()}
-        className={`w-full ${maxWidth} glass-panel shadow-xl animate-orbit-pop`}
+        className={`w-full ${maxWidth} max-h-full overflow-y-auto styled-scrollbar glass-panel shadow-xl animate-orbit-pop`}
       >
         <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-edge">
           <h2 id={titleId} className="text-base font-black tracking-tight text-retro-fg truncate">
@@ -300,8 +302,32 @@ export function Tabs<T extends string>({
   onChange: (id: T) => void
   className?: string
 }) {
+  /** A tablist is one composite control: arrow keys move between tabs (WAI-ARIA
+   *  tabs pattern). Without this, a keyboard user had to Tab through every tab
+   *  and press Enter, and focus stayed on a tab that was no longer selected.
+   *  Only handle keys that originate ON a tab — never from a control a caller
+   *  puts inside a tab's label. */
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement
+    if (target.getAttribute('role') !== 'tab') return
+    const keys = ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End']
+    if (!keys.includes(e.key)) return
+    const buttons = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
+    const index = buttons.indexOf(target as HTMLButtonElement)
+    if (index < 0) return
+    e.preventDefault()
+    const next =
+      e.key === 'Home' ? 0
+      : e.key === 'End' ? buttons.length - 1
+      : e.key === 'ArrowRight' || e.key === 'ArrowDown'
+        ? (index + 1) % buttons.length
+        : (index - 1 + buttons.length) % buttons.length
+    buttons[next]?.focus()
+    onChange(tabs[next].id)
+  }
+
   return (
-    <div role="tablist" className={`flex bg-glass-w5 p-0.5 rounded-lg border border-edge ${className}`}>
+    <div role="tablist" onKeyDown={onKeyDown} className={`flex bg-glass-w5 p-0.5 rounded-lg border border-edge ${className}`}>
       {tabs.map((t) => (
         <button
           key={t.id}

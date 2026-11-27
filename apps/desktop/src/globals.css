@@ -1248,8 +1248,11 @@ select.bg-transparent {
   isolation: isolate;
   overflow: hidden;
   color: var(--color-retro-accent-text);
-  background: #ffffff;
-  background-color: #ffffff;
+  /* The primary action reads the same accent token as .chrome-accent: a
+     hardcoded white fill vanished into the light-theme canvas (the flat
+     theme killed its shadow and its white border with it). */
+  background: var(--color-retro-accent);
+  background-color: var(--color-retro-accent);
   border: 1px solid rgba(255, 255, 255, 0.72);
   box-shadow:
     0 10px 26px rgba(0, 0, 0, 0.34),
@@ -1267,7 +1270,7 @@ select.bg-transparent {
 }
 .create-action:hover {
   color: var(--color-retro-accent-text);
-  background: #e4e4e7;
+  background: var(--color-retro-accent-hover);
   transform: translateY(-1px);
   box-shadow:
     0 14px 34px rgba(0, 0, 0, 0.40),
