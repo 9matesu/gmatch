@@ -11,9 +11,16 @@ import { peerNodeFor } from './peerNodes'
 import { logger } from './logger'
 
 export function readTurnEnv(): Record<string, string | undefined> {
-  if (typeof process !== 'undefined' && process.env) return process.env as Record<string, string | undefined>
-  if (typeof window !== 'undefined') return (window as unknown as { __ENV?: Record<string, string | undefined> }).__ENV ?? {}
-  return {}
+  // A packaged renderer is sandboxed (no process.env) and nothing injects
+  // window.__ENV, so those two alone always yielded an empty env. Vite's
+  // build-time env is the source that actually reaches the renderer; merge
+  // all three so every host can configure the relay-forced posture.
+  const fromBuild = (import.meta.env ?? {}) as Record<string, string | undefined>
+  const fromWindow = typeof window !== 'undefined'
+    ? (window as unknown as { __ENV?: Record<string, string | undefined> }).__ENV ?? {}
+    : {}
+  const fromProcess = typeof process !== 'undefined' && process.env ? process.env : {}
+  return { ...fromBuild, ...fromWindow, ...fromProcess }
 }
 
 export type CourierSignalPayload =

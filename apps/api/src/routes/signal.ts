@@ -112,11 +112,16 @@ signal.get('/answer/:offerId', orbitAuth, async (c) => {
     return c.json({ error: 'Forbidden' }, 403)
   }
 
-  let answer: unknown = null
-  for (let attempt = 0; attempt < 20; attempt++) {
-    answer = getAnswer(offerId)
-    if (answer !== null && answer !== undefined) break
-    await new Promise((r) => setTimeout(r, 250))
+  // "Offer exists, peer has not answered yet" is a NORMAL polling state, not
+  // a malformed answer. It must be distinguishable from "unknown offer" (404
+  // `Offer not found`) and from a genuinely corrupt stored answer (400).
+  // The initiator polls this route every second with its own 45s budget;
+  // answering that with a 400 after a server-side wait made it abort the whole
+  // connection as soon as a cross-NAT peer took more than a few seconds to
+  // answer. The 404 `Answer not found` is the contract the client waits for.
+  const answer = getAnswer(offerId)
+  if (answer === null || answer === undefined) {
+    return c.json({ error: 'Answer not found' }, 404)
   }
 
   const parsed = answer

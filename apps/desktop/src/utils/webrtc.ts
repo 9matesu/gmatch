@@ -18,9 +18,13 @@ function getIceServers(): RTCIceServer[] {
 }
 
 function readTurnEnv(): Record<string, string | undefined> {
-  if (typeof process !== 'undefined' && process.env) return process.env as Record<string, string | undefined>
-  if (typeof window !== 'undefined') return (window as any).__ENV ?? {}
-  return {}
+  // Same three sources as courierSignaling.ts: Vite build-time env is the one
+  // that exists in a sandboxed packaged renderer, window.__ENV is a runtime
+  // injection seam, process.env covers Node/dev tools.
+  const fromBuild = (import.meta.env ?? {}) as Record<string, string | undefined>
+  const fromWindow = typeof window !== 'undefined' ? ((window as any).__ENV ?? {}) as Record<string, string | undefined> : {}
+  const fromProcess = typeof process !== 'undefined' && process.env ? process.env as Record<string, string | undefined> : {}
+  return { ...fromBuild, ...fromWindow, ...fromProcess }
 }
 
 const CHUNK_SIZE = 64 * 1024 // 64KB
@@ -28,6 +32,22 @@ const ANSWER_TIMEOUT = 45_000
 const CHANNEL_TIMEOUT = 30_000
 const ICE_POLL_INTERVAL = 1000
 const ICE_POLL_TIMEOUT = 60_000 // stop polling for ICE after 60s
+
+/**
+ * Whether a failed answer poll is a transient "not yet" (keep waiting inside
+ * ANSWER_TIMEOUT) or a definitive refusal (stop). A peer across a slow link
+ * can take many seconds to answer — especially one that has to gather ICE on
+ * a phone network — and the initiator must not turn the node's short-poll
+ * response into a failed connection. Only an unknown offer or an auth refusal
+ * is final; every other non-success is retried until our own deadline.
+ */
+export function answerPollShouldRetry(status: number, errorText: string): boolean {
+  if (status === 401 || status === 403) return false
+  // 404 with "Offer not found" is a bad offer id; 404 with anything else is
+  // the node saying "no answer yet" (the `/answer` route's "Answer not found").
+  if (status === 404) return errorText !== 'Offer not found'
+  return status === 400 || status === 408 || status === 425 || status === 429 || status >= 500
+}
 
 export class OrbitPeer {
   private pc: RTCPeerConnection | null = null
@@ -39,6 +59,7 @@ export class OrbitPeer {
   private resolveConnect: ((meta: FileMeta) => void) | null = null
   private rejectConnect: ((err: Error) => void) | null = null
   private icePollTimer: ReturnType<typeof setTimeout> | null = null
+  private answerPollTimer: ReturnType<typeof setTimeout> | null = null
   private icePollTimeout: ReturnType<typeof setTimeout> | null = null
 
   onProgress?: (received: number, total: number) => void
@@ -57,6 +78,34 @@ export class OrbitPeer {
     this.channel = this.pc.createDataChannel('file-transfer')
     this.setupDataChannel(identity)
 
+    // setLocalDescription() starts ICE gathering immediately. The signal POST
+    // below is async, so attaching onicecandidate afterwards silently DROPS
+    // every candidate gathered in that window — including the srflx pair a
+    // Brazil<->USA connection needs to hole-punch. Attach first, buffer until
+    // the offer id exists, then flush; sanitization still gates every one.
+    const earlyCandidates: RTCIceCandidateInit[] = []
+    let offerId: string | null = null
+    const postIce = async (candidate: RTCIceCandidateInit) => {
+      if (!offerId) { earlyCandidates.push(candidate); return }
+      await orbitFetch('/api/signal/ice', {
+        method: 'POST',
+        body: JSON.stringify({ offer_id: offerId, candidate }),
+      }, identity).catch(() => {})
+    }
+    this.pc.onicecandidate = (e) => {
+      if (!e.candidate) return
+      const safe = sanitizeCandidate(e.candidate.toJSON())
+      if (!safe) return // raw-IP candidate — never leaves this machine
+      void postIce(safe)
+    }
+
+    this.pc.oniceconnectionstatechange = () => {
+      logger.log('[ORBIT WebRTC] ICE Connection State:', this.pc?.iceConnectionState)
+      if (this.pc?.iceConnectionState === 'failed' || this.pc?.iceConnectionState === 'disconnected') {
+        this.onError?.(new Error(`ICE connection ${this.pc.iceConnectionState}`))
+      }
+    }
+
     const offer = await this.pc.createOffer()
     await this.pc.setLocalDescription(offer)
 
@@ -70,67 +119,63 @@ export class OrbitPeer {
       throw new Error('Failed to initiate WebRTC signal')
     }
 
-    const { id: offerId } = await res.json()
-    logger.log('[ORBIT WebRTC] WebRTC offer initiated successfully! Offer ID:', offerId)
-
-    this.pc.onicecandidate = async (e) => {
-      if (!e.candidate) return
-      const safe = sanitizeCandidate(e.candidate.toJSON())
-      if (!safe) return // raw-IP candidate — never leaves this machine
-      await orbitFetch('/api/signal/ice', {
-        method: 'POST',
-        body: JSON.stringify({ offer_id: offerId, candidate: safe }),
-      }, identity).catch(() => {})
-    }
-
-    this.pc.oniceconnectionstatechange = () => {
-      logger.log('[ORBIT WebRTC] ICE Connection State:', this.pc?.iceConnectionState)
-      if (this.pc?.iceConnectionState === 'failed' || this.pc?.iceConnectionState === 'disconnected') {
-        this.onError?.(new Error(`ICE connection ${this.pc.iceConnectionState}`))
-      }
-    }
+    const { id } = await res.json()
+    const activeOfferId: string = id
+    offerId = activeOfferId
+    logger.log('[ORBIT WebRTC] WebRTC offer initiated successfully! Offer ID:', activeOfferId)
+    for (const candidate of earlyCandidates) void postIce(candidate)
+    earlyCandidates.length = 0
 
     await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        this.close()
-        reject(new Error('Timed out waiting for WebRTC answer signal'))
-      }, ANSWER_TIMEOUT)
+      let settled = false
+      const finish = (err?: Error) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timeout)
+        if (err) { this.close(); reject(err) } else resolve()
+      }
+      const timeout = setTimeout(() => finish(new Error('Timed out waiting for WebRTC answer signal')), ANSWER_TIMEOUT)
 
       const pollAnswer = async () => {
-        const res = await orbitFetch(`/api/signal/answer/${offerId}`, {}, identity)
-        if (res.status === 404) {
-          try {
-            const body = await res.json()
-            if (body?.error === 'Answer not found') { setTimeout(pollAnswer, 1000); return }
-          } catch (err) {
-            logger.warn('[webrtc] POST /api/signal/ice failed', err)
-          }
-          this.close(); reject(new Error('Poll answer failed (404)')); return
+        if (settled) return
+        let res: Response
+        try {
+          res = await orbitFetch(`/api/signal/answer/${offerId}`, {}, identity)
+        } catch (err) {
+          // Network hiccup is a transient miss, not a failed negotiation.
+          if (!settled) this.answerPollTimer = setTimeout(pollAnswer, 1000)
+          return
         }
-        clearTimeout(timeout)
-        if (!res.ok) { this.close(); reject(new Error('Poll answer failed')); return }
-        const { answer } = await res.json()
+        if (settled) return
+        const raw = await res.text().catch(() => '')
+        let data: { answer?: RTCSessionDescriptionInit; error?: unknown } | null = null
+        try { data = JSON.parse(raw) } catch { /* keep the raw text for logs */ }
+
+        if (answerPollShouldRetry(res.status, String(data?.error ?? ''))) {
+          if (!settled) this.answerPollTimer = setTimeout(pollAnswer, 1000)
+          return
+        }
+        if (!res.ok) { finish(new Error(`Poll answer failed (${res.status})`)); return }
+
+        const answer = data?.answer
         if (!answer || !answer.type) {
-          const bodyText = await res.text().catch(() => '')
-          logger.error('[ORBIT WebRTC] Invalid answer response body:', bodyText.slice(0, 500))
-          this.close()
-          reject(new Error('Invalid/null WebRTC answer from peer'))
+          logger.error('[ORBIT WebRTC] Invalid answer response body:', raw.slice(0, 500))
+          finish(new Error('Invalid/null WebRTC answer from peer'))
           return
         }
         try {
           logger.log('[ORBIT WebRTC] Received remote answer signal for offer:', offerId)
           await this.pc!.setRemoteDescription(new RTCSessionDescription(answer))
-          resolve()
+          finish()
         } catch (err) {
-          this.close()
-          reject(err instanceof Error ? err : new Error('Failed to set remote description'))
+          finish(err instanceof Error ? err : new Error('Failed to set remote description'))
         }
       }
       pollAnswer()
     })
 
-    this.startIcePoll(offerId, identity)
-    return offerId
+    this.startIcePoll(activeOfferId, identity)
+    return activeOfferId
   }
 
   async sendFile(file: File, identity: OrbitIdentity, _recipientId: string): Promise<void> {
@@ -195,6 +240,19 @@ export class OrbitPeer {
       }
     }
 
+    // Attach BEFORE setLocalDescription starts gathering: the answerer's
+    // candidates (the srflx pair that completes the cross-NAT hole punch)
+    // are emitted during/right after that call, not after the respond POST.
+    this.pc.onicecandidate = async (e) => {
+      if (!e.candidate) return
+      const safe = sanitizeCandidate(e.candidate.toJSON())
+      if (!safe) return // raw-IP candidate — never leaves this machine
+      await orbitFetch('/api/signal/ice', {
+        method: 'POST',
+        body: JSON.stringify({ offer_id: offerId, candidate: safe }),
+      }, identity).catch(() => {})
+    }
+
     await this.pc.setRemoteDescription(new RTCSessionDescription(offer))
     const answer = await this.pc.createAnswer()
     await this.pc.setLocalDescription(answer)
@@ -206,16 +264,6 @@ export class OrbitPeer {
     if (!respondRes.ok) {
       const body = await respondRes.text()
       throw new Error(`[phase:send-answer] ${respondRes.status} ${body}`)
-    }
-
-    this.pc.onicecandidate = async (e) => {
-      if (!e.candidate) return
-      const safe = sanitizeCandidate(e.candidate.toJSON())
-      if (!safe) return // raw-IP candidate — never leaves this machine
-      await orbitFetch('/api/signal/ice', {
-        method: 'POST',
-        body: JSON.stringify({ offer_id: offerId, candidate: safe }),
-      }, identity).catch(() => {})
     }
 
     this.startIcePoll(offerId, identity)
@@ -296,6 +344,7 @@ export class OrbitPeer {
 
   close() {
     if (this.icePollTimer) { clearTimeout(this.icePollTimer); this.icePollTimer = null }
+    if (this.answerPollTimer) { clearTimeout(this.answerPollTimer); this.answerPollTimer = null }
     if (this.icePollTimeout) { clearTimeout(this.icePollTimeout); this.icePollTimeout = null }
     this.channel?.close()
     this.pc?.close()

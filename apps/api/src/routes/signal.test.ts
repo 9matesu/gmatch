@@ -392,6 +392,33 @@ describe('Signal API — authorization (only participants)', () => {
   })
 })
 
+describe('Signal API — answer polling contract', () => {
+  it('an offer with no answer yet is a 404 "Answer not found", not a malformed-answer 400', async () => {
+    const env = await createMockEnv()
+    const sender = createTestIdentity()
+    const receiver = createTestIdentity()
+    await app.request('/api/users', { headers: authHeaders(sender, 'GET', '/api/users') }, env)
+    await app.request('/api/users', { headers: authHeaders(receiver, 'GET', '/api/users') }, env)
+
+    const offerBody = JSON.stringify({ offer: { type: 'offer', sdp: 'v=0...' }, receiver_id: receiver.orbitId })
+    const offerRes = await app.request('/api/signal/initiate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders(sender, 'POST', '/api/signal/initiate', offerBody) },
+      body: offerBody,
+    }, env)
+    const { id: offerId } = (await offerRes.json()) as { id: string }
+
+    // The initiator polls this route while the peer gathers ICE / accepts the
+    // transfer. A cross-country answer can take seconds; "not yet" must be a
+    // retryable 404, not a definitive 400 that aborts the whole negotiation.
+    const res = await app.request(`/api/signal/answer/${offerId}`, {
+      headers: authHeaders(sender, 'GET', `/api/signal/answer/${offerId}`),
+    }, env)
+    expect(res.status).toBe(404)
+    expect(await res.json()).toEqual({ error: 'Answer not found' })
+  })
+})
+
 describe('candidateLeaksIp (ICE hygiene gate)', () => {
   it('passes mDNS host, relay and srflx; drops literal-IP host + junk', () => {
     expect(candidateLeaksIp({ candidate: 'candidate:1 1 udp 100 me.local 54321 typ host' })).toBe(false)

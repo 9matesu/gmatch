@@ -5,6 +5,7 @@ import {
   effectiveTurn,
   iceServersFor,
   isLiteralIp,
+  normalizeTurnEnv,
   parseCandidate,
   peerConnectionConfig,
   sanitizeCandidate,
@@ -147,5 +148,22 @@ describe('turnCredentials + config', () => {
 
   it('env contract unchanged: turnCredentials({}) is still null', () => {
     expect(turnCredentials({})).toBeNull()
+  })
+
+  it('Vite VITE_TURN_* reaches the renderer where process.env does not', () => {
+    const viteEnv = {
+      VITE_TURN_URL: 'turn:vite.example:3478',
+      VITE_TURN_USERNAME: 'vite-user',
+      VITE_TURN_CREDENTIAL: 'vite-pass',
+    }
+    expect(normalizeTurnEnv(viteEnv)).toMatchObject({
+      NEXT_PUBLIC_TURN_URL: 'turn:vite.example:3478',
+      NEXT_PUBLIC_TURN_USERNAME: 'vite-user',
+      NEXT_PUBLIC_TURN_CREDENTIAL: 'vite-pass',
+    })
+    expect(turnCredentials(viteEnv)).toEqual({ url: 'turn:vite.example:3478', username: 'vite-user', credential: 'vite-pass' })
+    expect(defaultIceConfig(viteEnv).iceTransportPolicy).toBe('relay')
+    // An explicitly injected NEXT_PUBLIC_ value still wins over the alias.
+    expect(normalizeTurnEnv({ ...viteEnv, NEXT_PUBLIC_TURN_URL: 'turn:explicit' }).NEXT_PUBLIC_TURN_URL).toBe('turn:explicit')
   })
 })

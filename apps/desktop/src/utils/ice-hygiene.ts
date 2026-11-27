@@ -70,11 +70,32 @@ export function sanitizeCandidate<T extends { candidate?: string }>(cand: T): T 
   return candidateLeaksIp(cand.candidate) ? null : cand
 }
 
+/**
+ * Vite only exposes VITE_-prefixed variables into the renderer bundle; the
+ * NEXT_PUBLIC_TURN_* names are kept for Node/dev tools and for a runtime
+ * `window.__ENV` injection. Accept both spellings so TURN is actually
+ * configurable in a SHIPPED build — with no bridge or injection, reading only
+ * process.env/window.__ENV left every P2P stack STUN-only forever.
+ */
+export function normalizeTurnEnv(env: Record<string, string | undefined>): Record<string, string | undefined> {
+  const out = { ...env }
+  const aliases: Array<[string, string]> = [
+    ['VITE_TURN_URL', 'NEXT_PUBLIC_TURN_URL'],
+    ['VITE_TURN_USERNAME', 'NEXT_PUBLIC_TURN_USERNAME'],
+    ['VITE_TURN_CREDENTIAL', 'NEXT_PUBLIC_TURN_CREDENTIAL'],
+  ]
+  for (const [viteKey, canonicalKey] of aliases) {
+    if (!out[canonicalKey] && out[viteKey]) out[canonicalKey] = out[viteKey]
+  }
+  return out
+}
+
 /** TURN env lookup shared by both P2P stacks (renderer + dev tools). */
 export function turnCredentials(env: Record<string, string | undefined> = {}): { url: string; username: string; credential: string } | null {
-  const url = env.NEXT_PUBLIC_TURN_URL
-  const username = env.NEXT_PUBLIC_TURN_USERNAME
-  const credential = env.NEXT_PUBLIC_TURN_CREDENTIAL
+  const e = normalizeTurnEnv(env)
+  const url = e.NEXT_PUBLIC_TURN_URL
+  const username = e.NEXT_PUBLIC_TURN_USERNAME
+  const credential = e.NEXT_PUBLIC_TURN_CREDENTIAL
   if (url && username && credential) return { url, username, credential }
   return null
 }
