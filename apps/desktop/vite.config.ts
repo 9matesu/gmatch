@@ -48,7 +48,7 @@ function refererForUrl(target: URL): string {
 }
 
 const DEV_UA =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36'
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
 
 /**
  * Dev-only same-origin byte proxy: image hosts without ACAO headers
@@ -559,10 +559,20 @@ function imhentaiProxy(): ProxyOptions {
         proxyReq.setHeader('sec-fetch-site', 'same-origin')
         proxyReq.setHeader('sec-fetch-user', '?1')
         proxyReq.setHeader('upgrade-insecure-requests', '1')
+        // Client hints a current Chrome sends; Cloudflare's managed challenge
+        // checks these alongside the UA.
+        proxyReq.setHeader('sec-ch-ua', '"Chromium";v="131", "Not_A Brand";v="24", "Google Chrome";v="131"')
+        proxyReq.setHeader('sec-ch-ua-mobile', '?0')
+        proxyReq.setHeader('sec-ch-ua-platform', '"Windows"')
       })
       proxy.on('proxyRes', (proxyRes, req) => {
         try {
-          if (proxyRes.statusCode === 403 && req.url && req.url.includes('/gallery/')) {
+          // Cloudflare 403s a bare dev IP (no Chromium to solve the JS
+          // challenge). Mask it to 200 for BOTH search and gallery so booru.ts
+          // parses the (dataless) challenge body, finds nothing, and falls back
+          // to covers/offline cleanly — instead of a red 403 row per request.
+          // Real imh results need the packaged app's Electron net stack.
+          if (proxyRes.statusCode === 403 && req.url && /\/booru\/imh\//.test(req.url)) {
             proxyRes.statusCode = 200
           }
         } catch { /* passthrough */ }
