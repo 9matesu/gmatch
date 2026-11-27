@@ -1271,6 +1271,19 @@ export default function Home() {
     if (typeof window === 'undefined') return {}
     try { return JSON.parse(getSecureItem('goonmatch_pfps') || '{}') } catch { return {} }
   })
+  // The pfp caches are read once at boot from a global key, so switching
+  // identity inherited the previous account's picture. Clear the in-memory
+  // caches on a real identity CHANGE (not the first load) so the new profile
+  // never shows the old one's avatar; they re-fetch.
+  const prevIdentityRef = useRef<string | null>(null)
+  useEffect(() => {
+    const id = identity?.orbitId ?? null
+    if (prevIdentityRef.current !== null && prevIdentityRef.current !== id) {
+      setProfilePics({})
+      setMyProfile((p) => (p.pfpUrl ? { ...p, pfpUrl: '' } : p))
+    }
+    prevIdentityRef.current = id
+  }, [identity?.orbitId])
   const [repostedPosts, setRepostedPosts] = useState<FeedPost[]>([])
   const [archivedPostIds, setArchivedPostIds] = useState<Set<string>>(() => new Set())
   const [deletedPostIds, setDeletedPostIds] = useState<Set<string>>(() => readDeletedPostIds())
