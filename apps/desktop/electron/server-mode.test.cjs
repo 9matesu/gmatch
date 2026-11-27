@@ -65,6 +65,15 @@ async function main() {
   assert.strictEqual(dialed, 0)
   assert.strictEqual(serverMode.readServerMode().mode, 'host')
 
+  // ---- even BEFORE revalidation, a legacy pointer is never dialed ----
+  // A window can read the config while the health probe is still in flight;
+  // that read must not hand it a hosted-era world.
+  write({ mode: 'client', url: 'http://old-host.example.test' })
+  const direct = serverMode.readServerMode()
+  assert.strictEqual(direct.mode, 'host')
+  assert.strictEqual(direct.pausedReason, 'legacy')
+  assert.strictEqual(direct.pausedUrl, 'http://old-host.example.test')
+
   // ---- a v2 pointer this app wrote IS health-checked ----
   write({ mode: 'client', url: 'http://friend:8790', v: 2 })
   let checked = 0
@@ -105,6 +114,19 @@ async function main() {
   assert.strictEqual(await serverMode.revalidateServerMode({ fetchImpl: counted }), null)
   assert.deepStrictEqual(read(), { mode: 'host', url: '', v: 2 })
   assert.strictEqual(serverMode.readServerMode().pausedUrl, undefined)
+
+  // ---- a slow probe cannot clobber a choice changed while it was in flight ----
+  write({ mode: 'client', url: 'http://friend:8790', v: 2 })
+  const raced = await serverMode.revalidateServerMode({
+    fetchImpl: async () => {
+      // Another window (Settings) switches this install to host mode while
+      // our health check is outstanding.
+      write({ mode: 'host', url: '', v: 2 })
+      return okFetch()
+    },
+  })
+  assert.deepStrictEqual(raced, { mode: 'host', url: HOST }, 'this launch hosts, never dials the stale pointer')
+  assert.deepStrictEqual(read(), { mode: 'host', url: '', v: 2 }, 'the newer choice survives')
 
   // ---- Settings -> Reconnect asks health, not TCP ----
   const originalFetch = globalThis.fetch

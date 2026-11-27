@@ -129,10 +129,27 @@ serves cannot be confirmed deleted, so a post never vanishes and reappears.
 
 The local Bun API sidecar is supervised (`electron/sidecarSupervision.cjs`): a
 crash or a failed health probe restarts it with capped exponential backoff, and
-the attempt budget resets after a healthy minute — so a sidecar that died while
-the app sat idle is brought back instead of leaving the profile empty. It
-debounces failed probes (3 in a row), resets after any healthy answer, and stops
-a hung child before respawning so two Bun processes never fight over :8790.
+the attempt budget resets after ANY healthy answer — so a sidecar that died
+while the app sat idle is brought back instead of leaving the profile empty. It
+debounces failed probes (3 in a row), serialises/generation-tags them (a slow
+reply from before a recovery cannot seed a new streak), and a recovery CANCELS
+a restart already waiting in backoff. Before spawning it stops the old child
+and waits for :8790 to actually close, so two Bun processes never fight over
+the port.
+
+Launch (`electron/apiSidecar.cjs`) arbitrates with an exclusive `api-lease.json`
+in userData: the loser of a simultaneous start waits for the winner's node
+instead of spawning into EADDRINUSE. A healthy sidecar left by a previous launch
+is adopted only when it echoes this install's `instance_id` in `/api/health`
+(derived from the storage key and passed as `GMATCH_INSTANCE_ID`) — a foreign
+node on :8790 is never adopted, and an occupied port with no health answer is
+waited on, never raced. `apps/api/src/serve.ts` binds the listener BEFORE any
+SQLite work, so a duplicate launch loses at bind time without running
+`ensureSchema`/`VACUUM` against another node's database. Stored server pointers
+are defence-in-depth too: `server-mode.cjs` reads an unstamped client pointer as
+paused (host locally) even before boot revalidation, and its probe writes are
+compare-and-swap so a choice changed while the health check was in flight is
+never clobbered.
 
 The `booru` group also exposes `booru:timings` (read-only feed search metrics
 from `electron/feedMetrics.cjs`). Its fetch path may include an optional

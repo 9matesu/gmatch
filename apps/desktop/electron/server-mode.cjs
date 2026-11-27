@@ -64,8 +64,11 @@ function readServerMode() {
   const url = raw.url.replace(/\/+$/, '')
   // The courier is a directory/mail relay, never a world.
   if (isDecommissionedUrl(url)) return localHost
-  // Paused: run locally and remember what was chosen (and why).
-  if (raw.paused === true) {
+  // Paused: run locally and remember what was chosen (and why). An unstamped
+  // pointer from the hosted era is treated the same way even if revalidation
+  // has not run yet — a window reading the config before boot finishes must
+  // never dial a world that is not this install's.
+  if (raw.paused === true || isLegacyClientConfig(raw)) {
     return { ...localHost, pausedUrl: url, pausedReason: pauseReasonOf(raw) }
   }
   return { mode: 'client', url }
@@ -110,13 +113,27 @@ async function revalidateServerMode({ fetchImpl } = {}) {
   if (!raw || raw.mode !== 'client' || raw.paused === true) return null
   const url = normalizeServerUrl(raw.url)
   if (!url) return null
+  // The health probe is slow (up to 2.5s). Another window — or the user in
+  // Settings — can change the choice while we wait. Every write below is a
+  // compare-and-swap: never overwrite a newer choice with the stale pointer
+  // we started probing, and never dial it on this launch either.
+  const unchanged = () => {
+    const now = readRawConfig()
+    return Boolean(
+      now && now.mode === raw.mode && now.url === raw.url &&
+        now.v === raw.v && now.paused === raw.paused &&
+        now.pausedReason === raw.pausedReason,
+    )
+  }
+  const raced = () => ({ mode: 'host', url: HOST_URL })
   // A courier is a rendezvous, never a world: forget the pointer quietly.
   if (isDecommissionedUrl(url)) {
-    writeServerMode('host', '')
+    if (unchanged()) writeServerMode('host', '')
     return null
   }
   // An older app's choice is not this app's world. Not dialed, not deleted.
   if (isLegacyClientConfig(raw)) {
+    if (!unchanged()) return raced()
     pauseServerMode(url, 'legacy')
     return { mode: 'host', url: HOST_URL, pausedUrl: url, pausedReason: 'legacy' }
   }
@@ -130,6 +147,7 @@ async function revalidateServerMode({ fetchImpl } = {}) {
       if (typeof timer.unref === 'function') timer.unref()
     }),
   ])
+  if (!unchanged()) return raced()
   if (answered) {
     writeServerMode('client', url)
     return null

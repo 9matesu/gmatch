@@ -28,7 +28,13 @@ separate economies, no bridge between them.
   old process before restarting** — an early version required `db_ready` on a
   single probe and killed a healthy-but-busy sidecar under load, which then died
   on `EADDRINUSE` (the exact symptom it was meant to fix). `ping` only needs an
-  HTTP 200; `db_ready` is a boot detail, not liveness.
+  HTTP 200; `db_ready` is a boot detail, not liveness. Probes are serialised
+  and generation-tagged, and a healthy answer cancels a restart already in
+  backoff. Launch holds an exclusive `api-lease.json` so two callers cannot
+  both bind `:8790`; it adopts a healthy sidecar only when that node echoes
+  this install's `instance_id` (from the storage key) in `/api/health`.
+  `serve.ts` claims the listener before `ensureSchema`/`VACUUM`, so the loser
+  of a bind race never touches another node's SQLite file.
 - UI authority: Orbit's retro-glass Tailwind design system (shell). The idle
   game renders inside the shell's `grid` view, restyled to Tailwind 4 with
   shared recipes in `src/ui/styles.ts` (legacy goongrid.css deleted; only

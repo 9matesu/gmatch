@@ -27,12 +27,24 @@ const db = new D1Turso(client)
 // crypto.ts hard-requires a non-zero 64-hex STORAGE_ENCRYPTION_KEY; the server
 // can also be started bare (`bun run serve:api`, packaged api-stage). Resolve
 // env → persisted keyfile → fresh generated key so uploads/PMs never 500 on a
-// missing key.
-process.env.STORAGE_ENCRYPTION_KEY = resolveStorageKey(SNAPSHOT_PATH, process.env)
+// missing key. Deferred until AFTER the port bind below: two bare launches
+// racing here could otherwise overwrite each other's key file and make the
+// winner's blobs unreadable.
 const BLOB_STORE_DIR = process.env.BLOB_STORE_DIR || (process.env.SNAPSHOT_PATH ? join(dirname(process.env.SNAPSHOT_PATH), 'blobs') : './blobs')
 let dbReady = false
 let dbInitError: string | null = null
-const dbReadyPromise = (async () => {
+// The port is claimed BEFORE any DB work starts (see Bun.serve below). A
+// duplicate launch must lose at bind time, before it can run ensureSchema /
+// VACUUM against a database another node is already serving. The promise is
+// created now so the maintenance hooks below can attach to it; beginDbInit()
+// is called only once the listener is ours.
+let resolveDbReady!: () => void
+const dbReadyPromise = new Promise<void>((resolve) => { resolveDbReady = resolve })
+let dbInitStarted = false
+function beginDbInit(): void {
+  if (dbInitStarted) return
+  dbInitStarted = true
+  void (async () => {
   try {
     // Boot-time durability diagnostics: a deploy that lost the mounted
     // volume (the most common root cause of "cards reset on update") must
@@ -73,8 +85,11 @@ const dbReadyPromise = (async () => {
   } catch (err) {
     dbInitError = (err as Error)?.message || String(err)
     console.error('[DB] Startup error:', dbInitError)
+  } finally {
+    resolveDbReady()
   }
-})()
+  })()
+}
 
 // Watch rooms live in memory; keep them across restarts/deploys on the same
 // /data volume as the DB snapshot. 30 s tick + SIGTERM flush; file is tiny
@@ -133,18 +148,25 @@ dbReadyPromise.then(() => {
 })
 // ADMIN_PIN / ADMIN_PIN_HASH must reach routes via c.env — pre-B.4 neither was
 // wired here, so verify-pin silently ran on the hardcoded fallback forever.
-const nodeKey = resolveNodeKey(SNAPSHOT_PATH)
-const isDev = process.env.NODE_ENV !== 'production'
-const devAdminPin = isDev && !process.env.ADMIN_PIN && !process.env.ADMIN_PIN_HASH ? 'admin' : undefined
-const env = {
-  DB: db,
-  BUCKET: bucket,
-  NODE_PRIV_HEX: nodeKey.privHex,
-  NODE_PUB_HEX: nodeKey.pubHex,
-  ...(process.env.ADMIN_PIN || devAdminPin ? { ADMIN_PIN: process.env.ADMIN_PIN || devAdminPin } : {}),
-  ...(process.env.ADMIN_PIN_HASH ? { ADMIN_PIN_HASH: process.env.ADMIN_PIN_HASH } : {}),
-  ...(process.env.ADMIN_ORBIT_ID ? { ADMIN_ORBIT_ID: process.env.ADMIN_ORBIT_ID } : {}),
-  ...(process.env.API_SEALED_ONLY ? { API_SEALED_ONLY: process.env.API_SEALED_ONLY } : {}),
+// Like the storage key, the node key is resolved only after the bind: it writes
+// node.key next to the DB, and a duplicate launch must never regenerate it.
+let nodeKey: ReturnType<typeof resolveNodeKey>
+let env: any
+function beginNodeSecrets(): void {
+  process.env.STORAGE_ENCRYPTION_KEY = resolveStorageKey(SNAPSHOT_PATH, process.env)
+  nodeKey = resolveNodeKey(SNAPSHOT_PATH)
+  const isDev = process.env.NODE_ENV !== 'production'
+  const devAdminPin = isDev && !process.env.ADMIN_PIN && !process.env.ADMIN_PIN_HASH ? 'admin' : undefined
+  env = {
+    DB: db,
+    BUCKET: bucket,
+    NODE_PRIV_HEX: nodeKey.privHex,
+    NODE_PUB_HEX: nodeKey.pubHex,
+    ...(process.env.ADMIN_PIN || devAdminPin ? { ADMIN_PIN: process.env.ADMIN_PIN || devAdminPin } : {}),
+    ...(process.env.ADMIN_PIN_HASH ? { ADMIN_PIN_HASH: process.env.ADMIN_PIN_HASH } : {}),
+    ...(process.env.ADMIN_ORBIT_ID ? { ADMIN_ORBIT_ID: process.env.ADMIN_ORBIT_ID } : {}),
+    ...(process.env.API_SEALED_ONLY ? { API_SEALED_ONLY: process.env.API_SEALED_ONLY } : {}),
+  }
 }
 const WEB_DIST = process.env.WEB_DIST_DIR || join((import.meta as any).dir || process.cwd(), '..', '..', 'web', 'out')
 
@@ -216,9 +238,11 @@ const wsToConn = new WeakMap<object, WsConn>()
 // null => full node (self-host/dev); Set => official site, courier-only.
 const siteServices = parseSiteServices()
 
-Bun.serve({
+const API_PORT = parseInt(process.env.PORT || '8080', 10)
+try {
+  Bun.serve({
   hostname: '0.0.0.0',
-  port: parseInt(process.env.PORT || '8080', 10),
+  port: API_PORT,
   // Uploads can briefly contend with the remote database. The default 10s Bun
   // idle timeout was cutting off otherwise recoverable inbox refreshes.
   idleTimeout: 60,
@@ -280,6 +304,10 @@ Bun.serve({
         return Response.json({
           status: dbReady ? 'ok' : dbInitError ? 'error' : 'starting',
           db_ready: dbReady,
+          // Ownership proof for the launcher: a packaged host may only adopt
+          // the sidecar whose storage key is this install's. Derived from the
+          // same key it passes to the child (apiSidecar.instanceIdFor).
+          instance_id: process.env.GMATCH_INSTANCE_ID || null,
           error: dbInitError,
           timestamp: new Date().toISOString(),
           mode: siteServices ? 'courier' : 'legacy',
@@ -412,6 +440,16 @@ Bun.serve({
       }
     },
   },
-})
+  })
+} catch (err) {
+  // Two launches racing to :8790: the loser exits HERE, before beginDbInit()
+  // can touch the SQLite file. A bare Bun crash also leaves a clearer log
+  // than a generic EADDRINUSE stack from inside the runtime.
+  console.error(`[ORBIT API] cannot bind port ${API_PORT}: ${(err as Error)?.message || err}`)
+  process.exit(1)
+}
 
-console.log(`[ORBIT API] server running on port ${process.env.PORT || 8080}`)
+// Only the process that owns the listener touches key files or the database.
+beginNodeSecrets()
+beginDbInit()
+console.log(`[ORBIT API] server running on port ${API_PORT}`)

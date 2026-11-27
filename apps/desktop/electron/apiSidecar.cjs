@@ -5,15 +5,85 @@ const { EventEmitter } = require('node:events')
 const { app } = require('electron')
 const fs = require('node:fs')
 const path = require('node:path')
+const net = require('node:net')
+const { createHash } = require('node:crypto')
 const { adminPin } = require('./admin-pin.cjs')
+const { createApiLease } = require('./apiSidecarLease.cjs')
 
 const PORT = Number(process.env.GMATCH_API_PORT || 8790)
 const API_BASE = `http://127.0.0.1:${PORT}`
+// Bounds for "someone else is already bringing the node up". Two launches
+// racing to bind :8790 must resolve by waiting for the winner's health, never
+// by spawning a second Bun (EADDRINUSE kills the loser and can kill the winner).
+const ADOPT_WAIT_MS = Number(process.env.GMATCH_ADOPT_WAIT_MS || 30_000)
+const PORT_FREE_WAIT_MS = Number(process.env.GMATCH_PORT_FREE_WAIT_MS || 5_000)
 
 let proc = null
 let intentionalStop = false
+let lease = null
+let currentInstanceId = null
 /** Emits 'crashed' (exit code) when the child dies outside a planned stop. */
 const sidecarEvents = new EventEmitter()
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+/** Identity of THIS install's world, derived from the persisted storage key.
+ *  The node echoes it in /api/health, so a packaged host can adopt a sidecar
+ *  left by a previous launch of the same install but never a foreign node on
+ *  :8790 (adopting that would silently point the app at someone else's data). */
+function instanceIdFor(storageKey) {
+  return createHash('sha256').update(String(storageKey)).digest('hex')
+}
+
+/** One short health read. `db_ready` is required for adoption (the node is
+ *  accepting requests), and `instance_id` is the ownership proof above. */
+async function probeHealth(timeoutMs = 2500) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const r = await fetch(`${API_BASE}/api/health`, { signal: controller.signal })
+    if (!r.ok) return { ready: false, instanceId: null }
+    const body = await r.json()
+    return {
+      ready: Boolean(body && body.db_ready),
+      instanceId: body && body.instance_id ? String(body.instance_id) : null,
+    }
+  } catch {
+    return { ready: false, instanceId: null }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/** True when 127.0.0.1:PORT is bound. A bind probe is the only authoritative
+ *  answer (a fetch can fail while a half-started node still holds the port). */
+function portOccupied() {
+  return new Promise((resolve) => {
+    const probe = net.createServer()
+    probe.once('error', (err) => resolve(Boolean(err && (err.code === 'EADDRINUSE' || err.code === 'EACCES'))))
+    probe.once('listening', () => probe.close(() => resolve(false)))
+    probe.listen(PORT, '127.0.0.1')
+  })
+}
+
+/** Wait until no process holds :8790 (used after killing a hung child). */
+async function waitForPortFree({ timeoutMs = PORT_FREE_WAIT_MS, intervalMs = 200 } = {}) {
+  const deadline = Date.now() + timeoutMs
+  while (await portOccupied()) {
+    if (Date.now() >= deadline) return false
+    await sleep(intervalMs)
+  }
+  return true
+}
+
+async function waitFor(check, timeoutMs, intervalMs = 250) {
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    if (await check()) return true
+    if (Date.now() >= deadline) return false
+    await sleep(intervalMs)
+  }
+}
 
 /** Resolve the real bun executable (npm shims are .cmd wrappers that
  *  child_process.spawn can't exec directly on Windows). */
@@ -61,27 +131,51 @@ async function startApi() {
     ? path.join(process.resourcesPath, 'api', 'bun.exe')
     : null
 
-  const adoptable = !app.isPackaged || !process.env.GMATCH_HOST_MODE
-  // Adopt an already-healthy sidecar (e.g. `npm run dev` started one, or a
-  // second Electron window) instead of spawning a doomed duplicate. Host-mode
-  // packaged instances must own their server — never adopt a foreign one.
-  if (adoptable) {
-    try {
-      const controller = new AbortController()
-      const timer = setTimeout(() => controller.abort(), 5000)
-      let r
-      try {
-        r = await fetch(`${API_BASE}/api/health`, { signal: controller.signal })
-      } finally {
-        clearTimeout(timer)
-      }
-      if (r.ok && (await r.json()).db_ready) {
-        console.log(`[api] adopting existing sidecar at ${API_BASE}`)
-        return true
-      }
-    } catch {
-      /* nothing listening — spawn below */
+  const instanceId = instanceIdFor(storageKey)
+  currentInstanceId = instanceId
+  const hostOwned = app.isPackaged && Boolean(process.env.GMATCH_HOST_MODE)
+  // Packaged host mode may only adopt THIS install's node; an unrelated node
+  // that happens to sit on :8790 is never allowed to become our world.
+  const ours = (health) => health.ready && (!hostOwned || health.instanceId === instanceId)
+  const adopt = (reason) => {
+    console.log(`[api] adopting existing sidecar at ${API_BASE} (${reason})`)
+    return true
+  }
+
+  const first = await probeHealth(2500)
+  if (first.ready) {
+    if (ours(first)) return adopt('healthy')
+    throw new Error(`port ${PORT} is served by a different node; refusing to spawn`)
+  }
+
+  // A bound port with no health answer means a launch is mid-boot (or a hung
+  // node is still holding it). Spawning now is the classic EADDRINUSE race —
+  // wait for the winner's node and adopt it instead.
+  if (await portOccupied()) {
+    if (await waitFor(async () => ours(await probeHealth(1000)), ADOPT_WAIT_MS)) {
+      return adopt('port held by starting node')
     }
+    throw new Error(`port ${PORT} is occupied by a node that never became healthy; refusing to spawn`)
+  }
+
+  // Exclusive launch lease: two callers that both saw a free port must not
+  // both spawn. The loser waits for the winner's healthy node.
+  const launchLease = createApiLease({ directory: app.getPath('userData') })
+  if (!launchLease.acquire(instanceId)) {
+    if (await waitFor(async () => ours(await probeHealth(1000)), ADOPT_WAIT_MS)) {
+      return adopt('another launch owns the lease')
+    }
+    throw new Error('another launch is starting the local node; refusing to spawn against it')
+  }
+  lease = launchLease
+  // Close the bind-check -> spawn window: a dying predecessor can release the
+  // port a moment after we checked it.
+  if (!(await waitForPortFree())) {
+    const becameHealthy = await waitFor(async () => ours(await probeHealth(1000)), ADOPT_WAIT_MS)
+    launchLease.release(instanceId)
+    lease = null
+    if (becameHealthy) return adopt('port claimed by our own starting node')
+    throw new Error(`port ${PORT} did not become free before spawn`)
   }
   const apiDir = resourcesApi || path.join(__dirname, '..', '..', 'api')
   const bunPath = bundledBun || bunBin()
@@ -117,6 +211,9 @@ async function startApi() {
       ...process.env,
       ...(injected ? { ADMIN_PIN: injected } : {}),
       PORT: String(PORT),
+      // The node echoes this in /api/health so a later launch can prove the
+      // process on :8790 is THIS install's node before adopting it.
+      GMATCH_INSTANCE_ID: instanceId,
       STORAGE_ENCRYPTION_KEY: storageKey,
       SNAPSHOT_PATH: path.join(app.getPath('userData'), 'orbit.sqlite'),
       BLOB_STORE_DIR: path.join(app.getPath('userData'), 'blobs'),
@@ -159,40 +256,42 @@ async function startApi() {
   proc.stderr.on('error', () => {})
   proc.stdout.on('data', childLog('out'))
   proc.stderr.on('data', childLog('err'))
+  const releaseLease = () => {
+    if (!lease) return
+    try { lease.release(instanceId) } catch { /* best effort */ }
+    lease = null
+  }
   proc.on('error', (err) => {
     console.error('[api] sidecar spawn failed:', err.message)
     proc = null
+    releaseLease()
   })
   proc.on('exit', (code) => {
     proc = null
+    // A crashed child frees the launch slot; the supervisor must be able to
+    // restart it without waiting on a lease that no process owns.
+    releaseLease()
     if (!intentionalStop && code !== 0) sidecarEvents.emit('crashed', code)
   })
-  for (let i = 0; i < 60; i++) {
-    // If the child died or failed to spawn, stop waiting — a stale listener
-    // on the port must not masquerade as a healthy sidecar.
-    if (!proc) throw new Error('API sidecar process is not running')
-    try {
-      // Each health poll gets its own timeout: without this, one hung
-      // connection (stale 1.2.4 sidecar holding :8790) stalls boot forever
-      // and the window never appears (1.2.5 "Task Mgr spin" zombie).
-      const controller = new AbortController()
-      const timer = setTimeout(() => controller.abort(), 5000)
-      let r
-      try {
-        r = await fetch(`${API_BASE}/api/health`, { signal: controller.signal })
-      } finally {
-        clearTimeout(timer)
+  try {
+    for (let i = 0; i < 60; i++) {
+      // If the child died or failed to spawn, stop waiting — a stale listener
+      // on the port must not masquerade as a healthy sidecar.
+      if (!proc) throw new Error('API sidecar process is not running')
+      // Each poll has its own timeout: one hung connection (a stale sidecar
+      // holding :8790) must not stall boot forever (1.2.5 "Task Mgr spin").
+      const health = await probeHealth(5000)
+      if (health.ready) {
+        if (ours(health)) return true
+        throw new Error(`port ${PORT} is served by a different node; refusing to adopt it`)
       }
-      if (r.ok) {
-        const j = await r.json()
-        if (j.db_ready) return true
-      }
-    } catch {
-      /* not up yet */
+      await sleep(500)
     }
-    await new Promise((r) => setTimeout(r, 500))
+    throw new Error('API sidecar failed to start within 30s')
+  } catch (err) {
+    releaseLease()
+    throw err
   }
-  throw new Error('API sidecar failed to start within 30s')
 }
 
 function stopApi() {
@@ -209,6 +308,10 @@ function stopApi() {
       proc.kill('SIGKILL')
     } catch { /* already dead */ }
     proc = null
+  }
+  if (lease) {
+    try { lease.release(currentInstanceId) } catch { /* best effort */ }
+    lease = null
   }
 }
 
@@ -242,4 +345,16 @@ function isRunning() {
   return proc !== null
 }
 
-module.exports = { startApi, stopApi, ping, isRunning, API_BASE, PORT, sidecarEvents }
+module.exports = {
+  startApi,
+  stopApi,
+  ping,
+  isRunning,
+  instanceIdFor,
+  probeHealth,
+  portOccupied,
+  waitForPortFree,
+  API_BASE,
+  PORT,
+  sidecarEvents,
+}
