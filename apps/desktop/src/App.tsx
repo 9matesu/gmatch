@@ -2615,8 +2615,8 @@ export default function Home() {
             }
             const currentUsers = usersRef.current;
             const sender = currentUsers.find(u => u.id === newest.owner_id);
-            const senderName = sender?.display_name?.trim() || 'Unknown User';
-            toast(`${senderName} sent you an image`, 'info');
+            const senderName = sender?.display_name?.trim();
+            if (senderName) toast(`${senderName} sent you an image`, 'info');
           }
         }
       }
@@ -3029,8 +3029,8 @@ export default function Home() {
               try { playChime() } catch { }
               const currentUsers = usersRef.current;
               const wrtcSender = currentUsers.find(u => u.id === offer.sender_id);
-              const wrtcName = wrtcSender?.display_name?.trim() || 'Unknown User';
-              toast(`${wrtcName} sent you an image (P2P)`, 'info')
+              const wrtcName = wrtcSender?.display_name?.trim();
+              if (wrtcName) toast(`${wrtcName} sent you an image (P2P)`, 'info')
               peer.close()
             }
           }
