@@ -1313,11 +1313,32 @@ export default function Home() {
   useEffect(() => {
     const id = identity?.orbitId ?? null
     currentOrbitId = id
-    if (prevIdentityRef.current !== null && prevIdentityRef.current !== id) setProfilePics({})
+    if (prevIdentityRef.current !== null && prevIdentityRef.current !== id) {
+      // A different account: drop the previous profile so it is not inherited.
+      setProfilePics({})
+      setMyProfile({ displayName: '', tags: [], isAdmin: false, pfpUrl: '', bio: '', website: '' })
+      try {
+        for (const k of [
+          'orbit_display_name', 'orbit_tags', 'orbit_bio', 'orbit_website',
+          'orbit_p2p_gallery', 'orbit_chat_messages', 'orbit_p2p_known_peers',
+          'goonmatch-friends', 'goonmatch-blocked', 'goonmatch-relationships',
+          'orbit_unlocked_stories', 'orbit_read_dms', 'orbit_active_hack', 'orbit_key_saved',
+        ]) localStorage.removeItem(k)
+      } catch { /* private mode */ }
+    }
     prevIdentityRef.current = id
-    if (!id) { setMyProfile((p) => (p.pfpUrl ? { ...p, pfpUrl: '' } : p)); return }
-    const pfp = getSecureItem(pfpUrlKey()) || ''
-    setMyProfile((p) => (p.pfpUrl === pfp ? p : { ...p, pfpUrl: pfp }))
+    if (!id) return
+    // Hydrate the profile fields from the (per-device) local mirror.
+    try {
+      setMyProfile({
+        displayName: localStorage.getItem('orbit_display_name') || '',
+        tags: JSON.parse(localStorage.getItem('orbit_tags') || '[]'),
+        isAdmin: false,
+        pfpUrl: getSecureItem(pfpUrlKey()) || '',
+        bio: localStorage.getItem('orbit_bio') || '',
+        website: localStorage.getItem('orbit_website') || '',
+      })
+    } catch { /* private mode */ }
   }, [identity?.orbitId])
   const [repostedPosts, setRepostedPosts] = useState<FeedPost[]>([])
   const [archivedPostIds, setArchivedPostIds] = useState<Set<string>>(() => new Set())
