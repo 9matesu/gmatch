@@ -60,9 +60,9 @@ export function hashForView(view: RoutedView): string {
  * the feed. Fresh boot (no hash, no saved view) lands on the timeline —
  * the app's home — never the server directory or the profile.
  */
-export function resolveInitialView(hash: string, saved: string | null): RoutedView {
+export function resolveInitialView(hash: string, _saved: string | null): RoutedView {
   const fromHash = viewFromHash(hash)
   if (fromHash) return fromHash === 'messages' ? 'rooms' : fromHash
-  if (saved && isRoutedView(saved)) return saved === 'messages' ? 'rooms' : saved
+  // Always start on the feed/timeline (the app's home), ignoring the last view.
   return 'feed'
 }

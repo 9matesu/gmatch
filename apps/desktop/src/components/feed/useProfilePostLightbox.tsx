@@ -5,9 +5,11 @@ import type { OrbitIdentity } from '@orbit/crypto';
 import { createLikeGovernor, type LikeGovernor } from '../../utils/likeReconcile';
 import { playPress, playMsgReceive } from '../../utils/sounds';
 import { orbitFetch, postShareUrl } from '../../utils/api';
+import { copyText } from '../../utils/clipboard';
 import { ProfileExpandedPost } from './ProfileExpandedPost';
+import { SideSheet } from '../../ui/kit';
 import { SharePostModal } from './SharePostModal';
-import { PostOptionsModal } from './PostOptionsModal';
+import { PostContextMenu } from './PostContextMenu';
 import { PostLikersModal } from './PostLikersModal';
 import type { FeedPost, PostComment } from './GMatchFeed';
 
@@ -31,6 +33,8 @@ export interface ProfileLightboxDeps {
   onArchivePost?: (postId: string) => void;
   onDeletePost?: (postId: string) => void;
   onReportPost?: (post: FeedPost) => void;
+  /** Edit the caption of an own post. The caller owns the request + the toast. */
+  onEditPost?: (post: FeedPost) => void;
   /** Stacking override for lightboxes nested inside higher-z overlays
    *  (e.g. UserProfileModal at z-system). Defaults to z-modal. */
   zIndexClass?: string;
@@ -64,6 +68,7 @@ export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
     onArchivePost,
     onDeletePost,
     onReportPost,
+    onEditPost,
     zIndexClass,
   } = deps;
 
@@ -75,6 +80,7 @@ export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
   const [commentsLoadingId, setCommentsLoadingId] = useState<string | null>(null);
   const [sharingPost, setSharingPost] = useState<FeedPost | null>(null);
   const [optionsPost, setOptionsPost] = useState<FeedPost | null>(null);
+  const [optionsAt, setOptionsAt] = useState({ x: 0, y: 0 });
   const [likersPostId, setLikersPostId] = useState<string | null>(null);
   // Fresh reads for the governor without recreating the toggle on every
   // keystroke elsewhere in the tree (same pattern as the feed version, which
@@ -237,8 +243,9 @@ export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
       if (onCopyLink) {
         onCopyLink(post);
       } else {
-        void navigator.clipboard?.writeText(postShareUrl(post.id));
-        toast?.('Post link copied to clipboard!', 'success');
+        void copyText(postShareUrl(post.id)).then((ok) => {
+          toast?.(ok ? 'Post link copied to clipboard!' : 'Could not copy the link', ok ? 'success' : 'error');
+        });
       }
       setOptionsPost(null);
     },
@@ -269,13 +276,21 @@ export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
 
   const userNames = Object.fromEntries(users.map((u) => [u.id, u.display_name || '']));
 
-  // Inline expansion, rendered by the consumer directly under its grid —
-  // the card lives in the page flow, not in a dialog. Share/options/likers
-  // stay true overlays and render wherever the consumer mounts `modals`.
+  // The open post renders in a SideSheet ("ao lado", never pushing the grid
+  // down). Share/options/likers stay true overlays and render wherever the
+  // consumer mounts `modals`. zIndexClass lifts the sheet above a host
+  // overlay (e.g. UserProfileModal at z-system).
   const expandedNode = activePost ? (
-    <ProfileExpandedPost
-      post={activePost}
+    <SideSheet
+      open
       onClose={closePost}
+      title={activePost.author_name || 'Post'}
+      width="w-[480px] max-w-[94vw]"
+      zIndexClass={zIndexClass}
+    >
+      <ProfileExpandedPost
+        post={activePost}
+        onClose={closePost}
       identity={identity}
       profilePics={profilePics}
       isLiked={!!liked[activePost.id]}
@@ -291,9 +306,10 @@ export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
         setActivePost(null);
         setSharingPost(p);
       }}
-      onOptionsClick={(p) => {
+      onOptionsClick={(p, pos) => {
         setActivePost(null);
         setOptionsPost(p);
+        setOptionsAt(pos ?? { x: Math.round(window.innerWidth / 2), y: Math.round(window.innerHeight / 2) });
       }}
       onOpenLikers={(postId) => setLikersPostId(postId)}
       onSelectUser={handleAvatar}
@@ -306,7 +322,8 @@ export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
             }
           : undefined
       }
-    />
+      />
+    </SideSheet>
   ) : null;
 
   const modals = (
@@ -326,22 +343,22 @@ export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
         />
       )}
       {optionsPost && (
-        <PostOptionsModal
+        <PostContextMenu
           post={optionsPost}
+          x={optionsAt.x}
+          y={optionsAt.y}
           onClose={() => setOptionsPost(null)}
           identityOrbitId={identity?.orbitId}
+          isLiked={!!liked[optionsPost.id]}
+          isSaved={!!saved[optionsPost.id]}
+          onToggleLike={toggleLike}
+          onToggleSave={toggleSave}
           onShare={(p) => setSharingPost(p)}
           onCopyLink={handleCopyLink}
-          onArchive={(id) => {
-            onArchivePost?.(id);
-            setOptionsPost(null);
-          }}
-          onDelete={(id) => {
-            onDeletePost?.(id);
-            setOptionsPost(null);
-          }}
+          onEdit={onEditPost}
+          onArchive={onArchivePost}
+          onDelete={onDeletePost}
           onReport={handleReport}
-          toast={toast}
           zIndexClass={zIndexClass}
         />
       )}

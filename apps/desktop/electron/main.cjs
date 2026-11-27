@@ -1,10 +1,25 @@
 // gMatch Electron main process.
 // All booru HTTP happens HERE (renderer never touches the network directly).
 // Endpoints per docs/SPEC.md §6. 10s timeout, browser UA, round-robin health.
-const { app, BrowserWindow, ipcMain, protocol, net, dialog, safeStorage, session, shell, Notification, screen } = require('electron')
+const { app, BrowserWindow, ipcMain, protocol, net, dialog, safeStorage, session } = require('electron')
+
+// ── Bounded runtime (2026-11-24) ──────────────────────────────────────────
+// Keep the renderer heap bounded (LRUs are already capped in JS, so a runaway
+// blur/cache cannot grow to ~2GB). GPU acceleration stays ON: forcing software
+// composition made the UI stall and go black on this machine — the real cost
+// was the decorative blurred cover (removed) and the poll storm (shortened),
+// not the GPU process itself.
+app.commandLine.appendSwitch('js-flags', '--max-old-space-size=256')
+app.commandLine.appendSwitch('disable-dev-shm-usage')
+
 const https = require('https')
 const fs = require('node:fs')
 const path = require('node:path')
+// A closed stdout/stderr pipe used to kill the whole main process with an
+// uncaught "EPIPE: broken pipe, write" (main.log, 2026-11-25). The error is
+// an async 'error' EVENT on the stream, so the try/catch in apiSidecar.cjs
+// could never catch it — the listener has to live on the stream itself.
+require('./stdio-guard.cjs').guardStdio()
 const imageCache = require('./imageCache.cjs')
 const { createFetchBooru } = require('./booruSources.cjs')
 const vault = require('./vault.cjs')
@@ -57,6 +72,8 @@ function mainLog(line) {
   try { appendWithRotation(mainLogPath(), line) } catch { /* last resort only */ }
 }
 
+// Notification state (badge/overlay/flash/native toasts) lives in ./ipc/notify.cjs.
+
 // Startup sampler (see startupMetrics.cjs). Module-level so createWindow's
 // did-finish-load handler and the renderer's boot:mark IPC can reach it.
 let bootMetrics = null
@@ -66,18 +83,15 @@ process.on('uncaughtException', (err) => {
 })
 process.on('unhandledRejection', (reason) => mainLog(`unhandledRejection: ${reason?.stack || reason}`))
 
-// Update handoff: once the swap script is spawned, quitting must not be
-// blocked by the renderer's save-your-keys unload gate.
-let updateHandoff = false
-// Explicit renderer reload (context menu, Ctrl+R): the key-save flush runs
-// synchronously in beforeunload itself, so the stay/leave gate is pure noise
-// here - let reloads through unasked. Close keeps the dialog.
-let reloadWanted = false
 
 // One-shot camera permission consumed by setPermissionRequestHandler.
 let cameraGrantOnce = false
 const { createSecureStore } = require('./secureStore.cjs')
 const apiSidecar = require('./apiSidecar.cjs')
+const { createSidecarSupervisor } = require('./sidecarSupervision.cjs')
+const mediaqInstaller = require('./mediaqInstaller.cjs')
+const mediaqSidecar = require('./mediaqSidecar.cjs')
+const registerMediaqHandlers = require('./ipc/mediaq.cjs')
 const serverMode = require('./server-mode.cjs')
 
 // Secure KV (security plan B.3): renderer's sensitive localStorage keys are
@@ -247,26 +261,15 @@ function getQueryNegatives() {
 // 400px for localhost content-volume parity — small stills/gifs stay).
 const FLOOR_PX = 400
 
-// Blocklist matching. MUST stay byte-for-byte equivalent to
-// apps/desktop/src/game/tagFilter.ts (hitsAtTokenStart): the renderer and the
-// main process enforce the same hard line and a disagreement between them is
-// a safety hole, not a cosmetic bug. See tagFilter.ts for why a raw substring
-// test is wrong and why allowing a term to be a token PREFIX keeps every real
-// compound blocked.
-function normalizeTagText(raw) {
-  return String(raw).toLowerCase().replace(/[\s-]+/g, '_')
-}
-
-function hitsAtTokenStart(tag, term) {
-  if (!tag || !term) return false
-  let from = 0
-  for (;;) {
-    const i = tag.indexOf(term, from)
-    if (i === -1) return false
-    if (i === 0 || tag.charCodeAt(i - 1) === 95) return true // '_'
-    from = i + 1
-  }
-}
+// Blocklist matching. The RULE is canonical in
+// packages/shared/src/blocklist.ts; this file carries the CommonJS mirror
+// (apps/desktop/electron/blocklistRule.cjs) because main.cjs cannot import
+// TypeScript. The two are pinned against each other by a parity test: the
+// renderer and the main process enforce the same hard line and a
+// disagreement between them is a safety hole, not a cosmetic bug. See
+// blocklistRule.cjs for why a raw substring test is wrong and why allowing a
+// term to be a token PREFIX keeps every real compound blocked.
+const { normalizeTagText, hitsAtTokenStart } = require('./blocklistRule.cjs')
 
 function isQueryBlocked(query) {
   const q = normalizeTagText(query)
@@ -367,6 +370,42 @@ async function httpGet(url, headers, timeoutMs) {
     req.setTimeout(timeoutMs || TIMEOUT_MS, () => req.destroy(new Error('quality-gate timeout')))
     req.on('error', reject)
   })
+}
+
+/**
+ * POST JSON with the same timeout/abort contract as httpGet. Used by the mediaq
+ * ContentProvider (the only POST caller). An aborted request is a TIMEOUT, not a
+ * network failure, so a slow/absent mediaq is cooled and skipped like any slow
+ * mirror instead of stalling the round.
+ */
+async function postJson(url, body, timeoutMs, signal) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs || TIMEOUT_MS)
+  const unref = timer.unref
+  if (typeof unref === 'function') unref.call(timer)
+  if (signal) {
+    if (signal.aborted) controller.abort()
+    else signal.addEventListener('abort', () => controller.abort(), { once: true })
+  }
+  try {
+    const doFetch = net && typeof net.fetch === 'function' ? net.fetch.bind(net) : fetch
+    const res = await doFetch(url, {
+      method: 'POST',
+      headers: { 'User-Agent': UA, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+      redirect: 'follow',
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return await res.json()
+  } catch (err) {
+    if (err && (err.name === 'AbortError' || /abort/i.test(String(err.message || err)))) {
+      throw new Error('quality-gate timeout')
+    }
+    throw err
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 // --- source parsers -------------------------------------------------------
@@ -951,161 +990,6 @@ function redgifsNicheAgrees(niche, query) {
   return tokens.some((t) => parts.has(t))
 }
 
-// --- imhentai (hentai galleries: captions, hardcore doujins) ------------------
-// No JSON API — scrape HTML like gallery-dl: search page → gallery IDs →
-// cover image per gallery (data-src base + $.parseJSON ext map).
-const IMHENTAI_ROOT = 'https://imhentai.xxx'
-
-/**
- * imhentai HTML via Electron's net stack (Chromium TLS passes Cloudflare;
- * plain https.get gets a 403 challenge). Falls back to httpGet outside
- * Electron. Throws on bad status like httpGet.
- */
-async function imhGet(url) {
-  try {
-    if (net && typeof net.fetch === 'function') {
-      const res = await net.fetch(url, {
-        headers: {
-          'User-Agent': UA,
-          Accept: 'text/html,application/xhtml+xml,*/*',
-          Referer: 'https://imhentai.xxx/',
-        },
-      })
-      if (res.status !== 200) throw new Error(`imh status ${res.status}`)
-      return await res.text()
-    }
-  } catch (e) {
-    if (e && /imh status/.test(e.message)) throw e
-    /* no Electron net — fall through to https */
-  }
-  return httpGet(url, { Referer: 'https://imhentai.xxx/' })
-}
-const IMH_EXTS = { j: 'jpg', p: 'png', g: 'gif', w: 'webp', a: 'avif' }
-
-function parseImhentaiSearch(html, limit) {
-  const out = []
-  const re = /href="\/gallery\/(\d+)\/?"/g
-  let m
-  while ((m = re.exec(html))) {
-    if (!out.includes(m[1])) out.push(m[1])
-    if (out.length >= limit) break
-  }
-  return out
-}
-
-function parseImhentaiSearchResults(html, limit) {
-  const out = []
-  const seen = new Set()
-  const thumbRe = /<div class="thumb"[\s\S]*?href="\/gallery\/(\d+)\/?"[\s\S]*?<img[^>]+data-src="([^"]+)"/g
-  let m
-  while ((m = thumbRe.exec(html))) {
-    const [, id, coverUrl] = m
-    if (!seen.has(id)) {
-      seen.add(id)
-      out.push({ id, coverUrl })
-      if (out.length >= limit) break
-    }
-  }
-  if (out.length === 0) {
-    const linkRe = /href="\/gallery\/(\d+)\/?"[^>]*>[\s\S]*?<img[^>]+(?:data-src|src)="([^"]+)"/g
-    while ((m = linkRe.exec(html))) {
-      const [, id, coverUrl] = m
-      if (!seen.has(id)) {
-        seen.add(id)
-        out.push({ id, coverUrl })
-        if (out.length >= limit) break
-      }
-    }
-  }
-  return out
-}
-
-// EVERY page image from a gallery page (the $.parseJSON ext map carries the
-// whole book) — one fetch yields all pages, zero extra requests.
-/**
- * Real tags for an imhentai gallery, from its own tag links/title.
- *
- * imhentai has no JSON API, so relevance used to be FAKED: the search key was
- * split into sub-words and stamped onto every page of every gallery the search
- * returned. That made `matchesQuery` pass by construction, so whatever the
- * site's fuzzy search handed back was presented as if it carried the tag. It
- * also broke compounds — `shrooms_q` was stamped as `shrooms`, which the
- * renderer's whole-token gate then rejected, so the whole multi-fetch scrape
- * was spent producing results that got thrown away.
- *
- * Now the gallery's own tags decide. If the page publishes none (markup drift,
- * a book with no tags), we fall back to the search key as ONE whole tag —
- * search-attested rather than invented, and at least consistent with what the
- * renderer can match.
- */
-function parseImhentaiGalleryTags(html) {
-  const out = []
-  if (!html || typeof html !== 'string') return out
-  const push = (t) => {
-    const n = normRedgifsTag(String(t || '').replace(/\s+/g, '_'))
-    if (n && !out.includes(n)) out.push(n)
-  }
-  // `<div class="tags">` block: each tag is a link to /tag/<name>/
-  const tagsBlock = /class="tags"[\s\S]{0,4000}?<\/div>/i.exec(html)
-  const scope = tagsBlock ? tagsBlock[0] : html
-  const linkRe = /href="\/(?:tag|tags)\/([^"/?#]+)\/?"/gi
-  let m
-  while ((m = linkRe.exec(scope)) !== null) {
-    try {
-      push(decodeURIComponent(m[1]))
-    } catch {
-      push(m[1])
-    }
-  }
-  return out
-}
-
-function parseImhentaiGalleryPages(html, limit) {
-  const max = Math.max(1, limit || 20)
-  if (!html || typeof html !== 'string') return []
-  const srcTag = 'data-src="'
-  const srcStart = html.indexOf(srcTag)
-  if (srcStart === -1) return []
-  const urlStart = srcStart + srcTag.length
-  const urlEnd = html.indexOf('"', urlStart)
-  if (urlEnd === -1) return []
-  const src = html.slice(urlStart, urlEnd)
-  if (!src) return []
-  const slash = src.lastIndexOf('/')
-  const root = slash === -1 ? '' : src.slice(0, slash + 1)
-  const marker = 'parseJSON('
-  const mStart = html.indexOf(marker)
-  if (mStart !== -1) {
-    const q1 = html.indexOf("'", mStart + marker.length)
-    const q2 = q1 === -1 ? -1 : html.indexOf("'", q1 + 1)
-    if (q1 !== -1 && q2 !== -1) {
-      try {
-        const raw = html.slice(q1 + 1, q2).split(String.fromCharCode(92)).join('')
-        const data = JSON.parse(raw)
-        const pages = Object.keys(data)
-          .map(Number)
-          .filter((n) => Number.isInteger(n) && n >= 1)
-          .sort((a, b) => a - b)
-        const covers = []
-        for (const n of pages) {
-          if (covers.length >= max) break
-          const entry = data[String(n)]
-          if (typeof entry !== 'string') continue
-          const parts = entry.split(',')
-          const suffix = IMH_EXTS[parts[0]]
-          if (!suffix) continue
-          covers.push({ url: root + n + '.' + suffix, width: Number(parts[1]) || 0, height: Number(parts[2]) || 0 })
-        }
-        if (covers.length > 0) return covers
-      } catch {
-        /* fall through to raw data-src */
-      }
-    }
-  }
-  return [{ url: src, width: 0, height: 0 }]
-}
-
-// Galleries expanded per gallery-source round; lanes expanded in parallel.
 const GALLERY_CAP = 6
 const GALLERY_LANES = 3
 // Post-view (exact file URL) expansion bounds, mirroring services/booru.ts.
@@ -1176,269 +1060,35 @@ async function expandPostViews(entries, viewBase, parseView) {
   return entries.map((e) => byId.get(e.id) || stripViewPostId(e))
 }
 
-async function fetchImhentai(variant, n) {
-  const key = redgifsWords(variant)
-  // Cloudflare challenges Node-TLS fetches (403 "Just a moment") — Electron's
-  // net stack is Chromium TLS and passes like a real browser tab. Plain-node
-  // fallback stays for contexts without Electron.
-  const searchBody = await imhGet(`${IMHENTAI_ROOT}/search/?key=${encodeURIComponent(key)}`, undefined, HTML_TIMEOUT_MS)
-  // The FULL query as ONE token. Splitting it into sub-words (`shrooms_q` ->
-  // `shrooms`) produced tags the renderer's whole-token gate rejects, so the
-  // scrape was paid for and discarded.
-  const queryTag = normRedgifsTag(key.replace(/\s+/g, '_'))
-  const tags = queryTag ? [queryTag] : []
-  if (hasBadTag(tags)) return []
 
-  // Direct results from search HTML give gallery ids + cover thumbs. Enter EVERY gallery from the search page: covers are only thumbs and
-  // the blind thumb->1.jpg rewrite 404s on books that ship .webp/.png —
-  // the ext map in the gallery page carries the real extensions. Cover
-  // posts remain the fallback when all entries fail. parseImhentaiSearch
-  // covers galleries whose markup hides the thumbnail from the direct parse.
-  const results = parseImhentaiSearchResults(searchBody, GALLERY_CAP)
-  const entries = results.length > 0
-    ? results
-    : parseImhentaiSearch(searchBody, GALLERY_CAP).map((id) => ({ id, coverUrl: '' }))
-  if (entries.length === 0) return []
-  const perGallery = Math.max(1, Math.ceil(n / Math.min(entries.length, GALLERY_LANES)))
-  const sets = await mapLimit(entries, GALLERY_LANES, async ({ id, coverUrl }) => {
-    try {
-      const galleryBody = await imhGet(`${IMHENTAI_ROOT}/gallery/${encodeURIComponent(id)}/`, undefined, HTML_TIMEOUT_MS)
-      const pages = parseImhentaiGalleryPages(galleryBody, perGallery)
-      const thumb = pages.length > 0 ? pages[0].url : coverUrl
-      // Prefer the gallery's OWN tags: then the renderer gate can actually
-      // verify relevance instead of trusting a stamp. Fall back to the search
-      // key when the page publishes none — search-attested, not invented.
-      const own = parseImhentaiGalleryTags(galleryBody)
-      const postTags = own.length > 0 ? own : tags
-      if (hasBadTag(postTags)) return undefined
-      const set = []
-      pages.forEach((cover, i) => {
-        // Dims gate only when known — map-less covers skip it. Floor 400px
-        // (localhost parity), not the old 700px starver.
-        if (cover.width > 0 && cover.height > 0) {
-          if (cover.width < FLOOR_PX || cover.height < FLOOR_PX) return
-        }
-        set.push({ id: `imh-${id}-p${i + 1}`, url: cover.url, preview: thumb, tags: postTags, rating: undefined, kind: 'image' })
-      })
-      return set.length > 0 ? set : undefined
-    } catch {
-      return undefined /* one dead gallery never kills the round */
-    }
-  })
-  const expanded = roundRobinPosts(sets, n)
-  if (expanded.length > 0) return expanded
-  const directPosts = []
-  for (const { id, coverUrl } of results) {
-    const full = coverUrl.replace(/\/(?:thumb|t)\.([a-z0-9]+)(?:[?#]|$)/i, '/1.$1')
-    if (!full || /\/(?:thumb|thumbs)(?:[?#/.]|$)/i.test(full)) continue
-    directPosts.push({ id: `imh-${id}`, url: full, preview: coverUrl, tags, rating: undefined, kind: 'image' })
-    if (directPosts.length >= n) break
-  }
-  return directPosts
-}
+// imhentai source (parser lives in ./imhentai.cjs; deps injected here).
+const { createImhentaiSource } = require("./imhentai.cjs")
+const registerSecureHandlers = require("./ipc/secure.cjs")
+const registerCacheHandlers = require("./ipc/cache.cjs")
+const registerVaultHandlers = require("./ipc/vault.cjs")
+const registerWindowHandlers = require("./ipc/window.cjs")
+const registerServerHandlers = require("./ipc/server.cjs")
+const registerNotifyHandlers = require("./ipc/notify.cjs")
+const registerAppHandlers = require("./ipc/app.cjs")
+const registerDominationMediaHandlers = require("./ipc/domination-media.cjs")
+const registerBooruHandlers = require("./ipc/booru.cjs")
+const registerUpdateHandlers = require("./ipc/update.cjs")
+const notify = registerNotifyHandlers({
+  ipcMain, app, mainLog,
+})
+const imhentai = createImhentaiSource({
+  net, httpGet, ua: UA, htmlTimeoutMs: HTML_TIMEOUT_MS, galleryCap: GALLERY_CAP,
+  galleryLanes: GALLERY_LANES, floorPx: FLOOR_PX, redgifsWords, normRedgifsTag,
+  hasBadTag, mapLimit, roundRobinPosts,
+})
 
-// --- babesource (real porn photo galleries: full-res stills, never thumbs) --
-// Search: /search/<slug>/page<N>.html -> /galleries/<slug>-<id>.html (skip /video/)
-// Gallery: <a class="slideshowGalleryImage" href=FULL(babesource.com/media/...)>
-//          with thumb <img src>(media.babesource.com/.../thumbs/...).
-const BABESOURCE_ROOT = 'https://babesource.com'
+// babesource source (parser lives in ./babesource.cjs).
+const { createBabesourceSource } = require("./babesource.cjs")
+const babesource = createBabesourceSource({
+  httpGet, htmlTimeoutMs: HTML_TIMEOUT_MS, galleryCap: GALLERY_CAP,
+  mapLimit, roundRobinPosts, galleryLanes: GALLERY_LANES, hasBadTag, normRedgifsTag,
+})
 
-function babesourceSlug(query) {
-  return String(query || '')
-    .replace(/_/g, ' ')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-}
-
-function babesourceThumbToFull(thumb) {
-  const m = /^https:\/\/media\.babesource\.com\/galleries\/([0-9a-f]+)\/thumbs\/(?:300x406\/)?(.+\.(?:jpe?g|png|webp|gif))$/i.exec(
-    String(thumb || '').trim(),
-  )
-  if (!m) return null
-  return `https://babesource.com/media/galleries/${m[1]}/${m[2]}`
-}
-
-function parseBabesourceSearch(html, limit) {
-  const out = []
-  if (!html || typeof html !== 'string') return out
-  const re = /href="(https:\/\/babesource\.com\/galleries\/[^"]+?-(\d+)\.html)"/gi
-  let m
-  while ((m = re.exec(html))) {
-    if (m[1].includes('/video/')) continue
-    if (!out.includes(m[1])) out.push(m[1])
-    if (out.length >= limit) break
-  }
-  return out
-}
-
-function parseBabesourceMaxPage(html) {
-  if (!html || typeof html !== 'string') return 1
-  let max = 1
-  const re = /href=["']page(\d+)\.html["']/gi
-  let m
-  while ((m = re.exec(html))) {
-    const n = Number(m[1])
-    if (Number.isFinite(n) && n > max) max = Math.min(n, 50)
-  }
-  return Math.max(1, max)
-}
-
-function parseBabesourceGallery(html, limit) {
-  const out = []
-  const seen = new Set()
-  if (!html || typeof html !== 'string') return out
-  const isFull = (u) => /^https:\/\/babesource\.com\/media\/galleries\/[0-9a-f]+\/.+\.(?:jpe?g|png|webp|gif)$/i.test(u)
-  const push = (url, preview) => {
-    if (!isFull(url) || seen.has(url)) return
-    seen.add(url)
-    out.push({ url, preview: /^https:\/\/media\.babesource\.com\/galleries\//i.test(preview) ? preview : url })
-  }
-  let m
-  const anchorRe = /<a[^>]*class="[^"]*slideshowGalleryImage"[^>]*href="([^"]+)"[^>]*>[\s\S]*?<img[^>]+src="([^"]+)"[^>]*>/gi
-  while ((m = anchorRe.exec(html))) {
-    push(m[1], m[2])
-    if (out.length >= limit) return out
-  }
-  if (out.length === 0) {
-    const thumbRe = /https:\/\/media\.babesource\.com\/galleries\/[0-9a-f]+\/thumbs\/(?:300x406\/)?[^"'\s]+\.(?:jpe?g|png|webp|gif)/gi
-    while ((m = thumbRe.exec(html))) {
-      const full = babesourceThumbToFull(m[0])
-      if (full) push(full, m[0])
-      if (out.length >= limit) return out
-    }
-  }
-  return out
-}
-
-/**
- * Real tags for a babesource gallery: its own meta keywords / search links.
- *
- * The query used to be split into sub-words and unioned in, which meant every
- * gallery the search returned was stamped as if it carried the tag — so
- * `matchesQuery` passed by construction and a loosely-related gallery was
- * indistinguishable from an exact one. Now the gallery's own keywords decide,
- * and the query is only a fallback (as ONE whole token) for a page that
- * publishes none.
- */
-function parseBabesourceTags(html, query) {
-  const tags = new Set()
-  if (html && typeof html === 'string') {
-    const meta = /<meta\s+name="keywords"\s+content="([^"]*)"/i.exec(html)
-    if (meta) {
-      for (const part of meta[1].split(',')) {
-        const n = part.toLowerCase().replace(/[\s-]+/g, '_').replace(/[^a-z0-9_]/g, '')
-        if (n.length >= 2) tags.add(n)
-      }
-    }
-    // Gallery pages link to their own performers/search facets.
-    const linkRe = /href="https:\/\/babesource\.com\/(?:pornstars?|search)\/([^"/?#]+)\/?"/gi
-    let m
-    while ((m = linkRe.exec(html)) !== null) {
-      const n = normRedgifsTag(decodeURIComponent(m[1]))
-      if (n) tags.add(n)
-    }
-  }
-  if (tags.size === 0) {
-    // No tags published: attest the search itself, as ONE whole token.
-    const q = normRedgifsTag(String(query || '').replace(/[\s-]+/g, '_'))
-    if (q) tags.add(q)
-  }
-  return [...tags]
-}
-
-async function fetchBabesource(variant, n) {
-  const slug = babesourceSlug(variant)
-  if (!slug) return []
-  // Page-1 first; higher pages only when pagination advertises them.
-  // Single-page queries 404 on page2+ — normal, not a failure.
-  let searchBody
-  try {
-    searchBody = await httpGet(`${BABESOURCE_ROOT}/search/${encodeURIComponent(slug)}/page1.html`, undefined, HTML_TIMEOUT_MS)
-  } catch (e) {
-    if (/HTTP 404/.test(String((e && e.message) || e))) return []
-    throw e
-  }
-  const seen = new Set()
-  const galleries = []
-  const collect = (html) => {
-    for (const u of parseBabesourceSearch(html, GALLERY_CAP)) {
-      if (!seen.has(u)) {
-        seen.add(u)
-        galleries.push(u)
-      }
-    }
-  }
-  collect(searchBody)
-  const searchBodies = [searchBody]
-  const maxPage = Math.min(parseBabesourceMaxPage(searchBody), 5)
-  if (maxPage > 1 && galleries.length < GALLERY_CAP) {
-    // Up to two extra distinct random pages — page 1 alone re-serves the
-    // same galleries every round. Mirrors services/booru.ts.
-    const extra = new Set()
-    for (let i = 0; i < 6 && extra.size < 2; i++) {
-      extra.add(Math.max(2, 1 + Math.floor(Math.random() * maxPage)))
-    }
-    for (const page of [...extra].sort((a, b) => a - b)) {
-      try {
-        const body = await httpGet(`${BABESOURCE_ROOT}/search/${encodeURIComponent(slug)}/page${page}.html`, undefined, HTML_TIMEOUT_MS)
-        searchBodies.push(body)
-        collect(body)
-      } catch {
-        /* stale pagination link — page-1 results still stand */
-      }
-    }
-  }
-  if (galleries.length === 0) return []
-  // Every gallery contributes: bounded lanes expand in parallel, then images
-  // round-robin across galleries so one gallery can't fill the batch alone.
-  const perGallery = Math.max(1, Math.ceil(n / galleries.length))
-  const sets = await mapLimit(galleries, GALLERY_LANES, async (gUrl) => {
-    try {
-      const gHtml = await httpGet(gUrl, undefined, HTML_TIMEOUT_MS)
-      const tags = parseBabesourceTags(gHtml, variant)
-      if (hasBadTag(tags)) return undefined
-      const idMatch = /-(\d+)\.html?(?:[?#]|$)/.exec(gUrl)
-      const gid = idMatch ? idMatch[1] : 'x'
-      const images = parseBabesourceGallery(gHtml, perGallery)
-      if (images.length === 0) return undefined
-      return images.map((img, i) => ({ id: `bs-${gid}-${i}`, url: img.url, preview: img.preview, tags, rating: undefined, kind: 'image' }))
-    } catch {
-      return undefined /* one dead gallery never kills the round */
-    }
-  })
-  const expanded = roundRobinPosts(sets, n)
-  if (expanded.length > 0) return expanded
-  // Gallery expansion died but search HTML arrived: fall back to
-  // search-page covers rewritten to exact fulls (never thumbs-as-url).
-  // Mirrors services/booru.ts.
-  const seenCover = new Set()
-  const covers = []
-  const coverRe = /https:\/\/media\.babesource\.com\/galleries\/[0-9a-f]+\/thumbs\/(?:300x406\/)?[^"']+?\.(?:jpe?g|png|webp|gif)/gi
-  for (const body of searchBodies) {
-    let m
-    while ((m = coverRe.exec(body))) {
-      const full = babesourceThumbToFull(m[0])
-      if (!full || seenCover.has(full)) continue
-      seenCover.add(full)
-      const h = /\/galleries\/([0-9a-f]+)\//i.exec(m[0])
-      covers.push({
-        id: `bs-c-${h ? h[1] : 'x'}-${covers.length}`,
-        url: full,
-        preview: m[0],
-        tags: parseBabesourceTags(null, variant),
-        // No rating asserted: this source cannot report one. The renderer gate fails
-        // closed without an explicit no-rating-channel declaration.
-        rating: undefined,
-        kind: 'image',
-      })
-      if (covers.length >= n) break
-    }
-    if (covers.length >= n) break
-  }
-  return covers
-}
 
 // Per-kind fetch strategy. Everything about WHICH mirrors exist and where they
 // live comes from shared/sources.json; this map only says how each protocol
@@ -1497,10 +1147,10 @@ const SOURCE_FETCHERS = {
 
   // babesource: real porn photo galleries (full-res stills, eporner replacement).
   // Stills-only — no long videos by construction.
-  babesource: (s) => ({ id: s.id, category: s.category, fetch: (variant, n) => fetchBabesource(variant, n) }),
+  babesource: (s) => ({ id: s.id, category: s.category, fetch: (variant, n) => babesource.fetch(variant, n) }),
 
   // Slow (multi-fetch scrape) — last resort before giving up.
-  imhentai: (s) => ({ id: s.id, category: s.category, fetch: (variant, n) => fetchImhentai(variant, n) }),
+  imhentai: (s) => ({ id: s.id, category: s.category, fetch: (variant, n) => imhentai.fetch(variant, n) }),
 
   // paheal combos return 0 results — query a single tag only.
   paheal: (s) => ({
@@ -1526,6 +1176,15 @@ const SOURCE_FETCHERS = {
 }
 
 // Round-robin over sources with mirror health tracking (BOORU-API.md §7).
+// mediaq ContentProvider (self-hosted REST; default localhost, auto-probe, and
+// silently off when nothing answers). One provider serves BOTH categories — its
+// capabilities carry that, so it is never duplicated per category.
+const { createMediaqProvider } = require('./providers/mediaq.cjs')
+const { createFeedMetrics } = require('./feedMetrics.cjs')
+const MEDIAQ_URL = process.env.GMATCH_MEDIAQ_URL || 'http://127.0.0.1:8765'
+const mediaqProvider = createMediaqProvider({ baseUrl: MEDIAQ_URL, postJson })
+const feedMetrics = createFeedMetrics()
+
 // Explicit-rated human sources categorized as 'real' or 'hentai'. Built from
 // shared/sources.json — before this, main and the renderer kept independent
 // lists and allgirl.booru.org / rule34.booru.org shipped main-only.
@@ -1540,13 +1199,15 @@ const SOURCES = booruSources.flatMap((s) => {
   // lane while a mirror that answers in 300ms is never tried (FAST_PHASE).
   return [{ ...make(s), kind: s.kind }]
 })
-mainLog(`[booru] ${SOURCES.length} sources from registry: ${SOURCES.map((s) => s.id).join(', ')}`)
+SOURCES.push(mediaqProvider)
+mainLog(`[booru] ${SOURCES.length} sources: ${SOURCES.map((s) => s.id).join(', ')} (mediaq at ${MEDIAQ_URL}; auto-probe, off when unreachable)`)
 
 const fetchBooru = createFetchBooru({
   sources: SOURCES,
   httpGet,
   cache: imageCache,
   blocked: isQueryBlocked,
+  metrics: feedMetrics,
 })
 
 function createWindow() {
@@ -1572,6 +1233,8 @@ function createWindow() {
     backgroundColor: '#080A0D',
     title: 'gMatch',
     webPreferences: {
+      // Background throttling made a returning window stall/go black. The
+      // process stays responsive; pollers already skip work while hidden.
       backgroundThrottling: false,
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -1590,6 +1253,18 @@ function createWindow() {
   win.on('moved', persistBounds)
   win.on('resized', persistBounds)
   win.removeMenu()
+  // Energy: a hidden/minimized window must not keep compositing. Chromium's
+  // background throttling is disabled globally here (a throttled window used
+  // to come back with a stale frame), so it is switched ON only while the
+  // window is genuinely hidden/minimized — and switched OFF, with an explicit
+  // repaint, before it can be seen again.
+  const setThrottled = (on) => {
+    try { win.webContents.setBackgroundThrottling(on) } catch { /* best effort */ }
+  }
+  win.on('hide', () => setThrottled(true))
+  win.on('minimize', () => setThrottled(true))
+  win.on('show', () => { setThrottled(false); try { win.webContents.invalidate() } catch { /* best effort */ } })
+  win.on('restore', () => { setThrottled(false); try { win.webContents.invalidate() } catch { /* best effort */ } })
   // Boot timeline anchors. The renderer's own marks (first paint, hydration)
   // arrive over IPC and land on the same clock.
   win.webContents.on('did-finish-load', () => {
@@ -1597,30 +1272,13 @@ function createWindow() {
     bootMetrics?.mark('did-finish-load')
   })
   win.once('ready-to-show', () => bootMetrics?.mark('ready-to-show'))
-  // The renderer's beforeunload key-save gate must NEVER silently block the
-  // close button (1.0.1 bug: "cant close app" — in Electron, a prevented
+  notify.wireWindowNotifications(win)
   // unload just cancels the window close). Surface the page's message as a
-  // real native dialog instead: Stay saves nothing, Leave closes.
-  win.webContents.on('will-prevent-unload', (event) => {
-    if (updateHandoff || reloadWanted) { reloadWanted = false; event.preventDefault(); return }
-    const choice = dialog.showMessageBoxSync(win, {
-      type: 'warning',
-      buttons: ['Stay', 'Leave anyway'],
-      defaultId: 0,
-      cancelId: 0,
-      title: 'Save your secret key first?',
-      message: 'Your account is only recoverable with your secret key.',
-      detail: 'Open Settings → Identity & Keys to copy or download it. If you already backed it up, you can close safely.',
-    })
-    if (choice === 1) event.preventDefault()
-  })
   // Ctrl/Cmd+R = plain refresh (frameless window, no menu accelerators).
   win.webContents.on('before-input-event', (event, input) => {
     if (input.type === 'keyDown' && input.key.toLowerCase() === 'r' && (input.control || input.meta)) {
       event.preventDefault()
-      reloadWanted = true
       win.webContents.reload()
-      setTimeout(() => { reloadWanted = false }, 3000)
     }
   })
   // Only use the dev server when explicitly requested — never guess a port,
@@ -1668,23 +1326,8 @@ app.whenReady().then(async () => {
   // them on the bridge exposing winMinimize/winToggleMaximize/winClose (browser
   // dev has no preload -> no buttons). close() routes through the same
   // will-prevent-unload key-save gate as the native titlebar.
-  ipcMain.on('window:minimize', (e) => BrowserWindow.fromWebContents(e.sender)?.minimize())
-  ipcMain.on('window:toggle-maximize', (e) => {
-    const w = BrowserWindow.fromWebContents(e.sender)
-    if (!w) return
-    if (w.isMaximized()) w.unmaximize(); else w.maximize()
-  })
-  ipcMain.on('window:close', (e) => BrowserWindow.fromWebContents(e.sender)?.close())
-  // Reload = refresh, never the stay/leave dialog: the beforeunload handlers
-  // (key save + idle save) run synchronously before the reload lands.
-  ipcMain.on('window:reload', (e) => {
-    const w = BrowserWindow.fromWebContents(e.sender)
-    if (!w) return
-    reloadWanted = true
-    w.webContents.reload()
-    // Safety: if no unload attempt materializes, don't leak the bypass.
-    setTimeout(() => { reloadWanted = false }, 3000)
-  })
+
+  registerWindowHandlers({ ipcMain })
   const storageKeyPath = path.join(app.getPath('userData'), 'storage.key')
   let diskKey = null
   try { diskKey = fs.readFileSync(storageKeyPath, 'utf8').trim() } catch {}
@@ -1711,173 +1354,46 @@ app.whenReady().then(async () => {
   protocol.handle(imageCache.SCHEME, (request) => imageCache.serveImage(request))
   protocol.handle(vault.SCHEME, (request) => vault.serveVault(request))
   customFolders.init(app.getPath('userData'), { ipcMain, BrowserWindow })
-  ipcMain.handle('booru:fetch', (_event, payload) => {
-    // Player excludes arrive per round and become query negatives.
-    setRoundExcludes((payload && payload.excludes) || [])
-    return fetchBooru(payload ?? {})
+  registerBooruHandlers({ ipcMain, fetchBooru, setRoundExcludes, httpGet, feedMetrics })
+  registerMediaqHandlers({
+    ipcMain,
+    installer: mediaqInstaller,
+    sidecar: mediaqSidecar,
+    getUserData: () => app.getPath('userData'),
+    mainLog,
   })
-  ipcMain.handle('pmv:playlist', async (_event, id) => {
-    const rawId = String(id || '').trim()
-    if (!/^(?:[0-9a-fA-F]{24}|[a-zA-Z0-9_-]{12,32})$/.test(rawId)) return null
-    try {
-      const text = await httpGet(`https://pmvhaven.com/api/playlists/${rawId}`, { Referer: 'https://pmvhaven.com/' })
-      return JSON.parse(text)
-    } catch {
-      return null
-    }
-  })
-  // Secure KV bridge (B.3): renderer proxies designated localStorage keys here.
-  ipcMain.handle('secure:available', () => secureAvailable)
-  ipcMain.handle('secure:get', (_event, key) => secureKV.get(String(key)))
-  ipcMain.handle('secure:set', (_event, key, value) => secureKV.set(String(key), String(value)))
-  ipcMain.handle('secure:delete', (_event, key) => secureKV.delete(String(key)))
-  ipcMain.handle('cache:image', (_event, url) => imageCache.cacheImage(url).then((local) => ({ local })))
-  ipcMain.handle('cache:stats', () => imageCache.cacheStats())
-  ipcMain.handle('cache:clear', () => imageCache.clearCache())
-  ipcMain.handle('cache:clear-feed', () => imageCache.clearFeedCache())
-  ipcMain.handle('cache:evict', (_event, url) => ({ ok: imageCache.evict(String(url ?? '')) }))
-  // probe (not get) so a row whose bytes cannot be read is reported as
-  // unreadable rather than a miss, and is never dropped from the manifest.
-  ipcMain.handle('vault:get', (_event, url) => vault.probe(String(url ?? '')))
-  ipcMain.handle('vault:pin', (_event, url) => vault.pin(String(url ?? '')).then((local) => ({ local })))
-  ipcMain.handle('vault:pin-stream', (event, url) => vault.pinStream(String(url ?? ''), {
-    onProgress: ({ bytes, total }) => {
-      try { event.sender.send('vault:pin-stream-progress', { url: String(url ?? ''), bytes, total }) } catch {}
-    },
-  }))
-  ipcMain.handle('vault:unpin', (_event, url) => ({ ok: vault.unpin(String(url ?? '')) }))
-  ipcMain.handle('vault:remove', (_event, url) => ({ ok: vault.remove(String(url ?? '')) }))
-  // Disco-first: bytes the renderer already holds (verified swarm assembly,
-  // forged upload) are written straight to the encrypted store, re-checked
-  // against their content hash in the main process.
-  ipcMain.handle('vault:put-bytes', (_event, hash, mime, data, alias) =>
-    vault.putBytes(String(hash ?? ''), String(mime ?? ''), data, alias == null ? null : String(alias)))
-  ipcMain.handle('vault:list', () => vault.list())
-  ipcMain.handle('vault:stats', () => vault.stats())
-  ipcMain.handle('vault:clear', () => vault.clear())
-  ipcMain.handle('vault:http-url', (_event, url) => ({ local: vaultServer.httpUrl(String(url ?? '')) }))
+  // Start the mediaq sidecar if the one-shot setup suite has installed it. Off
+  // (installed=false) this is a cheap no-op; a failure leaves mediaq off, never
+  // blocks boot, and the feed still runs on local sources.
+  void mediaqInstaller
+    .mediaqStatus({ userData: app.getPath('userData') })
+    .then((st) => (st.bin ? mediaqSidecar.startMediaq({ mediaqBin: st.bin, onLog: (l) => mainLog('[mediaq] ' + l) }) : false))
+    .catch(() => false)
+  // Secure KV + encrypted picture cache: handlers live in ./ipc/*.cjs (deps injected).
+  registerSecureHandlers({ ipcMain, secureKV, secureAvailable })
+  registerCacheHandlers({ ipcMain, imageCache })
+  registerVaultHandlers({ ipcMain, vault, vaultServer })
   // Update check (Settings): installed version + open the download in the OS browser.
-  ipcMain.handle('app:version', () => app.getVersion())
-  ipcMain.handle('app:open-log', () => shell.openPath(app.getPath('userData')))
-  ipcMain.handle('shell:open', (_event, url) => {
-    if (typeof url === 'string' && /^https?:\/\//i.test(url)) return shell.openExternal(url)
-    return Promise.reject(new Error('only http(s) URLs'))
+  registerAppHandlers({
+    ipcMain, app,
+    blocklist: {
+      userPath: userBlocklistPath,
+      get: () => currentBlocklistData,
+      load: loadBlocklistData,
+      defaults: getDefaultBlocklistData,
+      apply: (data) => {
+        currentBlocklistData = data
+        currentBlocklist = Array.isArray(data?.blocklist) ? data.blocklist : []
+      },
+    },
   })
-  // Dynamic blocklist control (Settings -> Blocklist): full edit/reset.
-  ipcMain.handle('blocklist:get', () => {
-    const userPath = userBlocklistPath()
-    return {
-      current: currentBlocklistData || loadBlocklistData(),
-      defaults: getDefaultBlocklistData(),
-      isCustom: Boolean(userPath && fs.existsSync(userPath)),
-    }
-  })
-  ipcMain.handle('blocklist:set', (_event, payload) => {
-    try {
-      let data = payload
-      if (typeof data === 'string') data = JSON.parse(data)
-      if (!data || typeof data !== 'object') {
-        return { ok: false, error: 'Payload must be a JSON object' }
-      }
-      if (!Array.isArray(data.blocklist)) {
-        return { ok: false, error: 'Payload must contain a "blocklist" array' }
-      }
-      // Single source of truth: shared/blocklist.json is the factory
-      // default (read-only); Settings edits land ONLY in the userData copy,
-      // which takes precedence on load.
-      const userPath = userBlocklistPath()
-      if (userPath) {
-        fs.mkdirSync(path.dirname(userPath), { recursive: true })
-        fs.writeFileSync(userPath, JSON.stringify(data, null, 2), 'utf8')
-      }
-      currentBlocklistData = data
-      currentBlocklist = data.blocklist
-      return { ok: true, data: currentBlocklistData }
-    } catch (err) {
-      return { ok: false, error: err?.message || String(err) }
-    }
-  })
-  ipcMain.handle('blocklist:reset', () => {
-    try {
-      const userPath = userBlocklistPath()
-      if (userPath && fs.existsSync(userPath)) {
-        fs.unlinkSync(userPath)
-      }
-      currentBlocklistData = getDefaultBlocklistData()
-      currentBlocklist = Array.isArray(currentBlocklistData.blocklist) ? currentBlocklistData.blocklist : []
-      return { ok: true, data: currentBlocklistData }
-    } catch (err) {
-      return { ok: false, error: err?.message || String(err) }
-    }
-  })
-  // OS wallpaper swap for consented domination effects (Windows; no-op else).
-  ipcMain.handle('wallpaper:set-data', (_event, buf, mime) => wallpaperWin.setWallpaperFromBuffer(Buffer.from(buf), String(mime || '')))
-  ipcMain.handle('wallpaper:restore', () => wallpaperWin.restoreWallpaper())
-  ipcMain.handle('wallpaper:cleanup-files', () => { wallpaperWin.cleanupWallpaperFiles(); return { ok: true } })
-  // A domination wallpaper that outlives the app is the worst failure mode of
-  // this feature: the victim closes gMatch and their desktop is still
-  // somebody else's picture, with the only copy of the original living in this
-  // process. Nothing called restore on the way out (cleanup-files only deletes
-  // temp files, it does not put the wallpaper back), so close it here.
-  for (const evt of ['before-quit', 'will-quit']) {
-    app.on(evt, () => { if (wallpaperWin.hasPendingSwap()) void wallpaperWin.restoreWallpaper() })
-  }
-  // A stray domination video window must not outlive the app either.
-  app.on('before-quit', () => { if (domVideoWin) { try { domVideoWin.destroy() } catch { /* gone */ } domVideoWin = null } })
-  // Camera stays denied by default; the renderer consumes a one-shot grant
-  // only AFTER the victim clicks "Allow once" on the in-app prompt.
+  // Consented domination media (wallpaper + popup_video window) + one-shot
+  // camera grant: handlers live in ./ipc/domination-media.cjs.
+  registerDominationMediaHandlers({ ipcMain, app, wallpaperWin, domVideo, mainLog })
   ipcMain.handle('camera:grant-once', () => { cameraGrantOnce = true; return { ok: true } })
-  // Native OS notification for consented domination message/banner effects.
-  // Works while the window is minimized or unfocused (Windows Action Center);
-  // best-effort — the in-app overlay always renders regardless. Title/body
-  // are plain strings and Chromium escapes them; no shell, no URL, no exec.
-  ipcMain.handle('notify:native', (_event, title, body) => {
-    try {
-      const t = String(title || 'gMatch').slice(0, 120)
-      const b = String(body || '').slice(0, 280)
-      if (!Notification.isSupported()) return { ok: false, reason: 'unsupported' }
-      const n = new Notification({ title: t, body: b, silent: false })
-      n.on('failed', (_e, error) => { console.warn('[domination] native notification failed:', error) })
-      n.show()
-      return { ok: true }
-    } catch (err) {
-      return { ok: false, reason: err?.message || String(err) }
-    }
-  })
-  // Dedicated player window for consented popup_video effects: a real OS
-  // window (works while gMatch is minimized), sandboxed, muted, auto-closing
-  // at the effect duration. The window lifecycle IS the execution outcome the
-  // renderer reports back. URL is https-validated here on the privileged side.
-  let domVideoWin = null
-  ipcMain.handle('dom-video:open', (_event, url, durationMs) => {
-    return new Promise((resolve) => {
-      const valid = domVideo.validVideoUrl(url)
-      if (!valid) return resolve({ ok: false, reason: 'invalid-url' })
-      let settled = false
-      const finish = (ok, reason) => { if (!settled) { settled = true; resolve({ ok, reason }) } }
-      try {
-        if (domVideoWin) { try { domVideoWin.destroy() } catch { /* already gone */ } domVideoWin = null }
-        const geo = domVideo.windowGeometry(screen.getPrimaryDisplay()?.workArea)
-        domVideoWin = new BrowserWindow({
-          ...geo,
-          title: 'gMatch',
-          backgroundColor: '#000000',
-          autoHideMenuBar: true,
-          webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
-        })
-        let timer = null
-        domVideoWin.on('closed', () => {
-          domVideoWin = null
-          if (timer) clearTimeout(timer)
-          finish(true)
-        })
-        domVideoWin.webContents.on('did-fail-load', () => { try { domVideoWin?.close() } catch { /* gone */ } })
-        timer = setTimeout(() => { try { domVideoWin?.close() } catch { /* gone */ } }, domVideo.clampDurationMs(durationMs))
-        domVideoWin.loadURL(domVideo.playerPageUrl(valid)).catch(() => { try { domVideoWin?.close() } catch { /* gone */ } })
-      } catch (err) {
-        finish(false, err?.message || 'error')
-      }
-    })
+  app.on('session-end', () => {
+    // Logoff/shutdown: just go (and save what we have).
+    mainLog('session-end: quitting')
   })
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
     if (permission === 'media' && cameraGrantOnce) {
@@ -1895,44 +1411,7 @@ app.whenReady().then(async () => {
     callback(false)
   })
   // Server-mode bridge for the Settings UI (packaged topology control).
-  ipcMain.handle('server:state', () => ({
-    packaged: app.isPackaged,
-    // Hosts own their node: the PIN is shown in Settings so the developer
-    // (and any self-hoster) can unlock the bundled admin console. See
-    // electron/admin-pin.cjs header for the trust argument.
-    adminPin: require('./admin-pin.cjs').adminPin(app.getPath('userData')),
-    ...(app.isPackaged
-      ? { ...serverMode.readServerMode(), lanUrls: serverMode.lanUrls() }
-      : { mode: 'host', url: apiSidecar.API_BASE, lanUrls: serverMode.lanUrls() }),
-  }))
-  // Persist host/client choice + hand the renderer the fresh state. Switching
-  // takes effect on next launch (relaunch button in Settings does that).
-  ipcMain.handle('server:set', (_event, payload) => {
-    const mode = payload?.mode === 'client' ? 'client' : 'host'
-    try {
-      serverMode.writeServerMode(mode, String(payload?.url || ''))
-    } catch (err) {
-      return { ok: false, error: err.message }
-    }
-    return { ok: true }
-  })
-  ipcMain.handle('server:probe', async (_event, url) => {
-    try {
-      // Health, not TCP: a live host that 404s is not a node. The same rule
-      // the launch check uses, so Reconnect and boot agree.
-      return await serverMode.probeServer(url)
-    } catch (err) {
-      return { ok: false, error: err?.message || String(err) }
-    }
-  })
-  // Apply the new mode NOW: relaunch the app (used by the Settings button).
-  ipcMain.handle('server:relaunch', () => {
-    apiSidecar.stopApi()
-    try { if (secureKV) secureKV.flush() } catch { /* best effort */ }
-    const execPath = process.env.PORTABLE_EXECUTABLE_FILE || process.execPath
-    app.relaunch({ execPath })
-    app.exit(0)
-  })
+  registerServerHandlers({ ipcMain, app, serverMode, apiSidecar, secureKV })
   // Portable self-update (GitHub Releases): check + auto-download in main,
   // the renderer's "Install & Restart" triggers the exe swap + relaunch.
   let updater = null
@@ -1953,12 +1432,11 @@ app.whenReady().then(async () => {
       },
     })
   }
-  ipcMain.handle('update:check', () => (updater ? updater.check(true) : { phase: 'unsupported', current: app.getVersion() }))
-  ipcMain.handle('update:state', () => (updater ? updater.getState() : { phase: 'unsupported', current: app.getVersion() }))
-  ipcMain.handle('update:install', () => {
-    if (!updater) return { ok: false, error: 'updates only work in packaged builds' }
-    updateHandoff = true
-    return updater.install()
+  // Update IPC (Settings): the updater is created above (packaged only).
+  registerUpdateHandlers({
+    ipcMain, app,
+    getUpdater: () => updater,
+    onInstall: () => { app.quit() },
   })
   // Topology: packaged builds default to HOST mode (bundled Bun sidecar,
   // fully local — no Render required). Client mode (friend's node or central
@@ -1968,32 +1446,26 @@ app.whenReady().then(async () => {
   // on startApi() before createWindow(), so a slow/migrating bundled server
   // looked like "Task Mgr spin, never opens" (and invited double-clicks
   // that EADDRINUSE-crashed the sidecar).
-  let sidecarRestartTried = false
-  const onSidecarCrash = async (code) => {
-    mainLog(`sidecar crashed code=${code}`)
-    if (!sidecarRestartTried) {
-      sidecarRestartTried = true
+  const sidecarSupervisor = createSidecarSupervisor({
+    apiSidecar,
+    log: mainLog,
+    onError: () => {
       try {
-        await apiSidecar.startApi()
-        mainLog('sidecar restarted ok')
-        return
-      } catch (e) {
-        mainLog(`sidecar restart failed: ${e?.message || e}`)
+        dialog.showErrorBox(
+          'The local server stopped',
+          `gMatch could not keep its bundled server running.\n\nRestart the app, or switch to a friend's server in Settings > Server.\n\n${LOG_HINT}`,
+        )
+      } catch {
+        /* headless edge */
       }
-    }
-    try {
-      dialog.showErrorBox(
-        'The local server stopped',
-        `gMatch could not keep its bundled server running.\n\nRestart the app, or switch to a friend's server in Settings > Server.\n\n${LOG_HINT}`,
-      )
-    } catch { /* headless edge */ }
-  }
+    },
+  })
   let sidecarLogCount = 0
   apiSidecar.sidecarEvents.on('stderr', (line) => {
     // Crash forensics without letting a chatty server fill main.log.
     if (sidecarLogCount++ < 40) mainLog(`[sidecar] ${line}`)
   })
-  apiSidecar.sidecarEvents.on('crashed', (code) => void onSidecarCrash(code))
+  apiSidecar.sidecarEvents.on('crashed', (code) => sidecarSupervisor.crashed(code))
   // Read topology early so the window gets the right --api-base. A stored
   // client pointer is resolved ONCE here: an older app's choice is kept but not
   // dialed, a node this app verified is health-checked, and either way a launch
@@ -2024,6 +1496,7 @@ app.whenReady().then(async () => {
   // Start the bundled server in the background (host mode only). Failures
   // surface as dialogs + log lines; they can never take the window with them.
   const startSidecarBg = async () => {
+    bootMetrics.mark('sidecar.spawn')
     if (app.isPackaged) {
       if (packagedServer.mode !== 'host') return
       process.env.GMATCH_HOST_MODE = '1'
@@ -2031,6 +1504,8 @@ app.whenReady().then(async () => {
       try {
         await apiSidecar.startApi()
         mainLog('boot: bundled server ready')
+        sidecarSupervisor.markHealthy()
+        bootMetrics.mark('sidecar.healthy')
       } catch (err) {
         mainLog(`bundled server start failed: ${err?.message || err}`)
         try {
@@ -2043,6 +1518,7 @@ app.whenReady().then(async () => {
     } else {
       try {
         await apiSidecar.startApi()
+        sidecarSupervisor.markHealthy()
       } catch (err) {
         // Sidecar down (e.g. bun missing): the renderer still boots and shows
         // offline states; Grid feed works via IPC booru.
@@ -2051,6 +1527,7 @@ app.whenReady().then(async () => {
     }
   }
   void startSidecarBg()
+  sidecarSupervisor.startWatchdog()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
@@ -2084,10 +1561,13 @@ app.on('before-quit', () => {
   // Close the startup window early on quit so the summary is still written
   // (otherwise a fast close loses the measurement entirely).
   try { bootMetrics?.finish('quit') } catch { /* diagnostics only */ }
-  apiSidecar.stopApi(); try { if (secureKV) secureKV.flush() } catch { /* best effort */ }
+  apiSidecar.stopApi(); mediaqSidecar.stopMediaq(); try { if (secureKV) secureKV.flush() } catch { /* best effort */ }
 })
-app.on('will-quit', () => { apiSidecar.stopApi() })
+app.on('will-quit', () => {
+  apiSidecar.stopApi()
+  mediaqSidecar.stopMediaq()
+})
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
+  app.quit()
 })

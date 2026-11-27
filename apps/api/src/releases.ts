@@ -26,14 +26,6 @@ export interface ReleaseEnv {
   RELEASES_DIR?: string
 }
 
-export interface ReleaseManifest {
-  file: string
-  version: string
-  sha256: string
-  sizeBytes?: number
-  publishedAt?: string
-}
-
 /** Where the releases live, or null when this node hosts none. */
 export function releasesDir(env?: ReleaseEnv): string | null {
   const dir = env?.RELEASES_DIR || process.env.RELEASES_DIR

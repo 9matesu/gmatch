@@ -314,14 +314,14 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
           </button>
           <button
             onClick={validateDeck}
-            className="text-xs bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 px-3 py-1.5 rounded-lg flex items-center gap-1.5"
+            className="text-xs bg-info/20 hover:bg-info/30 text-info-fg px-3 py-1.5 rounded-lg flex items-center gap-1.5"
           >
             <Check className="w-3 h-3" />
             Validate Deck
           </button>
         </div>
 
-        <div className="bg-surface-raised border border-border-glass rounded-xl p-4">
+        <div className="bg-surface-raised border border-edge rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">
             <div>
                <div className="flex items-center gap-2">
@@ -335,14 +335,14 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
                    <Pencil className="w-3.5 h-3.5" />
                  </button>
                  {activeDeckId === selectedDeck.id ? (
-                   <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-mono text-[10px] font-bold flex items-center gap-1">
-                     <Star className="w-3 h-3 fill-emerald-400 text-emerald-400" /> Active Deck
+                   <span className="px-2 py-0.5 rounded-full bg-success/20 border border-success/40 text-success-fg font-mono text-2xs font-bold flex items-center gap-1">
+                     <Star className="w-3 h-3 fill-success text-success-fg" /> Active Deck
                    </span>
                  ) : (
                    <button
                      type="button"
                      onClick={() => setActiveDeck(selectedDeck.id)}
-                     className="px-2 py-0.5 rounded-full bg-surface-interactive border border-border-glass hover:border-emerald-500/40 text-retro-muted hover:text-emerald-300 text-[10px] font-bold cursor-pointer transition-colors"
+                     className="px-2 py-0.5 rounded-full bg-surface-interactive border border-edge hover:border-success/40 text-retro-muted hover:text-success-fg text-2xs font-bold cursor-pointer transition-colors"
                    >
                      Set as Active
                    </button>
@@ -356,7 +356,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
              <div className="flex items-center gap-2">
               <button
                 onClick={() => setAddingCards(!addingCards)}
-                className="text-xs bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 px-3 py-1.5 rounded-lg flex items-center gap-1.5 cursor-pointer font-semibold"
+                className="text-xs bg-info/20 hover:bg-info/30 text-info-fg px-3 py-1.5 rounded-lg flex items-center gap-1.5 cursor-pointer font-semibold"
               >
                 <Plus className="w-3 h-3" />
                 {addingCards ? 'Done' : 'Add Cards'}
@@ -368,7 +368,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
                     setActiveDeck(selectedDeck.id);
                     onEnterArena();
                   }}
-                  className="text-xs bg-retro-accent text-black font-black px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 hover:bg-retro-accent-hover cursor-pointer shadow-md"
+                  className="text-xs bg-retro-accent text-retro-accent-text font-black px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 hover:bg-retro-accent-hover cursor-pointer shadow-md"
                 >
                   <Swords className="w-3.5 h-3.5" />
                   Enter Arena
@@ -385,29 +385,29 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
                  value={editingName}
                  onChange={(e) => setEditingName(e.target.value)}
                  maxLength={60}
-                 className="flex-1 bg-surface-interactive border border-border-glass rounded-lg px-3 py-1.5 text-xs text-retro-fg outline-none focus:border-retro-accent/50"
+                 className="flex-1 bg-surface-interactive border border-edge rounded-lg px-3 py-1.5 text-xs text-retro-fg outline-none focus:border-retro-accent/50"
                />
-               <button type="button" onClick={renameDeck} className="px-3 py-1.5 rounded-lg bg-cyan-500 text-white text-xs font-bold cursor-pointer">Save</button>
-               <button type="button" onClick={() => setEditingName('')} className="px-3 py-1.5 rounded-lg border border-border-glass text-retro-muted text-xs cursor-pointer">Cancel</button>
+               <button type="button" onClick={renameDeck} className="px-3 py-1.5 rounded-lg bg-info text-retro-fg text-xs font-bold cursor-pointer">Save</button>
+               <button type="button" onClick={() => setEditingName('')} className="px-3 py-1.5 rounded-lg border border-edge text-retro-muted text-xs cursor-pointer">Cancel</button>
              </div>
            )}
 
            {validation && (
-            <div className={`mb-4 p-3 rounded-lg ${validation.valid ? 'bg-green-500/20 border border-green-500/30' : 'bg-red-500/20 border border-red-500/30'}`}>
+            <div className={`mb-4 p-3 rounded-lg ${validation.valid ? 'bg-success/20 border border-success/30' : 'bg-danger/20 border border-danger/30'}`}>
               <div className="flex items-center gap-2 mb-2">
                 {validation.valid ? (
-                  <Check className="w-4 h-4 text-green-400" />
+                  <Check className="w-4 h-4 text-success-fg" />
                 ) : (
-                  <AlertCircle className="w-4 h-4 text-red-400" />
+                  <AlertCircle className="w-4 h-4 text-danger-fg" />
                 )}
-                <span className={`text-sm font-bold ${validation.valid ? 'text-green-300' : 'text-red-300'}`}>
+                <span className={`text-sm font-bold ${validation.valid ? 'text-success-fg' : 'text-danger-fg'}`}>
                   {validation.valid ? 'Deck is valid' : 'Deck has issues'}
                 </span>
               </div>
               {!validation.valid && validation.issues.length > 0 && (
                 <ul className="list-disc list-inside space-y-1">
                   {validation.issues.map((issue, i) => (
-                    <li key={i} className="text-xs text-red-200">{issue}</li>
+                    <li key={i} className="text-xs text-danger-fg">{issue}</li>
                   ))}
                 </ul>
               )}
@@ -431,9 +431,9 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
                 if (payload.cardId) void addCardToDeck(payload.cardId);
               } catch { /* malformed */ }
             }}
-            className={`rounded-xl border-2 border-dashed transition-colors p-2 -m-2 ${deckDropOver ? 'border-cyan-400/70 bg-cyan-500/10' : 'border-transparent'}`}
+            className={`rounded-xl border-2 border-dashed transition-colors p-2 -m-2 ${deckDropOver ? 'border-info/70 bg-info/10' : 'border-transparent'}`}
           >
-            <h3 className="text-sm font-bold text-retro-body mb-2">Cards in Deck{deckDropOver && <span className="ml-2 text-xs font-semibold text-cyan-300 animate-pulse">Drop to add</span>}</h3>
+            <h3 className="text-sm font-bold text-retro-body mb-2">Cards in Deck{deckDropOver && <span className="ml-2 text-xs font-semibold text-info-fg animate-pulse">Drop to add</span>}</h3>
             {getCardsInDeck().length === 0 ? (
               <div className="text-center py-8 text-retro-muted text-xs">
                 No cards in this deck yet. Click &quot;Add Cards&quot;. Or drag a card here.
@@ -445,7 +445,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
                     <CardTile item={card} identity={identity} onClick={() => openCardDetail(card)} />
                     <button
                       onClick={() => removeCardFromDeck(canonicalId(card))}
-                      className="absolute top-2 right-2 bg-red-500/80 hover:bg-red-500 text-white p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute top-2 right-2 bg-danger/80 hover:bg-danger text-retro-fg p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
                       title="Remove from deck"
                     >
                       <Trash2 className="w-3 h-3" />
@@ -459,7 +459,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
           {addingCards && (
             <div className="mt-6">
               <h3 className="text-sm font-bold text-retro-body mb-2">Available cards</h3>
-              <div className="mb-3 flex items-center gap-2 bg-surface-canvas border border-border-glass rounded-lg px-3 py-2">
+              <div className="mb-3 flex items-center gap-2 bg-surface-canvas border border-edge rounded-lg px-3 py-2">
                 <Search className="w-4 h-4 text-retro-muted shrink-0" />
                 <input
                   type="text"
@@ -488,7 +488,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
                       <CardTile item={card} identity={identity} onClick={() => openCardDetail(card)} />
                       <button
                         onClick={() => addCardToDeck(canonicalId(card))}
-                        className="absolute top-2 right-2 bg-cyan-500/80 hover:bg-cyan-500 text-white p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute top-2 right-2 bg-info/80 hover:bg-info text-retro-fg p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
                         title="Add to deck (or drag into the deck above)"
                       >
                         <Plus className="w-3 h-3" />
@@ -506,7 +506,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
 
   return (
     <div className="space-y-4">
-      <div className="bg-surface-raised border border-border-glass rounded-xl p-4">
+      <div className="bg-surface-raised border border-edge rounded-xl p-4">
         <h2 className="text-lg font-bold text-retro-fg mb-4">Create new deck</h2>
         <div className="flex gap-2">
           <input
@@ -514,13 +514,13 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
             value={newDeckName}
             onChange={(e) => setNewDeckName(e.target.value)}
             placeholder="Deck name..."
-            className="flex-1 bg-surface-canvas border border-border-glass rounded-lg px-3 py-2 text-sm text-retro-fg placeholder:text-retro-muted focus:outline-none focus:border-retro-accent/50"
+            className="flex-1 bg-surface-canvas border border-edge rounded-lg px-3 py-2 text-sm text-retro-fg placeholder:text-retro-muted focus:outline-none focus:border-retro-accent/50"
             maxLength={60}
           />
           <button
             onClick={() => void createDeck()}
             disabled={!newDeckName.trim()}
-            className="bg-cyan-500 hover:bg-cyan-600 disabled:bg-surface-interactive disabled:text-retro-muted text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1.5"
+            className="bg-info hover:bg-info disabled:bg-surface-interactive disabled:text-retro-muted text-retro-fg px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1.5"
           >
             <Plus className="w-4 h-4" />
             Create
@@ -528,7 +528,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
         </div>
       </div>
 
-      <div className="bg-surface-raised border border-border-glass rounded-xl p-4">
+      <div className="bg-surface-raised border border-edge rounded-xl p-4">
         <h2 className="text-lg font-bold text-retro-fg mb-4">Your decks</h2>
         {loading ? (
           <div className="text-center py-8 text-retro-muted text-xs">Loading decks...</div>
@@ -541,7 +541,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
             {decks.map(deck => (
               <div
                 key={deck.id}
-                className="bg-surface-canvas border border-border-glass rounded-xl p-3 flex items-center justify-between hover:border-border-strong transition-colors"
+                className="bg-surface-canvas border border-edge rounded-xl p-3 flex items-center justify-between hover:border-edge-strong transition-colors"
               >
                 <button
                   onClick={() => setSelectedDeck(deck)}
@@ -553,8 +553,8 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
                       {deck.cards.length}/5 cards
                     </span>
                     {activeDeckId === deck.id && (
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-mono text-[10px] font-bold flex items-center gap-1">
-                        <Star className="w-2.5 h-2.5 fill-emerald-400 text-emerald-400" /> Active
+                      <span className="px-2 py-0.5 rounded-full bg-success/20 border border-success/40 text-success-fg font-mono text-2xs font-bold flex items-center gap-1">
+                        <Star className="w-2.5 h-2.5 fill-success text-success-fg" /> Active
                       </span>
                     )}
                   </div>
@@ -564,7 +564,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
                 </button>
                 <button
                   onClick={() => deleteDeck(deck.id)}
-                  className="text-red-400 hover:text-red-300 p-2 rounded-lg hover:bg-red-500/10 transition-colors"
+                  className="text-danger-fg hover:text-danger-fg p-2 rounded-lg hover:bg-danger/10 transition-colors"
                   title="Delete deck"
                 >
                   <Trash2 className="w-4 h-4" />

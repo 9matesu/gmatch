@@ -13,7 +13,7 @@ export function mount(): void {
       <div className="dark antialiased grain-overlay font-sans" style={{ colorScheme: 'dark' }}>
         <a
           href="#main-content"
-          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[var(--z-modal)] focus:bg-retro-panel focus:text-retro-accent focus:px-4 focus:py-2 focus:text-xs focus:font-bold focus:border focus:border-border-glass focus:rounded-lg"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[var(--z-modal)] focus:bg-retro-panel focus:text-retro-accent focus:px-4 focus:py-2 focus:text-xs focus:font-bold focus:border focus:border-edge focus:rounded-lg"
         >
           Skip to main content
         </a>
@@ -29,6 +29,11 @@ export function mount(): void {
       </div>
     </StrictMode>,
   )
+  // The static shell in index.html has done its job: the app has its own
+  // chrome now. Two frames, so the app is painted before the cover goes.
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => document.getElementById('boot')?.remove()),
+  )
   window.gmatch?.bootMark?.('renderer:mounted')
   // Two frames on purpose: the first commits the tree, the second runs after
   // that frame has painted. A single rAF measures before the paint, not after.
@@ -37,4 +42,7 @@ export function mount(): void {
       requestAnimationFrame(() => window.gmatch?.bootMark?.('renderer:first-paint')),
     )
   }
+  // "Interactive" is after the first paint AND after the browser has had a free
+  // turn: the moment the app stops competing with its own boot for the thread.
+  setTimeout(() => window.gmatch?.bootMark?.('renderer:interactive'), 0)
 }

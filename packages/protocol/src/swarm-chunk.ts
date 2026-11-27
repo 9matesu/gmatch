@@ -45,9 +45,6 @@ import {
  *   ciphertext path cannot substitute content.
  */
 
-export const SWARM_CHUNK_ENC = 'swarm-v1'
-export const SWARM_KEY_ENC = 'swarm-v1'
-
 /**
  * The context every chunk of one transfer is bound to.
  */

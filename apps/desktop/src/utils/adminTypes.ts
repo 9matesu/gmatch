@@ -21,8 +21,8 @@ export interface AdminUser {
   gacha_downloads_received?: number;
   score?: number;
   balance?: number;
+  /** Derived from the Followers table (the admin list never reads a counter column). */
   followers_count?: number;
-  following_count?: number;
   is_admin?: boolean | number;
   is_moderator?: boolean | number;
   is_banned?: boolean | number;
@@ -454,26 +454,6 @@ export interface FilterConfig {
   options?: Array<{ value: string; label: string }>;
   placeholder?: string;
   defaultValue?: unknown;
-}
-
-export interface AdminApiError {
-  error: string;
-  status: number;
-}
-
-export type OptimisticUpdate<T> = {
-  type: 'create' | 'update' | 'delete';
-  entity: string;
-  id: string;
-  previousData?: T;
-  newData?: T;
-  timestamp: number;
-};
-
-export interface WebSocketMessage {
-  type: 'stats_update' | 'match_update' | 'report_update' | 'user_update' | 'chat_message';
-  payload: unknown;
-  timestamp: number;
 }
 
 export type { Announcement, OrbitIdentity };

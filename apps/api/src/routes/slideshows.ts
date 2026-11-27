@@ -2,8 +2,6 @@ import { Hono } from 'hono'
 import { orbitAuth } from '../middleware/auth'
 import type { D1Turso } from '../db'
 import type { LocalBlobStore } from '../blob'
-import { getSlideshowImagesByTags } from '../bot-image-api'
-import { normalizeTagShape } from '@orbit/shared'
 
 type Bindings = {
   DB: D1Turso
@@ -14,7 +12,7 @@ export const slideshows = new Hono<{ Bindings: Bindings, Variables: { orbitId: s
 
 slideshows.use('*', orbitAuth)
 
-const SOURCES = ['cards', 'posts', 'both', 'api'] as const
+const SOURCES = ['cards', 'posts', 'both'] as const
 type Source = (typeof SOURCES)[number]
 
 const MAX_ITEMS = 200
@@ -27,7 +25,6 @@ interface SlideshowRow {
   owner_id: string
   title: string | null
   source: Source
-  tags: string | null
   interval_ms: number
   created_at: string
   updated_at: string
@@ -40,21 +37,11 @@ interface ResolvedItem {
   mime_type: string | null
 }
 
-function parseTags(raw: string | null | undefined): string[] {
-  if (!raw) return []
-  try {
-    const parsed = JSON.parse(raw)
-    if (Array.isArray(parsed)) return parsed.map((t) => String(t)).filter(Boolean)
-  } catch { }
-  return []
-}
-
 function serializeSlideshow(row: SlideshowRow, itemCount: number) {
   return {
     id: row.id,
     title: row.title,
     source: row.source,
-    tags: parseTags(row.tags),
     interval_ms: row.interval_ms,
     item_count: itemCount,
     created_at: row.created_at,
@@ -62,17 +49,9 @@ function serializeSlideshow(row: SlideshowRow, itemCount: number) {
   }
 }
 
-/** Resolve the playable items for a slideshow. For cards/posts/both this joins
- * the referenced Objects and drops anything the caller can no longer access or
- * that was deleted. For 'api' it fetches a fresh batch from the configured
- * providers using the stored tags. */
+/** Resolve the playable items for a slideshow: the referenced Objects, minus
+ * anything the caller can no longer access or that was deleted. */
 async function resolveItems(db: D1Turso, orbitId: string, row: SlideshowRow): Promise<ResolvedItem[]> {
-  if (row.source === 'api') {
-    const tags = parseTags(row.tags)
-    const images = await getSlideshowImagesByTags(db, tags, 20)
-    return images.map((i) => ({ object_id: null, url: i.url, caption: i.caption || null, mime_type: null }))
-  }
-
   const items = await db
     .prepare('SELECT id, object_id, caption, mime_type FROM SlideshowItems WHERE slideshow_id = ? ORDER BY position ASC')
     .bind(row.id)
@@ -155,17 +134,6 @@ slideshows.post('/', async (c) => {
 
   const id = crypto.randomUUID()
 
-  if (source === 'api') {
-    const rawTags = Array.isArray(body.tags) ? body.tags : (typeof body.tags === 'string' ? body.tags.split(/[\n,]+/) : [])
-    // Client-side filtering only: store tags verbatim (shared/blocklist.json).
-    const tags = normalizeTagShape(rawTags.map((t: unknown) => String(t ?? '')))
-    await c.env.DB
-      .prepare('INSERT INTO Slideshows (id, owner_id, title, source, tags, interval_ms) VALUES (?, ?, ?, ?, ?, ?)')
-      .bind(id, orbitId, title, source, JSON.stringify(tags), interval)
-      .run()
-    return c.json({ slideshow: serializeSlideshow({ id, owner_id: orbitId, title, source, tags: JSON.stringify(tags), interval_ms: interval, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, 0) })
-  }
-
   const rawItems = Array.isArray(body.items) ? body.items : []
   const items: Array<{ object_id: string; caption: string | null; mime_type: string | null }> = []
   for (const it of rawItems.slice(0, MAX_ITEMS)) {
@@ -192,7 +160,7 @@ slideshows.post('/', async (c) => {
       .run()
   }
 
-  return c.json({ slideshow: serializeSlideshow({ id, owner_id: orbitId, title, source, tags: null, interval_ms: interval, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, items.length) })
+  return c.json({ slideshow: serializeSlideshow({ id, owner_id: orbitId, title, source, interval_ms: interval, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, items.length) })
 })
 
 slideshows.patch('/:id', async (c) => {

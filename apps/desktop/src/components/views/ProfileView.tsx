@@ -15,6 +15,7 @@ export function ProfileView({
   myUser,
   profilePics,
   feedPosts,
+  savedPosts,
   myCards,
   repostedPosts,
   followingIds,
@@ -37,11 +38,14 @@ export function ProfileView({
   onSelectUser,
   onOpenNetwork,
   shareGroups,
+  onEditPost,
 }: {
   identity: OrbitIdentity | null;
   myUser: User | undefined;
   profilePics: Record<string, string>;
   feedPosts: FeedPost[];
+  /** The posts this player saved — the "Saved" tab, read from the node. */
+  savedPosts: FeedPost[];
   myCards: OrbitObject[];
   repostedPosts: FeedPost[];
   followingIds: string[];
@@ -60,7 +64,8 @@ export function ProfileView({
   loadUsers: () => void;
   setArchivedPostIds: React.Dispatch<React.SetStateAction<Set<string>>>;
   setDeletedPostIds: React.Dispatch<React.SetStateAction<Set<string>>>;
-  deletePostOnServer: (postId: string) => void;
+  /** Resolves how the delete went: node-confirmed, local-only, or failed. */
+  deletePostOnServer: (postId: string) => Promise<'deleted' | 'local' | 'failed'>;
   users: Array<{ id: string; display_name?: string }>;
   onSendDm: (peerId: string, text: string) => Promise<boolean>;
   onPersistLike: (postId: string, liked: boolean) => Promise<number | undefined>;
@@ -69,16 +74,18 @@ export function ProfileView({
   onSelectUser: (userId: string) => void;
   onOpenNetwork: (userId: string) => void;
   shareGroups: { id: string; name: string; member_count: number }[];
+  /** Edit the caption of an own post. The caller owns the request + the toast. */
+  onEditPost?: (post: FeedPost) => void;
 }) {
   return (
-    <div className="p-4 sm:p-8 w-full max-w-[1600px] mx-auto">
+    <div className="p-4 sm:p-6 w-full max-w-3xl mx-auto">
       <GMatchProfile
         identity={identity}
         myUser={myUser}
         profilePic={profilePics[identity?.orbitId || '']}
         posts={feedPosts}
         cards={myCards as any}
-        savedPosts={feedPosts.filter((p) => p.is_saved)}
+        savedPosts={savedPosts}
         repostPosts={repostedPosts}
         // No `?? likes_received` fallback: that is a LIKES count rendered under
         // a "followers" label, which is why the number could disagree with the
@@ -111,10 +118,17 @@ export function ProfileView({
           setArchivedPostIds((prev) => new Set(prev).add(id));
           toast('Post archived', 'info');
         }}
-        onDeletePost={(id) => {
+        onDeletePost={async (id) => {
+          // Only claim the delete once it actually happened. A post that never
+          // reached the node (a local-only outbox row) is removed locally, so
+          // that is a success with different wording, not a failure.
+          const result = await deletePostOnServer(id);
+          if (result === 'failed') {
+            toast('Could not delete the post', 'error');
+            return;
+          }
           setDeletedPostIds((prev) => new Set(prev).add(id));
-          deletePostOnServer(id);
-          toast('Post deleted', 'success');
+          toast(result === 'local' ? 'Post removed from this device' : 'Post deleted', 'success');
         }}
         followingIds={followingIds}
         users={users}
@@ -127,6 +141,7 @@ export function ProfileView({
         onOpenNetwork={onOpenNetwork}
         profileTags={myProfile.tags}
         toast={toast}
+        onEditPost={onEditPost}
       />
     </div>
   );

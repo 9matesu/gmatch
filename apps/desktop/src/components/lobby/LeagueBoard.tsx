@@ -21,30 +21,31 @@ export function LeagueBoard({ league, users, onOpenProfile }: LeagueBoardProps) 
   return (
     <div className="space-y-1.5 max-h-96 overflow-y-auto styled-scrollbar">
       {league.map((entry, rank) => (
-        <div
+        <button
           key={entry.user_id}
+          type="button"
           onClick={() => {
             const userObj = users?.find(u => u.id === entry.user_id) || { id: entry.user_id, display_name: entry.display_name } as User
             onOpenProfile?.(userObj)
           }}
-          className="border border-border-glass rounded p-2.5 bg-retro-panel flex items-center justify-between gap-3 hover:border-retro-accent transition-colors cursor-pointer"
+          className="w-full text-left border border-edge rounded p-2.5 bg-retro-panel flex items-center justify-between gap-3 hover:border-retro-accent transition-colors cursor-pointer"
         >
           <div className="flex items-center gap-3 min-w-0">
             <span className={`text-xs font-black font-mono w-6 text-center ${
-              rank === 0 ? 'text-yellow-400' : rank === 1 ? 'text-retro-body' : rank === 2 ? 'text-amber-600' : 'text-retro-muted'
+              rank === 0 ? 'text-warning-fg' : rank === 1 ? 'text-retro-body' : rank === 2 ? 'text-warning-fg' : 'text-retro-muted'
             }`}>
               {rank === 0 ? '①' : rank === 1 ? '②' : rank === 2 ? '③' : `#${rank + 1}`}
             </span>
             <Avatar id={entry.user_id} imageUrl={entry.pfp_url || undefined} size={28} />
             <div className="min-w-0 truncate">
               <span className="text-xs font-bold text-retro-fg truncate">{entry.display_name?.trim() || 'Unknown User'}</span>
-              <span className="text-[10px] text-retro-muted ml-2">{entry.wins}W {entry.losses ?? 0}L · Tier {entry.tier}</span>
+              <span className="text-2xs text-retro-muted ml-2">{entry.wins}W {entry.losses ?? 0}L · Tier {entry.tier}</span>
             </div>
           </div>
           <div className="text-xs font-black text-retro-accent font-mono shrink-0">
             {entry.points} PTS
           </div>
-        </div>
+        </button>
       ))}
     </div>
   )

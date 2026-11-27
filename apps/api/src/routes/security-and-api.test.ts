@@ -236,40 +236,6 @@ describe('WS-3: Users — attention', () => {
   })
 })
 
-describe('WS-3: Users — maximum-gooner', () => {
-  let env: Awaited<ReturnType<typeof createMockEnv>>
-  const user = createTestIdentity()
-
-  beforeAll(async () => {
-    env = await createMockEnv()
-    await app.request('/api/users', { headers: authHeaders(user, 'GET', '/api/users') }, env)
-  })
-
-  it('POST /api/users/maximum-gooner enables the flag', async () => {
-    const body = JSON.stringify({ enabled: true })
-    const res = await app.request('/api/users/maximum-gooner', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders(user, 'POST', '/api/users/maximum-gooner', body) },
-      body,
-    }, env)
-    expect(res.status).toBe(200)
-    const data: any = await res.json()
-    expect(data.maximum_gooner).toBe(true)
-  })
-
-  it('POST /api/users/maximum-gooner disables the flag', async () => {
-    const body = JSON.stringify({ enabled: false })
-    const res = await app.request('/api/users/maximum-gooner', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders(user, 'POST', '/api/users/maximum-gooner', body) },
-      body,
-    }, env)
-    expect(res.status).toBe(200)
-    const data: any = await res.json()
-    expect(data.maximum_gooner).toBe(false)
-  })
-})
-
 describe('WS-3: Users — block', () => {
   let env: Awaited<ReturnType<typeof createMockEnv>>
   const blocker = createTestIdentity()

@@ -24,6 +24,15 @@ Send → effect.
 | 1.6 | Sender sends a wallpaper with the receiver's OS tier off and only Wallpaper on. | Sender's outbox shows **landed** (in-app executed) — not a fabricated OS success. | ☐ |
 | 1.7 | Sender sends an oversized (>25 MB) or non-image media. | Receiver refuses; sender sees **failed**, desktop untouched. | ☐ |
 
+`electron/wallpaper-core.test.cjs` pins what the swap must never get wrong
+(2026-11-23): a non-Windows host or a non-buffer is refused up front; a restore
+never runs `SystemParametersInfo` with an empty path (that clears the desktop);
+and — the bug behind "set as OS wallpaper does nothing" — `SystemParametersInfo`
+returns 0 on failure, so the PowerShell `set` now checks the return code and
+reports a real failure instead of always writing `ok`. `runPs` distinguishes a
+**missing PowerShell** (`no-powershell`, PATH/policy) from a command that ran
+and failed (`set-failed`), and a failed set no longer leaks its temp file.
+
 ## 2. Message / Banner (native toast)
 
 | # | Step | Expected observable | Pass |

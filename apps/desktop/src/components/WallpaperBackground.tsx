@@ -34,12 +34,6 @@ export function WallpaperBackground({ wallpaperBg, wallpaperFit = 'cover', wallp
           }`}
         onClick={() => { if (hideUiForWallpaper) onRestore() }}
       >
-        {wallpaperFit !== 'repeat' && !isVideo && (
-          <div
-            className="absolute -inset-10 bg-cover bg-center filter blur-3xl opacity-40 scale-110 transform-gpu"
-            style={{ backgroundImage: `url("${wallpaperBg}")` }}
-          />
-        )}
         {isVideo ? (
           <video
             className={`absolute inset-0 w-full h-full ${videoStyle.objectFit}`}
@@ -52,9 +46,11 @@ export function WallpaperBackground({ wallpaperBg, wallpaperFit = 'cover', wallp
         ) : (
           <div className={`absolute inset-0 ${wallpaperFit === 'repeat' ? '' : 'bg-center'}`} style={imgStyle} />
         )}
-        {/* Scrim kept darker than the artwork so PLATE glass reads over bright
-            wallpapers. App-wide by nature: every view shares it. */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/65 to-black/85" />
+        {/* The plate every foreground pixel sits on. Without it a light-theme
+            app over a dark photo is dark text on a dark photo, and the same
+            wallpaper in the dark theme leaves muted text unreadable. One
+            token, both themes, no per-component colour. */}
+        <div className="absolute inset-0 bg-wallpaper-scrim" aria-hidden="true" />
       </div>
 
       {hideUiForWallpaper && (

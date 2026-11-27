@@ -22,6 +22,7 @@ import type { AppNotification, NotificationTarget } from "../utils/notifications
 import { playPress } from "../utils/sounds";
 import { resolveMediaUrl } from "../utils/media";
 import { formatAbsoluteTime } from "../utils/timeAgo";
+import { generateFallbackName } from "@orbit/shared";
 
 export interface NotificationItem {
   id: string;
@@ -57,6 +58,8 @@ export interface NotificationsPanelProps {
   onOpenTarget?: (target: NotificationTarget) => void;
   /** Courier-derived rows (DMs, sealed rooms) merged into the same list. */
   localItems?: AppNotification[];
+  /** Peer-lane rows (reports/interactions about my content). */
+  peerItems?: AppNotification[];
   onOpenLocalTarget?: (item: AppNotification) => void;
   onMarkLocalRead?: (keys: string[]) => void;
   onRespondInvite?: (inviteId: string, accept: boolean) => void;
@@ -67,23 +70,23 @@ export interface NotificationsPanelProps {
 }
 
 const TYPE_ICONS: Record<string, React.ReactNode> = {
-  match_invite: <Gamepad2 className="w-4 h-4 text-emerald-400" />,
-  match_result: <Trophy className="w-4 h-4 text-amber-400" />,
-  pm: <MessageSquare className="w-4 h-4 text-cyan-400" />,
-  babecock_invite: <Flame className="w-4 h-4 text-rose-400" />,
-  babecock_start: <Flame className="w-4 h-4 text-rose-400" />,
-  like: <Heart className="w-4 h-4 text-rose-500 fill-rose-500" />,
-  comment: <MessageSquare className="w-4 h-4 text-sky-400" />,
-  follow: <UserPlus className="w-4 h-4 text-purple-400" />,
-  card_received: <Sparkles className="w-4 h-4 text-amber-300" />,
+  match_invite: <Gamepad2 className="w-4 h-4 text-success-fg" />,
+  match_result: <Trophy className="w-4 h-4 text-warning-fg" />,
+  pm: <MessageSquare className="w-4 h-4 text-info-fg" />,
+  babecock_invite: <Flame className="w-4 h-4 text-danger-fg" />,
+  babecock_start: <Flame className="w-4 h-4 text-danger-fg" />,
+  like: <Heart className="w-4 h-4 text-danger-fg fill-danger" />,
+  comment: <MessageSquare className="w-4 h-4 text-info-fg" />,
+  follow: <UserPlus className="w-4 h-4 text-chrome-lav" />,
+  card_received: <Sparkles className="w-4 h-4 text-warning-fg" />,
   // Was missing: the group fold still folded these, but the row fell back to a
   // generic bell, so "bought your card" had no icon.
-  card_purchase: <ShoppingBag className="w-4 h-4 text-emerald-300" />,
-  reply: <MessageSquare className="w-4 h-4 text-sky-300" />,
-  comment_like: <Heart className="w-4 h-4 text-rose-400" />,
-  mention: <AtSign className="w-4 h-4 text-amber-400" />,
-  dm: <MessageSquare className="w-4 h-4 text-cyan-400" />,
-  room: <Users className="w-4 h-4 text-violet-400" />,
+  card_purchase: <ShoppingBag className="w-4 h-4 text-success-fg" />,
+  reply: <MessageSquare className="w-4 h-4 text-info-fg" />,
+  comment_like: <Heart className="w-4 h-4 text-danger-fg" />,
+  mention: <AtSign className="w-4 h-4 text-warning-fg" />,
+  dm: <MessageSquare className="w-4 h-4 text-info-fg" />,
+  room: <Users className="w-4 h-4 text-chrome-lav" />,
   system: <Bell className="w-4 h-4 text-retro-muted" />,
 };
 
@@ -96,6 +99,7 @@ export function NotificationsPanel({
   onMarkRead,
   onOpenTarget,
   localItems = [],
+  peerItems = [],
   onOpenLocalTarget,
   onMarkLocalRead,
   onRespondInvite,
@@ -144,29 +148,34 @@ export function NotificationsPanel({
 
   return (
     <div className={`flex flex-col h-full min-h-0 overflow-hidden ${embedded ? 'bg-transparent' : 'solid-panel'}`}>
-      <div className="px-3 py-2 border-b border-border-glass flex items-center justify-between shrink-0 bg-glass-w5">
+      <div className="px-3 py-2 border-b border-edge flex items-center justify-between shrink-0 bg-glass-w5">
         <span className="flex items-center gap-1.5 text-xs font-medium text-retro-fg">
           <Bell className="w-3.5 h-3.5" />
           Notifications
           {unreadCount > 0 && (
-            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none bg-retro-accent text-black tabular-nums">
+            <span className="px-1.5 py-0.5 rounded-full text-2xs font-bold leading-none bg-retro-accent text-retro-accent-text tabular-nums">
               {unreadCount}
             </span>
           )}
         </span>
         <div className="flex items-center gap-1">
-          {items.length > 0 && (
+          {items.length > 0 || peerItems.length > 0 ? (
             <button
               type="button"
               onClick={() => {
                 playPress(700);
                 onMarkAllRead();
+                // Peer-lane rows are ALERTS, not unread messages, so "mark all
+                // read" clears them too. The courier lane (DMs/rooms) is
+                // deliberately left alone: a DM is a real unread message,
+                // cleared by opening the conversation, never dismissed.
+                if (peerItems.length > 0) onMarkLocalRead?.(peerItems.map((i) => i.key));
               }}
-              className="glass-action px-2 py-0.5 rounded text-[10px] cursor-pointer text-retro-muted hover:text-retro-fg"
+              className="glass-action px-2 py-0.5 rounded text-2xs cursor-pointer text-retro-muted hover:text-retro-fg"
             >
               Mark all read
             </button>
-          )}
+          ) : null}
           {onClose && (
             <button
               type="button"
@@ -183,7 +192,7 @@ export function NotificationsPanel({
         </div>
       </div>
       {unreadBreakdown && (
-        <div className="px-3 py-1.5 text-[10px] text-retro-muted border-b border-border-glass shrink-0">
+        <div className="px-3 py-1.5 text-2xs text-retro-muted border-b border-edge shrink-0">
           {unreadBreakdown}
         </div>
       )}
@@ -217,12 +226,51 @@ export function NotificationsPanel({
                     <p className="text-xs text-retro-muted mt-0.5 truncate">{item.body}</p>
                   )}
                   {typeof item.mentions === 'number' && item.mentions > 0 && (
-                    <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-amber-300">
+                    <span className="mt-1 inline-flex items-center gap-1 text-2xs font-bold text-warning-fg">
                       <AtSign className="w-3 h-3" />
                       {item.mentions === 1 ? '1 mention' : `${item.mentions} mentions`}
                     </span>
                   )}
-                  <time className="mt-1 block text-[10px] text-retro-muted" dateTime={item.createdAt}>
+                  <time className="mt-1 block text-2xs text-retro-muted" dateTime={item.createdAt}>
+                    {formatAbsoluteTime(item.createdAt, { dateStyle: "short", timeStyle: "short" })}
+                  </time>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Peer lane: signed operations about MY content (reports, soon
+            follows/likes/comments). These have no node row, so they were
+            counted by the badge but never rendered — the badge could not
+            clear. Tapping opens the post/comment and marks the row read
+            durably (the same handler the courier rows use). */}
+        {peerItems.length > 0 && (
+          <div className="mb-2 space-y-1">
+            <div className="px-3 py-1.5 text-xs font-medium text-retro-muted">From your peers</div>
+            {peerItems.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => {
+                  playPress(700);
+                  onMarkLocalRead?.([item.key]);
+                  onOpenTarget?.(item.target);
+                }}
+                className="glass-inset w-full p-3 rounded-lg flex items-start gap-3 text-left cursor-pointer hover:bg-glass-w8 transition-colors"
+              >
+                <div className="w-8 h-8 rounded-full glass-inset flex items-center justify-center shrink-0">
+                  {TYPE_ICONS[item.type] || <Bell className="w-4 h-4" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium text-retro-fg truncate">{item.title}</p>
+                    {!item.read && <span className="w-1.5 h-1.5 rounded-full bg-retro-accent shrink-0" />}
+                  </div>
+                  {item.body && (
+                    <p className="text-xs text-retro-muted mt-0.5 truncate">{item.body}</p>
+                  )}
+                  <time className="mt-1 block text-2xs text-retro-muted" dateTime={item.createdAt}>
                     {formatAbsoluteTime(item.createdAt, { dateStyle: "short", timeStyle: "short" })}
                   </time>
                 </div>
@@ -256,7 +304,7 @@ export function NotificationsPanel({
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium text-retro-fg truncate">
-                      {inv.inviter_name?.trim() || 'Unknown User'}
+                      {inv.inviter_name?.trim() || generateFallbackName(inv.inviter_id)}
                     </p>
                     <p className="text-xs text-retro-muted">
                       Challenged you to a duel · expires in {secondsLeft}s
@@ -284,7 +332,7 @@ export function NotificationsPanel({
           </div>
         )}
 
-        {items.length === 0 && openInvites.length === 0 && localItems.length === 0 ? (
+        {items.length === 0 && openInvites.length === 0 && localItems.length === 0 && peerItems.length === 0 ? (
           <div className="py-12 text-center space-y-2">
             <Bell className="w-6 h-6 mx-auto text-retro-muted" />
             <p className="text-xs font-medium text-retro-body">No notifications</p>
@@ -320,8 +368,8 @@ export function NotificationsPanel({
                 } : undefined}
                 className={`p-3 rounded-lg flex items-start gap-3 border ${
                   g.unread === 0
-                    ? "border-border-glass bg-glass-w5"
-                    : "glass-inset border-border-glass"
+                    ? "border-edge bg-glass-w5"
+                    : "glass-inset border-edge"
                 }${actionable ? ' cursor-pointer hover:bg-glass-w8 transition-colors' : ''}`}
               >
                 <div className="w-8 h-8 rounded-full glass-inset flex items-center justify-center shrink-0">
@@ -360,14 +408,14 @@ export function NotificationsPanel({
                       <button
                         type="button"
                         onClick={() => { onRespondBabecock?.(inviteId, false); }}
-                        className="px-2.5 py-1.5 rounded bg-surface-interactive border border-border-glass text-retro-body text-xs font-medium cursor-pointer"
+                        className="px-2.5 py-1.5 rounded bg-surface-interactive border border-edge text-retro-body text-xs font-medium cursor-pointer"
                       >
                         Decline
                       </button>
                     </div>
                   )}
                   <time
-                    className="mt-1 block text-[10px] text-retro-muted"
+                    className="mt-1 block text-2xs text-retro-muted"
                     dateTime={n.created_at}
                   >
                     {formatAbsoluteTime(n.created_at, {

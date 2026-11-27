@@ -3,11 +3,9 @@
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { User, OrbitObject, ActiveHackDebuff } from '@orbit/shared';
 import type { AppSettings } from '../hooks/useSettings';
-import { Modal } from './Modal';
 import { toChatPeer, type ChatPeer } from './chat/chatPeer';
 import { IdentityModal } from './IdentityModal';
 import { HelpModal } from './HelpModal';
-import { PointsHelpModal } from './PointsHelpModal';
 import { FlashModal } from './FlashModal';
 import { FlashOverlay } from './FlashOverlay';
 import { MobileVirusOverlay } from './hacks/MobileVirusOverlay';
@@ -15,7 +13,6 @@ import { CreatePostModal } from './feed/CreatePostModal';
 import { GMatchSettingsModal, type SettingsOpenTarget } from './settings/GMatchSettingsModal';
 import { FollowersFollowingModal } from './profile/FollowersFollowingModal';
 import { CoffeeModal } from './CoffeeModal';
-import { RecommendationModal } from './RecommendationModal';
 
 export interface GlobalModalsProps {
   identity: OrbitIdentity;
@@ -28,7 +25,6 @@ export interface GlobalModalsProps {
   stories: OrbitObject[];
   activeVirusHack: ActiveHackDebuff | null;
   setActiveHacks: React.Dispatch<React.SetStateAction<ActiveHackDebuff[]>>;
-  relationships: any;
   followingIds: string[];
   items: OrbitObject[];
 
@@ -42,8 +38,6 @@ export interface GlobalModalsProps {
 
   showHelpModal: boolean;
   setShowHelpModal: (v: boolean) => void;
-  showPointsHelpModal: boolean;
-  setShowPointsHelpModal: (v: boolean) => void;
   showFlashModal: boolean;
   setShowFlashModal: (v: boolean) => void;
   showSettingsModal: boolean;
@@ -59,10 +53,6 @@ export interface GlobalModalsProps {
   setCreatePostInitialData?: (v: any) => void;
   showStoryModal: boolean;
   setShowStoryModal: (v: boolean) => void;
-  showMaxGoonerModal: boolean;
-  setShowMaxGoonerModal: (v: boolean) => void;
-  showRecommendations: boolean;
-  setShowRecommendations: (v: boolean) => void;
   followersModalState: { isOpen: boolean; initialTab: 'followers' | 'following'; targetUserId?: string | null; targetName?: string | null };
   setFollowersModalState: React.Dispatch<React.SetStateAction<{ isOpen: boolean; initialTab: 'followers' | 'following'; targetUserId?: string | null; targetName?: string | null }>>;
 
@@ -94,14 +84,12 @@ export interface GlobalModalsProps {
   toast: (text: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
 
   storyFileInputRef: React.RefObject<HTMLInputElement | null>;
-  pfpInputRef: React.RefObject<HTMLInputElement | null>;
-  handleSetProfilePic: (file: File) => Promise<void>;
 
   lobby: any;
 }
 
 export function GlobalModals(props: GlobalModalsProps) {
-  const { identity, users, profilePics, settings, updateSettings, setMyProfile, stories, activeVirusHack, setActiveHacks, relationships, followingIds, items, identityModalMode, setIdentityModalMode, exportIdentity, loginWithExportedId, clearIdentity, handleFullConfigDownload, handleFullConfigRestore, showHelpModal, setShowHelpModal, showPointsHelpModal, setShowPointsHelpModal, showFlashModal, setShowFlashModal, showSettingsModal, setShowSettingsModal, settingsInitialTab = 'preferences', showCreatePostModal, setShowCreatePostModal, createPostInitialData, setCreatePostInitialData, showStoryModal, setShowStoryModal, showMaxGoonerModal, setShowMaxGoonerModal, showRecommendations, setShowRecommendations, followersModalState, setFollowersModalState, showCoffee, manualCoffeeOpen, triggerReason, dismissCoffee, setManualCoffeeOpen, handleSetMainView, setMainView, setDmMinimized, setPmPeer, setSelectedProfileUser, setSelectedIds, setExpandedItemId, setStoryViewerUserId, loadUsers, loadGallery, loadStories, loadServerFeed, toggleFollowUser, toast, pfpInputRef, handleSetProfilePic, lobby } = props;
+  const { identity, users, profilePics, settings, updateSettings, setMyProfile, stories, activeVirusHack, setActiveHacks, followingIds, items, identityModalMode, setIdentityModalMode, exportIdentity, loginWithExportedId, clearIdentity, handleFullConfigDownload, handleFullConfigRestore, showHelpModal, setShowHelpModal, showFlashModal, setShowFlashModal, showSettingsModal, setShowSettingsModal, settingsInitialTab = 'preferences', showCreatePostModal, setShowCreatePostModal, createPostInitialData, setCreatePostInitialData, showStoryModal, setShowStoryModal, followersModalState, setFollowersModalState, showCoffee, manualCoffeeOpen, triggerReason, dismissCoffee, setManualCoffeeOpen, handleSetMainView, setMainView, setDmMinimized, setPmPeer, setSelectedProfileUser, setSelectedIds, setExpandedItemId, setStoryViewerUserId, loadUsers, loadGallery, loadStories, loadServerFeed, toggleFollowUser, toast, lobby } = props;
 
 
 
@@ -146,17 +134,6 @@ export function GlobalModals(props: GlobalModalsProps) {
         <HelpModal onClose={() => setShowHelpModal(false)} />
       )}
 
-      <input
-        ref={pfpInputRef}
-        type="file"
-        accept="image/*"
-        onChange={(e) => {
-          const file = e.target.files?.[0]
-          if (file) handleSetProfilePic(file)
-        }}
-        className="hidden"
-      />
-
       {showStoryModal && (
         <CreatePostModal
           mode="story"
@@ -168,51 +145,6 @@ export function GlobalModals(props: GlobalModalsProps) {
           }}
           toast={toast}
         />
-      )}
-
-      {showMaxGoonerModal && (
-        <Modal title="Maximum Gooner Hardcore" onClose={() => setShowMaxGoonerModal(false)}>
-          <div className="p-3 bg-retro-bg border border-border-glass text-xs text-retro-fg space-y-1 mb-3">
-            <p className="font-bold uppercase tracking-wider">You&apos;ve been warned</p>
-            <p>Maximum Gooner Mode turns on automatic image reception, chime audio alerts, blinking sender highlights, and auto-forwarding.</p>
-          </div>
-          <div className="space-y-3">
-            <label className="flex items-center justify-between p-2.5 bg-retro-bg border border-border-glass cursor-pointer hover:border-retro-accent transition-colors">
-              <span className="font-bold text-retro-fg">Master Hardcore Switch</span>
-              <input
-                type="checkbox"
-                checked={settings.maximumGooner}
-                onChange={(e) => {
-                  const val = e.target.checked
-                  updateSettings('maximumGooner', val)
-                  if (val) {
-                    updateSettings('autoOpenImages', true)
-                    updateSettings('autoForwardAll', true)
-                    updateSettings('idleEnabled', true)
-                    updateSettings('soundEffects', true)
-                  }
-                }}
-                className="w-4 h-4 accent-retro-accent cursor-pointer"
-              />
-            </label>
-            <label className="flex items-center justify-between p-2.5 bg-retro-bg border border-border-glass cursor-pointer hover:border-retro-accent transition-colors">
-              <span className="text-retro-fg">Sound effect on image arrival</span>
-              <input type="checkbox" checked={settings.soundEffects} onChange={(e) => updateSettings('soundEffects', e.target.checked)} className="w-4 h-4 accent-retro-accent cursor-pointer" />
-            </label>
-            <label className="flex items-center justify-between p-2.5 bg-retro-bg border border-border-glass cursor-pointer hover:border-retro-accent transition-colors">
-              <span className="text-retro-fg">▣ Auto-Open Image Lightbox</span>
-              <input type="checkbox" checked={settings.autoOpenImages} onChange={(e) => updateSettings('autoOpenImages', e.target.checked)} className="w-4 h-4 accent-retro-accent cursor-pointer" />
-            </label>
-            <label className="flex items-center justify-between p-2.5 bg-retro-bg border border-border-glass cursor-pointer hover:border-retro-accent transition-colors">
-              <span className="text-retro-fg">⇄ Auto-Forward to All Friends</span>
-              <input type="checkbox" checked={settings.autoForwardAll} onChange={(e) => updateSettings('autoForwardAll', e.target.checked)} className="w-4 h-4 accent-retro-accent cursor-pointer" />
-            </label>
-            <label className="flex items-center justify-between p-2.5 bg-retro-bg border border-border-glass cursor-pointer hover:border-retro-accent transition-colors">
-              <span className="text-retro-fg">▣ Allow Remote Wallpaper</span>
-              <input type="checkbox" checked={settings.allowRemoteWallpaper} onChange={(e) => updateSettings('allowRemoteWallpaper', e.target.checked)} className="w-4 h-4 accent-retro-accent cursor-pointer" />
-            </label>
-          </div>
-        </Modal>
       )}
 
       {activeVirusHack && (
@@ -245,8 +177,6 @@ export function GlobalModals(props: GlobalModalsProps) {
           toast={toast}
         />
       )}
-
-      {showPointsHelpModal && <PointsHelpModal onClose={() => setShowPointsHelpModal(false)} />}
 
       {showFlashModal && identity && (
         <FlashModal
@@ -295,7 +225,6 @@ export function GlobalModals(props: GlobalModalsProps) {
           targetDisplayName={followersModalState.targetName ?? null}
           users={users}
           followingIds={followingIds}
-          relationships={relationships}
           profilePics={profilePics}
           stories={stories}
           onToggleFollow={(uId) => {
@@ -333,14 +262,7 @@ export function GlobalModals(props: GlobalModalsProps) {
           setManualCoffeeOpen(false);
         }}
       />
-
-      {showRecommendations && (
-        <RecommendationModal
-          identity={identity}
-          onClose={() => setShowRecommendations(false)}
-          toast={toast}
-        />
-      )}
     </>
   );
 }
+

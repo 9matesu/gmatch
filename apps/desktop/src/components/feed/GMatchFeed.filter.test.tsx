@@ -23,6 +23,7 @@ global.IntersectionObserver = vi.fn().mockImplementation((cb) => ({
 vi.mock('../../services/imageCache', () => ({
   resolveImage: vi.fn(async (u: string) => u),
   devFetchable: vi.fn(() => null),
+  cachedImageFor: vi.fn(() => undefined),
 }));
 
 describe('GMatchFeed timeline filtering and resilience', () => {
@@ -36,14 +37,25 @@ describe('GMatchFeed timeline filtering and resilience', () => {
     { id: 'offline-author', display_name: 'Offline User', online: false, last_seen: '2020-01-01T00:00:00Z' },
   ];
 
-  it('filters out blank posts that lack media and url', () => {
+  it('keeps a text-only post and drops a row with no body and no media', () => {
     const posts: any[] = [
       {
-        id: 'blank-post-1',
+        id: 'text-post-1',
         author_id: 'online-author',
         author_name: 'Online User',
         created_at: new Date().toISOString(),
-        caption: 'Ghost empty post',
+        caption: 'Text only, no media',
+        url: '',
+        media: [],
+        like_count: 0,
+        comment_count: 0,
+      },
+      {
+        id: 'blank-row',
+        author_id: 'online-author',
+        author_name: 'Online User',
+        created_at: new Date().toISOString(),
+        caption: '',
         url: '',
         media: [],
         like_count: 0,
@@ -72,7 +84,7 @@ describe('GMatchFeed timeline filtering and resilience', () => {
     );
 
     expect(screen.getByText('Valid working post')).toBeInTheDocument();
-    expect(screen.queryByText('Ghost empty post')).toBeNull();
+    expect(screen.getByText('Text only, no media')).toBeInTheDocument();
   });
 
   it('keeps offline-author posts visible on the timeline so content remains shared', () => {

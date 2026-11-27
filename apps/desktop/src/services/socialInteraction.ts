@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  SOCIAL_PROTOCOL,
+  SOCIAL_PROTOCOL_VERSION,
   authorizeValidatedOperation,
   createSocialOperation,
   type SocialOperation,
@@ -52,6 +54,21 @@ export function commentPersistenceRoute(
   return post?.origin === 'peer' ? 'peer-operation' : 'server'
 }
 
+/**
+ * Where a save must be persisted.
+ *
+ * Same split as a like, but the peer half is a LOCAL durable store, not a
+ * signed operation: a bookmark is private intent with no shared signal, so
+ * unlike a like it is never gossiped. A peer-replicated post has no node row,
+ * so `POST /api/posts/:id/save` 404s it; the id lands in `utils/peerSaves.ts`
+ * instead and the Saved tab merges it back.
+ */
+export function savePersistenceRoute(
+  post: { origin?: 'server' | 'peer' } | null | undefined,
+): 'local-store' | 'server' {
+  return post?.origin === 'peer' ? 'local-store' : 'server'
+}
+
 /** Persist a like as a signed operation (peer-replicated posts). */
 export async function persistPeerLike(
   identity: OrbitIdentityLike,
@@ -69,12 +86,37 @@ async function acceptedHistory(log: SocialOperationLog): Promise<SocialOperation
   return entries.map((entry) => entry.record as unknown as SocialOperation)
 }
 
-async function signAndAppend(
+/**
+ * Append one signed social operation.
+ *
+ * The envelope fields every operation shares (protocol, version, actorId,
+ * signingKey, createdAt) used to be spelled out by hand in EIGHT publish
+ * functions below — including the protocol strings as bare literals, so a
+ * protocol bump could silently disagree with what the signer validates. They
+ * come from the protocol package now, and the actor fields come from the one
+ * identity the caller already holds.
+ */
+async function appendSocial(
   identity: OrbitIdentityLike,
   log: SocialOperationLog,
-  operation: Omit<SocialOperation, 'operationId' | 'signature'>,
+  type: string,
+  objectId: string,
+  payload: Record<string, unknown>,
   history: SocialOperation[],
 ): Promise<SocialOperation> {
+  const { actorSequence, previousOperationId } = await log.nextActorSlot(identity.orbitId)
+  const operation: Omit<SocialOperation, 'operationId' | 'signature'> = {
+    protocol: SOCIAL_PROTOCOL,
+    version: SOCIAL_PROTOCOL_VERSION,
+    type,
+    actorId: identity.orbitId,
+    signingKey: identity.publicKeyHex,
+    actorSequence,
+    previousOperationId,
+    createdAt: Date.now(),
+    objectId,
+    payload,
+  }
   // Sign first (the shape is validated by the signer), then authorize the
   // SIGNED operation against the accepted history — an unsigned draft cannot
   // be authorized (the authorizer verifies ids and signatures).
@@ -107,20 +149,9 @@ export async function publishReactionAdd(
   target: ReactionTarget,
   log: SocialOperationLog,
 ): Promise<SocialOperation> {
-  const { actorSequence, previousOperationId } = await log.nextActorSlot(identity.orbitId)
-  const history = await acceptedHistory(log)
-  return signAndAppend(identity, log, {
-    protocol: 'gmatch-social',
-    version: 1,
-    type: 'reaction.add',
-    actorId: identity.orbitId,
-    signingKey: identity.publicKeyHex,
-    actorSequence,
-    previousOperationId,
-    createdAt: Date.now(),
-    objectId: reactionObjectId(target),
-    payload: { targetType: target.targetType, targetId: target.targetId, reaction: 'like' },
-  }, history)
+  return appendSocial(identity, log, 'reaction.add', reactionObjectId(target),
+    { targetType: target.targetType, targetId: target.targetId, reaction: 'like' },
+    await acceptedHistory(log))
 }
 
 /**
@@ -144,19 +175,8 @@ export async function publishReactionRemove(
     .filter((entry) => !removed.has(entry.operationId))
     .map((entry) => entry.operationId)
   if (adds.length === 0) throw new Error('no active reaction to remove')
-  const { actorSequence, previousOperationId } = await log.nextActorSlot(identity.orbitId)
-  return signAndAppend(identity, log, {
-    protocol: 'gmatch-social',
-    version: 1,
-    type: 'reaction.remove',
-    actorId: identity.orbitId,
-    signingKey: identity.publicKeyHex,
-    actorSequence,
-    previousOperationId,
-    createdAt: Date.now(),
-    objectId: reactionObjectId(target),
-    payload: { targetAddOperationIds: adds },
-  }, history)
+  return appendSocial(identity, log, 'reaction.remove', reactionObjectId(target),
+    { targetAddOperationIds: adds }, history)
 }
 
 /**
@@ -171,20 +191,8 @@ export async function publishFollow(
   targetId: string,
   log: SocialOperationLog,
 ): Promise<SocialOperation> {
-  const { actorSequence, previousOperationId } = await log.nextActorSlot(identity.orbitId)
-  const history = await acceptedHistory(log)
-  return signAndAppend(identity, log, {
-    protocol: 'gmatch-social',
-    version: 1,
-    type: 'follow.add',
-    actorId: identity.orbitId,
-    signingKey: identity.publicKeyHex,
-    actorSequence,
-    previousOperationId,
-    createdAt: Date.now(),
-    objectId: `follow_${targetId}`,
-    payload: { targetId },
-  }, history)
+  return appendSocial(identity, log, 'follow.add', `follow_${targetId}`, { targetId },
+    await acceptedHistory(log))
 }
 
 /**
@@ -229,19 +237,8 @@ export async function publishUnfollow(
   const target = history.find((entry) => entry.operationId === followOperationId)
   if (!target || target.type !== 'follow.add') throw new Error('follow not found in the local log')
   if (target.actorId !== identity.orbitId) throw new Error('only the follower may remove the follow')
-  const { actorSequence, previousOperationId } = await log.nextActorSlot(identity.orbitId)
-  return signAndAppend(identity, log, {
-    protocol: 'gmatch-social',
-    version: 1,
-    type: 'follow.remove',
-    actorId: identity.orbitId,
-    signingKey: identity.publicKeyHex,
-    actorSequence,
-    previousOperationId,
-    createdAt: Date.now(),
-    objectId: target.objectId,
-    payload: { targetAddOperationIds: [followOperationId] },
-  }, history)
+  return appendSocial(identity, log, 'follow.remove', target.objectId,
+    { targetAddOperationIds: [followOperationId] }, history)
 }
 
 /**
@@ -255,20 +252,9 @@ export async function publishReport(
   reason: string,
   log: SocialOperationLog,
 ): Promise<SocialOperation> {
-  const { actorSequence, previousOperationId } = await log.nextActorSlot(identity.orbitId)
-  const history = await acceptedHistory(log)
-  return signAndAppend(identity, log, {
-    protocol: 'gmatch-social',
-    version: 1,
-    type: 'report.create',
-    actorId: identity.orbitId,
-    signingKey: identity.publicKeyHex,
-    actorSequence,
-    previousOperationId,
-    createdAt: Date.now(),
-    objectId: `report_${target.targetId}`,
-    payload: { targetType: target.targetType, targetId: target.targetId, reason: reason.trim() },
-  }, history)
+  return appendSocial(identity, log, 'report.create', `report_${target.targetId}`,
+    { targetType: target.targetType, targetId: target.targetId, reason: reason.trim() },
+    await acceptedHistory(log))
 }
 
 export interface ProfileFields {
@@ -296,20 +282,8 @@ export async function publishProfileUpdate(
   if (fields.displayName !== undefined) payload.displayName = fields.displayName.trim()
   if (fields.bio !== undefined) payload.bio = fields.bio
   if (Object.keys(payload).length === 0) throw new Error('profile update must name at least one field')
-  const { actorSequence, previousOperationId } = await log.nextActorSlot(identity.orbitId)
-  const history = await acceptedHistory(log)
-  return signAndAppend(identity, log, {
-    protocol: 'gmatch-social',
-    version: 1,
-    type: 'profile.update',
-    actorId: identity.orbitId,
-    signingKey: identity.publicKeyHex,
-    actorSequence,
-    previousOperationId,
-    createdAt: Date.now(),
-    objectId: identity.orbitId,
-    payload,
-  }, history)
+  return appendSocial(identity, log, 'profile.update', identity.orbitId, payload,
+    await acceptedHistory(log))
 }
 
 /**
@@ -375,20 +349,9 @@ export async function publishComment(
   input: CommentInput,
   log: SocialOperationLog,
 ): Promise<SocialOperation> {
-  const { actorSequence, previousOperationId } = await log.nextActorSlot(identity.orbitId)
-  const history = await acceptedHistory(log)
-  return signAndAppend(identity, log, {
-    protocol: 'gmatch-social',
-    version: 1,
-    type: 'comment.create',
-    actorId: identity.orbitId,
-    signingKey: identity.publicKeyHex,
-    actorSequence,
-    previousOperationId,
-    createdAt: Date.now(),
-    objectId: input.commentId,
-    payload: { postId: input.postId, parentCommentId: input.parentCommentId, body: input.body },
-  }, history)
+  return appendSocial(identity, log, 'comment.create', input.commentId,
+    { postId: input.postId, parentCommentId: input.parentCommentId, body: input.body },
+    await acceptedHistory(log))
 }
 
 export async function publishCommentDelete(
@@ -400,17 +363,6 @@ export async function publishCommentDelete(
   const target = history.find((entry) => entry.operationId === commentOperationId)
   if (!target || target.type !== 'comment.create') throw new Error('comment not found in the local log')
   if (target.actorId !== identity.orbitId) throw new Error('only the comment author may delete it')
-  const { actorSequence, previousOperationId } = await log.nextActorSlot(identity.orbitId)
-  return signAndAppend(identity, log, {
-    protocol: 'gmatch-social',
-    version: 1,
-    type: 'comment.delete',
-    actorId: identity.orbitId,
-    signingKey: identity.publicKeyHex,
-    actorSequence,
-    previousOperationId,
-    createdAt: Date.now(),
-    objectId: target.objectId,
-    payload: { targetOperationId: commentOperationId },
-  }, history)
+  return appendSocial(identity, log, 'comment.delete', target.objectId,
+    { targetOperationId: commentOperationId }, history)
 }

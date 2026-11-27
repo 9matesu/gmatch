@@ -61,14 +61,14 @@ export function MatchChat({ matchId, selfId, messages, onSend, onLoad, soundEnab
   const list = messages || []
 
   return (
-    <div className="border border-border-glass rounded-xl overflow-hidden bg-surface-raised shadow-xs font-sans">
+    <div className="border border-edge rounded-xl overflow-hidden bg-surface-raised shadow-xs font-sans">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-bold text-retro-body hover:text-retro-fg hover:bg-glass-w5 cursor-pointer transition-colors"
       >
         <span className="flex items-center gap-1.5">
-          <MessageSquare className="w-3.5 h-3.5 text-cyan-300" />
+          <MessageSquare className="w-3.5 h-3.5 text-info-fg" />
           <span>Match Chat {open ? '' : `(${list.length})`}</span>
         </span>
         <span className="text-retro-muted flex items-center gap-1 text-xs">
@@ -78,7 +78,7 @@ export function MatchChat({ matchId, selfId, messages, onSend, onLoad, soundEnab
       </button>
 
       {open && (
-        <div className="border-t border-border-glass">
+        <div className="border-t border-edge">
           <div ref={scrollRef} className="max-h-40 overflow-y-auto styled-scrollbar p-2.5 space-y-2 bg-surface-raised select-text">
             {list.length === 0 ? (
               <div className="text-center text-xs text-retro-muted py-3 select-none">
@@ -93,16 +93,16 @@ export function MatchChat({ matchId, selfId, messages, onSend, onLoad, soundEnab
                       className={`max-w-[85%] px-3 py-1.5 rounded-xl text-xs shadow-xs select-text ${
                         mine
                           ? 'bg-retro-accent text-retro-accent-text rounded-br-xs'
-                          : 'bg-surface-interactive text-retro-fg border border-border-glass rounded-bl-xs'
+                          : 'bg-surface-interactive text-retro-fg border border-edge rounded-bl-xs'
                       }`}
                     >
                       {!mine && (
-                        <div className="text-[10px] font-bold text-retro-muted uppercase tracking-wider mb-0.5 select-none">
+                        <div className="text-2xs font-bold text-retro-muted uppercase tracking-wider mb-0.5 select-none">
                           {m.sender_name?.trim() || 'Unknown User'}
                         </div>
                       )}
                       <div className="break-words whitespace-pre-wrap leading-relaxed select-text cursor-text"><Linkify text={m.body} /></div>
-                      <time className={`mt-1 block text-[10px] select-none ${mine ? 'text-retro-muted text-right' : 'text-retro-muted'}`} dateTime={m.created_at}>
+                      <time className={`mt-1 block text-2xs select-none ${mine ? 'text-retro-muted text-right' : 'text-retro-muted'}`} dateTime={m.created_at}>
                         {formatAbsoluteTime(m.created_at, { hour: '2-digit', minute: '2-digit' })}
                       </time>
                     </div>
@@ -111,7 +111,7 @@ export function MatchChat({ matchId, selfId, messages, onSend, onLoad, soundEnab
               })
             )}
           </div>
-          <div className="flex gap-1.5 p-2 border-t border-border-glass bg-surface-raised">
+          <div className="flex gap-1.5 p-2 border-t border-edge bg-surface-raised">
             <input
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
@@ -122,13 +122,13 @@ export function MatchChat({ matchId, selfId, messages, onSend, onLoad, soundEnab
                 }
               }}
               placeholder="Send a message to your opponent..."
-              className="flex-1 bg-surface-interactive border border-border-glass text-retro-fg placeholder:text-retro-muted text-xs px-3 py-1.5 rounded-xl outline-none focus:border-purple-500 transition-colors"
+              className="flex-1 bg-surface-interactive border border-edge text-retro-fg placeholder:text-retro-muted text-xs px-3 py-1.5 rounded-xl outline-none focus:border-chrome-lav transition-colors"
             />
             <button
               type="button"
               disabled={!draft.trim() || sending}
               onClick={() => void handleSend()}
-              className="px-3 py-1.5 text-xs font-bold bg-cyan-500 text-white hover:bg-cyan-600 disabled:opacity-40 rounded-xl transition-colors cursor-pointer flex items-center gap-1 shrink-0 shadow-xs"
+              className="px-3 py-1.5 text-xs font-bold bg-info text-retro-fg hover:bg-info disabled:opacity-40 rounded-xl transition-colors cursor-pointer flex items-center gap-1 shrink-0 shadow-xs"
             >
               <Send className="w-3 h-3" />
               <span>Send</span>

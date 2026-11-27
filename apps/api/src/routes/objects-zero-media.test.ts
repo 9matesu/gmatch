@@ -92,4 +92,35 @@ describe('Objects zero-media policy (Plan P-Zero)', () => {
     expect(row).toBeDefined()
     expect(row?.id).toBe('p2p-registered-1')
   })
+
+  it('GET /api/objects/:id serves bytes when the node holds them for a urn/magnet row', async () => {
+    const id = createTestIdentity()
+    await env.DB.prepare('INSERT INTO Users (id, public_key, display_name) VALUES (?, ?, ?)').bind(id.orbitId, id.publicKeyHex, 'Test User').run()
+
+    // Register the zero-media row (URl stays content-addressed)...
+    const regPath = '/api/objects/register'
+    const bodyStr = JSON.stringify({
+      id: 'p2p-with-local-bytes',
+      content_hash: 'c'.repeat(64),
+      size_bytes: 12,
+      mime_type: 'video/mp4',
+      magnet_uri: 'magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567',
+      is_public: 1,
+    })
+    const regHeaders = signRequestHeaders(id, 'POST', regPath, bodyStr)
+    regHeaders['Content-Type'] = 'application/json'
+    const regRes = await app.request(regPath, { method: 'POST', headers: regHeaders, body: bodyStr }, env)
+    expect(regRes.status).toBe(200)
+
+    // ...but THIS node physically holds the bytes (imported vault / replica).
+    const payload = new Uint8Array([0, 0, 0, 24, 102, 116, 121, 112, 105, 115, 111, 109])
+    const { encryptBlob } = await import('../crypto')
+    await env.BUCKET.put('objects/p2p-with-local-bytes', encryptBlob(payload))
+
+    const getPath = '/api/objects/p2p-with-local-bytes'
+    const res = await app.request(getPath, { method: 'GET', headers: signRequestHeaders(id, 'GET', getPath) }, env)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('Content-Type')).toBe('video/mp4')
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(payload)
+  })
 })

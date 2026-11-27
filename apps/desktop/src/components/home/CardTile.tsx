@@ -143,7 +143,7 @@ export function CardTile({
           ? `perspective(1000px) rotateX(${tilt.rotateX.toFixed(2)}deg) rotateY(${tilt.rotateY.toFixed(2)}deg) scale3d(1.02, 1.02, 1.02)`
           : undefined,
       } as React.CSSProperties}
-      className={`holo-card group relative select-none cursor-pointer transition-transform duration-150 ease-out active:scale-[0.96] rounded-xl border border-border-glass bg-retro-bg overflow-hidden shadow-xs hover:border-border-strong ${
+      className={`holo-card group relative select-none cursor-pointer transition-transform duration-150 ease-out active:scale-(--scale-press-sm) rounded-xl border border-edge bg-retro-bg overflow-hidden shadow-xs hover:border-edge-strong ${
         selected ? 'ring-2 ring-retro-accent shadow-xl z-10' : ''
       }`}
       onMouseMove={handleMouseMove}
@@ -167,25 +167,25 @@ export function CardTile({
       <div className="holo-card-inner flex flex-col h-full rounded-[6px] overflow-hidden" style={{ boxShadow: `inset 0 0 0 1.5px ${accent}66` }}>
         {/* Top Badges */}
         <div className="absolute top-2 left-2 z-20 flex flex-wrap items-center gap-1">
-          <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md border backdrop-blur-xs ${rarity.badgeClass}`}>
+          <span className={`text-2xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md border backdrop-blur-xs ${rarity.badgeClass}`}>
             {rarity.label}
           </span>
           {frameType !== 'chrome' && (
-            <span className={`text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded-md border font-mono backdrop-blur-xs ${
+            <span className={`text-2xs font-medium uppercase tracking-wider px-1.5 py-0.5 rounded-md border font-mono backdrop-blur-xs ${
               frameType === 'holo'
-                ? 'bg-gradient-to-r from-pink-500/80 via-purple-500/80 to-cyan-500/80 text-white border-pink-400/60'
+                ? 'bg-chrome-lav/90 text-chrome-lav border-chrome-lav/60'
                 : frameType === 'carbon'
-                ? 'bg-retro-bg/90 text-retro-fg border-border-glass'
+                ? 'bg-retro-bg/90 text-retro-fg border-edge'
                 : frameType === 'neon'
-                ? 'bg-cyan-950/90 text-cyan-300 border-cyan-400/80'
-                : 'bg-black/80 text-retro-fg border-border-glass'
+                ? 'bg-info/90 text-info-fg border-info/80'
+                : 'bg-black/80 text-retro-fg border-edge'
             }`}>
               {frameType}
             </span>
           )}
           {isReceived && (
-            <span className="text-[10px] font-medium px-1.5 py-0.5 bg-black/75 text-purple-300 rounded-md border border-purple-400/30 flex items-center gap-1 backdrop-blur-xs">
-              <Gift className="w-2.5 h-2.5 text-purple-400" />
+            <span className="text-2xs font-medium px-1.5 py-0.5 bg-black/75 text-chrome-lav rounded-md border border-chrome-lav/30 flex items-center gap-1 backdrop-blur-xs">
+              <Gift className="w-2.5 h-2.5 text-chrome-lav" />
               <span>RECEIVED</span>
             </span>
           )}
@@ -194,7 +194,7 @@ export function CardTile({
         {/* Top-Right Badges: Expiry Timer & Select Checkbox */}
         <div className="absolute top-2 right-2 z-20 flex items-center gap-1">
           {minsLeft !== null && minsLeft > 0 && (
-            <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 bg-black/75 text-amber-300 rounded-md border border-amber-400/30 backdrop-blur-xs flex items-center gap-1">
+            <span className="text-2xs font-mono font-medium px-1.5 py-0.5 bg-black/75 text-warning-fg rounded-md border border-warning/30 backdrop-blur-xs flex items-center gap-1">
               <Clock className="w-2.5 h-2.5" />
               <span>{minsLeft > 60 ? `${Math.floor(minsLeft / 60)}h` : `${minsLeft}m`}</span>
             </span>
@@ -205,10 +205,10 @@ export function CardTile({
               e.stopPropagation()
               onSelect?.(item.id)
             }}
-            className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
+            className={`w-5 h-5 rounded-md border flex items-center justify-center transition ${
               selected
-                ? 'bg-surface-interactive border-border-glass text-retro-fg shadow-md'
-                : 'bg-black/60 border-border-glass opacity-0 group-hover:opacity-100 text-transparent hover:border-border-glass'
+                ? 'bg-surface-interactive border-edge text-retro-fg shadow-md'
+                : 'bg-black/60 border-edge opacity-0 group-hover:opacity-100 text-transparent hover:border-edge'
             }`}
           >
             <Check className="w-3 h-3 stroke-[3]" />
@@ -233,19 +233,19 @@ export function CardTile({
         </div>
 
         {/* Card Info Footer */}
-        <div className="p-2.5 bg-retro-bg border-t border-border-glass flex flex-col gap-1">
+        <div className="p-2.5 bg-retro-bg border-t border-edge flex flex-col gap-1">
           <div className="flex items-center justify-between gap-1.5">
             <div className="min-w-0 flex-1 text-xs font-semibold text-retro-fg truncate" title={cardTitle}>
               {cardTitle}
             </div>
             {hasValuation && (
-              <div className="shrink-0 text-[10px] font-mono font-bold tabular-nums tracking-tight" style={{ color: accent }}>
+              <div className="shrink-0 text-2xs font-mono font-bold tabular-nums tracking-tight" style={{ color: accent }}>
                 {formatGc(cardValue)}
               </div>
             )}
           </div>
 
-          <div className="flex items-center justify-between gap-2 text-[10px] font-mono text-retro-muted">
+          <div className="flex items-center justify-between gap-2 text-2xs font-mono text-retro-muted">
             {ownerLabel && (
               <span className="truncate">
                 by{' '}
@@ -267,7 +267,7 @@ export function CardTile({
               </span>
             )}
             <span className="shrink-0 flex items-center gap-1 font-bold text-retro-fg">
-              <Heart className="w-2.5 h-2.5 fill-rose-500 text-rose-400" />
+              <Heart className="w-2.5 h-2.5 fill-danger text-danger-fg" />
               <span>{likes}</span>
             </span>
           </div>
@@ -277,7 +277,7 @@ export function CardTile({
               {itemTags.map((tag) => (
                 <span
                   key={tag}
-                  className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-retro-panel border border-border-glass text-retro-muted truncate max-w-[90px]"
+                  className="text-2xs font-mono font-medium px-1.5 py-0.5 rounded bg-retro-panel border border-edge text-retro-muted truncate max-w-[90px]"
                   style={{ color: accent }}
                 >
                   #{tag}

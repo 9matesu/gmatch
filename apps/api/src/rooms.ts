@@ -1,6 +1,7 @@
 import type { D1Turso } from './db'
 import { LOBBY_PICK_SECONDS, LOBBY_REVEAL_SECONDS, LOBBY_DECIDE_SECONDS, ROOM_START_SECONDS, ROOM_MIN_PLAYERS, ROOM_MAX_ROUNDS, LEAGUE_CHAMPION_POINTS, MatchRoom, RoomPair, RoomMember, RoomSnapshot, MatchCard, LeagueEntry } from '@orbit/shared'
 import { addPoints } from './game'
+import { findDisplayName } from './common/userLookup'
 import { broadcastToRoom } from './ws-bus'
 import crypto from 'node:crypto'
 
@@ -109,8 +110,8 @@ export async function createRoom(db: D1Turso, userId: string, name?: string): Pr
   const id = crypto.randomUUID()
   let roomName = (name || '').trim().slice(0, 64)
   if (!roomName) {
-    const user = await db.prepare('SELECT display_name FROM Users WHERE id = ?').bind(userId).first<{ display_name: string | null }>()
-      roomName = `${user?.display_name?.trim() || 'Unknown User'}'s Arena`
+    const userName = await findDisplayName(db, userId)
+      roomName = `${userName?.trim() || 'Unknown User'}'s Arena`
   }
   await db
     .prepare("INSERT INTO MatchRooms (id, name, owner_id, status, phase) VALUES (?, ?, ?, 'open', 'waiting')")

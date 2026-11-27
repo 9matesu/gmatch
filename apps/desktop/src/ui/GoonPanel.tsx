@@ -1,19 +1,17 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
 import { useGame } from '../game/store'
 import { gridSizeForMode, isGridMode } from '../game/store'
-import { CAPS, capEffectLabel, capStacks } from '../game/caps'
 import { HEAT_WINDOW_MS, heatMultiplier } from '../game/economy'
+import { ALL_CAP_IDS } from '../game/caps'
 import type { CapId, ViewMode } from '../game/types'
 import { playPress } from '../utils/sounds'
-import { offlineSvg } from '../services/offlineSvg'
-import { prefetchImages, resolveImage } from '../services/imageCache'
+import { cachedImageFor, prefetchImages, resolveImage } from '../services/imageCache'
 import { isVideoUrl } from '../services/postFilter'
 import { redgifsPlayable } from '../services/redgifs'
 import { formatNum } from './format'
 import {
   BTN,
   BTN_SMALL,
-  DISPLAY,
   FLOAT_GC,
   FLOAT_GC_CRIT,
   GOON_IMAGE,
@@ -53,7 +51,7 @@ interface Float {
   cell: number | null
 }
 
-const CAP_ORDER: CapId[] = ['blue', 'filter', 'hypno', 'melt']
+const CAP_ORDER: readonly CapId[] = ALL_CAP_IDS
 
 /** Autoplay is opt-in: honor prefers-reduced-motion (SPEC §7 a11y). */
 function useReducedMotion(): boolean {
@@ -74,11 +72,9 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
   const feedOffline = useGame((s) => s.feedOffline)
   const feedEmptyFresh = useGame((s) => s.feedEmptyFresh)
   const fetching = useGame((s) => s.fetching)
-  const points = useGame((s) => s.points)
   const foeHp = useGame((s) => s.foeHp)
   const foeMaxHp = useGame((s) => s.foeMaxHp)
   const defeated = useGame((s) => s.defeated)
-  const caps = useGame((s) => s.caps)
   const viewMode = useGame((s) => s.viewMode)
   const grid = useGame((s) => s.grid)
   const heatStreak = useGame((s) => s.heatStreak)
@@ -102,8 +98,6 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
   const canGridBack = useGame((s) => s.gridPast.length > 0)
   const queue = useGame((s) => s.queue)
   const past = useGame((s) => s.past)
-  const popCap = useGame((s) => s.popCap)
-  const imageReady = useGame((s) => s.imageReady)
   const setImageReady = useGame((s) => s.setImageReady)
 
   const [floats, setFloats] = useState<Float[]>([])
@@ -111,6 +105,40 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
   const [failedUrl, setFailedUrl] = useState<string | null>(null)
   const [shownUrl, setShownUrl] = useState<string | null>(null)
   const [dropsOpen, setDropsOpen] = useState(false)
+  // Multi-select ban: the ✕ toggles a tag into a per-drop selection, then one
+  // "Ban selected" button applies them all (claimDropAntiTag per tag).
+  const [banSel, setBanSel] = useState<Record<string, string[]>>({})
+  const toggleBanSel = (dropId: string, tag: string) =>
+    setBanSel((prev) => {
+      const cur = prev[dropId] || []
+      const next = cur.includes(tag) ? cur.filter((t) => t !== tag) : [...cur, tag]
+      return { ...prev, [dropId]: next }
+    })
+  const applyBanSel = async (dropId: string) => {
+    for (const t of banSel[dropId] || []) await claimDropAntiTag(dropId, t)
+    setBanSel((prev) => ({ ...prev, [dropId]: [] }))
+  }
+  // Ban-by-tag for the CURRENT foe: the Prohibit button opens a picker of that
+  // image's tags instead of purging the whole image + auto-learning 3 tags.
+  const userExcludes = useGame((s) => s.userExcludes)
+  const banTag = useGame((s) => s.banTag)
+  const [banPickerOpen, setBanPickerOpen] = useState(false)
+  const [banPick, setBanPick] = useState<string[]>([])
+  const toggleBanPick = (tag: string) =>
+    setBanPick((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]))
+  const applyBanCurrent = async () => {
+    const before = current?.id
+    // A ban is DURABLE: the term lands in the user's blocklist.json, so the
+    // clicker never offers it again.
+    for (const t of banPick) await banTag(t)
+    setBanPick([])
+    setBanPickerOpen(false)
+    // The ban already pulled the current foe if it carried the term; only
+    // advance when it did not.
+    if (useGame.getState().current?.id === before) advanceFeed()
+  }
+  // A new foe is a new picker: drop the previous selection.
+  useEffect(() => { setBanPick([]); setBanPickerOpen(false) }, [current?.id])
   const [dragFrom, setDragFrom] = useState<number | null>(null)
   const [dragOver, setDragOver] = useState<number | null>(null)
   // Shake + hit-flash are retriggered by REMOUNTING a child span, not the tile
@@ -122,8 +150,6 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
   const floatId = useRef(0)
   const stageRef = useRef<HTMLElement | null>(null)
   const reduceMotion = useReducedMotion()
-
-  const now = Date.now()
 
   const onImageError = useCallback(() => {
     if (current?.preview && shownUrl !== current.preview) {
@@ -209,9 +235,10 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
         }
         return
       }
-      if (e.key === '1' || e.key === '2' || e.key === '3' || e.key === '4') {
+      const capIndex = Number(e.key) - 1
+      if (/^[1-9]$/.test(e.key) && capIndex < CAP_ORDER.length) {
         e.preventDefault()
-        st.popCap(CAP_ORDER[Number(e.key) - 1])
+        st.popCap(CAP_ORDER[capIndex])
         return
       }
       if (e.key === 'ArrowLeft') {
@@ -260,7 +287,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
     setShakeKey((k) => k + 1)
   }
 
-  const handleClick = (e: MouseEvent<HTMLDivElement>) => {
+  const handleClick = (e: MouseEvent<HTMLElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
     const { gain, crit, heat } = clickImage()
     playHit(crit)
@@ -285,7 +312,6 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
   }
 
   const showOffline = feedOffline || !current || failedUrl === current.url
-  const src = showOffline ? offlineSvg(current?.tags ?? []) : current.url
   // Motion posts (redgifs mp4/webm) play inline; gifs stay on <img>.
   const isMotion =
     !showOffline &&
@@ -300,6 +326,11 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
   // Verified stage swap: keep the last decoded picture on screen until the
   // next one is cached + decoded successfully — arrows never show a blank
   // frame, and scoring stays locked (store.imageReady) until it is visible.
+  //
+  // The FIRST paint uses the session cache map when it already knows the bytes
+  // (`cachedImageFor`), so a foe whose picture is on disk mounts straight on
+  // gmcache:// instead of the remote URL. That is the difference between
+  // "instant" and "a frame late" for every picture after the first.
   useEffect(() => {
     if (showOffline || !current) {
       setImageReady(false)
@@ -313,14 +344,24 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
     }
     let live = true
     const url = current.url
-    setShownUrl(url)
+    const warm = cachedImageFor(url)
+    setShownUrl(warm ?? url)
     // NOT ready yet. This used to be set immediately, which meant clicks
     // scored against a picture that had not painted: the "Loading" overlay was
     // unreachable and the first click or two of every picture were lost (or
     // worse, scored while the old frame was still up). The stage <img> now
     // reports its own load, and readiness follows the pixels.
+    //
+    // A warm picture is decoded ahead of time (imageCache.decodeAhead), so its
+    // load event lands in the same frame the element mounts — the player sees
+    // it and can click it immediately.
     setImageReady(false)
     setStageLoaded(false)
+    if (warm) {
+      // Already local: the bytes are in the encrypted disk cache, so the only
+      // remaining work is the browser's own decode of a gmcache:// URL.
+      return () => { live = false }
+    }
     void (async () => {
       try {
         const resolved = await resolveImage(url)
@@ -381,10 +422,35 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
     viewMode === '2x2' || viewMode === '1x2' ? 'grid-cols-2' : 'grid-cols-3'
 
   const critFlashEl = critFlash && (
-    <div className="pointer-events-none absolute inset-0 z-[10] flex items-center justify-center bg-rose-500/15 backdrop-blur-[1px] animate-[gg-crit_0.35s_ease-out_forwards]">
-      <div className="flex items-center gap-2 rounded-xl border border-rose-500/60 bg-retro-bg/90 px-6 py-2.5 font-mono text-xl font-black tracking-widest text-rose-400 shadow-[0_0_40px_rgba(244,63,94,0.4)]">
-        <Lightning className="h-5 w-5 text-rose-400" weight="fill" />
+    <div className="pointer-events-none absolute inset-0 z-[10] flex items-center justify-center bg-danger/15 backdrop-blur-[1px] animate-[gg-crit_0.2s_ease-out_forwards]">
+      <div className="flex items-center gap-2 rounded-xl border border-danger/60 bg-retro-bg/90 px-6 py-2.5 font-mono text-xl font-black tracking-widest text-danger-fg">
+        <Lightning className="h-5 w-5 text-danger-fg" weight="fill" />
         CRITICAL HIT!
+      </div>
+    </div>
+  )
+
+  // KO popup: a brief screen pop the moment a foe is drained — mobile-game
+  // feedback, honoring prefers-reduced-motion.
+  const [koPop, setKoPop] = useState(false)
+  const prevDefeated = useRef(defeated)
+  useEffect(() => {
+    if (defeated <= prevDefeated.current) {
+      prevDefeated.current = defeated
+      return
+    }
+    prevDefeated.current = defeated
+    if (reduceMotion) return
+    setKoPop(true)
+    const t = window.setTimeout(() => setKoPop(false), 900)
+    return () => window.clearTimeout(t)
+  }, [defeated, reduceMotion])
+
+  const koPopEl = koPop && (
+    <div className="pointer-events-none absolute inset-0 z-[11] flex items-center justify-center">
+      <div className="animate-orbit-pop flex items-center gap-2 rounded-2xl border border-edge bg-black/85 px-8 py-3 font-mono text-3xl font-black tracking-widest text-retro-fg">
+        <Skull className="h-7 w-7 text-danger-fg" weight="fill" />
+        KO
       </div>
     </div>
   )
@@ -400,7 +466,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
       {/* Layout selector on top of the game header */}
       <div className="flex flex-none items-center justify-between gap-2 px-1 pt-0.5">
         <div
-          className="inline-flex flex-none overflow-hidden rounded-lg border border-border-glass"
+          className="inline-flex flex-none overflow-hidden rounded-lg border border-edge"
           role="group"
           aria-label="Feed layout"
         >
@@ -408,7 +474,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
             <button
               key={mode}
               type="button"
-              className={`${MONO} cursor-pointer border-0 bg-transparent px-2 py-0.5 text-[11px] font-bold ${viewMode === mode ||
+              className={`${MONO} cursor-pointer border-0 bg-transparent px-2 py-0.5 text-xs font-bold ${viewMode === mode ||
                 (mode === '3x3' && viewMode === 'grid')
                 ? 'bg-retro-accent text-retro-accent-text'
                 : 'bg-transparent text-retro-muted hover:text-retro-fg'
@@ -441,6 +507,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           aria-label={`${viewMode} goon grid`}
         >
           {critFlashEl}
+          {koPopEl}
           {grid.map((cell, i) => {
             const motion =
               (cell.post.kind === 'video' || isVideoUrl(cell.post.url)) &&
@@ -480,7 +547,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                   setDragFrom(null)
                   setDragOver(null)
                 }}
-                className={`relative min-h-0 cursor-grab overflow-hidden rounded-lg border bg-black p-0 text-left font-[inherit] text-[color:inherit] active:cursor-grabbing ${dragOver === i ? 'border-retro-accent ring-2 ring-retro-accent/60' : 'border-border-glass'
+                className={`relative min-h-0 cursor-grab overflow-hidden rounded-lg border bg-retro-bg p-0 text-left font-[inherit] text-[color:inherit] active:cursor-grabbing ${dragOver === i ? 'border-retro-accent ring-2 ring-retro-accent/60' : 'border-edge'
                   } ${dragFrom === i ? 'opacity-50' : ''}`}
                 onClick={(e) => handleCellClick(i, e)}
                 onAuxClick={handleAuxClick}
@@ -492,7 +559,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                     className={GOON_IMAGE}
                     src={redgifsPlayable(cell.post.url)}
                     poster={cell.post.preview ? redgifsPlayable(cell.post.preview) : undefined}
-                    autoPlay={!reduceMotion}
+                    autoPlay
                     loop
                     muted
                     playsInline
@@ -552,7 +619,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           {Array.from({ length: Math.max(0, gridTarget - grid.length) }, (_, k) => (
             <div
               key={`empty-${k}`}
-              className="relative flex min-h-0 cursor-default items-center justify-center overflow-hidden rounded-lg border border-dashed border-border-glass bg-black"
+              className="relative flex min-h-0 cursor-default items-center justify-center overflow-hidden rounded-lg border border-dashed border-edge bg-retro-bg"
             >
               {fetching ? (
                 <Skeleton className="h-full w-full" />
@@ -573,7 +640,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
             <>
               <button
                 type="button"
-                className="icon-btn absolute left-2 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-white/80 border border-white/10 backdrop-blur-md hover:bg-white/15 hover:text-white hover:border-white/20 transition-all duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
+                className="icon-btn absolute left-2 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-retro-fg/80 border border-edge backdrop-blur-md hover:bg-retro-accent/15 hover:text-retro-fg hover:border-edge transition duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
                 aria-label="Previous image"
                 title={canGridBack ? 'Back to the previous board' : 'Nothing behind you yet'}
                 disabled={!canGridBack}
@@ -583,7 +650,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               </button>
               <button
                 type="button"
-                className="icon-btn absolute right-2 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-white/80 border border-white/10 backdrop-blur-md hover:bg-white/15 hover:text-white hover:border-white/20 transition-all duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
+                className="icon-btn absolute right-2 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-retro-fg/80 border border-edge backdrop-blur-md hover:bg-retro-accent/15 hover:text-retro-fg hover:border-edge transition duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
                 aria-label="Next image"
                 title="Skip this round. No reward"
                 onClick={() => skipGrid()}
@@ -595,22 +662,32 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
         </div>
       ) : (
         <div
-          // No `key` here on purpose ÔÇö see the grid tile above. This div holds
+          // No `key` here on purpose — see the grid tile above. This box holds
           // the <img>/<video>, and a per-click key remounted them.
-          className={`${STAGE_FRAME} relative min-h-0 flex-1 ${imageReady ? 'cursor-pointer active:cursor-grabbing' : 'cursor-progress'} max-[1100px]:min-h-[320px]`}
-          onClick={handleClick}
-          onAuxClick={handleAuxClick}
-          role="button"
-          tabIndex={0}
-          aria-label="Attack the current foe"
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault()
-              clickImage()
-            }
-          }}
+          className={`${STAGE_FRAME} border-beam relative min-h-0 flex-1 max-[1100px]:min-h-[320px]`}
         >
+          {/* The click target is a real button LAYERED OVER the media, not the
+              stage element itself: the stage also holds <video controls> and
+              the prev/next/purge buttons, and interactive content must never
+              nest inside a button. */}
+          {!showOffline && (
+            <button
+              type="button"
+              onPointerDown={(e) => {
+                // Score on PRESS, not release: a clicker that waits for mouse-up
+                // feels a frame late. The click that follows is ignored (detail > 0)
+                // so one press scores exactly once; keyboard activation (detail 0)
+                // still scores through onClick.
+                if (e.button === 0) handleClick(e)
+              }}
+              onClick={(e) => { if (e.detail === 0) handleClick(e) }}
+              onAuxClick={handleAuxClick}
+              aria-label="Attack the current foe"
+              className="absolute inset-0 z-[2] cursor-pointer"
+            />
+          )}
           {critFlashEl}
+          {koPopEl}
           {/* Shake on its own keyed-free overlay, and the progressive damage
               wash. Both sit above the media and below the controls. */}
           {shakeCell === null && shakeKey > 0 && (
@@ -638,22 +715,15 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               </span>
             </span>
           )}
-          {/* Blurred cover fill so the stage reads as an image, not a
-              letterbox. The foreground stays 100% visible (object-contain). */}
-          {!showOffline && shownUrl && (
-            <img
-              src={shownUrl}
-              alt=""
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 z-0 h-full w-full scale-110 object-cover opacity-40 blur-2xl select-none"
-            />
-          )}
+          {/* Lightweight runtime: no blurred cover fill. It forced a full-stage
+              backdrop re-composite on every shake/crit frame for a purely
+              decorative effect — the object-contain image is the whole stage. */}
           {isMotion && current ? (
             <video
-              className={`${GOON_IMAGE} relative z-[1]`}
+              className={`${GOON_IMAGE} relative z-[3]`}
               src={redgifsPlayable(current.url)}
               poster={current.preview ? redgifsPlayable(current.preview) : undefined}
-              autoPlay={!reduceMotion}
+              autoPlay
               loop
               muted
               playsInline
@@ -688,7 +758,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           )}
           <button
             type="button"
-            className="icon-btn absolute left-3 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-white/80 border border-white/10 backdrop-blur-md hover:bg-white/15 hover:text-white hover:border-white/20 transition-all duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
+            className="icon-btn absolute left-3 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-retro-fg/80 border border-edge backdrop-blur-md hover:bg-retro-accent/15 hover:text-retro-fg hover:border-edge transition duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
             aria-label="Previous image"
             title={canGoBack ? 'Back to the skipped foe' : 'Nothing behind you yet'}
             disabled={!canGoBack}
@@ -701,7 +771,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           </button>
           <button
             type="button"
-            className="icon-btn absolute right-3 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-white/80 border border-white/10 backdrop-blur-md hover:bg-white/15 hover:text-white hover:border-white/20 transition-all duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
+            className="icon-btn absolute right-3 top-1/2 z-[6] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-black/60 text-retro-fg/80 border border-edge backdrop-blur-md hover:bg-retro-accent/15 hover:text-retro-fg hover:border-edge transition duration-150 disabled:opacity-20 active:scale-95 cursor-pointer"
             aria-label="Next image"
             title="Skip this foe. No reward"
             onClick={(e) => {
@@ -713,17 +783,68 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           </button>
           <button
             type="button"
-            className="icon-btn absolute right-3 top-3 z-[6] flex h-8 w-8 items-center justify-center rounded-xl bg-black/60 text-white/70 border border-white/10 backdrop-blur-md hover:bg-rose-600/80 hover:text-white hover:border-rose-500/60 transition-all duration-150 active:scale-95 cursor-pointer"
-            aria-label="Never show this again"
-            title="Purge. This image and its rarest tags never return"
+            className="icon-btn absolute right-3 top-3 z-[6] flex h-8 w-8 items-center justify-center rounded-xl bg-black/60 text-retro-fg/70 border border-edge backdrop-blur-md hover:bg-danger/80 hover:text-retro-fg hover:border-danger/60 transition duration-150 active:scale-95 cursor-pointer"
+            aria-label="Ban tags from this image"
+            title="Choose which tags of this image to ban"
             hidden={!current}
             onClick={(e) => {
               e.stopPropagation()
-              if (current) purgePost(current)
+              setBanPickerOpen((v) => !v)
+              setBanPick([])
             }}
           >
             <Prohibit size={16} weight="bold" />
           </button>
+          {banPickerOpen && current && (
+            <div
+              className="absolute right-3 top-14 z-[7] w-60 rounded-xl border border-edge bg-retro-panel p-2.5 shadow-2xl backdrop-blur-md"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mb-1.5 text-2xs font-bold uppercase tracking-wider text-retro-muted">
+                Ban tags from this image
+              </div>
+              <div className="flex max-h-40 flex-wrap gap-1 overflow-y-auto styled-scrollbar">
+                {current.tags.map((tag) => {
+                  const already = userExcludes.includes(tag)
+                  const on = banPick.includes(tag)
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      disabled={already}
+                      onClick={() => toggleBanPick(tag)}
+                      aria-pressed={on}
+                      title={already ? `${tag} is already excluded` : `Ban ${tag}`}
+                      className={`${MONO} cursor-pointer rounded-md border px-1.5 py-0.5 text-2xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${on ? 'border-danger/60 bg-danger/20 text-danger-fg' : 'border-edge bg-glass-w8 text-retro-body hover:text-retro-fg'}`}
+                    >
+                      {tag}
+                    </button>
+                  )
+                })}
+                {current.tags.length === 0 && (
+                  <span className="text-2xs text-retro-muted">No tags on this one.</span>
+                )}
+              </div>
+              <div className="mt-2 flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={applyBanCurrent}
+                  disabled={banPick.length === 0}
+                  className={`${MONO} flex-1 cursor-pointer rounded-md border border-danger/50 bg-danger/15 px-2 py-1 text-2xs font-bold text-danger-fg hover:bg-danger/25 transition-colors disabled:opacity-40`}
+                >
+                  Ban {banPick.length || ''} selected
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { purgePost(current); setBanPickerOpen(false); setBanPick([]) }}
+                  title="Purge the image and auto-learn its rarest tags"
+                  className={`${MONO} cursor-pointer rounded-md border border-edge bg-glass-w8 px-2 py-1 text-2xs font-bold text-retro-muted hover:text-retro-fg transition-colors`}
+                >
+                  Purge
+                </button>
+              </div>
+            </div>
+          )}
           {floats
             .filter((f) => f.cell === null)
             .map((f) => (
@@ -746,58 +867,74 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               onClick={() => setDropsOpen((v) => !v)}
               aria-expanded={dropsOpen}
               aria-label={`${pendingDrops.length} novelty drops waiting`}
-              title="KO drops. Adopt a tag, ban an anti-tag, one click each"
-              className={`${MONO} inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border border-rose-500/40 bg-rose-500/10 px-2.5 py-1 text-xs font-bold text-rose-300 hover:bg-rose-500/20 transition-colors`}
+              title="KO drops. Adopt (+) or ban (✕) any tag from the foe"
+              className={`${MONO} inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border border-danger/40 bg-danger/10 px-2.5 py-1 text-xs font-bold text-danger-fg hover:bg-danger/20 transition-colors`}
             >
-              <Gift size={14} weight="bold" className="text-rose-400" />
-              Drops
-              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-black text-white">
+              <Gift size={14} weight="bold" className="text-danger-fg" />
+              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-2xs font-black text-retro-fg">
                 {pendingDrops.length}
               </span>
             </button>
             {dropsOpen && (
-              <div className="absolute bottom-full left-0 z-30 mb-1.5 w-64 space-y-1.5 rounded-xl border border-border-glass bg-retro-panel p-2.5 shadow-2xl backdrop-blur-md">
+              <div className="absolute bottom-full left-0 z-30 mb-1.5 w-64 space-y-1.5 rounded-xl border border-edge bg-retro-panel p-2.5 shadow-2xl backdrop-blur-md">
                 {pendingDrops.slice(0, 4).map((drop) => (
-                  <div key={drop.id} className="rounded-lg border border-border-glass bg-retro-bg/80 p-2">
+                  <div key={drop.id} className="rounded-lg border border-edge bg-retro-bg/80 p-2">
                     <div className="flex items-center justify-between gap-1">
-                      <span className={`${MONO} truncate text-[10px] font-bold text-retro-muted`}>
+                      <span className={`${MONO} truncate text-2xs font-bold text-retro-muted`}>
                         from {drop.foeTitle}
                       </span>
                       <button
                         type="button"
                         onClick={() => dismissDrop(drop.id)}
                         aria-label="Dismiss drop"
-                        className="shrink-0 cursor-pointer border-0 bg-transparent p-0.5 text-white/40 hover:text-white transition-colors"
+                        className="shrink-0 cursor-pointer border-0 bg-transparent p-0.5 text-retro-fg/40 hover:text-retro-fg transition-colors"
                       >
                         <X size={12} weight="bold" />
                       </button>
                     </div>
                     <div className="mt-1.5 flex flex-wrap gap-1">
-                      {drop.suggestedTag && (
-                        <button
-                          type="button"
-                          onClick={() => claimDropTag(drop.id)}
-                          title={`Adopt +${drop.suggestedTag} into your feed`}
-                          className={`${MONO} cursor-pointer rounded-md border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-300 hover:bg-emerald-500/25 transition-colors`}
-                        >
-                          + {drop.suggestedTag}
-                        </button>
-                      )}
-                      {drop.suggestedAntiTag && (
-                        <button
-                          type="button"
-                          onClick={() => claimDropAntiTag(drop.id)}
-                          title={`Ban ${drop.suggestedAntiTag} from your feed`}
-                          className={`${MONO} inline-flex items-center gap-1 cursor-pointer rounded-md border border-rose-500/40 bg-rose-500/10 px-2 py-0.5 text-[10px] font-bold text-rose-300 hover:bg-rose-500/20 transition-colors`}
-                        >
-                          <X size={10} weight="bold" className="shrink-0" /> {drop.suggestedAntiTag}
-                        </button>
-                      )}
+                      {drop.tags.map((tag) => {
+                        const banned = (banSel[drop.id] || []).includes(tag)
+                        return (
+                          <span
+                            key={tag}
+                            className={`${MONO} inline-flex items-center overflow-hidden rounded-md border text-2xs font-bold ${banned ? 'border-danger/60 bg-danger/15' : 'border-edge bg-glass-w8'}`}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => claimDropTag(drop.id, tag)}
+                              title={`Adopt +${tag} into your feed`}
+                              className="cursor-pointer px-1.5 py-0.5 text-success-fg hover:bg-success/20 transition-colors"
+                            >
+                              + {tag}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => toggleBanSel(drop.id, tag)}
+                              title={banned ? `Unselect ${tag}` : `Select ${tag} to ban`}
+                              aria-label={banned ? `Unselect ${tag}` : `Select ${tag} to ban`}
+                              aria-pressed={banned}
+                              className="cursor-pointer border-l border-edge px-1 py-0.5 text-danger-fg hover:bg-danger/20 transition-colors"
+                            >
+                              <X size={10} weight="bold" />
+                            </button>
+                          </span>
+                        )
+                      })}
                     </div>
+                    {(banSel[drop.id]?.length || 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => applyBanSel(drop.id)}
+                        className={`${MONO} mt-1.5 w-full cursor-pointer rounded-md border border-danger/50 bg-danger/15 px-2 py-1 text-2xs font-bold text-danger-fg hover:bg-danger/25 transition-colors`}
+                      >
+                        Ban {banSel[drop.id].length} selected
+                      </button>
+                    )}
                   </div>
                 ))}
                 {pendingDrops.length > 4 && (
-                  <div className={`${MONO} text-center text-[10px] text-white/40`}>
+                  <div className={`${MONO} text-center text-2xs text-retro-fg/40`}>
                     +{pendingDrops.length - 4} more…
                   </div>
                 )}
@@ -811,14 +948,14 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           </span>
         ) : inBattle ? (
           <div className="flex min-w-0 flex-1 items-center gap-2.5" title={`${Math.ceil(foeHp)} / ${foeMaxHp} HP`}>
-            <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-black/60 border border-white/5">
+            <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-black/60 border border-edge">
               <div
-                className={`h-full rounded-full transition-all duration-150 ${hpPct <= 30 ? 'bg-gradient-to-r from-rose-500 to-amber-500' : 'bg-gradient-to-r from-emerald-500 to-teal-400'}`}
+                className={`h-full rounded-full transition duration-150 ${hpPct <= 30 ? 'bg-amber-500' : 'bg-emerald-500'}`}
                 style={{ width: `${hpPct}%` }}
               />
             </div>
             <span className={`${MONO} whitespace-nowrap text-xs font-semibold text-retro-muted`}>
-              {formatNum(Math.ceil(foeHp))}/{formatNum(foeMaxHp)} <span className="text-[10px] text-white/40">HP</span>
+              {formatNum(Math.ceil(foeHp))}/{formatNum(foeMaxHp)} <span className="text-2xs text-retro-fg/40">HP</span>
             </span>
           </div>
         ) : (
@@ -826,11 +963,11 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
         )}
         {heatLive && (
           <span
-            className={`${MONO} inline-flex min-w-0 shrink items-center gap-1.5 whitespace-nowrap rounded-lg border border-amber-500/40 bg-amber-500/15 px-2.5 py-1 text-xs font-black text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.2)]${reduceMotion ? '' : ' animate-pulse'}`}
+            className={`${MONO} inline-flex min-w-0 shrink items-center gap-1.5 whitespace-nowrap rounded-lg border border-warning/40 bg-warning/15 px-2.5 py-1 text-xs font-black text-warning-fg${reduceMotion ? '' : ' animate-pulse'}`}
             title={`Heat combo: ${heatStreak} rapid clicks. X${heat} click power`}
             aria-label={`Heat combo x${heat}`}
           >
-            <Fire size={14} weight="fill" className="text-amber-400" />
+            <Fire size={14} weight="fill" className="text-warning-fg" />
             x{heat}
           </span>
         )}
@@ -848,59 +985,14 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           </button>
         )}
         <span
-          className={`${MONO} inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-border-glass bg-glass-w8 px-2.5 py-1 text-xs font-bold text-retro-body shadow-sm`}
+          className={`${MONO} inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-edge bg-glass-w8 px-2.5 py-1 text-xs font-bold text-retro-body shadow-sm`}
           title="Lifetime KOs. Each foe hits harder"
         >
-          <Skull size={13} weight="bold" className="text-rose-400" />
-          KOs: {formatNum(defeated)}
+          <Skull size={13} weight="bold" className="text-danger-fg" />
+          {formatNum(defeated)}
         </span>
       </div>
 
-      {/* Thumb-sized compact bottom dock with [1] [2] [3] [4] keyboard triggers */}
-      <div
-        className="flex flex-none items-center gap-2 overflow-x-auto rounded-xl border border-border-glass bg-glass-w8 p-1.5 backdrop-blur-md styled-scrollbar"
-        role="group"
-        aria-label="Powerups dock"
-      >
-        {CAP_ORDER.map((id, idx) => {
-          const def = CAPS[id]
-          const st = capStacks(caps, id, now)
-          const isLive = st.count > 0
-          return (
-            <button
-              key={id}
-              type="button"
-              className={`group relative flex flex-1 min-w-[125px] cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-all duration-150 enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${isLive
-                ? 'border-rose-500/50 bg-rose-500/10 shadow-[0_0_12px_rgba(244,63,94,0.15)] hover:border-rose-500/70 hover:bg-rose-500/15'
-                : 'border-border-glass bg-retro-bg/60 hover:border-border-strong hover:bg-glass-w5'
-                }`}
-              disabled={points < def.cost}
-              onClick={() => popCap(id)}
-              title={`${def.name}. ${capEffectLabel(id)}. ${formatNum(def.cost)} pts. Press [${idx + 1}]`}
-            >
-              <kbd className={`${MONO} inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border border-white/15 bg-black/60 text-[10px] font-bold text-white/60 group-hover:text-white transition-colors`}>
-                {idx + 1}
-              </kbd>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-1">
-                  <span className={`${DISPLAY} truncate text-xs font-bold leading-tight text-white group-hover:text-retro-accent transition-colors`}>
-                    {def.name}
-                  </span>
-                  {st.count > 0 && (
-                    <span className={`${MONO} text-[10px] font-black text-rose-400`}>
-                      x{st.count}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center justify-between gap-1 text-[10px] text-retro-muted leading-tight">
-                  <span className="truncate">{capEffectLabel(id)}</span>
-                  <span className={`${MONO} shrink-0 font-semibold text-retro-body`}>{formatNum(def.cost)}</span>
-                </div>
-              </div>
-            </button>
-          )
-        })}
-      </div>
     </section>
   )
 }

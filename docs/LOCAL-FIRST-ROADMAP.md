@@ -9,16 +9,14 @@ run the narrow checks, then commit only the files in that slice.
 
 ## Current state and constraints
 
-- **No hosted world (2026-10-24).** The Fly full node and the Render courier
-  were retired. Nothing resolves to them any more: packaged installs start
-  their OWN node (host mode is the default), and the only shared piece is a
-  blind Cloudflare rendezvous at `gmatch.pages.dev` — a signed public-node
-  directory plus a sealed-mail relay in D1, with no content tables, accounts,
-  presence or TURN. The courier role is still "the node each client is
-  connected to": blind, stateless, only moving ciphertext. The end state is
-  **direct peer-to-peer** — no third-party host storing posts, media, comments,
-  likes, profiles or presence (SPEC §12b). Every route's fate is written down
-  in `docs/API-INVENTORY.md`.
+- **No hosted world or rendezvous (2026-11-26).** The Fly full node, the Render
+  courier and the Cloudflare-KV courier (`site/functions/`) were all retired.
+  Packaged installs start their OWN node (host mode is the default), and the
+  node each client is connected to serves the signed public-node directory and
+  the sealed-mail relay — the "courier role" is a capability of that node, not a
+  hosted origin. The end state is **direct peer-to-peer** — no third-party host
+  storing posts, media, comments, likes, profiles or presence (SPEC §12b). Every
+  route's fate is written down in `docs/API-INVENTORY.md`.
 - The desktop app still uses API nodes for feed reads and writes, comments,
   likes, profile/directory data, notifications, Lobby chat, and other social
   state. Public gossip replicates signed post metadata between hosts, but that
@@ -41,8 +39,9 @@ run the narrow checks, then commit only the files in that slice.
   sealed end to end since swarm-v1 (2026-10-22), including over the relay.
   Keep the existing DM envelope unless a concrete cryptographic defect is
   shown; do not silently change its wire format.
-- The central deployment is configured as a blind courier and returns 404 for
-  stateful routes. Do not make it a content host or open remote CORS as a
+- A node booted with `SITE_SERVICES` that omit the stateful services is a
+  courier shape and returns 404 for stateful routes. Do not make it a content
+  host or open remote CORS as a
   workaround. Reproduce API routing/configuration errors against a recorded
   runtime before changing them.
 - Do not remove, rewrite, or migrate user data destructively. Add versioned,
@@ -218,9 +217,14 @@ now persist to IndexedDB (`swarm_receipts`, capped, additive DB v3 upgrade)
 and are re-validated + reloaded on boot (`hydrateDurableReplications`), so
 replication evidence survives restarts. The swarm
 transport already bounds frames/objects and hash-verifies before persistence.
-Still open: authorization capabilities for private objects, streaming
-backpressure, UI surfacing of "peer-confirmed durable", and the
-multi-instance adversarial evidence.
+The evidence is now SURFACED, and only a receipt reaches the claim: a new
+attestation emits `DURABLE_REPLICATION_EVENT`, `hooks/useDurableCustody.ts`
+reads `durableCustodyHolders(id)` and re-reads on that signal, and
+`utils/durableCustody.ts` stays silent at one holder (this node alone is not
+replication) and says `Stored on N devices` from two. The post detail sheet
+renders it keyed by the row's `content_hash`; a HAVE, an in-flight download or
+an online peer never counts. Still open: authorization capabilities for private
+objects, streaming backpressure, and the multi-instance adversarial evidence.
 
 - [ ] Version swarm messages and bind every transfer to object CID/hash,
   manifest version, declared size, MIME, requester/owner identity, and an
@@ -349,9 +353,43 @@ deterministic post list (objectId identity so server/local rows dedupe against
 it, edited-head resolution, tombstone hiding, createdAt ordering with an
 operationId tiebreak, blocklist filtering of remote tags), and
 `hooks/usePeerFeedPosts.ts` merges those rows into the shell feed as
-`origin: 'peer'` with `sync_state` derived from the local log status. Media
-still resolves through `useObjectImage` (local vault/IndexedDB → signed GET →
-swarm with expectedHash), never a provider URL.
+`origin: 'peer'` with `sync_state` derived from the local log status.
+
+Media for those rows is now resolved from their CONTENT
+(`utils/contentAddressedMedia.ts`, `2026-11-26`): the operation's `contentCid`
+travels into the feed row (`FeedPost.content_hash`) and the media ladder tries
+local bytes held under the object id or the content hash (both hash-verified),
+then the swarm asking for the content hash with `expectedHash`, then the
+object-id alias with the same expectation. No `/api/objects` call is made for a
+row that names its content — the node may not carry it at all. Bytes that do
+not hash to the address are refused, from disk or from a peer. A row without a
+hash keeps the legacy ladder. `services/socialFeedJoin.test.ts` executes the
+full A→B path with no node at all (publish, accept, project, verified fetch,
+tampered-seeder refusal).
+
+Delivery is live as of `2026-11-26` too: the outbound wave used to run only on
+boot and on peer-online, so an operation appended while a peer was ALREADY
+online was never handed to the network. `services/socialOpBroadcast.ts`
+subscribes to the durable log's change signal and broadcasts the new entry
+immediately (coalesced, `committed`-only so the wave's own writes cannot make
+it re-send; boot/peer-online waves still retry `sending` entries).
+`e2e/post-two-peer.spec.ts` is the executed acceptance: two independent
+contexts, A publishes while B is online, B's operation log receives the signed
+`post.create` and B pulls byte-identical media by content hash.
+
+The **L4 acceptance itself is now executed** (2026-11-26):
+`e2e/feed-offline-local-first.spec.ts` aborts `/api/posts**` and
+`/api/objects**`, then reloads and asserts (a) a peer-replicated row renders
+WITH its media (the bytes come from the content-addressed ladder, not from a
+signed object fetch - the decoded `naturalWidth` is the proof), (b) a post made
+through the real composer while those routes stay dead still shows, and (c) it
+is still there after a second reload, with its outbox entry honestly `local` or
+`pending` rather than pretending the node took it. The local log is the only
+thing that could carry either row across the reload, since the node stores no
+operations.
+
+Still open: offline read paths beyond the local log, and the
+migration/compatibility work below.
 
 Performance: the log now caches its entry list behind a process-wide revision
 counter, so replicating a wave no longer costs one full store scan per
@@ -415,8 +453,47 @@ durable log instead of calling a node that does not own the post
 (`persistLike` → `likePersistenceRoute` → `persistPeerLike`); server posts keep
 the node path. The comment box write path is live for peer-replicated posts
 too: a signed `comment.create`/`comment.delete` in the durable log, replicated
-like every other operation (`persistPeerComment`). Still open: profile/follow
-operations, moderation reports, and the import surface.
+like every other operation (`persistPeerComment`).
+
+Bookmarks follow the same split, with a different half: a peer-replicated post
+has no node row, so `POST /api/posts/:id/save` answers `404 Post not found` and
+the save used to vanish (icon hollow, nothing on reload, never in the Saved
+tab). A save is the reader's own private intent, not a shared signal, so unlike
+a like it is NOT gossiped: `savePersistenceRoute` sends a peer post to
+`utils/peerSaves.ts`, a durable identity-scoped store, and the peer projection
+folds `is_saved` back into the row (`applySavesToFeedPosts`). The profile Saved
+tab merges the node query (`?saved=1`) with the locally-bookmarked peer rows.
+`e2e/save-peer-post.spec.ts` pins the whole path on a genuine peer row: the
+node's 404, the local write, and the bookmark surviving a reload.
+
+Profile fields, follows and reports are operations too (`profile.update`,
+`follow.add`/`follow.remove`, `report.create`), consumed as follows: profile
+updates fold deterministically per actor and feed `rememberNames`, and a peer
+report surfaces in the author's notification centre as its own peer-lane row.
+The lane now carries every interaction aimed at my content or at me — follow,
+like, comment, reply and report — projected by
+`projectPeerAttentionFor` (`services/socialInteractionProjection.ts`) with the
+honest rules (never notify yourself, a withdrawn like/undone follow is not an
+event, a tombstoned post/comment says nothing, a comment target carries its
+post) and fed by `hooks/usePeerAttention.ts`. Those rows used to be counted by
+the badge but never rendered (and could never be marked read, since they have
+no node flag and no chat stamp); they now render in a "From your peers" section
+and the durable per-identity read set (`utils/peerNotifications.ts`, keyed by
+the operation id) lets them clear. The
+follow graph's read side is local-first for MY OWN follows: `hooks/usePeerFollows.ts` projects my
+signed follows and the targets my own removals withdrew, and `followingIds` is
+the node list UNION the operation follows MINUS the withdrawn ones, so a follow
+made while the node was unreachable no longer vanishes on the next launch (and
+an operation-level unfollow masks the node's stale row). `e2e/follow-offline.spec.ts`
+pins it with both follow endpoints aborted: the empty feed's suggestions must
+keep excluding the person the operation followed after a reload. The profile's
+own tabs now read the same graph: `projectFollowEdgesFor` gives the four edges
+around ONE profile (who follows them, who they follow, and the two masked sets),
+`usePeerFollowEdges` reads it over the shared lifecycle, and `utils/followList.ts`
+merges it into rows — the node's order kept, operations adding what the node
+never received and masking what it still lists, and an operation-only id named
+from the roster instead of a hash fragment. `FollowersFollowingModal.test.tsx`
+drives that with the node unreachable.
 
 **Migration of existing content.** `services/socialPostImport.ts` turns the
 user's OWN public local posts into `post.create` operations, so the
@@ -424,6 +501,21 @@ local-first feed is not born empty. Guardrails: own posts only, idempotent by
 objectId, capped per run, additive only (it never touches the post, its bytes
 or the vault), and **opt-in** — re-publishing old content to peers is a
 visible decision, so nothing calls it automatically at boot.
+
+Implemented (2026-11-26), one click in Settings → Preferences
+(`components/settings/ImportPostsSection.tsx`). Each candidate is gated exactly
+like a fresh publish (`shouldEmitSocialOperation`: public feed post, never a
+story/avatar/chat/private row), skipped when a tombstone or the log already
+carries its object id, and its bytes must be READABLE: local swarm/vault first,
+otherwise the node — and a node that does not physically hold the row answers
+with a `p2p` DESCRIPTOR, which the import refuses on `content-type` so
+descriptor text is never imported as a picture. A `content_hash` the node
+declares must match the bytes (a mismatch is skipped and never re-addressed);
+with no declared hash the computed one becomes the address. Verified bytes are
+seeded under the object id AND the hash BEFORE the operation is committed, so a
+peer that receives the operation has a seeder. `services/socialPostImport.test.ts`
+pins all of it (own-public-only, idempotency, tombstone, hash mismatch,
+descriptor refusal, node fallback, per-run cap).
 - [ ] Model comments/replies, reactions, follows, profile fields, and
   moderation reports as authorized signed operations with stable IDs and
   explicit deletion/edit behavior.
@@ -524,7 +616,42 @@ routes disabled.
 cross-platform test results, green required gates, and no unverified claims in
 UI or documentation.
 
-## Evidence log (2026-10-24, the Cloudflare rendezvous)
+## Evidence log (2026-11-26, the Cloudflare dependency is gone)
+
+- `site/functions/` (the Cloudflare-KV mailbox + directory) is deleted;
+  `deploy-pages.mjs` ships a static page only and refuses to run if a
+  `functions/` directory comes back.
+- `central.url` has no default (`utils/central.ts`); a stored or env
+  `*.gmatch.pages.dev` pointer is dropped (`isRetiredRendezvous`), never dialed.
+- `isKnownSiteCourier` is removed; `MailClient` opens one watch socket per
+  mailbox base and falls back to polling a box only after a socket dies twice
+  without ever opening.
+- The updater's public feed is the GitHub Releases API; `parseDigest` accepts
+  the real `sha256:<hex>` colon form (the dash-only regex refused every asset).
+- `site/release.json` and the page's hash blocks are regenerated from the
+  published GitHub asset (they had described a build that was never published).
+
+## Evidence log (2026-11-26, the media surface: no empty previews, one balloon)
+
+- **The feed hides a row it cannot show, reversibly.** A post whose media bytes
+  are not held locally or by any online peer used to occupy a slot as an empty
+  frame or a "No preview" strip. `GMatchFeed` now keeps a `deadPosts` set: a
+  terminal miss (`onMediaUnavailable` / `FeedGrid`'s `onMediaDead`) hides the
+  row, and the state is reversed the moment bytes exist — the same row's
+  `onLoad` (`onMediaReady`) promotes it, and `PEER_ONLINE_EVENT` clears the set
+  so every hidden row is re-checked (the media ladder is unchanged: local vault
+  → local swarm store → signed `GET /api/objects/:id` → swarm peers, resolved by
+  content hash for peer rows). Text-only rows are untouched.
+- **The media picker is one fixed-size balloon.** `MediaPickerPanel` takes a
+  fixed footprint per mode (default `h-[560px]`, compact `h-[420px]`, body the
+  only scroller) so a pane switch cannot resize or move it; the navbar Post
+  bubble is click-only (hover open/leave-close removed) and closes on
+  pick/close/Escape/outside pointerdown; `ProfilePicModal` reuses the same picker
+  with a crop/apply step and the bespoke hidden-file avatar path is deleted; a
+  `--z-picker` (65) layer keeps the balloon above the lightbox it opens from.
+  `CommandIsland.test.tsx` and `ProfilePicModal.test.tsx` pin the behaviour.
+
+## Evidence log (2026-10-24, the Cloudflare rendezvous — superseded 2026-11-26)
 
 - The Render courier and the Fly full node were **removed from the code**:
   `isCourierApiUrl` now knows only `gmatch.pages.dev`; `DEFAULT_CENTRAL_URL`

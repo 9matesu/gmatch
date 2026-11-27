@@ -11,9 +11,10 @@ export function normalizeServerUrl(v: string): string | null {
 }
 
 /**
- * True for a node that is a directory courier, never a data destination
- * (the Cloudflare courier 404s every stateful route). A regular node — the
- * local sidecar or a friend's node — is fine.
+ * True for a URL that is no longer a data destination: the retired Pages
+ * origin (`gmatch.pages.dev`) is a static release page and 404s every
+ * stateful route. A regular node — the local sidecar or a friend's node — is
+ * fine.
  */
 export function isDecommissionedUrl(v: unknown): boolean {
   if (typeof v !== 'string' || !v) return false

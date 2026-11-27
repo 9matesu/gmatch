@@ -38,22 +38,22 @@ const CATEGORY_META: Record<
   blocklist: {
     label: 'Hard Blocklist (blocklist)',
     desc: 'Tags dropped at query origin and rejected by clicker feed filters.',
-    color: 'text-red-400',
-    badgeBg: 'bg-red-500/10 text-red-300 border-red-500/30',
+    color: 'text-danger-fg',
+    badgeBg: 'bg-danger/10 text-danger-fg border-danger/30',
     commentKey: '_comment_hard',
   },
   suggested: {
     label: 'Suggested Excludes (suggested)',
     desc: 'Polarising tags offered as one-tap excludes on setup and in Feed options.',
-    color: 'text-amber-400',
-    badgeBg: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
+    color: 'text-warning-fg',
+    badgeBg: 'bg-warning/10 text-warning-fg border-warning/30',
     commentKey: '_comment_suggested',
   },
   noise: {
     label: 'Noise Tags (noise)',
     desc: 'Quality, meta, and watermarking tags excluded from tag rankings and card stats.',
-    color: 'text-blue-400',
-    badgeBg: 'bg-blue-500/10 text-blue-300 border-blue-500/30',
+    color: 'text-info-fg',
+    badgeBg: 'bg-info/10 text-info-fg border-info/30',
     commentKey: '_comment_noise',
   },
 }
@@ -69,6 +69,13 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
   const [isSaving, setIsSaving] = useState(false)
   const [isCopied, setIsCopied] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  /** True once the first bridge sync resolved: before that, the panel must
+   *  NOT write (its initial state is the renderer's in-memory copy, which can
+   *  be older than the file). */
+  const [synced, setSynced] = useState(false)
+  /** The last state known to be ON DISK. An edit that does not differ from it
+   *  is not written (opening the panel must not write anything). */
+  const onDiskRef = useRef<string | null>(null)
 
   // Sync with main process / bridge on mount
   useEffect(() => {
@@ -76,15 +83,34 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
     syncBlocklistFromBridge()
       .then((current) => {
         if (mounted && current) {
+          onDiskRef.current = JSON.stringify(current)
           setData(current)
           setJsonText(JSON.stringify(current, null, 2))
         }
       })
       .catch(() => {})
+      .finally(() => {
+        if (mounted) setSynced(true)
+      })
     return () => {
       mounted = false
     }
   }, [])
+
+  // Auto-save: every edit persists immediately (no manual Save step).
+  //
+  // NOT before the first bridge sync, and NOT when the panel shows exactly
+  // what is already on disk. The panel used to save on MOUNT, which wrote the
+  // renderer's in-memory copy over the file — silently reverting a ban made
+  // in the clicker ("I banned yaoi and it came back").
+  useEffect(() => {
+    if (!synced) return
+    const stamp = JSON.stringify(data)
+    if (onDiskRef.current === stamp) return
+    void saveBlocklist(data)
+      .then(() => { onDiskRef.current = stamp })
+      .catch(() => {})
+  }, [data, synced])
 
   // Check if current data differs from factory defaults
   const isModified = useMemo(() => {
@@ -251,6 +277,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
     try {
       const ok = await saveBlocklist(payload)
       if (ok) {
+        onDiskRef.current = JSON.stringify(payload)
         setData(payload)
         setJsonText(JSON.stringify(payload, null, 2))
         toast?.('blocklist.json saved and applied to active filters.', 'success')
@@ -335,20 +362,20 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
   return (
     <div className="space-y-6 animate-orbit-fade-in">
       {/* Header card */}
-      <div className="p-4 bg-surface-interactive border border-border-glass rounded-xl space-y-3">
+      <div className="p-4 bg-surface-interactive border border-edge rounded-xl space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
+            <div className="w-8 h-8 rounded-xl bg-danger/10 border border-danger/20 flex items-center justify-center text-danger-fg">
               <ShieldAlert className="w-4 h-4" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-semibold text-retro-fg">Content Blocklist (blocklist.json)</h3>
                 <span
-                  className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-medium border ${
+                  className={`text-2xs px-2 py-0.5 rounded-full font-mono font-medium border ${
                     isModified
-                      ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-                      : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                      ? 'bg-warning/10 text-warning-fg border-warning/30'
+                      : 'bg-success/10 text-success-fg border-success/30'
                   }`}
                 >
                   {isModified ? 'Customized' : 'Factory Default'}
@@ -361,13 +388,13 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
           </div>
 
           {/* Mode Switcher */}
-          <div className="flex bg-surface-raised border border-border-glass rounded-xl p-1 text-xs font-bold shrink-0 self-start sm:self-auto">
+          <div className="flex bg-surface-raised border border-edge rounded-xl p-1 text-xs font-bold shrink-0 self-start sm:self-auto">
             <button
               type="button"
               onClick={switchToVisual}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition cursor-pointer ${
                 mode === 'visual'
-                  ? 'bg-black text-white shadow-xs'
+                  ? 'bg-retro-bg text-retro-fg shadow-xs'
                   : 'text-retro-muted hover:text-retro-fg'
               }`}
             >
@@ -377,9 +404,9 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
             <button
               type="button"
               onClick={switchToJson}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition cursor-pointer ${
                 mode === 'json'
-                  ? 'bg-black text-white shadow-xs'
+                  ? 'bg-retro-bg text-retro-fg shadow-xs'
                   : 'text-retro-muted hover:text-retro-fg'
               }`}
             >
@@ -408,27 +435,27 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
                     setActiveCategory(cat)
                     setSearchFilter('')
                   }}
-                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer space-y-1 ${
+                  className={`p-3 rounded-xl border text-left transition cursor-pointer space-y-1 ${
                     isSelected
                       ? 'bg-surface-interactive border-retro-accent shadow-xs'
-                      : 'bg-surface-raised border-border-glass hover:bg-surface-interactive'
+                      : 'bg-surface-raised border-edge hover:bg-surface-interactive'
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-retro-fg capitalize">{cat}</span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono border ${meta.badgeBg}`}>
+                    <span className={`text-2xs px-2 py-0.5 rounded-full font-mono border ${meta.badgeBg}`}>
                       {count}
                     </span>
                   </div>
-                  <p className="text-[10px] text-retro-muted truncate">{meta.desc}</p>
+                  <p className="text-2xs text-retro-muted truncate">{meta.desc}</p>
                 </button>
               )
             })}
           </div>
 
           {/* Active Category Editor */}
-          <div className="p-4 bg-surface-raised border border-border-glass rounded-xl space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-border-glass">
+          <div className="p-4 bg-surface-raised border border-edge rounded-xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-edge">
               <div>
                 <h4 className="text-xs font-semibold text-retro-fg">{CATEGORY_META[activeCategory].label}</h4>
                 <p className="text-xs text-retro-muted">{CATEGORY_META[activeCategory].desc}</p>
@@ -437,7 +464,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
                 <button
                   type="button"
                   onClick={clearCategory}
-                  className="text-xs text-red-400 hover:text-red-300 font-medium cursor-pointer self-start sm:self-auto"
+                  className="text-xs text-danger-fg hover:text-danger-fg font-medium cursor-pointer self-start sm:self-auto"
                 >
                   Clear All ({currentCategoryTags.length})
                 </button>
@@ -459,13 +486,13 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
                     }
                   }}
                   placeholder={`Add tag(s) to ${activeCategory}...`}
-                  className="flex-1 bg-surface-interactive border border-border-glass rounded-xl px-3 py-1.5 text-xs text-retro-fg outline-none focus:border-retro-accent placeholder:text-retro-muted/60"
+                  className="flex-1 bg-surface-interactive border border-edge rounded-xl px-3 py-1.5 text-xs text-retro-fg outline-none focus:border-retro-accent placeholder:text-retro-muted/60"
                 />
                 <button
                   type="button"
                   onClick={addTag}
                   disabled={!newTagInput.trim()}
-                  className="px-3 py-1.5 bg-retro-accent hover:bg-retro-accent-hover disabled:opacity-40 text-black rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer shrink-0"
+                  className="px-3 py-1.5 bg-retro-accent hover:bg-retro-accent-hover disabled:opacity-40 text-retro-accent-text rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer shrink-0"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Add</span>
@@ -480,7 +507,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
                   value={searchFilter}
                   onChange={(e) => setSearchFilter(e.target.value)}
                   placeholder={`Search ${currentCategoryTags.length} tags...`}
-                  className="w-full bg-surface-interactive border border-border-glass rounded-xl pl-8 pr-3 py-1.5 text-xs text-retro-fg outline-none focus:border-retro-accent placeholder:text-retro-muted/60"
+                  className="w-full bg-surface-interactive border border-edge rounded-xl pl-8 pr-3 py-1.5 text-xs text-retro-fg outline-none focus:border-retro-accent placeholder:text-retro-muted/60"
                 />
                 {searchFilter && (
                   <button
@@ -504,7 +531,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
                 {filteredTags.map((tag) => (
                   <span
                     key={tag}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-border-glass bg-glass-w5 px-2.5 py-1 text-xs font-mono text-retro-fg transition-colors hover:border-retro-accent/40"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-edge bg-glass-w5 px-2.5 py-1 text-xs font-mono text-retro-fg transition-colors hover:border-retro-accent/40"
                   >
                     <span>{tag}</span>
                     <button
@@ -512,7 +539,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
                       aria-label={`Remove ${tag}`}
                       title={`Remove ${tag}`}
                       onClick={() => removeTag(tag)}
-                      className="text-retro-muted hover:text-red-400 cursor-pointer text-xs"
+                      className="text-retro-muted hover:text-danger-fg cursor-pointer text-xs"
                     >
                       <X className="w-3 h-3" />
                     </button>
@@ -529,12 +556,12 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
             <div className="flex items-center gap-2">
               <span className="text-xs font-mono text-retro-muted">shared/blocklist.json</span>
               {jsonError ? (
-                <span className="text-[10px] text-red-400 flex items-center gap-1 font-mono">
+                <span className="text-2xs text-danger-fg flex items-center gap-1 font-mono">
                   <AlertCircle className="w-3 h-3" />
                   {jsonError}
                 </span>
               ) : (
-                <span className="text-[10px] text-emerald-400 flex items-center gap-1 font-mono">
+                <span className="text-2xs text-success-fg flex items-center gap-1 font-mono">
                   <Check className="w-3 h-3" />
                   Valid JSON
                 </span>
@@ -545,16 +572,16 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
               <button
                 type="button"
                 onClick={formatJson}
-                className="px-2.5 py-1 rounded-lg border border-border-glass text-xs font-bold text-retro-fg hover:bg-surface-interactive cursor-pointer"
+                className="px-2.5 py-1 rounded-lg border border-edge text-xs font-bold text-retro-fg hover:bg-surface-interactive cursor-pointer"
               >
                 Prettify
               </button>
               <button
                 type="button"
                 onClick={copyJson}
-                className="px-2.5 py-1 rounded-lg border border-border-glass text-xs font-bold text-retro-fg hover:bg-surface-interactive flex items-center gap-1 cursor-pointer"
+                className="px-2.5 py-1 rounded-lg border border-edge text-xs font-bold text-retro-fg hover:bg-surface-interactive flex items-center gap-1 cursor-pointer"
               >
-                {isCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                {isCopied ? <Check className="w-3 h-3 text-success-fg" /> : <Copy className="w-3 h-3" />}
                 <span>{isCopied ? 'Copied' : 'Copy'}</span>
               </button>
             </div>
@@ -567,22 +594,22 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
             spellCheck={false}
             className={`w-full font-mono text-xs p-3 rounded-xl bg-surface-interactive border outline-none leading-relaxed resize-y styled-scrollbar ${
               jsonError
-                ? 'border-red-500/60 focus:border-red-500 text-red-100'
-                : 'border-border-glass focus:border-retro-accent text-retro-fg'
+                ? 'border-danger/60 focus:border-danger text-danger-fg'
+                : 'border-edge focus:border-retro-accent text-retro-fg'
             }`}
           />
         </div>
       )}
 
       {/* Action Buttons Bar */}
-      <div className="p-4 bg-surface-interactive border border-border-glass rounded-xl flex flex-wrap items-center justify-between gap-3">
+      <div className="p-4 bg-surface-interactive border border-edge rounded-xl flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           {/* Save Button */}
           <button
             type="button"
             onClick={handleSave}
             disabled={isSaving || Boolean(jsonError)}
-            className="px-4 py-2 bg-retro-accent hover:bg-retro-accent-hover disabled:opacity-40 text-black rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+            className="px-4 py-2 bg-retro-accent hover:bg-retro-accent-hover disabled:opacity-40 text-retro-accent-text rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
           >
             <Save className="w-3.5 h-3.5" />
             <span>{isSaving ? 'Saving...' : 'Save Changes'}</span>
@@ -592,7 +619,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
           <button
             type="button"
             onClick={handleReset}
-            className="px-3 py-2 bg-surface-raised border border-border-glass hover:border-red-500/40 text-retro-muted hover:text-red-400 rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
+            className="px-3 py-2 bg-surface-raised border border-edge hover:border-danger/40 text-retro-muted hover:text-danger-fg rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Reset to Defaults</span>
@@ -604,7 +631,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="px-3 py-2 bg-surface-raised border border-border-glass hover:bg-surface-elevated text-retro-fg rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
+            className="px-3 py-2 bg-surface-raised border border-edge hover:bg-surface-elevated text-retro-fg rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
           >
             <Upload className="w-3.5 h-3.5 text-retro-muted" />
             <span>Import JSON</span>
@@ -621,7 +648,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
           <button
             type="button"
             onClick={handleExport}
-            className="px-3 py-2 bg-surface-raised border border-border-glass hover:bg-surface-elevated text-retro-fg rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
+            className="px-3 py-2 bg-surface-raised border border-edge hover:bg-surface-elevated text-retro-fg rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
           >
             <Download className="w-3.5 h-3.5 text-retro-muted" />
             <span>Export</span>

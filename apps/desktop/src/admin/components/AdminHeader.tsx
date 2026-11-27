@@ -68,7 +68,7 @@ export function AdminHeader({
 
   return (
     <header className={cn(
-      "h-14 border-b border-border-glass px-4 md:px-6 flex items-center justify-between shrink-0 glass-toolbar border-0 border-b border-border-glass rounded-none sticky top-0 z-30",
+      "h-14 border-b border-edge px-4 md:px-6 flex items-center justify-between shrink-0 glass-toolbar border-0 border-b border-edge rounded-none sticky top-0 z-30",
       isMobile && "px-3"
     )}>
       <div className="flex items-center gap-3 min-w-0">
@@ -93,7 +93,7 @@ export function AdminHeader({
             onChange={handleSearchChange}
             onKeyDown={handleKeyDown}
             placeholder={searchPlaceholder}
-            className="w-full bg-surface-raised border border-border-glass pl-10 pr-10 py-1.5 text-xs text-retro-fg placeholder:text-retro-muted rounded-md outline-none focus:border-retro-accent/60"
+            className="w-full bg-surface-raised border border-edge pl-10 pr-10 py-1.5 text-xs text-retro-fg placeholder:text-retro-muted rounded-md outline-none focus:border-retro-accent/60"
             aria-label="Search"
             autoComplete="off"
           />
@@ -106,7 +106,7 @@ export function AdminHeader({
             type="button"
             onClick={onRefresh}
             disabled={isLoading}
-            className="p-2 rounded border border-border-glass bg-surface-interactive hover:bg-glass-w10 text-retro-fg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="p-2 rounded border border-edge bg-surface-interactive hover:bg-glass-w10 text-retro-fg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             aria-label="Refresh data"
             aria-busy={isLoading}
           >
@@ -122,11 +122,11 @@ export function AdminHeader({
             aria-expanded={userMenuOpen}
             aria-haspopup="true"
           >
-            <div className="w-7 h-7 rounded-full bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-full bg-info/20 border border-info/30 flex items-center justify-center">
               {user?.avatar ? (
                 <img src={resolveMediaUrl(user.avatar)} alt="" className="w-full h-full rounded-full object-cover" />
               ) : (
-                <User className="w-4 h-4 text-cyan-300" />
+                <User className="w-4 h-4 text-info-fg" />
               )}
             </div>
             <span className="hidden sm:block text-xs font-bold text-retro-fg max-w-[120px] truncate">
@@ -136,10 +136,10 @@ export function AdminHeader({
           </button>
 
           {userMenuOpen && (
-            <div className="absolute right-0 top-full mt-2 z-50 min-w-[200px] bg-surface-elevated border border-border-glass rounded-lg shadow-lg overflow-hidden animate-orbit-pop">
-              <div className="px-3 py-2 border-b border-border-glass">
+            <div className="absolute right-0 top-full mt-2 z-50 min-w-[200px] bg-surface-elevated border border-edge rounded-lg shadow-lg overflow-hidden animate-orbit-pop">
+              <div className="px-3 py-2 border-b border-edge">
                 <p className="text-xs font-bold text-retro-fg truncate">{user?.name || "Administrator"}</p>
-                <p className="text-[10px] text-retro-muted truncate font-mono">Admin Console</p>
+                <p className="text-2xs text-retro-muted truncate font-mono">Admin Console</p>
               </div>
               <button
                 type="button"
@@ -158,7 +158,7 @@ export function AdminHeader({
                   setUserMenuOpen(false);
                   onSignOut?.();
                 }}
-                className="w-full px-3 py-2 text-left text-xs text-red-300 hover:bg-red-500/10 transition-colors flex items-center gap-2"
+                className="w-full px-3 py-2 text-left text-xs text-danger-fg hover:bg-danger/10 transition-colors flex items-center gap-2"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 Sign Out

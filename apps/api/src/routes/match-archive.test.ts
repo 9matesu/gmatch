@@ -147,10 +147,10 @@ describe('Match Archive (admin-only reports)', () => {
     expect(pBody.limit).toBe(1)
   })
 
-  it('returns full detail for a single archived match', async () => {
+  it('returns the round history in the archive listing', async () => {
     const aId = `user-a2-${Math.random().toString(36).slice(2, 8)}`
     const bId = `user-b2-${Math.random().toString(36).slice(2, 8)}`
-    const id = await seedArchivedMatch({
+    await seedArchivedMatch({
       userA: aId,
       userB: bId,
       nameA: 'Charlie',
@@ -162,18 +162,20 @@ describe('Match Archive (admin-only reports)', () => {
       perfect: 1,
       rounds: JSON.stringify([{ round: 1, matched: true }, { round: 2, matched: true }]),
     })
-    const res = await app.request(`/api/admin/matches/archive/${id}`, {
-      headers: authHeaders(adminId, 'GET', `/api/admin/matches/archive/${id}`),
+    const res = await app.request(`/api/admin/matches/archive?user=${encodeURIComponent(aId)}`, {
+      headers: authHeaders(adminId, 'GET', '/api/admin/matches/archive'),
     }, env)
     expect(res.status).toBe(200)
     const body: any = await res.json()
-    expect(body.user_a_name).toBe('Charlie')
-    expect(body.user_b_name).toBe('Dana')
-    expect(body.score_a).toBe(4)
-    expect(body.score_b).toBe(2)
-    expect(body.perfect).toBe(1)
-    expect(Array.isArray(body.rounds_history)).toBe(true)
-    expect(body.rounds_history.length).toBe(2)
+    const row = body.matches.find((m: any) => m.user_a === aId)
+    expect(row).toBeTruthy()
+    expect(row.user_a_name).toBe('Charlie')
+    expect(row.user_b_name).toBe('Dana')
+    expect(row.score_a).toBe(4)
+    expect(row.score_b).toBe(2)
+    expect(row.perfect).toBe(1)
+    expect(Array.isArray(row.rounds_history)).toBe(true)
+    expect(row.rounds_history.length).toBe(2)
   })
 
   it('archives a resolved match via resolveMatch', async () => {
@@ -194,8 +196,8 @@ describe('Match Archive (admin-only reports)', () => {
        VALUES (?, ?, ?, 'playing', 'result', 5, 5, 2, 1, '[]', '[]', '[]', ?, 1)`,
       [matchId, a, b, Date.now() + 60000]
     )
-    const row = await env._client.execute('SELECT * FROM GameMatches WHERE id = ?', [matchId])
-    const match = row.rows[0] as any
+    const matchRow = await env._client.execute('SELECT * FROM GameMatches WHERE id = ?', [matchId])
+    const match = matchRow.rows[0] as any
     await resolveMatch(env.DB, {
       id: match.id,
       user_a: match.user_a,
@@ -222,15 +224,17 @@ describe('Match Archive (admin-only reports)', () => {
       updated_at: match.updated_at,
     } as any, Date.now(), 'winner_a')
 
-    const res = await app.request(`/api/admin/matches/archive/${matchId}`, {
-      headers: authHeaders(adminId, 'GET', `/api/admin/matches/archive/${matchId}`),
+    const res = await app.request('/api/admin/matches/archive', {
+      headers: authHeaders(adminId, 'GET', '/api/admin/matches/archive'),
     }, env)
     expect(res.status).toBe(200)
     const body: any = await res.json()
-    expect(body.user_a_name).toBe('ResolvedA')
-    expect(body.user_b_name).toBe('ResolvedB')
-    expect(body.result).toBe('winner_a')
-    expect(body.score_a).toBe(2)
-    expect(body.score_b).toBe(1)
+    const row = body.matches.find((m: any) => m.id === matchId)
+    expect(row).toBeTruthy()
+    expect(row.user_a_name).toBe('ResolvedA')
+    expect(row.user_b_name).toBe('ResolvedB')
+    expect(row.result).toBe('winner_a')
+    expect(row.score_a).toBe(2)
+    expect(row.score_b).toBe(1)
   })
 })

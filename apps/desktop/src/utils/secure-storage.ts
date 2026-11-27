@@ -67,18 +67,7 @@ function bridge(): SecureBridge | null {
 /** Secure-mode RAM mirror: key -> value (null = absent). */
 const mirror = new Map<string, string | null>()
 let secureMode = false
-let encryptionAvailable: boolean | null = null
 let initPromise: Promise<void> | null = null
-
-/**
- * Whether the main-process store can actually ENCRYPT (Electron
- * safeStorage/DPAPI). `false` means the KV is holding plaintext envelopes —
- * the settings security warning reads this. Never a reason to read
- * localStorage instead of the KV (see doInit).
- */
-export function secureEncryptionAvailable(): boolean | null {
-  return encryptionAvailable
-}
 
 /**
  * One-time boot migration+load (Electron): plaintext in localStorage moves
@@ -93,12 +82,6 @@ export function initSecureStorage(): Promise<void> {
 async function doInit(): Promise<void> {
   const b = bridge()
   if (!b) return // browser/dev: pure localStorage mode
-  let available = false
-  try {
-    available = await b.secureAvailable()
-  } catch {
-    available = false
-  }
   // The KV is used whenever the bridge exists — even when safeStorage reports
   // encryption unavailable. Flapping availability used to strand the player:
   // the boot where encryption WAS available migrated `orbit_identity` into the
@@ -106,7 +89,6 @@ async function doInit(): Promise<void> {
   // and read localStorage, which no longer held anything → a permanent,
   // unexplained logout. The main store still answers while unencrypted (plain
   // envelopes), so read through it and surface the degradation instead.
-  encryptionAvailable = available
   secureMode = true
   for (const key of SECURE_KEYS) {
     let kvVal: string | null = null
@@ -202,7 +184,7 @@ async function drain(): Promise<void> {
 }
 
 /** Await all queued writes (used by tests + beforeunload). */
-export async function flushWrites(): Promise<void> {
+async function flushWrites(): Promise<void> {
   while (pending.size) await drain()
 }
 
@@ -267,7 +249,6 @@ export const _test = {
     mirror.clear()
     pending.clear()
     secureMode = false
-    encryptionAvailable = null
     initPromise = null
   },
 }

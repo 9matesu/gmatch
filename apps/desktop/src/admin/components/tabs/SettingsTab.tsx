@@ -12,6 +12,7 @@ import {
   BarChart2,
 } from "lucide-react";
 import { cn } from "../../../lib/utils";
+import { SubTabBar } from "../SubTabBar";
 import { formatAbsoluteTime } from "../../../utils/timeAgo";
 import type { OrbitIdentity } from "@orbit/crypto";
 import type { AdminAuditEntry, AdminDailyStat } from "../../../utils/adminTypes";
@@ -163,59 +164,42 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-black text-retro-fg uppercase tracking-wider">System & Settings</h1>
+          <h1 className="text-lg font-black text-retro-fg tracking-wider">System & Settings</h1>
           <p className="text-xs text-retro-muted mt-0.5">Platform configurations, administrative audit log, and database maintenance</p>
         </div>
       </div>
 
-      {/* Subtab Navigation */}
-      <div className="flex flex-wrap gap-1 bg-surface-raised border border-border-glass rounded-xl p-1">
-        {subTabs.map(section => {
-          const Icon = section.icon;
-          const active = activeSubTab === section.id;
-          return (
-            <button
-              key={section.id}
-              type="button"
-              onClick={() => setActiveSubTab(section.id)}
-              className={cn(
-                "px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer",
-                active
-                  ? "bg-retro-accent text-retro-accent-text shadow-sm"
-                  : "text-retro-muted hover:text-retro-fg"
-              )}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {section.label}
-            </button>
-          );
-        })}
-      </div>
+      <SubTabBar
+        tabs={subTabs}
+        active={activeSubTab}
+        onChange={(id) => setActiveSubTab(id as SubTab)}
+      />
 
       {/* Subtab 1: Platform Settings */}
       {activeSubTab === "platform" && (
         <div className="space-y-6">
-          <div className="rounded-xl border border-border-glass bg-surface-raised p-5 space-y-6">
-            <div className="flex items-center justify-between border-b border-border-glass pb-3">
+          <div className="rounded-xl border border-edge bg-surface-raised p-5 space-y-6">
+            <div className="flex items-center justify-between border-b border-edge pb-3">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-retro-fg">
-                <Globe className="w-4 h-4 text-cyan-300" />
+                <Globe className="w-4 h-4 text-info-fg" />
                 <span>Discord Community Invite</span>
               </div>
             </div>
             <div className="space-y-3">
-              <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider block">Discord Invite URL</label>
+              <label htmlFor="admin-discord-invite" className="text-2xs font-bold text-retro-muted uppercase tracking-wider block">Discord Invite URL</label>
               <div className="flex items-center gap-2">
                 <input
+                id="admin-discord-invite"
                   type="text"
                   value={discordLink}
                   onChange={e => setDiscordLink(e.target.value)}
                   placeholder="https://discord.gg/..."
-                  className="flex-1 bg-glass-w8 border border-border-glass rounded-lg px-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent"
+                  className="flex-1 bg-glass-w8 border border-edge rounded-lg px-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent"
                 />
                 <button
                   type="button"
                   onClick={handleSaveDiscord}
-                  className="px-4 py-2 bg-retro-accent text-retro-accent-text rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                  className="px-4 py-2 bg-retro-accent text-retro-accent-text rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
                 >
                   <Save className="w-3.5 h-3.5" />
                   Save
@@ -224,29 +208,30 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
             </div>
           </div>
 
-          <div className="rounded-xl border border-border-glass bg-surface-raised p-5 space-y-6">
-            <div className="flex items-center justify-between border-b border-border-glass pb-3">
+          <div className="rounded-xl border border-edge bg-surface-raised p-5 space-y-6">
+            <div className="flex items-center justify-between border-b border-edge pb-3">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-retro-fg">
-                <ZapIcon className="w-4 h-4 text-amber-400" />
+                <ZapIcon className="w-4 h-4 text-warning-fg" />
                 <span>Economy Cashout Rate</span>
               </div>
             </div>
             <div className="space-y-3">
-              <label className="text-[10px] font-bold text-retro-muted uppercase tracking-wider block">Cashout Rate (basis points)</label>
+              <label htmlFor="admin-cashout-bps" className="text-2xs font-bold text-retro-muted uppercase tracking-wider block">Cashout Rate (basis points)</label>
               <p className="text-xs text-retro-muted">1 bp = 0.01%. Current: {(cashoutRateBps / 100).toFixed(2)}% (12500 = 125%)</p>
               <div className="flex items-center gap-2">
                 <input
+                id="admin-cashout-bps"
                   type="number"
                   value={cashoutRateBps}
                   onChange={e => setCashoutRateBps(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
                   min={0}
                   max={100000}
-                  className="flex-1 bg-glass-w8 border border-border-glass rounded-lg px-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent font-mono"
+                  className="flex-1 bg-glass-w8 border border-edge rounded-lg px-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent font-mono"
                 />
                 <button
                   type="button"
                   onClick={handleSaveCashout}
-                  className="px-4 py-2 bg-retro-accent text-retro-accent-text rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                  className="px-4 py-2 bg-retro-accent text-retro-accent-text rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
                 >
                   <Save className="w-3.5 h-3.5" />
                   Save Rate
@@ -260,7 +245,7 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
       {/* Subtab 2: Audit Log & Daily Stats */}
       {activeSubTab === "audit" && (
         <div className="space-y-4">
-          <div className="flex items-center gap-2 border-b border-border-glass pb-3">
+          <div className="flex items-center gap-2 border-b border-edge pb-3">
             <button
               type="button"
               onClick={() => setAuditSubTab("log")}
@@ -284,26 +269,26 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
           </div>
 
           {auditSubTab === "log" ? (
-            <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
+            <div className="rounded-xl border border-edge bg-surface-raised overflow-hidden">
               {isLoadingAudit ? (
                 <AdminLoadingState rows={6} columns={4} />
               ) : auditLog.length === 0 ? (
                 <AdminEmptyState title="No audit entries" description="Zero administrative actions logged" illustration="folder" />
               ) : (
-                <div className="divide-y divide-border-subtle">
+                <div className="divide-y divide-edge-subtle">
                   {auditLog.map(entry => (
                     <div key={entry.id} className="p-3 flex items-center justify-between gap-3 hover:bg-glass-w5 transition-colors">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <Badge variant="info" size="sm">{entry.action}</Badge>
                           <span className="text-xs font-bold text-retro-fg">{entry.admin_name || entry.admin_id.slice(0, 8)}</span>
-                          <span className="text-[10px] text-retro-muted">{formatAbsoluteTime(entry.created_at)}</span>
+                          <span className="text-2xs text-retro-muted">{formatAbsoluteTime(entry.created_at)}</span>
                         </div>
                         <p className="text-xs text-retro-body mt-1">
                           Target: <span className="font-mono text-retro-fg">{entry.target_type}:{entry.target_id}</span>
                         </p>
                         {entry.reason && (
-                          <p className="text-[10px] text-retro-muted font-mono mt-0.5 truncate">
+                          <p className="text-2xs text-retro-muted font-mono mt-0.5 truncate">
                             Reason: {entry.reason}
                           </p>
                         )}
@@ -316,26 +301,26 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
           ) : (
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                <div className="p-4 rounded-xl border border-border-glass bg-surface-raised">
-                  <span className="text-[10px] font-bold text-retro-muted uppercase block mb-1">Active Users</span>
+                <div className="p-4 rounded-xl border border-edge bg-surface-raised">
+                  <span className="text-2xs font-bold text-retro-muted uppercase block mb-1">Active Users</span>
                   <div className="h-10">
                     <Sparkline data={dailyStats.map(d => d.active_users)} color="#34d399" />
                   </div>
                 </div>
-                <div className="p-4 rounded-xl border border-border-glass bg-surface-raised">
-                  <span className="text-[10px] font-bold text-retro-muted uppercase block mb-1">Matches Played</span>
+                <div className="p-4 rounded-xl border border-edge bg-surface-raised">
+                  <span className="text-2xs font-bold text-retro-muted uppercase block mb-1">Matches Played</span>
                   <div className="h-10">
                     <Sparkline data={dailyStats.map(d => d.matches_played)} color="#a855f7" />
                   </div>
                 </div>
-                <div className="p-4 rounded-xl border border-border-glass bg-surface-raised">
-                  <span className="text-[10px] font-bold text-retro-muted uppercase block mb-1">Peak Concurrent</span>
+                <div className="p-4 rounded-xl border border-edge bg-surface-raised">
+                  <span className="text-2xs font-bold text-retro-muted uppercase block mb-1">Peak Concurrent</span>
                   <div className="h-10">
                     <Sparkline data={dailyStats.map(d => d.peak_concurrent)} color="#38bdf8" />
                   </div>
                 </div>
-                <div className="p-4 rounded-xl border border-border-glass bg-surface-raised">
-                  <span className="text-[10px] font-bold text-retro-muted uppercase block mb-1">New Signups</span>
+                <div className="p-4 rounded-xl border border-edge bg-surface-raised">
+                  <span className="text-2xs font-bold text-retro-muted uppercase block mb-1">New Signups</span>
                   <div className="h-10">
                     <Sparkline data={dailyStats.map(d => d.new_users)} color="#f59e0b" />
                   </div>
@@ -349,8 +334,8 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
       {/* Subtab 3: Maintenance & Danger Zone */}
       {activeSubTab === "danger" && (
         <div className="space-y-4">
-          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-5 space-y-2">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-red-300">
+          <div className="bg-danger/10 border border-danger/30 rounded-xl p-5 space-y-2">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-danger-fg">
               <AlertTriangle className="w-4 h-4" />
               <span>Danger Zone & Server Maintenance</span>
             </div>
@@ -360,48 +345,48 @@ export function SettingsTab({ identity, pinVerified, onAction }: SettingsTabProp
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-5 space-y-3">
+            <div className="rounded-xl border border-danger/30 bg-danger/ p-5 space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-xs font-bold text-red-300 uppercase tracking-wider">Run Database Cleanup</h3>
-                  <p className="text-[10px] text-retro-muted mt-1">Expires stale content, sweeps orphan blobs, and resets daily scores.</p>
+                  <h3 className="text-xs font-bold text-danger-fg tracking-wider">Run Database Cleanup</h3>
+                  <p className="text-2xs text-retro-muted mt-1">Expires stale content, sweeps orphan blobs, and resets daily scores.</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowCleanupConfirm(true)}
-                  className="px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shrink-0 cursor-pointer"
+                  className="px-3 py-2 bg-danger/20 hover:bg-danger/30 text-danger-fg border border-danger/30 rounded-xl text-xs font-bold uppercase tracking-wider transition shrink-0 cursor-pointer"
                 >
                   Run Cleanup
                 </button>
               </div>
             </div>
 
-            <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-5 space-y-3">
+            <div className="rounded-xl border border-danger/30 bg-danger/ p-5 space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-xs font-bold text-red-300 uppercase tracking-wider">Clean ALL Posts & Reset</h3>
-                  <p className="text-[10px] text-retro-muted mt-1">Purges all user posts, media objects, likes and comments platform-wide.</p>
+                  <h3 className="text-xs font-bold text-danger-fg tracking-wider">Clean ALL Posts & Reset</h3>
+                  <p className="text-2xs text-retro-muted mt-1">Purges all user posts, media objects, likes and comments platform-wide.</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowCleanPostsConfirm(true)}
-                  className="px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shrink-0 cursor-pointer"
+                  className="px-3 py-2 bg-danger/20 hover:bg-danger/30 text-danger-fg border border-danger/30 rounded-xl text-xs font-bold uppercase tracking-wider transition shrink-0 cursor-pointer"
                 >
                   Clean All
                 </button>
               </div>
             </div>
 
-            <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5 space-y-3 md:col-span-2">
+            <div className="rounded-xl border border-warning/30 bg-warning/ p-5 space-y-3 md:col-span-2">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-xs font-bold text-amber-300 uppercase tracking-wider">Migrate Lobby → Posts</h3>
-                  <p className="text-[10px] text-retro-muted mt-1">Transfers all lobby board images into user gMatch profiles under Posts, preserving metadata.</p>
+                  <h3 className="text-xs font-bold text-warning-fg tracking-wider">Migrate Lobby → Posts</h3>
+                  <p className="text-2xs text-retro-muted mt-1">Transfers all lobby board images into user gMatch profiles under Posts, preserving metadata.</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowMigrateConfirm(true)}
-                  className="px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shrink-0 cursor-pointer"
+                  className="px-3 py-2 bg-warning/20 hover:bg-warning/30 text-warning-fg border border-warning/30 rounded-xl text-xs font-bold uppercase tracking-wider transition shrink-0 cursor-pointer"
                 >
                   Migrate Now
                 </button>

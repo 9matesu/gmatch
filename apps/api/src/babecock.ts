@@ -131,7 +131,7 @@ export async function startRound(
   const roundId = crypto.randomUUID()
   const deadline = Date.now() + BABECOCK_ROUND_SECONDS * 1000
   const gridSize = Math.max(3, Math.ceil(Math.sqrt(images.length)))
-  await db.batch([
+  await db.atomicBatch([
     db.prepare('INSERT INTO BabecockRounds (id, host_id, status, phase_deadline, grid_size) VALUES (?, ?, \'open\', ?, ?)').bind(roundId, hostId, deadline, gridSize),
     ...images.map((entry, index) => db.prepare('INSERT INTO BabecockEntries (id, round_id, user_id, content_url, mime_type, grid_position) VALUES (?, ?, ?, ?, ?, ?)').bind(crypto.randomUUID(), roundId, hostId, entry.contentUrl, entry.mimeType, index)),
   ])
@@ -172,7 +172,7 @@ export async function addHostEntries(
   const startPosition = Number(existing?.count || 0)
   const total = startPosition + images.length
   const gridSize = Math.max(3, Math.ceil(Math.sqrt(total)))
-  await db.batch([
+  await db.atomicBatch([
     db.prepare('UPDATE BabecockRounds SET grid_size = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(gridSize, roundId),
     ...images.map((entry, index) => db.prepare('INSERT INTO BabecockEntries (id, round_id, user_id, content_url, mime_type, grid_position) VALUES (?, ?, ?, ?, ?, ?)').bind(crypto.randomUUID(), roundId, hostId, entry.contentUrl, entry.mimeType, startPosition + index)),
   ])

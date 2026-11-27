@@ -155,7 +155,7 @@ export function ActionModal({
         aria-label={`${actionTitle} settings`}
       >
         {/* Header */}
-        <div className="px-5 py-3.5 border-b border-border-subtle flex items-center justify-between">
+        <div className="px-5 py-3.5 border-b border-edge-subtle flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-md glass-inset flex items-center justify-center">
               <Sparkles className="w-3.5 h-3.5 text-retro-muted" />
@@ -180,18 +180,18 @@ export function ActionModal({
         <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs">
           {needsUrl && (
             <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-retro-fg">
+              <span className="block text-xs font-medium text-retro-fg">
                 {action === 'popup_video' ? 'Video (mp4/webm)' : 'Image'}
-              </label>
+              </span>
               <button
                 type="button"
                 onClick={() => void openMediaPicker().then((sel) => { if (sel) void takeSelection(sel); })}
                 className={`w-full flex items-center gap-2 px-3 py-2 rounded-md border text-left transition-colors cursor-pointer ${
-                  formError ? 'border-retro-error' : 'border-border-glass hover:border-retro-accent'
+                  formError ? 'border-retro-error' : 'border-edge hover:border-retro-accent'
                 } bg-surface-interactive`}
               >
                 <FolderOpen className="w-3.5 h-3.5 text-retro-muted shrink-0" />
-                <span className="text-[11px] text-retro-fg truncate">
+                <span className="text-xs text-retro-fg truncate">
                   {inlineName
                     ? `Inline: ${inlineName}`
                     : url
@@ -204,11 +204,11 @@ export function ActionModal({
                 </span>
               </button>
               {inlineName && (
-                <p className="text-[10px] text-retro-muted">
+                <p className="text-2xs text-retro-muted">
                   Inline: {inlineName} — the image rides sealed in the request, so it reaches them with no shared server.
                 </p>
               )}
-              <p className="text-[10px] text-retro-muted">
+              <p className="text-2xs text-retro-muted">
                 {action === 'popup_video'
                   ? 'Paste a direct https media link. Their client loads it straight.'
                   : 'From your media, this device, or a direct https link (picked images ride sealed to them, up to 4 MB).'}
@@ -218,8 +218,9 @@ export function ActionModal({
 
           {needsText && (
             <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-retro-fg">Message</label>
+              <label htmlFor="domination-message" className="block text-xs font-medium text-retro-fg">Message</label>
               <textarea
+                id="domination-message"
                 rows={3}
                 maxLength={action === 'text_overlay' ? 120 : 280}
                 placeholder="What they will see…"
@@ -233,10 +234,11 @@ export function ActionModal({
           {action === 'text_overlay' && (
             <div className="grid grid-cols-3 gap-2.5 p-3 rounded-lg glass-inset">
               <div>
-                <label className="block text-[10px] text-retro-muted mb-1 flex items-center gap-1">
+                <label htmlFor="domination-position" className="block text-2xs text-retro-muted mb-1 flex items-center gap-1">
                   <Layers className="w-3 h-3" /> Position
                 </label>
                 <select
+                  id="domination-position"
                   value={position}
                   onChange={(e) => setPosition(e.target.value as any)}
                   className={`${field} p-2`}
@@ -249,10 +251,11 @@ export function ActionModal({
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] text-retro-muted mb-1 flex items-center gap-1">
+                <label htmlFor="domination-size" className="block text-2xs text-retro-muted mb-1 flex items-center gap-1">
                   <Sliders className="w-3 h-3" /> Size
                 </label>
                 <select
+                  id="domination-size"
                   value={size}
                   onChange={(e) => setSize(e.target.value as any)}
                   className={`${field} p-2`}
@@ -263,10 +266,11 @@ export function ActionModal({
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] text-retro-muted mb-1 flex items-center gap-1">
+                <label htmlFor="domination-color" className="block text-2xs text-retro-muted mb-1 flex items-center gap-1">
                   <Palette className="w-3 h-3" /> Color
                 </label>
                 <input
+                  id="domination-color"
                   type="color"
                   value={color}
                   onChange={(e) => setColor(e.target.value)}
@@ -279,10 +283,11 @@ export function ActionModal({
           {action === 'blur' && (
             <div className="p-3.5 rounded-lg glass-inset space-y-2">
               <div className="flex justify-between items-center text-xs">
-                <label className="font-medium text-retro-fg">Blur strength</label>
+                <label htmlFor="domination-blur" className="font-medium text-retro-fg">Blur strength</label>
                 <span className="font-mono text-retro-muted">{intensity}px</span>
               </div>
               <input
+                  id="domination-blur"
                 type="range"
                 min="2"
                 max="24"
@@ -296,10 +301,11 @@ export function ActionModal({
           {action !== 'camera' && (
             <div className="p-3.5 rounded-lg glass-inset space-y-2">
               <div className="flex justify-between items-center text-xs">
-                <label className="font-medium text-retro-fg">Duration</label>
+                <label htmlFor="domination-duration" className="font-medium text-retro-fg">Duration</label>
                 <span className="font-mono text-retro-muted">{duration}s</span>
               </div>
               <input
+                  id="domination-duration"
                 type="range"
                 aria-label="Duration"
                 min="3"
@@ -331,7 +337,7 @@ export function ActionModal({
           )}
 
           {formError && (
-            <p className="text-xs text-rose-400" role="alert">{formError}</p>
+            <p className="text-xs text-danger-fg" role="alert">{formError}</p>
           )}
 
           {/* Footer: honest cost line */}

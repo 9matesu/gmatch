@@ -17,7 +17,7 @@ export interface EpochState {
   prev: string
 }
 
-export function newEpoch(): string {
+function newEpoch(): string {
   const b = new Uint8Array(16)
   crypto.getRandomValues(b)
   return Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('')

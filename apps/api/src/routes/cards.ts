@@ -3,6 +3,7 @@ import { orbitAuth } from '../middleware/auth'
 import type { D1Turso } from '../db'
 import { CardService } from '../cards'
 import { badRequest, toDomainError } from '../common/errors'
+import { findDisplayName } from '../common/userLookup'
 import type { CardRarity } from '@orbit/shared'
 
 type Bindings = { DB: D1Turso }
@@ -92,8 +93,7 @@ cards.post('/:id/buy', async (c) => {
   if (!result.replayed) {
     // Seller ping — best-effort; the purchase already stands (follow-notify pattern).
     try {
-      const buyer = await c.env.DB.prepare('SELECT display_name FROM Users WHERE id = ?').bind(result.buyerId).first<{ display_name: string | null }>()
-      const name = buyer?.display_name?.trim() || 'Someone'
+      const name = (await findDisplayName(c.env.DB, result.buyerId))?.trim() || 'Someone'
       const { createNotification } = await import('../notifications')
       const { broadcastToUser } = await import('../ws-bus')
       const notif = await createNotification(c.env.DB, result.sellerId, 'card_purchase', `${name} bought your card`, null, { card_id: result.cardId, buyer_id: result.buyerId })
@@ -110,11 +110,7 @@ cards.post('/:id/transfer', async (c) => {
   const service = new CardService(c.env.DB)
   const card = await service.transferOwnership(fromUserId, toUserId, c.req.param('id'))
   try {
-    const sender = await c.env.DB
-      .prepare('SELECT display_name FROM Users WHERE id = ?')
-      .bind(fromUserId)
-      .first<{ display_name: string | null }>()
-    const senderName = sender?.display_name?.trim() || fromUserId
+    const senderName = (await findDisplayName(c.env.DB, fromUserId))?.trim() || fromUserId
     const { createNotification } = await import('../notifications')
     const { broadcastToUser } = await import('../ws-bus')
     const notif = await createNotification(

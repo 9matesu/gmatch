@@ -105,7 +105,7 @@ export function UpdateSection({ toast }: {
   const hasUpdateFallback = Boolean(installed && latest && isNewer(latest.version, installed));
 
   return (
-    <div className="p-4 bg-surface-interactive border border-border-glass rounded-lg space-y-3">
+    <div className="p-4 bg-surface-interactive border border-edge rounded-lg space-y-3">
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
           <h4 className="text-xs font-medium text-retro-fg">Updates</h4>
@@ -129,7 +129,7 @@ export function UpdateSection({ toast }: {
               type="button"
               disabled={installing}
               onClick={() => { playPress(900); void install(); }}
-              className="px-3 py-1.5 rounded-lg bg-retro-accent text-black text-xs font-bold cursor-pointer flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-lg bg-retro-accent text-retro-accent-text text-xs font-bold cursor-pointer flex items-center gap-1.5"
             >
               <Rocket className="w-3.5 h-3.5" /> {installing ? 'Restarting…' : `Install & Restart`}
             </button>
@@ -143,7 +143,7 @@ export function UpdateSection({ toast }: {
                 if (bridge?.openExternal) void bridge.openExternal(url);
                 else if (typeof window !== 'undefined') window.open(url, '_blank');
               }}
-              className="px-3 py-1.5 rounded-lg bg-retro-accent text-black text-xs font-bold cursor-pointer flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-lg bg-retro-accent text-retro-accent-text text-xs font-bold cursor-pointer flex items-center gap-1.5"
             >
               <Download className="w-3.5 h-3.5" /> Download {latest.version}
             </button>
@@ -152,7 +152,7 @@ export function UpdateSection({ toast }: {
             type="button"
             disabled={busy}
             onClick={() => { playPress(700); void (updater ? check() : checkFallback()); }}
-            className="px-3 py-1.5 rounded-lg border border-border-glass text-xs text-retro-muted hover:text-retro-fg disabled:opacity-40 cursor-pointer flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-lg border border-edge text-xs text-retro-muted hover:text-retro-fg disabled:opacity-40 cursor-pointer flex items-center gap-1.5"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${busy ? 'animate-spin' : ''}`} /> {busy ? 'Checking…' : 'Check for updates'}
           </button>
@@ -162,16 +162,16 @@ export function UpdateSection({ toast }: {
               playPress(700);
               window.dispatchEvent(new CustomEvent('gmatch-open-changelog'));
             }}
-            className="px-3 py-1.5 rounded-lg border border-border-glass text-xs text-retro-muted hover:text-retro-fg cursor-pointer flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-lg border border-edge text-xs text-retro-muted hover:text-retro-fg cursor-pointer flex items-center gap-1.5"
           >
             <Sparkles className="w-3.5 h-3.5 text-retro-accent" /> What&apos;s New
           </button>
         </div>
       </div>
       {updater && phase === 'error' && (
-        <div className="flex items-start justify-between gap-3 text-[10px] text-retro-muted">
+        <div className="flex items-start justify-between gap-3 text-2xs text-retro-muted">
           <p className="flex items-start gap-1.5 min-w-0">
-            <ShieldAlert className="w-3 h-3 shrink-0 mt-px text-amber-400" />
+            <ShieldAlert className="w-3 h-3 shrink-0 mt-px text-warning-fg" />
             <span className="break-words">{status?.error || 'Update failed'}. You can grab the .exe manually.</span>
           </p>
           <button type="button" onClick={openReleases} className="shrink-0 underline hover:text-retro-fg cursor-pointer">
@@ -180,15 +180,15 @@ export function UpdateSection({ toast }: {
         </div>
       )}
       {updater && phase === 'ready' && (
-        <p className="text-[10px] text-retro-muted flex items-start gap-1.5">
-          {status?.verified ? <ShieldCheck className="w-3 h-3 shrink-0 mt-px text-emerald-400" /> : <ShieldCheck className="w-3 h-3 shrink-0 mt-px text-amber-400" />}
+        <p className="text-2xs text-retro-muted flex items-start gap-1.5">
+          {status?.verified ? <ShieldCheck className="w-3 h-3 shrink-0 mt-px text-success-fg" /> : <ShieldCheck className="w-3 h-3 shrink-0 mt-px text-warning-fg" />}
           {status?.verified
             ? 'Download verified (SHA-256 matches the release digest).'
             : 'SHA-256 digest was not published on this release. The file comes straight from the repo, unverified.'}
         </p>
       )}
       {!updater && hasUpdateFallback && (
-        <p className="text-[10px] text-retro-muted flex items-start gap-1.5">
+        <p className="text-2xs text-retro-muted flex items-start gap-1.5">
           <ShieldCheck className="w-3 h-3 shrink-0 mt-px" />
           Verify before running: <code className="font-mono break-all">SHA-256 {latest?.sha256}</code>. In
           PowerShell: <code className="font-mono">Get-FileHash $env:USERPROFILE\Downloads\{latest?.file} -Algorithm SHA256</code>

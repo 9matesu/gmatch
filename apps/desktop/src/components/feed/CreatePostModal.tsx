@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Trash2,
+  Link2,
 } from 'lucide-react';
 import { useMediaPicker } from '../media/MediaPickerModal';
 import { selectionToFile, type MediaSelection } from '../media/picker';
@@ -69,6 +70,8 @@ export function CreatePostModal({
   const [tags, setTags] = useState(initialTags || '');
   const [aspectRatio, setAspectRatio] = useState<'square' | 'portrait' | 'landscape'>('square');
   const [uploading, setUploading] = useState(false);
+  /** Typed link to post as a shared anchor (not media). */
+  const [linkUrl, setLinkUrl] = useState('');
 
   // Camera state
   const [,setIsCameraActive] = useState(false);
@@ -166,6 +169,43 @@ function extForMime(mime: string): string {
   return 'jpg';
 }
 
+/**
+ * True when a URL points straight at media BYTES (an image / video file), as
+ * opposed to a page that merely shows one.
+ *
+ * The share path proxies every URL as if it were an image, so this decides
+ * whether a pasted link belongs in the media list or in the written body.
+ * Extension-less URLs are NOT media here: a query-string image
+ * (`?image=…`) is rare next to the far more common article/product link, and
+ * a false positive means the post FAILS instead of degrading to a text post.
+ */
+function isDirectMediaUrl(raw: string): boolean {
+  try {
+    const clean = new URL(raw).pathname.toLowerCase();
+    return /\.(?:jpe?g|png|gif|webp|avif|bmp|mp4|webm|mov|m4v|ogv|mkv)$/.test(clean);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Put a shared link into the written body.
+ *
+ * Appended, never replacing: the player may have written a caption already, and
+ * the link is the thing being shared, not a reason to lose their words. The
+ * feed renders it as a safe anchor (Linkify) and the notification/permalink
+ * paths already escape everything.
+ */
+function addLinkToCaption(raw: string): void {
+  setCaption((prev) => {
+    const trimmed = prev.trim();
+  if (trimmed.includes(raw)) return prev;
+  return trimmed ? `${trimmed}\n${raw}` : raw;
+  });
+  toast?.('Link added to your post.', 'success');
+  playPress(840);
+}
+
   const handleFilesSelected = async (files: FileList | File[] | null) => {
     if (!files || files.length === 0) return;
     const room = MAX_MEDIA - mediaList.length;
@@ -208,6 +248,20 @@ function extForMime(mime: string): string {
     if (!raw) return;
     if (!/^https?:\/\//i.test(raw)) {
       toast?.('Paste a full https:// link', 'warning');
+      return;
+    }
+    // A link that is NOT media belongs in the written body, not in the media
+    // list: the server proxies every URL as if it were an image, so a news
+    // article or a product page failed with "Could not fetch or validate the
+    // URL" and the post could not be made at all. The feed already renders
+    // URLs in a caption as safe anchors (Linkify), so a text post that carries
+    // a link is the SAME post — no schema, no migration.
+    //
+    // A video PAGE (redgifs watch, YouTube, Vimeo) still goes to the media
+    // list: the server has a resolver for those and the row is honest about
+    // being a placeholder until it lands.
+    if (!isDirectMediaUrl(raw) && !isTwitterUrl(raw) && !isVideoPageUrl(raw)) {
+      addLinkToCaption(raw);
       return;
     }
     // Page URLs (X posts, watch pages) are not media bytes: resolve to a
@@ -293,8 +347,8 @@ function extForMime(mime: string): string {
       toast?.('Please sign in to share posts', 'error');
       return;
     }
-    if (mediaList.length === 0) {
-      toast?.('Please add at least one photo or video', 'warning');
+    if (mediaList.length === 0 && !caption.trim()) {
+      toast?.('Write something, or add a photo', 'warning');
       return;
     }
 
@@ -307,9 +361,51 @@ function extForMime(mime: string): string {
       // first row carries caption/location/tags.
       const postGroup = crypto.randomUUID();
       const ids: string[] = [];
+
+      // Text-only post (Twitter-style): the same object row with no bytes. The
+      // API accepts it and the feed renders the written body.
+      if (mediaList.length === 0) {
+        const form = new FormData();
+        form.append('post_caption', caption.trim());
+        form.append('location', location.trim());
+        form.append('tags', tags.trim());
+        form.append('is_public', mode === 'story' ? '0' : '1');
+        form.append('post_group', postGroup);
+        const res = await orbitFetch('/api/objects', { method: 'POST', body: form }, identity);
+        if (!res.ok) {
+          const err = await res.json().catch(() => null);
+          throw new Error(err?.error || 'Could not publish the post');
+        }
+        const data = await res.json();
+        toast?.('Post shared.', 'success');
+        onPostCreated?.({
+          id: data.id,
+          author_id: identity.orbitId,
+          author_name: 'You',
+          author_avatar: null,
+          url: '',
+          mediaUrls: [],
+          localPreviewUrl: null,
+          mime_type: undefined,
+          caption: caption.trim(),
+          location: location.trim(),
+          tags: tags.split(/[\s,#]+/).map((t) => t.trim()).filter(Boolean),
+          created_at: new Date().toISOString(),
+          like_count: 0,
+          comment_count: 0,
+          is_liked: false,
+          is_saved: false,
+        });
+        onClose();
+        return;
+      }
+
       let primaryId = '';
       let primaryLocalUrl: string | null = null;
       let primaryMime: string | null = null;
+      // Per-item failures are collected, not fatal: one unreadable file must
+      // not discard the whole carousel. The post fails only if NOTHING lands.
+      const itemErrors: string[] = [];
       for (let i = 0; i < mediaList.length; i++) {
         const item = mediaList[i];
         const formData = new FormData();
@@ -382,65 +478,76 @@ function extForMime(mime: string): string {
           }
         }
 
-        if (uploadFile) {
-          // Zero-media P2P path: seed locally into swarm and register metadata
-          // with central server. Never sends raw binary bytes (which 422).
-          const forged = await forgeMediaLocally(uploadFile, identity, {
-            caption: i === 0 ? caption.trim() : undefined,
-            postCaption: i === 0 ? caption.trim() : undefined,
-            location: i === 0 ? location.trim() : undefined,
-            tags: i === 0 ? tags.trim() : undefined,
-            isPublic: mode !== 'story',
-            isStory: mode === 'story',
-            postGroup,
-            durable: true,
-          });
-          ids.push(forged.id);
-          if (!primaryId) primaryId = forged.id;
-          // Instant tile: render the session blob URL with zero fetch.
-          if (!primaryLocalUrl && forged.localUrl) primaryLocalUrl = forged.localUrl;
-          // Optimistic mime so the feed renders <video> immediately (the
-          // forge already recovered empty File.types via resolveVideoMime).
-          if (!primaryMime && forged.mimeType) primaryMime = forged.mimeType;
-        } else {
-          // Local-only URLs (vault/gmcache/loopback) can never render off
-          // this machine: they must resolve to bytes + forge above. Posting
-          // the URL string would store an unrenderable row for everyone.
-          if (/^(gmcache|idle-file|vault):/i.test(item.previewUrl) || item.previewUrl.includes('/api/objects/') || /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//i.test(item.previewUrl)) {
-            throw new Error('Could not read those local bytes for sharing — try again or pick the file directly');
+        try {
+          if (uploadFile) {
+            // Zero-media P2P path: seed locally into swarm and register metadata
+            // with central server. Never sends raw binary bytes (which 422).
+            const forged = await forgeMediaLocally(uploadFile, identity, {
+              caption: i === 0 ? caption.trim() : undefined,
+              postCaption: i === 0 ? caption.trim() : undefined,
+              location: i === 0 ? location.trim() : undefined,
+              tags: i === 0 ? tags.trim() : undefined,
+              isPublic: mode !== 'story',
+              isStory: mode === 'story',
+              postGroup,
+              durable: true,
+            });
+            ids.push(forged.id);
+            if (!primaryId) primaryId = forged.id;
+            // Instant tile: render the session blob URL with zero fetch.
+            if (!primaryLocalUrl && forged.localUrl) primaryLocalUrl = forged.localUrl;
+            // Optimistic mime so the feed renders <video> immediately (the
+            // forge already recovered empty File.types via resolveVideoMime).
+            if (!primaryMime && forged.mimeType) primaryMime = forged.mimeType;
+          } else {
+            // Local-only URLs (vault/gmcache/loopback) can never render off
+            // this machine: they must resolve to bytes + forge above. Posting
+            // the URL string would store an unrenderable row for everyone.
+            if (/^(gmcache|idle-file|vault):/i.test(item.previewUrl) || item.previewUrl.includes('/api/objects/') || /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//i.test(item.previewUrl)) {
+              throw new Error('Could not read those local bytes for sharing — try again or pick the file directly');
+            }
+            formData.append('url', item.previewUrl);
+            formData.append('is_public', mode === 'story' ? '0' : '1');
+            if (mode === 'story') {
+              formData.append('is_story', '1');
+            }
+            formData.append('post_group', postGroup);
+            const fallbackMime = urlFallbackMime(item as any);
+            if (!primaryMime) primaryMime = item.mimeType || fallbackMime;
+            if (fallbackMime) {
+              formData.append('mime_type', fallbackMime);
+            }
+            if (i === 0) {
+              formData.append('post_caption', caption.trim());
+              formData.append('location', location.trim());
+              formData.append('tags', tags.trim());
+            }
+            const res = await orbitFetch('/api/objects', { method: 'POST', body: formData }, identity);
+            if (!res.ok) {
+              const errData = await res.json().catch(() => null);
+              let host = '';
+              try { host = new URL(item.previewUrl).hostname; } catch { /* relative/data urls */ }
+              const hint = item.isVideoPage || (host && !/\.(jpe?g|png|gif|webp|mp4|webm)$/i.test(item.previewUrl.split('?')[0]))
+                ? ', that link has no direct media. Try a direct image/GIF/MP4 URL'
+                : '';
+              throw new Error(errData?.error || `Upload failed on item ${i + 1} of ${mediaList.length}${host ? ` (${host})` : ''}${hint}`);
+            }
+            const data = await res.json();
+            if (data.id) {
+              ids.push(data.id);
+              if (!primaryId) primaryId = data.id;
+            }
           }
-          formData.append('url', item.previewUrl);
-          formData.append('is_public', mode === 'story' ? '0' : '1');
-          if (mode === 'story') {
-            formData.append('is_story', '1');
-          }
-          formData.append('post_group', postGroup);
-          const fallbackMime = urlFallbackMime(item as any);
-          if (!primaryMime) primaryMime = item.mimeType || fallbackMime;
-          if (fallbackMime) {
-            formData.append('mime_type', fallbackMime);
-          }
-          if (i === 0) {
-            formData.append('post_caption', caption.trim());
-            formData.append('location', location.trim());
-            formData.append('tags', tags.trim());
-          }
-          const res = await orbitFetch('/api/objects', { method: 'POST', body: formData }, identity);
-          if (!res.ok) {
-            const errData = await res.json().catch(() => null);
-            let host = '';
-            try { host = new URL(item.previewUrl).hostname; } catch { /* relative/data urls */ }
-            const hint = item.isVideoPage || (host && !/\.(jpe?g|png|gif|webp|mp4|webm)$/i.test(item.previewUrl.split('?')[0]))
-              ? ', that link has no direct media. Try a direct image/GIF/MP4 URL'
-              : '';
-            throw new Error(errData?.error || `Upload failed on item ${i + 1} of ${mediaList.length}${host ? ` (${host})` : ''}${hint}`);
-          }
-          const data = await res.json();
-          if (data.id) {
-            ids.push(data.id);
-            if (!primaryId) primaryId = data.id;
-          }
+        } catch (err) {
+          // One bad item is a partial success, not a failed post: record it
+          // and keep going so the rest of the carousel still publishes.
+          itemErrors.push(err instanceof Error ? err.message : String(err));
         }
+      }
+      if (ids.length === 0) {
+        // Nothing at all landed: report the real reason instead of posting an
+        // empty row that claims success.
+        throw new Error(itemErrors[0] || 'Could not publish the post');
       }
       const objectId = primaryId || 'post_' + Math.random().toString(36).substring(2, 9);
  
@@ -452,7 +559,7 @@ function extForMime(mime: string): string {
         author_id: identity.orbitId,
         author_name: 'You',
         author_avatar: null,
-        url: primaryId ? `/api/objects/${primaryId}` : mediaList[0].previewUrl,
+        url: primaryId ? `/api/objects/${primaryId}` : (mediaList[0]?.previewUrl || ''),
         mediaUrls: ids.map((id) => `/api/objects/${id}`),
         localPreviewUrl: primaryLocalUrl,
         mime_type: primaryMime || undefined,
@@ -474,6 +581,24 @@ function extForMime(mime: string): string {
     }
   };
 
+  // The written body is not media: it renders for every post, including a
+  // text-only one (no bytes attached).
+  const captionField = (
+              <div>
+                <textarea
+                  value={caption}
+                  onChange={(e) => setCaption(e.target.value)}
+                  placeholder={mediaList.length === 0 ? 'What is happening?!' : 'Write a caption...'}
+                  rows={3}
+                  maxLength={1000}
+                  className="w-full bg-retro-bg border border-edge rounded-lg p-3 text-xs text-retro-fg focus:outline-none focus:border-edge transition-colors placeholder:text-retro-muted resize-none"
+                />
+                <div className="text-right text-2xs font-mono text-retro-muted mt-0.5">
+                  {caption.length}/1000
+                </div>
+              </div>
+  )
+
   const currentMedia = mediaList[activeMediaIndex] || mediaList[0];
 
   return (
@@ -481,11 +606,11 @@ function extForMime(mime: string): string {
       className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 pb-[calc(0.75rem+var(--island-clearance))] sm:p-4 sm:pb-[calc(1rem+var(--island-clearance))] font-sans select-none animate-orbit-fade-in"
     >
       <div
-        className="w-full max-w-3xl bg-retro-panel border border-border-glass rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[calc(100dvh-var(--island-clearance)-2rem)] text-retro-fg animate-orbit-pop"
+        className="w-full max-w-2xl bg-retro-panel border border-edge rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[calc(100dvh-var(--island-clearance)-2rem)] text-retro-fg animate-orbit-pop"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border-glass shrink-0">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-edge shrink-0">
           <button
             type="button"
             onClick={onClose}
@@ -494,26 +619,26 @@ function extForMime(mime: string): string {
             <X className="w-5 h-5" />
           </button>
 
-          <span className="font-semibold text-xs text-retro-fg">
+          <span className="font-black uppercase tracking-tight text-base text-retro-fg">
             {mode === 'story' ? 'Create Story' : 'Create Post'} {mediaList.length > 0 ? `(${mediaList.length} media)` : ''}
           </span>
 
           <button
             type="button"
             onClick={handleShare}
-            disabled={uploading || mediaList.length === 0}
-            className="text-xs font-semibold text-retro-bg bg-white hover:bg-retro-fg disabled:opacity-40 cursor-pointer transition-all duration-150 active:scale-[0.96] px-4 py-1.5 rounded-md shadow-xs"
+            disabled={uploading || (mediaList.length === 0 && !caption.trim())}
+            className="text-xs font-semibold text-retro-bg bg-retro-accent hover:bg-retro-fg disabled:opacity-40 cursor-pointer transition duration-150 active:scale-(--scale-press-sm) px-4 py-1.5 rounded-md shadow-xs"
           >
             {uploading ? 'Sharing...' : (mode === 'story' ? 'Share Story' : 'Share')}
           </button>
         </div>
 
         {/* Mode Selector Tabs */}
-        <div className="flex items-center border-b border-border-glass px-3 pt-2 pb-2 gap-1.5 text-xs">
+        <div className="flex items-center border-b border-edge px-3 pt-2 pb-2 gap-1.5 text-xs">
           <button
             type="button"
             onClick={() => { playPress(750); setActiveTab('upload'); }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all duration-150 cursor-pointer font-medium ${activeTab === 'upload'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition duration-150 cursor-pointer font-medium ${activeTab === 'upload'
               ? 'bg-glass-w12 text-retro-fg'
               : 'text-retro-muted hover:text-retro-fg'
               }`}
@@ -525,7 +650,7 @@ function extForMime(mime: string): string {
           <button
             type="button"
             onClick={() => { playPress(750); setActiveTab('camera'); }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all duration-150 cursor-pointer font-medium ${activeTab === 'camera'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition duration-150 cursor-pointer font-medium ${activeTab === 'camera'
               ? 'bg-glass-w12 text-retro-fg'
               : 'text-retro-muted hover:text-retro-fg'
               }`}
@@ -537,7 +662,7 @@ function extForMime(mime: string): string {
           <button
             type="button"
             onClick={() => { playPress(750); setActiveTab('pick'); }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all duration-150 cursor-pointer font-medium ${activeTab === 'pick'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition duration-150 cursor-pointer font-medium ${activeTab === 'pick'
               ? 'bg-glass-w12 text-retro-fg'
               : 'text-retro-muted hover:text-retro-fg'
               }`}
@@ -548,29 +673,65 @@ function extForMime(mime: string): string {
         </div>
 
         {/* Body Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 styled-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 styled-scrollbar">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+            <div className="space-y-3 md:order-2">{captionField}</div>
+            <div className="space-y-3 md:order-1">
+
           {/* Active Tab Modalities */}
           {activeTab === 'upload' && (
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-border-glass hover:border-retro-accent rounded-xl bg-surface-interactive hover:bg-glass-w10 p-5 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all text-center group"
-            >
-              <UploadCloud className="w-8 h-8 text-retro-muted group-hover:text-retro-accent group-hover:scale-110 transition-transform" />
-              <p className="text-xs font-bold text-retro-body">Drag &amp; drop photos or click to browse</p>
-              <span className="text-[10px] text-retro-muted">Images and video, up to {MAX_MEDIA}. {mediaList.length}/{MAX_MEDIA} added</span>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept="image/*,video/*"
-                onChange={(e) => handleFilesSelected(e.target.files)}
-                className="hidden"
-              />
+            <div className="space-y-2">
+              {/* Share a LINK instead of a file: the bytes never leave the
+                  origin, and the row carries the anchor in its written body. */}
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1 min-w-0">
+                  <Link2 className="w-3.5 h-3.5 text-retro-muted absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="url"
+                    inputMode="url"
+                    value={linkUrl}
+                    onChange={(e) => setLinkUrl(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key !== 'Enter') return;
+                      e.preventDefault();
+                      addLinkToCaption(linkUrl.trim());
+                      setLinkUrl('');
+                    }}
+                    placeholder="Paste a link to share…"
+                    aria-label="Link to share"
+                    className="w-full bg-retro-bg border border-edge rounded-lg pl-9 pr-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted focus:outline-none focus:border-edge"
+                  />
+                </div>
+                <button
+                  type="button"
+                  disabled={!linkUrl.trim()}
+                  onClick={() => { addLinkToCaption(linkUrl.trim()); setLinkUrl(''); }}
+                  className="shrink-0 rounded-lg chrome-accent px-3 py-2 text-xs font-bold text-retro-accent-text disabled:opacity-40 cursor-pointer active:scale-95 transition"
+                >
+                  Add
+                </button>
+              </div>
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-edge hover:border-retro-accent rounded-xl bg-surface-interactive hover:bg-glass-w10 p-5 flex flex-col items-center justify-center gap-2 cursor-pointer transition text-center group"
+              >
+                <UploadCloud className="w-8 h-8 text-retro-muted group-hover:text-retro-accent group-hover:scale-110 transition-transform" />
+                <p className="text-xs font-bold text-retro-body">Drag &amp; drop photos or click to browse</p>
+                <span className="text-2xs text-retro-muted">Images and video, up to {MAX_MEDIA}. {mediaList.length}/{MAX_MEDIA} added</span>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*,video/*"
+                  onChange={(e) => handleFilesSelected(e.target.files)}
+                  className="hidden"
+                />
+              </div>
             </div>
           )}
 
           {activeTab === 'camera' && (
-            <div className="border border-border-glass rounded-xl overflow-hidden bg-black p-2 flex flex-col items-center gap-3">
+            <div className="border border-edge rounded-xl overflow-hidden bg-retro-bg p-2 flex flex-col items-center gap-3">
               {cameraError ? (
                 <div className="p-6 text-center text-xs text-retro-error font-bold">
                   {cameraError}
@@ -583,7 +744,7 @@ function extForMime(mime: string): string {
               <button
                 type="button"
                 onClick={capturePhoto}
-                className="px-5 py-2 rounded-xl chrome-accent text-black text-xs font-bold flex items-center gap-2 shadow-md cursor-pointer active:scale-95 transition-all"
+                className="px-5 py-2 rounded-xl chrome-accent text-retro-accent-text text-xs font-bold flex items-center gap-2 shadow-md cursor-pointer active:scale-95 transition"
               >
                 <Camera className="w-4 h-4" />
                 <span>Snap Picture</span>
@@ -596,11 +757,11 @@ function extForMime(mime: string): string {
               <button
                 type="button"
                 onClick={() => void openMediaPicker().then((sel) => { if (sel) void takePickerSelection(sel); })}
-                className="w-full border-2 border-dashed border-border-glass hover:border-retro-accent rounded-xl bg-surface-interactive hover:bg-glass-w10 p-5 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all text-center group"
+                className="w-full border-2 border-dashed border-edge hover:border-retro-accent rounded-xl bg-surface-interactive hover:bg-glass-w10 p-5 flex flex-col items-center justify-center gap-2 cursor-pointer transition text-center group"
               >
                 <FolderOpen className="w-7 h-7 text-retro-muted group-hover:text-retro-accent transition-colors" />
                 <p className="text-xs font-bold text-retro-body">From your media, this device, or a link</p>
-                <span className="text-[10px] text-retro-muted">Previewed before it attaches. {mediaList.length}/{MAX_MEDIA} added</span>
+                <span className="text-2xs text-retro-muted">Previewed before it attaches. {mediaList.length}/{MAX_MEDIA} added</span>
               </button>
             </div>
           )}
@@ -608,15 +769,15 @@ function extForMime(mime: string): string {
           {/* Carousel & Multi-Media Viewer */}
           {mediaList.length > 0 && currentMedia && (
             <div className="space-y-3">
-              <div className="relative w-full rounded-xl overflow-hidden bg-black flex items-center justify-center border border-border-glass group">
+              <div className="relative w-full rounded-xl overflow-hidden bg-retro-bg flex items-center justify-center border border-edge group">
                 {currentMedia.isVideoPage ? (
                   <div className="w-full aspect-video flex flex-col items-center justify-center gap-2 p-4 text-center">
-                    <span className="w-10 h-10 rounded-full bg-glass-w12 border border-border-glass flex items-center justify-center text-retro-fg text-xs font-black">▶</span>
+                    <span className="w-10 h-10 rounded-full bg-glass-w12 border border-edge flex items-center justify-center text-retro-fg text-xs font-black">▶</span>
                     <span className="text-xs font-semibold text-retro-fg">Video link attached</span>
-                    <span className="text-[10px] text-retro-muted break-all max-w-full">
+                    <span className="text-2xs text-retro-muted break-all max-w-full">
                       {(currentMedia.originalUrl || currentMedia.previewUrl).slice(0, 80)}
                     </span>
-                    <span className="text-[10px] text-retro-muted">
+                    <span className="text-2xs text-retro-muted">
                       {currentMedia.resolveNote || 'Media attaches when you share'}
                     </span>
                   </div>
@@ -629,7 +790,7 @@ function extForMime(mime: string): string {
                     <img
                       src={devFetchable(currentMedia.previewUrl) || currentMedia.previewUrl}
                       alt=""
-                      className={`w-full object-cover transition-all ${aspectRatio === 'square'
+                      className={`w-full object-cover transition ${aspectRatio === 'square'
                         ? 'aspect-square'
                         : aspectRatio === 'portrait'
                           ? 'aspect-[4/5]'
@@ -641,15 +802,15 @@ function extForMime(mime: string): string {
                 )}
 
                 {/* Aspect Ratio Switcher */}
-                <div className="absolute bottom-3 left-3 bg-black/75 backdrop-blur-md rounded-xl p-1 flex items-center gap-1 text-[10px] font-bold text-white z-10">
+                <div className="absolute bottom-3 left-3 bg-black/75 backdrop-blur-md rounded-xl p-1 flex items-center gap-1 text-2xs font-bold text-retro-fg z-10">
                   {(['square', 'portrait', 'landscape'] as const).map((ratio) => (
                     <button
                       key={ratio}
                       type="button"
                       onClick={() => setAspectRatio(ratio)}
-                      className={`px-2 py-1 rounded-lg capitalize transition-all ${aspectRatio === ratio
+                      className={`px-2 py-1 rounded-lg capitalize transition ${aspectRatio === ratio
                         ? 'bg-surface-raised text-retro-fg font-black'
-                        : 'text-retro-body hover:text-white'
+                        : 'text-retro-body hover:text-retro-fg'
                         }`}
                     >
                       {ratio}
@@ -663,14 +824,14 @@ function extForMime(mime: string): string {
                     <button
                       type="button"
                       onClick={() => { playPress(750); setActiveMediaIndex((prev) => (prev > 0 ? prev - 1 : mediaList.length - 1)); }}
-                      className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center transition-all cursor-pointer"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 hover:bg-black/90 text-retro-fg flex items-center justify-center transition cursor-pointer"
                     >
                       <ChevronLeft className="w-5 h-5" />
                     </button>
                     <button
                       type="button"
                       onClick={() => { playPress(750); setActiveMediaIndex((prev) => (prev < mediaList.length - 1 ? prev + 1 : 0)); }}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center transition-all cursor-pointer"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 hover:bg-black/90 text-retro-fg flex items-center justify-center transition cursor-pointer"
                     >
                       <ChevronRight className="w-5 h-5" />
                     </button>
@@ -681,7 +842,7 @@ function extForMime(mime: string): string {
                 <button
                   type="button"
                   onClick={() => removeMedia(activeMediaIndex)}
-                  className="absolute top-3 right-3 p-1.5 rounded-xl bg-black/75 hover:bg-red-600 text-white transition-colors cursor-pointer"
+                  className="absolute top-3 right-3 p-1.5 rounded-xl bg-black/75 hover:bg-danger text-retro-fg transition-colors cursor-pointer"
                   title="Remove this photo"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -690,12 +851,12 @@ function extForMime(mime: string): string {
 
               {/* Thumbnails & Reorder Bar */}
               {mediaList.length > 1 && (
-                <div className="flex items-center gap-2 overflow-x-auto p-1.5 styled-scrollbar bg-retro-bg border border-border-glass rounded-lg">
+                <div className="flex items-center gap-2 overflow-x-auto p-1.5 styled-scrollbar bg-retro-bg border border-edge rounded-lg">
                   {mediaList.map((m, idx) => (
                     <div
                       key={m.id}
                       onClick={() => setActiveMediaIndex(idx)}
-                      className={`relative w-14 h-14 rounded-md overflow-hidden shrink-0 border cursor-pointer transition-all duration-150 active:scale-[0.96] ${activeMediaIndex === idx ? 'border-white ring-1 ring-white' : 'border-border-glass opacity-60 hover:opacity-100'
+                      className={`relative w-14 h-14 rounded-md overflow-hidden shrink-0 border cursor-pointer transition duration-150 active:scale-(--scale-press-sm) ${activeMediaIndex === idx ? 'border-edge ring-1 ring-white' : 'border-edge opacity-60 hover:opacity-100'
                         }`}
                     >
                       {m.isVideoPage ? (
@@ -705,7 +866,7 @@ function extForMime(mime: string): string {
                       ) : (
                         <img src={m.previewUrl} alt="" className="w-full h-full object-cover" />
                       )}
-                      <span className="absolute bottom-0.5 right-0.5 px-1 bg-black/70 text-[10px] font-bold text-white rounded">
+                      <span className="absolute bottom-0.5 right-0.5 px-1 bg-black/70 text-2xs font-bold text-retro-fg rounded">
                         #{idx + 1}
                       </span>
                     </div>
@@ -716,7 +877,7 @@ function extForMime(mime: string): string {
                       type="button"
                       onClick={() => moveMedia(activeMediaIndex, activeMediaIndex - 1)}
                       disabled={activeMediaIndex === 0}
-                      className="px-2 py-1 bg-glass-w12 border border-border-glass rounded text-[10px] font-mono font-semibold disabled:opacity-30 hover:bg-glass-w20 cursor-pointer transition-all duration-150 active:scale-[0.96]"
+                      className="px-2 py-1 bg-glass-w12 border border-edge rounded text-2xs font-mono font-semibold disabled:opacity-30 hover:bg-glass-w20 cursor-pointer transition duration-150 active:scale-(--scale-press-sm)"
                       title="Move photo left"
                     >
                       ←
@@ -725,7 +886,7 @@ function extForMime(mime: string): string {
                       type="button"
                       onClick={() => moveMedia(activeMediaIndex, activeMediaIndex + 1)}
                       disabled={activeMediaIndex === mediaList.length - 1}
-                      className="px-2 py-1 bg-glass-w12 border border-border-glass rounded text-[10px] font-mono font-semibold disabled:opacity-30 hover:bg-glass-w20 cursor-pointer transition-all duration-150 active:scale-[0.96]"
+                      className="px-2 py-1 bg-glass-w12 border border-edge rounded text-2xs font-mono font-semibold disabled:opacity-30 hover:bg-glass-w20 cursor-pointer transition duration-150 active:scale-(--scale-press-sm)"
                       title="Move photo right"
                     >
                       →
@@ -734,24 +895,11 @@ function extForMime(mime: string): string {
                 </div>
               )}
 
-              {/* Description / Caption */}
-              <div>
-                <textarea
-                  value={caption}
-                  onChange={(e) => setCaption(e.target.value)}
-                  placeholder="Write a caption..."
-                  rows={3}
-                  maxLength={1000}
-                  className="w-full bg-retro-bg border border-border-glass rounded-lg p-3 text-xs text-retro-fg focus:outline-none focus:border-border-glass transition-colors placeholder:text-retro-muted resize-none"
-                />
-                <div className="text-right text-[10px] font-mono text-retro-muted mt-0.5">
-                  {caption.length}/1000
-                </div>
-              </div>
+
 
               {/* Location & Tags inputs */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div className="flex items-center gap-2 bg-retro-bg border border-border-glass rounded-lg px-3 py-2 text-xs">
+                <div className="flex items-center gap-2 bg-retro-bg border border-edge rounded-lg px-3 py-2 text-xs">
                   <MapPin className="w-4 h-4 text-retro-muted shrink-0" />
                   <input
                     type="text"
@@ -762,7 +910,7 @@ function extForMime(mime: string): string {
                   />
                 </div>
 
-                <div className="flex items-center gap-2 bg-retro-bg border border-border-glass rounded-lg px-3 py-2 text-xs">
+                <div className="flex items-center gap-2 bg-retro-bg border border-edge rounded-lg px-3 py-2 text-xs">
                   <Tag className="w-4 h-4 text-retro-muted shrink-0" />
                   <input
                     type="text"
@@ -775,6 +923,8 @@ function extForMime(mime: string): string {
               </div>
             </div>
           )}
+            </div>
+          </div>
         </div>
       </div>
       {cropper}

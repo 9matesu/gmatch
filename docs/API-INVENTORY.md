@@ -6,10 +6,11 @@ remaining central service rather than silently treating rendezvous as content
 authority"). A new route that is not listed here fails the guard test
 (`apps/desktop/src/utils/apiInventory.test.ts`), so the inventory cannot rot.
 
-The central deployment is a **blind courier** (`SITE_SERVICES=mail,turn`): it
+A node booted with `SITE_SERVICES=mail,turn` is a **courier shape**: it
 serves mail, TURN and a few static public endpoints, and answers **404** for
 every stateful route below. A node that hosts a world answers all of them.
-The client must therefore treat "route missing" as a state, not a crash.
+The client must therefore treat "route missing" as a state, not a crash. No
+hosted courier is deployed any more — this shape is a capability, not an origin.
 
 Roles:
 
@@ -19,7 +20,7 @@ Roles:
 | `economy` | the authoritative `g$` ledger. Deliberately node-authoritative: settlement needs one ordering. |
 | `core-social` | stateful social content. **The L4/L5 migration target** — these are the routes that make the app "not really decentralized". |
 | `media-metadata` | object registration and story lists. L6 target. |
-| `legacy` | retired routes. The client must never call them; the courier 404s them. |
+| `legacy` | retired routes. The client must never call them; a courier-shape node 404s them. |
 | `optional` | enhancements that may be absent. Offline state is honest and quiet. |
 | `host` | only meaningful when THIS machine hosts a node. |
 
@@ -33,7 +34,7 @@ Patterns: a trailing `*` covers every route below it.
 | `/api/discord-invite` | optional | public static invite link |
 | `/api/identity` | rendezvous | node X25519 public key (sealing capability) |
 | `/api/ws-ticket` | rendezvous | socket authentication ticket |
-| `/api/users/online` | legacy | 404 on the courier; presence comes from sealed beacons |
+| `/api/users/online` | legacy | 404 on a courier-shape node; presence comes from sealed beacons |
 | `/api/users/heartbeat` | rendezvous | server listing heartbeat (host mode) |
 | `/api/signal/*` | legacy | retired: signaling rides sealed mail |
 | `/api/gossip/*` | rendezvous | signed public gossip envelopes (metadata only) |

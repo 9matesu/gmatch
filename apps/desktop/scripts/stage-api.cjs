@@ -7,7 +7,7 @@
 // Then `npm install --omit=dev` inside apps/api makes it run with zero repo.
 //
 // Run: node scripts/stage-api.cjs (from apps/desktop)
-const { existsSync, mkdirSync, cpSync, readFileSync, writeFileSync, rmSync } = require('node:fs')
+const { existsSync, mkdirSync, cpSync, writeFileSync, rmSync } = require('node:fs')
 const { join } = require('node:path')
 const { execFileSync } = require('node:child_process')
 

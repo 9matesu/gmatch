@@ -142,9 +142,21 @@ async function startApi() {
   const childLog = (kind) => (d) => {
     const line = String(d).trim()
     if (!line) return
-    (kind === 'out' ? console.log : console.error)(`[api${kind === 'err' ? '!' : ''}]`, line)
+    // A closed log pipe makes console.* raise EPIPE. That arrives as an async
+    // 'error' EVENT on the stream, so this try/catch cannot catch it — the
+    // real guard is stdio-guard.cjs (installed in main.cjs). The try/catch
+    // still covers a synchronous throw, and the guard keeps the app alive.
+    try {
+      (kind === 'out' ? console.log : console.error)(`[api${kind === 'err' ? '!' : ''}]`, line)
+    } catch {
+      /* log sink closed: drop the line */
+    }
     sidecarEvents.emit('stderr', `${kind}:${line}`.slice(0, 500))
   }
+  // Swallow stream errors on the log pipes: EPIPE/ECONNRESET here is normal
+  // when the parent closes the read end, not a crash.
+  proc.stdout.on('error', () => {})
+  proc.stderr.on('error', () => {})
   proc.stdout.on('data', childLog('out'))
   proc.stderr.on('data', childLog('err'))
   proc.on('error', (err) => {
@@ -204,4 +216,30 @@ process.on('exit', () => stopApi())
 process.on('SIGINT', () => { stopApi(); process.exit(0) })
 process.on('SIGTERM', () => { stopApi(); process.exit(0) })
 
-module.exports = { startApi, stopApi, API_BASE, PORT, sidecarEvents }
+/** One-shot health probe: true when a ready sidecar answers on API_BASE.
+ *  Used by the main-process watchdog to detect a hung (not cleanly-exited) server. */
+async function ping(timeoutMs = 3000) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const r = await fetch(`${API_BASE}/api/health`, { signal: controller.signal })
+    // HTTP 200 proves the process answers. `db_ready` was required here before
+    // and produced false negatives when the Bun/SQLite event loop was busy: a
+    // healthy-but-slow sidecar looked dead and the watchdog needlessly killed
+    // it (which then caused EADDRINUSE / the real death it was trying to avoid).
+    return r.ok
+  } catch {
+    return false
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/** True while a spawned sidecar child is alive. The supervisor uses it to
+ *  stop a hung process before restarting, instead of spawning a second one
+ *  against the same port (EADDRINUSE). */
+function isRunning() {
+  return proc !== null
+}
+
+module.exports = { startApi, stopApi, ping, isRunning, API_BASE, PORT, sidecarEvents }

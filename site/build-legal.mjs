@@ -192,6 +192,7 @@ const cl = [
   '<p>2026-09-09.2: English-only binding corpus (terms, LGPD/GDPR privacy, community, abuse reports, adult records, E2E notice).</p>',
   '<p>2026-09-11.1: wave-2 privacy facts: rotating session delivery addresses, salted-hash rate-limit keys, masked server addresses, image metadata stripped on ingress.</p>',
   '<p>2026-09-11.2: contact channels moved in-app (Settings → Help); audit published on this site; no other substantive changes.</p>',
+  '<p>2026-11-07.1: gmatch 2.0 topology — this project runs no data service, so the controller, routing and retention statements now describe the node you run (or the node you joined) instead of an official hosted courier.</p>',
 ].join('\n')
 writeFileSync(join(OUT, 'changelog.html'), page('Legal changelog', cl, 'Generated from legal/version.json. Canonical source: apps/desktop/src/legal/documents.ts.'))
 n++

@@ -5,7 +5,6 @@ import type {
   AdminMatch,
   AdminArchivedMatch,
   AdminTierMatch,
-  AdminObject,
   AdminLobbyImage,
   AdminReport,
   AdminRecommendation,
@@ -111,8 +110,6 @@ export const adminApi = {
   dashboard: (identity: OrbitIdentity) =>
     fetchJson<DashboardStats>(`${ADMIN_BASE}/dashboard`, identity),
 
-  live: (identity: OrbitIdentity) =>
-    fetchArray<AdminUser>(`${ADMIN_BASE}/live`, identity),
 
   users: (identity: OrbitIdentity, params: TableParams) => {
     const searchParams = new URLSearchParams();
@@ -151,20 +148,6 @@ export const adminApi = {
   babecock: (identity: OrbitIdentity) =>
     fetchArray<AdminBabecockRound>(`${ADMIN_BASE}/babecock`, identity),
 
-  objects: (identity: OrbitIdentity, params: TableParams) => {
-    const searchParams = new URLSearchParams();
-    searchParams.set("limit", String(params.pageSize));
-    searchParams.set("offset", String((params.page - 1) * params.pageSize));
-    const sortInfo = parseSortParams(params);
-    if (sortInfo.sort) {
-      searchParams.set("sort", sortInfo.sort);
-      searchParams.set("order", sortInfo.order || "desc");
-    }
-    if (params.filters?.q) searchParams.set("q", String(params.filters.q));
-    if (params.filters?.owner) searchParams.set("owner", String(params.filters.owner));
-    if (params.filters?.type) searchParams.set("type", String(params.filters.type));
-    return fetchTable<AdminObject>(`${ADMIN_BASE}/objects?${searchParams}`, identity, params);
-  },
 
   posts: (identity: OrbitIdentity, params: TableParams) => {
     const searchParams = new URLSearchParams();
@@ -265,7 +248,7 @@ export const adminApi = {
 
   toggleModerator: (identity: OrbitIdentity, userId: string, isModerator: boolean) =>
     fetchJson<{ success: boolean }>(`${ADMIN_BASE}/users/${userId}/moderator`, identity, {
-      method: "PUT",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ is_moderator: isModerator }),
     }),
@@ -312,11 +295,6 @@ export const adminApi = {
       body: JSON.stringify({ tags }),
     }),
 
-  deleteObject: (identity: OrbitIdentity, objectId: string) =>
-    fetchJson<{ success: boolean }>(`${ADMIN_BASE}/objects/${objectId}/delete`, identity, { method: "POST" }),
-
-  redactObject: (identity: OrbitIdentity, objectId: string) =>
-    fetchJson<{ success: boolean }>(`${ADMIN_BASE}/objects/${objectId}/redact`, identity, { method: "POST" }),
 
   deleteLobbyImage: (identity: OrbitIdentity, imageId: string) =>
     fetchJson<{ success: boolean }>(`${ADMIN_BASE}/lobby-images/${imageId}`, identity, { method: "DELETE" }),
@@ -345,6 +323,13 @@ export const adminApi = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message, is_active: isActive }),
+    }),
+
+  toggleAnnouncement: (identity: OrbitIdentity, id: string, isActive: boolean) =>
+    fetchJson<{ ok: boolean }>(`${ADMIN_BASE}/announcements/${id}/toggle`, identity, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_active: isActive }),
     }),
 
   deleteAnnouncement: (identity: OrbitIdentity, id: string) =>
@@ -438,51 +423,4 @@ export const adminApi = {
 
   getCashoutRate: (identity: OrbitIdentity) =>
     fetchJson<{ cashoutRateBps: number }>(`${ADMIN_BASE}/settings/economy`, identity),
-
-  getBotConfig: (identity: OrbitIdentity) =>
-    fetchJson<{ providers: unknown[]; tags: string[]; names: string[]; enabled: boolean }>(`${ADMIN_BASE}/bot-config`, identity),
-
-  saveBotConfig: (identity: OrbitIdentity, config: unknown) =>
-    fetchJson<{ success: boolean }>(`${ADMIN_BASE}/bot-config`, identity, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(config),
-    }),
-
-  testBotProvider: (identity: OrbitIdentity, provider: unknown) =>
-    fetchJson<{ ok: boolean; foundCount: number; latencyMs: number }>(`${ADMIN_BASE}/bot-config/test`, identity, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ provider }),
-    }),
-
-  syncBotImages: (identity: OrbitIdentity) =>
-    fetchJson<{ success: boolean; cachedCount: number }>(`${ADMIN_BASE}/bot-config/sync-images`, identity, { method: "POST" }),
-
-  getBots: (identity: OrbitIdentity) =>
-    fetchJson<{ bots: unknown[] }>(`${ADMIN_BASE}/bots`, identity),
-
-  createBot: (identity: OrbitIdentity, name: string, tags: string[]) =>
-    fetchJson<{ success: boolean; bot: unknown }>(`${ADMIN_BASE}/bots`, identity, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, tags }),
-    }),
-
-  updateBot: (identity: OrbitIdentity, botId: string, data: unknown) =>
-    fetchJson<{ success: boolean; bot: unknown }>(`${ADMIN_BASE}/bots/${botId}`, identity, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    }),
-
-  deleteBot: (identity: OrbitIdentity, botId: string) =>
-    fetchJson<{ success: boolean }>(`${ADMIN_BASE}/bots/${botId}`, identity, { method: "DELETE" }),
-
-  generateBotPicture: (identity: OrbitIdentity, botId: string, customUrl?: string) =>
-    fetchJson<{ success: boolean; bot: unknown }>(`${ADMIN_BASE}/bots/${botId}/picture`, identity, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ customUrl }),
-    }),
 };

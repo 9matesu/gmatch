@@ -40,7 +40,7 @@ export class ErrorBoundary extends Component<Props, State> {
             <p className="text-xs text-retro-muted">Reloading keeps your progress (the game saves every 10s). If this keeps happening, the log in Settings can help us look.</p>
             <button
               onClick={() => { const w = (window as unknown as { gmatch?: { winReload?: () => void } }).gmatch; if (w?.winReload) w.winReload(); else window.location.reload() }}
-              className="bg-retro-accent text-black px-4 py-2 text-xs font-bold hover:bg-retro-fg hover:text-retro-bg transition-colors"
+              className="bg-retro-accent text-retro-accent-text px-4 py-2 text-xs font-bold hover:bg-retro-fg hover:text-retro-bg transition-colors"
             >
               Reload
             </button>

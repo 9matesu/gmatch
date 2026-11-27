@@ -18,6 +18,8 @@
  */
 
 
+import type { CachedPicture } from '../types/gmatch-bridge'
+
 export interface ImageCacheStats {
   files: number
   bytes: number
@@ -27,6 +29,7 @@ export interface ImageCacheStats {
 interface Bridge {
   cacheImage?: (url: string) => Promise<{ local: string | null }>
   cacheStats?: () => Promise<{ files: number; bytes: number }>
+  cacheList?: () => Promise<{ items: CachedPicture[] }>
   clearCache?: () => Promise<{ files: number; bytes: number }>
   clearFeedCache?: () => Promise<void>
   evictImage?: (url: string) => Promise<{ ok: boolean }>
@@ -40,10 +43,6 @@ function bridge(): Bridge | null {
     return null
   }
 }
-
-// Session RAM store removed — main process handles caching via encrypted disk.
-// ponytail: dev mode has no cache; acceptable since Electron bridge owns it in prod.
-export const SESSION_CAP = 0
 
 // Destroy the legacy IndexedDB store once per session (fire-and-forget).
 let idbCleanupStarted = false
@@ -68,25 +67,72 @@ function destroyLegacyIdb(): void {
 // Pure (exported for tests).
 export { devFetchable } from './booruSources'
 
-function isDev(): boolean {
-  try {
-    return !!import.meta.env.DEV
-  } catch {
-    return false
-  }
-}
-
 // Background (speculative) byte fetches are limited so browser sockets — and
 // the IPC channel to the main-process cache — are never starved by a prefetch
 // sweep. This only ever gates PREFETCH: the on-demand path (resolveImageNow)
 // deliberately bypasses it, because the player is waiting on that one.
-const MAX_CONCURRENT_BG_FETCHES = 2
+const BG_FETCH_LIMIT = 2
 let activeBgFetches = 0
 const bgFetchQueue: Array<() => void> = []
 const inFlightUrls = new Set<string>()
 
+/**
+ * Resolved cache URLs (gmcache://, blob:, data:), keyed by the REMOTE url.
+ *
+ * This is the map that makes "instant" real: without it every <img> starts on
+ * the remote URL and only swaps to the local bytes in an effect, so a picture
+ * that is already on disk still paints late. With it the render hands the
+ * cached URL to the element on the FIRST paint.
+ *
+ * Bounded (see CACHE_URL_CAP) and deliberately NOT persisted: it holds
+ * session-local blob: URLs that die with the process.
+ */
+const resolvedCache = new Map<string, string>()
+const CACHE_URL_CAP = 512
+
+/** Session-only lookup. Read by render paths — never throws. */
+export function cachedImageFor(url: string): string | undefined {
+  return resolvedCache.get(url)
+}
+
+function rememberResolved(url: string, local: string): void {
+  if (!url || !local || local === url) return
+  // Insertion-ordered LRU: a hit refreshes recency.
+  resolvedCache.delete(url)
+  resolvedCache.set(url, local)
+  while (resolvedCache.size > CACHE_URL_CAP) {
+    const oldest = resolvedCache.keys().next().value as string | undefined
+    if (oldest === undefined) break
+    resolvedCache.delete(oldest)
+  }
+}
+
+/**
+ * Decode a cached picture AHEAD of the moment it is shown.
+ *
+ * `cacheImage` puts the bytes on disk; it does not decode them. The decode is
+ * what the browser does when the <img> mounts, and it is the last thing
+ * standing between a warm cache and a picture the player can click — the
+ * clicker scores nothing until its own stage reports `load`. Doing it here,
+ * while the previous foe is still on screen, is what makes the next one
+ * instant.
+ *
+ * Best-effort by contract: no Image, no decode, no bridge = a silent no-op.
+ */
+function decodeAhead(local: string): void {
+  try {
+    if (typeof Image === 'undefined') return
+    const img = new Image()
+    img.decoding = 'async'
+    img.src = local
+    if (typeof img.decode === 'function') void img.decode().catch(() => {})
+  } catch {
+    /* best effort — the <img> still decodes when it mounts */
+  }
+}
+
 function runNextBgFetch(): void {
-  if (activeBgFetches >= MAX_CONCURRENT_BG_FETCHES || bgFetchQueue.length === 0) return
+  if (activeBgFetches >= BG_FETCH_LIMIT || bgFetchQueue.length === 0) return
   const next = bgFetchQueue.shift()
   if (next) {
     activeBgFetches++
@@ -123,11 +169,16 @@ function queueBgFetch(url: string, task: () => Promise<void>): void {
 export async function resolveImage(url: string): Promise<string> {
   if (!url) return url
   destroyLegacyIdb()
+  const known = resolvedCache.get(url)
+  if (known) return known
   const b = bridge()
   if (b?.cacheImage) {
     try {
       const res = await b.cacheImage(url)
-      if (res?.local) return res.local
+      if (res?.local) {
+        rememberResolved(url, res.local)
+        return res.local
+      }
     } catch {
       /* fall through to remote */
     }
@@ -148,6 +199,10 @@ export function prefetchImages(urls: string[], limit = 11): void {
       // prefetch can never delay it.
       queueBgFetch(u, async () => {
         await resolveImage(u)
+        // The bytes are on disk now; decode them before the player advances,
+        // so the next picture is paintable the instant its <img> mounts.
+        const local = resolvedCache.get(u)
+        if (local) decodeAhead(local)
       })
       if (seen.size >= limit) break
     }
@@ -163,6 +218,24 @@ export function prefetchImages(urls: string[], limit = 11): void {
  */
 export async function resolveImageNow(url: string): Promise<string> {
   return resolveImage(url)
+}
+
+/**
+ * What the device holds, newest first.
+ *
+ * The cache viewer's data source. The list is the MAIN process's persisted
+ * index, so it survives a relaunch — the bytes live in the encrypted disk LRU
+ * and each row carries the local (gmcache://) url that serves them.
+ */
+export async function listCachedPictures(): Promise<CachedPicture[]> {
+  const b = bridge()
+  if (!b?.cacheList) return []
+  try {
+    const res = await b.cacheList()
+    return Array.isArray(res?.items) ? res.items : []
+  } catch {
+    return []
+  }
 }
 
 export async function imageCacheStats(): Promise<ImageCacheStats> {
@@ -225,9 +298,10 @@ export const _test = {
     bgFetchQueue.length = 0
     inFlightUrls.clear()
     activeBgFetches = 0
+    resolvedCache.clear()
   },
-  sessionCacheSize: () => 0,
-  clearSessionCache: async () => {},
-  SESSION_CAP: 0,
+  sessionCacheSize: () => resolvedCache.size,
+  clearSessionCache: async () => { resolvedCache.clear() },
+  SESSION_CAP: CACHE_URL_CAP,
   inFlightCount: () => inFlightUrls.size,
 }

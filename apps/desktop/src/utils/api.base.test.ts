@@ -14,7 +14,7 @@ globalThis.localStorage = {
 } as Storage
 
 /**
- * The Cloudflare courier is a blind directory/mail relay and can never be a
+ * The retired Pages origin was a blind directory/mail relay and can never be a
  * data base. An ordinary node (local or a friend's) is joinable.
  */
 describe('api base without a hosted fallback', () => {
@@ -54,12 +54,60 @@ describe('api base without a hosted fallback', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     expect(await clearUnreachableApiBase(50)).toBe('https://dead.example.test')
+    // Bounded retries, not one shot: a single aborted/timed-out boot probe
+    // must not erase the user's chosen node.
+    expect(fetchMock).toHaveBeenCalledTimes(3)
     expect(fetchMock).toHaveBeenCalledWith(
       'https://dead.example.test/api/health',
       expect.objectContaining({ signal: expect.anything() }),
     )
     expect(localStorage.getItem('gmatch.api.url')).toBeNull()
     expect(localStorage.getItem('gmatch.onboarding.serverUrl')).toBeNull()
+  })
+
+  it('keeps the pointer when the host answers but is waking (502/503/504)', async () => {
+    // A hosted node behind a sleeping dyno answers 503 while it boots: the
+    // pointer is legitimate and wiping it silently rewires the app to another
+    // world. An answered transient 5xx is evidence the host exists.
+    localStorage.setItem('gmatch.api.url', 'https://waking.example.test')
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 503 })
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect(await clearUnreachableApiBase(50)).toBeNull()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(localStorage.getItem('gmatch.api.url')).toBe('https://waking.example.test')
+
+    fetchMock.mockResolvedValue({ ok: false, status: 502 })
+    expect(await clearUnreachableApiBase(50)).toBeNull()
+    expect(localStorage.getItem('gmatch.api.url')).toBe('https://waking.example.test')
+
+    fetchMock.mockResolvedValue({ ok: false, status: 504 })
+    expect(await clearUnreachableApiBase(50)).toBeNull()
+    expect(localStorage.getItem('gmatch.api.url')).toBe('https://waking.example.test')
+  })
+
+  it('retries a failed probe and keeps the pointer when a later attempt answers', async () => {
+    // The boot probe races the page load: a reload mid-probe aborts the fetch
+    // and must not count as "the node is dead".
+    localStorage.setItem('gmatch.api.url', 'https://peer-node.example.test')
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new Error('aborted'))
+      .mockResolvedValueOnce({ ok: true })
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect(await clearUnreachableApiBase(50)).toBeNull()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(localStorage.getItem('gmatch.api.url')).toBe('https://peer-node.example.test')
+  })
+
+  it('drops the pointer when the host answers but is not a node (404)', async () => {
+    localStorage.setItem('gmatch.api.url', 'https://notanode.example.test')
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 404 })
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect(await clearUnreachableApiBase(50)).toBe('https://notanode.example.test')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(localStorage.getItem('gmatch.api.url')).toBeNull()
   })
 
   it('keeps a stored node that answers, and never probes the courier or loopback', async () => {

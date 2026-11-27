@@ -180,13 +180,13 @@ export function IdentityModal({
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 select-none font-sans"
+      className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 select-none font-sans"
     >
       <div
-        className="bg-surface-raised border border-border-glass w-full max-w-lg rounded-lg shadow-xl overflow-hidden animate-orbit-pop flex flex-col"
+        className="bg-surface-raised border border-edge w-full max-w-lg rounded-lg shadow-xl overflow-hidden animate-orbit-pop flex flex-col"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border-glass">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-edge">
           <div className="flex items-center gap-2">
             <KeyRound className="w-4 h-4 text-retro-muted" />
             <h2 className="text-sm font-medium text-retro-fg">
@@ -205,7 +205,7 @@ export function IdentityModal({
         </div>
 
         {/* Tab switcher */}
-        <div className="flex border-b border-border-glass p-1 gap-0.5">
+        <div className="flex border-b border-edge p-1 gap-0.5">
           <button
             type="button"
             onClick={() => setMode("export")}
@@ -238,10 +238,10 @@ export function IdentityModal({
           </button>
         </div>
 
-        <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto styled-scrollbar">
+        <div className="p-4 space-y-4 max-h-(--max-h-sheet) overflow-y-auto styled-scrollbar">
           {mode === "export" && (
             <div className="space-y-4">
-              <div className="p-3 bg-surface-interactive border border-border-glass rounded-lg space-y-1">
+              <div className="p-3 bg-surface-interactive border border-edge rounded-lg space-y-1">
                 <div className="text-xs font-medium text-retro-muted">Your Orbit ID</div>
                 <div className="font-mono text-xs text-retro-body break-all select-all">
                   {identity?.orbitId || "Not loaded"}
@@ -256,14 +256,15 @@ export function IdentityModal({
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-retro-muted block">
+                <label htmlFor="identity-backup-key" className="text-xs font-medium text-retro-muted block">
                   Encoded backup key
                 </label>
                 <textarea
+                  id="identity-backup-key"
                   readOnly
                   value={encodedString}
                   rows={3}
-                  className="w-full bg-surface-interactive border border-border-glass p-2.5 text-xs font-mono text-retro-body rounded-lg outline-none select-all resize-none"
+                  className="w-full bg-surface-interactive border border-edge p-2.5 text-xs font-mono text-retro-body rounded-lg outline-none select-all resize-none"
                 />
               </div>
 
@@ -271,7 +272,7 @@ export function IdentityModal({
                 <button
                   type="button"
                   onClick={() => void handleCopyKey(encodedString, "Secret key string")}
-                  className="flex-1 py-2.5 px-3 bg-surface-interactive border border-border-glass text-retro-body font-medium text-xs rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5 hover:border-border-strong"
+                  className="flex-1 py-2.5 px-3 bg-surface-interactive border border-edge text-retro-body font-medium text-xs rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5 hover:border-edge-strong"
                 >
                   {copied ? <><Check className="w-3.5 h-3.5 text-retro-online" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy key</>}
                 </button>
@@ -279,14 +280,14 @@ export function IdentityModal({
                 <button
                   type="button"
                   onClick={handleDownloadKeyfile}
-                  className="flex-1 py-2.5 px-3 bg-surface-interactive border border-border-glass text-retro-body font-medium text-xs rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5 hover:border-border-strong"
+                  className="flex-1 py-2.5 px-3 bg-surface-interactive border border-edge text-retro-body font-medium text-xs rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5 hover:border-edge-strong"
                 >
                   <FileJson className="w-3.5 h-3.5" />
                   <span>Download .json</span>
                 </button>
               </div>
 
-              <div className="border-t border-border-glass pt-3 space-y-2">
+              <div className="border-t border-edge pt-3 space-y-2">
                 <div className="text-xs font-medium text-retro-muted">
                   Full backup
                 </div>
@@ -297,7 +298,7 @@ export function IdentityModal({
                   type="button"
                   disabled={configDownloading}
                   onClick={() => void handleFullConfigDownload()}
-                  className="w-full py-2.5 px-3 bg-surface-interactive border border-border-glass text-retro-body font-medium text-xs rounded-lg transition-colors cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2 hover:border-border-strong"
+                  className="w-full py-2.5 px-3 bg-surface-interactive border border-edge text-retro-body font-medium text-xs rounded-lg transition-colors cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2 hover:border-edge-strong"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>{configDownloading ? "Preparing..." : "Download full backup"}</span>
@@ -317,7 +318,7 @@ export function IdentityModal({
                 onChange={(event) => setKeyInput(event.target.value)}
                 placeholder="Paste backup key string, private key, or JSON..."
                 rows={4}
-                className="w-full bg-surface-interactive border border-border-glass p-3 text-xs font-mono text-retro-fg placeholder:text-retro-muted rounded-lg outline-none focus:border-retro-accent resize-none"
+                className="w-full bg-surface-interactive border border-edge p-3 text-xs font-mono text-retro-fg placeholder:text-retro-muted rounded-lg outline-none focus:border-retro-accent resize-none"
               />
 
               <DropZone
@@ -333,7 +334,7 @@ export function IdentityModal({
                 </div>
               </DropZone>
 
-              <div className="border-t border-border-glass pt-3 space-y-2">
+              <div className="border-t border-edge pt-3 space-y-2">
                 <div className="text-xs font-medium text-retro-muted">
                   Restore full backup
                 </div>
@@ -346,7 +347,7 @@ export function IdentityModal({
                     if (files[0]) void handleFullConfigRestore(files[0]);
                   }}
                 >
-                  <div className={`p-3 text-center border rounded-lg ${configRestoring ? "border-retro-accent/30 bg-glass-w5" : "border-border-glass"}`}>
+                  <div className={`p-3 text-center border rounded-lg ${configRestoring ? "border-retro-accent/30 bg-glass-w5" : "border-edge"}`}>
                     <div className="text-xs font-medium text-retro-accent">
                       {configRestoring ? "Restoring..." : "Drop .goon-config.json here"}
                     </div>
@@ -358,7 +359,7 @@ export function IdentityModal({
                 type="button"
                 disabled={submitting || !keyInput.trim()}
                 onClick={() => handleLoginSubmit()}
-                className="w-full py-2.5 bg-retro-accent hover:bg-retro-accent-hover text-black font-medium text-xs rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                className="w-full py-2.5 bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text font-medium text-xs rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
               >
                 {submitting ? "Restoring..." : "Restore & Log In"}
               </button>
@@ -384,7 +385,7 @@ export function IdentityModal({
                 <button
                   type="button"
                   onClick={() => setMode("export")}
-                  className="flex-1 py-2.5 bg-glass-w8 border border-border-glass text-retro-fg font-medium text-xs rounded-lg transition-colors cursor-pointer hover:bg-glass-w12 active:scale-[0.98]"
+                  className="flex-1 py-2.5 bg-glass-w8 border border-edge text-retro-fg font-medium text-xs rounded-lg transition-colors cursor-pointer hover:bg-glass-w12 active:scale-(--scale-press)"
                 >
                   Export key first
                 </button>
@@ -392,7 +393,7 @@ export function IdentityModal({
                 <button
                   type="button"
                   onClick={handleConfirmLogout}
-                  className="flex-1 py-2.5 bg-retro-error/15 border border-retro-error/40 text-retro-error font-semibold text-xs rounded-lg transition-colors cursor-pointer hover:bg-retro-error/25 active:scale-[0.98]"
+                  className="flex-1 py-2.5 bg-retro-error/15 border border-retro-error/40 text-retro-error font-semibold text-xs rounded-lg transition-colors cursor-pointer hover:bg-retro-error/25 active:scale-(--scale-press)"
                 >
                   Sign out
                 </button>

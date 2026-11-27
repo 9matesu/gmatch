@@ -257,14 +257,86 @@ export function useVaultUrl(url?: string | null): string {
   return local ?? url ?? ''
 }
 
+export interface VaultLookupResult {
+  /** The local URL for the source, or null when there is no local copy. */
+  local: string | null
+  /**
+   * True once the lookup COMPLETED (hit, miss or failure).
+   *
+   * The URL and this flag come from ONE promise, so they can never disagree:
+   * the gate can never open while `local` is still unknown, which is what
+   * made the remote frame flash before the local copy swapped in.
+   */
+  settled: boolean
+}
+
 /**
- * Batch lookup for lists (gallery tiles): url -> vault:// for stored bytes.
- * Grows only; stale keys are harmless because every entry is URL-keyed and
- * vaultGet itself no-ops when the vault is off.
- * Mount-once + settings-event dep list: the joined key string is stable.
+ * ONE vault lookup, with an honest "settled" flag.
+ *
+ * The flicker guard used to run two independent lookups: `useVaultUrl` for the
+ * local URL and a second `vaultGet` for the "is it settled?" gate. The two
+ * promises resolve in any order, so the gate could open before the local URL
+ * was known — the remote frame was revealed and the media then reloaded from
+ * the local copy. One promise, one answer: the URL and the settled flag always
+ * agree, and the remote is only revealed when there is genuinely no local
+ * copy.
  */
-export function useVaultUrls(urls: Array<string | null | undefined>): Record<string, string> {
-  const [map, setMap] = useState<Record<string, string>>({})
+export function useVaultLookup(url?: string | null): VaultLookupResult {
+  const [result, setResult] = useState<VaultLookupResult>({ local: null, settled: false })
+  useEffect(() => {
+    if (!url || !vaultOptIn()) {
+      setResult({ local: null, settled: true })
+      return
+    }
+    let dead = false
+    setResult({ local: null, settled: false })
+    const resolve = () => {
+      void vaultGet(url)
+        .then((local) => { if (!dead) setResult({ local, settled: true }) })
+        .catch(() => { if (!dead) setResult({ local: null, settled: true }) })
+    }
+    resolve()
+    const onSettings = () => resolve()
+    const onVaultUpdate = (e: Event) => {
+      const custom = e as CustomEvent<{ url?: string; local?: string }>
+      if (custom.detail?.url === url && custom.detail?.local) {
+        if (!dead) setResult({ local: custom.detail.local, settled: true })
+        return
+      }
+      resolve()
+    }
+    window.addEventListener('orbit-settings-updated', onSettings)
+    window.addEventListener('orbit-vault-updated', onVaultUpdate)
+    return () => {
+      dead = true
+      window.removeEventListener('orbit-settings-updated', onSettings)
+      window.removeEventListener('orbit-vault-updated', onVaultUpdate)
+    }
+  }, [url])
+  return result
+}
+
+export interface VaultUrlLookups {
+  /** source url -> local url (hits only; the map only grows) */
+  urls: Record<string, string>
+  /**
+   * The source urls whose lookup COMPLETED in THIS mount (hit or miss).
+   *
+   * Deliberately per-mount. The module-level `vaultLookupSettled` set is
+   * sticky across visits, so a tile that had been looked up on a previous
+   * visit read as "settled" the instant it mounted again: the guard opened
+   * while the local copy was still on its way and the remote frame flashed.
+   * A guard must wait for ITS OWN lookup.
+   */
+  settled: Set<string>
+}
+
+/**
+ * Batch lookup for lists (gallery tiles): url -> vault:// for stored bytes,
+ * plus a per-url "this mount's lookup finished" set.
+ */
+export function useVaultUrlLookups(urls: Array<string | null | undefined>): VaultUrlLookups {
+  const [state, setState] = useState<VaultUrlLookups>({ urls: {}, settled: new Set() })
   const key = urls.filter(Boolean).join('|')
   useEffect(() => {
     if (!key || !vaultOptIn()) return
@@ -273,20 +345,24 @@ export function useVaultUrls(urls: Array<string | null | undefined>): Record<str
       void Promise.all(
         key.split('|').map(async (u) => [u, await vaultGet(u)] as const),
       ).then((pairs) => {
-        if (!dead) {
-          setMap((prev) => {
-            const next = { ...prev }
-            for (const [u, l] of pairs) if (l) next[u] = l
-            return next
-          })
-        }
+        if (dead) return
+        setState((prev) => {
+          const nextUrls = { ...prev.urls }
+          for (const [u, l] of pairs) if (l) nextUrls[u] = l
+          const nextSettled = new Set(prev.settled)
+          for (const [u] of pairs) nextSettled.add(u)
+          return { urls: nextUrls, settled: nextSettled }
+        })
       })
     }
     resolve()
     const onVaultUpdate = (e: Event) => {
       const custom = e as CustomEvent<{ url?: string; local?: string }>
       if (custom.detail?.url && custom.detail?.local && key.includes(custom.detail.url)) {
-        setMap((prev) => ({ ...prev, [custom.detail!.url!]: custom.detail!.local! }))
+        setState((prev) => ({
+          urls: { ...prev.urls, [custom.detail!.url!]: custom.detail!.local! },
+          settled: prev.settled,
+        }))
       } else {
         resolve()
       }
@@ -299,7 +375,22 @@ export function useVaultUrls(urls: Array<string | null | undefined>): Record<str
       window.removeEventListener('orbit-vault-updated', onVaultUpdate)
     }
   }, [key])
-  return map
+  return state
+}
+
+/**
+ * Batch lookup for lists (gallery tiles): url -> vault:// for stored bytes.
+ * Grows only; stale keys are harmless because every entry is URL-keyed and
+ * vaultGet itself no-ops when the vault is off.
+ *
+ * Mount-once + settings-event dep list: the joined key string is stable.
+ *
+ * Callers that also need to know WHEN a lookup finished (the flicker guard)
+ * must use `useVaultUrlLookups` — the map alone cannot say "this tile's own
+ * lookup has not answered yet".
+ */
+export function useVaultUrls(urls: Array<string | null | undefined>): Record<string, string> {
+  return useVaultUrlLookups(urls).urls
 }
 
 /**

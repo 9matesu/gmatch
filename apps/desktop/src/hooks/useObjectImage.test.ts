@@ -41,6 +41,48 @@ afterEach(() => {
   cleanup()
 })
 
+describe('useObjectImage failed-resolution TTL', () => {
+  it('a failed object is retried after the TTL instead of staying failed forever', async () => {
+    const { useObjectImage } = await import('./useObjectImage')
+    const orbitFetch = (await import('../utils/api')).orbitFetch as ReturnType<typeof vi.fn>
+    // Keep the module's default mock implementation for the other tests in this
+    // file; override only this case and restore it afterwards.
+    const defaultImpl = orbitFetch.getMockImplementation()
+    orbitFetch.mockClear()
+    // First call fails definitively (404) -> cached as FAILED.
+    orbitFetch.mockResolvedValueOnce({ ok: false, status: 404, headers: new Headers(), json: async () => ({}) })
+    let h = renderHook(() => useObjectImage('ttl-404', identity))
+    await waitFor(() => expect(h.result.current.failed).toBe(true))
+    h.unmount()
+    expect(orbitFetch).toHaveBeenCalledTimes(1)
+
+    // Immediately remounting must use the cached failure — no new request.
+    h = renderHook(() => useObjectImage('ttl-404', identity))
+    await waitFor(() => expect(h.result.current.failed).toBe(true))
+    h.unmount()
+    expect(orbitFetch).toHaveBeenCalledTimes(1)
+
+    // After the TTL the cached failure expires and the tile retries.
+    const realNow = Date.now
+    Date.now = () => realNow() + 60_000
+    try {
+      orbitFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'Content-Type': 'image/png' }),
+        blob: async () => new Blob(['ok'], { type: 'image/png' }),
+      })
+      h = renderHook(() => useObjectImage('ttl-404', identity))
+      await waitFor(() => expect(h.result.current.failed).toBe(false))
+      h.unmount()
+      expect(orbitFetch).toHaveBeenCalledTimes(2)
+    } finally {
+      Date.now = realNow
+      if (defaultImpl) orbitFetch.mockImplementation(defaultImpl)
+    }
+  })
+})
+
 describe('useObjectImage magic-byte video sniffing', () => {
   it('marks typeless local bytes with mp4 magic as video', async () => {
     const { useObjectImage } = await import('./useObjectImage')
@@ -64,6 +106,44 @@ describe('useObjectImage magic-byte video sniffing', () => {
     const h = renderHook(() => useObjectImage('img-sniff-1', identity))
     await waitFor(() => expect(h.result.current.url).toMatch(/^blob:/))
     expect(h.result.current.isVideo).toBe(false)
+    h.unmount()
+  })
+})
+
+/**
+ * A cache hit on a MOUNTED consumer must render the cached bytes.
+ *
+ * The effect used to `return` on a cache hit without calling setImg, so only
+ * the FIRST mount (whose useState initialiser reads the cache) ever showed a
+ * warm object. Recycle the hook to another id — a feed tile the window
+ * reuses, a story tray advance — and `img` still pointed at the previous
+ * cardId, so the `img.cardId !== normalized` branch fell through to EMPTY and
+ * the tile sat on "Loading media..." until an unrelated retry.
+ */
+describe('useObjectImage warm cache on a recycled consumer', () => {
+  it('renders a cached object after cardId changes to one already resolved', async () => {
+    const { useObjectImage } = await import('./useObjectImage')
+    const { orbitFetch } = await import('../utils/api')
+
+    // Resolve A first so its bytes land in the LRU.
+    const a = renderHook(() => useObjectImage('warm-a', identity))
+    await waitFor(() => expect(a.result.current.url).toMatch(/^blob:/))
+    a.unmount()
+
+    // Now mount on B, then switch to A: A is warm, B is not.
+    const h = renderHook(
+      ({ id }) => useObjectImage(id, identity),
+      { initialProps: { id: 'warm-b' } },
+    )
+    await waitFor(() => expect(h.result.current.url).toMatch(/^blob:/))
+
+    vi.mocked(orbitFetch).mockClear()
+    h.rerender({ id: 'warm-a' })
+
+    // The cached A must render immediately, with no network call at all.
+    await waitFor(() => expect(h.result.current.url).toMatch(/^blob:/))
+    expect(h.result.current.failed).toBe(false)
+    expect(orbitFetch).not.toHaveBeenCalled()
     h.unmount()
   })
 })
@@ -113,5 +193,130 @@ describe('useObjectImage eviction (signed media vanish)', () => {
     expect(revokeSpy).not.toHaveBeenCalledWith(liveUrl)
 
     pinned.unmount()
+  })
+})
+
+describe('useObjectImage resolveObject edge cases (Fase 4)', () => {
+  const identity = { orbitId: 'me', publicKeyHex: 'p', privateKeyHex: 'k' }
+
+  beforeEach(async () => {
+    const { __resetObjectImageCacheForTests } = await import('./useObjectImage')
+    __resetObjectImageCacheForTests()
+    ;(URL as unknown as { createObjectURL: unknown }).createObjectURL = vi.fn(() => 'blob:test-url')
+    ;(URL as unknown as { revokeObjectURL: unknown }).revokeObjectURL = vi.fn()
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.restoreAllMocks()
+  })
+
+  it('magnet/urn descriptor never touches the network', async () => {
+    const { useObjectImage } = await import('./useObjectImage')
+    const { orbitFetch } = await import('../utils/api')
+    vi.mocked(orbitFetch).mockClear()
+
+    const h = renderHook(() => useObjectImage('magnet:?xt=urn:btih:abc123def456', identity))
+    await waitFor(() => expect(h.result.current.failed).toBe(true))
+
+    expect(orbitFetch).not.toHaveBeenCalled()
+    h.unmount()
+  })
+
+  it('urn:sha256 descriptor never touches the network', async () => {
+    const { useObjectImage } = await import('./useObjectImage')
+    const { orbitFetch } = await import('../utils/api')
+    vi.mocked(orbitFetch).mockClear()
+
+    const h = renderHook(() => useObjectImage('urn:sha256:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab', identity))
+    await waitFor(() => expect(h.result.current.failed).toBe(true))
+
+    expect(orbitFetch).not.toHaveBeenCalled()
+    h.unmount()
+  })
+
+  it('retries a cold-dyno 503 until a 200 arrives', async () => {
+    const { useObjectImage } = await import('./useObjectImage')
+    const { orbitFetch } = await import('../utils/api')
+    const calls: number[] = []
+    vi.mocked(orbitFetch).mockImplementation(async () => {
+      calls.push(calls.length)
+      if (calls.length === 1) return { ok: false, status: 503 } as Response
+      return {
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'Content-Type': 'image/png' }),
+        blob: async () => new Blob(['recovered'], { type: 'image/png' }),
+      } as Response
+    })
+
+    const h = renderHook(() => useObjectImage('cold-dyno-card', identity))
+    await waitFor(() => expect(h.result.current.url).toMatch(/^blob:/))
+    expect(h.result.current.failed).toBe(false)
+    expect(calls).toHaveLength(2)
+    h.unmount()
+  })
+
+  it('404 without swarm bytes fails honestly without poisoning the cache', async () => {
+    const { useObjectImage } = await import('./useObjectImage')
+    const { orbitFetch } = await import('../utils/api')
+    vi.mocked(orbitFetch).mockResolvedValue({ ok: false, status: 404 } as Response)
+
+    const h = renderHook(() => useObjectImage('dead-card', identity))
+    await waitFor(() => expect(h.result.current.failed).toBe(true))
+    // The miss was probed on the wire before giving up.
+    expect(vi.mocked(orbitFetch)).toHaveBeenCalledWith(
+      '/api/objects/dead-card',
+      { method: 'GET' },
+      identity,
+    )
+    h.unmount()
+  })
+})
+
+describe('useObjectImage bounded object fetches', () => {
+  it('never holds more than 3 signed object streams at once', async () => {
+    // Media keeps the long 120s budget, and a grid used to start one fetch per
+    // tile. Chromium only opens six connections per host, so every other call
+    // (feed, lobby, DELETE) queued behind the media and timed out.
+    const { useObjectImage } = await import('./useObjectImage')
+    const orbitFetch = (await import('../utils/api')).orbitFetch as ReturnType<typeof vi.fn>
+    const defaultImpl = orbitFetch.getMockImplementation()
+    const releases: Array<() => void> = []
+    let active = 0
+    let peak = 0
+    orbitFetch.mockImplementation(async (url: string) => {
+      active += 1
+      peak = Math.max(peak, active)
+      await new Promise<void>((resolve) => {
+        releases.push(() => { active -= 1; resolve() })
+      })
+      const id = String(url).split('/').pop() || 'x'
+      return {
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'Content-Type': 'image/png' }),
+        blob: async () => new Blob([id], { type: 'image/png' }),
+      }
+    })
+    try {
+      const hooks = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) =>
+        renderHook(() => useObjectImage(`slot-${id}`, identity)),
+      )
+      await waitFor(() => expect(orbitFetch).toHaveBeenCalled())
+      await new Promise((resolve) => setTimeout(resolve, 60))
+      expect(peak).toBe(3)
+
+      // Draining one slot lets the next queued fetch start, never more than 3.
+      for (let round = 0; round < 12; round++) {
+        releases.splice(0).forEach((release) => release())
+        await new Promise((resolve) => setTimeout(resolve, 20))
+      }
+      expect(peak).toBeLessThanOrEqual(3)
+      hooks.forEach((hook) => hook.unmount())
+    } finally {
+      releases.splice(0).forEach((release) => release())
+      if (defaultImpl) orbitFetch.mockImplementation(defaultImpl)
+    }
   })
 })

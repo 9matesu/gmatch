@@ -5,7 +5,7 @@
 
 import { useState } from 'react'
 import { classifyStaticUrl } from '@orbit/shared'
-import { Modal } from '../Modal'
+import { Modal } from '../../ui/kit'
 import { WatchLocalFile } from './WatchLocalFile'
 import { BTN_PRIMARY } from '../../ui/styles'
 import { createParty, expandPlaylist, loadPartyVideo, loadPartyVideos, type PartyRuntime } from '../../hooks/watchPartyStore'
@@ -225,7 +225,7 @@ export function WatchPartyUrlModal({
           }}
           className="glass-field w-full px-3 py-2 text-xs font-mono resize-y"
         />
-        <p className="text-[10px] text-retro-muted">
+        <p className="text-2xs text-retro-muted">
           {hintText}
         </p>
         {!inRoom && (
@@ -241,8 +241,8 @@ export function WatchPartyUrlModal({
         )}
         {blocked && <p className="text-xs text-retro-muted">Only the host can load videos in this room.</p>}
         {statusText && (
-          <div className="flex items-center gap-2 px-3 py-2 rounded bg-glass-w5 border border-border-glass text-xs font-mono text-retro-fg animate-orbit-fade-in">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+          <div className="flex items-center gap-2 px-3 py-2 rounded bg-glass-w5 border border-edge text-xs font-mono text-retro-fg animate-orbit-fade-in">
+            <span className="w-2 h-2 rounded-full bg-success animate-pulse shrink-0" />
             <span className="truncate">{statusText}</span>
           </div>
         )}
@@ -258,7 +258,7 @@ export function WatchPartyUrlModal({
           </button>
         </div>
         {(!inRoom || (party && (party.host === identity.orbitId || !party.lockVideo))) && (
-          <div className="border-t border-border-glass pt-3">
+          <div className="border-t border-edge pt-3">
             <WatchLocalFile
               identity={identity}
               party={party}
@@ -272,3 +272,4 @@ export function WatchPartyUrlModal({
     </Modal>
   )
 }
+

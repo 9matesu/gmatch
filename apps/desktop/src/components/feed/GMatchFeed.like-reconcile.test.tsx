@@ -24,6 +24,7 @@ vi.mock('../../utils/sounds', () => ({
 vi.mock('../../services/imageCache', () => ({
   resolveImage: vi.fn(async (u: string) => u),
   devFetchable: vi.fn(() => null),
+  cachedImageFor: vi.fn(() => undefined),
 }));
 
 const mockIdentity = { orbitId: 'me', sign: vi.fn() } as any;
@@ -112,6 +113,6 @@ describe('like reconciliation (observable state sequence)', () => {
     await waitFor(() => expect(countText()).toMatch(/^10 likes$/));
     // Heart must also revert to unliked.
     const heart = container.querySelector('[aria-label="Like post"] svg');
-    expect(heart?.getAttribute('class') ?? '').not.toMatch(/fill-rose-500/);
+    expect(heart?.getAttribute('class') ?? '').not.toMatch(/fill-danger/);
   });
 });

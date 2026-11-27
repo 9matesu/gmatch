@@ -1,6 +1,7 @@
 import type { D1Turso } from './db'
 import { tierForMatches, tierColor, VOTE_POINTS, calculateDiscoveryReward, computeCardRarity, type CardVoteAction } from '@orbit/shared'
 import { ScoreService } from './score'
+import { findDisplayName } from './common/userLookup'
 
 /**
  * Pair-scoped match counts between two users, computed ONLY from non-story
@@ -222,7 +223,7 @@ export async function applyLikeDecision(
   const wasPositive = previousDecision === 'like' || previousDecision === 'boost'
 
   if (isPositive && !wasPositive) {
-    await db.batch([
+    await db.atomicBatch([
       db.prepare('UPDATE Users SET likes_given = COALESCE(likes_given, 0) + 1 WHERE id = ?').bind(userId),
       db.prepare('UPDATE Users SET likes_received = COALESCE(likes_received, 0) + 1 WHERE id = ?').bind(obj.owner_id),
       db.prepare("UPDATE Cards SET like_count = like_count + 1, updated_at = ? WHERE media_object_id = ?").bind(new Date().toISOString(), objectId),
@@ -235,11 +236,7 @@ export async function applyLikeDecision(
     try {
       const { createNotification } = await import('./notifications')
       const { broadcastToUser } = await import('./ws-bus')
-      const liker = await db
-        .prepare('SELECT display_name FROM Users WHERE id = ?')
-        .bind(userId)
-        .first<{ display_name: string | null }>()
-      const likerName = liker?.display_name?.trim() || 'Someone'
+      const likerName = (await findDisplayName(db, userId))?.trim() || 'Someone'
       const notif = await createNotification(
         db,
         obj.owner_id,
@@ -253,7 +250,7 @@ export async function applyLikeDecision(
       if (notif) broadcastToUser(obj.owner_id, { type: 'notification', action: 'new', notification: notif })
     } catch { /* bell is best-effort */ }
   } else if (!isPositive && wasPositive) {
-    await db.batch([
+    await db.atomicBatch([
       db.prepare('UPDATE Users SET likes_given = MAX(0, COALESCE(likes_given, 0) - 1) WHERE id = ?').bind(userId),
       db.prepare('UPDATE Users SET likes_received = MAX(0, COALESCE(likes_received, 0) - 1) WHERE id = ?').bind(obj.owner_id),
       db.prepare("UPDATE Cards SET like_count = MAX(0, like_count - 1), updated_at = ? WHERE media_object_id = ?").bind(new Date().toISOString(), objectId),

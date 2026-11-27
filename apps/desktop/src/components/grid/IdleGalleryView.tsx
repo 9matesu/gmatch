@@ -1,14 +1,16 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useGame } from '../../game/store'
 import type { GalleryImage } from '../../game/types'
-import { IconTrash, IconWallpaper, IconX, IconRefresh, IconChevronL, IconChevronR } from '../../ui/icons'
+import { IconTrash, IconWallpaper, IconX, IconChevronL, IconChevronR } from '../../ui/icons'
 import { DND_KEEPSAKE } from '../DropZone'
 import { offlineSvg } from '../../services/offlineSvg'
 import { redgifsPlayable } from '../../services/redgifs'
+import { GALLERY_ACTION_EVENT, type GalleryActionDetail } from '../../utils/galleryActions'
 import CachedImg from '../../ui/CachedImg'
 import MediaViewerModal from '../../ui/MediaViewerModal'
 import { EmptyState } from '../EmptyState'
-import { useVaultUrls, useVaultUrl, useVaultHttpUrls, vaultLookupSettled, vaultForgetFailure } from '../../services/vault'
+import { Button, Tabs, Title } from '../../ui/kit'
+import { useVaultUrlLookups, useVaultUrl, useVaultHttpUrls, vaultForgetFailure, vaultOptIn } from '../../services/vault'
 import { resolveKeepsakeLocal, resolveLocalMedia, retainLocalUrl, releaseLocalUrl, markLocalLookupSettled, keepsakeLocalSettled, type KeepsakeLocal } from '../../services/keepsake'
 import { SlideshowPlayer, type ResolvedItem } from '../slideshows/SlideshowPlayer'
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer'
@@ -24,13 +26,9 @@ import {
   Repeat,
   Sparkles,
   ImagePlus,
-  MoreVertical,
   ExternalLink,
 } from 'lucide-react'
 import { MUTED } from '../../ui/styles'
-
-const HOVER_BTN =
-  'glass-button absolute flex cursor-pointer items-center justify-center rounded-lg p-0 opacity-0 focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100'
 
 const RARITY_ORDER: Record<string, number> = {
   Common: 1,
@@ -65,15 +63,6 @@ async function downloadMedia(url: string, filename: string): Promise<boolean> {
   } catch {
     return false
   }
-}
-
-function toResolvedItems(images: GalleryImage[]): ResolvedItem[] {
-  return images.map((img) => ({
-    object_id: img.localRef || null,
-    url: img.url,
-    caption: img.tags.slice(0, 5).join(' ') || 'Keepsake',
-    mime_type: img.kind === 'video' ? 'video/mp4' : 'image/jpeg',
-  }))
 }
 
 /**
@@ -233,6 +222,29 @@ function useVaultPinProgress(): Record<string, number> {
  *  downloads for the same bytes. */
 const retryingKeepsakes = new Set<string>()
 
+/** Boot repair runs once per session: every keep that is not yet verified
+ *  'persisted' goes through the authorized persist pipeline, so the vault
+ *  ends up holding ALL the media the app knows about — offline data, not
+ *  best-effort. The vault bridge dedupes by content hash, so a re-run after
+ *  an eviction re-fetches only what is actually missing. */
+let bootRepairRan = false
+async function repairKeepsakeVault(gallery: GalleryImage[]): Promise<void> {
+  if (bootRepairRan) return
+  bootRepairRan = true
+  const missing = gallery.filter((g) => g.url && g.saveState !== 'persisted' && !retryingKeepsakes.has(g.id))
+  // Bounded pool of 3: the pipeline is already per-URL guarded; this keeps the
+  // boot repair from storming a host with every keep at once.
+  const queue = [...missing]
+  const worker = async () => {
+    for (;;) {
+      const img = queue.shift()
+      if (!img) return
+      await retryKeepsake(img).catch(() => { /* a failed repair stays 'failed' honestly */ })
+    }
+  }
+  await Promise.all([worker(), worker(), worker()])
+}
+
 /** Re-run the authorized persist pipeline for one keep; store the outcome.
  *  A failed retry never discards an identity the record already carries. */
 async function retryKeepsake(img: GalleryImage): Promise<void> {
@@ -295,7 +307,7 @@ function KeepsakeErrorState({
   return (
     <div
       role="alert"
-      className="flex max-h-[70vh] min-h-[240px] w-[320px] max-w-full flex-col items-center justify-center gap-2 rounded-lg border border-border-glass bg-black/60 p-6 text-center"
+      className="flex max-h-(--max-h-sheet) min-h-[240px] w-[320px] max-w-full flex-col items-center justify-center gap-2 rounded-lg border border-edge bg-black/60 p-6 text-center"
     >
       <span className="text-xs font-semibold text-retro-fg">{title}</span>
       {state !== 'pending' && (
@@ -316,7 +328,7 @@ function KeepsakeErrorState({
 
 export interface IdleGalleryViewProps {
   onCreateCard?: (media: { url: string; tags: string[]; name: string }) => void
-  onSetWallpaper?: (url: string, mime?: string) => void
+  onSetWallpaper?: (url: string, target?: 'app' | 'os', mime?: string) => void
   onRepostImage?: (media: { url: string; tags: string[]; name?: string; kind?: 'video' | 'image'; mimeType?: string }) => void
   onAddToStory?: (media: { url: string; tags: string[]; name?: string; kind?: 'video' | 'image'; mimeType?: string }) => void
 }
@@ -337,6 +349,10 @@ export default function IdleGalleryView({
   const setBackground = useGame((s) => s.setBackground)
   const removeGalleryImage = useGame((s) => s.removeGalleryImage)
 
+  // The context-menu bridge runs outside React's render, so it needs the latest
+  // resolver without re-subscribing on every render.
+  const forwardUrlRef = useRef<(img: GalleryImage) => string>(() => '')
+
   // Filters, search, sort, tags & pagination
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | 'image' | 'video'>('all')
@@ -352,6 +368,77 @@ export default function IdleGalleryView({
   const [slideshowItems, setSlideshowItems] = useState<ResolvedItem[]>([])
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const pinProgress = useVaultPinProgress()
+
+  // Boot repair: sweep every keep that is not yet verified into the vault once
+  // per session, so the offline data IS there when the network is not.
+  const galleryRef = useRef(gallery)
+  galleryRef.current = gallery
+  useEffect(() => {
+    void repairKeepsakeVault(galleryRef.current)
+  }, [])
+
+  // The shared media context menu asks; the gallery owns the bytes, so it runs
+  // the action against its own store. Keeps this view free of a second dropdown.
+  useEffect(() => {
+    const onAction = (e: Event) => {
+      const detail = (e as CustomEvent<GalleryActionDetail>).detail
+      if (!detail?.keepsakeId) return
+      const img = useGame.getState().gallery.find((g) => g.id === detail.keepsakeId)
+      if (!img) return
+      switch (detail.action) {
+        case 'repost':
+          onRepostImage?.({
+            url: forwardUrlRef.current(img),
+            tags: img.tags,
+            name: img.tags.slice(0, 3).join(' ') || 'Keepsake',
+            kind: img.kind,
+            mimeType: img.kind === 'video' ? 'video/mp4' : undefined,
+          })
+          break
+        case 'story':
+          onAddToStory?.({
+            url: forwardUrlRef.current(img),
+            tags: img.tags,
+            name: img.tags.slice(0, 3).join(' ') || 'Keepsake',
+            kind: img.kind,
+            mimeType: img.kind === 'video' ? 'video/mp4' : undefined,
+          })
+          break
+        case 'card':
+          onCreateCard?.({
+            url: img.url,
+            tags: img.tags.slice(0, 8),
+            name: img.tags.slice(0, 3).join(' ') || 'Keepsake',
+          })
+          break
+        case 'feature':
+          featureImage(img.id)
+          break
+        case 'backdrop': {
+          const url = forwardUrlRef.current(img)
+          const target = (detail as { target?: string }).target === 'os' ? 'os' : 'app'
+          setBackground(url)
+          // Local keepsake -> OS wallpaper needs NO consent (it is this machine's
+  // own bytes, an explicit user action). The app tier is the in-app background.
+          onSetWallpaper?.(url, target, img.kind === 'video' ? 'video/mp4' : undefined)
+          break
+        }
+        case 'delete':
+          if (window.confirm('Delete this keepsake permanently?')) {
+            removeGalleryImage(img.id)
+            setViewerId((v) => (v === img.id ? null : v))
+            setSelectedIds((prev) => {
+              const next = new Set(prev)
+              next.delete(img.id)
+              return next
+            })
+          }
+          break
+      }
+    }
+    window.addEventListener(GALLERY_ACTION_EVENT, onAction)
+    return () => window.removeEventListener(GALLERY_ACTION_EVENT, onAction)
+  }, [onRepostImage, onAddToStory, onCreateCard, onSetWallpaper, setBackground, featureImage, removeGalleryImage])
 
   useEffect(() => {
     if (!openMenuId) return
@@ -442,7 +529,15 @@ export default function IdleGalleryView({
   }, [sortedGallery, safePage])
 
   // Local vault (opt-in): render pinned bytes from disk instead of remote.
-  const vaultUrls = useVaultUrls(paginatedGallery.map((g) => g.url))
+  //
+  // The per-mount `settled` set is what makes the flicker guard honest: it
+  // says "THIS mount's lookup for this url has answered". The old guard used
+  // the module-level `vaultLookupSettled`, which is sticky across visits — so
+  // on the second visit to the gallery a tile read as settled the moment it
+  // mounted, the remote frame painted, and the local copy swapped in under
+  // the player's eyes.
+  const vaultLookups = useVaultUrlLookups(paginatedGallery.map((g) => g.url))
+  const vaultUrls = vaultLookups.urls
   // Phase 5: local bytes from the swarm store (covers dev / vault-off).
   const localUrls = useKeepsakeLocalUrls(paginatedGallery, vaultUrls)
   // Viewer may sit outside the current page; resolve its url separately.
@@ -624,6 +719,7 @@ export default function IdleGalleryView({
     const r = resolveKeepsakeLocal(img, vaultUrls, localUrls)
     return r.kind === 'local' ? r.url : img.url
   }
+  forwardUrlRef.current = forwardUrl
 
   // Cross-surface open: the context menu dispatches this for keepsake tiles so
   // "Open in New Tab" resolves local bytes instead of the raw <img> src.
@@ -673,38 +769,28 @@ export default function IdleGalleryView({
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       {/* Header Toolbar */}
-      <div className="glass-header p-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <div className="glass-inset w-7 h-7 rounded-lg flex items-center justify-center text-retro-muted">
-            <ImageIcon className="w-4 h-4" />
-          </div>
-          <div>
-            <h2 className="text-xs font-bold text-retro-fg uppercase tracking-wider">
-              Gallery ({gallery.length})
-            </h2>
-            <p className="text-[10px] text-retro-muted">Drained images, booru captures, and idle keepsakes</p>
-          </div>
-        </div>
+      <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-3 border-b border-edge">
+        <Title>
+          Gallery ({gallery.length})
+        </Title>
 
         <div className="flex items-center gap-2 flex-wrap text-xs">
-          <div className="glass-field flex items-center gap-1 px-2 py-1 text-xs">
-            <span className="text-retro-muted font-semibold text-[10px] uppercase tracking-wider">Sort:</span>
-            <select
-              value={gallerySort}
-              onChange={(e) => {
-                setGallerySort(e.target.value as any)
-                setPage(0)
-              }}
-              className="bg-transparent text-retro-body text-xs font-semibold outline-none cursor-pointer"
-            >
-              <option value="newest" className="bg-surface-raised text-retro-body">Newest</option>
-              <option value="oldest" className="bg-surface-raised text-retro-body">Oldest</option>
-              <option value="rarity" className="bg-surface-raised text-retro-body">Rarity</option>
-              <option value="clicks" className="bg-surface-raised text-retro-body">Clicks</option>
-            </select>
-          </div>
+          <select
+            value={gallerySort}
+            onChange={(e) => {
+              setGallerySort(e.target.value as any)
+              setPage(0)
+            }}
+            aria-label="Sort gallery"
+            className="bg-glass-w5 border border-edge rounded-lg px-2 py-1.5 text-xs text-retro-fg outline-none cursor-pointer"
+          >
+            <option value="newest">Newest</option>
+            <option value="oldest">Oldest</option>
+            <option value="rarity">Rarity</option>
+            <option value="clicks">Clicks</option>
+          </select>
 
-          <div className="glass-field flex items-center gap-1 px-2 py-1 text-xs">
+          <div className="flex items-center gap-1.5 bg-glass-w5 border border-edge rounded-lg px-2 py-1.5">
             <Search className="w-3.5 h-3.5 text-retro-muted" />
             <input
               type="text"
@@ -714,35 +800,22 @@ export default function IdleGalleryView({
                 setPage(0)
               }}
               placeholder="Filter gallery…"
-              className="bg-transparent text-retro-body text-xs font-semibold outline-none placeholder:text-retro-muted w-24 sm:w-32"
+              aria-label="Filter gallery"
+              className="bg-transparent text-retro-fg text-xs outline-none placeholder:text-retro-muted w-24 sm:w-32"
             />
           </div>
 
-          <div className="glass-inset flex p-0.5 rounded-lg text-xs font-semibold">
-            {(['all', 'image', 'video'] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => {
-                  setTypeFilter(t)
-                  setPage(0)
-                }}
-                // The bare word "all" was an ambiguous accessible name — the
-                // audit found two controls on the gallery reading "all" and
-                // nothing to tell a screen-reader user which was which.
-                aria-label={`Filter: ${t}`}
-                aria-pressed={typeFilter === t}
-                className={`px-2.5 py-1 rounded-md cursor-pointer uppercase tracking-wider transition-colors ${
-                  typeFilter === t ? 'bg-glass-w12 text-retro-fg font-bold shadow-sm' : 'text-retro-muted hover:text-retro-body'
-                }`}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
+          <Tabs
+            tabs={[{ id: 'all' as const, label: 'All' }, { id: 'image' as const, label: 'Images' }, { id: 'video' as const, label: 'Videos' }]}
+            value={typeFilter}
+            onChange={(t) => {
+              setTypeFilter(t)
+              setPage(0)
+            }}
+          />
 
-          <button
-            type="button"
+          <Button
+            size="sm"
             onClick={() => {
               if (sortedGallery.length > 0) {
                 const { items, skipped } = toLocalSlideshowItems(sortedGallery, vaultUrls, localUrls)
@@ -758,33 +831,28 @@ export default function IdleGalleryView({
               }
             }}
             disabled={sortedGallery.length === 0}
-            className="glass-action px-3 py-1 rounded-lg font-semibold text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
             title="Play slideshow of current items"
           >
             <Film className="w-3.5 h-3.5" />
             <span>Slideshow</span>
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Batch Action Bar */}
       {selectedIds.size > 0 && (
-        <div className="glass-header px-4 py-2.5 flex items-center justify-between gap-3 text-xs animate-orbit-fade-in border-t border-border-glass">
-          <div className="flex items-center gap-2 text-retro-fg font-bold">
-            <CheckSquare className="w-4 h-4 text-emerald-600" />
-            <span>{selectedIds.size} images selected</span>
+        <div className="px-4 py-2.5 flex items-center justify-between gap-3 text-xs animate-orbit-fade-in border-t border-edge">
+          <div className="flex items-center gap-2 text-retro-fg font-semibold">
+            <CheckSquare className="w-4 h-4 text-success-fg" />
+            <span>{selectedIds.size} selected</span>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={handleBatchDownload}
-              className="glass-action glass-action-primary px-3 py-1.5 rounded-lg font-bold text-xs cursor-pointer flex items-center gap-1"
-            >
+            <Button size="sm" variant="primary" onClick={handleBatchDownload}>
               <Download className="w-3.5 h-3.5" />
-              <span>Download Selected</span>
-            </button>
-            <button
-              type="button"
+              <span>Download</span>
+            </Button>
+            <Button
+              size="sm"
               onClick={() => {
                 const selectedItems = gallery.filter((i) => selectedIds.has(i.id))
                 if (selectedItems.length > 0) {
@@ -800,29 +868,20 @@ export default function IdleGalleryView({
                   setShowSlideshow(true)
                 }
               }}
-              className="glass-action px-3 py-1.5 rounded-lg font-bold text-xs cursor-pointer flex items-center gap-1"
             >
               <Film className="w-3.5 h-3.5" />
               <span>Slideshow</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleBatchDelete}
-              className="glass-action glass-action-danger px-3 py-1.5 rounded-lg font-bold text-xs cursor-pointer flex items-center gap-1"
-            >
+            </Button>
+            <Button size="sm" variant="danger" onClick={handleBatchDelete}>
               <Trash2 className="w-3.5 h-3.5" />
               <span>Delete</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedIds(new Set())}
-              className="text-xs text-retro-muted hover:text-retro-body px-2 py-1 cursor-pointer"
-            >
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
               Clear
-            </button>
+            </Button>
           </div>
           {batchNotice && (
-            <div className="px-4 pb-1 text-[11px] text-amber-300" role="status">
+            <div className="px-4 pb-1 text-xs text-warning-fg" role="status">
               {batchNotice}
             </div>
           )}
@@ -830,7 +889,7 @@ export default function IdleGalleryView({
       )}
 
       {batchNotice && selectedIds.size === 0 && (
-        <div className="px-4 pt-1 text-[11px] text-amber-300" role="status">
+        <div className="px-4 pt-1 text-xs text-warning-fg" role="status">
           {batchNotice}
         </div>
       )}
@@ -845,10 +904,10 @@ export default function IdleGalleryView({
               type="button"
               onClick={() => toggleTag(t)}
               aria-pressed={activeTags.has(t)}
-              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border cursor-pointer transition-colors ${
+              className={`px-2 py-0.5 rounded-full text-2xs font-semibold border cursor-pointer transition-colors ${
                 activeTags.has(t)
                   ? 'bg-glass-w20 border-retro-fg/70 text-retro-fg'
-                  : 'border-border-glass text-retro-muted hover:text-retro-body'
+                  : 'border-edge text-retro-muted hover:text-retro-body'
               }`}
             >
               {t} <span className="opacity-60">{n}</span>
@@ -861,7 +920,7 @@ export default function IdleGalleryView({
                 setActiveTags(new Set())
                 setPage(0)
               }}
-              className="text-[10px] text-retro-muted hover:text-retro-fg cursor-pointer underline ml-1"
+              className="text-2xs text-retro-muted hover:text-retro-fg cursor-pointer underline ml-1"
             >
               clear ({activeTags.size})
             </button>
@@ -870,16 +929,11 @@ export default function IdleGalleryView({
       )}
 
       {backgroundUrl && (
-        <div className="mx-4 my-2 flex items-center gap-2.5 rounded-[10px] border border-border-glass bg-retro-bg px-3 py-1.5 text-xs text-retro-muted">
+        <div className="mx-4 my-2 flex items-center gap-2.5 rounded-lg border border-edge bg-retro-bg px-3 py-1.5 text-xs text-retro-muted">
           <span>App backdrop is active</span>
-          <button
-            type="button"
-            className="glass-action px-2 py-0.5 text-xs font-semibold rounded-md flex items-center gap-1 cursor-pointer ml-auto"
-            onClick={() => setBackground(null)}
-            title="Remove the app backdrop"
-          >
+          <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setBackground(null)} title="Remove the app backdrop">
             <IconX size={12} /> Clear
-          </button>
+          </Button>
         </div>
       )}
 
@@ -890,18 +944,14 @@ export default function IdleGalleryView({
             title="No keepsakes match filter"
             description="No images match your search and tag criteria. Try clearing tags or filters."
             action={
-              <button
-                type="button"
-                className="glass-action px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer"
-                onClick={() => {
-                  setSearch('')
-                  setTypeFilter('all')
-                  setActiveTags(new Set())
-                  setPage(0)
-                }}
-              >
+              <Button size="sm" onClick={() => {
+                setSearch('')
+                setTypeFilter('all')
+                setActiveTags(new Set())
+                setPage(0)
+              }}>
                 Clear filter
-              </button>
+              </Button>
             }
           />
         </div>
@@ -913,6 +963,13 @@ export default function IdleGalleryView({
               const isMotion = img.kind === 'video'
               const isSelected = selectedIds.has(img.id)
               const tileUrl = getTileUrl(img)
+              // Vault flicker guard: while THIS mount's local vault lookup is
+              // still resolving (or a vault:// ref has not become a playable
+              // http url yet), keep the tile invisible instead of flashing the
+              // remote frame first. Layout is held by the aspect-square parent.
+              const vaultPending =
+                vaultOptIn() &&
+                (!vaultLookups.settled.has(img.url || '') || tileUrl.startsWith('vault://'))
               // A record that CLAIMS persisted bytes but whose lookup finished
               // with nothing (evicted vault / cleared object store / unreadable
               // row) must say so and offer a retry — the tile used to render a
@@ -921,7 +978,7 @@ export default function IdleGalleryView({
                 img.saveState === 'persisted' &&
                 !vaultUrls[img.url || ''] &&
                 !localUrls[img.url || ''] &&
-                vaultLookupSettled(img.url || '') &&
+                vaultLookups.settled.has(img.url || '') &&
                 keepsakeLocalSettled(img.localRef || img.url)
 
               return (
@@ -940,14 +997,14 @@ export default function IdleGalleryView({
                     )
                     e.dataTransfer.effectAllowed = 'copy'
                   }}
-                  className={`group relative aspect-square rounded-[10px] border bg-black shadow-[0_4px_10px_rgba(0,0,0,0.5)] cursor-grab active:cursor-grabbing ${
+                  className={`group relative aspect-square rounded-lg border bg-retro-bg cursor-grab active:cursor-grabbing ${
                     openMenuId === img.id ? 'z-30' : 'overflow-hidden'
                   } ${
                     isSelected
-                      ? 'border-emerald-500 ring-2 ring-emerald-500/40'
+                      ? 'border-success ring-2 ring-success/40'
                       : isBackdrop
                       ? 'border-retro-accent'
-                      : 'border-border-glass'
+                      : 'border-edge'
                   }`}
                 >
                   {/* Top-left Select Checkbox */}
@@ -958,10 +1015,10 @@ export default function IdleGalleryView({
                       toggleSelect(img.id)
                     }}
                     aria-label={isSelected ? 'Deselect image' : 'Select image'}
-                    className={`absolute left-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-md backdrop-blur-md transition-all cursor-pointer ${
+                    className={`absolute left-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-md backdrop-blur-md transition cursor-pointer ${
                       isSelected
-                        ? 'bg-emerald-600/90 text-white opacity-100 shadow-md ring-1 ring-white/30'
-                        : 'bg-black/60 text-white/70 opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+                        ? 'bg-success/90 text-retro-fg opacity-100 shadow-md ring-1 ring-white/30'
+                        : 'bg-black/60 text-retro-fg/70 opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
                     }`}
                   >
                     {isSelected ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
@@ -971,6 +1028,7 @@ export default function IdleGalleryView({
                   <button
                     type="button"
                     className="block h-full w-full cursor-pointer border-0 bg-transparent p-0"
+                    style={vaultPending ? { opacity: 0 } : undefined}
                     title="View keepsake"
                     aria-label={`View ${img.tags.slice(0, 2).join(' ') || 'keepsake'}`}
                     onClick={(e) => {
@@ -1002,6 +1060,10 @@ export default function IdleGalleryView({
                         alt={img.tags.slice(0, 3).join(' ') || 'gallery image'}
                         referrerPolicy="no-referrer"
                         loading="lazy"
+                        // A dense keepsake grid asks for the SMALL cached copy;
+                        // the full-size bytes are only fetched when a tile is
+                        // opened.
+                        thumb
                         data-keepsake-id={img.id}
                       />
                     )}
@@ -1010,7 +1072,7 @@ export default function IdleGalleryView({
                   {/* Phase 5: local-cache status — never imply a keep is saved
                       when its bytes are not locally stored. */}
                   {img.saveState === 'downloading' && (
-                    <span className="pointer-events-none absolute bottom-1.5 left-1.5 z-20 rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] font-mono text-white/80 backdrop-blur-md">
+                    <span className="pointer-events-none absolute bottom-1.5 left-1.5 z-20 rounded-md bg-black/70 px-1.5 py-0.5 text-2xs font-mono text-retro-fg/80 backdrop-blur-md">
                       Caching…{pinProgress[img.url] != null ? ` ${pinProgress[img.url]}%` : ''}
                     </span>
                   )}
@@ -1022,7 +1084,7 @@ export default function IdleGalleryView({
                         await retryKeepsake(img)
                       }}
                       title="Could not cache this keep locally. The source link is kept for a retry."
-                      className="absolute bottom-1.5 left-1.5 z-20 rounded-md border border-rose-500/40 bg-black/75 px-1.5 py-0.5 text-[10px] font-mono text-rose-300 backdrop-blur-md cursor-pointer hover:bg-black/90"
+                      className="absolute bottom-1.5 left-1.5 z-20 rounded-md border border-danger/40 bg-black/75 px-1.5 py-0.5 text-2xs font-mono text-danger-fg backdrop-blur-md cursor-pointer hover:bg-black/90"
                     >
                       Not cached · Retry
                     </button>
@@ -1035,167 +1097,21 @@ export default function IdleGalleryView({
                         await retryKeepsake(img)
                       }}
                       title="This keep was saved but its local bytes are no longer readable. Retry to fetch them again."
-                      className="absolute bottom-1.5 left-1.5 z-20 rounded-md border border-amber-500/40 bg-black/75 px-1.5 py-0.5 text-[10px] font-mono text-amber-300 backdrop-blur-md cursor-pointer hover:bg-black/90"
+                      className="absolute bottom-1.5 left-1.5 z-20 rounded-md border border-warning/40 bg-black/75 px-1.5 py-0.5 text-2xs font-mono text-warning-fg backdrop-blur-md cursor-pointer hover:bg-black/90"
                     >
                       Missing locally · Retry
                     </button>
                   )}
-
-                  {/* Top-right More Options Menu Button & Dropdown */}
-                  <div className="absolute right-1.5 top-1.5 z-20">
-                    <button
-                      type="button"
-                      className={`${HOVER_BTN} ${
-                        openMenuId === img.id ? '!opacity-100 ring-1 ring-white/30' : ''
-                      } relative right-auto top-auto h-6 w-6 rounded-md bg-black/75 hover:bg-black/90 text-white/80 hover:text-white border border-white/10 shadow-md backdrop-blur-md cursor-pointer transition-all`}
-                      title="More options"
-                      aria-label={`Options for ${img.tags.slice(0, 2).join(' ') || 'keepsake'}`}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setOpenMenuId((prev) => (prev === img.id ? null : img.id))
-                      }}
-                    >
-                      <MoreVertical size={13} />
-                    </button>
-
-                    {openMenuId === img.id && (
-                      <div
-                        className="absolute right-0 top-7 z-30 w-44 py-1 bg-surface-raised/95 backdrop-blur-xl border border-border-glass rounded-xl shadow-2xl text-xs flex flex-col animate-orbit-fade-in"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {onRepostImage && (
-                          <button
-                            type="button"
-                            className="flex items-center gap-2 px-3 py-1.5 text-left text-retro-fg hover:bg-glass-w10 transition-colors cursor-pointer"
-                            title="Repost to feed"
-                            aria-label={`Repost ${img.tags.slice(0, 2).join(' ') || 'image'} to feed`}
-                            onClick={() => {
-                              setOpenMenuId(null)
-                              onRepostImage({
-                                url: forwardUrl(img),
-                                tags: img.tags,
-                                name: img.tags.slice(0, 3).join(' ') || 'Keepsake',
-                                kind: img.kind,
-                                mimeType: img.kind === 'video' ? 'video/mp4' : undefined,
-                              })
-                            }}
-                          >
-                            <Repeat size={13} className="text-sky-400" />
-                            <span>Repost to feed</span>
-                          </button>
-                        )}
-
-                        {onAddToStory && (
-                          <button
-                            type="button"
-                            className="flex items-center gap-2 px-3 py-1.5 text-left text-retro-fg hover:bg-glass-w10 transition-colors cursor-pointer"
-                            title="Add to story"
-                            aria-label={`Add ${img.tags.slice(0, 2).join(' ') || 'image'} to story`}
-                            onClick={() => {
-                              setOpenMenuId(null)
-                              onAddToStory({
-                                url: forwardUrl(img),
-                                tags: img.tags,
-                                name: img.tags.slice(0, 3).join(' ') || 'Keepsake',
-                                kind: img.kind,
-                                mimeType: img.kind === 'video' ? 'video/mp4' : undefined,
-                              })
-                            }}
-                          >
-                            <Sparkles size={13} className="text-amber-400" />
-                            <span>Add to story</span>
-                          </button>
-                        )}
-
-                        {onCreateCard && (
-                          <button
-                            type="button"
-                            className="flex items-center gap-2 px-3 py-1.5 text-left text-retro-fg hover:bg-glass-w10 transition-colors cursor-pointer"
-                            title="Turn into a card"
-                            aria-label={`Turn ${img.tags.slice(0, 2).join(' ') || 'keepsake'} into a card`}
-                            onClick={() => {
-                              setOpenMenuId(null)
-                              onCreateCard({
-                                url: isMotion && img.url.includes('redgifs') ? redgifsPlayable(img.url) : img.url,
-                                tags: img.tags.slice(0, 8),
-                                name: img.tags.slice(0, 3).join(' ') || 'Keepsake',
-                              })
-                            }}
-                          >
-                            <ImagePlus size={13} className="text-purple-400" />
-                            <span>Create card</span>
-                          </button>
-                        )}
-
-                        <button
-                          type="button"
-                          className="flex items-center gap-2 px-3 py-1.5 text-left text-retro-fg hover:bg-glass-w10 transition-colors cursor-pointer"
-                          title="Re-feature in the Goon Panel"
-                          aria-label={`Re-feature ${img.tags.slice(0, 2).join(' ') || 'keepsake'}`}
-                          onClick={() => {
-                            setOpenMenuId(null)
-                            featureImage(img.id)
-                          }}
-                        >
-                          <IconRefresh size={13} className="text-emerald-400" />
-                          <span>Re-feature</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          disabled={isBackdrop}
-                          className="flex items-center gap-2 px-3 py-1.5 text-left text-retro-fg hover:bg-glass-w10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-default"
-                          title={isBackdrop ? 'This is the app backdrop' : 'Set as app backdrop'}
-                          aria-label={
-                            isBackdrop
-                              ? 'Current app backdrop'
-                              : `Set ${img.tags.slice(0, 2).join(' ') || 'image'} as app backdrop`
-                          }
-                          onClick={() => {
-                            setOpenMenuId(null)
-                            setBackground(img.url)
-                            onSetWallpaper?.(img.url, isMotion ? 'video/mp4' : undefined)
-                          }}
-                        >
-                          <IconWallpaper size={13} className="text-cyan-400" />
-                          <span>{isBackdrop ? 'Active backdrop' : 'Set backdrop'}</span>
-                        </button>
-
-                        <div className="h-[1px] bg-border-glass my-1" />
-
-                        <button
-                          type="button"
-                          className="flex items-center gap-2 px-3 py-1.5 text-left text-rose-400 hover:bg-rose-500/15 transition-colors cursor-pointer"
-                          title="Delete permanently from the gallery"
-                          aria-label={`Delete ${img.tags.slice(0, 2).join(' ') || 'keepsake'} permanently`}
-                          onClick={() => {
-                            setOpenMenuId(null)
-                            if (window.confirm('Delete this keepsake permanently?')) {
-                              removeGalleryImage(img.id)
-                              if (viewerId === img.id) setViewerId(null)
-                              setSelectedIds((prev) => {
-                                const next = new Set(prev)
-                                next.delete(img.id)
-                                return next
-                              })
-                            }
-                          }}
-                        >
-                          <IconTrash size={13} />
-                          <span>Delete</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
                 </div>
               )
             })}
           </div>
 
           {/* Pagination and Select All on Page Footer */}
-          <div className="flex items-center justify-between pt-3 border-t border-border-glass/80 mt-4 text-xs">
-            <button
-              type="button"
+          <div className="flex items-center justify-between pt-3 border-t border-edge/80 mt-4 text-xs">
+            <Button
+              size="sm"
+              variant="ghost"
               onClick={() => {
                 const pageIds = paginatedGallery.map((i) => i.id)
                 const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id))
@@ -1209,34 +1125,31 @@ export default function IdleGalleryView({
                   return next
                 })
               }}
-              className="text-xs font-semibold text-retro-muted hover:text-retro-body cursor-pointer"
             >
               {paginatedGallery.length > 0 && paginatedGallery.every((i) => selectedIds.has(i.id))
                 ? 'Deselect all on page'
                 : 'Select all on page'}
-            </button>
+            </Button>
 
             {totalPages > 1 && (
               <div className="flex items-center gap-2 text-xs">
-                <button
-                  type="button"
+                <Button
+                  size="sm"
                   disabled={safePage === 0}
                   onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  className="glass-action px-3 py-1.5 text-xs font-semibold rounded-lg disabled:opacity-30 cursor-pointer"
                 >
                   ← Prev
-                </button>
+                </Button>
                 <span className="text-retro-muted font-mono text-xs">
-                  Page <strong className="text-retro-body">{safePage + 1}</strong> of {totalPages}
+                  Page <strong className="text-retro-fg">{safePage + 1}</strong> of {totalPages}
                 </span>
-                <button
-                  type="button"
+                <Button
+                  size="sm"
                   disabled={safePage >= totalPages - 1}
                   onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                  className="glass-action px-3 py-1.5 text-xs font-semibold rounded-lg disabled:opacity-30 cursor-pointer"
                 >
                   Next →
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -1246,15 +1159,15 @@ export default function IdleGalleryView({
       {/* Viewer Modal */}
       {viewer && (
         <MediaViewerModal onClose={() => setViewerId(null)} label="Keepsake viewer">
-          <figure className="relative flex max-h-[80vh] min-h-0 w-auto max-w-full flex-col items-center">
+          <figure className="relative flex max-h-(--max-h-panel) min-h-0 w-auto max-w-full flex-col items-center">
             <div className="relative min-h-0 w-auto max-w-full" data-keepsake-id={viewer.id}>
               {viewerResolved.status === 'local' ? (
                 viewerResolved.media === 'video' ? (
                   <NativeVideoPlayer
                     src={viewerResolved.url}
                     poster={viewer.preview || undefined}
-                    className="max-h-[70vh] w-auto max-w-full rounded-lg"
-                    videoClassName="max-h-[70vh] w-auto max-w-full rounded-lg object-contain"
+                    className="max-h-(--max-h-sheet) w-auto max-w-full rounded-lg"
+                    videoClassName="max-h-(--max-h-sheet) w-auto max-w-full rounded-lg object-contain"
                     controls
                     autoPlay
                     muted={false}
@@ -1265,7 +1178,7 @@ export default function IdleGalleryView({
                   <img
                     src={viewerResolved.url}
                     alt={viewer.tags.slice(0, 3).join(' ') || 'keepsake'}
-                    className="max-h-[70vh] w-auto max-w-full rounded-lg object-contain"
+                    className="max-h-(--max-h-sheet) w-auto max-w-full rounded-lg object-contain"
                     referrerPolicy="no-referrer"
                   />
                 )
@@ -1290,7 +1203,7 @@ export default function IdleGalleryView({
                     type="button"
                     aria-label="Previous keepsake"
                     title="Previous"
-                    className="absolute left-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border-0 bg-black/60 p-0 text-white/90 backdrop-blur-sm transition-colors hover:bg-black/85 hover:text-white"
+                    className="absolute left-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border-0 bg-black/60 p-0 text-retro-fg/90 backdrop-blur-sm transition-colors hover:bg-black/85 hover:text-retro-fg"
                     onClick={(e) => {
                       e.stopPropagation()
                       stepViewer(-1)
@@ -1302,7 +1215,7 @@ export default function IdleGalleryView({
                     type="button"
                     aria-label="Next keepsake"
                     title="Next"
-                    className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border-0 bg-black/60 p-0 text-white/90 backdrop-blur-sm transition-colors hover:bg-black/85 hover:text-white"
+                    className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border-0 bg-black/60 p-0 text-retro-fg/90 backdrop-blur-sm transition-colors hover:bg-black/85 hover:text-retro-fg"
                     onClick={(e) => {
                       e.stopPropagation()
                       stepViewer(1)
@@ -1321,8 +1234,8 @@ export default function IdleGalleryView({
             {/* Viewer Action Bar */}
             <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
               {onRepostImage && (
-                <button
-                  type="button"
+                <Button
+                  size="sm"
                   onClick={() =>
                     onRepostImage({
                       url: viewerLocalUrl ?? viewer.url,
@@ -1332,16 +1245,15 @@ export default function IdleGalleryView({
                       mimeType: viewer.kind === 'video' ? 'video/mp4' : undefined,
                     })
                   }
-                  className="glass-action px-2.5 py-1 text-xs font-semibold rounded-lg flex items-center gap-1 cursor-pointer"
                   title="Repost to feed"
                 >
                   <Repeat className="w-3.5 h-3.5" />
                   <span>Repost</span>
-                </button>
+                </Button>
               )}
               {onAddToStory && (
-                <button
-                  type="button"
+                <Button
+                  size="sm"
                   onClick={() =>
                     onAddToStory({
                       url: viewerLocalUrl ?? viewer.url,
@@ -1351,16 +1263,15 @@ export default function IdleGalleryView({
                       mimeType: viewer.kind === 'video' ? 'video/mp4' : undefined,
                     })
                   }
-                  className="glass-action px-2.5 py-1 text-xs font-semibold rounded-lg flex items-center gap-1 cursor-pointer"
                   title="Add to story"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>Story</span>
-                </button>
+                </Button>
               )}
               {onCreateCard && (
-                <button
-                  type="button"
+                <Button
+                  size="sm"
                   onClick={() =>
                     onCreateCard({
                       url:
@@ -1371,15 +1282,14 @@ export default function IdleGalleryView({
                       name: viewer.tags.slice(0, 3).join(' ') || 'Keepsake',
                     })
                   }
-                  className="glass-action px-2.5 py-1 text-xs font-semibold rounded-lg flex items-center gap-1 cursor-pointer"
                   title="Turn into card"
                 >
                   <ImagePlus className="w-3.5 h-3.5" />
                   <span>Card</span>
-                </button>
+                </Button>
               )}
-              <button
-                type="button"
+              <Button
+                size="sm"
                 onClick={() => {
                   // Local-only: download from freshly verified bytes.
                   if (!viewer) return
@@ -1397,14 +1307,13 @@ export default function IdleGalleryView({
                   })()
                 }}
                 disabled={!viewerLocalUrl}
-                className="glass-action px-2.5 py-1 text-xs font-semibold rounded-lg flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 title={viewerLocalUrl ? 'Download media' : 'Download needs local bytes first'}
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Download</span>
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                size="sm"
                 onClick={async () => {
                   // Local-only: the vault localhost URL in Electron, the
                   // verified blob URL in dev. Never the provider URL.
@@ -1436,26 +1345,25 @@ export default function IdleGalleryView({
                   }
                 }}
                 disabled={!viewerLocalUrl}
-                className="glass-action px-2.5 py-1 text-xs font-semibold rounded-lg flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 title={viewerLocalUrl ? 'Open in browser' : 'Open needs local bytes first'}
               >
                 <ExternalLink className="w-3.5 h-3.5" />
                 <span>Browser</span>
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                size="sm"
                 onClick={() => {
                   setBackground(viewer.url)
-                  onSetWallpaper?.(viewer.url, viewer.kind === 'video' ? 'video/mp4' : undefined)
+                  onSetWallpaper?.(viewer.url, 'app', viewer.kind === 'video' ? 'video/mp4' : undefined)
                 }}
-                className="glass-action px-2.5 py-1 text-xs font-semibold rounded-lg flex items-center gap-1 cursor-pointer"
                 title="Set as app backdrop"
               >
                 <IconWallpaper size={13} />
                 <span>Backdrop</span>
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                size="sm"
+                variant="danger"
                 onClick={() => {
                   if (window.confirm('Delete this keepsake permanently?')) {
                     removeGalleryImage(viewer.id)
@@ -1467,12 +1375,11 @@ export default function IdleGalleryView({
                     })
                   }
                 }}
-                className="glass-action glass-action-danger px-2.5 py-1 text-xs font-semibold rounded-lg flex items-center gap-1 cursor-pointer"
                 title="Delete keepsake"
               >
                 <IconTrash size={13} />
                 <span>Delete</span>
-              </button>
+              </Button>
             </div>
           </figure>
         </MediaViewerModal>

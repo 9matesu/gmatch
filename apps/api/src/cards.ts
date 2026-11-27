@@ -13,12 +13,19 @@
 // than trusting a prior read.
 
 import crypto from 'crypto'
-import type { D1Turso, AtomicStatement } from './db'
+import type { D1Turso } from './db'
 import { SqlError } from './db'
 import { computeCardRarity, computeCashoutPayout, clampCashoutRateBps, DEFAULT_CASHOUT_RATE_BPS, type CardRarity } from '@orbit/shared'
 import { badRequest, conflict, forbidden, idempotencyConflict, insufficientFunds, notFound } from './common/errors'
 import { requireId, requireString, requireNonNegativeInt } from './common/validation'
-import { EconomyService, buildTransferStatements, type TransferResult } from './economy'
+import {
+  EconomyService,
+  buildTransferStatements,
+  findRecordedOperation,
+  assertReplayMatches,
+  parseRecordedResult,
+  type TransferResult,
+} from './economy'
 
 export type ModerationState = 'active' | 'hidden' | 'banned'
 export type MarketStatus = 'none' | 'listed' | 'sold' | 'cancelled' | 'cashed_out'
@@ -178,41 +185,6 @@ function mapCard(row: CardRow, ownerId: string): CardRecord {
   }
 }
 
-// A fully-specified card mint input (media + metadata). Used by pack opening and
-// starter-deck initialization where media is generated/fetched server-side.
-export interface MintCardSpec {
-  name: string | null
-  rarity: CardRarity
-  contentUrl: string
-  mimeType: string
-  sizeBytes: number
-  value?: number
-}
-
-// Statement list that mints one canonical card (Objects media + Cards +
-// CardOwnership + CardHistory). Every statement is gated on SQLite's changes()
-// so it composes with a preceding gate (e.g. inventory decrement or an
-// init-marker insert) inside a single atomicBatch — if the gate fails, the card
-// is not minted.
-export function mintCardStatements(params: {
-  ownerId: string
-  cardId: string
-  objectId: string
-  spec: MintCardSpec
-  historyId: string
-  nowIso: string
-  source: string
-}): AtomicStatement[] {
-  const { ownerId, cardId, objectId, spec, historyId, nowIso, source } = params
-  const value = spec.value != null && Number.isSafeInteger(spec.value) && spec.value >= 0 ? spec.value : 0
-  return [
-    { sql: 'INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_url, is_public, is_story, created_at) SELECT ?, ?, ?, ?, ?, 0, 0, ? WHERE changes() = 1', args: [objectId, ownerId, spec.sizeBytes, spec.mimeType, spec.contentUrl, nowIso] },
-    { sql: "INSERT INTO Cards (id, creator_id, media_object_id, name, rarity, value, like_count, market_status, moderation_state, created_at, updated_at) SELECT ?, ?, ?, ?, ?, ?, 0, 'none', 'active', ?, ? WHERE changes() = 1", args: [cardId, ownerId, objectId, spec.name, spec.rarity, value, nowIso, nowIso] },
-    { sql: 'INSERT INTO CardOwnership (card_id, owner_id, acquired_at) SELECT ?, ?, ? WHERE changes() = 1', args: [cardId, ownerId, nowIso] },
-    { sql: "INSERT INTO CardHistory (id, card_id, event, from_user, to_user, meta, created_at) SELECT ?, ?, 'created', NULL, ?, ?, ? WHERE changes() = 1", args: [historyId, cardId, ownerId, JSON.stringify({ source, mediaObjectId: objectId }), nowIso] },
-  ]
-}
-
 export class CardService {
   private economy: EconomyService
 
@@ -220,43 +192,6 @@ export class CardService {
     this.economy = new EconomyService(db)
   }
 
-  // Mint a single canonical card from server-generated media (no pre-existing
-  // media object required). Creates Objects + Cards + CardOwnership + CardHistory
-  // atomically. Used by starter-deck initialization and other server mints.
-  async mintCard(input: {
-    ownerId: string
-    name?: string | null
-    rarity?: CardRarity
-    contentUrl: string
-    mimeType: string
-    sizeBytes: number
-    value?: number
-    source: string
-  }): Promise<CardRecord> {
-    const ownerId = requireId(input.ownerId, 'ownerId')
-    const rarity = input.rarity ?? 'common'
-    if (!(RARITIES as readonly string[]).includes(rarity)) {
-      throw badRequest('rarity must be one of: ' + RARITIES.join(', '))
-    }
-    const name = input.name ? requireString(input.name, 'name', { max: 80 }) : null
-    const contentUrl = requireString(input.contentUrl, 'contentUrl', { max: 5_000_000 })
-    const mimeType = requireString(input.mimeType, 'mimeType', { min: 1, max: 100 })
-    const value = input.value != null && Number.isSafeInteger(input.value) && input.value >= 0 ? input.value : 0
-
-    const cardId = crypto.randomUUID()
-    const objectId = crypto.randomUUID()
-    const historyId = crypto.randomUUID()
-    const nowIso = new Date().toISOString()
-
-    await this.db.atomicBatch([
-      { sql: 'INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_url, is_public, is_story, created_at) VALUES (?, ?, ?, ?, ?, 0, 0, ?)', args: [objectId, ownerId, input.sizeBytes, mimeType, contentUrl, nowIso] },
-      { sql: "INSERT INTO Cards (id, creator_id, media_object_id, name, rarity, value, like_count, market_status, moderation_state, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, 'none', 'active', ?, ?)", args: [cardId, ownerId, objectId, name, rarity, value, nowIso, nowIso] },
-      { sql: 'INSERT INTO CardOwnership (card_id, owner_id, acquired_at) VALUES (?, ?, ?)', args: [cardId, ownerId, nowIso] },
-      { sql: "INSERT INTO CardHistory (id, card_id, event, from_user, to_user, meta, created_at) VALUES (?, ?, 'created', NULL, ?, ?, ?)", args: [historyId, cardId, ownerId, JSON.stringify({ source: input.source, mediaObjectId: objectId }), nowIso] },
-    ])
-
-    return (await this.getCard(cardId, ownerId))!
-  }
 
   // Create a card from a media object the creator owns. The creator becomes the
   // first owner. The card insert is conditional on the media still being owned
@@ -613,13 +548,10 @@ export class CardService {
 
     // Idempotent replay: bind the key to the buyer and card before reading the
     // (now 'sold') listing, and never return another buyer's purchase.
-    const existing = await this.db
-      .prepare('SELECT user_id, fingerprint, result FROM EconomicOperations WHERE idempotency_key = ?')
-      .bind(idempotencyKey)
-      .first<{ user_id: string; fingerprint: string | null; result: string | null }>()
+    const existing = await findRecordedOperation(this.db, idempotencyKey)
     if (existing) {
-      const stored = existing.result ? (JSON.parse(existing.result) as PurchaseResult) : null
-      if (existing.user_id !== buyerId) throw idempotencyConflict()
+      const stored = parseRecordedResult<PurchaseResult>(existing)
+      assertReplayMatches(existing, { userId: buyerId })
       if (stored && stored.cardId !== cardId) throw idempotencyConflict()
       if (stored) return { ...stored, replayed: true }
     }
@@ -691,13 +623,12 @@ export class CardService {
       res = await this.db.atomicBatch(statements)
     } catch (err) {
       if (isConstraintError(err)) {
-        const recorded = await this.db
-          .prepare('SELECT user_id, result FROM EconomicOperations WHERE idempotency_key = ?')
-          .bind(idempotencyKey)
-          .first<{ user_id: string; result: string | null }>()
+        const recorded = await findRecordedOperation(this.db, idempotencyKey)
         if (recorded?.result) {
-          const stored = JSON.parse(recorded.result) as PurchaseResult
-          if (recorded.user_id !== buyerId || stored.cardId !== cardId) throw idempotencyConflict()
+          const stored = parseRecordedResult<PurchaseResult>(recorded)
+          if (!stored) throw err
+          assertReplayMatches(recorded, { userId: buyerId })
+          if (stored.cardId !== cardId) throw idempotencyConflict()
           return { ...stored, replayed: true }
         }
       }
@@ -767,13 +698,10 @@ export class CardService {
 
     // Idempotent replay: bind the key to the owner and card, never return
     // another user's cashout, and refuse keys reused with a different card.
-    const existing = await this.db
-      .prepare('SELECT user_id, fingerprint, result FROM EconomicOperations WHERE idempotency_key = ?')
-      .bind(idempotencyKey)
-      .first<{ user_id: string; fingerprint: string | null; result: string | null }>()
+    const existing = await findRecordedOperation(this.db, idempotencyKey)
     if (existing) {
-      const stored = existing.result ? (JSON.parse(existing.result) as CashOutResult) : null
-      if (existing.user_id !== ownerId) throw idempotencyConflict()
+      const stored = parseRecordedResult<CashOutResult>(existing)
+      assertReplayMatches(existing, { userId: ownerId })
       if (stored && stored.cardId !== cardId) throw idempotencyConflict()
       if (stored) return { ...stored, replayed: true }
     }
@@ -841,13 +769,12 @@ export class CardService {
       ])
     } catch (err) {
       if (isConstraintError(err)) {
-        const recorded = await this.db
-          .prepare('SELECT user_id, result FROM EconomicOperations WHERE idempotency_key = ?')
-          .bind(idempotencyKey)
-          .first<{ user_id: string; result: string | null }>()
+        const recorded = await findRecordedOperation(this.db, idempotencyKey)
         if (recorded?.result) {
-          const stored = JSON.parse(recorded.result) as CashOutResult
-          if (recorded.user_id !== ownerId || stored.cardId !== cardId) throw idempotencyConflict()
+          const stored = parseRecordedResult<CashOutResult>(recorded)
+          if (!stored) throw err
+          assertReplayMatches(recorded, { userId: ownerId })
+          if (stored.cardId !== cardId) throw idempotencyConflict()
           return { ...stored, replayed: true }
         }
       }

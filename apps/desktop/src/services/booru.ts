@@ -2,7 +2,7 @@
 // the only booru client — the social feed carries peer media over the swarm
 // (docs/ARCHITECTURE-P2P.md) and never asks a booru for it.
 import type { BooruPost } from '../game/types'
-import { isQueryBlocked, isUserExcluded } from '../game/tagFilter'
+import { isQueryBlocked, isUserExcluded, getUserExcludes } from '../game/tagFilter'
 import { blockedPair, getCoRules, isFeedIntent } from '../game/tagCooccur'
 import { matchesQuery as matchMatchesQuery, parseQuery } from '../game/matchRule'
 import { endRound, markStage, startRound } from './queryTiming'
@@ -59,6 +59,17 @@ export interface BooruRequest {
    * own pool from the feed or stuff the reshow ledger with unseen pictures.
    */
   silent?: boolean
+  /** Query one provider by id (tag browser source picker, e.g. 'imhentai'). */
+  source?: string
+  /**
+   * Player excludes for this round. They become `-term` negatives in the
+   * provider query, so the source never OFFERS the excluded content (it used
+   * to be fetched and then thrown away by the renderer filter).
+   *
+   * Filled in by `fetchPosts` from the live exclude list — callers do not
+   * pass it.
+   */
+  excludes?: string[]
 }
 
 export interface BooruResponse {
@@ -85,8 +96,8 @@ const TIMEOUT_MS = 3_500
 const HTML_TIMEOUT_MS = 8_000
 
 /** View-page (gallery) expansion bounds: capped lanes, exact file URLs. */
-export const VIEW_POST_CAP = 6
-export const VIEW_POST_LANES = 3
+const VIEW_POST_CAP = 6
+const VIEW_POST_LANES = 3
 
 /**
  * Hard budget for ONE feed round.
@@ -243,7 +254,7 @@ function writeSeen(): void {
 }
 
 /** Flush the pending seen-set immediately (page hide / app close). */
-export function flushSeen(): void {
+function flushSeen(): void {
   if (!seenTimer) return
   clearTimeout(seenTimer)
   seenTimer = null
@@ -406,11 +417,6 @@ function rememberCounted(
 // (probe/page-explicit) draws are never recorded.
 const PAGE_MEMORY_DEPTH = 20
 const recentPages = new Map<string, number[]>()
-/** Test hook: clear page memory (also run by __resetFeedState). */
-export function __resetPageMemoryForTests(): void {
-  recentPages.clear()
-}
-
 function recordPage(key: string, page: number): void {
   recentPages.set(key, [...(recentPages.get(key) ?? []), page].slice(-PAGE_MEMORY_DEPTH))
 }
@@ -1041,16 +1047,13 @@ async function fetchVariant(
     parsed = kind === 'moe' ? toMoePosts(data, src.origin) : toPosts(data, src.origin)
   }
 
-  let clean: BooruPost[] = []
-  if (src.type === 'booruorg') {
-    // Single tagless fetch; check all variants against the page's posts in memory.
-    for (const v of queryVariants(req.tags)) {
-      clean = sanitize(parsed, v)
-      if (clean.length > 0) break
-    }
-  } else {
-    clean = sanitize(parsed, variant)
-  }
+  // Gate on the FULL query (req.tags), never the narrowed variant that was
+  // sent. The ladder over-fetches (full -> top-2 -> leading tag) because a narrow
+  // AND combo often returns 0 from the mirror, but a KEPT post must answer EVERY
+  // requested tag — otherwise a one-tag variant satisfies a multi-tag (merged)
+  // request and the picture stops matching the tags. The main-process twin
+  // (booruSources.cjs) already does this; the renderer must not drift.
+  const clean = sanitize(parsed, req.tags)
   return { posts: clean, sick: false }
 }
 
@@ -1442,7 +1445,7 @@ function withRedgifsQueryTags(posts: BooruPost[], query: string): BooruPost[] {
 /** Galleries expanded per gallery-source round; lanes expanded in parallel. */
 const GALLERY_CAP = 6
 const GALLERY_LANES = 3
-export async function babesourceDirect(
+async function babesourceDirect(
   query: string,
   limit: number,
   budget?: RoundBudget,
@@ -1655,7 +1658,7 @@ async function fetchPostsUncached(req: BooruRequest): Promise<BooruResponse> {
       const budget = startRoundBudget()
       const t0 = Date.now()
       const res = await Promise.race([
-        window.gmatch.booruFetch(req),
+        window.gmatch.booruFetch({ ...req, excludes: getUserExcludes() }),
         budget.signal.aborted
           ? Promise.reject(new DOMException('round deadline', 'TimeoutError'))
           : new Promise<never>((_, reject) => {
@@ -1672,11 +1675,14 @@ async function fetchPostsUncached(req: BooruRequest): Promise<BooruResponse> {
         const fetched = res.posts || []
         const f0 = Date.now()
         if (req.silent) {
-          // Validation-only: checked, never memoized (see BooruRequest.silent).
-          const clean = sanitize(fetched, req.tags)
+          // Validation-only: the MAIN process already applied the blocklist +
+          // postFilter (dims, tags, kind). Re-running the renderer's stricter
+          // sanitize() here dropped every imhentai cover (small gallery thumbs),
+          // so the tag browser read "offline" for a source that answered. Trust
+          // the authority; only the dev `directFetch` path needs the local gate.
           markStage(round, 'filter', Date.now() - f0)
           endRound(round)
-          return clean.length > 0 ? { ...res, posts: clean } : { ...offline }
+          return fetched.length > 0 ? { ...res, posts: fetched } : { ...offline }
         }
         const fresh = remember(sanitize(fetched, req.tags), req.tags)
         markStage(round, 'filter', Date.now() - f0)

@@ -44,6 +44,15 @@ function readPendingMigrations(currentVersion: number): Array<{ version: number;
     .sort((a, b) => a.version - b.version)
 }
 
+/** Highest version on disk: what a fresh database ends at after migrate(). */
+export function latestMigrationVersion(): number {
+  if (!existsSync(MIGRATIONS_DIR)) return 0
+  const versions = readdirSync(MIGRATIONS_DIR)
+    .filter((f) => /^\d+_.*\.sql$/.test(f))
+    .map((f) => parseInt(f, 10))
+  return versions.length ? Math.max(...versions) : 0
+}
+
 export async function migrate(client: Client): Promise<void> {
   // 1. Apply the canonical schema. Every statement is idempotent
   //    (CREATE TABLE/INDEX IF NOT EXISTS), so this is safe on fresh and
@@ -78,8 +87,14 @@ export async function migrate(client: Client): Promise<void> {
       try {
         await client.execute(statement)
       } catch (err: any) {
-        if (err?.message?.includes('duplicate column name') || err?.message?.includes('already exists')) {
+        const msg = String(err?.message || '')
+        if (msg.includes('duplicate column name') || msg.includes('already exists')) {
           // column or index already exists, safe to continue
+        } else if (msg.includes('no such column') && /drop\s+column/i.test(statement)) {
+          // A DROP COLUMN for a column that is not there has ALREADY reached
+          // the state the migration wanted. This is not a failure: the column
+          // may never have existed on this database (a schema that never had
+          // it) or a later migration may already have removed it.
         } else {
           throw err
         }

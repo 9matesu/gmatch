@@ -1,17 +1,17 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { playPress, playWin } from '../../utils/sounds';
+import { playPress } from '../../utils/sounds';
 import {
   Heart,
   Send,
   Bookmark,
-  MoreHorizontal,
   X,
   ChevronLeft,
   ChevronRight,
   ZoomIn,
   ZoomOut,
+  ShieldCheck,
 } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { FeedPost, PostComment } from './GMatchFeed';
@@ -20,6 +20,8 @@ import { NativeVideoPlayer } from '../media/NativeVideoPlayer';
 import { isVideoPost, resolveMediaUrl } from '../../utils/media';
 import { timeAgo } from '../../utils/timeAgo';
 import { formatLikedBy } from '../../utils/likedBy';
+import { custodyStatus } from '../../utils/durableCustody';
+import { useDurableCustody } from '../../hooks/useDurableCustody';
 import { PostComments } from './PostComments';
 
 /**
@@ -46,7 +48,12 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
   onToggleCommentLike?: (postId: string, commentId: string) => void;
   onReportComment?: (commentId: string) => void;
   onOpenShare?: (post: FeedPost) => void;
-  onOptionsClick?: (post: FeedPost) => void;
+  /**
+   * Open the post context menu. The optional position is the CURSOR point of
+   * the right-click; when absent the caller picks a sensible spot (the menu
+   * is clamped to the viewport either way).
+   */
+  onOptionsClick?: (post: FeedPost, position?: { x: number; y: number }) => void;
   onOpenLikers?: (postId: string) => void;
   onSelectUser?: (userId: string) => void;
   onAvatarClick?: (userId: string) => void;
@@ -61,6 +68,11 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
     post?.likers?.filter((l) => l.user_id !== identity?.orbitId),
     likeCount,
   );
+
+  // Peer-confirmed durability. Only a signed receipt that a peer read the bytes
+  // back from its own store counts, and only when it proves at least one OTHER
+  // device holds them (this node alone is not replication).
+  const custody = custodyStatus(useDurableCustody(post?.content_hash || post?.id));
 
   // Reset carousel/zoom whenever a different post is opened.
   useEffect(() => {
@@ -104,7 +116,6 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
     isVideoPost(mime, url, mediaItems.map((m) => m.mime));
 
   const handleDoubleTap = () => {
-    playWin();
     if (!isLiked && post && onToggleLike) {
       onToggleLike(post);
     }
@@ -134,17 +145,23 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
   return (
     <article
       data-expanded-post={post.id}
-      className="mt-2 rounded-xl border border-border-glass bg-retro-panel text-retro-fg overflow-hidden animate-orbit-slide-up"
+      onContextMenu={(e) => {
+        // The context menu REPLACED the three-dots button: right-click the
+        // post (here or in the timeline) for every action it has.
+        e.preventDefault();
+        onOptionsClick?.(post, { x: e.clientX, y: e.clientY });
+      }}
+      className="mt-2 rounded-xl border border-edge bg-retro-panel text-retro-fg overflow-hidden animate-orbit-slide-up"
     >
-      {/* Header: author + options + collapse */}
-      <div className="p-3 border-b border-border-glass flex items-center justify-between">
+      {/* Header: author + collapse */}
+      <div className="p-3 border-b border-edge flex items-center justify-between">
         <button
           type="button"
           onClick={handleAuthorClick}
           aria-label={`View profile of ${post.author_name}`}
           className="flex items-center gap-3 text-left cursor-pointer"
         >
-          <div className="w-8 h-8 rounded-full bg-glass-w12 border border-border-glass p-[1px] flex-shrink-0">
+          <div className="w-8 h-8 rounded-full bg-glass-w12 border border-edge p-[1px] flex-shrink-0">
             <div className="w-full h-full rounded-full bg-retro-panel overflow-hidden flex items-center justify-center text-xs font-semibold text-retro-fg">
               {authorAvatar ? (
                 <img src={resolvedAuthorAvatar} alt="" className="w-full h-full object-cover" />
@@ -157,21 +174,13 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
             <div className="flex items-center gap-1">
               <span className="text-xs font-semibold text-retro-fg hover:underline">{post.author_name}</span>
             </div>
-            <span className="text-[10px] text-retro-muted font-medium block">
+            <span className="text-2xs text-retro-muted font-medium block">
               {post.location ? `${post.location} · ` : ''}{timeAgo(post.created_at)}
             </span>
           </div>
         </button>
 
         <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => onOptionsClick?.(post)}
-            aria-label="Post options"
-            className="p-1.5 text-retro-muted hover:text-retro-fg rounded-md cursor-pointer hover:bg-glass-w12 transition-colors"
-          >
-            <MoreHorizontal className="w-4 h-4" />
-          </button>
           <button
             type="button"
             onClick={() => { playPress(700); onClose(); }}
@@ -185,7 +194,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
 
       {/* Media: carousel + zoom, capped for inline flow (not a dialog). */}
       <div
-        className="relative bg-black flex items-center justify-center overflow-hidden min-h-[280px]"
+        className="relative bg-retro-bg flex items-center justify-center overflow-hidden min-h-[280px]"
         onDoubleClick={handleDoubleTap}
       >
         {post.localPreviewUrl ? (
@@ -193,8 +202,8 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
             <NativeVideoPlayer
               key={post.localPreviewUrl}
               src={post.localPreviewUrl}
-              className="w-full h-full max-h-[70vh] object-contain"
-              videoClassName="w-full h-full max-h-[70vh] object-contain"
+              className="w-full h-full max-h-(--max-h-sheet) object-contain"
+              videoClassName="w-full h-full max-h-(--max-h-sheet) object-contain"
               autoPlay={true}
               controls={true}
               alwaysShowControls={true}
@@ -211,7 +220,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
               <img
                 src={post.localPreviewUrl}
                 alt={post.caption || ''}
-                className="w-full h-full object-contain max-h-[70vh]"
+                className="w-full h-full object-contain max-h-(--max-h-sheet)"
                 draggable={false}
               />
             </div>
@@ -224,8 +233,8 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
             identity={identity}
             mimeType={activeMedia.mime || post.mime_type}
             loading="eager"
-            className="w-full h-full max-h-[70vh] object-contain"
-            videoClassName="w-full h-full max-h-[70vh] object-contain"
+            className="w-full h-full max-h-(--max-h-sheet) object-contain"
+            videoClassName="w-full h-full max-h-(--max-h-sheet) object-contain"
             autoPlay={true}
             controls={true}
             alwaysShowControls={true}
@@ -242,10 +251,11 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
             <ObjectImage
               contentUrl={post.localPreviewUrl || activeMedia?.url || post.url}
               objectId={activeMedia?.id || post.id}
+              contentHash={post.content_hash}
               identity={identity}
               mimeType={activeMedia?.mime || post.mime_type}
               alt=""
-              className="w-full h-full object-contain max-h-[70vh]"
+              className="w-full h-full object-contain max-h-(--max-h-sheet)"
               muted={false}
               autoPlay={false}
               controls={false}
@@ -258,7 +268,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
         {/* Double Tap Heart Pop */}
         {doubleTapAnimation && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 animate-orbit-pop">
-            <Heart className="w-28 h-28 text-white fill-white drop-shadow-2xl opacity-90 animate-pulse" />
+            <Heart className="w-28 h-28 text-retro-fg fill-white drop-shadow-2xl opacity-90 animate-pulse" />
           </div>
         )}
 
@@ -274,7 +284,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
                   setActiveMediaIndex((i) => Math.max(0, i - 1));
                 }}
                 aria-label="Previous image"
-                className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 text-white hover:bg-black/80 cursor-pointer"
+                className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 text-retro-fg hover:bg-black/80 cursor-pointer"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
@@ -288,7 +298,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
                   setActiveMediaIndex((i) => Math.min(mediaItems.length - 1, i + 1));
                 }}
                 aria-label="Next image"
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 text-white hover:bg-black/80 cursor-pointer"
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 text-retro-fg hover:bg-black/80 cursor-pointer"
               >
                 <ChevronRight className="w-5 h-5" />
               </button>
@@ -299,7 +309,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
               {mediaItems.map((_, idx) => (
                 <span
                   key={idx}
-                  className={`w-1.5 h-1.5 rounded-full transition-all ${idx === activeMediaIndex ? 'bg-white w-3' : 'bg-glass-w20'
+                  className={`w-1.5 h-1.5 rounded-full transition ${idx === activeMediaIndex ? 'bg-retro-accent w-3' : 'bg-glass-w20'
                     }`}
                 />
               ))}
@@ -308,7 +318,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
         )}
 
         {/* Zoom controls pill */}
-        <div className="absolute top-3 left-3 flex items-center gap-1 bg-black/60 backdrop-blur-md rounded-full px-2.5 py-1 text-white text-[10px] font-medium border border-white/10">
+        <div className="absolute top-3 left-3 flex items-center gap-1 bg-black/60 backdrop-blur-md rounded-full px-2.5 py-1 text-retro-fg text-2xs font-medium border border-edge">
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); handleZoomToggle(); }}
@@ -330,7 +340,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
           aria-pressed={isLiked}
           className="p-1.5 hover:bg-glass-w12 rounded-full transition-colors cursor-pointer"
         >
-          <Heart className={`w-5 h-5 ${isLiked ? 'fill-red-500 text-red-500' : 'text-retro-fg'}`} />
+          <Heart className={`w-5 h-5 ${isLiked ? 'fill-danger text-danger-fg' : 'text-retro-fg'}`} />
         </button>
         <button
           type="button"
@@ -348,7 +358,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
           aria-pressed={isSaved}
           className="p-1.5 hover:bg-glass-w12 rounded-full transition-colors cursor-pointer"
         >
-          <Bookmark className={`w-5 h-5 ${isSaved ? 'fill-amber-400 text-amber-400' : 'text-retro-fg'}`} />
+          <Bookmark className={`w-5 h-5 ${isSaved ? 'fill-warning text-warning-fg' : 'text-retro-fg'}`} />
         </button>
       </div>
 
@@ -362,6 +372,18 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
       >
         {likedByLabel || `${likeCount.toLocaleString()} ${likeCount === 1 ? 'like' : 'likes'}`}
       </button>
+
+      {/* Peer-confirmed durability: a peer's signed receipt proved it stored
+          these bytes. Absent until that proof exists — never inferred. */}
+      {custody.label && (
+        <div
+          className="flex items-center gap-1 px-3 pb-2 text-2xs font-medium text-retro-muted"
+          aria-label="Media replication"
+        >
+          <ShieldCheck className="w-3.5 h-3.5 text-success-fg" />
+          <span>{custody.label}</span>
+        </div>
+      )}
 
       {/* Comments thread + composer, shared with the feed inline expansion. */}
       <PostComments

@@ -30,4 +30,9 @@ describe('NativeHeaderBar', () => {
     await userEvent.click(screen.getByLabelText('Forward'));
     expect(onForward).toHaveBeenCalledTimes(1);
   });
+
+  it('carries no post button: posting lives in the footer Command Island', () => {
+    render(<NativeHeaderBar />);
+    expect(screen.queryByLabelText('Create a post')).toBeNull();
+  });
 });

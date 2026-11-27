@@ -1,3 +1,4 @@
+import { expect } from '@playwright/test'
 import { generateIdentity } from '../src/identity.cjs'
 import { legalVersionKey } from '../src/legal/documents'
 
@@ -26,6 +27,11 @@ export const E2E_TAG = 'e2e'
 export function firstRunOverlayKeys(orbitId: string): [string, string][] {
   return [
     ['gmatch_last_seen_changelog', E2E_CHANGELOG_VERSION],
+    // First login opens Help once per identity (App's "tour replacement"). A
+    // seeded returning user must not be interrupted by it: an open Help modal
+    // duplicates the island's nav names (Feed, Clicker, Watch, Domination), so
+    // the duplicate-control audit failed on every view.
+    ['gmatch_help_seen_' + orbitId, '1'],
     ['orbit_tour_v1:' + orbitId, JSON.stringify({ version: 1, index: 0, status: 'done' })],
     [
       'orbit_onboarding_v2:' + orbitId,
@@ -143,6 +149,27 @@ export async function mockBooruFeed(page: import('@playwright/test').Page): Prom
 }
 
 /**
+ * Assert a toast appeared — where a toast actually lives.
+ *
+ * A toast does not float over the page: it lives in the notification centre (the
+ * bell), a left sidebar that mounts ONLY when opened, because the design keeps
+ * transient messages in one place instead of spamming a floating overlay. So
+ * opening the bell is exactly how a user reads a toast ("Post shared.", a
+ * purchase, a warning), and a journey that asserts one opens it, checks, closes.
+ *
+ * The auto-expire timer runs inside the centre, so a toast raised while the
+ * sidebar is closed waits in the store instead of aging out unseen.
+ */
+export async function expectToast(
+  page: import('@playwright/test').Page,
+  text: string,
+): Promise<void> {
+  await page.getByRole('button', { name: 'Notifications', exact: true }).first().click()
+  await expect(page.getByText(text).first()).toBeVisible({ timeout: 20_000 })
+  await page.getByRole('button', { name: 'Close notifications' }).click()
+}
+
+/**
  * 404s that are a FEATURE-DETECTION SIGNAL, not a fault. The mail-mode probe
  * (utils/mail-mode.ts:3-10) deliberately hits `/api/pm`: on any current node
  * that route is retired and the 404 is how the client learns "courier sealed
@@ -208,14 +235,20 @@ export function watchApiNetwork(
   })
   page.on('console', (msg) => {
     if (msg.type() !== 'error') return
+    const text = msg.text()
     // Chromium logs one "Failed to load resource: NNN" console error per
     // non-2xx response. That duplicates the `response` handler above, which
     // records the same failure with method + URL and honours `allow`. Keeping
     // it would make every allowed probe (e.g. the /api/pm mail-mode 404) an
     // unfilterable failure. Real console errors still surface here.
-    if (msg.text().startsWith('Failed to load resource')) return
+    if (text.startsWith('Failed to load resource')) return
+    // A third-party transport socket being down is not an /api failure — the
+    // same rule the request handlers above already apply ("booru mirrors and
+    // P2P peers are allowed to be down"). Public WebRTC trackers die; our own
+    // node socket rides /api/... and still surfaces.
+    if (/^WebSocket connection to 'wss?:\/\//.test(text) && !/\/api\//.test(text)) return
     const at = msg.location()
-    errors.push(`console: ${msg.text()}${at?.url ? ` (${at.url})` : ''}`)
+    errors.push(`console: ${text}${at?.url ? ` (${at.url})` : ''}`)
   })
   page.on('pageerror', (err) => errors.push(`pageerror: ${err.message}`))
 

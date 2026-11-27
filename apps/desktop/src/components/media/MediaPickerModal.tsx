@@ -33,25 +33,30 @@ type Pending =
 /** Small preview surface shared by all panes: img for stills, video for mp4/webm. */
 function Preview({ url, isVideo }: { url: string; isVideo: boolean }) {
   if (isVideo) {
-    return <video src={url} controls muted playsInline className="max-h-56 w-auto max-w-full rounded-lg bg-black" />;
+    return <video src={url} controls muted playsInline className="max-h-56 w-auto max-w-full rounded-lg bg-retro-bg" />;
   }
-  return <img src={url} alt="Selected media preview" className="max-h-56 w-auto max-w-full rounded-lg object-contain bg-black" />;
+  return <img src={url} alt="Selected media preview" className="max-h-56 w-auto max-w-full rounded-lg object-contain bg-retro-bg" />;
 }
 
-export function MediaPickerModal({
+export function MediaPickerPanel({
   options,
   onPick,
   onClose,
+  compact = false,
 }: {
   options: MediaPickerOptions;
   onPick: (sel: MediaSelection) => void;
   onClose: () => void;
+  /** Bubble mode: tighter paddings, no dialog chrome. */
+  compact?: boolean;
 }) {
   const accept = options.accept ?? ['image'];
   const sources = options.sources ?? ['browse', 'upload', 'url'];
   const gallery = useGame((s) => s.gallery);
 
-  const [pane, setPane] = useState<Pane>(sources[0]);
+  // Open on Browse (the gallery) whenever it is offered — fewest clicks to a
+  // keepsake. Callers that only allow upload/url still open on their first pane.
+  const [pane, setPane] = useState<Pane>(sources.includes('browse') ? 'browse' : sources[0]);
   const [pending, setPending] = useState<Pending | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tagFilter, setTagFilter] = useState('');
@@ -59,6 +64,11 @@ export function MediaPickerModal({
   const [dragOver, setDragOver] = useState(false);
   const [busyKeepId, setBusyKeepId] = useState<string | null>(null);
   const [selectedKeepId, setSelectedKeepId] = useState<string | null>(null);
+  // Browse pane renders a bounded window and grows on demand: mounting every
+  // keepsake tile (each a vault-fetched <img>/<video>) at once is what made
+  // the gallery lag with a few hundred keeps.
+  const PAGE = 24;
+  const [visibleCount, setVisibleCount] = useState(PAGE);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Object URL for the current upload preview; revoked on replace/close —
   // EXCEPT after a confirm, when ownership transfers to the caller.
@@ -163,6 +173,17 @@ export function MediaPickerModal({
     try {
       fresh = await resolveFreshLocalUrl(img);
       if (!fresh) {
+        // The tile already renders these bytes through the SAME local pipeline
+        // (vault loopback / IndexedDB blob). What you can see you can post: a
+        // display URL that is local IS the local copy — never a provider
+        // hotlink, so the fallback stays honest.
+        const display = tileUrl(img);
+        const isLocalDisplay =
+          /^(blob:|data:)/i.test(display) ||
+          /^https?:\/\/(127\.0\.0\.1|localhost)([:/]|$)/i.test(display);
+        if (isLocalDisplay) fresh = display;
+      }
+      if (!fresh) {
         setError('No local copy of this keepsake on this device yet — open it in the Gallery first so the bytes are fetched.');
         return;
       }
@@ -204,6 +225,7 @@ export function MediaPickerModal({
     .filter((g) =>
       tagFilter.trim() ? g.tags.some((t) => t.toLowerCase().includes(tagFilter.trim().toLowerCase())) : true,
     );
+  const shownGallery = filteredGallery.slice(0, visibleCount);
 
   const confirm = () => {
     if (!pending) return;
@@ -221,7 +243,7 @@ export function MediaPickerModal({
         setPane(p);
         setError(null);
       }}
-      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
+      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition cursor-pointer ${
         pane === p ? 'bg-glass-w12 text-retro-fg' : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8'
       }`}
     >
@@ -232,58 +254,61 @@ export function MediaPickerModal({
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 select-none font-sans"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+      aria-label={options.title ?? 'Pick media'}
+      // A FIXED footprint, not a content-sized box: the balloon keeps the same
+      // width and height on every pane, so switching tabs never resizes it or
+      // moves the controls under the pointer. The body is the only part that
+      // scrolls.
+      className={`bg-surface-raised border border-edge rounded-xl w-full max-w-lg flex flex-col shadow-2xl overflow-hidden text-retro-fg ${
+        compact
+          ? 'h-[420px] max-h-(--max-h-sheet) text-xs'
+          : 'h-[560px] max-h-(--max-h-panel)'
+      }`}
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={options.title ?? 'Pick media'}
-        className="bg-surface-raised border border-border-glass rounded-xl w-full max-w-xl max-h-[80vh] flex flex-col shadow-2xl overflow-hidden text-retro-fg"
-      >
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border-glass">
-          <h2 className="text-sm font-bold">{options.title ?? 'Pick media'}</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close media picker"
-            className="p-1 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w8 cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+      <div className={`flex items-center justify-between ${compact ? 'px-3 py-2' : 'px-4 py-2.5'} border-b border-edge`}>
+        <h2 className="text-base font-black tracking-tight">{options.title ?? 'Pick media'}</h2>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close media picker"
+          className="p-1 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w8 cursor-pointer"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
 
-        <div className="flex items-center gap-1.5 px-4 py-2 border-b border-border-glass">
-          {sources.includes('browse') && tabBtn('browse', 'Your media', FolderOpen)}
-          {sources.includes('upload') && tabBtn('upload', 'Upload', UploadCloud)}
-          {sources.includes('url') && tabBtn('url', 'Paste URL', LinkIcon)}
-        </div>
+      <div className={`flex items-center gap-1.5 ${compact ? 'px-3 py-1.5' : 'px-4 py-2'} border-b border-edge`}>
+        {sources.includes('browse') && tabBtn('browse', 'Your media', FolderOpen)}
+        {sources.includes('upload') && tabBtn('upload', 'Upload', UploadCloud)}
+        {sources.includes('url') && tabBtn('url', 'Paste URL', LinkIcon)}
+      </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 styled-scrollbar">
-          {error && (
-            <p className="text-xs font-bold text-retro-error" role="alert">
-              {error}
+      <div className={`flex-1 overflow-y-auto ${compact ? 'p-3' : 'p-4'} space-y-3 styled-scrollbar`}>
+        {error && (
+          <p className="text-xs font-bold text-retro-error" role="alert">
+            {error}
+          </p>
+        )}
+
+        {pane === 'browse' && (
+          browseGallery.length === 0 ? (
+            <p className="text-xs text-retro-muted py-6 text-center">
+              Your gallery is empty — upload a file or paste a URL instead.
             </p>
-          )}
-
-          {pane === 'browse' && (
-            browseGallery.length === 0 ? (
-              <p className="text-xs text-retro-muted py-6 text-center">
-                Your gallery is empty — upload a file or paste a URL instead.
-              </p>
-            ) : (
-              <>
-                <input
-                  type="text"
-                  value={tagFilter}
-                  onChange={(e) => setTagFilter(e.target.value)}
-                  placeholder="Filter by tag…"
-                  className="w-full px-3 py-1.5 rounded-lg bg-glass-w8 border border-border-glass text-xs text-retro-fg placeholder:text-retro-muted focus:outline-none focus:border-retro-accent"
-                />
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                  {filteredGallery.map((g: GalleryImage) => {
+          ) : (
+            <>
+              <input
+                type="text"
+                value={tagFilter}
+                onChange={(e) => {
+                  setTagFilter(e.target.value);
+                  setVisibleCount(PAGE);
+                }}
+                placeholder="Filter by tag…"
+                className="w-full px-3 py-1.5 rounded-lg bg-glass-w8 border border-edge text-xs text-retro-fg placeholder:text-retro-muted focus:outline-none focus:border-retro-accent"
+              />
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                {shownGallery.map((g: GalleryImage) => {
                     const video = g.kind === 'video';
                     const selected = selectedKeepId === g.id && pending?.kind === 'file' && pending.source === 'browse';
                     const src = tileUrl(g);
@@ -295,12 +320,12 @@ export function MediaPickerModal({
                         key={g.id}
                         type="button"
                         onClick={() => void pickKeep(g)}
-                        className={`relative aspect-square rounded-lg overflow-hidden border transition-all bg-glass-w8 ${
+                        className={`relative aspect-square rounded-lg overflow-hidden border transition bg-glass-w8 ${
                           unresolvable
-                            ? 'border-border-glass opacity-50 cursor-not-allowed'
+                            ? 'border-edge opacity-50 cursor-not-allowed'
                             : busyKeepId === g.id
                               ? 'border-retro-accent cursor-progress'
-                              : 'border-border-glass hover:border-retro-accent/60 cursor-pointer'
+                              : 'border-edge hover:border-retro-accent/60 cursor-pointer'
                         }`}
                         title={unresolvable ? 'No local copy yet' : g.tags?.join(', ')}
                         disabled={unresolvable || busyKeepId === g.id}
@@ -310,7 +335,7 @@ export function MediaPickerModal({
                             <Loader2 className="w-5 h-5 animate-spin text-retro-accent" />
                           </span>
                         ) : unresolvable ? (
-                          <span className="absolute inset-0 flex items-center justify-center text-[10px] text-retro-muted">No local copy</span>
+                          <span className="absolute inset-0 flex items-center justify-center text-2xs text-retro-muted">No local copy</span>
                         ) : video ? (
                           <video src={src} muted preload="metadata" className="w-full h-full object-cover" />
                         ) : (
@@ -326,16 +351,25 @@ export function MediaPickerModal({
                         )}
                         {selected && (
                           <span className="absolute inset-0 bg-retro-accent/20 flex items-center justify-center">
-                            <ImageIcon className="w-5 h-5 text-white drop-shadow" />
+                            <ImageIcon className="w-5 h-5 text-retro-fg drop-shadow" />
                           </span>
                         )}
                         {raw.startsWith('vault://') && !httpUrlMap[raw] && !unresolvable && (
-                          <span className="absolute inset-x-0 bottom-0 py-0.5 text-center text-[9px] bg-black/50 text-white/80">…</span>
+                          <span className="absolute inset-x-0 bottom-0 py-0.5 text-center text-2xs bg-black/60 text-retro-fg/80">…</span>
                         )}
                       </button>
                     );
                   })}
                 </div>
+                {filteredGallery.length > shownGallery.length && (
+                  <button
+                    type="button"
+                    onClick={() => setVisibleCount((c) => c + PAGE)}
+                    className="w-full py-2 rounded-lg bg-glass-w8 border border-edge text-xs font-bold text-retro-muted hover:text-retro-fg hover:bg-glass-w12 transition-colors cursor-pointer"
+                  >
+                    Load more ({filteredGallery.length - shownGallery.length} left)
+                  </button>
+                )}
                 {filteredGallery.length === 0 && (
                   <p className="text-xs text-retro-muted text-center">No keepsakes match that tag.</p>
                 )}
@@ -356,13 +390,13 @@ export function MediaPickerModal({
                 setDragOver(false);
                 takeFile(e.dataTransfer.files?.[0], 'upload');
               }}
-              className={`border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer text-center transition-all ${
-                dragOver ? 'border-retro-accent bg-glass-w10' : 'border-border-glass hover:border-retro-accent bg-surface-interactive'
+              className={`border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer text-center transition ${
+                dragOver ? 'border-retro-accent bg-glass-w10' : 'border-edge hover:border-retro-accent bg-surface-interactive'
               }`}
             >
               <UploadCloud className="w-7 h-7 text-retro-muted" />
               <p className="text-xs font-bold text-retro-body">Drop a file, click to browse, or paste from the clipboard</p>
-              <span className="text-[10px] text-retro-muted">{accept.join(' or ')}</span>
+              <span className="text-2xs text-retro-muted">{accept.join(' or ')}</span>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -390,23 +424,23 @@ export function MediaPickerModal({
                     }
                   }}
                   placeholder="https://…"
-                  className="flex-1 px-3 py-1.5 rounded-lg bg-glass-w8 border border-border-glass text-xs text-retro-fg placeholder:text-retro-muted focus:outline-none focus:border-retro-accent"
+                  className="flex-1 px-3 py-1.5 rounded-lg bg-glass-w8 border border-edge text-xs text-retro-fg placeholder:text-retro-muted focus:outline-none focus:border-retro-accent"
                 />
                 <button
                   type="button"
                   onClick={previewUrlInput}
-                  className="px-3 py-1.5 rounded-lg chrome-accent text-black text-xs font-bold cursor-pointer active:scale-95 transition-transform"
+                  className="px-3 py-1.5 rounded-lg chrome-accent text-retro-accent-text text-xs font-bold cursor-pointer active:scale-95 transition-transform"
                 >
                   Preview
                 </button>
               </div>
-              <p className="text-[10px] text-retro-muted">The media is previewed before it is attached — broken links are caught here.</p>
+              <p className="text-2xs text-retro-muted">The media is previewed before it is attached — broken links are caught here.</p>
             </div>
           )}
 
           {pending && (
             <div className="space-y-2 pt-1">
-              <div className="flex justify-center border border-border-glass rounded-xl bg-glass-w4 p-2">
+              <div className="flex justify-center border border-edge rounded-xl bg-glass-w5 p-2">
                 <Preview url={pending.kind === 'file' ? pending.previewUrl : pending.url} isVideo={pending.kind === 'file' ? fileAccepted(pending.file, ['video']) && !fileAccepted(pending.file, ['image']) : /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(pending.url)} />
               </div>
               <div className="flex justify-end gap-2">
@@ -423,14 +457,41 @@ export function MediaPickerModal({
                 <button
                   type="button"
                   onClick={confirm}
-                  className="px-4 py-1.5 rounded-lg chrome-accent text-black text-xs font-bold cursor-pointer active:scale-95 transition-transform"
+                  className="px-4 py-1.5 rounded-lg chrome-accent text-retro-accent-text text-xs font-bold cursor-pointer active:scale-95 transition-transform"
                 >
                   Use this media
                 </button>
               </div>
             </div>
           )}
-        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The modal wrapper: fixed overlay + dialog semantics around the SAME panel
+ * the navbar bubble renders inline. All picker behaviour lives in
+ * MediaPickerPanel — this adds only the backdrop and the close-on-backdrop.
+ */
+export function MediaPickerModal({
+  options,
+  onPick,
+  onClose,
+}: {
+  options: MediaPickerOptions;
+  onPick: (sel: MediaSelection) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[var(--z-picker)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 select-none font-sans"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div role="dialog" aria-modal="true" aria-label={options.title ?? 'Pick media'} className="contents">
+        <MediaPickerPanel options={options} onPick={onPick} onClose={onClose} />
       </div>
     </div>
   );

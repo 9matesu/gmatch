@@ -471,17 +471,13 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
               <Monitor className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-xs font-bold text-retro-fg uppercase tracking-wider">
+              <h2 className="text-xs font-bold text-retro-fg tracking-wider">
                 PC Domination
               </h2>
-              <p className="text-[10px] text-retro-muted">Opt-in pranks between friends. Every effect costs g$ and needs consent</p>
             </div>
           </div>
-          <div className="p-8 text-center max-w-md mx-auto space-y-2">
-            <p className="text-xs text-retro-muted leading-relaxed">
-              Log in to use Domination. Switch on <span className="text-retro-fg font-medium">Receive</span> to let opted-in
-              effects land on your screen, or send effects to players who have.
-            </p>
+          <div className="p-8 text-center">
+            <p className="text-xs text-retro-muted">Log in to use Domination.</p>
           </div>
         </div>
       </div>
@@ -489,9 +485,9 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
   }
 
   const statusChip = (t: DominationTarget) => {
-    if (!t.enabled) return { text: 'blocked', cls: 'text-retro-muted border-border-glass' };
-    if (t.online) return { text: 'online', cls: 'text-emerald-400 border-emerald-500/30' };
-    return { text: `seen ${timeAgo(t.last_seen)}`, cls: 'text-amber-400/80 border-amber-500/20' };
+    if (!t.enabled) return { text: 'blocked', cls: 'text-retro-muted border-edge' };
+    if (t.online) return { text: 'online', cls: 'text-success-fg border-success/30' };
+    return { text: `seen ${timeAgo(t.last_seen)}`, cls: 'text-warning-fg/80 border-warning/20' };
   };
 
   const SUBTAB_LABELS: Record<DominationSubtab, string> = {
@@ -511,17 +507,15 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
             <Monitor className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <h2 className="text-xs font-bold text-retro-fg uppercase tracking-wider">
+            <h2 className="text-xs font-bold text-retro-fg tracking-wider">
               PC Domination
             </h2>
-            <p className="text-[10px] text-retro-muted truncate">Opt-in pranks between friends. Every effect costs g$ and needs consent</p>
           </div>
         </div>
         <div className="flex items-center gap-2 rounded-xl glass-panel px-3 py-2">
-          <Radio className={`w-3.5 h-3.5 ${receiving && !paused ? 'text-emerald-400' : 'text-retro-muted'}`} />
-          <div className="text-xs leading-tight">
-            <div className="font-medium">{receiving ? (paused ? 'Receiving (paused)' : 'Receiving effects') : 'Not receiving'}</div>
-            <div className="text-retro-muted">Sending is always available</div>
+          <Radio className={`w-3.5 h-3.5 ${receiving && !paused ? 'text-success-fg' : 'text-retro-muted'}`} />
+          <div className="text-xs leading-tight font-medium">
+            {receiving ? (paused ? 'Receiving (paused)' : 'Receiving') : 'Not receiving'}
           </div>
           <button
             type="button"
@@ -533,11 +527,11 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
           >
             <span
               aria-hidden="true"
-              className={`absolute inset-x-0 h-1 rounded-full transition-colors ${receiving ? 'bg-emerald-500/50' : 'bg-surface-raised'}`}
+              className={`absolute inset-x-0 h-1 rounded-full transition-colors ${receiving ? 'bg-success/50' : 'bg-surface-raised'}`}
             />
             <span
               aria-hidden="true"
-              className={`absolute left-0 h-3 w-3 rounded-full shadow transition-transform ${receiving ? 'translate-x-6 bg-emerald-400' : 'translate-x-0 bg-retro-muted'}`}
+              className={`absolute left-0 h-3 w-3 rounded-full shadow transition-transform ${receiving ? 'translate-x-6 bg-success' : 'translate-x-0 bg-retro-muted'}`}
             />
           </button>
           {receiving && (
@@ -545,7 +539,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
               type="button"
               onClick={togglePause}
               className={`ml-1 px-2 py-1 rounded-md text-xs font-medium border cursor-pointer transition-colors ${
-                paused ? 'border-emerald-500/30 text-emerald-400' : 'border-border-glass text-retro-muted hover:text-retro-fg'
+                paused ? 'border-success/30 text-success-fg' : 'border-edge text-retro-muted hover:text-retro-fg'
               }`}
             >
               {paused ? 'Resume' : 'Pause 15m'}
@@ -555,7 +549,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
       </div>
 
       {/* Subtabs Bar */}
-      <div className="px-4 py-2.5 border-b border-border-subtle flex items-center justify-between gap-2 shrink-0">
+      <div className="px-4 py-2.5 border-b border-edge-subtle flex items-center justify-between gap-2 shrink-0">
         <div className="flex items-center gap-1.5" role="tablist" aria-label="Domination categories">
           {DOMINATION_SUBTABS.map((tab) => {
             const isSel = subtab === tab;
@@ -583,7 +577,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
           {/* Target column */}
           <div className="lg:col-span-2 rounded-xl glass-panel flex flex-col overflow-hidden">
-            <div className="px-4 py-3 border-b border-border-subtle flex items-center justify-between gap-2">
+            <div className="px-4 py-3 border-b border-edge-subtle flex items-center justify-between gap-2">
               <div className="text-xs font-medium flex items-center gap-1.5 text-retro-fg">
                 <Target className="w-3.5 h-3.5 text-retro-muted" /> Target
               </div>
@@ -599,7 +593,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                 </button>
               </div>
             </div>
-            <div className="p-3 border-b border-border-subtle">
+            <div className="p-3 border-b border-edge-subtle">
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -616,7 +610,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
               )}
               {targetsState === 'error' && (
                 <div className="p-6 text-center space-y-3">
-                  <p className="text-xs text-rose-400">Couldn't load the player list.</p>
+                  <p className="text-xs text-danger-fg">Couldn't load the player list.</p>
                   <button
                     type="button"
                     onClick={() => void loadTargets()}
@@ -651,12 +645,12 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                     key={t.id}
                     type="button"
                     onClick={() => setSelectedTarget(t)}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-left border-b border-border-subtle transition-colors cursor-pointer ${
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-left border-b border-edge-subtle transition-colors cursor-pointer ${
                       isSel ? 'glass-nav-active' : 'hover:bg-glass-w10'
                     }`}
                   >
                     {t.pfpUrl ? (
-                      <img src={resolveMediaUrl(t.pfpUrl)} alt="" className="w-7 h-7 rounded-md object-cover border border-border-glass" />
+                      <img src={resolveMediaUrl(t.pfpUrl)} alt="" className="w-7 h-7 rounded-md object-cover border border-edge" />
                     ) : (
                       <div className="w-7 h-7 rounded-md glass-inset flex items-center justify-center text-xs font-semibold text-retro-fg">
                         {t.displayName.charAt(0).toUpperCase()}
@@ -664,9 +658,9 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                     )}
                     <div className="min-w-0 flex-1">
                       <div className="text-xs font-medium truncate text-retro-fg">{t.displayName}</div>
-                      <div className="text-[10px] text-retro-muted">{consentCountOf(t)}/7 effects allowed</div>
+                      <div className="text-2xs text-retro-muted">{consentCountOf(t)}/7 effects allowed</div>
                     </div>
-                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border shrink-0 ${chip.cls}`}>{chip.text}</span>
+                    <span className={`text-2xs font-mono px-1.5 py-0.5 rounded border shrink-0 ${chip.cls}`}>{chip.text}</span>
                   </button>
                 );
               })}
@@ -676,7 +670,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
           {/* Effects column */}
           <div className="lg:col-span-3 space-y-3">
             {!selectedTarget ? (
-              <div className="rounded-xl border border-dashed border-border-glass p-10 text-center text-sm text-retro-muted">
+              <div className="rounded-xl border border-dashed border-edge p-10 text-center text-sm text-retro-muted">
                 Pick a target on the left to start.
               </div>
             ) : (
@@ -685,20 +679,34 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                   <div className="text-xs text-retro-fg">
                     Effects for <span className="font-semibold">{selectedTarget.displayName}</span>
                     {selectedTarget.enabled && !selectedTarget.online && (
-                      <span className="text-amber-400/80"> · offline, sends will be refused (free)</span>
+                      <span className="text-warning-fg/80"> · offline, sends will be refused (free)</span>
                     )}
                   </div>
                   <div className="text-xs font-mono text-retro-muted">{formatCount(points)} g$</div>
                 </div>
+                {(() => {
+                  // A state shared by every card is stated once here; the cards then
+                  // carry only the exception.
+                  const allowedCount = ACTION_ORDER.filter(
+                    (a) => Boolean(selectedTarget.consents?.[ACTION_LABELS[a].consent]),
+                  ).length
+                  const allAllowed = allowedCount === ACTION_ORDER.length
+                  const noneAllowed = allowedCount === 0
+                  const allFree = Boolean(mesh && mesh.peerKnown(selectedTarget.id))
+                  if (allAllowed && !allFree) return null
+                  return (
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-retro-muted -mt-1">
+                      {noneAllowed && <span>No consent yet — ask in the Consent tab.</span>}
+                      {!noneAllowed && !allAllowed && <span>Some effects are not consented.</span>}
+                      {allFree && <span className="text-success-fg/80">Free via mesh.</span>}
+                    </div>
+                  )
+                })()}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {ACTION_ORDER.map((action) => {
-                    const { label, icon: Icon, description, consent } = ACTION_LABELS[action];
+                    const { label, icon: Icon, consent } = ACTION_LABELS[action];
                     const allowed = Boolean(selectedTarget.consents?.[consent]);
                     const sendable = allowed && Boolean(selectedTarget.enabled) && selectedTarget.online !== false;
-                    // Mesh-addressable peers skip the ledger entirely: no
-                    // price, no charge — the badge says so up front.
-                    const meshable = Boolean(mesh && mesh.peerKnown(selectedTarget.id));
-                    const price = prices[action];
                     return (
                       <button
                         key={action}
@@ -715,33 +723,25 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                           sending === action
                             ? 'border-retro-accent cursor-wait'
                             : sendable
-                              ? 'border-border-glass hover:border-retro-accent/60 cursor-pointer'
-                              : 'border-border-subtle opacity-45 cursor-not-allowed'
+                              ? 'border-edge hover:border-retro-accent/60 cursor-pointer'
+                              : 'border-edge-subtle opacity-45 cursor-not-allowed'
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <Icon className="w-4 h-4 text-retro-muted" />
-                          {meshable ? (
-                            <span className="text-xs font-mono text-emerald-400/80">Free via mesh</span>
-                          ) : price != null ? (
-                            <span className="text-xs font-mono text-retro-muted">{price} g$</span>
-                          ) : (
-                            <Zap className="w-3.5 h-3.5 text-retro-muted opacity-40" />
-                          )}
                         </div>
                         <div className="text-xs font-semibold text-retro-fg">{label}</div>
-                        <div className="text-xs text-retro-muted mt-1 leading-snug">{description}</div>
-                        <div className={`mt-2 text-[10px] font-mono ${allowed ? 'text-emerald-400/80' : 'text-retro-muted'}`}>
-                          {sending === action ? 'sending…' : allowed ? 'consented' : 'no consent'}
-                        </div>
+                        {/* Consented is the default and lives in the group line; the card
+                            only states what is different. */}
+                        {!allowed || sending === action ? (
+                          <div className={`mt-2 text-2xs font-mono ${allowed ? 'text-success-fg/80' : 'text-danger-fg/80'}`}>
+                            {sending === action ? 'sending…' : 'no consent'}
+                          </div>
+                        ) : null}
                       </button>
                     );
                   })}
                 </div>
-                <p className="text-xs text-retro-muted leading-relaxed px-1">
-                  Charged only when the server accepts the send. If the connection drops mid-send, check
-                  History → Outbox before retrying.
-                </p>
               </>
             )}
           </div>
@@ -779,16 +779,16 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
           </div>
 
           <div className="rounded-xl glass-panel overflow-hidden">
-            <div className="px-4 py-3 border-b border-border-subtle flex items-center gap-1.5">
+            <div className="px-4 py-3 border-b border-edge-subtle flex items-center gap-1.5">
               <Shield className="w-3.5 h-3.5 text-retro-muted" />
               <span className="text-xs font-medium text-retro-fg">What others may send you</span>
-              {!receiving && <span className="text-[10px] text-retro-muted ml-2">(saved. Inactive while Receiving is off)</span>}
+              {!receiving && <span className="text-2xs text-retro-muted ml-2">(saved. Inactive while Receiving is off)</span>}
             </div>
-            <div className="divide-y divide-border-subtle">
-              {CONSENT_ROWS.map(({ key, label, desc }) => {
+            <div className="divide-y divide-edge-subtle">
+              {CONSENT_ROWS.map(({ key, label }) => {
                 const value = Boolean((settings as any)[key]);
                 return (
-                  <label key={key} className="flex items-start gap-3 px-4 py-3 hover:bg-glass-w10 cursor-pointer transition-colors">
+                  <div key={key} className="flex items-start gap-3 px-4 py-3 hover:bg-glass-w10 cursor-pointer transition-colors">
                       <button
                         type="button"
                         role="switch"
@@ -802,18 +802,17 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                       >
                         <span
                           aria-hidden="true"
-                          className={`absolute inset-x-0 h-1 rounded-full transition-colors ${value ? 'bg-emerald-500/50' : 'bg-surface-raised'}`}
+                          className={`absolute inset-x-0 h-1 rounded-full transition-colors ${value ? 'bg-success/50' : 'bg-surface-raised'}`}
                         />
                         <span
                           aria-hidden="true"
-                          className={`absolute left-0 h-3 w-3 rounded-full shadow transition-transform ${value ? 'translate-x-6 bg-emerald-400' : 'translate-x-0 bg-retro-muted'}`}
+                          className={`absolute left-0 h-3 w-3 rounded-full shadow transition-transform ${value ? 'translate-x-6 bg-success' : 'translate-x-0 bg-retro-muted'}`}
                         />
                       </button>
                     <div className="min-w-0">
                       <div className="text-xs font-medium text-retro-fg">{label}</div>
-                      <div className="text-xs text-retro-muted leading-snug mt-0.5">{desc}</div>
                     </div>
-                  </label>
+                  </div>
                 );
               })}
             </div>
@@ -858,7 +857,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
           )}
           {historyState === 'error' && (
             <div className="py-10 text-center space-y-3">
-              <p className="text-xs text-rose-400">Couldn't load history.</p>
+              <p className="text-xs text-danger-fg">Couldn't load history.</p>
               <button
                 type="button"
                 onClick={() => void loadHistory()}
@@ -869,7 +868,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
             </div>
           )}
           {historyState === 'ready' && (historyPane === 'outgoing' ? outgoingAll : history).length === 0 && (
-            <div className="py-12 text-center space-y-2 rounded-xl border border-dashed border-border-glass">
+            <div className="py-12 text-center space-y-2 rounded-xl border border-dashed border-edge">
               <Inbox className="w-5 h-5 mx-auto text-retro-muted" />
               <p className="text-xs text-retro-muted">
                 {historyPane === 'outgoing' ? 'You have not sent anything yet.' : 'Nothing has landed on your screen yet.'}
@@ -897,14 +896,14 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                     </div>
                   </div>
                   <span
-                    className={`shrink-0 text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+                    className={`shrink-0 text-2xs font-mono px-1.5 py-0.5 rounded border ${
                       st === 'executed' || st === 'completed'
-                        ? 'text-emerald-400 border-emerald-500/30'
+                        ? 'text-success-fg border-success/30'
                         : st === 'sent' || st === 'landed'
-                          ? 'text-retro-muted border-border-glass'
+                          ? 'text-retro-muted border-edge'
                           : st === 'expired'
-                            ? 'text-amber-400 border-amber-500/30'
-                            : 'text-rose-400 border-rose-500/30'
+                            ? 'text-warning-fg border-warning/30'
+                            : 'text-danger-fg border-danger/30'
                     }`}
                     title={
                       st === 'sent' ? 'Accepted by the server, waiting for their screen to confirm'
@@ -932,8 +931,8 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
           {historyPane === 'outgoing' && historyState === 'ready' && outgoingAll.length > 0 && (
             <p className="text-xs text-retro-muted px-1">
               <span className="font-mono">awaiting</span> = charged and relayed; it flips to{' '}
-              <span className="font-mono text-emerald-400/80">landed</span> once their client confirms, or to{' '}
-              <span className="font-mono text-amber-400/80">fizzled</span> after 30 min if it never rendered.
+              <span className="font-mono text-success-fg/80">landed</span> once their client confirms, or to{' '}
+              <span className="font-mono text-warning-fg/80">fizzled</span> after 30 min if it never rendered.
               Camera requests stay <span className="font-mono">awaiting</span> until they approve the photo.
             </p>
           )}

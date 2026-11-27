@@ -37,3 +37,40 @@ describe('tokenizeUrls', () => {
     expect(containsUrl('visit https://gmatch.pages.dev')).toBe(true)
   })
 })
+
+/**
+ * A URL that becomes an <a href> is a scheme the browser may ACT on, not just
+ * text. Peer-authored captions and DMs are untrusted input, so an executable
+ * scheme must degrade to inert text rather than a live sink.
+ */
+describe('linkify rejects executable schemes (security)', () => {
+  const dangerous = [
+    'javascript:alert(1)',
+    'JavaScript:alert(1)',
+    'vbscript:msgbox(1)',
+    'data:text/html,<script>alert(1)</script>',
+    'file:///etc/passwd',
+    'tg://resolve?domain=x',
+    'about:blank',
+  ]
+
+  for (const url of dangerous) {
+    it(`does not linkify ${url}`, () => {
+      const tokens = tokenizeUrls(`click ${url} now`)
+      // The dangerous token must survive as TEXT, never as a url token.
+      expect(tokens.some((t) => t.type === 'url')).toBe(false)
+      expect(tokens.map((t) => t.value).join('')).toContain(url)
+    })
+  }
+
+  it('still linkifies a real share link', () => {
+    const tokens = tokenizeUrls('see https://gmatch.pages.dev/p/abc')
+    expect(tokens.filter((t) => t.type === 'url')).toHaveLength(1)
+  })
+
+  it('does not linkify a bare www. token that resolves to a non-http scheme', () => {
+    // `www.` always normalizes to http://, so this must stay a link.
+    const tokens = tokenizeUrls('go to www.example.com')
+    expect(tokens[1]).toEqual({ type: 'url', value: 'http://www.example.com' })
+  })
+})

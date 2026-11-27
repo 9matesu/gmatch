@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 
 import { orbitFetch, getApiBaseUrl } from "../utils/api";
+import { adminApi } from "../utils/adminApi";
 import { useToast } from "../components/Toast";
 import { describePinFailure } from "./pinFailure";
 import { useConfirm } from "../components/ConfirmDialog";
@@ -13,7 +14,7 @@ import { ModerationTab } from "./components/tabs/ModerationTab";
 import { UsersTab } from "./components/tabs/UsersTab";
 import { ContentTab } from "./components/tabs/ContentTab";
 import { SettingsTab } from "./components/tabs/SettingsTab";
-import { CardZoomModal } from "../components/CardZoomModal";
+import { ZoomModal, useZoomModal } from "../components/CardZoomModalHost";
 import { TAB_REGISTRY, LEGACY_TAB_MAP, getTabBadge } from "../utils/adminTabs";
 import { useAdminWebSocket } from "../hooks/useAdminWebSocket";
 import type { OrbitIdentity } from "@orbit/crypto";
@@ -75,13 +76,7 @@ export default function AdminPageClient({ identity: appIdentity }: { identity?: 
   });
 
   // Modals
-  const [zoomModal, setZoomModal] = useState<{
-    isOpen: boolean;
-    imageUrl: string | null;
-    isVideo?: boolean;
-    title?: string;
-    subtitle?: string;
-  }>({ isOpen: false, imageUrl: null });
+  const zoom = useZoomModal();
 
   // WebSocket for real-time updates (must be called before any early returns)
   useAdminWebSocket({
@@ -219,12 +214,16 @@ export default function AdminPageClient({ identity: appIdentity }: { identity?: 
   const handleAction = useCallback(async (action: string, ...args: unknown[]) => {
     if (!identity || !pinVerified) return;
     try {
+      // ONE admin HTTP layer: every action goes through `adminApi`, which
+      // throws on a non-2xx response. The direct `orbitFetch` calls this
+      // replaces IGNORED the response status — a 403 or a 500 still toasted
+      // "<action> completed", so a failed moderation action reported success.
       switch (action) {
         case "forceEnd":
-          await orbitFetch(`/api/admin/matches/${args[0]}/end`, { method: "POST" }, identity);
+          await adminApi.forceEndMatch(identity, String(args[0]));
           break;
         case "cancel":
-          await orbitFetch(`/api/admin/matches/${args[0]}`, { method: "DELETE" }, identity);
+          await adminApi.cancelMatch(identity, String(args[0]));
           break;
         case "override": {
           const result = await confirm({
@@ -234,117 +233,96 @@ export default function AdminPageClient({ identity: appIdentity }: { identity?: 
             tone: "danger",
           });
           if (result) {
-            await orbitFetch(`/api/admin/matches/${args[0]}/result`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ result: args[1] }),
-            }, identity);
+            await adminApi.overrideMatchResult(identity, String(args[0]), String(args[1]));
           }
           break;
         }
         case "forceMatchup":
-          await orbitFetch("/api/admin/matches/force-all", { method: "POST" }, identity);
+          await adminApi.forceMatchup(identity);
           break;
         case "runCleanup":
-          await orbitFetch("/api/admin/cleanup", { method: "POST" }, identity);
+          await adminApi.triggerCleanup(identity);
           break;
         case "endTier":
-          await orbitFetch(`/api/admin/special-matches/${args[0]}/end`, { method: "POST" }, identity);
+          await adminApi.endTierMatch(identity, String(args[0]));
           break;
         case "closeRoom":
-          await orbitFetch(`/api/admin/rooms/${args[0]}/close`, { method: "POST" }, identity);
+          await adminApi.closeRoom(identity, String(args[0]));
           break;
         case "closeBabecock":
-          await orbitFetch(`/api/admin/babecock/${args[0]}/close`, { method: "POST" }, identity);
-          break;
-        case "viewArchive":
-          // Navigate to archive detail
+          await adminApi.closeBabecock(identity, String(args[0]));
           break;
         case "banUser":
           if (await confirm({ title: `Ban user ${args[0]}?`, description: "Ban this user and wipe/moderate their active content.", confirmLabel: "Ban User", tone: "danger" })) {
-            await orbitFetch(`/api/admin/users/${args[0]}/ban`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ reason: args[1] || "Admin inline moderation", wipe: true, scope: "all" }),
-            }, identity);
+            await adminApi.banUser(identity, String(args[0]), String(args[1] || "Admin inline moderation"), true, "all");
           }
           break;
         case "togglePostVisibility":
           {
             const post = args[0] as { id: string; hidden_at: string | null };
-            await orbitFetch(`/api/admin/posts/${post.id}/visibility`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ hidden: !post.hidden_at }),
-            }, identity);
+            await adminApi.togglePostVisibility(identity, post.id, !post.hidden_at);
           }
           break;
         case "deletePost":
           if (await confirm({ title: "Delete post?", description: "Permanently delete this public post.", confirmLabel: "Delete", tone: "danger" })) {
-            await orbitFetch(`/api/admin/posts/${args[0]}`, { method: "DELETE" }, identity);
+            await adminApi.deletePost(identity, String(args[0]));
           }
           break;
         case "deleteLobbyImage":
           if (await confirm({ title: "Delete lobby image?", description: "Removes the row and blob permanently.", confirmLabel: "Delete", tone: "danger" })) {
-            await orbitFetch(`/api/admin/lobby-images/${args[0]}`, { method: "DELETE" }, identity);
+            await adminApi.deleteLobbyImage(identity, String(args[0]));
           }
           break;
         case "unban":
-          await orbitFetch(`/api/admin/users/${args[0]}/unban`, { method: "POST" }, identity);
+          await adminApi.unbanUser(identity, String(args[0]));
           break;
         case "moderator":
-          await orbitFetch(`/api/admin/users/${args[0]}/moderator`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ is_moderator: args[1] }),
-          }, identity);
+          await adminApi.toggleModerator(identity, String(args[0]), Boolean(args[1]));
           break;
         case "admin":
-          await orbitFetch(`/api/admin/users/${args[0]}/adjust`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ is_admin: args[1] }),
-          }, identity);
+          await adminApi.adjustUser(identity, String(args[0]), { is_admin: args[1] });
           break;
         case "deleteUser":
-          if (await confirm({ title: `Delete user?`, description: "Permanently deletes the account and all content.", confirmLabel: "Delete", tone: "danger" })) {
-            await orbitFetch(`/api/admin/users/${args[0]}/delete`, { method: "POST" }, identity);
+          if (await confirm({ title: "Delete user?", description: "Permanently deletes the account and all content.", confirmLabel: "Delete", tone: "danger" })) {
+            await adminApi.deleteUser(identity, String(args[0]));
           }
           break;
         case "hideComment":
-          await orbitFetch(`/api/admin/lobby-comments/${args[0]}/hide`, { method: "POST" }, identity);
+          await adminApi.hideLobbyComment(identity, String(args[0]));
           break;
         case "unhideComment":
-          await orbitFetch(`/api/admin/lobby-comments/${args[0]}/unhide`, { method: "POST" }, identity);
+          await adminApi.unhideLobbyComment(identity, String(args[0]));
           break;
         case "deleteComment":
           if (await confirm({ title: "Delete comment?", description: "Permanently delete this comment.", confirmLabel: "Delete", tone: "danger" })) {
-            await orbitFetch(`/api/admin/lobby-comments/${args[0]}`, { method: "DELETE" }, identity);
+            await adminApi.deleteLobbyComment(identity, String(args[0]));
           }
           break;
         case "deleteChat":
           if (await confirm({ title: "Delete chat message?", description: "Permanently delete this message.", confirmLabel: "Delete", tone: "danger" })) {
-            await orbitFetch(`/api/admin/chat/messages/${args[0]}/${args[1]}`, { method: "DELETE" }, identity);
+            await adminApi.deleteChatMessage(identity, String(args[0]), String(args[1]));
           }
           break;
         case "moderateCard":
-          await orbitFetch(`/api/admin/cards/${args[0]}/moderation`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ moderation_state: args[1] }),
-          }, identity);
+          await adminApi.moderateCard(identity, String(args[0]), args[1] as "active" | "hidden" | "banned");
           break;
         case "toggleAnnouncement":
-          await orbitFetch(`/api/admin/announcements/${args[0]}/toggle`, { method: "PATCH" }, identity);
+          await adminApi.toggleAnnouncement(identity, String(args[0]), Boolean(args[1]));
           break;
         case "deleteAnnouncement":
           if (await confirm({ title: "Delete announcement?", description: "Permanently delete this announcement.", confirmLabel: "Delete", tone: "danger" })) {
-            await orbitFetch(`/api/admin/announcements/${args[0]}`, { method: "DELETE" }, identity);
+            await adminApi.deleteAnnouncement(identity, String(args[0]));
           }
           break;
         case "refresh":
           loadDashboardData();
           break;
+        default:
+          // An unknown action is a client bug, not a server error: say so
+          // instead of reporting success for something that never ran.
+          logger.error(`Unknown admin action: ${action}`);
+          toast(`Unknown action: ${action}`, "error");
+          return;
       }
       toast(`${action} completed`, "success");
     } catch (err) {
@@ -354,8 +332,8 @@ export default function AdminPageClient({ identity: appIdentity }: { identity?: 
   }, [identity, pinVerified, confirm, toast, loadDashboardData]);
 
   const handleZoom = useCallback((url: string, isVideo: boolean, title: string, subtitle: string) => {
-    setZoomModal({ isOpen: true, imageUrl: url, isVideo, title, subtitle });
-  }, []);
+    zoom.showZoom(url, { isVideo, title, subtitle });
+  }, [zoom.showZoom]);
 
   const tabsForLayout = useMemo(() => TAB_REGISTRY.map(tab => ({
     id: tab.id,
@@ -379,10 +357,10 @@ export default function AdminPageClient({ identity: appIdentity }: { identity?: 
           <div className="absolute top-1/4 left-1/4 w-48 h-48 rounded-full bg-retro-accent/3 blur-3xl" />
         </div>
         <div className="relative z-10 w-full max-w-sm glass-panel p-6 space-y-4">
-          <div className="flex items-center justify-between border-b border-border-glass pb-3">
+          <div className="flex items-center justify-between border-b border-edge pb-3">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-retro-accent" />
-              <h1 className="text-sm font-bold text-retro-fg uppercase tracking-wider">Admin Operations</h1>
+              <h1 className="text-sm font-bold text-retro-fg tracking-wider">Admin Operations</h1>
             </div>
 
           </div>
@@ -392,12 +370,12 @@ export default function AdminPageClient({ identity: appIdentity }: { identity?: 
           </p>
 
           {(Boolean(import.meta.env.DEV) || (typeof window !== 'undefined' && (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1'))) && (
-            <div className="flex items-center justify-between text-xs bg-amber-500/10 border border-amber-500/20 text-amber-300 px-2.5 py-1.5 rounded">
+            <div className="flex items-center justify-between text-xs bg-warning/10 border border-warning/20 text-warning-fg px-2.5 py-1.5 rounded">
               <span>Dev mode: default passcode is <code className="font-mono font-bold bg-black/30 px-1 py-0.5 rounded">admin</code></span>
               <button
                 type="button"
                 onClick={() => setPin('admin')}
-                className="text-[10px] font-bold underline hover:text-white cursor-pointer ml-2 shrink-0"
+                className="text-2xs font-bold underline hover:text-retro-fg cursor-pointer ml-2 shrink-0"
               >
                 Use admin
               </button>
@@ -412,20 +390,20 @@ export default function AdminPageClient({ identity: appIdentity }: { identity?: 
                 onChange={(e) => setPin(e.target.value)}
                 placeholder="Secret Passcode"
                 autoFocus
-                className="w-full bg-surface-raised border border-border-glass focus:border-retro-accent/60 px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted rounded-md outline-none font-mono"
+                className="w-full bg-surface-raised border border-edge focus:border-retro-accent/60 px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted rounded-md outline-none font-mono"
               />
             </div>
 
             <button
               type="submit"
               disabled={verifyingPin || !pin.trim()}
-              className="w-full py-2 bg-retro-accent hover:bg-retro-accent-hover text-black font-bold text-xs rounded-md uppercase tracking-wider transition-colors disabled:opacity-40 cursor-pointer shadow-[0_4px_12px_rgba(159,227,255,0.15)]"
+              className="w-full py-2 bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text font-bold text-xs rounded-md uppercase tracking-wider transition-colors disabled:opacity-40 cursor-pointer"
             >
               {verifyingPin ? "Verifying..." : "Unlock Admin Console"}
             </button>
           </form>
 
-          <div className="text-[10px] text-retro-muted font-mono text-center pt-1 space-y-0.5">
+          <div className="text-2xs text-retro-muted font-mono text-center pt-1 space-y-0.5">
             <div>Target: {getApiBaseUrl()}</div>
             <div className="flex items-center justify-center gap-1.5">
               <span>Signed as: <span className="font-mono">{identity?.orbitId || "No identity. Sign in first."}</span></span>
@@ -433,7 +411,7 @@ export default function AdminPageClient({ identity: appIdentity }: { identity?: 
                 <button
                   type="button"
                   onClick={() => { void navigator.clipboard.writeText(identity.orbitId) }}
-                  className="text-retro-accent hover:text-white underline cursor-pointer"
+                  className="text-retro-accent hover:text-retro-fg underline cursor-pointer"
                   title="Copy your Orbit ID (needed for ADMIN_ORBIT_ID)"
                 >
                   Copy
@@ -458,17 +436,7 @@ export default function AdminPageClient({ identity: appIdentity }: { identity?: 
       isLoading={loading}
       onSignOut={() => handleAuthError()}
     >
-      {zoomModal.isOpen && zoomModal.imageUrl && (
-        <CardZoomModal
-          isOpen={zoomModal.isOpen}
-          onClose={() => setZoomModal({ isOpen: false, imageUrl: null })}
-          imageUrl={zoomModal.imageUrl}
-          isVideo={zoomModal.isVideo}
-          title={zoomModal.title}
-          subtitle={zoomModal.subtitle}
-          identity={identity}
-        />
-      )}
+      <ZoomModal zoom={zoom} identity={identity} />
 
       {activeTab === "dashboard" && (
         <DashboardTab identity={identity} pinVerified={pinVerified} onZoom={handleZoom} onAction={handleAction} onNavigate={handleTabChange} />

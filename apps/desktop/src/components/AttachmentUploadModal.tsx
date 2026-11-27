@@ -5,6 +5,7 @@ import { orbitFetch } from '../utils/api'
 import { CameraCapture } from './CameraCapture'
 import { DropZone } from './DropZone'
 import { contentHash } from '../utils/media'
+import { dataUrlToFile } from '../utils/mediaData'
 import { useCropper } from '../hooks/useCropper'
 import { isCropableImage } from './CropModal'
 import { forgeMediaLocally } from '../services/mediaForge'
@@ -107,19 +108,12 @@ export function AttachmentUploadModal({
     if (!trimmed) return
     setUrlInput(trimmed)
     setError(null)
-    if (trimmed.startsWith('data:')) {
-      try {
-        const [meta, b64] = trimmed.split(',')
-        const mime = (meta.match(/data:([^;]+)/) || [])[1] || 'image/jpeg'
-        const bin = atob(b64)
-        const bytes = new Uint8Array(bin.length)
-        for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i)
-        const file = new File([bytes], `attachment-${Date.now()}.jpg`, { type: mime })
-        fileRef.current = file
-        setHasFile(true)
-        setPreview(trimmed)
-        return
-      } catch { }
+    const dataFile = dataUrlToFile(trimmed, `attachment-${Date.now()}.jpg`)
+    if (dataFile) {
+      fileRef.current = dataFile
+      setHasFile(true)
+      setPreview(trimmed)
+      return
     }
     fileRef.current = null
     setHasFile(false)
@@ -159,14 +153,9 @@ export function AttachmentUploadModal({
       const recipientStr = recipientList.length > 0 ? recipientList.join(',') : undefined
 
       if (file || (preview && preview.startsWith('data:'))) {
-        let payloadFile = file
-        if (!payloadFile && preview && preview.startsWith('data:')) {
-          const [meta, b64] = preview.split(',')
-          const mime = (meta.match(/data:([^;]+)/) || [])[1] || 'image/jpeg'
-          const bin = atob(b64)
-          const bytes = new Uint8Array(bin.length)
-          for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i)
-          payloadFile = new File([bytes], `attachment-${Date.now()}.jpg`, { type: mime })
+        let payloadFile: File | null = file ?? null
+        if (!payloadFile && preview) {
+          payloadFile = dataUrlToFile(preview, `attachment-${Date.now()}.jpg`)
         }
         if (payloadFile) {
           // Zero-media P2P path: seed into swarm + register metadata (no 422).
@@ -190,14 +179,9 @@ export function AttachmentUploadModal({
         form.append('image', file, file.name || `attachment-${Date.now()}.jpg`)
       } else if (link) {
         form.append('url', link)
-      } else if (preview && preview.startsWith('data:')) {
-        const [meta, b64] = preview.split(',')
-        const mime = (meta.match(/data:([^;]+)/) || [])[1] || 'image/jpeg'
-        const bin = atob(b64)
-        const bytes = new Uint8Array(bin.length)
-        for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i)
-        const f = new File([bytes], `attachment-${Date.now()}.jpg`, { type: mime })
-        form.append('image', f)
+      } else {
+        const f = preview ? dataUrlToFile(preview, `attachment-${Date.now()}.jpg`) : null
+        if (f) form.append('image', f)
       }
 
       form.append('content_hash', await contentHash(file || new File([], '')))
@@ -229,14 +213,14 @@ export function AttachmentUploadModal({
 
   return (
     <div className="fixed inset-0 z-[var(--z-lightbox)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-surface-raised border border-border-glass rounded-xl max-w-lg w-full overflow-hidden shadow-2xl space-y-4 p-5">
-        <div className="flex items-center justify-between border-b border-border-glass pb-3">
+      <div className="bg-surface-raised border border-edge rounded-xl max-w-lg w-full overflow-hidden shadow-2xl space-y-4 p-5">
+        <div className="flex items-center justify-between border-b border-edge pb-3">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-xl bg-orange-100 border border-orange-200 flex items-center justify-center text-orange-600">
               <ImagePlus className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-xs font-black text-retro-fg uppercase tracking-wider">{title}</h2>
+              <h2 className="text-xs font-black text-retro-fg tracking-wider">{title}</h2>
             </div>
           </div>
           <button
@@ -249,7 +233,7 @@ export function AttachmentUploadModal({
         </div>
 
         {/* Mode Selectors */}
-        <div className="flex bg-surface-interactive p-1 rounded-xl border border-border-glass text-xs font-bold">
+        <div className="flex bg-surface-interactive p-1 rounded-xl border border-edge text-xs font-bold">
           {(['upload', 'url', 'camera'] as const).map((m) => (
             <button
               key={m}
@@ -261,7 +245,7 @@ export function AttachmentUploadModal({
                 fileRef.current = null
                 setHasFile(false)
               }}
-              className={`flex-1 py-1.5 rounded-lg transition-all uppercase tracking-wider cursor-pointer flex items-center justify-center gap-1.5 ${mode === m ? 'bg-surface-raised text-retro-fg shadow-xs font-black' : 'text-retro-muted hover:text-retro-body'
+              className={`flex-1 py-1.5 rounded-lg transition uppercase tracking-wider cursor-pointer flex items-center justify-center gap-1.5 ${mode === m ? 'bg-surface-raised text-retro-fg shadow-xs font-black' : 'text-retro-muted hover:text-retro-body'
                 }`}>
               {m === 'upload' && <UploadCloud className="w-3.5 h-3.5" />}
               {m === 'url' && <LinkIcon className="w-3.5 h-3.5" />}
@@ -277,13 +261,13 @@ export function AttachmentUploadModal({
             <>
               <CameraCapture onCapture={handleCameraFile} onCancel={() => setMode('upload')} />
               {hasFile && (
-                <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-800">
+                <div className="flex items-center gap-2 px-3 py-2 bg-success border border-success rounded-xl text-xs font-bold text-success-fg">
                   <Check className="w-4 h-4" />
                   <span>Snapshot captured & ready to attach.</span>
                   <button
                     type="button"
                     onClick={() => { fileRef.current = null; setHasFile(false); setPreview(null) }}
-                    className="ml-auto text-retro-muted hover:text-red-500 underline cursor-pointer"
+                    className="ml-auto text-retro-muted hover:text-danger-fg underline cursor-pointer"
                   >
                     Discard
                   </button>
@@ -298,12 +282,12 @@ export function AttachmentUploadModal({
                   value={urlInput}
                   onChange={(e) => handleUrl(e.target.value)}
                   placeholder="Paste image or video link (e.g. https://...)"
-                  className="flex-1 bg-surface-interactive border border-border-glass rounded-xl px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-black"
+                  className="flex-1 bg-surface-interactive border border-edge rounded-xl px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-black"
                 />
               </div>
               {urlInput && (
-                <div className="p-3 rounded-xl border border-border-glass bg-surface-raised text-xs text-retro-body flex items-center gap-2">
-                  <LinkIcon className="w-4 h-4 text-cyan-600 shrink-0" />
+                <div className="p-3 rounded-xl border border-edge bg-surface-raised text-xs text-retro-body flex items-center gap-2">
+                  <LinkIcon className="w-4 h-4 text-info-fg shrink-0" />
                   <span className="truncate">URL ready. Will be fetched and stored on submit</span>
                 </div>
               )}
@@ -313,19 +297,19 @@ export function AttachmentUploadModal({
               <DropZone onFiles={handleFile} onPasteUrl={handleUrl} compact={false} accept="image/jpeg, image/png, image/webp, image/avif, image/gif, video/mp4, video/webm, video/quicktime, video/ogg, video/*" multiple={false}>
                 <div className="space-y-1 text-center py-2">
                   <p className="text-xs text-retro-body font-bold">Drop an image/video or click to browse</p>
-                  <p className="text-[10px] text-retro-muted">JPG, PNG, WebP, GIF, MP4, WebM (up to 50MB)</p>
+                  <p className="text-2xs text-retro-muted">JPG, PNG, WebP, GIF, MP4, WebM (up to 50MB)</p>
                 </div>
               </DropZone>
               {preview && (
                 preview.startsWith('data:video') || preview.startsWith('blob:') ? (
-                  <video src={preview} controls className="w-full max-h-52 object-contain rounded-xl border border-border-glass bg-black" />
+                  <video src={preview} controls className="w-full max-h-52 object-contain rounded-xl border border-edge bg-retro-bg" />
                 ) : preview.startsWith('http://') || preview.startsWith('https://') ? (
-                  <div className="w-full text-center py-3 rounded-xl border border-border-glass bg-surface-raised text-xs text-retro-body flex items-center justify-center gap-2">
-                    <LinkIcon className="w-3.5 h-3.5 text-cyan-600" />
+                  <div className="w-full text-center py-3 rounded-xl border border-edge bg-surface-raised text-xs text-retro-body flex items-center justify-center gap-2">
+                    <LinkIcon className="w-3.5 h-3.5 text-info-fg" />
                     <span>Link ready to submit</span>
                   </div>
                 ) : (
-                  <img src={preview} alt="Preview" className="w-full max-h-52 object-contain rounded-xl border border-border-glass bg-black" />
+                  <img src={preview} alt="Preview" className="w-full max-h-52 object-contain rounded-xl border border-edge bg-retro-bg" />
                 )
               )}
             </>
@@ -333,17 +317,17 @@ export function AttachmentUploadModal({
         </div>
 
         {error && (
-          <p role="alert" className="text-xs font-bold text-red-700 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+          <p role="alert" className="text-xs font-bold text-danger-fg bg-danger border border-danger rounded-xl px-3 py-2">
             {error}
           </p>
         )}
 
         {/* Actions */}
-        <div className="pt-2 border-t border-border-glass flex justify-end gap-2">
+        <div className="pt-2 border-t border-edge flex justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-xs font-bold text-retro-muted hover:text-retro-fg border border-border-glass rounded-xl cursor-pointer transition-colors"
+            className="px-4 py-2 text-xs font-bold text-retro-muted hover:text-retro-fg border border-edge rounded-xl cursor-pointer transition-colors"
           >
             Cancel
           </button>
@@ -351,7 +335,7 @@ export function AttachmentUploadModal({
             type="button"
             disabled={uploading || (!hasFile && !urlInput.trim() && !preview)}
             onClick={submit}
-            className="px-5 py-2 bg-black hover:bg-surface-elevated text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-5 py-2 bg-retro-bg hover:bg-surface-elevated text-retro-fg font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
             <span>{uploading ? 'Uploading…' : 'Attach'}</span>

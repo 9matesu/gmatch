@@ -129,14 +129,14 @@ export function DropZone({
       onPaste={handlePasteEvent}
        onClick={() => clickToBrowse && !disabled && inputRef.current?.click()}
 
-        className={bare ? `${className || ''} relative outline-none ${dragOver ? 'bg-retro-accent/5 ring-1 ring-inset ring-retro-accent/50' : ''}` : `${className || ''} relative border-2 border-dashed text-center transition-all cursor-pointer outline-none focus:border-retro-accent ${
+        className={bare ? `${className || ''} relative outline-none ${dragOver ? 'bg-retro-accent/5 ring-1 ring-inset ring-retro-accent/50' : ''}` : `${className || ''} relative border-2 border-dashed text-center transition cursor-pointer outline-none focus:border-retro-accent ${
          compact ? 'p-3' : 'p-6'
        } ${
          disabled
-           ? 'border-border-glass/30 opacity-40 cursor-not-allowed'
+           ? 'border-edge/30 opacity-40 cursor-not-allowed'
            : dragOver
            ? 'border-retro-accent bg-retro-bg'
-           : 'border-border-glass hover:border-retro-muted hover:bg-retro-panel'
+           : 'border-edge hover:border-retro-muted hover:bg-retro-panel'
        }`}
     >
       <input
@@ -168,7 +168,7 @@ export function DropZone({
           <p className={`${compact ? 'text-xs' : 'text-sm'} text-retro-muted`}>
             Drop image/video, click to browse, or paste (Ctrl+V) link
           </p>
-          {!compact && <p className="text-[10px] text-retro-muted/60">JPG, PNG, WebP, GIF, MP4, WebM, Twitter/X</p>}
+          {!compact && <p className="text-2xs text-retro-muted/60">JPG, PNG, WebP, GIF, MP4, WebM, Twitter/X</p>}
         </div>
       )}
     </div>

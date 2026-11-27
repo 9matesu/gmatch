@@ -12,7 +12,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ArrowLeft } from 'lucide-react';
-import { Modal } from '../Modal';
+import { Modal } from '../../ui/kit';
 
 export function AddWorldDialog({
   open,
@@ -65,10 +65,10 @@ export function AddWorldDialog({
           <button
             type="button"
             onClick={() => setStep('join')}
-            className="w-full rounded-lg border border-border-glass bg-glass-w5 hover:bg-glass-w10 px-3 py-2.5 text-left cursor-pointer transition-colors duration-150"
+            className="w-full rounded-lg border border-edge bg-glass-w5 hover:bg-glass-w10 px-3 py-2.5 text-left cursor-pointer transition-colors duration-150"
           >
             <span className="block text-xs font-bold text-retro-fg">Join with code</span>
-            <span className="mt-0.5 block text-[10px] text-retro-muted">
+            <span className="mt-0.5 block text-2xs text-retro-muted">
               Paste the code the host sent you.
             </span>
           </button>
@@ -76,10 +76,10 @@ export function AddWorldDialog({
             <button
               type="button"
               onClick={() => setStep('host')}
-              className="w-full rounded-lg border border-border-glass bg-glass-w5 hover:bg-glass-w10 px-3 py-2.5 text-left cursor-pointer transition-colors duration-150"
+              className="w-full rounded-lg border border-edge bg-glass-w5 hover:bg-glass-w10 px-3 py-2.5 text-left cursor-pointer transition-colors duration-150"
             >
               <span className="block text-xs font-bold text-retro-fg">Host a server</span>
-              <span className="mt-0.5 block text-[10px] text-retro-muted">
+              <span className="mt-0.5 block text-2xs text-retro-muted">
                 Run a world on this computer and share its code.
               </span>
             </button>
@@ -118,9 +118,9 @@ export function AddWorldDialog({
             />
           </label>
           {joinError ? (
-            <p role="alert" className="text-[10px] text-retro-error">{joinError}</p>
+            <p role="alert" className="text-2xs text-retro-error">{joinError}</p>
           ) : (
-            <p className="text-[10px] text-retro-muted">
+            <p className="text-2xs text-retro-muted">
               Paste the code the host sent you. It carries the address, not a secret.
             </p>
           )}
@@ -148,3 +148,4 @@ export function AddWorldDialog({
     </Modal>
   )
 }
+

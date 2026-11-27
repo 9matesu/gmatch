@@ -120,12 +120,12 @@ export function RankingsPanel({
 
   return (
     <div className="glass-surface rounded-lg p-4 space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border-glass pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-edge pb-3">
         <div className="flex items-center gap-2">
           <Trophy className="w-4 h-4 text-retro-accent" />
           <h2 className="text-sm font-medium text-retro-fg">Rankings</h2>
         </div>
-        <div className="flex bg-surface-interactive border border-border-glass p-0.5 rounded-md text-xs" role="group" aria-label="Ranking boards">
+        <div className="flex bg-surface-interactive border border-edge p-0.5 rounded-md text-xs" role="group" aria-label="Ranking boards">
           {BOARDS.map((b) => {
             const Icon = b.icon;
             return (
@@ -153,7 +153,7 @@ export function RankingsPanel({
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search players"
             aria-label="Search players"
-            className="w-full bg-surface-interactive border border-border-glass rounded-md pl-8 pr-3 py-1.5 text-xs text-retro-fg outline-none focus:border-border-glass placeholder:text-retro-muted"
+            className="w-full bg-surface-interactive border border-edge rounded-md pl-8 pr-3 py-1.5 text-xs text-retro-fg outline-none focus:border-edge placeholder:text-retro-muted"
           />
         </div>
         <button
@@ -162,13 +162,13 @@ export function RankingsPanel({
           aria-pressed={onlineOnly}
           className={`px-2.5 py-1.5 rounded-md text-xs border transition-colors cursor-pointer ${onlineOnly
             ? 'border-retro-accent text-retro-fg bg-surface-raised'
-            : 'border-border-glass text-retro-muted hover:text-retro-fg bg-surface-interactive'
+            : 'border-edge text-retro-muted hover:text-retro-fg bg-surface-interactive'
             }`}
         >
           Online only
         </button>
         {board === 'social' && (
-          <div className="flex bg-surface-interactive border border-border-glass p-0.5 rounded-md text-xs" role="group" aria-label="Social metric timeframe">
+          <div className="flex bg-surface-interactive border border-edge p-0.5 rounded-md text-xs" role="group" aria-label="Social metric timeframe">
             {(['all', 'today'] as const).map((m) => (
               <button
                 key={m}
@@ -184,7 +184,7 @@ export function RankingsPanel({
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-retro-muted">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-2xs text-retro-muted">
         <span>{boardHint}</span>
         {myRank && (
           <span className="font-mono" data-testid="rankings-my-rank">
@@ -211,7 +211,7 @@ export function RankingsPanel({
                 key={user.id}
                 type="button"
                 onClick={() => onSelectUser(user.id)}
-                className="w-full text-left bg-surface-interactive border border-border-glass rounded-lg p-2.5 flex items-center gap-3 hover:border-border-glass transition-colors cursor-pointer"
+                className="w-full text-left bg-surface-interactive border border-edge rounded-lg p-2.5 flex items-center gap-3 hover:border-edge transition-colors cursor-pointer"
               >
                 <span className="w-6 flex-shrink-0 text-center">
                   <RankBadge rank={rank} />
@@ -225,7 +225,7 @@ export function RankingsPanel({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-medium text-retro-fg truncate">{displayName(user)}</div>
-                  <div className="text-[10px] text-retro-muted mt-0.5 truncate">{secondaryLine(board, user)}</div>
+                  <div className="text-2xs text-retro-muted mt-0.5 truncate">{secondaryLine(board, user)}</div>
                 </div>
                 <span className="flex-shrink-0 text-xs font-mono text-retro-accent tabular-nums">
                   {scoreLabel(board, value)}

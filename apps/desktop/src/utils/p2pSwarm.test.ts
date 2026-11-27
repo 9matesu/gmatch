@@ -20,13 +20,42 @@ import {
 
 // Only deleteObject is observed: the durable store itself is not under test
 // here, and getLocalObject must still answer honestly (null) when offline.
-const storageMock = vi.hoisted(() => ({ deleteObject: vi.fn().mockResolvedValue(undefined) }))
+const storageMock = vi.hoisted(() => ({
+  deleteObject: vi.fn().mockResolvedValue(undefined),
+  saveObject: vi.fn().mockResolvedValue(undefined),
+}))
 vi.mock('./storage', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./storage')>()),
   deleteObject: storageMock.deleteObject,
+  saveObject: storageMock.saveObject,
 }))
 
 describe('p2pSwarm (WebRTC Object Swarm Transfer)', () => {
+  it('persistToVault: a uuid-keyed object still lands (bytes via its sha256) and writes the metadata row', async () => {
+    // Regression: vaultPutBytes only accepts a sha256 hex key, so a forge
+    // registered under a UUID was rejected (bad-hash) and the packaged app
+    // lost BOTH the bytes row and the metadata row — the post vanished
+    // "even for me" after a restart.
+    storageMock.saveObject.mockClear()
+    const put = vi.fn().mockResolvedValue({ ok: true, ref: 'a'.repeat(64) })
+    vi.stubGlobal('window', { gmatch: { vaultPutBytes: put } })
+    const blob = new Blob(['persist-me'], { type: 'image/jpeg' })
+    registerLocalObject('not-a-hash-uuid', blob, { ownerId: 'me', isPublic: true })
+    await vi.waitFor(() => {
+      expect(put).toHaveBeenCalledTimes(1)
+      expect(put.mock.calls[0][0]).toMatch(/^[0-9a-f]{64}$/) // sha256 key, not the uuid
+      expect(storageMock.saveObject).toHaveBeenCalledTimes(1)
+      const row = storageMock.saveObject.mock.calls[0][0]
+      expect(row.id).toBe('not-a-hash-uuid')
+      expect(row.source_url).toBe('vault://f/' + 'a'.repeat(64))
+      expect(row.is_public).toBe(1)
+      expect(row.owner_id).toBe('me')
+      expect(new Uint8Array(row.data).length).toBeGreaterThan(0) // descriptor link, not bytes
+    })
+    vi.unstubAllGlobals()
+    __resetLocalObjectCacheForTests()
+  })
+
   it('registers and retrieves local objects for swarm seeding', async () => {
     const blob = new Blob(['sample-card-media-data'], { type: 'image/png' })
     registerLocalObject('obj-card-1', blob)
@@ -216,6 +245,118 @@ describe('p2pSwarm (WebRTC Object Swarm Transfer)', () => {
     setSwarmTransport(send)
     await expect(requestSwarmObject('cached-tamper', 1000, { expectedHash })).rejects.toThrow(/hash verification/)
     expect(send).not.toHaveBeenCalled()
+    setSwarmTransport(null)
+    vi.unstubAllGlobals()
+  })
+
+  it('fails honestly (never persisting an empty blob) when the relay drops the transfer key', async () => {
+    // The exact shape of a broken relay: SWARM_KEY never arrives, so every
+    // chunk fails its AEAD check. The fetch must NOT assemble an empty
+    // object (0 chunks === total 0) and hand it to the durable store.
+    const text = 'f'.repeat(40 * 1024)
+    const blob = new Blob([text], { type: 'image/jpeg' })
+    const store = new Map([['keyless', blob]])
+    const seeder = createSwarmSession({
+      send: (m) => {
+        // A relay that drops the sealed DEK (it used to be missing from the
+        // node's client-to-client allowlist).
+        if (m.type === 'SWARM_KEY') return
+        void handleSwarmMessage(m)
+      },
+      localStore: store,
+    })
+    setSwarmTransport((m) => { void seeder.handleMessage(m) })
+    vi.stubGlobal('window', { gmatch: { vaultPutBytes: vi.fn().mockResolvedValue({ ok: true }) } })
+
+    await expect(requestSwarmObject('keyless', 3000)).rejects.toThrow(
+      /failed authenticated decryption|assembled no bytes|timed out/i,
+    )
+    expect(hasLocalObject('keyless')).toBe(false)
+    setSwarmTransport(null)
+    vi.unstubAllGlobals()
+  })
+
+  it('completes a swarm-v1 transfer when the relay forwards the transfer key', async () => {
+    const text = 'g'.repeat(40 * 1024)
+    const blob = new Blob([text], { type: 'image/jpeg' })
+    const frames: SwarmMessage[] = []
+    const seeder = createSwarmSession({
+      send: (m) => { frames.push(m); void handleSwarmMessage(m) },
+      localStore: new Map([['keyed', blob]]),
+    })
+    setSwarmTransport((m) => { void seeder.handleMessage(m) })
+    vi.stubGlobal('window', { gmatch: { vaultPutBytes: vi.fn().mockResolvedValue({ ok: true }) } })
+
+    const received = await requestSwarmObject('keyed', 5000)
+    expect(received.size).toBe(blob.size)
+    expect(frames.some((f) => f.type === 'SWARM_KEY')).toBe(true)
+    expect(frames.some((f) => f.type === 'SWARM_CHUNK')).toBe(true)
+    setSwarmTransport(null)
+    vi.unstubAllGlobals()
+  })
+
+  it('a session fetch survives a hostile pre-key chunk (one shared engine)', async () => {
+    // The module path drops a chunk that fails its AEAD check and lets the
+    // real seeder's stream complete. The old session twin rejected the fetch
+    // on the FIRST such chunk — the drift this suite pins shut: both paths
+    // run the same engine now, so a session fetcher must tolerate it too.
+    const text = 'k'.repeat(9 * 1024)
+    const blob = new Blob([text], { type: 'image/png' })
+    const seeder = createSwarmSession({
+      send: (m) => { void fetcher.handleMessage(m) },
+      localStore: new Map([['session-hostile', blob]]),
+    })
+    const fetcher = createSwarmSession({
+      send: (m) => {
+        if (m.type !== 'SWARM_WANT') return
+        // A hostile peer that saw the WANT injects a chunk that fails its
+        // AEAD check before the real seeder answers.
+        void fetcher.handleMessage({
+          type: 'SWARM_CHUNK', id: 'session-hostile', index: 0, total: 9999,
+          mimeType: 'image/png', enc: 'swarm-v1', transferId: m.transferId,
+          nonce: Buffer.alloc(24, 7).toString('base64'),
+          dataBase64: Buffer.alloc(64, 3).toString('base64'),
+        })
+        void seeder.handleMessage(m)
+      },
+    })
+
+    const received = await fetcher.requestObject('session-hostile', 5000)
+    expect(received.size).toBe(blob.size)
+  })
+
+  it('ignores an unauthenticated chunk that lies about the transfer size', async () => {
+    // A hostile peer that saw the WANT knows the victim's transferId. It can
+    // inject a chunk that fails its AEAD check and claims a bogus `total`.
+    // The claimed size must NOT become the transfer's size: otherwise the
+    // legitimate seeder's chunks look inconsistent and the fetch dies.
+    const text = 'h'.repeat(40 * 1024)
+    const blob = new Blob([text], { type: 'image/jpeg' })
+    const seeder = createSwarmSession({
+      send: (m) => { void handleSwarmMessage(m) },
+      localStore: new Map([['poison', blob]]),
+    })
+    const nonce = Buffer.alloc(24, 7).toString('base64')
+    setSwarmTransport((m) => {
+      if (m.type === 'SWARM_WANT') {
+        void handleSwarmMessage({
+          type: 'SWARM_CHUNK',
+          id: 'poison',
+          index: 0,
+          total: 9999,
+          mimeType: 'image/jpeg',
+          enc: 'swarm-v1',
+          transferId: m.transferId,
+          nonce,
+          dataBase64: Buffer.alloc(64, 3).toString('base64'),
+        })
+      }
+      void seeder.handleMessage(m)
+    })
+    vi.stubGlobal('window', { gmatch: { vaultPutBytes: vi.fn().mockResolvedValue({ ok: true }) } })
+
+    const received = await requestSwarmObject('poison', 5000)
+    expect(received.size).toBe(blob.size)
     setSwarmTransport(null)
     vi.unstubAllGlobals()
   })

@@ -11,6 +11,18 @@ import { bytesToHex } from '@noble/hashes/utils'
 import { proxyAndStoreExternal } from '../proxy'
 import { isPartyMediaObject } from '../watchparty'
 import { stripImageMetadata } from '../metadata-strip'
+import { findDisplayName } from '../common/userLookup'
+
+/**
+ * An object id is CLIENT-CHOSEN (an outbox replays the id it minted) and it
+ * becomes a blob-store path component, so it must be a single safe segment.
+ *
+ * Deliberately not `requireId`: that helper enforces an 8-char minimum for
+ * database ids, while the client legitimately registers short ids. The rule
+ * that matters here is "no separators, no traversal" — the length is the
+ * blob store's business, not a security boundary.
+ */
+const SAFE_OBJECT_ID = /^[A-Za-z0-9_-]{1,128}$/
 
 type Bindings = {
   DB: D1Turso
@@ -93,6 +105,28 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
 /** Any object still alive (profile pics never expire, everything else has a future expires_at). */
 const LIVE_OBJECT_FILTER = "(expires_at IS NULL OR datetime(expires_at) > datetime('now'))"
 
+/**
+ * Bytes the client attached to a metadata registration, or null.
+ *
+ * The metadata path is JSON, so an optional `data_base64` is the least invasive
+ * way to carry bytes: a JSON-only register stays byte-identical on the wire, and
+ * an offline publisher can replay the SAME body with its bytes attached — which
+ * is exactly what the outbox already stores and re-sends.
+ *
+ * Bounded: 50 MB, matching the multipart limit. Anything larger belongs on the
+ * multipart path.
+ */
+const REGISTER_BYTES_CAP = 50 * 1024 * 1024
+
+function bytesFromBody(raw: unknown): Uint8Array | null {
+  const b64 = (raw as { data_base64?: unknown } | null)?.data_base64
+  if (typeof b64 !== 'string' || b64.length === 0) return null
+  // A malformed payload must not become a corrupt row.
+  const bin = Buffer.from(b64, 'base64')
+  if (bin.length === 0 || bin.length > REGISTER_BYTES_CAP) return null
+  return new Uint8Array(bin)
+}
+
 objects.post('/register', orbitAuth, async (c) => {
   try {
     const orbitId = c.get('orbitId')
@@ -101,10 +135,23 @@ objects.post('/register', orbitAuth, async (c) => {
       return c.json({ error: 'Invalid JSON body' }, 400)
     }
 
-    const objectId = (typeof body.id === 'string' && body.id.trim()) ? body.id.trim() : crypto.randomUUID()
+    // The id is CLIENT-CHOSEN (an outbox replays the id it minted), and it
+    // becomes a blob-store path component. Validate it as an id, not as a path:
+    // a traversal-shaped id used to reach the filesystem verbatim.
+    const requestedId = typeof body.id === 'string' ? body.id.trim() : ''
+    if (requestedId && !SAFE_OBJECT_ID.test(requestedId)) {
+      return c.json({ error: 'Invalid object id' }, 400)
+    }
+    const objectId = requestedId || crypto.randomUUID()
     const contentHash = (typeof body.content_hash === 'string' && body.content_hash.trim().toLowerCase()) || null
     const magnetUri = (typeof body.magnet_uri === 'string' && body.magnet_uri.trim()) || null
-    const sizeBytes = Number(body.size_bytes) || 0
+    // `let`, not `const`: a registration that carries its bytes REPLACES this
+    // with the real length, because the whole point of this path is that the
+    // client learns the size from the bytes it sent rather than a claim.
+    let sizeBytes = Number(body.size_bytes) || 0
+    // Likewise the hash: when bytes arrive, the row is keyed by the hash of
+    // THOSE bytes, so the addressable id always matches the stored blob.
+    let storedContentHash = contentHash
     const mimeType = (typeof body.mime_type === 'string' && body.mime_type.trim()) || 'application/octet-stream'
     const caption = (typeof body.caption === 'string' && body.caption.trim()) || null
     const postCaption = (typeof body.post_caption === 'string' && body.post_caption.trim()) || null
@@ -120,13 +167,45 @@ objects.post('/register', orbitAuth, async (c) => {
     // hard-blocks them (single source of truth: shared/blocklist.json,
     // editable through desktop Settings).
     const expiresAt = isStory ? new Date(Date.now() + 24 * 3600 * 1000).toISOString() : null
-    const contentUrl = magnetUri || (contentHash ? `urn:sha256:${contentHash}` : `/api/objects/${objectId}`)
     const recipientsRaw = typeof body.recipients === 'string' ? body.recipients : null
 
     // Idempotent retry (Phase 3 outbox): the client reuses its own objectId
     // across attempts. Same owner => return the existing row (no duplicate,
     // no double posts_count, no second broadcast). Foreign owner => 409 so a
     // client id can never squat or overwrite another owner's row.
+    //
+    // A retry MAY carry the bytes the first attempt never delivered (the
+    // outbox replays after an offline publish). Storing them HERE — rather than
+    // leaving the row blobless forever — is what makes a post readable by
+    // anyone but the machine that authored it: without this, `GET /api/objects/:id`
+    // answered `bytes missing for row` until the end of time.
+    //
+    // On the hash: `content_hash` names the CANONICAL row bytes (EXIF/metadata
+    // stripped) and the client can only hash the file it holds, so the two
+    // legitimately differ. Rejecting that pair dropped the bytes of every real
+    // post (the row survived, the picture did not). The supplied bytes are
+    // therefore accepted AS the row's bytes and the hash is recomputed from what
+    // was stored, so a row always describes its own blob — which is what
+    // `GET /api/objects/:id` and the by-hash address both read.
+    // The body was already parsed above (a request body is a one-shot stream),
+    // so the bytes come from that object - NOT a second c.req.json() read, which
+    // would always be empty and silently drop every attachment.
+    const bodyBytes = bytesFromBody(body)
+    if (bodyBytes) {
+      const bytes = new Uint8Array(bodyBytes)
+      // The size recorded on the row must describe the bytes we actually
+      // stored, not what the client claimed before it had them.
+      sizeBytes = bytes.length
+      storedContentHash = await sha256Hex(bytes)
+      await c.env.BUCKET?.put(`objects/${objectId}`, encryptBlob(bytes), {
+        httpMetadata: { contentType: mimeType },
+      })
+    }
+
+    // Computed AFTER the bytes land, so the addressable hash describes the blob
+    // that was actually stored rather than the client's claim about it.
+    const contentUrl = magnetUri || (storedContentHash ? `urn:sha256:${storedContentHash}` : `/api/objects/${objectId}`)
+
     const existing = await c.env.DB.prepare(
       'SELECT id, owner_id, content_hash, content_url, size_bytes, mime_type, is_public, is_avatar FROM Objects WHERE id = ?'
     ).bind(objectId).first<{
@@ -153,7 +232,7 @@ objects.post('/register', orbitAuth, async (c) => {
     await c.env.DB.prepare(
       'INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_url, caption, is_public, post_caption, location, post_tags, is_story, expires_at, content_hash, post_group, is_chat, is_avatar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(
-      objectId, orbitId, sizeBytes, mimeType, contentUrl, caption, isPublic, postCaption, location, postTags, isStory, expiresAt, contentHash, postGroup, isChat, isAvatar
+      objectId, orbitId, sizeBytes, mimeType, contentUrl, caption, isPublic, postCaption, location, postTags, isStory, expiresAt, storedContentHash, postGroup, isChat, isAvatar
     ).run()
 
     if (recipientsRaw) {
@@ -250,14 +329,28 @@ objects.post('/', orbitAuth, async (c) => {
       expiresAt = null
     }
 
+    const objectId = crypto.randomUUID()
+
+    // A text-only post is still a post: no media, just the written body. The
+    // feed renders it like any other row (caption + author), so this is a row
+    // with no bytes, not a different kind of object.
     if (!imageFile && !linkUrl) {
-      return c.json({ error: 'Provide either an image file or a URL' }, 400)
+      const body = postCaption || caption
+      if (!body) return c.json({ error: 'Write something, or add an image' }, 400)
+      await c.env.DB.prepare(
+        "INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_url, caption, is_public, post_caption, location, post_tags, is_story, expires_at, post_group, is_chat) VALUES (?, ?, 0, 'text/plain', NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      ).bind(
+        objectId, orbitId, caption, isPublic, postCaption, location, postTags, isStory, expiresAt, postGroup, isChat
+      ).run()
+      if (isPublic === 1) {
+        await c.env.DB.prepare('UPDATE Users SET posts_count = COALESCE(posts_count, 0) + 1 WHERE id = ?').bind(orbitId).run().catch(() => { })
+      }
+      return c.json({ id: objectId, type: 'text', size: 0 }, 200)
     }
     if (imageFile && linkUrl) {
       return c.json({ error: 'Provide either an image file or a URL, not both' }, 400)
     }
 
-    const objectId = crypto.randomUUID()
     let imageSize = 0
 
     if (linkUrl) {
@@ -406,8 +499,7 @@ objects.post('/', orbitAuth, async (c) => {
         await c.env.DB.prepare('INSERT OR IGNORE INTO Recipients (object_id, recipient_id) VALUES (?, ?)').bind(objectId, id).run().catch(() => { })
       }
       try {
-        const sender = await c.env.DB.prepare('SELECT display_name FROM Users WHERE id = ?').bind(orbitId).first<{ display_name: string | null }>()
-        const name = sender?.display_name?.trim() || 'Someone'
+        const name = (await findDisplayName(c.env.DB, orbitId))?.trim() || 'Someone'
         const { createNotification } = await import('../notifications')
         const { broadcastToUser } = await import('../ws-bus')
         for (const recipientId of ids) {
@@ -639,8 +731,19 @@ objects.get('/:id', async (c, next) => {
   // server. Return a descriptor the client resolves from its local store /
   // swarm peers. NEVER fall through to BUCKET purge — there is no blob to
   // miss, and deleting the metadata row would destroy the only record.
+  //
+  // Exception: serve the bytes when THIS node actually holds them (an imported
+  // vault copy, a repaired upload, a replica). A preview the node can stream
+  // now beats a swarm lookup that can only fail; the descriptor stays the
+  // fallback for every row the node does not host.
   if (row.content_url && (row.content_url.startsWith('magnet:') || row.content_url.startsWith('urn:sha256:'))) {
-    return c.json({
+    const localBytes = c.env.BUCKET ? await c.env.BUCKET.get(`objects/${id}`) : null
+    // We only probed for existence; release the stream so a miss does not hold
+    // a file descriptor until GC.
+    if (localBytes?.body) {
+      try { await localBytes.body.cancel() } catch { /* already closed */ }
+    }
+    if (!localBytes) return c.json({
       type: 'p2p',
       id: row.id,
       content_url: row.content_url,

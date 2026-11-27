@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { playPress } from '../../utils/sounds';
 import {
   Grid,
@@ -24,9 +24,26 @@ import { ProfileEditorModal } from './ProfileEditorModal';
 import { ProfilePicModal } from './ProfilePicModal';
 import { useProfilePostLightbox } from '../feed/useProfilePostLightbox';
 import { ObjectImage } from '../ObjectImage';
-import { isVideoPost, resolveMediaUrl } from '../../utils/media';
+import { isVideoPost } from '../../utils/media';
 import { saveUserProfile } from '../../utils/profile';
 import { profileShareUrl, orbitFetch, invalidateCache } from '../../utils/api';
+import { mergeFollowIds } from '../../utils/followList';
+import { usePeerFollowEdges } from '../../hooks/usePeerFollows';
+
+/**
+ * The ids a follower/following JSON answer carries.
+ *
+ * A failed request is treated as an EMPTY list on purpose: the tab that opens
+ * from this counter merges the same way (an unreachable node contributes
+ * nothing), so the number and the rows cannot disagree about what the node
+ * knows.
+ */
+function followerIdsFrom(rows: unknown): string[] {
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .map((row) => (row as { id?: unknown } | null)?.id)
+    .filter((id): id is string => typeof id === 'string');
+}
 
 export function GMatchProfile({
   identity,
@@ -55,6 +72,7 @@ export function GMatchProfile({
   onReportPost,
   onArchivePost,
   onDeletePost,
+  onEditPost,
   profileTags = [],
   toast,
 }: {
@@ -74,6 +92,8 @@ export function GMatchProfile({
   onProfileUpdated?: (updated: { name: string; bio: string; website: string; pfpUrl?: string; tags?: string[] }) => void;
   onArchivePost?: (postId: string) => void;
   onDeletePost?: (postId: string) => void;
+  /** Edit the caption of an own post. The caller owns the request + the toast. */
+  onEditPost?: (post: FeedPost) => void;
   followingIds?: string[];
   users?: Array<{ id: string; display_name?: string }>;
   shareGroups?: { id: string; name: string; member_count: number }[];
@@ -107,6 +127,7 @@ export function GMatchProfile({
     onArchivePost,
     onDeletePost,
     onReportPost,
+    onEditPost,
   });
   const [bio, setBio] = useState(() => myUser?.bio || '');
   const [website, setWebsite] = useState(() => myUser?.website || '');
@@ -140,9 +161,26 @@ export function GMatchProfile({
   );
   const displayPosts = myPosts;
 
+  // isVideoPost ran four times per render (once per grid) with a fresh
+  // post.media.map() each time. The profile re-renders often, so this was
+  // thousands of allocations and regex tests per second. One pass per list.
+  const videoPostIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const post of [...displayPosts, ...(savedPosts ?? []), ...(repostPosts ?? [])]) {
+      if (isVideoPost(post.mime_type, post.url, post.media?.map((mm) => mm.mime_type) ?? [])) ids.add(post.id)
+    }
+    return ids
+  }, [displayPosts, savedPosts, repostPosts]);
+
+  const videoCardIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const card of cards) {
+      if (isVideoPost(card.mime_type, card.content_url || (card as { url?: string }).url)) ids.add(card.id)
+    }
+    return ids
+  }, [cards]);
+
   const isSelf = Boolean(identity && (!myUser?.id || myUser?.id === identity.orbitId));
-  const totalLikes = myPosts.reduce((acc, p) => acc + (p.like_count || 0), 0) + (myUser?.likes_received || 0);
-  const goonCoins = myUser?.balance ?? 0;
   const [showPfpModal, setShowPfpModal] = useState(false);
 
   const handleShareProfile = async () => {
@@ -198,8 +236,8 @@ export function GMatchProfile({
     });
   };
 
-  const [liveFollowersCount, setLiveFollowersCount] = useState<number | null>(null);
-  const [liveFollowingCount, setLiveFollowingCount] = useState<number | null>(null);
+  const [liveFollowerIds, setLiveFollowerIds] = useState<string[] | null>(null);
+  const [liveFollowingIds, setLiveFollowingIds] = useState<string[] | null>(null);
 
   useEffect(() => {
     const targetId = isSelf ? identity?.orbitId : myUser?.id;
@@ -219,8 +257,8 @@ export function GMatchProfile({
         const followers = followersRes && followersRes.ok ? await followersRes.json() : null;
         const following = followingRes && followingRes.ok ? await followingRes.json() : null;
         if (!cancelled) {
-          if (Array.isArray(followers)) setLiveFollowersCount(followers.length);
-          if (Array.isArray(following)) setLiveFollowingCount(following.length);
+          setLiveFollowerIds(followerIdsFrom(followers));
+          if (!isSelf) setLiveFollowingIds(followerIdsFrom(following));
         }
       } catch {
         /* ignore */
@@ -246,21 +284,34 @@ export function GMatchProfile({
     };
   }, [identity, identity?.orbitId, myUser?.id, isSelf]);
 
-  const effectiveFollowersCount = liveFollowersCount ?? followersCount ?? myUser?.followers_count ?? 0;
+  // The node's counters are bookkeeping, and a follow signed while the node was
+  // unreachable never reached its table. The number above a tab merges the SAME
+  // operations the tab lists, so the count cannot disagree with the rows the
+  // modal shows for the same profile.
+  const peerEdges = usePeerFollowEdges(isSelf ? identity?.orbitId : myUser?.id);
+  const mergedFollowerCount = liveFollowerIds
+    ? mergeFollowIds(liveFollowerIds, {
+        added: peerEdges.followers,
+        removed: peerEdges.withdrawnFollowers,
+      }).length
+    : null;
+  const mergedFollowingCount = liveFollowingIds
+    ? mergeFollowIds(liveFollowingIds, {
+        added: peerEdges.following,
+        removed: peerEdges.withdrawnFollowing,
+      }).length
+    : null;
+
+  const effectiveFollowersCount = mergedFollowerCount ?? followersCount ?? myUser?.followers_count ?? 0;
   const effectiveFollowingCount = isSelf
     ? followingIds.length
-    : (liveFollowingCount ?? followingCount ?? myUser?.following_count ?? 0);
+    : (mergedFollowingCount ?? followingCount ?? myUser?.following_count ?? 0);
 
   const stats = [
     { label: 'posts', value: displayPosts.length, onClick: () => setProfileTab('posts') },
     { value: effectiveFollowersCount, label: 'followers', onClick: () => { playPress(700); onOpenFollowers?.('followers'); } },
     { value: effectiveFollowingCount, label: 'following', onClick: () => { playPress(700); onOpenFollowers?.('following'); } },
-    { value: totalLikes, label: 'likes' },
   ];
-
-  if (isSelf) {
-    stats.push({ value: goonCoins, label: 'coins' } as any);
-  }
 
   const tabs = [
     { id: 'posts', label: 'Posts', icon: Grid },
@@ -270,9 +321,9 @@ export function GMatchProfile({
   ];
 
   return (
-    <div className="w-full bg-surface-canvas font-sans select-none border border-border-glass rounded-xl overflow-hidden text-retro-fg animate-orbit-fade-in shadow-xl">
+    <div className="w-full bg-surface-canvas font-sans select-none border border-edge rounded-xl overflow-hidden text-retro-fg animate-orbit-fade-in shadow-xl">
       {/* Profile Header */}
-      <div className="bg-surface-raised border-b border-border-glass p-4 sm:p-6 flex flex-col gap-4">
+      <div className="bg-surface-raised border-b border-edge p-4 sm:p-6 flex flex-col gap-4">
         {/* Avatar & Stats */}
         <div className="flex items-center gap-5 sm:gap-6">
           {/* Avatar */}
@@ -289,15 +340,20 @@ export function GMatchProfile({
             className={`relative w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden shrink-0 group border-2 p-0 text-left ${
               isSelf ? 'cursor-pointer' : 'cursor-default'
             } ${
-              isFlashing ? 'border-retro-accent' : 'border-border-glass'
+              isFlashing ? 'border-retro-accent' : 'border-edge'
             }`}
           >
             {pfp ? (
-              <img
-                src={resolveMediaUrl(pfp)}
+              <ObjectImage
+                contentUrl={pfp}
+                objectId={pfp?.includes('/api/objects/') ? pfp.slice(pfp.indexOf('/api/objects/') + 13).split(/[?#]/)[0] : null}
+                identity={identity}
                 alt={displayName}
-                onError={() => setPfp('')}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                loading="eager"
+                fetchPriority="high"
+                hideUnavailable
+                onMediaUnavailable={() => setPfp('')}
               />
             ) : (
               <div className="w-full h-full bg-surface-interactive flex items-center justify-center text-xl sm:text-2xl font-medium text-retro-muted">
@@ -306,7 +362,7 @@ export function GMatchProfile({
             )}
             {isSelf && (
               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <Camera className="w-5 h-5 text-white" />
+                <Camera className="w-5 h-5 text-retro-fg" />
               </div>
             )}
           </button>
@@ -331,7 +387,7 @@ export function GMatchProfile({
         {/* Name & Bio */}
         <div className="space-y-1">
           <div className="flex items-center gap-1.5">
-            <h2 className="text-sm font-semibold text-retro-fg">{displayName}</h2>
+            <h2 className="text-xl font-black tracking-tight text-retro-fg">{displayName}</h2>
             {isVerified && (
               <span title="Verified">
                 <CheckCircle2 className="w-4 h-4 text-retro-accent shrink-0" />
@@ -364,7 +420,7 @@ export function GMatchProfile({
           <button
             type="button"
             onClick={() => { playPress(800); setShowEditor(true); }}
-            className="flex-1 py-2 px-3 rounded-lg bg-surface-interactive border border-border-glass hover:border-border-glass text-retro-body font-medium text-xs transition-colors cursor-pointer"
+            className="flex-1 py-2 px-3 rounded-lg bg-surface-interactive border border-edge hover:border-edge text-retro-body font-medium text-xs transition-colors cursor-pointer"
           >
             Edit profile
           </button>
@@ -372,7 +428,7 @@ export function GMatchProfile({
           <button
             type="button"
             onClick={handleShareProfile}
-            className="flex-1 py-2 px-3 rounded-lg bg-surface-interactive border border-border-glass hover:border-border-glass text-retro-body font-medium text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+            className="flex-1 py-2 px-3 rounded-lg bg-surface-interactive border border-edge hover:border-edge text-retro-body font-medium text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
           >
             <Share2 className="w-3.5 h-3.5" />
             <span>Share</span>
@@ -387,7 +443,7 @@ export function GMatchProfile({
             // on one screen are indistinguishable to a screen reader, so this
             // one names its surface. Behaviour is unchanged.
             aria-label="Profile settings"
-            className="p-2 rounded-lg bg-surface-interactive border border-border-glass hover:border-border-glass text-retro-body cursor-pointer transition-colors"
+            className="p-2 rounded-lg bg-surface-interactive border border-edge hover:border-edge text-retro-body cursor-pointer transition-colors"
           >
             <Settings className="w-4 h-4" />
           </button>
@@ -395,7 +451,7 @@ export function GMatchProfile({
       </div>
 
       {/* Tabs */}
-      <div className="bg-surface-raised border-b border-border-glass flex items-center gap-1 px-2 py-2">
+      <div className="bg-surface-raised border-b border-edge flex items-center gap-1 px-2 py-2">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = profileTab === tab.id;
@@ -423,6 +479,7 @@ export function GMatchProfile({
             {displayPosts.map((post) => (
               <div
                 key={post.id}
+                data-post-id={post.id}
                 onClick={() => {
                   playPress(700);
                   openPost(post);
@@ -441,12 +498,12 @@ export function GMatchProfile({
                   autoPlay={false}
                   playsInline
                 />
-                {(isVideoPost(post.mime_type, post.url, post.media?.map((mm) => mm.mime_type) ?? [])) && (
-                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-white z-10">
+                {videoPostIds.has(post.id) && (
+                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-retro-fg z-10">
                     <Play className="w-3 h-3 fill-white" />
                   </div>
                 )}
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 text-white text-xs font-medium z-10">
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 text-retro-fg text-xs font-medium z-10">
                   <div className="flex items-center gap-1">
                     <Heart className="w-4 h-4 fill-white" />
                     <span>{post.like_count || 0}</span>
@@ -471,6 +528,7 @@ export function GMatchProfile({
             {(savedPosts && savedPosts.length > 0 ? savedPosts : []).map((post) => (
               <div
                 key={post.id}
+                data-post-id={post.id}
                 onClick={() => {
                   playPress(700);
                   openPost(post);
@@ -489,12 +547,12 @@ export function GMatchProfile({
                   autoPlay={false}
                   playsInline
                 />
-                {(isVideoPost(post.mime_type, post.url, post.media?.map((mm) => mm.mime_type) ?? [])) && (
-                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-white z-10">
+                {videoPostIds.has(post.id) && (
+                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-retro-fg z-10">
                     <Play className="w-3 h-3 fill-white" />
                   </div>
                 )}
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white z-10">
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-retro-fg z-10">
                   <Bookmark className="w-5 h-5 fill-white" />
                 </div>
               </div>
@@ -530,8 +588,8 @@ export function GMatchProfile({
                   autoPlay={false}
                   playsInline
                 />
-                {(isVideoPost(post.mime_type, post.url, post.media?.map((mm) => mm.mime_type) ?? [])) && (
-                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-white z-10">
+                {videoPostIds.has(post.id) && (
+                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-retro-fg z-10">
                     <Play className="w-3 h-3 fill-white" />
                   </div>
                 )}
@@ -568,8 +626,8 @@ export function GMatchProfile({
                   autoPlay={false}
                   playsInline
                 />
-                {(isVideoPost(card.mime_type, card.content_url || (card as any).url)) && (
-                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-white z-10">
+                {videoCardIds.has(card.id) && (
+                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-retro-fg z-10">
                     <Play className="w-3 h-3 fill-white" />
                   </div>
                 )}

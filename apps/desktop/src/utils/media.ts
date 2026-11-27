@@ -3,6 +3,7 @@
 import { getApiBaseUrl } from './api';
 import { logger } from './logger';
 import { mediaUrlToCachedFile } from './cacheMedia';
+import { resolveObjectRefId } from './objectRef';
 
 /**
  * Resolves any relative media endpoint (/api/objects/..., /api/lobby/images/...)
@@ -16,6 +17,19 @@ export function resolveMediaUrl(url?: string | null): string {
   // `about:`/`javascript:` URL never fires a doomed request (the classic
   // `net::ERR_FILE_NOT_FOUND` on the front page).
   if (/^(file|about|javascript|chrome|chrome-extension|moz-extension|safari-web-extension):/i.test(trimmed)) {
+    return '';
+  }
+  // Content-addressed media from imported posts: `urn:sha256:<uuid>` and
+  // `urn:sha256:<sha256-hex>`. The id lives INSIDE the descriptor, so it
+  // resolves to /api/objects/<id> and the server streams the local P2P copy.
+  // The parse lives in utils/objectRef.ts — ONE rule for every media ref.
+  const urnId = resolveObjectRefId(trimmed);
+  if (urnId && /^urn:/i.test(trimmed)) {
+    const base = getApiBaseUrl().replace(/\/+$/, '');
+    return base ? `${base}/api/objects/${urnId}` : `/api/objects/${urnId}`;
+  }
+  // magnet: links cannot be rendered directly; no doomed request.
+  if (/^magnet:/i.test(trimmed)) {
     return '';
   }
   // A bare object id (UUID) is never a URL: treat it as the canonical
@@ -292,16 +306,6 @@ export async function resolveTwitterMediaAll(url: string): Promise<string[] | nu
     return null;
   }
 }
-
-/**
- * Resolves a Twitter/X URL to a single playable direct video MP4 URL or image URL.
- * @deprecated Prefer resolveTwitterMediaAll — returns only the first item.
- */
-export async function resolveTwitterMedia(url: string): Promise<string | null> {
-  const all = await resolveTwitterMediaAll(url);
-  return all?.[0] ?? null;
-}
-
 
 /**
  * Computes a SHA-256 hex digest of a Blob/File's bytes. Used as a content

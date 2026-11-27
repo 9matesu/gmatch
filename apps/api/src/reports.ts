@@ -66,7 +66,7 @@ export async function hideContent(db: D1Turso, type: ReportTargetType, id: strin
     return
   }
   if (type === 'user') {
-    await db.batch([
+    await db.atomicBatch([
       db.prepare('UPDATE Users SET hidden_at = CURRENT_TIMESTAMP WHERE id = ? AND hidden_at IS NULL').bind(id),
       db.prepare('UPDATE Objects SET hidden_at = CURRENT_TIMESTAMP WHERE owner_id = ? AND hidden_at IS NULL').bind(id),
       db.prepare('UPDATE LobbyImages SET hidden_at = CURRENT_TIMESTAMP WHERE owner_id = ? AND hidden_at IS NULL').bind(id),
@@ -88,7 +88,7 @@ export async function unhideContent(db: D1Turso, type: ReportTargetType, id: str
     return
   }
   if (type === 'user') {
-    await db.batch([
+    await db.atomicBatch([
       db.prepare('UPDATE Users SET hidden_at = NULL WHERE id = ?').bind(id),
       db.prepare('UPDATE Objects SET hidden_at = NULL WHERE owner_id = ?').bind(id),
       db.prepare('UPDATE LobbyImages SET hidden_at = NULL WHERE owner_id = ?').bind(id),
@@ -111,7 +111,7 @@ export async function deleteContent(
     case 'post':
     case 'story': {
       if (bucket) await bucket.delete(`objects/${id}`).catch(() => {})
-      await db.batch([
+      await db.atomicBatch([
         db.prepare('DELETE FROM Favorites WHERE object_id = ?').bind(id),
         db.prepare('DELETE FROM Recipients WHERE object_id = ?').bind(id),
         db.prepare('DELETE FROM PostLikes WHERE object_id = ?').bind(id),
@@ -125,7 +125,7 @@ export async function deleteContent(
     }
     case 'lobby_image': {
       if (bucket) await bucket.delete(`lobby/${id}`).catch(() => {})
-      await db.batch([
+      await db.atomicBatch([
         db.prepare('DELETE FROM LobbyComments WHERE image_id = ?').bind(id),
         db.prepare('DELETE FROM LobbyLikes WHERE image_id = ?').bind(id),
       ])
@@ -137,7 +137,7 @@ export async function deleteContent(
       return
     }
     case 'post_comment': {
-      await db.batch([
+      await db.atomicBatch([
         db.prepare('DELETE FROM CommentLikes WHERE comment_id = ?').bind(id),
         db.prepare('DELETE FROM Comments WHERE id = ?').bind(id),
       ])

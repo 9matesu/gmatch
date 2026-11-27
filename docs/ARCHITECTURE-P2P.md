@@ -8,16 +8,21 @@
 ## 1. System Overview
 
 Since 2026-10-24 there is **no central data deployment**: every packaged copy of
-the app runs **its own node** (host mode is the default). What remains shared is
-a blind rendezvous at `https://gmatch.pages.dev` — a Cloudflare Pages Function
-that serves a signed public-node directory and a sealed-mail relay (D1), with
-no content tables, no accounts, no presence and no TURN. It is not a node and
-never a data base. The old hosted courier and full node are retired and no
-longer appear in the code.
+the app runs **its own node** (host mode is the default). Since 2026-11-07 there
+is no hosted rendezvous either — the hosted courier function and its D1 were
+removed, and the release page is static. The rendezvous is **the node each
+client is connected to**: it serves a signed public-node directory and a
+sealed-mail relay, with no content tables, no accounts and no presence. It is
+not a world, never a data base.
 
-A node is still a *blind, stateless courier* for its own clients: it holds no
-user profiles, no presence, no posts, no feeds and no media objects. It only
-moves sealed envelopes and relays swarm frames.
+A packaged install runs a **full node**: it stores the world it serves
+(profiles, posts, objects, presence) and is the directory, the mail relay and
+the swarm rendezvous for its clients. The **courier** shape is the same code
+with `SITE_SERVICES` set: blind and stateless, holding only
+sealed envelopes and relayed swarm frames, with every other route 404 at the
+edge. The two are one codebase with one env flag, not two deployments. No
+hosted courier is deployed any more (since 2026-11-26) — the courier shape is a
+capability a node can run, not an origin the app assumes.
 
 The courier role moved from "one central host" to "the node each client is
 connected to":
@@ -26,8 +31,8 @@ connected to":
         +-------------------------+            +-------------------------+
         |      Node A (you)       |            |      Node B (friend)    |
         |  bundled Bun, :8790     |            |  bundled Bun, :8790     |
-        |  blind courier for its  |            |  blind courier for its  |
-        |  own clients            |            |  own clients            |
+        |  full node: world +    |            |  full node: world +    |
+        |  relay for its clients|            |  relay for its clients|
         +-------------------------+            +-------------------------+
              ^          |                             ^          |
    sealed mail |        | presence beacon              |        | presence beacon
@@ -47,8 +52,10 @@ node's mailbox — the node still cannot open it.
 1. **Blind Courier Relay (`/api/mail/:token` & `/api/mail/ws`):**
    - The courier only handles sealed binary envelopes (`Envelope v2`) addressed by 64-hex BLAKE3 delivery tokens.
    - The courier learns nothing about the sender's identity, the message body, or the routing kind.
-   - Deliberately returns `404 Not Found` for legacy central endpoints: `/api/users/online`, `/api/posts`, `/api/objects`, and `/api/signal/*`.
-   - The Cloudflare courier (`gmatch.pages.dev`) offers the HTTP mailbox only — a Pages isolate cannot hold another isolate's socket — so `MailClient` polls that origin every 20 s instead of opening `/api/mail/ws`.
+   - In COURIER mode it deliberately returns `404 Not Found` for the legacy central
+     endpoints (`/api/users/online`, `/api/posts`, `/api/objects`, `/api/signal/*`);
+     a FULL node serves them to signed clients.
+   - A node whose WebSocket is unavailable (a relay behind a proxy that drops upgrades) offers the HTTP mailbox only, so `MailClient` polls that origin every 20 s instead of opening `/api/mail/ws`.
 
 2. **Ephemeral Presence Discovery:**
    - Peers discover each other by broadcasting signed presence beacons to a shared public presence mailbox token (`sha256Hex('orbit-global-presence-v1')`).
@@ -173,6 +180,15 @@ type CourierSignalPayload =
 
 - Peer connections configure STUN and TURN relays provided by the environment (`defaultIceConfig(readTurnEnv())`).
 - Private LAN IP candidates are stripped/sanitized before dispatch over the courier (`sanitizeCandidate`) to prevent internal network leakage.
+- **One STUN endpoint, not a list (2026-11-23).** `STUN_SERVERS` is a single
+  Cloudflare server. Chromium logs a `socket_manager.cc` error for every STUN
+  host whose DNS it cannot resolve, so the old four-provider list printed up to
+  eight `Failed to resolve address for stun... (errorcode: -105)` lines per peer
+  on an offline or filtering network. `errorcode: -105` is
+  `ERR_NAME_NOT_RESOLVED` — the network, not the app. One provider keeps that to
+  a single line; the WS-relay swarm remains the documented fallback when no
+  direct channel forms, so a redundant STUN costs a little direct-path reach, not
+  connectivity. TURN (relay-forced posture) still appends to the list.
 
 ### Transport selection is explicit and bounded (2026-10-22)
 
@@ -244,11 +260,26 @@ courier until something unrelated pulled. The watch socket is built by
 `wsUrlForBase` (`utils/api.ts`) so a relative API base (browser dev, riding the
 Vite proxy) resolves to the page origin instead of the invalid `ws:///api/mail/ws`.
 
-### The release feed (2026-10-24)
+**The receiver drains every legitimate mailbox (2026-11-04).** The sender
+chooses the box — a peer who learned our node from a signed beacon drops the
+envelope into THAT node's mailbox, one who never learned a node uses the
+rendezvous. A receiver that drained only its primary (the rendezvous courier)
+therefore never saw mail addressed to its own node's box — the whole sealed
+DM round trip was dead in a two-instance run (`e2e/courier-two-instance.spec.ts`,
+unmasked and green). `MailClient` accepts `extraBases` (bounded to 4,
+deduped): `useCourierDms` always passes the node the client is connected to
+when it differs from the mail base; each distinct base gets a watch socket
+(a base behind a WS-dropping proxy falls back to polling) and is drained (with
+ack) on every pull.
+One server piece was required for browser contexts: `serve.ts`'s fast-path
+`/api/health` now answers with CORS headers — without them a cross-origin
+client's health probe is unreadable, courier mode is never detected, and no
+beacon is ever broadcast.
 
-`release.json` is served by the Cloudflare Pages project
-(`https://gmatch.pages.dev`, staged by `site/deploy-pages.mjs`) and, when it
-publishes one, by the node this install is connected to:
+### The release feed (2026-10-24, host-free since 2026-11-26)
+
+The manifest is served by the node this install is connected to (and by the
+project's GitHub Release, which is where the artifact actually lives):
 
 | route | what |
 |---|---|
@@ -258,12 +289,14 @@ publishes one, by the node this install is connected to:
 The node directory is `userData/releases` on a packaged install (empty by
 default). `npm run dist` ends with `stage:release`, which copies the built
 exe there and writes the manifest — so the builder's own node serves the new
-build to everyone who joined it. The updater asks, in order: the node this
-install is connected to, then the Pages manifest (skipped when it does not
-answer within its budget). The manifest's sha256 is what makes the
-download safe: the updater verifies it and discards a mismatch, and a plain
-http feed is accepted only for a host on the user's own network (loopback or
-a private LAN address) — never for a public one.
+build to everyone who joined it. The updater asks every feed in parallel: the
+node this install is connected to, and the public feed — the project's **GitHub
+Releases API** (`/repos/9matesu/gmatch/releases/latest`), whose asset carries a
+`digest` (`sha256:<hex>`) and a `size` for verification. A host that does not
+answer is skipped instead of blocking the check. The manifest's sha256 is what
+makes the download safe: the updater verifies it and discards a mismatch, and a
+plain http feed is accepted only for a host on the user's own network (loopback
+or a private LAN address) — never for a public one.
 
 ### Group chat is a sealed room (2026-10-22)
 
@@ -290,6 +323,16 @@ more. A peer that lives on a DIFFERENT node is still reachable, because:
   A relay that rewrites the address breaks the signature, so the beacon is
   dropped instead of being redirected. A beacon from a client that does not
   know the field still verifies against the old payload.
+- that URL is **dialable** (2026-11-07). The API base is not: the packaged
+  app talks to its own node over `127.0.0.1` (a peer would read that as its
+  OWN loopback) and a browser build rides the dev proxy with no address at
+  all. `resolveNodeAddress` (`utils/serverAddress.ts`) asks the node for the
+  addresses it answers on (`GET /api/servers/node` → `lanUrls`) and signs the
+  LAN one into the beacon; a non-loopback base — a client joined to a
+  friend's node — is already the answer. The client then drains that SAME
+  box: `useCourierDms` adds the node's address as a mailbox base when the API
+  base hides it, so an envelope addressed to our node is READ instead of
+  waiting out its TTL on a box nobody polls.
 - the presence token is a well-known public constant, so a client can read the
   presence mailbox of any node it knows (ours, plus the nodes the directory
   lists). That is how a peer on another node enters the roster.
@@ -461,6 +504,74 @@ type SwarmMessage =
 - **Response Cycle:** Any peer holding the object slices the binary buffer and sends sequential `SWARM_CHUNK` frames (4 MiB = 820 frames at legacy size).
 - **Reassembly:** The requesting peer tracks received chunk indices in memory. Once all chunks are present, it assembles the final `Blob`, verifies the SHA-256 digest against `objectId`, and commits it to local IndexedDB.
 
+### The node's WS relay carries the WHOLE client-to-client wire (2026-11-07)
+
+The node's relay allowlist (`apps/api/src/ws-bus.ts`) is the boundary between
+"the relay moves peer traffic" and "the relay invents server events" (audit
+A2). It used to list only `SWARM_WANT`, `SWARM_HAVE`, `SWARM_CHUNK` and the
+announce shapes — so the relay DROPPED `SWARM_KEY`, `SWARM_CHALLENGE`,
+`SWARM_RECEIPT`, `SWARM_OP` and `SWARM_OP_ACK`.
+
+That silently broke the relay path for exactly the traffic it exists for:
+
+- a swarm-v1 transfer over the relay could never decrypt a chunk (the sealed
+  DEK never arrived), so the "guaranteed fallback" moved nothing but
+  ciphertext the receiver could not read;
+- durable-replication receipts and signed social operations could not cross
+  the node either.
+
+The allowlist now carries every client-to-client frame, each with a shape
+check (bounded strings, an object payload), while still refusing anything
+that looks like a server-published event. The relay never opens a payload: the
+`SWARM_KEY` body is sealed to the FETCHER's ephemeral offer key, a receipt is
+a signature, and an operation carries its own author signature — the
+receiver's authorizer decides, the relay only moves bytes.
+
+### One swarm contract, both ends (2026-11-08)
+
+The allowlist above was a hand-written list inside `apps/api/src/ws-bus.ts`,
+while the frame shapes lived in the desktop's `p2pSwarm.ts` and the desktop
+cast whatever arrived to `SwarmMessage` (`inner as SwarmMessage`,
+`frame.swarm as P2PSwarmMessage`). The two ends could therefore disagree:
+the relay carried a shape the client then dropped, and the client accepted a
+shape the relay had never allowed.
+
+- **The contract lives in `packages/protocol/src/swarm-frame.ts`** — the
+  package both sides already import. It holds the byte-protocol frames
+  (`SwarmMessage`), the announcement envelopes (`SwarmAnnounce`), the bounds
+  (`SWARM_CHUNK_SIZE`, `SWARM_CHUNK_PAYLOAD`, `SWARM_MAX_OBJECT_BYTES`,
+  `SWARM_MAX_CHUNKS`, `SWARM_MAX_CHUNK_BASE64`), the relay allowlist
+  (`isRelayableSwarmFrame`) and the narrowing (`parseSwarmFrame`,
+  `parseSwarmEnvelope`, `parseBareSwarmAnnounce`, `parseSwarmAnnounce`).
+- **The node's allowlist IS the shared predicate.** `ws-bus.ts` calls
+  `isRelayableSwarmFrame`; it no longer re-implements the list. The rule is
+  one rule: bounded strings, an object payload, a chunk whose index belongs
+  to its total, and nothing that looks like a server event.
+- **The client narrows instead of casting.** Every inbound pipe — the relay
+  socket, the local-tab channel and the direct mesh — goes through ONE route
+  (`routeInboundFrame` in `useP2P.ts`), so there is one place that knows what
+  a peer frame is. A field of the wrong type is DROPPED; a frame that does
+  not fit its declared shape never reaches a handler.
+- **One announcement handler, not two.** The local-tab channel used to carry
+  its own copy of the announce logic (a weaker one: it never stored the
+  object). Both pipes now use the same handler.
+- **The relay's proof wins over the self-description.** When a frame came
+  through the relay, the socket PROVED the sender (`relayedBy`). An
+  announcement whose self-described user id disagrees is dropped — the same
+  rule the object path already applied (`resolveClaimedOwner`).
+- **The chunk count bound follows the smallest payload.** `SWARM_MAX_CHUNKS`
+  is counted against the 4 KiB sealed chunk, so an object at the 64 MiB size
+  limit fits in BOTH encodings (the legacy 5 KiB chunk needs fewer chunks).
+
+**Assembly is honest about missing bytes.** A transfer is complete only when
+it declared a size AND every index arrived (`req.total > 0 &&
+chunks.size === req.total`). The bare size comparison used to fire on the
+FIRST frame — even one that failed its AEAD check — and assembled an EMPTY
+blob, which the durable store then rejected with a misleading "Invalid local
+object". A chunk that never authenticated now fails the fetch with the
+truth (`failed authenticated decryption`) instead of an empty object or a
+timeout, and nothing is ever persisted from a partial transfer.
+
 ### swarm-v1: chunk transfers are sealed end to end (2026-10-22)
 
 The media path is the one place the node used to see bytes it forwarded.
@@ -598,11 +709,30 @@ unbounded `Map`, so every object the app had ever seen stayed resident: the
 (disk) or IndexedDB, so an eviction costs one re-read — and boot hydration
 (`hydrateLocalObjects`) fills to the same budget instead of 256MB.
 
+### The remaining bounded stores (2026-11-12)
+
+The same plan bounded the last four session-lifetime collections:
+
+- `game/presenceStore.ts` — an ingest now drops records not re-sighted for 24h
+  (the same window the P2P peer map's hydration uses). Every id ever seen used
+  to live in the roster Map forever.
+- `utils/mediaData.ts` — `localObjectUrlCache` (legacy IndexedDB object blob
+  URLs) is an LRU capped at 512; a hit refreshes recency and eviction revokes
+  the URL, freeing the Blob. The gallery rebuild re-mints every row it still
+  holds, so a live row is never evicted; nothing durable is affected (the bytes
+  stay in IndexedDB).
+- `hooks/watchLocalShare.ts` — `verifiedIds` is a bounded ring (256); past the
+  cap the oldest verified transfer id is forgotten, which at worst asks an
+  ancient room entry to re-verify before claiming readiness again.
+- `hooks/useP2P.ts` — the in-memory peer map is swept hourly by
+  `pruneStalePeers` (entries unseen >24h are ghosts); storage hydration already
+  applied the same window at boot.
+
 ---
 
 ## 5. Honest Boundaries & Fallback Behavior
 
-| Feature | Courier (Render) | Peer Node (Client) |
+| Feature | Courier mode (Pages) | Full node (packaged) |
 | :--- | :--- | :--- |
 | **User Accounts / Passwords** | None (Zero knowledge) | Self-generated Ed25519/X25519 Identity in local DPAPI / localStorage |
 | **Media / Content Storage** | 404 (None stored) | Stored in local IndexedDB; seeded over WebRTC DataChannel |
@@ -731,8 +861,13 @@ read-back, no signing identity) never do. Accepted receipts persist to
 IndexedDB (`orbit-gallery`/`swarm_receipts`, capped at 256) and are
 re-validated and reloaded on boot (`hydrateDurableReplications`), so
 "peer-confirmed durable" evidence survives restarts. The receipts are
-historical attestations (freshness was enforced at accept time); they are
-not yet surfaced in the UI.
+historical attestations (freshness was enforced at accept time), and they are
+now surfaced: `DURABLE_REPLICATION_EVENT` is emitted when a new attestation
+lands, `hooks/useDurableCustody.ts` reads `durableCustodyHolders(id)` for a row
+(its `content_hash`), and `utils/durableCustody.ts` turns the count into a
+claim — silent at one holder (this node alone is not replication), `Stored on
+N devices` from two. The post detail sheet shows it. A receipt is the ONLY way
+in: a HAVE, an in-flight download or an online peer never reaches the label.
 
 Pending swarm transfers persist (`gmatch_pending_transfers_v1`) and resume on
 boot and on `PEER_ONLINE_EVENT`, so an offline seeder is retried later rather

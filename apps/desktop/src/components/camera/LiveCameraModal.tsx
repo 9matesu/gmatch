@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { playPress, playLike } from '../../utils/sounds';
+import { playPress } from '../../utils/sounds';
 import { Camera, X, RefreshCw, Check, AlertCircle, Upload } from 'lucide-react';
 import { logger } from '../../utils/logger';
 
@@ -117,7 +117,7 @@ export function LiveCameraModal({
       ctx.drawImage(video, startX, startY, size, size, 0, 0, size, size);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
       setCapturedPhoto(dataUrl);
-      playLike();
+      playPress(820);
       stopStream();
     }
   };
@@ -159,15 +159,15 @@ export function LiveCameraModal({
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 animate-orbit-fade-in select-none"
+      className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 animate-orbit-fade-in select-none"
       onClick={onClose}
     >
       <div
-        className="bg-surface-raised text-retro-fg w-full max-w-lg rounded-none sm:rounded-xl border border-border-glass shadow-2xl overflow-hidden flex flex-col h-full sm:h-auto max-h-screen sm:max-h-[90vh]"
+        className="bg-surface-raised text-retro-fg w-full max-w-lg rounded-none sm:rounded-xl border border-edge shadow-2xl overflow-hidden flex flex-col h-full sm:h-auto max-h-dvh sm:max-h-(--max-h-dialog)"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-4 bg-surface-raised border-b border-border-glass flex items-center justify-between">
+        <div className="p-4 bg-surface-raised border-b border-edge flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Camera className="w-5 h-5 text-retro-fg" />
             <h3 className="text-sm font-black text-retro-fg tracking-tight">Camera snapshot</h3>
@@ -182,10 +182,10 @@ export function LiveCameraModal({
         </div>
 
         {/* Viewfinder Viewport */}
-        <div className="relative aspect-square w-full bg-black flex items-center justify-center overflow-hidden">
+        <div className="relative aspect-square w-full bg-retro-bg flex items-center justify-center overflow-hidden">
           {cameraError ? (
             <div className="p-6 text-center space-y-3 bg-surface-canvas text-retro-fg w-full h-full flex flex-col items-center justify-center">
-              <AlertCircle className="w-12 h-12 text-rose-500 mx-auto" />
+              <AlertCircle className="w-12 h-12 text-danger-fg mx-auto" />
               <p className="text-xs text-retro-body font-medium leading-relaxed max-w-xs mx-auto">
                 {cameraError}
               </p>
@@ -219,15 +219,15 @@ export function LiveCameraModal({
                 className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
               />
               {/* Instagram Grid Guide Overlay */}
-              <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none opacity-25 border border-border-strong">
-                <div className="border-r border-b border-white" />
-                <div className="border-r border-b border-white" />
-                <div className="border-b border-white" />
-                <div className="border-r border-b border-white" />
-                <div className="border-r border-b border-white" />
-                <div className="border-b border-white" />
-                <div className="border-r border-white" />
-                <div className="border-r border-white" />
+              <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none opacity-25 border border-edge-strong">
+                <div className="border-r border-b border-edge" />
+                <div className="border-r border-b border-edge" />
+                <div className="border-b border-edge" />
+                <div className="border-r border-b border-edge" />
+                <div className="border-r border-b border-edge" />
+                <div className="border-b border-edge" />
+                <div className="border-r border-edge" />
+                <div className="border-r border-edge" />
                 <div />
               </div>
             </>
@@ -238,13 +238,13 @@ export function LiveCameraModal({
         </div>
 
         {/* Action Controls Footer */}
-        <div className="p-4 bg-surface-raised border-t border-border-glass flex items-center justify-around gap-4">
+        <div className="p-4 bg-surface-raised border-t border-edge flex items-center justify-around gap-4">
           {capturedPhoto ? (
             <>
               <button
                 type="button"
                 onClick={handleRetake}
-                className="flex-1 py-3 bg-surface-interactive hover:bg-retro-accent-hover text-retro-fg rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors border border-border-glass"
+                className="flex-1 py-3 bg-surface-interactive hover:bg-retro-accent-hover text-retro-fg rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors border border-edge"
               >
                 <RefreshCw className="w-4 h-4" />
                 <span>Retake</span>
@@ -252,7 +252,7 @@ export function LiveCameraModal({
               <button
                 type="button"
                 onClick={handleConfirmPhoto}
-                className="flex-1 py-3 bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text rounded-xl text-xs font-black flex items-center justify-center gap-2 cursor-pointer transition-all shadow-md"
+                className="flex-1 py-3 bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text rounded-xl text-xs font-black flex items-center justify-center gap-2 cursor-pointer transition shadow-md"
               >
                 <Check className="w-4 h-4" />
                 <span>Attach to Post</span>
@@ -263,7 +263,7 @@ export function LiveCameraModal({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="p-3 bg-surface-interactive hover:bg-retro-accent-hover text-retro-fg rounded-full cursor-pointer transition-colors border border-border-glass"
+                className="p-3 bg-surface-interactive hover:bg-retro-accent-hover text-retro-fg rounded-full cursor-pointer transition-colors border border-edge"
                 title="Upload Photo File"
               >
                 <Upload className="w-5 h-5" />
@@ -276,14 +276,14 @@ export function LiveCameraModal({
                 disabled={!!cameraError || isStarting}
                 className="w-16 h-16 rounded-full bg-retro-accent p-1 cursor-pointer hover:scale-105 active:scale-95 transition-transform shadow-xl disabled:opacity-30"
               >
-                <div className="w-full h-full rounded-full border-2 border-white bg-surface-raised flex items-center justify-center" />
+                <div className="w-full h-full rounded-full border-2 border-edge bg-surface-raised flex items-center justify-center" />
               </button>
 
               <button
                 type="button"
                 onClick={handleFlipCamera}
                 disabled={!!cameraError || isStarting}
-                className="p-3 bg-surface-interactive hover:bg-retro-accent-hover text-retro-fg rounded-full cursor-pointer transition-colors border border-border-glass"
+                className="p-3 bg-surface-interactive hover:bg-retro-accent-hover text-retro-fg rounded-full cursor-pointer transition-colors border border-edge"
                 title="Flip Camera"
               >
                 <RefreshCw className="w-5 h-5" />

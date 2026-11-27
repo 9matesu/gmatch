@@ -1,16 +1,12 @@
 "use client";
 
-import { useEffect, useState } from 'react'
 import { generateFallbackName } from '@orbit/shared'
 import type { FeedPost } from '../components/feed/GMatchFeed'
-import {
-  OPERATION_LOG_CHANGED_EVENT,
-  sharedSocialOperationLog,
-  type LoggedOperation,
-} from '../services/socialOperationLog'
+import type { LoggedOperation } from '../services/socialOperationLog'
 import { projectPosts, type ProjectedPost } from '../services/socialFeedProjection'
 import { projectReactions, reactionKey, type ProjectedReaction } from '../services/socialInteractionProjection'
-import { PEER_ONLINE_EVENT } from '../utils/p2pSwarm'
+import { usePeerProjection } from './usePeerProjection'
+import { readPeerSavedIds } from '../utils/peerSaves'
 
 /**
  * Peer-replicated feed rows (roadmap L4.2): the visible half of the operation
@@ -31,6 +27,10 @@ export function projectedPostsToFeedPosts(posts: readonly ProjectedPost[], selfI
       author_avatar: null,
       url: `/api/objects/${post.id}`,
       mime_type: post.mimeType,
+      // The row's content address travels with it: the media ladder resolves
+      // these bytes by hash (verified) instead of asking a node that may not
+      // have the row at all (roadmap L4).
+      content_hash: post.contentCid,
       caption: post.caption,
       tags: post.tags,
       created_at: new Date(post.createdAt).toISOString(),
@@ -71,30 +71,29 @@ export function applyReactionsToFeedPosts(
   })
 }
 
-async function readProjection(selfId?: string | null): Promise<FeedPost[]> {
-  const log = sharedSocialOperationLog()
-  const entries: LoggedOperation[] = await log.listAllOperations()
+/**
+ * Fold the LOCAL bookmarks into the peer rows: a peer post has no node row, so
+ * its save is kept on this device (`utils/peerSaves.ts`) and the row must carry
+ * it back so the Saved tab and the bookmark icon agree without a reload.
+ */
+export function applySavesToFeedPosts(
+  rows: readonly FeedPost[],
+  savedIds: ReadonlySet<string>,
+): FeedPost[] {
+  if (savedIds.size === 0) return rows as FeedPost[]
+  return rows.map((row) => (savedIds.has(row.id) ? { ...row, is_saved: true } : row))
+}
+
+function readProjection(entries: readonly LoggedOperation[], selfId?: string | null): FeedPost[] {
   const rows = projectedPostsToFeedPosts(projectPosts(entries), selfId)
-  return applyReactionsToFeedPosts(rows, projectReactions(entries), selfId)
+  const liked = applyReactionsToFeedPosts(rows, projectReactions(entries), selfId)
+  return applySavesToFeedPosts(liked, readPeerSavedIds(selfId))
 }
 
 export function usePeerFeedPosts(selfId?: string | null): FeedPost[] {
-  const [posts, setPosts] = useState<FeedPost[]>([])
-  useEffect(() => {
-    let alive = true
-    const refresh = () => {
-      void readProjection(selfId)
-        .then((next) => { if (alive) setPosts(next) })
-        .catch(() => { /* IndexedDB unavailable: the feed simply has no peer rows */ })
-    }
-    refresh()
-    window.addEventListener(OPERATION_LOG_CHANGED_EVENT, refresh)
-    window.addEventListener(PEER_ONLINE_EVENT, refresh)
-    return () => {
-      alive = false
-      window.removeEventListener(OPERATION_LOG_CHANGED_EVENT, refresh)
-      window.removeEventListener(PEER_ONLINE_EVENT, refresh)
-    }
-  }, [selfId])
-  return posts
+  return usePeerProjection<FeedPost[]>(
+    (entries) => readProjection(entries, selfId),
+    selfId,
+    [],
+  )
 }

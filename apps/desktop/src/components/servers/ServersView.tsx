@@ -8,12 +8,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
-import { Lock, Globe, ShieldCheck, RefreshCw, Pencil, Check, X, Search, Share2, ArrowLeft, Plus, Trash2 } from 'lucide-react'
+import { Lock, Globe, ShieldCheck, RefreshCw, Pencil, Check, X, Search, Share2, ArrowLeft, Plus, Trash2, Loader2, Copy } from 'lucide-react'
 import { generateIdentity } from '@orbit/crypto'
 import { getCentralApiUrl, setCentralApiUrl } from '../../utils/central'
 import { rememberKnownNodeHint } from '../../utils/peerNodes'
 import { orbitFetch, getApiBaseUrl, isCourierApiUrl, LOCAL_NODE_BASE } from '../../utils/api'
 import { normalizeServerUrl, isCurrentServerUrl } from '../../utils/serverUrl'
+import { pickShareableHint } from '../../utils/serverAddress'
 import { joinServer } from '../../utils/join-server'
 import { switchClientWorld } from '../../utils/server-switch'
 import { rememberPendingHost } from '../../utils/server-host-pending'
@@ -22,11 +23,12 @@ import { readLabels, writeLabels, type LocalMeshLabel } from './meshLabels'
 import { decodeNodeMask } from '../../utils/nodeMask'
 import { buildNodeCode } from '../../utils/nodeShare'
 import { PromptDialog } from '../PromptDialog'
-import { Modal } from '../Modal'
+import { Modal } from '../../ui/kit'
 import { AddWorldDialog } from './AddWorldDialog'
 import { GroupsDialog } from './GroupsDialog'
 import { WorldRow, WorldMenuItem, formatDomain, formatRelativeTime } from './WorldRow'
 import type { WorldRowState } from './WorldRow'
+import { worldGlyph, worldTileStyle } from './worldIdentity'
 import { claimPendingHost } from '../../hooks/usePendingServerHost'
 import { SERVER_MARKER_KEY } from '../../firstRun/onboardingState'
 import { playPress } from '../../utils/sounds'
@@ -72,6 +74,10 @@ export interface ServerNode {
   directoryId?: string | null
   tags?: string[]
   isAdmin: boolean
+  /** How this node is reached from the LAN (the node's own report). */
+  lanUrls?: string[]
+  /** Host-only since 1.6.8: every node hosts a world. */
+  mode?: string
 }
 
 type Toast = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void
@@ -135,11 +141,11 @@ function rowCounts(
     const total = typeof dash.members_total === 'number'
       ? dash.members_total
       : (Array.isArray(dash.users) ? dash.users.length : 0)
-    return `${online} / ${total}`
+    return `${online} online · ${total} members`
   }
 
   if (typeof s.online_count === 'number' && typeof s.user_count === 'number') {
-    return `${s.online_count} / ${s.user_count}`
+    return `${s.online_count} online · ${s.user_count} members`
   }
   if (typeof s.online_count === 'number') return `${s.online_count} online`
   if (typeof s.user_count === 'number') return `${s.user_count} members`
@@ -152,12 +158,17 @@ export function ServersView({
   onSelectUser,
   profilePics = {},
   onServerJoined,
+  p2pPeers = [],
 }: {
   identity: Parameters<typeof orbitFetch>[2] | null
   toast: Toast
   onSelectUser?: (user: User) => void
   profilePics?: Record<string, string>
   onServerJoined?: (server: DirectoryServer) => void
+  /** Live P2P roster (signed presence beacons). Peers on OTHER nodes never
+   *  appear in this node's dashboard, so without this the hub shows "nobody
+   *  online" while the swarm is actually alive. */
+  p2pPeers?: User[]
 }) {
   const [central, setCentral] = useState(() => getCentralApiUrl())
   const [servers, setServers] = useState<DirectoryServer[]>([])
@@ -231,17 +242,19 @@ export function ServersView({
 
 
   // There is no built-in world any more: a fresh install runs its OWN node
-  // (packaged sidecar) and finds others through the directory. A blind
-  // courier is a directory, never a destination (isCourierApiUrl guards the
-  // switch paths), so it is not listed as a row either.
+  // (packaged sidecar) and finds others through the directory. The retired
+  // Pages origin is a static release page, never a destination
+  // (isCourierApiUrl guards the switch paths), so it is not listed as a row
+  // either.
 
 
   // Mirror the connected server into the dev-proxy cookie so browser /api
-  // traffic follows it. A courier is a DIRECTORY, not a data node (it 404s
-  // every stateful route), so it is never written to `gmatch.api.url` — doing
-  // so pointed the data API at the courier and 404'd every lobby/feed poll,
-  // in dev and in the packaged app alike. A cookie left by an older build is
-  // expired here too: the dev proxy honours it and would keep answering 503.
+  // traffic follows it. The Pages origin is a STATIC PAGE, not a data node
+  // (it 404s every stateful route), so it is never written to
+  // `gmatch.api.url` — doing so pointed the data API at it and 404'd every
+  // lobby/feed poll, in dev and in the packaged app alike. A cookie left by
+  // an older build is expired here too: the dev proxy honours it and would
+  // keep answering 503.
   useEffect(() => {
     try {
       if (typeof document !== 'undefined' && document.cookie.includes('gmatch_server_url=')) {
@@ -392,8 +405,11 @@ export function ServersView({
 
   useEffect(() => {
     try {
+      // The legacy built-in row ("gmatch", no address of its own) is not a
+      // destination. A REAL listing keeps its address — even on port 8790,
+      // which is the port every default node runs on.
       const cached = readDirectoryCache().filter(
-        (s) => s.name.trim().toLowerCase() !== 'gmatch' && !s.endpoint_hint?.includes('8790') && s.id !== 'central-node'
+        (s) => s.id !== 'central-node' && !(s.name.trim().toLowerCase() === 'gmatch' && !s.endpoint_hint?.trim())
       )
       writeDirectoryCache(cached)
       if (localStorage.getItem(DIRECTORY_ID_KEY) === 'central-node') localStorage.removeItem(DIRECTORY_ID_KEY)
@@ -401,7 +417,12 @@ export function ServersView({
       if (regRaw) {
         try {
           const parsed = JSON.parse(regRaw)
-          if (parsed.name?.trim().toLowerCase() === 'gmatch' || parsed.endpoint_hint?.includes('8790')) {
+          // Only an address nobody else can dial retires the claim: the old
+          // auto-registration pointed at THIS machine's loopback sidecar (or
+          // at the courier), so no friend could ever join it. A LAN address
+          // is joinable and stays — otherwise the listing would silently die
+          // on the next boot.
+          if (isLocalHint(parsed.endpoint_hint) || isCourierApiUrl(parsed.endpoint_hint)) {
             localStorage.removeItem(REG_KEY)
           }
         } catch { /* ignore */ }
@@ -430,7 +451,18 @@ export function ServersView({
 
   const saveCentral = () => {
     const raw = setupUrl.trim()
-    if (!raw) { setSetupError('Enter your central node address.'); return }
+    // Empty means "no shared hub": the own node is the directory. That is the
+    // gmatch 2.0 default — nothing hosted holds a row or a mailbox for this
+    // install unless the user asks for a shared rendezvous point.
+    if (!raw) {
+      setCentralApiUrl('')
+      setCentral('')
+      setSetupError('')
+      setSetupUrl('')
+      toast('Directory disabled — this node is the directory.', 'info')
+      void refresh()
+      return
+    }
     const normalized = normalizeServerUrl(raw) || normalizeServerUrl(`http://${raw}`)
     if (!normalized) {
       setSetupError('That does not look like an http(s) address (e.g. https://central.example).')
@@ -509,7 +541,11 @@ export function ServersView({
     const q = query.trim().toLowerCase()
     return servers.filter((s) => {
       if (s.id === 'central-node' || s.id === 'central-p2p' || s.id === 'central-local') return false
-      if (s.name.trim().toLowerCase() === 'gmatch') return false
+      // The legacy built-in "gmatch" row carried no address of its own. A REAL
+      // listing named "gmatch" (the default node name) has one and stays
+      // visible — hiding it by name alone would make this machine unfindable
+      // for every other player.
+      if (s.name.trim().toLowerCase() === 'gmatch' && !s.endpoint_hint?.trim()) return false
       // A blind courier is infrastructure, never a destination: a stale
       // directory mirror of it is never a row.
       if (isCourierApiUrl(s.endpoint_hint)) return false
@@ -528,12 +564,34 @@ export function ServersView({
     const matches = (s: DirectoryServer) =>
       !q || `${s.name} ${s.description ?? ''}`.toLowerCase().includes(q)
     const listed = dedupeServers([...visibleServers])
+    // Every address that belongs to THIS machine (loopback + the node's own
+    // LAN URLs). A directory row pointing at one of them is the same node the
+    // synthetic own-row already represents — one machine, ONE row, never two.
+    // The connected base only counts as "this machine" when we are hosting it;
+    // a client connected to a friend's node must not swallow that friend's row.
+    const selfHosts = new Set(['localhost', '127.0.0.1', '::1', '[::1]'])
+    const lanUrls = [...(hostState?.lanUrls ?? []), ...(node?.lanUrls ?? [])]
+    // Host mode with no measured LAN list: the bridge's own URL is still this
+    // machine. Never the committed base — a client joined to a friend's node
+    // must not swallow that friend's row.
+    if (!lanUrls.length && hostState?.mode === 'host' && hostState.url) lanUrls.push(hostState.url)
+    for (const u of lanUrls) {
+      if (!u) continue
+      try { selfHosts.add(new URL(u).hostname.toLowerCase()) } catch { /* not a URL */ }
+    }
+    const hostOf = (hint?: string): string => {
+      if (!hint) return ''
+      try { return new URL(hint.includes('://') ? hint : `http://${hint}`).hostname.toLowerCase() } catch { return '' }
+    }
+    const deduped = ownServer
+      ? listed.filter((s) => !selfHosts.has(hostOf(s.endpoint_hint)))
+      : listed
     // The node on this machine IS a server even when the directory does not
     // list it. Its own directory record wins when there is one (that is the
     // name it registered under); the synthetic row is only the fallback.
     const ownListed = !!ownServer && matches(ownServer)
-      && !listed.some((s) => serverKey(s) === serverKey(ownServer))
-    const rows = ownListed ? [...listed, ownServer!] : listed
+      && !deduped.some((s) => serverKey(s) === serverKey(ownServer))
+    const rows = ownListed ? [...deduped, ownServer!] : deduped
     return rows.sort((a, b) => {
       // The connected world first, then by measured population.
       const rank = (s: DirectoryServer) => (isCurrent(s) ? 0 : 1)
@@ -542,7 +600,7 @@ export function ServersView({
       if (ac !== bc) return ac - bc
       return (b.online_count ?? -1) - (a.online_count ?? -1) || a.name.localeCompare(b.name)
     })
-  }, [ownServer, visibleServers, query, apiBaseTick])
+  }, [ownServer, visibleServers, query, apiBaseTick, hostState, node, nodeUrl])
 
   const currentServerTitle = useMemo(() => {
     const apiBase = getEffectiveServerUrl()
@@ -669,13 +727,28 @@ export function ServersView({
       const st = await window.gmatch?.serverState?.().catch(() => null)
       let claimedBefore = false
       try { claimedBefore = Boolean(localStorage.getItem(REG_KEY)) } catch { /* session-only */ }
-      // One server per install: this machine already hosts its own node.
-      if (claimedBefore && st?.mode === 'host') {
+      // One server per install: this machine already hosts its own node. A
+      // browser build has no bridge to ask, but the node it talks to IS this
+      // machine's — so the same guard applies there.
+      if (claimedBefore && (st?.mode === 'host' || !st)) {
         toast(`This computer already hosts “${serverName || 'a server'}”. Rename it on the left instead.`, 'warning')
         return
       }
       const canHost = Boolean(window.gmatch?.serverSet && st?.packaged)
-      const hintFinal = hint.trim() || (canHost ? st?.lanUrls?.[0] ?? '' : '')
+      // The addresses this node answers on. The bridge knows them; without it
+      // the NODE knows them (it binds 0.0.0.0 and owns the port) and says so
+      // on GET /api/servers/node.
+      let lanUrls = st?.lanUrls ?? []
+      if (!lanUrls.length) {
+        try {
+          const n = await orbitFetch('/api/servers/node', { method: 'GET' }, identity)
+          if (n.ok) {
+            const nj = (await n.json()) as ServerNode
+            lanUrls = nj.lanUrls ?? []
+          }
+        } catch { /* node without the route */ }
+      }
+      const hintFinal = hint.trim() || pickShareableHint(lanUrls)
       if (canHost) {
         // Claim marker first: even if every request below dies, the heartbeat
         // will replay the registration once the host is reachable again.
@@ -701,9 +774,16 @@ export function ServersView({
         await refresh()
         return
       }
-      // Browser/dev build without the desktop bridge: directory-only listing;
-      // hosting your own node needs the packaged app.
+      // Browser/dev build without the desktop bridge: the node on this machine
+      // IS the world — list it so other players can find and join it.
       if (!central && !getApiBaseUrl()) { toast('No node to list this server on. Hosting runs in the desktop app.', 'warning'); return }
+      // Claim marker first: even if the request below dies, the heartbeat
+      // replays this registration once the directory answers again.
+      try {
+        localStorage.setItem(REG_KEY, JSON.stringify({
+          name: trimmed, description: desc, endpoint_hint: hintFinal, password_required: needsPassword, private: isPrivate,
+        }))
+      } catch { /* session-only */ }
       const listed = await registerDirectory(trimmed, desc, hintFinal, needsPassword, isPrivate)
       if (listed) {
         toast('Server registered. Signed-in users can see it in the directory.', 'success')
@@ -723,7 +803,7 @@ export function ServersView({
     setConnectingId(s.id)
     try {
       if (!mine(s)) {
-        const out = await joinServer(s, toast, askPassword)
+        const out = await joinServer(s, toast, askPassword, identity)
         if (out === 'connected') onServerJoined?.(s)
         if (out !== 'relaunching') setConnectingId(null)
         return
@@ -915,7 +995,7 @@ export function ServersView({
         }
         return
       }
-      const out = await joinServer(s, toast, askPassword)
+      const out = await joinServer(s, toast, askPassword, identity)
       if (out === 'connected' && onServerJoined) {
         onServerJoined(s)
       }
@@ -950,7 +1030,7 @@ export function ServersView({
     // Persist before the relaunch kills the process.
     const serverObj = { id: `mask:${host}`, name: coord.name, owner_id: '', password_required: 0, endpoint_hint: host }
     writeDirectoryCache(mergeDirectory(readDirectoryCache(), [serverObj]))
-    const res = await joinServer(serverObj, toast, askPassword)
+    const res = await joinServer(serverObj, toast, askPassword, identity)
     if (res === 'connected') {
       onServerJoined?.(serverObj)
     }
@@ -1095,10 +1175,16 @@ export function ServersView({
   }
 
   const allUsers = dash?.users || []
-  const onlineUsers = useMemo(() => allUsers.filter((u) => u.online), [allUsers])
+  const onlineUsers = useMemo(() => {
+    const roster = allUsers.filter((u) => u.online)
+    // P2P peers (other nodes) join the roster: deduped by id, dashboard rows win.
+    const seen = new Set(roster.map((u) => u.id))
+    const swarm = p2pPeers.filter((p) => p.online !== false && p.id !== identity?.orbitId && !seen.has(p.id))
+    return [...roster, ...swarm]
+  }, [allUsers, p2pPeers, identity?.orbitId])
   const offlineUsers = useMemo(() => allUsers.filter((u) => !u.online), [allUsers])
 
-  const handleUserClick = (u: DashboardUser) => {
+  const handleUserClick = (u: DashboardUser | User) => {
     if (!onSelectUser) return
     playPress(700)
     onSelectUser({
@@ -1239,12 +1325,12 @@ export function ServersView({
         </label>
       </div>
       {(() => {
-        const preview = buildNodeCode(hint.trim() || hostState?.lanUrls?.[0] || '', name.trim())
+        const preview = buildNodeCode(hint.trim() || pickShareableHint(hostState?.lanUrls ?? node?.lanUrls ?? []), name.trim())
         return preview ? (
           <div data-testid="create-handle-preview" className="flex items-center gap-2 text-xs font-mono text-retro-muted">
             <span className="truncate max-w-[240px]">{preview.slice(0, 28)}…</span>
             <button type="button" onClick={() => void navigator.clipboard.writeText(preview)}
-              className="glass-action px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer">Copy code</button>
+              className="glass-action px-2 py-0.5 rounded text-2xs font-bold cursor-pointer">Copy code</button>
           </div>
         ) : <p className="text-xs text-retro-muted">Type a name to get your share code.</p>
       })()}
@@ -1286,13 +1372,13 @@ export function ServersView({
     <div className="h-full min-h-0 flex-1 overflow-hidden p-2 animate-orbit-fade-in flex flex-col items-center">
       {/* First-login admin passcode */}
       {serverMode === 'host' && node?.isAdmin && pinToDismiss && (
-        <div role="alert" data-testid="admin-pin-banner" className="mb-2 bg-surface-interactive/90 border border-amber-400/40 p-3 rounded-lg space-y-1.5 shrink-0 shadow-lg">
+        <div role="alert" data-testid="admin-pin-banner" className="mb-2 bg-surface-interactive/90 border border-warning/40 p-3 rounded-lg space-y-1.5 shrink-0 shadow-lg">
           <p className="text-xs text-retro-fg font-bold">You are the admin of this server</p>
           <p className="text-xs text-retro-muted">
             Your admin passcode (unlocks the console. Store it somewhere safe):{' '}
             <button
               type="button"
-              className="font-mono text-amber-200 hover:text-amber-100 cursor-pointer"
+              className="font-mono text-warning-fg hover:text-warning-fg cursor-pointer"
               onClick={() => { void navigator.clipboard.writeText(pinToDismiss); toast('Passcode copied', 'success'); }}
             >
               {pinToDismiss}
@@ -1301,7 +1387,7 @@ export function ServersView({
           <button
             type="button"
             onClick={() => { try { localStorage.setItem(PIN_SEEN_KEY, '1'); } catch { /* session-only */ } setPinToDismiss(''); }}
-            className="glass-action glass-action-primary px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer"
+            className="glass-action glass-action-primary px-2.5 py-1 rounded-lg text-2xs font-bold cursor-pointer"
           >
             Got it
           </button>
@@ -1311,13 +1397,13 @@ export function ServersView({
       {/* One narrow column on the page background: no card wrapping the list. */}
       <div className="flex flex-col h-full min-h-0 flex-1 w-full max-w-[720px] overflow-hidden">
         {/* One page header: one title, one primary action, a quiet search. */}
-        <div className="glass-toolbar border-0 border-b border-border-glass rounded-none px-4 py-2.5 flex items-center gap-2 shrink-0">
+        <div className="glass-toolbar border-0 border-b border-edge rounded-none px-4 py-2.5 flex items-center gap-2 shrink-0">
           <div className="min-w-0 shrink-0">
             <h1 className="text-sm font-bold text-retro-fg leading-tight truncate">
               {activeTab === 'hub' ? 'Hub' : 'Servers'}
             </h1>
             {activeTab === 'hub' && (
-              <p className="text-[10px] text-retro-muted truncate">Members, invites and settings</p>
+              <p className="text-2xs text-retro-muted truncate">Members, invites and settings</p>
             )}
           </div>
 
@@ -1363,9 +1449,9 @@ export function ServersView({
               {showCentralPopover && (
                 <div
                   data-menu-content
-                  className="absolute right-0 top-full mt-2 w-72 bg-surface-raised border border-border-glass rounded-lg p-3 shadow-xl z-[var(--z-dropdown)] space-y-2.5 animate-orbit-fade-in"
+                  className="absolute right-0 top-full mt-2 w-72 bg-surface-raised border border-edge rounded-lg p-3 shadow-xl z-[var(--z-dropdown)] space-y-2.5 animate-orbit-fade-in"
                 >
-                  <div className="flex items-center justify-between border-b border-border-subtle pb-1.5">
+                  <div className="flex items-center justify-between border-b border-edge-subtle pb-1.5">
                     <span className="text-xs font-bold text-retro-fg">Directory</span>
                     <button
                       type="button"
@@ -1376,9 +1462,9 @@ export function ServersView({
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                  <p className="text-[10px] text-retro-muted">
-                    Optional: a node that publishes a server directory for others. Empty means your own node
-                    is the directory.
+                  <p className="text-2xs text-retro-muted">
+                    Empty means your own node is the directory. Set one only if
+                    you want a shared rendezvous point.
                   </p>
                   <div className="flex items-center gap-1.5">
                     <input
@@ -1396,10 +1482,10 @@ export function ServersView({
                       Save
                     </button>
                   </div>
-                  {setupError && <p role="alert" className="text-[10px] text-retro-error">{setupError}</p>}
+                  {setupError && <p role="alert" className="text-2xs text-retro-error">{setupError}</p>}
                   {isDev && (
-                    <div className="pt-1 border-t border-border-subtle flex items-center justify-between">
-                      <span className="text-[10px] text-retro-muted font-mono">Dev switch:</span>
+                    <div className="pt-1 border-t border-edge-subtle flex items-center justify-between">
+                      <span className="text-2xs text-retro-muted font-mono">Dev switch:</span>
                       <div className="flex items-center gap-1">
                         <button
                           type="button"
@@ -1409,7 +1495,7 @@ export function ServersView({
                             toast('Switched to local 8790', 'info')
                             void refresh()
                           }}
-                          className={`px-1.5 py-0.5 rounded text-[10px] font-mono cursor-pointer ${
+                          className={`px-1.5 py-0.5 rounded text-2xs font-mono cursor-pointer ${
                             central === 'http://127.0.0.1:8790'
                               ? 'bg-retro-accent text-retro-accent-text font-bold'
                               : 'bg-glass-w10 text-retro-muted hover:text-retro-fg'
@@ -1425,7 +1511,7 @@ export function ServersView({
                       type="button"
                       onClick={() => { setShowCentralPopover(false); playPress(760); setShowAdmin((v) => !v) }}
                       aria-label="Central admin panel"
-                      className="w-full pt-2 border-t border-border-subtle flex items-center gap-2 text-xs text-retro-muted hover:text-retro-fg cursor-pointer transition-colors text-left"
+                      className="w-full pt-2 border-t border-edge-subtle flex items-center gap-2 text-xs text-retro-muted hover:text-retro-fg cursor-pointer transition-colors text-left"
                     >
                       <ShieldCheck className="w-3.5 h-3.5" /> Central admin panel
                     </button>
@@ -1461,7 +1547,7 @@ export function ServersView({
         {activeTab === 'hub' && identity ? (
           <aside className="flex flex-col min-h-0 h-full overflow-y-auto styled-scrollbar p-4 sm:p-6 space-y-4 max-w-4xl w-full mx-auto" aria-label="Current server hub">
             {/* Top Navigation */}
-            <div className="flex items-center justify-between pb-2 border-b border-border-glass">
+            <div className="flex items-center justify-between pb-2 border-b border-edge">
               <button
                 type="button"
                 onClick={() => { playPress(700); setActiveTab('browse'); }}
@@ -1486,15 +1572,15 @@ export function ServersView({
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <h2 className="truncate text-lg font-bold text-retro-fg">{currentServerTitle || serverName || 'gmatch'}</h2>
+                      <h2 className="truncate text-2xl font-black tracking-tighter text-retro-fg">{currentServerTitle || serverName || 'gmatch'}</h2>
                       {serverMode && (
-                        <span className="text-[10px] px-2 py-0.5 rounded font-mono uppercase tracking-wider bg-surface-interactive border border-border-subtle text-retro-muted">
+                        <span className="text-2xs px-2 py-0.5 rounded font-mono uppercase tracking-wider bg-surface-interactive border border-edge-subtle text-retro-muted">
                           {serverMode}
                         </span>
                       )}
                       {node?.isAdmin && (
                         <span
-                          className="text-[10px] px-2 py-0.5 rounded font-mono uppercase tracking-wider text-amber-200 border border-amber-400/30 bg-amber-400/10"
+                          className="text-2xs px-2 py-0.5 rounded font-mono uppercase tracking-wider text-warning-fg border border-warning/30 bg-warning/10"
                           title="You administer this server"
                         >
                           Admin
@@ -1504,6 +1590,29 @@ export function ServersView({
                     <p className="text-xs text-retro-muted mt-1">
                       {dash ? `${dash.members_total} members · ${dash.posts_24h} posts/24h` : (serverDescription || 'Connected')}
                     </p>
+                    {/* The one line that says WHERE this world lives and that
+                        it is actually reachable — copied with one click. */}
+                    {(() => {
+                      const addr = serverMode === 'client'
+                        ? hostState?.url || ''
+                        : (hostState?.lanUrls?.[0] || hostState?.url || '')
+                      if (!addr) return null
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void navigator.clipboard?.writeText(addr)
+                            toast('Address copied — send it to a friend', 'success')
+                          }}
+                          title="Copy address"
+                          className="mt-1 inline-flex items-center gap-1.5 text-2xs font-mono text-retro-muted hover:text-retro-fg transition-colors cursor-pointer"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-retro-online shrink-0" aria-hidden />
+                          <span className="truncate max-w-[280px]">{addr}</span>
+                          <Copy className="w-3 h-3 shrink-0" aria-hidden />
+                        </button>
+                      )
+                    })()}
                   </div>
                 </div>
 
@@ -1547,7 +1656,7 @@ export function ServersView({
 
               {/* Inline Editor */}
               {editingServer && (
-                <div className="bg-surface-interactive/60 border border-border-glass space-y-2 p-3 rounded-xl">
+                <div className="bg-surface-interactive/60 border border-edge space-y-2 p-3 rounded-xl">
                   <label className="block text-xs text-retro-muted">
                     Server name
                     <input
@@ -1637,7 +1746,7 @@ export function ServersView({
             <section className="glass-inset p-4 space-y-4 overflow-y-auto max-h-[60vh]" aria-label="Server members">
               {/* Online Section */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between pb-1.5 border-b border-border-glass">
+                <div className="flex items-center justify-between pb-1.5 border-b border-edge">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-retro-online shrink-0" />
                     <span className="text-xs font-bold text-retro-fg uppercase tracking-wider font-mono">
@@ -1655,13 +1764,14 @@ export function ServersView({
                     {onlineUsers.map((u) => {
                       const initial = (u.display_name || u.id || '?').charAt(0).toUpperCase()
                       return (
-                        <div
+                        <button
+                          type="button"
                           key={u.id}
                           onClick={() => handleUserClick(u)}
-                          className="group flex items-center justify-between gap-2 p-2.5 rounded-xl bg-surface-interactive/40 border border-border-subtle hover:border-border-strong hover:bg-surface-interactive transition-colors cursor-pointer"
+                          className="group flex items-center justify-between gap-2 p-2.5 rounded-xl bg-surface-interactive/40 border border-edge-subtle hover:border-edge-strong hover:bg-surface-interactive transition-colors cursor-pointer"
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="relative w-8 h-8 rounded-full overflow-hidden bg-surface-raised border border-border-subtle shrink-0 flex items-center justify-center text-xs font-bold text-retro-muted">
+                            <div className="relative w-8 h-8 rounded-full overflow-hidden bg-surface-raised border border-edge-subtle shrink-0 flex items-center justify-center text-xs font-bold text-retro-muted">
                               {u.pfp_url ? (
                                 <img src={resolveMediaUrl(u.pfp_url)} alt="" className="w-full h-full object-cover" />
                               ) : (
@@ -1676,15 +1786,15 @@ export function ServersView({
                               <div className="text-xs font-bold text-retro-fg truncate group-hover:text-retro-accent transition-colors">
                                 {u.display_name || u.id}
                               </div>
-                              <div className="text-[10px] text-retro-online truncate font-mono">
+                              <div className="text-2xs text-retro-online truncate font-mono">
                                 active now
                               </div>
                             </div>
                           </div>
-                          <span className="text-[10px] text-retro-muted opacity-0 group-hover:opacity-100 transition-opacity pr-1">
+                          <span className="text-2xs text-retro-muted opacity-0 group-hover:opacity-100 transition-opacity pr-1">
                             profile →
                           </span>
-                        </div>
+                        </button>
                       )
                     })}
                   </div>
@@ -1693,7 +1803,7 @@ export function ServersView({
 
               {/* Offline Section */}
               <div className="space-y-2 pt-2">
-                <div className="flex items-center justify-between pb-1.5 border-b border-border-glass">
+                <div className="flex items-center justify-between pb-1.5 border-b border-edge">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-retro-muted/40 shrink-0" />
                     <span className="text-xs font-bold text-retro-muted uppercase tracking-wider font-mono">
@@ -1711,13 +1821,14 @@ export function ServersView({
                     {offlineUsers.map((u) => {
                       const initial = (u.display_name || u.id || '?').charAt(0).toUpperCase()
                       return (
-                        <div
+                        <button
+                          type="button"
                           key={u.id}
                           onClick={() => handleUserClick(u)}
-                          className="group flex items-center justify-between gap-2 p-2.5 rounded-xl bg-surface-interactive/20 border border-border-subtle/50 hover:border-border-strong hover:bg-surface-interactive/60 transition-colors cursor-pointer opacity-85 hover:opacity-100"
+                          className="group flex items-center justify-between gap-2 p-2.5 rounded-xl bg-surface-interactive/20 border border-edge-subtle/50 hover:border-edge-strong hover:bg-surface-interactive/60 transition-colors cursor-pointer opacity-85 hover:opacity-100"
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="relative w-8 h-8 rounded-full overflow-hidden bg-surface-raised border border-border-subtle shrink-0 flex items-center justify-center text-xs font-bold text-retro-muted opacity-75">
+                            <div className="relative w-8 h-8 rounded-full overflow-hidden bg-surface-raised border border-edge-subtle shrink-0 flex items-center justify-center text-xs font-bold text-retro-muted opacity-75">
                               {u.pfp_url ? (
                                 <img src={resolveMediaUrl(u.pfp_url)} alt="" className="w-full h-full object-cover" />
                               ) : (
@@ -1728,15 +1839,15 @@ export function ServersView({
                               <div className="text-xs font-bold text-retro-fg/90 truncate group-hover:text-retro-accent transition-colors">
                                 {u.display_name || u.id}
                               </div>
-                              <div className="text-[10px] text-retro-muted truncate font-mono">
+                              <div className="text-2xs text-retro-muted truncate font-mono">
                                 {formatRelativeTime(u.last_seen)}
                               </div>
                             </div>
                           </div>
-                          <span className="text-[10px] text-retro-muted opacity-0 group-hover:opacity-100 transition-opacity pr-1">
+                          <span className="text-2xs text-retro-muted opacity-0 group-hover:opacity-100 transition-opacity pr-1">
                             profile →
                           </span>
-                        </div>
+                        </button>
                       )
                     })}
                   </div>
@@ -1746,18 +1857,50 @@ export function ServersView({
           </aside>
         ) : (
           /* BROWSE SERVERS VIEW */
-          <section className="flex flex-col min-h-0 h-full overflow-hidden" aria-label="Server directory">
+          <section className="relative flex flex-col min-h-0 h-full overflow-hidden" aria-label="Server directory">
+            {/* Entering a world is a transition, not a silent row swap: the
+                list dims, the target world's tile carries its own colour and
+                the wait is named. Weight where the action happens. */}
+            {connectingId && (() => {
+              const target = serverRows.find((s) => s.id === connectingId)
+              const worldName = target?.name || 'world'
+              const key = target ? serverKey(target) : worldName
+              return (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  data-testid="world-connecting"
+                  className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-retro-bg/80 backdrop-blur-sm"
+                >
+                  <span
+                    className="flex h-16 w-16 items-center justify-center rounded-xl border text-2xl font-bold text-retro-fg/90 shadow-xl animate-orbit-pop"
+                    style={worldTileStyle(key)}
+                  >
+                    {worldGlyph(worldName)}
+                  </span>
+                  <p className="text-sm font-bold text-retro-fg">
+                    Entering <span className="text-retro-accent">{worldName}</span>…
+                  </p>
+                  <div className="flex items-center gap-2 text-2xs font-mono text-retro-muted">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Connecting to this world's node
+                  </div>
+                </div>
+              )
+            })()}
             {!identity && (
-              <div className="px-3 py-1.5 bg-surface-interactive/60 border-b border-border-subtle text-xs text-retro-muted shrink-0">
+              <div className="px-3 py-1.5 bg-surface-interactive/60 border-b border-edge-subtle text-xs text-retro-muted shrink-0">
                 No account yet. One is created for you on the server you pick.
               </div>
             )}
 
-            {/* ONE list: every server this client knows, the current one first. */}
-            <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar px-4 py-2">
+            {/* ONE list: every server this client knows, the current one first.
+                A near-solid backing: a world list is data you read, not glass
+                you see the wallpaper through. */}
+            <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar px-4 py-2 bg-retro-bg/85 backdrop-blur-md">
               {/* A failed directory request never erases servers we already know. */}
               {dirError && serverRows.length > 0 && (
-                <div role="status" className="mb-2 flex items-center gap-2 px-3 py-2 rounded-lg border border-border-glass bg-glass-w5 text-[10px] text-retro-muted">
+                <div role="status" className="mb-2 flex items-center gap-2 px-3 py-2 rounded-lg border border-edge bg-glass-w5 text-2xs text-retro-muted">
                   <span className="min-w-0 flex-1 truncate">
                     Directory unreachable. Showing the last known servers.
                   </span>
@@ -1776,7 +1919,7 @@ export function ServersView({
                   <p className="text-sm font-semibold text-retro-fg">
                     {dirError ? 'Directory unavailable' : query ? 'No servers match' : 'No servers yet'}
                   </p>
-                  <p className="max-w-sm text-[10px] text-retro-muted">
+                  <p className="max-w-sm text-2xs text-retro-muted">
                     {dirError
                       ? `Could not reach ${central || 'the directory'} and nothing is cached for this session.`
                       : query
@@ -1799,22 +1942,22 @@ export function ServersView({
               )}
 
               {serverRows.length > 0 && (
-                <ul className="divide-y divide-border-subtle" aria-label="Servers" onKeyDown={onRowListKeyDown}>
+                <ul className="divide-y divide-edge-subtle" aria-label="Servers" onKeyDown={onRowListKeyDown}>
                   {serverRows.map((s) => renderRow(s))}
                 </ul>
               )}
 
               {/* Device-local labels are not servers and never join the list;
                   they stay behind one quiet, secondary door. */}
-              <div className="mt-3 border-t border-border-subtle pt-2 pb-1">
+              <div className="mt-3 border-t border-edge-subtle pt-2 pb-1">
                 <button
                   type="button"
                   onClick={() => { playPress(700); setGroupsOpen(true) }}
-                  className="text-[10px] text-retro-muted hover:text-retro-fg cursor-pointer transition-colors"
+                  className="text-2xs text-retro-muted hover:text-retro-fg cursor-pointer transition-colors"
                 >
                   Local groups{labels.length ? ` (${labels.length})` : ''}
                 </button>
-                <span className="ml-1.5 text-[10px] text-retro-muted/70">· device-only labels, not servers</span>
+                <span className="ml-1.5 text-2xs text-retro-muted/70">· device-only labels, not servers</span>
               </div>
             </div>
 
@@ -1857,10 +2000,11 @@ export function ServersView({
 
               {!mine(deleteTarget) && (
                 <div className="space-y-1.5 pt-1">
-                  <label className="block text-[10px] font-semibold text-retro-fg">
+                  <label htmlFor="central-admin-passcode" className="block text-2xs font-semibold text-retro-fg">
                     Central Admin Passcode
                   </label>
                   <input
+                    id="central-admin-passcode"
                     type="password"
                     aria-label="Central admin passcode"
                     value={deletePasscode}
@@ -1868,7 +2012,7 @@ export function ServersView({
                     placeholder="Enter central passcode (e.g. 1984)"
                     className="glass-field w-full px-3 py-2 text-xs font-mono"
                   />
-                  <p className="text-[10px] text-retro-muted">
+                  <p className="text-2xs text-retro-muted">
                     Required when deleting a server created by another identity, or while unauthenticated.
                   </p>
                 </div>
@@ -1881,7 +2025,7 @@ export function ServersView({
               )}
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border-subtle">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-edge-subtle">
               <button
                 type="button"
                 onClick={() => forgetLocalServer(deleteTarget)}
@@ -1917,3 +2061,4 @@ export function ServersView({
     </div>
   )
 }
+

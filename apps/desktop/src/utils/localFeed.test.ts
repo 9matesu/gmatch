@@ -1,0 +1,101 @@
+// @vitest-environment jsdom
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { enqueueOutbox, OUTBOX_KEY, setOutboxState } from '../services/postOutbox'
+import { tombstonePost } from './deletedPosts'
+import { localFeedPosts } from './localFeed'
+
+const identity = { orbitId: 'u1' }
+
+// Node 26 exposes a global `localStorage` that is undefined without
+// --localstorage-file; stub it the way the store tests do.
+const mem = new Map<string, string>()
+vi.stubGlobal('localStorage', {
+  getItem: (k: string) => mem.get(k) ?? null,
+  setItem: (k: string, v: string) => void mem.set(k, String(v)),
+  removeItem: (k: string) => void mem.delete(k),
+  clear: () => mem.clear(),
+  key: () => null,
+  length: 0,
+} as Storage)
+
+beforeEach(() => {
+  mem.clear()
+})
+
+describe('localFeedPosts', () => {
+  it('rebuilds a durable local post the node has not echoed back', () => {
+    enqueueOutbox({
+      objectId: 'o1',
+      postGroup: 'g1',
+      registerBody: { id: 'o1', mime_type: 'image/png', post_caption: 'hello', tags: 'a,b' },
+      gossipInput: {
+        id: 'o1',
+        contentHash: 'h',
+        mimeType: 'image/png',
+        sizeBytes: 1,
+        magnetUri: 'm',
+        caption: 'hello',
+      },
+    })
+
+    const rows = localFeedPosts(identity, 'Tester')
+    expect(rows).toHaveLength(1)
+    // The id is the OBJECT id — the same id the server row will carry, so the
+    // optimistic tile is replaced by the authoritative one instead of rendered
+    // beside it as a duplicate.
+    expect(rows[0]).toMatchObject({
+      id: 'o1',
+      author_id: 'u1',
+      author_name: 'Tester',
+      url: '/api/objects/o1',
+      caption: 'hello',
+      tags: ['a', 'b'],
+      sync_state: 'local',
+    })
+  })
+
+  it('renders ONE row for a multi-image post, carrying its siblings', () => {
+    // The outbox holds one entry per image; the server coalesces the group into
+    // a single row. Rebuilding each entry as its own tile used to render N rows.
+    for (const [i, id] of ['m1', 'm2', 'm3'].entries()) {
+      enqueueOutbox({
+        objectId: id,
+        postGroup: 'grp-1',
+        registerBody: { id, mime_type: 'image/png', post_caption: 'carousel' },
+        gossipInput: null,
+      })
+      void i
+    }
+    const rows = localFeedPosts(identity, 'Tester')
+    expect(rows).toHaveLength(1)
+    expect(rows[0].id).toBe('m1')
+    expect(rows[0].media?.map((m) => m.id)).toEqual(['m1', 'm2', 'm3'])
+  })
+
+  it('survives a reload (the outbox is localStorage, not memory)', () => {
+    enqueueOutbox({ objectId: 'o2', registerBody: { id: 'o2', mime_type: 'image/png' }, gossipInput: null })
+    expect(mem.get(OUTBOX_KEY)).toBeTruthy()
+    expect(localFeedPosts(identity, 'Tester').map((r) => r.id)).toContain('o2')
+  })
+
+  it('keeps showing a pending post until the server row lands', () => {
+    enqueueOutbox({ objectId: 'o3', registerBody: { id: 'o3', mime_type: 'image/png' }, gossipInput: null })
+    setOutboxState('o3', 'pending')
+    expect(localFeedPosts(identity, 'Tester')[0].sync_state).toBe('pending')
+  })
+
+  it('is empty without an identity', () => {
+    enqueueOutbox({ objectId: 'o4', registerBody: { id: 'o4' }, gossipInput: null })
+    expect(localFeedPosts(null, 'Nobody')).toEqual([])
+  })
+
+  it('never renders a tombstoned post, even while the outbox still holds it', () => {
+    // The outbox is durable storage: a deleted post can still sit there (a
+    // delete from an older build, or one whose outbox removal never ran). It
+    // must not come back on the profile.
+    enqueueOutbox({ objectId: 'o5', registerBody: { id: 'o5', mime_type: 'image/png' }, gossipInput: null })
+    enqueueOutbox({ objectId: 'o6', registerBody: { id: 'o6', mime_type: 'image/png' }, gossipInput: null })
+    tombstonePost('o5')
+    expect(localFeedPosts(identity, 'Tester').map((r) => r.id)).toEqual(['o6'])
+  })
+})

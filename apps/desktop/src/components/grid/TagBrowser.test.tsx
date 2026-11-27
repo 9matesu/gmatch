@@ -111,4 +111,37 @@ describe('TagBrowser', () => {
     render(<TagBrowser />)
     expect(screen.getByText(/own tags in the tag market first/i)).toBeInTheDocument()
   })
+
+  it('plays the clip in the viewer, and only on hover in the grid', async () => {
+    // The grid tile was already muted, but the VIEWER was `muted={false}`.
+    // Chromium refuses to autoplay an unmuted video without a user gesture,
+    // so opening a clip showed a black, paused first frame with controls —
+    // exactly the "the video does not play in the tag browser" complaint.
+    fetchPostsMock.mockResolvedValue({
+      posts: [
+        { id: 'v1', url: 'https://e.test/v1.mp4', kind: 'video', preview: 'https://e.test/v1.jpg', tags: ['wet_ass'] },
+      ],
+      source: 'redgifs',
+      ok: true,
+    })
+    render(<TagBrowser />)
+    fireEvent.click(screen.getByRole('button', { name: /wet_ass/i }))
+    const tiles = await screen.findAllByRole('button', { name: /view image tagged/i })
+    fireEvent.click(tiles[0])
+
+    // One video in the grid tile, one in the portaled viewer.
+    await waitFor(() => expect(document.querySelectorAll('video').length).toBe(2))
+    const videos = Array.from(document.querySelectorAll('video')) as HTMLVideoElement[]
+    // The tile is a POSTER until the pointer is over it: a grid of decoders
+    // was the single biggest GPU/energy cost in the app.
+    const tile = videos.find((v) => v.getAttribute('preload') === 'none')
+    const viewer = videos.find((v) => v.getAttribute('preload') === 'auto')
+    expect(tile).toBeTruthy()
+    expect(tile?.autoplay).toBe(false)
+    expect(tile?.muted).toBe(true)
+    // The clip the player explicitly opened still plays by itself.
+    expect(viewer).toBeTruthy()
+    expect(viewer?.autoplay).toBe(true)
+    expect(viewer?.muted).toBe(true)
+  })
 })

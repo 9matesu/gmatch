@@ -27,6 +27,7 @@ vi.mock('../../utils/sounds', () => ({
 vi.mock('../../services/imageCache', () => ({
   resolveImage: vi.fn(async (u: string) => u),
   devFetchable: vi.fn(() => null),
+  cachedImageFor: vi.fn(() => undefined),
 }));
 
 const mockIdentity = { orbitId: 'me', sign: vi.fn() } as any;
@@ -62,7 +63,12 @@ function renderFeed(posts: any[], onPersistLike?: (postId: string, liked: boolea
   return { rerender: (p: any[]) => rerender(ui(p)) };
 }
 
-const countText = () => screen.getByLabelText('View who liked this post').textContent;
+const countLabel = () => screen.queryByLabelText('View who liked this post');
+const countText = () => {
+  const el = countLabel();
+  if (!el) throw new Error('no like count is shown (0 is not a datum)');
+  return el.textContent;
+};
 const likeButton = () => screen.getByLabelText('Like post');
 
 beforeEach(() => {
@@ -72,7 +78,7 @@ beforeEach(() => {
 describe('like count follows the post', () => {
   it('updates when the server count arrives after a stale local copy', async () => {
     const { rerender } = renderFeed([post({ like_count: 0 })]);
-    expect(countText()).toMatch(/^0 likes$/);
+    expect(countLabel()).toBeNull();
 
     // The server row for the same id lands with one like.
     rerender([post({ like_count: 1 })]);
@@ -84,9 +90,10 @@ describe('like count follows the post', () => {
     expect(countText()).toMatch(/^3 likes$/);
     rerender([post({ like_count: 4 })]);
     await waitFor(() => expect(countText()).toMatch(/^4 likes$/));
-    // A late duplicate from the local store must not roll it back.
+    // A late duplicate from the local store must not roll it back: the count
+    // goes away instead of reading "0 likes".
     rerender([post({ like_count: 0 })]);
-    await waitFor(() => expect(countText()).toMatch(/^0 likes$/));
+    await waitFor(() => expect(countLabel()).toBeNull());
   });
 
   it('keeps the optimistic count while the post still reports the old value', async () => {

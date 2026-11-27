@@ -86,7 +86,7 @@ interface AdminLoadingStateProps {
 export function AdminLoadingState({ rows = 5, columns = 6, className }: AdminLoadingStateProps) {
   return (
     <div className={cn("space-y-3", className)}>
-      <div className="grid gap-3 px-3 py-2 border-b border-border-glass bg-surface-raised">
+      <div className="grid gap-3 px-3 py-2 border-b border-edge bg-surface-raised">
         <div className="grid grid-cols-12 gap-3">
           {Array.from({ length: columns }).map((_, i) => (
             <div key={i} className="skeleton h-5 w-full" style={{ gridColumn: `span ${Math.floor(12 / columns)}` }} />
@@ -94,7 +94,7 @@ export function AdminLoadingState({ rows = 5, columns = 6, className }: AdminLoa
         </div>
       </div>
       {Array.from({ length: rows }).map((_, rowIndex) => (
-        <div key={rowIndex} className="grid grid-cols-12 gap-3 px-3 py-3 border-b border-border-subtle">
+        <div key={rowIndex} className="grid grid-cols-12 gap-3 px-3 py-3 border-b border-edge-subtle">
           {Array.from({ length: columns }).map((_, i) => (
             <div
               key={i}
@@ -126,7 +126,7 @@ export function AdminErrorState({ message, onRetry, className }: AdminErrorState
         <button
           type="button"
           onClick={onRetry}
-          className="px-4 py-2 bg-cyan-500 text-black text-xs font-bold rounded hover:bg-cyan-400 transition-colors"
+          className="px-4 py-2 bg-info text-retro-accent-text text-xs font-bold rounded hover:bg-info transition-colors"
         >
           Try Again
         </button>

@@ -7,21 +7,50 @@ import { deliveryToken } from '@orbit/protocol'
 import { rotateEpoch, peerAddressToken, type EpochState } from '../utils/handleRotation'
 import { getSecureItem, setSecureItem } from '../utils/secure-storage'
 import { RoomManager, type Room, type RoomMessage } from '../utils/rooms'
-import { detectMailMode, staticMailMode, cachedMailMode, isKnownSiteCourier, type MailMode } from '../utils/mail-mode'
+import { detectMailMode, staticMailMode, cachedMailMode, type MailMode } from '../utils/mail-mode'
 import { getApiBaseUrl } from '../utils/api'
 import { getCentralApiUrl } from '../utils/central'
 import { logger } from '../utils/logger'
 import { handleInboundSignal } from '../utils/courierSignaling'
 import { ownDisplayName } from '../utils/displayName'
 import { activeTypists, pruneTypingState } from '../utils/dmTyping'
+import { resolveNodeAddress } from '../utils/serverAddress'
 
 /**
- * Where sealed mail is relayed. The Cloudflare courier is the default
- * (directory origin): two peers on different worlds still share one mailbox
- * relay. A deployment that disables the directory falls back to its own node.
+ * Where sealed mail is relayed. The node this client is connected to is the
+ * relay: two peers on the SAME node share one mailbox, and a peer on another
+ * node is reached through the node its beacon names. A shared hub is opt-in
+ * (`gmatch.central.url`) for bridging two networks that cannot reach each
+ * other; without one, the client's own node is the relay.
  */
 function mailBase(): string {
   return (getCentralApiUrl() || getApiBaseUrl()).replace(/\/+$/, '')
+}
+
+/**
+ * Mailboxes besides the primary this client must drain: the node we are
+ * CONNECTED to, when the primary is an opt-in hub. A peer who learned our
+ * node from a signed beacon drops envelopes into THAT node's mailbox
+ * (ARCHITECTURE-P2P §10d) — a receiver that drains only the hub never sees
+ * mail addressed to its own node's box.
+ */
+function extraMailBases(): string[] {
+  const node = getApiBaseUrl().replace(/\/+$/, '')
+  const primary = mailBase()
+  if (!node || node === primary) return []
+  return [node]
+}
+
+/**
+ * True when the node this client talks to is NOT among the drained boxes.
+ *
+ * A browser build rides the dev proxy: the API base is RELATIVE, so the node
+ * behind it never shows up as a mailbox base. The node's own dialable
+ * address has to be added instead — otherwise a peer that learned our node
+ * from the signed beacon drops envelopes into a box nobody reads.
+ */
+function nodeBoxMissing(): boolean {
+  return !getApiBaseUrl().replace(/\/+$/, '')
 }
 
 export interface CourierDeps {
@@ -53,11 +82,11 @@ export interface CourierDeps {
  */
 export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps = {}) {
   const [mode, setMode] = useState<MailMode>(() => {
-    // Known courier hosts / the loopback sidecar run current code: start in
-    // courier mode right away so no legacy fetch fires before the probe
-    // resolves. A bare/relative base still waits for the wire probe.
+    // The loopback sidecar runs current code: start in courier mode right
+    // away so no legacy fetch fires before the probe resolves. A bare/relative
+    // base still waits for the wire probe.
     const base = mailBase()
-    if (isKnownSiteCourier(base) || staticMailMode(base)) return 'courier'
+    if (staticMailMode(base)) return 'courier'
     return cachedMailMode(base) || 'legacy'
   })
   const [threads, setThreads] = useState<Record<string, DmMessage[]>>({})
@@ -177,6 +206,7 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
     })
     const client = new MailClient({
       apiBase: mailBase(),
+      extraBases: extraMailBases(),
       identity,
       webSocketFactory: depsRef.current.webSocketFactory,
       fetchImpl: depsRef.current.fetchImpl,
@@ -222,6 +252,19 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
       roomsRef.current = null
       storeRef.current = null
     }
+  }, [identity, mode])
+
+  // The node's own box, when the dev proxy hid it. The address is the SAME
+  // one our signed presence beacon names, so a peer on another node drops
+  // envelopes exactly where we now read them.
+  useEffect(() => {
+    if (!identity || mode !== 'courier' || !nodeBoxMissing()) return
+    let cancelled = false
+    void resolveNodeAddress(identity, depsRef.current.fetchImpl).then((addr) => {
+      if (cancelled || !addr) return
+      clientRef.current?.addBases([addr])
+    })
+    return () => { cancelled = true }
   }, [identity, mode])
 
   // The sender is always the local user, so the name is read from the shared
@@ -290,6 +333,41 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
   const registerPeerKeys = useCallback((orbitId: string, publicKeyHex: string, encryptionPubHex: string) => {
     storeRef.current?.rememberPeer(orbitId, { publicKeyHex, encryptionPubHex })
   }, [])
+
+  /**
+   * Replay messages this device authored that never left it.
+   *
+   * The store is the outbox, so this is the only "retry" that exists: a failed
+   * row stays failed until something runs this. Wired to connectivity returning
+   * (`online`) and to the initial drain, so a courier that was down when the
+   * player hit Enter delivers the message on the next breath instead of never.
+   */
+  const resendFailed = useCallback(async (peerId?: string): Promise<number> => {
+    if (!managerRef.current) return 0
+    return managerRef.current.resendFailed(peerId)
+  }, [])
+
+  useEffect(() => {
+    if (!identity || mode !== 'courier') return
+    // After the first drain: whatever failed while we were closed is replayed.
+    const kick = window.setTimeout(() => { void resendFailed() }, 1_500)
+    const onOnline = () => { void resendFailed() }
+    // A specific peer becoming reachable is the precise moment a held message
+    // can land: the sender addressed a box that was not being read, and now it
+    // is. Presence carries the orbitId; the replay is per peer, so a roster of
+    // 50 does not cost 50 full outbox sweeps.
+    const onPeerOnline = (e: Event) => {
+      const peerId = (e as CustomEvent<{ peerId?: string }>).detail?.peerId
+      if (peerId) void resendFailed(peerId)
+    }
+    window.addEventListener('online', onOnline)
+    window.addEventListener('orbit-peer-online', onPeerOnline)
+    return () => {
+      window.clearTimeout(kick)
+      window.removeEventListener('online', onOnline)
+      window.removeEventListener('orbit-peer-online', onPeerOnline)
+    }
+  }, [identity, mode, resendFailed])
 
   /** Mesh domination send (Fase 5/6): sealed dom_request, free, no server.
    *  Null when the peer has no known keys — the caller falls back to the
@@ -363,5 +441,5 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
 
   const courierActive = useMemo(() => mode === 'courier' && !!identity, [mode, identity])
 
-  return { mode, courierActive, send, pull, threadFor, registerPeerKeys, meshSend, peerAddressable, threads, rooms, createRoom, createRoomWithId, inviteToRoom, sayInRoom, leaveRoom, roomMessages, edit, remove, react, type, markRead, isTyping }
+  return { mode, courierActive, send, pull, threadFor, registerPeerKeys, meshSend, peerAddressable, threads, rooms, createRoom, createRoomWithId, inviteToRoom, sayInRoom, leaveRoom, roomMessages, edit, remove, react, type, markRead, isTyping, resendFailed }
 }

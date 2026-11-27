@@ -9,7 +9,7 @@ import { useObjectImage } from '../hooks/useObjectImage'
 import { playTierUpOnce, playMatchOnce, playRejectOnce, playTimeoutOnce } from '../utils/sounds'
 import { matchEndSummary } from '../utils/matchEndSummary'
 import { notifyWhenHidden } from '../utils/notifyHidden'
-import { CardZoomModal } from './CardZoomModal'
+import { ZoomModal, useZoomModal } from './CardZoomModalHost'
 import { CardBack } from './CardBack'
 import { CreateCardModal } from './CreateCardModal'
 import { LazyVideo } from './LazyVideo'
@@ -60,10 +60,7 @@ export function YourMatchTab({
     const res = (await onDecide(match.id, decision)) as { payout?: { gp: number; reason: string } } | null | undefined
     if (res && typeof res.payout?.gp === 'number') setLastPayout(res.payout)
   }
-  const [zoomModal, setZoomModal] = useState<{ isOpen: boolean; imageUrl: string | null; title?: string; subtitle?: string }>({
-    isOpen: false,
-    imageUrl: null,
-  })
+  const zoom = useZoomModal()
   const [showCreateCardModal, setShowCreateCardModal] = useState(false)
   const prevKey = useMemo(() => `${match.id}:${match.tier}:${match.last_result}:${match.status}`, [match.id, match.tier, match.last_result, match.status])
   const [lastKey, setLastKey] = useState<string>(prevKey)
@@ -143,9 +140,7 @@ export function YourMatchTab({
             onOpenProfile?.(profileUser)
             return
           }
-          setZoomModal({
-            isOpen: true,
-            imageUrl: img.url,
+          zoom.showZoom(img.url, {
             title: `${label} Card`,
             subtitle: `Tier ${st.tier} · ${opponentName}`,
           })
@@ -166,15 +161,13 @@ export function YourMatchTab({
               onClick={(e) => {
                 e.stopPropagation()
                 if (img?.url) {
-                  setZoomModal({
-                    isOpen: true,
-                    imageUrl: img.url,
+                  zoom.showZoom(img.url, {
                     title: `${label} Card`,
                     subtitle: `Tier ${st.tier} · ${opponentName}`,
                   })
                 }
               }}
-              className="absolute top-1.5 right-1.5 bg-black/80 border border-border-glass text-retro-fg text-[10px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity font-bold flex items-center gap-1 cursor-pointer"
+              className="absolute top-1.5 right-1.5 bg-black/80 border border-edge text-retro-fg text-2xs px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity font-bold flex items-center gap-1 cursor-pointer"
               title="Zoom into card"
             >
               <ZoomIn className="w-3 h-3" />
@@ -182,12 +175,12 @@ export function YourMatchTab({
             </button>
           </>
         ) : img?.failed ? (
-          <div className="w-full h-full flex items-center justify-center text-retro-muted text-[10px] px-1 text-center">Unavailable</div>
+          <div className="w-full h-full flex items-center justify-center text-retro-muted text-2xs px-1 text-center">Unavailable</div>
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-retro-muted text-[10px] px-1 text-center">{placeholder}</div>
+          <div className="w-full h-full flex items-center justify-center text-retro-muted text-2xs px-1 text-center">{placeholder}</div>
         )}
       </div>
-      <div className="mt-1 text-center text-[10px] font-medium text-retro-muted truncate">{label}</div>
+      <div className="mt-1 text-center text-2xs font-medium text-retro-muted truncate">{label}</div>
     </div>
   )
 
@@ -217,7 +210,7 @@ export function YourMatchTab({
         <button
           onClick={() => void onEnd(match.id)}
           disabled={submitting}
-          className="text-xs font-medium px-2.5 py-1 border border-border-glass text-retro-muted hover:text-retro-fg hover:border-retro-fg disabled:opacity-30 rounded transition-colors"
+          className="text-xs font-medium px-2.5 py-1 border border-edge text-retro-muted hover:text-retro-fg hover:border-retro-fg disabled:opacity-30 rounded transition-colors"
         >
           End
         </button>
@@ -241,31 +234,31 @@ export function YourMatchTab({
 
         {/* No match */}
         {!celebrate && st.phase === 'ended' && st.lastResult === 'ended' && (
-          <div className="border border-rose-500/30 bg-rose-500/5 p-4 text-center space-y-2 animate-orbit-slide-up rounded-lg">
-            <div className="text-sm font-medium text-rose-400">{matchEndSummary(st.lastResult, lastPayout, false)}</div>
+          <div className="border border-danger/30 bg-danger/ p-4 text-center space-y-2 animate-orbit-slide-up rounded-lg">
+            <div className="text-sm font-medium text-danger-fg">{matchEndSummary(st.lastResult, lastPayout, false)}</div>
             <div className="text-xs text-retro-muted">Cards revealed below.</div>
             <div className="grid grid-cols-2 gap-2">
-              {cardSlot('You', revealMineImg, 'Your card', 'border-rose-500/30', false)}
-              {cardSlot(opponentName, revealTheirsImg, 'Their card', 'border-rose-500/30', false, false, opponentUser)}
+              {cardSlot('You', revealMineImg, 'Your card', 'border-danger/30', false)}
+              {cardSlot(opponentName, revealTheirsImg, 'Their card', 'border-danger/30', false, false, opponentUser)}
             </div>
           </div>
         )}
 
         {/* Quit */}
         {!celebrate && st.phase === 'ended' && st.lastResult === 'quit' && (
-          <div className="border border-border-glass p-3 text-center text-xs text-retro-muted animate-orbit-fade-in rounded-lg">
+          <div className="border border-edge p-3 text-center text-xs text-retro-muted animate-orbit-fade-in rounded-lg">
             {matchEndSummary(st.lastResult, lastPayout, false)}
           </div>
         )}
 
         {st.phase !== 'ended' && (
           <div className="grid grid-cols-2 gap-2">
-            {cardSlot('You', myCardImg, needCard ? 'Send a card' : 'Your card', st.myCardId ? 'border-retro-accent bg-glass-w5' : 'border-border-glass border-dashed', needCard)}
+            {cardSlot('You', myCardImg, needCard ? 'Send a card' : 'Your card', st.myCardId ? 'border-retro-accent bg-glass-w5' : 'border-edge border-dashed', needCard)}
             {cardSlot(
               opponentName,
               oppCardImg,
               'Waiting...',
-              opponentHidden ? 'border-border-glass border-dashed' : st.opponentCardId ? 'border-retro-accent bg-glass-w5' : 'border-border-glass border-dashed',
+              opponentHidden ? 'border-edge border-dashed' : st.opponentCardId ? 'border-retro-accent bg-glass-w5' : 'border-edge border-dashed',
               !st.opponentCardId,
               opponentHidden,
               opponentUser
@@ -279,10 +272,10 @@ export function YourMatchTab({
           </div>
         )}
 
-        {error && <div className="border border-border-glass p-2 text-center text-xs text-retro-muted rounded-lg">{error}</div>}
+        {error && <div className="border border-edge p-2 text-center text-xs text-retro-muted rounded-lg">{error}</div>}
 
         {(waitingForCard || waitingForDecision) && !celebrate && (
-          <div className="border border-border-glass p-2 text-center text-xs text-retro-muted animate-orbit-pulse-soft rounded-lg">
+          <div className="border border-edge p-2 text-center text-xs text-retro-muted animate-orbit-pulse-soft rounded-lg">
             Waiting for {opponentName}...
           </div>
         )}
@@ -292,7 +285,7 @@ export function YourMatchTab({
             <button
               type="button"
               onClick={() => setShowCreateCardModal(true)}
-              className="w-full py-3 text-sm font-medium bg-retro-accent text-black rounded-lg hover:bg-retro-accent-hover transition-colors cursor-pointer flex items-center justify-center gap-2"
+              className="w-full py-3 text-sm font-medium bg-retro-accent text-retro-accent-text rounded-lg hover:bg-retro-accent-hover transition-colors cursor-pointer flex items-center justify-center gap-2"
             >
               <Sparkles className="w-4 h-4" />
               <span>Create Card</span>
@@ -304,7 +297,7 @@ export function YourMatchTab({
                     <button
                       key={card.id}
                       onClick={() => setSelectedCard(card.id)}
-                      className={`relative aspect-square overflow-hidden border-2 rounded ${selectedCard === card.id ? 'border-retro-fg ring-2 ring-retro-fg/30' : 'border-border-glass hover:border-retro-muted'}`}
+                      className={`relative aspect-square overflow-hidden border-2 rounded ${selectedCard === card.id ? 'border-retro-fg ring-2 ring-retro-fg/30' : 'border-edge hover:border-retro-muted'}`}
                     >
                       {card.content_url ? (
                         <ObjectImage
@@ -313,6 +306,7 @@ export function YourMatchTab({
                           identity={identity}
                           className="w-full h-full object-cover"
                           videoClassName="pointer-events-none w-full h-full object-cover"
+                          thumb
                         />
                       ) : (
                         <div className="w-full h-full bg-retro-border" />
@@ -337,7 +331,7 @@ export function YourMatchTab({
             <button
               disabled={submitting}
               onClick={() => void decideAndCapture('reject')}
-              className="py-2.5 text-xs font-medium border border-border-glass text-retro-muted hover:text-rose-400 hover:border-rose-500/30 bg-surface-interactive hover:bg-rose-500/5 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              className="py-2.5 text-xs font-medium border border-edge text-retro-muted hover:text-danger-fg hover:border-danger/30 bg-surface-interactive hover:bg-danger/ rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
               <span>Reject</span>
@@ -347,27 +341,20 @@ export function YourMatchTab({
               onClick={() => void decideAndCapture('like')}
               className="py-2.5 text-xs font-medium bg-retro-fg text-retro-bg hover:bg-retro-fg/90 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
             >
-              <Heart className="w-3.5 h-3.5 fill-current text-rose-400" />
+              <Heart className="w-3.5 h-3.5 fill-current text-danger-fg" />
               <span>Like</span>
             </button>
           </div>
         )}
 
         {st.phase === 'decide' && st.myDecision && (
-          <div className="border border-border-glass p-3 text-center text-xs text-retro-muted rounded-lg">
+          <div className="border border-edge p-3 text-center text-xs text-retro-muted rounded-lg">
             Decision recorded. Waiting for {opponentName}...
           </div>
         )}
       </div>
 
-      <CardZoomModal
-        isOpen={zoomModal.isOpen}
-        onClose={() => setZoomModal({ isOpen: false, imageUrl: null })}
-        imageUrl={zoomModal.imageUrl}
-        title={zoomModal.title}
-        subtitle={zoomModal.subtitle}
-        identity={identity}
-      />
+      <ZoomModal zoom={zoom} identity={identity} />
       {showCreateCardModal && identity && (
         <CreateCardModal
           identity={identity}

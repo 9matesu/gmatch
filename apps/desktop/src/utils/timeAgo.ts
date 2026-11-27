@@ -32,6 +32,22 @@ export function parseApiTimestamp(value: string | null | undefined): Date | null
  * pass their own (e.g. `{ hour: '2-digit', minute: '2-digit' }`). Returns ''
  * for junk so call sites keep owning their own fallback copy.
  */
+/**
+ * Formatters are expensive to BUILD and a timeline asks for one per row per
+ * render. Caching the instance per locale makes the repeated calls free; the
+ * options-carrying callers (dateStyle/timeStyle) are the cold path.
+ */
+const dateFmtCache = new Map<string, Intl.DateTimeFormat>();
+
+function cachedDateFmt(locale: string | undefined): Intl.DateTimeFormat {
+  const key = locale || '<default>';
+  const hit = dateFmtCache.get(key);
+  if (hit) return hit;
+  const fmt = new Intl.DateTimeFormat(locale);
+  dateFmtCache.set(key, fmt);
+  return fmt;
+}
+
 export function formatAbsoluteTime(
   value: string | null | undefined,
   options: Intl.DateTimeFormatOptions = { dateStyle: 'short', timeStyle: 'short' },
@@ -58,5 +74,5 @@ export function timeAgo(value: string | null | undefined, now: number = Date.now
   if (days < 7) return `${days}d`;
   const weeks = Math.floor(days / 7);
   if (weeks < 5) return `${weeks}w`;
-  return d.toLocaleDateString();
+  return cachedDateFmt(undefined).format(d);
 }

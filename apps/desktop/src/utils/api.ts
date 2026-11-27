@@ -3,18 +3,18 @@ import { sealApiRequest } from '@orbit/protocol';
 import { logger } from './logger';
 
 /**
- * Courier nodes are BLIND: `SITE_SERVICES` makes every route outside
- * directory/mail 404 at the edge (apps/api/src/serve.ts + site-services.ts).
- * They are a valid *directory*, never a valid *data* base — pointing the data
- * API at one turns every lobby/feed/users poll into a 404.
+ * The retired Pages origin is NOT a world and NOT a relay.
  *
- * The courier lives on the same Cloudflare Pages origin as the release page
- * (site/functions/api/[[path]].ts), including its preview subdomains.
+ * It once served the blind rendezvous on the same origin as the release
+ * page. That courier is gone: the origin is a static page now, so pointing
+ * the data API at it turns every lobby/feed/users poll into a 404. The
+ * matcher stays as a guard so an old pointer can never be dialed as a data
+ * base — it is dropped upstream (utils/central.ts), not used as a fallback.
  * Used by computeApiBase + the WS builder.
  */
 const COURIER_HOSTS = /(^|\.)gmatch\.pages\.dev$/;
 
-/** True for the Cloudflare courier origin (a directory, never a world). */
+/** True for the retired Pages origin (never a world, never a relay). */
 export function isCourierHost(url: string | null | undefined): boolean {
   if (!url?.trim()) return false;
   try {
@@ -73,7 +73,7 @@ function computeApiBase(): string {
 
   // Last resort (no preload/env/stored server, e.g. a browser build served
   // from a public host): the node on this machine. There is no hosted data
-  // fallback — the Cloudflare courier is a directory/mail relay only, and a
+  // fallback — the release page is a static page, never a relay, and a
   // dead address is worse than an honest "no node".
   return LOCAL_NODE_BASE
 }
@@ -108,7 +108,7 @@ export function resolveLiveApiBase(): string {
 }
 
 /** Fired after a client-to-client switch commits, so effects re-subscribe. */
-export const API_BASE_CHANGED_EVENT = 'gmatch-api-base-changed'
+const API_BASE_CHANGED_EVENT = 'gmatch-api-base-changed'
 
 export function notifyApiBaseChanged(base: string): void {
   try {
@@ -209,13 +209,6 @@ export function getApiWebSocketUrl(path = '/api/ws'): string {
   return wsUrlForBase(base, path)
 }
 
-export function setApiBaseUrl(url: string): void {
-  try {
-    if (url.trim()) localStorage.setItem('gmatch.api.url', url.trim())
-    else localStorage.removeItem('gmatch.api.url')
-  } catch { /* session-only */ }
-}
-
 /** True for a loopback API base (packaged host-mode sidecar address). */
 export function isLoopbackApiUrl(url: string | null | undefined): boolean {
   if (!url) return false
@@ -225,26 +218,6 @@ export function isLoopbackApiUrl(url: string | null | undefined): boolean {
   } catch {
     return /127\.0\.0\.1|localhost/.test(url)
   }
-}
-
-/**
- * Packaged-exe install fix: a stale `gmatch.api.url=http://127.0.0.1:8790`
- * (left by an old host-mode install or server-join debug) makes a fresh
- * client-default install hammer a dead sidecar forever — the "loops pinging
- * 127.0.0.1" report. Call once on boot when the main process says we are a
- * packaged client: the stale key is dropped so API_BASE falls through to
- * the central node. Returns true when a stale key was cleared.
- */
-export function clearStaleLoopbackApiBase(): boolean {
-  try {
-    if (typeof localStorage === 'undefined') return false
-    const manual = localStorage.getItem('gmatch.api.url')
-    if (manual?.trim() && isLoopbackApiUrl(manual.trim())) {
-      localStorage.removeItem('gmatch.api.url')
-      return true
-    }
-  } catch { /* private mode */ }
-  return false
 }
 
 /** Cookie the dev proxy reads to route /api (vite.config.ts `resolveDevApiTarget`). */
@@ -334,17 +307,31 @@ export async function clearDeadLoopbackApiBase(): Promise<boolean> {
  * Loopback is handled by clearDeadLoopbackApiBase; the courier by
  * purgeCourierApiState (it answers /api/health but is never a data base).
  */
-export async function clearUnreachableApiBase(timeoutMs = 2500): Promise<string | null> {
+export async function clearUnreachableApiBase(timeoutMs = 2500, attempts = 3): Promise<string | null> {
   try {
     if (typeof localStorage === 'undefined') return null
     const manual = localStorage.getItem('gmatch.api.url')?.trim()
     if (!manual || !/^https?:\/\//i.test(manual)) return null
     if (isLoopbackApiUrl(manual) || isCourierApiUrl(manual)) return null
     const base = manual.replace(/\/+$/, '')
-    try {
-      const res = await fetch(`${base}/api/health`, { signal: AbortSignal.timeout(timeoutMs) })
-      if (res.ok) return null // a node answers: the pointer is legitimate
-    } catch { /* unreachable: drop it below */ }
+    for (let i = 0; i < Math.max(1, attempts); i++) {
+      let answered: Response | null = null
+      try {
+        answered = await fetch(`${base}/api/health`, { signal: AbortSignal.timeout(timeoutMs) })
+      } catch {
+        answered = null // aborted/timed out: an inconclusive probe, retry
+      }
+      if (answered) {
+        if (answered.ok) return null // a node answers: the pointer is legitimate
+        // Woken gateway (502/503/504): the HOST answered and the node is
+        // starting — a transient state, not a dead pointer. Wiping here
+        // silently rewires the app to another world (SPEC §12: the pointer
+        // is resolved, never assumed — and never dropped on a guess).
+        if (answered.status === 502 || answered.status === 503 || answered.status === 504) return null
+        break // answered and still not a node: drop below
+      }
+      if (i < attempts - 1) await new Promise((resolve) => setTimeout(resolve, 200))
+    }
     localStorage.removeItem('gmatch.api.url')
     localStorage.removeItem(SERVER_MARKER)
     try {
@@ -585,8 +572,10 @@ export async function orbitFetch(
     }
     const retryAfter = response?.headers.get('Retry-After')
     const parsed = retryAfter ? Number(retryAfter) * 1000 : 0
-    const base = Math.min(1000 * (2 ** attempt), 8000)
-    return Math.min(parsed || base, 10000) + Math.floor(Math.random() * 250)
+    // One short retry. The old 1s -> 2s -> 4s ladder let a dead node hold the
+    // renderer hostage for tens of seconds across a dozen concurrent polls.
+    const base = 250
+    return Math.min(parsed || base, 2000) + Math.floor(Math.random() * 100)
   }
   const waitRetry = (attempt: number, response?: Response) => new Promise<void>((resolve) => setTimeout(resolve, retryDelay(attempt, response)))
 
@@ -599,7 +588,11 @@ export async function orbitFetch(
     // them the upload-scale budget rather than letting the abort masquerade as
     // a hard failure (see the catch below).
     const isMedia = method === 'GET' && /\/api\/(objects|watchparty\/[^/]+\/stream)/.test(url)
-    const timeout = setTimeout(() => controller.abort(), isUpload || isMedia ? 120000 : 30000)
+    // A round of small API calls used to wait 30s + 2 retries = up to 90s each.
+    // With a dozen pollers that is a promise pile-up that freezes the renderer
+    // (the "tudo trava / fica preto" report). Short and bounded for normal
+    // calls; only real media streams keep the long budget.
+    const timeout = setTimeout(() => controller.abort(), isUpload || isMedia ? 120000 : 8000)
     try {
       // GET must never carry a body (real fetch throws) — the seal lives in
       // the header alone; only non-GET sealed requests send the placeholder.
@@ -633,8 +626,8 @@ export async function orbitFetch(
         }
         return retryRes
       }
-      if (canRetry && attempt < 4 && (res.status === 408 || res.status === 425 || res.status === 429 || res.status >= 500)) {
-        logger.warn(`[orbitFetch] transient ${res.status}; retry ${attempt + 1}/4`)
+      if (canRetry && attempt < 1 && (res.status === 408 || res.status === 425 || res.status === 429 || res.status >= 500)) {
+        logger.warn(`[orbitFetch] transient ${res.status}; retry ${attempt + 1}/1`)
         await waitRetry(attempt, res)
         return doFetch(attempt + 1)
       }
@@ -646,8 +639,8 @@ export async function orbitFetch(
       // unavailable and (b) bypassed the retry ladder above, since that lives
       // inside the try. A big media GET that simply took too long therefore
       // surfaced as "Media unavailable" with no retry. Retry a real timeout.
-      if ((err as Error)?.name === 'AbortError' && attempt < 2) {
-        logger.warn(`[orbitFetch] ${isMedia ? 'media ' : ''}request timed out; retry ${attempt + 1}/2`)
+      if ((err as Error)?.name === 'AbortError' && attempt < 1) {
+        logger.warn(`[orbitFetch] ${isMedia ? 'media ' : ''}request timed out; retry ${attempt + 1}/1`)
         await waitRetry(attempt)
         return doFetch(attempt + 1)
       }
@@ -665,82 +658,6 @@ export async function orbitFetch(
 
 }
 
-export interface UploadWithProgressResult {
-  ok: boolean
-  status: number
-  /** Parsed `{ id }` from a successful response body or existing duplicate. */
-  id: string | null
-  error?: string
-}
-
-/**
- * XHR-based POST of a FormData body that reports upload progress. Auth signing
- * matches orbitFetch (fresh nonce/timestamp per request). `fetch` can't expose
- * upload progress, so match-card uploads use this to drive a progress bar.
- */
-export function uploadWithProgress(
-  endpoint: string,
-  formData: FormData,
-  identity: { orbitId: string; publicKeyHex: string; privateKeyHex: string; encryptionPubHex?: string },
-  onProgress?: (pct: number) => void
-): Promise<UploadWithProgressResult> {
-  return new Promise((resolve) => {
-    const url = resolveEndpoint(endpoint)
-    const pathname = getPathname(url)
-    const send = (attempt: number) => {
-      const headers = signRequestHeaders('POST', pathname, '', identity)
-
-      const xhr = new XMLHttpRequest()
-      xhr.open('POST', url)
-
-      headers.forEach((value, key) => {
-        if (key.toLowerCase() === 'content-type') return
-        xhr.setRequestHeader(key, value)
-      })
-
-      xhr.upload.onprogress = (e) => {
-        if (!onProgress) return
-        if (!e.lengthComputable) return
-        const pct = Math.round((e.loaded / e.total) * 100)
-        onProgress(Math.min(100, Math.max(0, pct)))
-      }
-
-      xhr.onerror = () => {
-        if (attempt === 0) {
-          send(1)
-        } else {
-          resolve({ ok: false, status: 0, id: null, error: 'Network error during upload' })
-        }
-      }
-      xhr.onabort = () => resolve({ ok: false, status: 0, id: null, error: 'Upload aborted' })
-      xhr.onload = () => {
-        let body: any = null
-        try {
-          body = JSON.parse(xhr.responseText)
-        } catch {}
-
-        if (xhr.status >= 200 && xhr.status < 300) {
-          onProgress?.(100)
-          const id = body && typeof body.id === 'string' ? body.id : null
-          resolve({ ok: true, status: xhr.status, id })
-        } else if (xhr.status === 401 && attempt === 0) {
-          // Re-sign with a fresh timestamp and retry once. The X-Orbit
-          // ticket window may have expired between the user opening the
-          // dialog and the upload actually starting (max 5 min on the
-          // server now, but still worth a one-shot retry).
-          send(1)
-        } else {
-          const id = (body && typeof body.existing_id === 'string') ? body.existing_id : ((body && typeof body.id === 'string') ? body.id : null)
-          const errorMsg = body?.error || `Upload failed (${xhr.status})`
-          resolve({ ok: false, status: xhr.status, id, error: errorMsg })
-        }
-      }
-
-      xhr.send(formData)
-    }
-    send(0)
-  })
-}
 
 // Genuine network failures return an honest 503 so callers surface an offline
 // state instead of locally fabricated mock data (which made the app appear to

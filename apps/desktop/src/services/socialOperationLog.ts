@@ -86,11 +86,6 @@ function backendRevision(backend: object): number {
   return backendRevisions.get(backend) ?? 0
 }
 
-/** Revision the cached read is valid for (diagnostics/tests). */
-export function currentOperationLogRevision(): number {
-  return externalRevision
-}
-
 /** Fired after a durable write so projections/UI can refresh. */
 export const OPERATION_LOG_CHANGED_EVENT = 'gmatch:operation-log-changed'
 
@@ -322,6 +317,23 @@ export class SocialOperationLog {
     const all = await this.allEntries()
     return all
       .filter((entry) => entry.status !== 'delivered')
+      .sort((a, b) => a.createdAt - b.createdAt || (a.operationId < b.operationId ? -1 : 1))
+  }
+
+  /**
+   * Entries that were NEVER handed to the network (`committed`), oldest first.
+   *
+   * The difference from `listPendingOperations` is what makes an
+   * append-triggered wave safe: broadcasting an entry advances it to `sending`
+   * AND writes, and every write announces a change. A wave that also selected
+   * `sending` entries would therefore re-send on its own announcement forever.
+   * Selecting only `committed` entries means the wave's own writes make the
+   * next pass empty, so a burst of appends settles after one extra no-op pass.
+   */
+  async listUnsentOperations(): Promise<LoggedOperation[]> {
+    const all = await this.allEntries()
+    return all
+      .filter((entry) => entry.status === 'committed')
       .sort((a, b) => a.createdAt - b.createdAt || (a.operationId < b.operationId ? -1 : 1))
   }
 

@@ -3,6 +3,7 @@ import {
   ArrowsIn,
   ArrowsOut,
   FolderOpen,
+  HardDrive,
   Images,
   MagnifyingGlass,
   SidebarSimple,
@@ -11,17 +12,37 @@ import {
 import GoonPanel from '../../ui/GoonPanel'
 import ShopPanel from '../../ui/ShopPanel'
 import StatsPanel from '../../ui/StatsPanel'
-import { FeedTuneStep } from '../../firstRun/FeedTuneStep'
 import { useToast } from '../Toast'
 import { useGame } from '../../game/store'
 import { useResizablePanel } from '../../hooks/useResizablePanel'
 import { PanelResizer } from '../../ui/PanelResizer'
 import IdleGalleryView from './IdleGalleryView'
 import TagBrowser from './TagBrowser'
+import { ClickerCacheView } from './ClickerCacheView'
 import { playPress } from '../../utils/sounds'
 import '../../ui/grid-animations.css'
 
 const RIGHT_KEY = 'idle.right.collapsed.v1'
+
+/**
+ * Escape closes the clicker's modals.
+ *
+ * These three are hand-rolled shells (a wide custom header the kit's `Modal`
+ * does not have), so they need their own key handler — one hook, three
+ * modals. Without it a modal could only be left with the mouse: a trap.
+ */
+function useEscapeClose(open: boolean, onClose: () => void) {
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      e.preventDefault()
+      onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+}
 
 function readCollapsed(): boolean {
   try {
@@ -54,13 +75,16 @@ export default function GridWorkspace({
   onSetWallpaper?: (url: string) => void
 }) {
   const ageVerified = useGame((s) => s.ageVerified)
-  const setupComplete = useGame((s) => s.setupComplete)
   const toasts = useGame((s) => s.toasts)
   const { toast } = useToast()
   const right = useResizablePanel('dock')
   const [collapsed, setCollapsed] = useState<boolean>(readCollapsed)
   const [galleryOpen, setGalleryOpen] = useState(false)
   const [browserOpen, setBrowserOpen] = useState(false)
+  const [cacheOpen, setCacheOpen] = useState(false)
+  useEscapeClose(galleryOpen, () => setGalleryOpen(false))
+  useEscapeClose(browserOpen, () => setBrowserOpen(false))
+  useEscapeClose(cacheOpen, () => setCacheOpen(false))
   const toggleCollapsed = () => {
     setCollapsed((v) => {
       try {
@@ -73,7 +97,7 @@ export default function GridWorkspace({
   }
 
   // The shell's AgeGateModal is the single 18+ gate (plan 5.5): mirror it
-  // into the idle store so offline earnings + feed unlock the same way.
+  // into the clicker store so the feed and the click game unlock together.
   useEffect(() => {
     if (
       typeof localStorage !== 'undefined' &&
@@ -93,26 +117,12 @@ export default function GridWorkspace({
     useGame.getState().clearToasts()
   }, [toasts, toast])
 
-  // First feed pull once the player's own tags exist (was in old App.tsx).
+  // First feed pull once the age gate is passed. The clicker opens straight
+  // into the game: tags are added in the Tags tab, and fetchFeed falls back to
+  // the honest offline card until the player owns one.
   useEffect(() => {
-    if (ageVerified && setupComplete) void useGame.getState().fetchFeed()
-  }, [ageVerified, setupComplete])
-
-  if (!setupComplete) {
-    return (
-      <div className="relative flex h-full min-h-0 items-center justify-center overflow-hidden bg-surface-canvas p-4 sm:p-8">
-        <div className="glass-card flex max-h-full w-full max-w-2xl flex-col rounded-xl p-6 sm:p-8 space-y-5 overflow-y-auto styled-scrollbar">
-          <div className="shrink-0 text-center">
-            <h2 className="text-xl font-bold tracking-tight text-retro-fg">Pick your pleasure</h2>
-            <p className="text-sm text-retro-muted mt-1.5">
-              Tap {4} pills to tune your feed. Nothing is fetched before that.
-            </p>
-          </div>
-          <FeedTuneStep onFinished={() => { /* fetchFeed fires off the setupComplete effect */ }} />
-        </div>
-      </div>
-    );
-  }
+    if (ageVerified) void useGame.getState().fetchFeed()
+  }, [ageVerified])
 
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-transparent p-3 sm:p-4 pb-[var(--island-clearance)]">
@@ -127,7 +137,7 @@ export default function GridWorkspace({
                   onClick={() => { playPress(750); setGalleryOpen(true); }}
                   title="Keepsakes Gallery (drained foes)"
                   aria-label="Keepsakes Gallery"
-                  className="h-7 px-2 rounded-md border border-border-glass bg-glass-w8 text-retro-muted hover:text-white hover:bg-glass-w10 hover:border-border-strong transition-all cursor-pointer flex items-center gap-1.5 text-xs font-medium"
+                  className="h-7 px-2 rounded-md border border-edge bg-glass-w8 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong transition cursor-pointer flex items-center gap-1.5 text-xs font-medium"
                 >
                   <Images size={14} weight="bold" className="text-retro-accent" />
                   <span className="hidden sm:inline">Gallery</span>
@@ -137,10 +147,20 @@ export default function GridWorkspace({
                   onClick={() => { playPress(720); setBrowserOpen(true); }}
                   title="Browse images by owned tag"
                   aria-label="Browse by tag"
-                  className="h-7 px-2 rounded-md border border-border-glass bg-glass-w8 text-retro-muted hover:text-white hover:bg-glass-w10 hover:border-border-strong transition-all cursor-pointer flex items-center gap-1.5 text-xs font-medium"
+                  className="h-7 px-2 rounded-md border border-edge bg-glass-w8 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong transition cursor-pointer flex items-center gap-1.5 text-xs font-medium"
                 >
                   <MagnifyingGlass size={14} weight="bold" className="text-retro-accent" />
                   <span className="hidden sm:inline">Browse</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { playPress(740); setCacheOpen(true); }}
+                  title="Picture cache — the pictures you already saw, ready to save"
+                  aria-label="Picture cache"
+                  className="h-7 px-2 rounded-md border border-edge bg-glass-w8 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong transition cursor-pointer flex items-center gap-1.5 text-xs font-medium"
+                >
+                  <HardDrive size={14} weight="bold" className="text-retro-accent" />
+                  <span className="hidden sm:inline">Cache</span>
                 </button>
                 {onOpenSources && (
                   <button
@@ -148,7 +168,7 @@ export default function GridWorkspace({
                     onClick={() => { playPress(700); onOpenSources(); }}
                     title="Custom image sources: add your own URLs or folders"
                     aria-label="Custom image sources"
-                    className="h-7 px-2 rounded-md border border-border-glass bg-glass-w8 text-retro-muted hover:text-white hover:bg-glass-w10 hover:border-border-strong transition-all cursor-pointer flex items-center gap-1.5 text-xs font-medium"
+                    className="h-7 px-2 rounded-md border border-edge bg-glass-w8 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong transition cursor-pointer flex items-center gap-1.5 text-xs font-medium"
                   >
                     <FolderOpen size={14} weight="bold" />
                     <span className="hidden sm:inline">Sources</span>
@@ -161,9 +181,9 @@ export default function GridWorkspace({
                     title={idleFullscreen ? 'Exit fullscreen' : 'Play fullscreen'}
                     aria-label={idleFullscreen ? 'Exit fullscreen' : 'Play fullscreen'}
                     aria-pressed={idleFullscreen}
-                    className={`h-7 w-7 rounded-md border transition-all cursor-pointer flex items-center justify-center ${idleFullscreen
+                    className={`h-7 w-7 rounded-md border transition cursor-pointer flex items-center justify-center ${idleFullscreen
                       ? 'border-retro-accent/60 bg-retro-accent/20 text-retro-accent'
-                      : 'border-border-glass bg-glass-w8 text-retro-muted hover:text-white hover:bg-glass-w10 hover:border-border-strong'
+                      : 'border-edge bg-glass-w8 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong'
                       }`}
                   >
                     {idleFullscreen ? <ArrowsIn size={14} weight="bold" /> : <ArrowsOut size={14} weight="bold" />}
@@ -175,9 +195,9 @@ export default function GridWorkspace({
                   title={collapsed ? 'Show tags & shop' : 'Maximize game stage (hide side column)'}
                   aria-label={collapsed ? 'Show tags & shop' : 'Maximize game stage'}
                   aria-pressed={collapsed}
-                  className={`h-7 w-7 rounded-md border transition-all cursor-pointer flex items-center justify-center ${collapsed
+                  className={`h-7 w-7 rounded-md border transition cursor-pointer flex items-center justify-center ${collapsed
                     ? 'border-retro-accent/60 bg-retro-accent/20 text-retro-accent'
-                    : 'border-border-glass bg-glass-w8 text-retro-muted hover:text-white hover:bg-glass-w10 hover:border-border-strong'
+                    : 'border-edge bg-glass-w8 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong'
                     }`}
                 >
                   <SidebarSimple size={14} weight={collapsed ? 'fill' : 'bold'} />
@@ -218,25 +238,25 @@ export default function GridWorkspace({
           onClick={() => setGalleryOpen(false)}
         >
           <div
-            className="relative flex h-full max-h-[90dvh] w-full max-w-4xl flex-col rounded-xl border border-border-glass bg-retro-panel p-5 shadow-xl overflow-hidden"
+            className="relative flex h-full max-h-[90dvh] w-full max-w-4xl flex-col rounded-xl border border-edge bg-retro-panel p-5 shadow-xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between pb-3 border-b border-border-glass">
+            <div className="flex items-center justify-between pb-3 border-b border-edge">
               <div className="flex items-center gap-2.5">
                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-retro-accent/15 text-retro-accent border border-retro-accent/30">
                   <Images size={16} weight="bold" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white tracking-wide uppercase">
+                  <h3 className="text-sm font-bold text-retro-fg tracking-wide ">
                     Drained Foes Gallery
                   </h3>
-                  <p className="text-xs text-white/40">Collected keepsake archive & cards</p>
+                  <p className="text-xs text-retro-fg/40">Collected keepsake archive & cards</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setGalleryOpen(false)}
-                className="flex h-7 w-7 items-center justify-center rounded-lg border border-border-glass bg-glass-w5 text-retro-muted hover:text-white hover:bg-glass-w10 hover:border-border-strong transition-all cursor-pointer"
+                className="flex h-7 w-7 items-center justify-center rounded-lg border border-edge bg-glass-w5 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong transition cursor-pointer"
                 aria-label="Close gallery"
               >
                 <X size={14} weight="bold" />
@@ -264,31 +284,72 @@ export default function GridWorkspace({
           onClick={() => setBrowserOpen(false)}
         >
           <div
-            className="relative flex h-full max-h-[90dvh] w-full max-w-4xl flex-col rounded-xl border border-border-glass bg-retro-panel p-5 shadow-xl overflow-hidden"
+            className="relative flex h-full max-h-[90dvh] w-full max-w-4xl flex-col rounded-xl border border-edge bg-retro-panel p-5 shadow-xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between pb-3 border-b border-border-glass">
+            <div className="flex items-center justify-between pb-3 border-b border-edge">
               <div className="flex items-center gap-2.5">
                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-retro-accent/15 text-retro-accent border border-retro-accent/30">
                   <MagnifyingGlass size={16} weight="bold" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white tracking-wide uppercase">
+                  <h3 className="text-sm font-bold text-retro-fg tracking-wide ">
                     Tag Browser
                   </h3>
-                  <p className="text-xs text-white/40">Browse live images by your owned tags</p>
+                  <p className="text-xs text-retro-fg/40">Browse live images by your owned tags</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setBrowserOpen(false)}
-                className="flex h-7 w-7 items-center justify-center rounded-lg border border-border-glass bg-glass-w5 text-retro-muted hover:text-white hover:bg-glass-w10 hover:border-border-strong transition-all cursor-pointer"
+                className="flex h-7 w-7 items-center justify-center rounded-lg border border-edge bg-glass-w5 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong transition cursor-pointer"
                 aria-label="Close tag browser"
               >
                 <X size={14} weight="bold" />
               </button>
             </div>
             <TagBrowser />
+          </div>
+        </div>
+      )}
+
+      {/* Picture Cache Modal */}
+      {cacheOpen && (
+        <div
+          className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 p-3 sm:p-6 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Picture cache"
+          onClick={() => setCacheOpen(false)}
+        >
+          <div
+            className="relative flex h-full max-h-[90dvh] w-full max-w-4xl flex-col rounded-xl border border-edge bg-retro-panel p-5 shadow-xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-edge">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-retro-accent/15 text-retro-accent border border-retro-accent/30">
+                  <HardDrive size={16} weight="bold" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-retro-fg tracking-wide ">
+                    Picture Cache
+                  </h3>
+                  <p className="text-xs text-retro-fg/40">Every picture you already saw, kept on disk</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCacheOpen(false)}
+                className="flex h-7 w-7 items-center justify-center rounded-lg border border-edge bg-glass-w5 text-retro-muted hover:text-retro-fg hover:bg-glass-w10 hover:border-edge-strong transition cursor-pointer"
+                aria-label="Close picture cache"
+              >
+                <X size={14} weight="bold" />
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto pt-3 styled-scrollbar">
+              <ClickerCacheView toast={toast} />
+            </div>
           </div>
         </div>
       )}

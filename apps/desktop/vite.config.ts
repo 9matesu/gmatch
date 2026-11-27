@@ -61,6 +61,10 @@ function devPxPlugin(): Plugin {
     name: 'gmatch-dev-px',
     configureServer(server) {
       server.middlewares.use('/px', async (req: IncomingMessage, res: ServerResponse) => {
+        // Aborted request: the browser closed the tab. Swallow it here so the
+        // socket cannot become an unhandled 'error' and kill the dev server.
+        req.on('error', () => { try { res.destroy() } catch { /* gone */ } })
+
         try {
           const u = new URL(req.url ?? '', 'http://local').searchParams.get('u') ?? ''
           const target = new URL(u)
@@ -127,6 +131,10 @@ function devApiProxyPlugin(): Plugin {
     configureServer(server) {
       server.middlewares.use((req: IncomingMessage, res: ServerResponse, next: () => void) => {
         if (!req.url?.startsWith('/api')) return next()
+
+        // The browser can abort mid-request (tab closed, route change). That
+        // reset must not surface as an unhandled 'error' on the socket.
+        req.on('error', () => { try { res.destroy() } catch { /* already gone */ } })
 
         // Handle preflight OPTIONS
         res.setHeader('Access-Control-Allow-Origin', '*')
@@ -303,6 +311,13 @@ function proxyUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer, target
   const headers: Record<string, string | string[] | undefined> = { ...req.headers }
   delete headers.host
   headers.host = targetUrl.host
+
+  // A browser that navigates away mid-upgrade resets the socket. Without a
+  // listener that reset is an unhandled 'error' event and it takes the whole
+  // dev server down (observed live: ECONNRESET). The client is gone, so
+  // closing is the only correct response.
+  socket.on('error', () => { try { socket.destroy() } catch { /* already gone */ } })
+  req.on('error', () => { try { socket.destroy() } catch { /* already gone */ } })
 
   const proxyReq = client.request({
     protocol: targetUrl.protocol,

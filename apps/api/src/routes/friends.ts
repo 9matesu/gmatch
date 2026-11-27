@@ -45,7 +45,7 @@ friends.post('/requests/:id/accept', orbitAuth, async (c) => {
   if (!req) return c.json({ error: 'Request not found' }, 404)
 
   // Create friend link (bidirectional)
-  await c.env.DB.batch([
+  await c.env.DB.atomicBatch([
     c.env.DB.prepare('UPDATE FriendRequests SET status = ? WHERE id = ?').bind('accepted', requestId),
     c.env.DB.prepare('INSERT OR IGNORE INTO Friends (user_id, friend_id) VALUES (?, ?)').bind(orbitId, req.sender_id),
     c.env.DB.prepare('INSERT OR IGNORE INTO Friends (user_id, friend_id) VALUES (?, ?)').bind(req.sender_id, orbitId)
@@ -74,7 +74,7 @@ friends.post('/remove', orbitAuth, async (c) => {
 
   if (!friendId) return c.json({ error: 'Missing friendId' }, 400)
 
-  await c.env.DB.batch([
+  await c.env.DB.atomicBatch([
     c.env.DB.prepare('DELETE FROM Friends WHERE user_id = ? AND friend_id = ?').bind(orbitId, friendId),
     c.env.DB.prepare('DELETE FROM Friends WHERE user_id = ? AND friend_id = ?').bind(friendId, orbitId),
   ])

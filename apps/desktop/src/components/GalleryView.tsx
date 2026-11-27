@@ -159,10 +159,10 @@ export function GalleryView({
               <Layers className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-xs font-bold text-retro-fg uppercase tracking-wider">
+              <h2 className="text-xs font-bold text-retro-fg tracking-wider">
                 Cards Collection ({filteredItems.length})
               </h2>
-              <p className="text-[10px] text-retro-muted">Your unlocked deck, received trades, and favorites</p>
+              <p className="text-2xs text-retro-muted">Your unlocked deck, received trades, and favorites</p>
             </div>
           </div>
 
@@ -192,7 +192,7 @@ export function GalleryView({
             </div>
 
             <div className="glass-field flex items-center gap-1 px-2 py-1 text-xs">
-              <span className="text-retro-muted font-semibold text-[10px] uppercase tracking-wider">Sort:</span>
+              <span className="text-retro-muted font-semibold text-2xs uppercase tracking-wider">Sort:</span>
               <select
                 aria-label="Sort cards by"
                 value={gallerySort}
@@ -265,7 +265,7 @@ export function GalleryView({
         {selectedGalleryIds.size > 0 && (
           <div className="glass-header px-4 py-2.5 flex items-center justify-between gap-3 text-xs animate-orbit-fade-in">
             <div className="flex items-center gap-2 text-retro-fg font-bold">
-              <CheckSquare className="w-4 h-4 text-emerald-600" />
+              <CheckSquare className="w-4 h-4 text-success-fg" />
               <span>{selectedGalleryIds.size} cards selected</span>
             </div>
             <div className="flex items-center gap-2">
@@ -296,13 +296,13 @@ export function GalleryView({
           </div>
         )}
 
-        <div className="p-4 border-b border-border-glass bg-glass-w5 space-y-2">
+        <div className="p-4 border-b border-edge bg-glass-w5 space-y-2">
           <div className="flex items-center justify-between text-xs font-bold text-retro-body">
             <span className="flex items-center gap-1.5 text-retro-fg">
               <Layers className="w-4 h-4 text-retro-muted" />
               <span>Add Media to Card Collection</span>
             </span>
-            <span className="text-[10px] text-retro-muted font-normal">All cards must be created through the Card Forge</span>
+            <span className="text-2xs text-retro-muted font-normal">All cards must be created through the Card Forge</span>
           </div>
           <button
             type="button"
@@ -337,7 +337,7 @@ export function GalleryView({
                   type="button"
                   onClick={() => toggleTag(t)}
                   aria-pressed={activeTags.has(t)}
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border cursor-pointer transition-colors ${activeTags.has(t) ? 'bg-glass-w20 border-retro-fg/70' : 'border-border-glass text-retro-muted hover:text-retro-body'}`}
+                  className={`px-2 py-0.5 rounded-full text-2xs font-semibold border cursor-pointer transition-colors ${activeTags.has(t) ? 'bg-glass-w20 border-retro-fg/70' : 'border-edge text-retro-muted hover:text-retro-body'}`}
                 >
                   {t} <span className="opacity-60">{n}</span>
                 </button>
@@ -346,7 +346,7 @@ export function GalleryView({
                 <button
                   type="button"
                   onClick={() => setActiveTags(new Set())}
-                  className="text-[10px] text-retro-muted hover:text-retro-fg cursor-pointer underline"
+                  className="text-2xs text-retro-muted hover:text-retro-fg cursor-pointer underline"
                 >
                   clear ({activeTags.size})
                 </button>
@@ -358,7 +358,7 @@ export function GalleryView({
               {Array.from({ length: 10 }).map((_, i) => <CardSkeleton key={i} />)}
             </div>
           ) : filteredItems.length === 0 ? (
-            <EmptyState title="No cards found" description="Upload images, battle in the duel arena, or open lootboxes to expand your deck!" />
+            <EmptyState title="No cards found" description="Forge a card from an image, or win one in the duel arena." />
           ) : (
             <>
               <div
@@ -420,7 +420,7 @@ export function GalleryView({
                 ))}
               </div>
 
-              <div className="flex items-center justify-between pt-3 border-t border-border-glass/80 mt-4 text-xs">
+              <div className="flex items-center justify-between pt-3 border-t border-edge/80 mt-4 text-xs">
                 <button
                   type="button"
                   onClick={() => {

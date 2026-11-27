@@ -47,7 +47,7 @@ it('rejects name-bearing profile updates on a nameless user; allows bio-only sav
   expect(ok.status).toBe(200)
 })
 
-function makePngBlob(): Blob {
+function makePngBlob(seed = 0): Blob {
   const bytes = new Uint8Array([
     0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
     0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
@@ -59,12 +59,20 @@ function makePngBlob(): Blob {
     0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE,
     0x42, 0x60, 0x82,
   ])
-  return new Blob([bytes], { type: 'image/png' })
+  // The object store is CONTENT-ADDRESSED: two posts with identical bytes are
+  // the same object (the API answers 200 `reused` instead of 201). A fixture
+  // that needs two DISTINCT posts must therefore carry different bytes. The
+  // trailing bytes sit after the IEND chunk, which every PNG decoder ignores,
+  // so the image still decodes.
+  const out = new Uint8Array(bytes.length + (seed > 0 ? 2 : 0))
+  out.set(bytes, 0)
+  if (seed > 0) out.set([0x00, seed & 0xff], bytes.length)
+  return new Blob([out], { type: 'image/png' })
 }
 
-async function createPublicPost(env: any, identity: ReturnType<typeof createTestIdentity>, caption: string) {
+async function createPublicPost(env: any, identity: ReturnType<typeof createTestIdentity>, caption: string, seed = 0) {
   const formData = new FormData()
-  formData.append('image', makePngBlob(), 'card.png')
+  formData.append('image', makePngBlob(seed), 'card.png')
   formData.append('is_public', '1')
   formData.append('post_caption', caption)
   formData.append('location', 'Testville')
@@ -148,6 +156,40 @@ describe('Posts API (gMatch feed engagement)', () => {
     expect(unsave.status).toBe(200)
   })
 
+  it('GET /api/posts?saved=1 lists exactly the posts the caller saved', async () => {
+    // The profile "Saved" tab reads this. Without it the tab is structurally
+    // dead: the save writes a row, but nothing can ever list it.
+    const env = await createMockEnv()
+    await registerUser(env, alice)
+    await registerUser(env, bob)
+    const savedId = await createPublicPost(env, alice, 'a post bob saves', 1)
+    const otherId = await createPublicPost(env, alice, 'a post bob does NOT save', 2)
+
+    const save = await app.request(`/api/posts/${savedId}/save`, { method: 'POST', headers: authHeaders(bob, 'POST', `/api/posts/${savedId}/save`) }, env)
+    expect(save.status).toBe(200)
+
+    // The signature covers the PATHNAME only (the server signs
+    // `new URL(req.url).pathname`), so the query string is not signed.
+    const list = await app.request('/api/posts?saved=1&limit=200&sort=latest', { headers: authHeaders(bob, 'GET', '/api/posts') }, env)
+    expect(list.status).toBe(200)
+    const json: any = await list.json()
+    const ids = (json.posts || []).map((p: any) => p.id)
+    expect(ids).toContain(savedId)
+    expect(ids).not.toContain(otherId)
+
+    // Another caller's saved list must not leak into this one.
+    const asAlice = await app.request('/api/posts?saved=1&limit=200&sort=latest', { headers: authHeaders(alice, 'GET', '/api/posts') }, env)
+    const aliceJson: any = await asAlice.json()
+    expect((aliceJson.posts || []).map((p: any) => p.id)).not.toContain(savedId)
+
+    // Un-saving removes it from the list again.
+    const unsave = await app.request(`/api/posts/${savedId}/save`, { method: 'DELETE', headers: authHeaders(bob, 'DELETE', `/api/posts/${savedId}/save`) }, env)
+    expect(unsave.status).toBe(200)
+    const after = await app.request('/api/posts?saved=1&limit=200&sort=latest', { headers: authHeaders(bob, 'GET', '/api/posts') }, env)
+    const afterJson: any = await after.json()
+    expect((afterJson.posts || []).map((p: any) => p.id)).not.toContain(savedId)
+  })
+
   it('comments: create, list, like, delete', async () => {
     const body = JSON.stringify({ body: 'sick card!' })
     const create = await app.request(`/api/posts/${postId}/comments`, {
@@ -215,6 +257,120 @@ describe('Posts API (gMatch feed engagement)', () => {
     const feed = await app.request('/api/posts', { headers: authHeaders(alice, 'GET', '/api/posts') }, env)
     const feedJson: any = await feed.json()
     expect(feedJson.posts.find((p: any) => p.id === postId)).toBeUndefined()
+  })
+
+  it('a deleted post is GONE FOR GOOD: the row is removed and no read path lists it', async () => {
+    // The durable proof. The feed query is not enough: the row can be hidden
+    // from a read path and still sit in the table, where the next snapshot or
+    // the profile query brings it back.
+    const id = await createPublicPost(env, alice, 'An old post that must stay deleted')
+
+    const before = await env.DB.prepare('SELECT id FROM Objects WHERE id = ?').bind(id).first<{ id: string }>()
+    expect(before?.id).toBe(id)
+
+    const del = await app.request(`/api/posts/${id}`, { method: 'DELETE', headers: authHeaders(alice, 'DELETE', `/api/posts/${id}`) }, env)
+    expect(del.status).toBe(200)
+
+    // 1. The row itself is gone.
+    const after = await env.DB.prepare('SELECT id FROM Objects WHERE id = ?').bind(id).first<{ id: string }>()
+    expect(after).toBeFalsy()
+
+    // 2. The public feed does not list it.
+    const feed = await app.request('/api/posts', { headers: authHeaders(bob, 'GET', '/api/posts') }, env)
+    const feedJson: any = await feed.json()
+    expect(feedJson.posts.find((p: any) => p.id === id)).toBeUndefined()
+
+    // 3. The PROFILE query does not list it — this is the path the own profile
+    //    uses, and it is the one that used to keep showing deleted posts.
+    //    The signature covers the PATHNAME only (the server signs
+    //    `new URL(req.url).pathname`), so the query string is not signed.
+    const profile = await app.request(`/api/posts?author_id=${alice.orbitId}&limit=200&sort=latest`, { headers: authHeaders(alice, 'GET', '/api/posts') }, env)
+    const profileJson: any = await profile.json()
+    expect(profileJson.posts.find((p: any) => p.id === id)).toBeUndefined()
+
+    // 4. The detail route 404s.
+    const detail = await app.request(`/api/posts/${id}`, { headers: authHeaders(alice, 'GET', `/api/posts/${id}`) }, env)
+    expect(detail.status).toBe(404)
+
+    // 5. Deleting it again is still the goal state, not a failure.
+    const again = await app.request(`/api/posts/${id}`, { method: 'DELETE', headers: authHeaders(alice, 'DELETE', `/api/posts/${id}`) }, env)
+    expect(again.status).toBe(404)
+  })
+})
+
+describe('Editing a post caption (PATCH /api/posts/:id)', () => {
+  let env: Awaited<ReturnType<typeof createMockEnv>>
+  let postId: string
+
+  beforeAll(async () => {
+    env = await createMockEnv()
+    await registerUser(env, alice)
+    await registerUser(env, bob)
+    await setDisplayName(env, alice, 'Alice Arcade')
+    postId = await createPublicPost(env, alice, 'the original caption')
+  })
+
+  async function patch(caption: unknown, identity = alice) {
+    const body = JSON.stringify({ caption })
+    return app.request(`/api/posts/${postId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...authHeaders(identity, 'PATCH', `/api/posts/${postId}`, body) },
+      body,
+    }, env)
+  }
+
+  it('the owner can edit the caption and the feed shows the new one', async () => {
+    const res = await patch('the EDITED caption')
+    expect(res.status).toBe(200)
+    const json: any = await res.json()
+    expect(json.success).toBe(true)
+    expect(json.caption).toBe('the EDITED caption')
+
+    const feed = await app.request('/api/posts', { headers: authHeaders(bob, 'GET', '/api/posts') }, env)
+    const feedJson: any = await feed.json()
+    const post = feedJson.posts.find((p: any) => p.id === postId)
+    expect(post.caption).toBe('the EDITED caption')
+  })
+
+  it('a NON-owner cannot edit the caption', async () => {
+    const res = await patch('hijacked', bob)
+    expect(res.status).toBe(403)
+
+    const feed = await app.request('/api/posts', { headers: authHeaders(bob, 'GET', '/api/posts') }, env)
+    const feedJson: any = await feed.json()
+    expect(feedJson.posts.find((p: any) => p.id === postId).caption).toBe('the EDITED caption')
+  })
+
+  it('editing a post that does not exist is a 404', async () => {
+    const body = JSON.stringify({ caption: 'nope' })
+    const res = await app.request('/api/posts/does-not-exist', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...authHeaders(alice, 'PATCH', '/api/posts/does-not-exist', body) },
+      body,
+    }, env)
+    expect(res.status).toBe(404)
+  })
+
+  it('rejects a caption that is not a string', async () => {
+    const res = await patch(42)
+    expect(res.status).toBe(400)
+  })
+
+  it('rejects an absurdly long caption', async () => {
+    const res = await patch('x'.repeat(2001))
+    expect(res.status).toBe(400)
+  })
+
+  it('an empty caption CLEARS the text (it does not fall back to the old one)', async () => {
+    const res = await patch('   ')
+    expect(res.status).toBe(200)
+    // The API serializes an empty caption as null (a caption is text or
+    // absent) — the point is that the OLD text does not come back.
+    const json: any = await res.json()
+    expect(json.caption).toBeNull()
+    const feed = await app.request('/api/posts', { headers: authHeaders(bob, 'GET', '/api/posts') }, env)
+    const feedJson: any = await feed.json()
+    expect(feedJson.posts.find((p: any) => p.id === postId).caption).toBeNull()
   })
 })
 

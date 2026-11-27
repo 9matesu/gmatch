@@ -2,8 +2,6 @@ import type { ActiveCap, CapId, CustomSource, GalleryImage, OwnedTag, ViewMode }
 
 export const SAVE_KEY = 'gmatch.save.v1'
 export const SAVE_VERSION = 3
-export const OFFLINE_RATE = 0.25
-export const OFFLINE_CAP_MS = 8 * 60 * 60 * 1000
 
 export interface SaveData {
   version: number
@@ -27,8 +25,7 @@ export interface SaveData {
   maxHeatStreak: number
   backgroundUrl: string | null
   viewMode: ViewMode
-  /** Player's feed starter picks + extra excludes (setup screen / config tab). */
-  setupComplete: boolean
+  /** Player's extra excludes (Config tab). */
   userExcludes: string[]
   /** Co-occurrence pairs learned from purges (T4). */
   coRules: { a: string; b: string; count: number }[]
@@ -60,7 +57,6 @@ export function defaultSave(now = Date.now()): SaveData {
     maxHeatStreak: 0,
     backgroundUrl: null,
     viewMode: 'single',
-    setupComplete: false,
     userExcludes: [],
     coRules: [],
     customSources: [],
@@ -112,7 +108,6 @@ export function deserialize(raw: string | null | undefined): SaveData | null {
     viewMode: (['single', 'grid', '1x1', '1x2', '2x2', '3x3'].includes(d.viewMode as string)
       ? d.viewMode
       : 'single') as ViewMode,
-    setupComplete: d.setupComplete === true,
     userExcludes: arr<string>(d.userExcludes),
     coRules: (Array.isArray(d.coRules) ? d.coRules : []).filter((r: any) => typeof r?.a === 'string' && typeof r?.b === 'string').slice(0, 200),
     customSources: sanitizeCustomSources((d as Partial<SaveData>).customSources),
@@ -169,12 +164,3 @@ function sanitizeCustomSources(v: unknown): CustomSource[] {
  * Offline earnings = elapsed * pts/s * 25%, capped at 8h (SPEC §11).
  * elapsedMs is clamped to [0, capMs].
  */
-export function offlineEarnings(
-  gps: number,
-  elapsedMs: number,
-  capMs = OFFLINE_CAP_MS,
-  rate = OFFLINE_RATE,
-): number {
-  const capped = Math.min(Math.max(0, elapsedMs), capMs)
-  return (capped / 1000) * Math.max(0, gps) * rate
-}

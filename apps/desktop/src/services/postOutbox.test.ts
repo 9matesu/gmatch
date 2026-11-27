@@ -16,8 +16,14 @@ import {
   setOutboxState,
   pruneOutbox,
   flushPostOutbox,
+  removeOutboxEntry,
+  rearmMissingReplicated,
+  updateOutboxCaption,
   OUTBOX_KEY,
 } from './postOutbox';
+import { orbitFetch } from '../utils/api';
+
+vi.mock('../utils/api', () => ({ orbitFetch: vi.fn() }));
 
 const identity = { orbitId: 'me-1' } as never;
 
@@ -53,6 +59,56 @@ describe('postOutbox store (Phase 3b)', () => {
     setOutboxState('o1', 'replicated');
     pruneOutbox(0, Date.now() + 1);
     expect(listOutbox().map((e) => e.objectId)).toEqual(['o2']);
+  });
+
+  it('updateOutboxCaption syncs the local copy with an edited caption', () => {
+    // The local outbox copy of a post is what the tile renders BEFORE the node
+    // echoes it back. After the author edits the caption on the node, the local
+    // copy must carry the new text too — otherwise the pre-echo window (and a
+    // re-register) shows the old caption.
+    enqueueOutbox({
+      objectId: 'o1', postGroup: null,
+      registerBody: { ...regBody('o1'), caption: 'old', post_caption: 'old' },
+      gossipInput: null,
+    });
+    expect(updateOutboxCaption('o1', 'new')).toBe(true);
+    const body = listOutbox()[0].registerBody as Record<string, unknown>;
+    expect(body.caption).toBe('new');
+    expect(body.post_caption).toBe('new');
+  });
+
+  it('updateOutboxCaption is a no-op for an object that was never outboxed', () => {
+    expect(updateOutboxCaption('nope', 'x')).toBe(false);
+  });
+
+  it('removeOutboxEntry removes a local-only row and reports what it was', () => {
+    enqueueOutbox({ objectId: 'o1', postGroup: null, registerBody: regBody('o1'), gossipInput: null });
+    const removed = removeOutboxEntry('o1');
+    expect(removed?.objectId).toBe('o1');
+    expect(listOutbox()).toHaveLength(0);
+  });
+
+  it('removeOutboxEntry returns null when the object was never outboxed', () => {
+    enqueueOutbox({ objectId: 'o1', postGroup: null, registerBody: regBody('o1'), gossipInput: null });
+    expect(removeOutboxEntry('nope')).toBeNull();
+    // the unrelated row is untouched
+    expect(listOutbox().map((e) => e.objectId)).toEqual(['o1']);
+  });
+
+  it('rearmMissingReplicated moves a replicated entry back to local when the node 404s', async () => {
+    enqueueOutbox({ objectId: 'rearm-1', postGroup: null, registerBody: regBody('rearm-1'), gossipInput: null });
+    setOutboxState('rearm-1', 'replicated');
+    (orbitFetch as unknown as { mockResolvedValue: (v: unknown) => void }).mockResolvedValue({ status: 404 });
+    await rearmMissingReplicated(identity);
+    expect(listOutbox()[0].state).toBe('local');
+  });
+
+  it('rearmMissingReplicated leaves a replicated entry alone when the node holds it', async () => {
+    enqueueOutbox({ objectId: 'rearm-2', postGroup: null, registerBody: regBody('rearm-2'), gossipInput: null });
+    setOutboxState('rearm-2', 'replicated');
+    (orbitFetch as unknown as { mockResolvedValue: (v: unknown) => void }).mockResolvedValue({ status: 200 });
+    await rearmMissingReplicated(identity);
+    expect(listOutbox()[0].state).toBe('replicated');
   });
 });
 

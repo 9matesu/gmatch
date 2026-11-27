@@ -2,6 +2,7 @@
 // Control frames only travel while a room is open; zero traffic otherwise.
 // Up to MAX_SLOTS rooms can play side by side; each is its own WS room.
 import { useSyncExternalStore } from 'react'
+import { parseWatchServerFrame, type QueueEntry, type WatchPong } from '@orbit/protocol'
 import { orbitFetch } from '../utils/api'
 import { subscribeOrbitWebSocket, sendOrbitWebSocket } from '../utils/orbitWebSocket'
 import { ClockOffset, type SyncFrame } from '../utils/watchSync'
@@ -19,18 +20,10 @@ export interface PartyInfo {
   url: string
 }
 
-export interface QueueEntry {
-  id: string
-  name: string
-  url: string
-  hash?: string
-  size?: number
-  local?: boolean
-  /** Poster still for a shared local video (swarm object URL). */
-  thumb?: string
-  status?: 'queued' | 'proposed' | 'unavailable'
-  provider?: string
-}
+// The queue entry is part of the shared wire contract — the same shape the
+// server broadcasts and the client narrows (@orbit/protocol).
+export type { QueueEntry } from '@orbit/protocol'
+
 
 export interface PartyRuntime extends PartyInfo {
   frame: (SyncFrame & { by?: string; rev?: number }) | null
@@ -279,9 +272,19 @@ export function resetWatchParty(): void {
   watchPartyStore.set({ open: false, parties: [], subscribed: false, kickedNotice: '' })
 }
 
-export function handleWatchMessage(msg: any): void {
-  if (!msg || typeof msg !== 'object') return
-  if (msg.type === '__ws_reconnected') {
+/**
+ * Apply one inbound room frame.
+ *
+ * The room payloads are NARROWED by the shared contract
+ * (`parseWatchPayload`, @orbit/protocol) before anything reads them: the
+ * handler used to take `msg: any` and coerce every field with
+ * String(...)/Number(...), so a malformed frame silently became a room with
+ * a blank name and a queue of empty entries.
+ */
+export function handleWatchMessage(raw: unknown): void {
+  if (!raw || typeof raw !== 'object') return
+  const record = raw as Record<string, unknown>
+  if (record.type === '__ws_reconnected') {
     // The server-side socket is brand new and holds no watch rooms: re-join
     // everything we still have open. The join snapshot restores position.
     if (!subscribedIdentity) return
@@ -290,6 +293,8 @@ export function handleWatchMessage(msg: any): void {
     }
     return
   }
+  const msg = parseWatchServerFrame(raw)
+  if (!msg) return
   if (msg.type === 'watch.nack') {
     // Our control frame was refused (non-host, or the 200ms throttle). The
     // optimistic frame we applied locally is a lie; roll it back to the last
@@ -319,114 +324,111 @@ export function handleWatchMessage(msg: any): void {
     }
     return
   }
-  if (msg.type === 'watch.sync' || msg.type === 'watch.roster' || msg.type === 'watch.chat'
-      || msg.type === 'watch.chat_del' || msg.type === 'watch.system'
-      || msg.type === 'watch.settings' || msg.type === 'watch.queue') {
-    const party = state.parties.find((p) => p.id === msg.party)
-    if (!party) return
-    switch (msg.type) {
-      case 'watch.sync': {
-        const rev = Number(msg.frame?.rev)
-        // Authoritative revisions only move forward. Legacy frames without a
-        // revision are still applied; a stale revision is dropped.
-        if (Number.isFinite(rev) && rev >= 0 && rev <= party.frameRev) break
+  if (msg.type === 'watch.pong') {
+    pongResolve?.(msg)
+    return
+  }
+  const party = state.parties.find((p) => p.id === msg.party)
+  if (!party) return
+  switch (msg.type) {
+    case 'watch.sync': {
+      const rev = msg.frame.rev
+      // Authoritative revisions only move forward. An UNVERSIONED frame (no
+      // rev at all) is still applied — there is nothing to compare it to; a
+      // stale revision is dropped.
+      if (rev !== undefined && rev <= party.frameRev) break
+      party.frame = msg.frame
+      if (rev !== undefined) party.frameRev = rev
+      break
+    }
+    case 'watch.roster': {
+      party.members = msg.members
+      if (msg.host) party.host = msg.host
+      for (const m of msg.members) if (m.muted) party.mutedIds[m.id] = true
+      // join snapshots ride this frame: full state recovery in one message
+      if ('frame' in msg) {
         party.frame = msg.frame
-        if (Number.isFinite(rev) && rev >= 0) party.frameRev = Math.floor(rev)
-        break
-      }
-      case 'watch.roster': {
-        party.members = Array.isArray(msg.members) ? msg.members : []
-        if (typeof msg.host === 'string' && msg.host) party.host = msg.host
-        for (const m of party.members) if (m.muted) party.mutedIds[m.id] = true
-        // join snapshots ride this frame: full state recovery in one message
-        if (msg.frame) {
-          party.frame = msg.frame
-          const rev = Number(msg.frame?.rev)
-          if (Number.isFinite(rev) && rev >= 0) party.frameRev = Math.floor(rev)
-        }
-        if (Array.isArray(msg.chat)) party.chat = msg.chat.map((c: any) => ({ id: String(c.id || ''), from: String(c.from || ''), name: String(c.name || ''), text: String(c.text || ''), at: Number(c.at) || 0 }))
-        if (Array.isArray(msg.queue)) party.queue = msg.queue.map((q: any) => ({ id: String(q.id), name: String(q.name), url: String(q.url), hash: typeof q.hash === 'string' ? q.hash : undefined, size: Number.isFinite(Number(q.size)) ? Number(q.size) : undefined, local: q.local === true ? true : undefined, status: q.status === 'proposed' || q.status === 'unavailable' ? q.status : undefined, provider: typeof q.provider === 'string' ? q.provider : undefined }))
-        if (typeof msg.current === 'string') {
+        if (msg.frame.rev !== undefined) party.frameRev = msg.frame.rev
+        party.chat = msg.chat.map((c) => ({ id: c.id, from: c.from, name: c.name, text: c.text, at: c.at }))
+        party.queue = msg.queue.map((q) => ({
+          id: q.id, name: q.name, url: q.url, hash: q.hash, size: q.size, local: q.local,
+          thumb: q.thumb, status: q.status, provider: q.provider,
+        }))
+        if (msg.current) {
           party.current = msg.current
           party.mediaName = party.queue.find((q) => q.id === party.current)?.name || party.mediaName
         }
-        const queueRev = Number((msg as any).queueRev)
-        if (Number.isFinite(queueRev) && queueRev >= 0) party.queueRev = Math.floor(queueRev)
-        const settingsRev = Number((msg as any).settingsRev)
-        if (Number.isFinite(settingsRev) && settingsRev >= 0) party.settingsRev = Math.floor(settingsRev)
-        if (msg.ready && typeof msg.ready === 'object') party.ready = msg.ready as Record<string, string[]>
-        if (typeof (msg as any).sharedControl === 'boolean') party.sharedControl = (msg as any).sharedControl
-        if (typeof (msg as any).requireApproval === 'boolean') party.requireApproval = (msg as any).requireApproval
-        if (typeof (msg as any).lockVideo === 'boolean') party.lockVideo = (msg as any).lockVideo
-        if (typeof (msg as any).isPrivate === 'boolean') party.isPrivate = (msg as any).isPrivate
-        break
+        if (msg.queueRev >= 0) party.queueRev = msg.queueRev
+        if (msg.settingsRev >= 0) party.settingsRev = msg.settingsRev
+        party.ready = msg.ready
+        party.sharedControl = msg.sharedControl
+        party.requireApproval = msg.requireApproval
+        party.lockVideo = msg.lockVideo
+        party.isPrivate = msg.isPrivate
       }
-      case 'watch.chat':
-        party.chat = [...party.chat, { id: String(msg.msgId || ''), from: String(msg.from?.id || ''), name: msg.from?.name || 'Unknown User', text: String(msg.text || '').slice(0, 80), at: Number(msg.at) || Date.now() }].slice(-80)
-        break
-      case 'watch.chat_del':
-        party.chat = party.chat.filter((c) => c.id !== String(msg.msgId))
-        break
-      case 'watch.system':
-        party.chat = [...party.chat, { id: `sys${Date.now()}`, name: '', text: String(msg.text || ''), at: Date.now(), sys: true }].slice(-80)
-        break
-      case 'watch.settings': {
-        const settingsRev = Number((msg as any).settingsRev)
-        if (Number.isFinite(settingsRev) && settingsRev >= 0 && settingsRev <= party.settingsRev) break
-        if (typeof msg.name === 'string') party.name = msg.name
-        if (typeof msg.isPrivate === 'boolean') party.isPrivate = msg.isPrivate
-        if (typeof msg.lockVideo === 'boolean') party.lockVideo = msg.lockVideo
-        if (typeof (msg as any).sharedControl === 'boolean') party.sharedControl = (msg as any).sharedControl
-        if (typeof (msg as any).requireApproval === 'boolean') party.requireApproval = (msg as any).requireApproval
-        if (msg.muted && typeof msg.muted === 'object') party.mutedIds = { ...party.mutedIds, ...msg.muted }
-        if (Number.isFinite(settingsRev) && settingsRev >= 0) party.settingsRev = Math.floor(settingsRev)
-        break
-      }
-      case 'watch.queue': {
-        const queueRev = Number((msg as any).queueRev)
-        if (Number.isFinite(queueRev) && queueRev >= 0 && queueRev <= party.queueRev) break
-        party.queue = Array.isArray(msg.queue) ? msg.queue : []
-        party.current = String(msg.current || '')
-        if (msg.frame) {
-          party.frame = msg.frame
-          const frameRev = Number(msg.frame?.rev)
-          if (Number.isFinite(frameRev) && frameRev >= 0) party.frameRev = Math.floor(frameRev)
-          party.url = String(msg.frame.url || party.url)
-          const entry = party.queue.find((q) => q.id === party.current)
-          party.mediaName = entry?.name || ''
-        }
-        if (Number.isFinite(queueRev) && queueRev >= 0) party.queueRev = Math.floor(queueRev)
-        if (msg.ready && typeof msg.ready === 'object') party.ready = msg.ready as Record<string, string[]>
-        break
-      }
+      break
     }
-    watchPartyStore.set({})
-    return
+    case 'watch.chat':
+      party.chat = [...party.chat, { id: msg.msgId, from: msg.from.id, name: msg.from.name || 'Unknown User', text: msg.text.slice(0, 80), at: msg.at || Date.now() }].slice(-80)
+      break
+    case 'watch.chat_del':
+      party.chat = party.chat.filter((c) => c.id !== msg.msgId)
+      break
+    case 'watch.system':
+      party.chat = [...party.chat, { id: `sys${Date.now()}`, name: '', text: msg.text, at: Date.now(), sys: true }].slice(-80)
+      break
+    case 'watch.settings': {
+      const settingsRev = msg.settingsRev
+      if (settingsRev !== undefined && settingsRev >= 0 && settingsRev <= party.settingsRev) break
+      if (msg.name !== undefined) party.name = msg.name
+      if (msg.isPrivate !== undefined) party.isPrivate = msg.isPrivate
+      if (msg.lockVideo !== undefined) party.lockVideo = msg.lockVideo
+      if (msg.sharedControl !== undefined) party.sharedControl = msg.sharedControl
+      if (msg.requireApproval !== undefined) party.requireApproval = msg.requireApproval
+      if (msg.muted) party.mutedIds = { ...party.mutedIds, ...msg.muted }
+      if (settingsRev !== undefined && settingsRev >= 0) party.settingsRev = settingsRev
+      break
+    }
+    case 'watch.queue': {
+      const queueRev = msg.queueRev
+      if (queueRev >= 0 && queueRev <= party.queueRev) break
+      party.queue = msg.queue.map((q) => ({
+        id: q.id, name: q.name, url: q.url, hash: q.hash, size: q.size, local: q.local,
+        thumb: q.thumb, status: q.status, provider: q.provider,
+      }))
+      party.current = msg.current
+      party.frame = msg.frame
+      if (msg.frame.rev !== undefined) party.frameRev = msg.frame.rev
+      party.url = msg.frame.url || party.url
+      const entry = party.queue.find((q) => q.id === party.current)
+      party.mediaName = entry?.name || ''
+      if (queueRev >= 0) party.queueRev = queueRev
+      party.ready = msg.ready
+      break
+    }
   }
-  if (msg.type === 'watch.pong') {
-    pongResolve?.(msg)
-  }
+  watchPartyStore.set({})
 }
 
 let unsubscribe: (() => void) | null = null
-let pongResolve: ((v: any) => void) | null = null
+let pongResolve: ((v: WatchPong) => void) | null = null
 let subscribedIdentity: IdentityLike | null = null
 
 function pingOnce(): Promise<{ t0: number; t1: number; t3: number }> {
   return new Promise((resolve) => {
     const t0 = Date.now() / 1000
-    const done = (pong: any) => {
+    const done = (pong: WatchPong) => {
       const t3 = Date.now() / 1000
       if (pongResolve === done) pongResolve = null
-      resolve({ t0, t1: Number(pong?.t1) || t3, t3 })
+      resolve({ t0, t1: pong.t1 || t3, t3 })
     }
     pongResolve = done
     if (!sendOrbitWebSocket({ type: 'watch.ping', t0 })) {
-      done({ t1: t0 })
+      done({ type: 'watch.pong', t0, t1: t0 })
     }
     // never hang the estimator if the pong is lost
     setTimeout(() => {
-      if (pongResolve === done) done({ t1: t0 })
+      if (pongResolve === done) done({ type: 'watch.pong', t0, t1: t0 })
     }, 3000)
   })
 }

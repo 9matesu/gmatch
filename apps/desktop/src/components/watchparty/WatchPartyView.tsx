@@ -55,9 +55,9 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
   if (!inRoom) {
     return (
       <div className="p-2 sm:p-4 h-full flex-1 flex flex-col min-h-0 overflow-hidden">
-        <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden glass-card rounded-xl border border-border-glass bg-surface-canvas/60 backdrop-blur-md">
-          <div className="glass-header flex items-center justify-between px-4 py-3 border-b border-border-glass">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-retro-fg flex items-center gap-2">
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden glass-card rounded-xl border border-edge bg-surface-canvas/60 backdrop-blur-md">
+          <div className="glass-header flex items-center justify-between px-4 py-3 border-b border-edge">
+            <h3 className="text-xs font-bold tracking-wider text-retro-fg flex items-center gap-2">
               <Clapperboard className="w-4 h-4 text-retro-accent" />
               Watch
             </h3>
@@ -85,9 +85,9 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
 
   // ROOM MODE: Full-bleed theater layout with video viewer and docked side rail
   return (
-    <div className="group/watch relative h-full flex-1 flex flex-row min-h-0 overflow-hidden bg-black">
+    <div className="group/watch relative h-full flex-1 flex flex-row min-h-0 overflow-hidden bg-retro-bg">
       {/* Video Viewer Container: takes remaining width, resizes automatically */}
-      <div className="flex-1 min-w-0 min-h-0 relative flex flex-col bg-black overflow-hidden">
+      <div className="flex-1 min-w-0 min-h-0 relative flex flex-col bg-retro-bg overflow-hidden">
         {parties.length === 1 ? (
           <WatchPartySlot
             party={parties[0]}
@@ -126,25 +126,25 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
 
       {/* Docked Side Rail (Room info + Participants + Queue + Chat) */}
       <aside
-        className={`w-72 lg:w-80 shrink-0 h-full flex-col min-h-0 overflow-hidden border-l border-border-glass solid-panel z-20 ${
+        className={`w-72 lg:w-80 shrink-0 h-full flex-col min-h-0 overflow-hidden border-l border-edge solid-panel z-20 ${
           railOpen ? 'flex animate-orbit-fade-in' : 'hidden'
         }`}
       >
         {active && <WatchRoomHeader party={active} identity={identity} profilePics={profilePics} />}
 
-        <div className="flex items-start justify-between gap-2 px-3 py-1.5 border-b border-border-glass">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-retro-fg">In this room</p>
+        <div className="flex items-start justify-between gap-2 px-3 py-1.5 border-b border-edge">
+          <p className="text-2xs font-bold uppercase tracking-wider text-retro-fg">In this room</p>
         </div>
 
         {active && active.members.length > 0 && (
-          <ul className="px-3 py-2 space-y-1.5 border-b border-border-glass max-h-36 overflow-y-auto styled-scrollbar">
+          <ul className="px-3 py-2 space-y-1.5 border-b border-edge max-h-36 overflow-y-auto styled-scrollbar">
             {active.members.map((m) => (
               <li key={m.id} className="flex items-center gap-2">
                 <Avatar id={m.id} size={18} imageUrl={profilePics[m.id] || null} />
                 <span className="text-xs text-retro-fg truncate flex-1">{m.name || m.id}</span>
-                {m.muted ? <span className={`text-[10px] uppercase tracking-wider ${MUTED}`}>muted</span> : null}
-                {m.id === active.host && <span className="text-[10px] uppercase tracking-wider text-retro-muted">host</span>}
-                {m.id === identity.orbitId && <span className="text-[10px] uppercase tracking-wider text-retro-muted">you</span>}
+                {m.muted ? <span className={`text-2xs uppercase tracking-wider ${MUTED}`}>muted</span> : null}
+                {m.id === active.host && <span className="text-2xs uppercase tracking-wider text-retro-muted">host</span>}
+                {m.id === identity.orbitId && <span className="text-2xs uppercase tracking-wider text-retro-muted">you</span>}
               </li>
             ))}
           </ul>

@@ -79,3 +79,40 @@ export function mergeRecentPushes<T extends { id: string }>(
   keep.sort((a, b) => createdAtMs(b) - createdAtMs(a))
   return [...keep, ...snapshot]
 }
+
+/** Fields a timeline row renders. Two rows equal in all of them are the same
+ *  row to the reader, so a fresh snapshot may keep the old object. */
+const ROW_FIELDS = [
+  'url',
+  'caption',
+  'created_at',
+  'like_count',
+  'comment_count',
+  'is_liked',
+  'is_saved',
+  'is_archived',
+] as const
+
+/**
+ * True when a fresh snapshot carries exactly what is already on screen.
+ *
+ * The timeline is re-read on a socket push and on return to focus, so the same
+ * rows arrive again about once a second. Replacing the array with an equal one
+ * is a new reference: the shell re-renders, and a 500-post timeline pays for a
+ * 500-card render to draw the same pixels. Keeping the old array makes React
+ * bail out, which is the whole point imo  a timeline that did not change must
+ * cost nothing.
+ */
+export function sameTimeline<T extends { id: string }>(a: readonly T[], b: readonly T[]): boolean {
+  if (a === b) return true
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i] as Record<string, unknown>
+    const y = b[i] as Record<string, unknown>
+    if (x.id !== y.id) return false
+    for (const key of ROW_FIELDS) {
+      if (x[key] !== y[key]) return false
+    }
+  }
+  return true
+}

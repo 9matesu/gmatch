@@ -159,7 +159,7 @@ babecock.post('/round/:id/reorder', async (c) => {
   const maxPosition = Math.max(...placements.map(({ grid_position }) => grid_position), 0)
   const requestedGrid = Number.isInteger(body.grid_size) && Number(body.grid_size) > 0 ? Number(body.grid_size) : Number(round.grid_size || 3)
   const gridSize = Math.max(3, requestedGrid, Math.ceil(Math.sqrt(maxPosition + 1)))
-  await c.env.DB.batch([
+  await c.env.DB.atomicBatch([
     c.env.DB.prepare('UPDATE BabecockRounds SET grid_size = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(gridSize, roundId),
     ...placements.map(({ entry_id, grid_position }) => c.env.DB.prepare('UPDATE BabecockEntries SET grid_position = ? WHERE id = ? AND round_id = ?').bind(grid_position, entry_id, roundId)),
   ])

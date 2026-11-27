@@ -25,17 +25,9 @@ export const GAMES: readonly GameModule[] = [
 
 const byId = new Map(GAMES.map((g) => [g.id, g]))
 
-export function isKnownGame(gameId: string): boolean {
-  return byId.has(gameId)
-}
-
 // Returns the registered game module or throws NOT_FOUND for unknown ids.
 export function getGame(gameId: string): GameModule {
   const game = byId.get(gameId)
   if (!game) throw notFound('unknown game')
   return game
-}
-
-export function gameDeckRules(gameId: string): DeckRules {
-  return getGame(gameId).deckRules
 }

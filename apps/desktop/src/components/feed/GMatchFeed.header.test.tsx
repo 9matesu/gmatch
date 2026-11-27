@@ -23,8 +23,8 @@ describe('GMatchFeed header layout', () => {
         posts={[]}
         stories={[]}
         users={[]}
-        feedCols="2"
-        onFeedColsChange={vi.fn()}
+        feedLayout="list"
+        onFeedLayoutChange={vi.fn()}
       />,
     );
 
@@ -35,12 +35,13 @@ describe('GMatchFeed header layout', () => {
     expect(wrapper.firstElementChild?.tagName.toLowerCase()).toBe('header');
   });
 
-  it('puts the 1-5 column picker inside the header, exactly once', () => {
+  it('puts the timeline/grid switch inside the header, exactly once', () => {
     const { container } = renderFeed();
     const header = container.querySelector('header');
     expect(header).toBeTruthy();
-    expect(header!.querySelector('[aria-label="3-column feed"]')).toBeTruthy();
-    expect(container.querySelectorAll('[aria-label="3-column feed"]').length).toBe(1);
+    expect(header!.querySelector('[aria-label="Timeline layout"]')).toBeTruthy();
+    expect(header!.querySelector('[aria-label="Grid layout"]')).toBeTruthy();
+    expect(container.querySelectorAll('[aria-label="Grid layout"]').length).toBe(1);
   });
 
   it('drops the plain "Timeline" label from the header', () => {

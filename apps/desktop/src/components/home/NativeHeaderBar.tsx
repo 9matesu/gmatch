@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { SpeakerHigh, SpeakerSlash, Minus, Square, X, CaretLeft, CaretRight } from '@phosphor-icons/react';
 import { isAudioMuted, setAudioMuted, playPress } from '../../utils/sounds';
-import { NotificationCenter, type NotificationCenterProps } from '../notifications/NotificationCenter';
 
 export interface NativeHeaderBarProps {
   wsConnected?: boolean;
@@ -11,11 +10,6 @@ export interface NativeHeaderBarProps {
   activeRoomName?: string;
   onGoBack?: () => void;
   onGoForward?: () => void;
-  /**
-   * The unified notification centre's data + handlers. Omitted only in tests /
-   * non-shell embeds; the bell still renders, just with an empty inbox.
-   */
-  notifications?: NotificationCenterProps;
 }
 
 export function NativeHeaderBar({
@@ -24,7 +18,6 @@ export function NativeHeaderBar({
   activeRoomName: _activeRoomName,
   onGoBack,
   onGoForward,
-  notifications,
 }: NativeHeaderBarProps = {}) {
   const [isMuted, setIsMuted] = useState(false);
 
@@ -40,7 +33,7 @@ export function NativeHeaderBar({
 
   return (
     <header
-      className="w-full h-9 flex items-center justify-between px-3 select-none z-[var(--z-dropdown)] bg-transparent text-xs"
+      className="relative w-full h-9 flex items-center justify-between px-3 select-none z-[var(--z-dropdown)] bg-retro-bg text-xs"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
       {/* Left: Navigators & Branding */}
@@ -77,27 +70,18 @@ export function NativeHeaderBar({
           </button>
         </div>
 
-        <span className="text-[13px] font-bold tracking-wide text-retro-fg select-none ml-1">gMatch</span>
+        <span className="text-field font-bold tracking-wide text-retro-fg select-none ml-1">gMatch</span>
       </div>
 
-      {/* Center: the unified notification centre (badge, list, invites, toasts) */}
-      <NotificationCenter
-        {...(notifications ?? {
-          onMarkAllRead: () => {},
-          onMarkRead: () => {},
-          onOpenTarget: () => {},
-          onOpenLocalTarget: () => {},
-          onMarkLocalRead: () => {},
-        })}
-      />
+      {/* The notification bell lives in the footer Command Island (navbar). */}
 
-      {/* Right: mute + window controls (frameless: buttons render
-          only when the preload bridge exposes them. Browser/dev = no bridge) */}
+      {/* Right: mute + window controls (frameless: buttons
+          render only when the preload bridge exposes them. Browser/dev =
+          no bridge) */}
       <div
         className="flex items-center gap-2 text-retro-muted"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
-
         <button
           type="button"
           onClick={toggleSound}
@@ -113,10 +97,10 @@ export function NativeHeaderBar({
         </button>
 
         {window.gmatch?.winClose && (
-          <div className="flex items-center gap-0.5 ml-1 border-l border-border-glass pl-1.5">
+          <div className="flex items-center gap-0.5 ml-1 border-l border-edge pl-1.5">
             <button
               type="button"
-              onClick={window.gmatch.winMinimize}
+              onClick={() => window.gmatch?.winMinimize?.()}
               className="p-1.5 rounded-md hover:bg-glass-w10 hover:text-retro-fg transition-colors cursor-pointer"
               aria-label="Minimize window"
             >
@@ -124,7 +108,7 @@ export function NativeHeaderBar({
             </button>
             <button
               type="button"
-              onClick={window.gmatch.winToggleMaximize}
+              onClick={() => window.gmatch?.winToggleMaximize?.()}
               className="p-1.5 rounded-md hover:bg-glass-w10 hover:text-retro-fg transition-colors cursor-pointer"
               aria-label="Maximize window"
             >
@@ -132,7 +116,7 @@ export function NativeHeaderBar({
             </button>
             <button
               type="button"
-              onClick={window.gmatch.winClose}
+              onClick={() => window.gmatch?.winClose?.()}
               className="p-1.5 rounded-md hover:bg-retro-error hover:text-retro-fg transition-colors cursor-pointer"
               aria-label="Close window"
             >

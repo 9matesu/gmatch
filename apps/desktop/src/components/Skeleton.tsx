@@ -4,28 +4,18 @@ export function Skeleton({ className = '' }: { className?: string }) {
 
 export function CardSkeleton() {
   return (
-    <div className="bg-retro-panel border border-border-glass overflow-hidden">
-      <div className="p-3 border-b border-border-glass flex justify-between items-center">
+    <div className="bg-retro-panel border border-edge overflow-hidden">
+      <div className="p-3 border-b border-edge flex justify-between items-center">
         <Skeleton className="h-4 w-14" />
         <Skeleton className="h-4 w-4" />
       </div>
-      <div className="aspect-square bg-black flex items-center justify-center">
+      <div className="aspect-square bg-retro-bg flex items-center justify-center">
         <Skeleton className="h-full w-full" />
       </div>
       <div className="p-4 space-y-2">
         <Skeleton className="h-3 w-3/4" />
         <Skeleton className="h-3 w-1/2" />
       </div>
-    </div>
-  );
-}
-
-export function IdentityCardSkeleton() {
-  return (
-    <div className="bg-retro-panel p-6 border border-border-glass">
-      <Skeleton className="h-3 w-32 mb-2" />
-      <Skeleton className="h-5 w-64 mb-4" />
-      <Skeleton className="h-10 w-36" />
     </div>
   );
 }

@@ -33,10 +33,22 @@ const EXT_MIME = {
 }
 
 let UA = 'Mozilla/5.0'
-/** url -> { key, mime, bytes } (RAM only) */
+/**
+ * url -> { key, mime, bytes, ts }
+ *
+ * RAM mirror of the PERSISTED index (`<userData>/imgcache/index.json`). The
+ * bytes live in the encrypted .enc files; this map says which url is which
+ * file. It used to live in RAM only, which made the cache write-only across
+ * restarts: every picture was re-downloaded and the 500MB on disk could not
+ * be reached (nor listed by the cache viewer).
+ */
 let meta = {}
 /** normQuery -> { posts, ts } (RAM only) */
 let feed = {}
+/** Where the url index is persisted (null = not initialised). */
+let indexPath = null
+/** The index is a cache, not an archive: keep the newest entries only. */
+const INDEX_MAX_ENTRIES = 2000
 
 function fnv1a(str) {
   let h = 0x811c9dc5
@@ -79,16 +91,99 @@ function destroyDiskCaches(userDataPath) {
   try { fs.writeFileSync(marker, new Date().toISOString()) } catch { /* retry next boot */ }
 }
 
+/**
+ * Persist the url -> file map next to the encrypted bytes.
+ *
+ * The map is what makes the cache reachable after a restart (and what the
+ * cache viewer lists). It is written as a flat array of rows; the newest
+ * entries win when the cap is hit.
+ */
+function saveIndex() {
+  if (!indexPath) return
+  try {
+    const rows = Object.entries(meta)
+      .map(([url, m]) => ({ url, key: m.key, mime: m.mime, bytes: m.bytes, ts: m.ts || 0 }))
+      .sort((a, b) => (b.ts || 0) - (a.ts || 0))
+      .slice(0, INDEX_MAX_ENTRIES)
+    fs.writeFileSync(indexPath, JSON.stringify(rows), 'utf8')
+  } catch {
+    /* the index is a cache: a failed write is not fatal */
+  }
+}
+
+/**
+ * Load the persisted url -> file map.
+ *
+ * An entry whose .enc file is gone (the LRU evicted it while the app was
+ * closed, or the user cleared the cache) is DROPPED: keeping it would make
+ * `cacheImage` answer a gmcache:// URL that 404s forever.
+ */
+function loadIndex() {
+  meta = {}
+  if (!indexPath) return
+  try {
+    if (!fs.existsSync(indexPath)) return
+    const rows = JSON.parse(fs.readFileSync(indexPath, 'utf8'))
+    if (!Array.isArray(rows)) return
+    for (const r of rows) {
+      const url = typeof r?.url === 'string' ? r.url : ''
+      const key = typeof r?.key === 'string' ? r.key : ''
+      if (!url || !key || !mem.has(key)) continue
+      meta[url] = {
+        key,
+        mime: typeof r.mime === 'string' ? r.mime : 'application/octet-stream',
+        bytes: Number(r.bytes) || 0,
+        ts: Number(r.ts) || 0,
+      }
+    }
+  } catch {
+    /* a corrupt index is not fatal: the cache simply starts empty */
+  }
+}
+
 function init(userDataPath, userAgent, storageKeyHex) {
   if (userAgent) UA = userAgent
   destroyDiskCaches(userDataPath)
   mem.init(userDataPath, storageKeyHex)
-  meta = {}
+  indexPath = path.join(userDataPath, 'imgcache', 'index.json')
+  loadIndex()
   feed = {}
 }
 
 function stats() {
   return { files: mem.size(), bytes: mem.totalBytes() }
+}
+
+/**
+ * What the device holds, newest first.
+ *
+ * The cache viewer's data source: every cached picture with its local
+ * (gmcache://) url, so the picture renders from disk and can be saved to the
+ * gallery without touching the network.
+ *
+ * An entry whose bytes the LRU dropped mid-session is PRUNED here: the
+ * viewer must never show a tile whose local url 404s.
+ */
+function list() {
+  let pruned = false
+  const rows = []
+  for (const [url, m] of Object.entries(meta)) {
+    if (!mem.has(m.key)) {
+      delete meta[url]
+      pruned = true
+      continue
+    }
+    rows.push({
+      url,
+      local: `${SCHEME}://f/${m.key}`,
+      mime: m.mime,
+      bytes: m.bytes,
+      ts: m.ts || 0,
+    })
+  }
+  if (pruned) saveIndex()
+  rows.sort((a, b) => b.ts - a.ts)
+  return rows
 }
 
 function getReferer(url) {
@@ -254,7 +349,8 @@ async function cacheImage(url) {
     const { buf, mime } = fetched
     const key = cacheFileName(url)
     if (!mem.put(key, buf)) return null // over budget: no local copy, remote URL stands
-    meta[url] = { key, mime: mime || EXT_MIME[key.split('.').pop()] || 'application/octet-stream', bytes: buf.length }
+    meta[url] = { key, mime: mime || EXT_MIME[key.split('.').pop()] || 'application/octet-stream', bytes: buf.length, ts: Date.now() }
+    saveIndex()
     return `${SCHEME}://f/${key}`
   } catch {
     return null
@@ -265,6 +361,9 @@ function clear() {
   mem.clear()
   meta = {}
   feed = {}
+  // The index lives INSIDE the cache dir, so mem.clear() already removed it;
+  // write an empty one so the next boot does not read a stale file.
+  saveIndex()
   return stats()
 }
 
@@ -289,6 +388,7 @@ function evict(url) {
     if (hit) {
       mem.del(hit.key)
       delete meta[url]
+      saveIndex()
       return true
     }
     return false
@@ -330,7 +430,69 @@ function setFeedCache(query, posts) {
 /**
  * protocol.handle('gmcache') handler — serves RAM buffers keyed by the
  * sanitized filename. Unknown/evicted key → 404 (renderer falls back remote).
+ *
+ * `gmcache://thumb/<key>` serves a DOWNSCALED copy instead of the full-size
+ * picture. A gallery of 70 full-res boorus is ~1.2 GB of decoded bitmaps; a
+ * 360px thumbnail is ~0.2 MB and decodes in a fraction of the time, which is
+ * what the cache viewer, the tag browser and the gallery grids actually show.
+ * Thumbs are generated on demand in the main process (Electron's built-in
+ * `nativeImage`, no new dependency), kept in a small LRU, and never written to
+ * disk — the encrypted originals remain the only durable copy.
  */
+const THUMB_MAX_EDGE = 360
+const THUMB_LRU_MAX = 400
+const THUMB_MIME = 'image/jpeg'
+const thumbs = new Map()
+
+function thumbCacheGet(key) {
+  const hit = thumbs.get(key)
+  if (!hit) return null
+  // Refresh recency (Map keeps insertion order; a read moves it to the end).
+  thumbs.delete(key)
+  thumbs.set(key, hit)
+  return hit
+}
+
+function thumbCacheSet(key, buf) {
+  thumbs.set(key, buf)
+  while (thumbs.size > THUMB_LRU_MAX) {
+    const oldest = thumbs.keys().next().value
+    if (oldest === undefined) break
+    thumbs.delete(oldest)
+  }
+}
+
+/** Downscale picture bytes to a small JPEG. Returns null when not possible. */
+function makeThumb(buf, ext) {
+  // Videos and unknown blobs have no thumbnail: the caller falls through to the
+  // original bytes, so a <video> poster still works.
+  if (!/^(jpe?g|png|webp|gif|img)$/i.test(ext || '')) return null
+  let image = null
+  try {
+    const { nativeImage } = require('electron')
+    image = nativeImage.createFromBuffer(buf)
+  } catch {
+    return null
+  }
+  if (!image || image.isEmpty()) return null
+  const size = image.getSize()
+  const longest = Math.max(size.width, size.height)
+  if (!longest || longest <= THUMB_MAX_EDGE) {
+    // Already small enough: re-encoding would only cost CPU.
+    return buf
+  }
+  const ratio = THUMB_MAX_EDGE / longest
+  try {
+    return image.resize({
+      width: Math.max(1, Math.round(size.width * ratio)),
+      height: Math.max(1, Math.round(size.height * ratio)),
+      quality: 'good',
+    }).toJPEG(72)
+  } catch {
+    return null
+  }
+}
+
 async function serveImage(request) {
   try {
     if (request.method === 'OPTIONS') {
@@ -343,11 +505,31 @@ async function serveImage(request) {
       })
     }
     const u = new URL(request.url)
+    const wantsThumb = u.host === 'thumb'
     const key = path.basename(u.pathname || u.host || '')
     if (!key || key.includes('..')) return new Response('bad file', { status: 400 })
     const buf = mem.get(key)
     if (!buf) return new Response('miss', { status: 404 })
     const mime = Object.values(meta).find((m) => m.key === key)?.mime || EXT_MIME[key.split('.').pop()] || 'application/octet-stream'
+    if (wantsThumb) {
+      const ext = key.split('.').pop()
+      let thumb = thumbCacheGet(key)
+      if (!thumb) {
+        thumb = makeThumb(buf, ext)
+        if (thumb) thumbCacheSet(key, thumb)
+      }
+      if (thumb) {
+        return new Response(thumb, {
+          headers: {
+            'Content-Type': thumb === buf ? mime : THUMB_MIME,
+            'Cache-Control': 'no-store',
+            'Access-Control-Allow-Origin': '*',
+          },
+        })
+      }
+      // No thumbnail possible (a video): fall through and serve the original,
+      // so a poster/first frame still renders.
+    }
     // Range support: <video> seeking re-requests with Range; answering 200
     // every time makes a cached mp4 re-download the whole blob per seek.
     const range = request.headers.get('range')
@@ -384,12 +566,28 @@ async function serveImage(request) {
   }
 }
 
+/** Test seam: plant a url -> file entry (no network, no bytes). */
+function setMeta(url, entry) {
+  if (!url || !entry?.key) return false
+  meta[url] = { key: entry.key, mime: entry.mime || 'application/octet-stream', bytes: Number(entry.bytes) || 0, ts: Number(entry.ts) || Date.now() }
+  return true
+}
+
+/** Test seam: plant bytes in the encrypted store under a key. */
+function putBytes(key, buf) {
+  if (!key || !buf) return false
+  if (!mem.put(key, buf)) return false
+  return true
+}
+
+/** Test seam (pure-ish helpers; heavy IO stays in cacheImage/serveImage). */
 module.exports = {
   SCHEME,
   init,
   fetchBinary,
   cacheImage,
   cacheStats: stats,
+  list,
   clearCache: clear,
   clearFeedCache,
   evict,
@@ -398,5 +596,5 @@ module.exports = {
   serveImage,
   capFor,
   // Test seam (pure-ish helpers; heavy IO stays in cacheImage/serveImage).
-  _test: { fnv1a, cacheFileName, normalizeQuery, destroyDiskCaches, capFor },
+  _test: { fnv1a, cacheFileName, normalizeQuery, destroyDiskCaches, capFor, setMeta, putBytes, saveIndex },
 }

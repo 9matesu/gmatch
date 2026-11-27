@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, RefreshCw, Search } from 'lucide-react';
+import { ChevronDown, Radio, RefreshCw, Search } from 'lucide-react';
 import { playPress } from '../../utils/sounds';
 
 interface FeedHeaderProps {
@@ -9,27 +9,43 @@ interface FeedHeaderProps {
   onRefresh?: () => void;
   /** Sort tabs (For You / Latest) rendered inline — one bar, one row. */
   sortTabs?: React.ReactNode;
-  /** Grid 1-5 picker, rendered next to search. */
-  colsControls?: React.ReactNode;
+  /** Timeline/grid switch, rendered next to search. */
+  layoutToggle?: React.ReactNode;
   /** Collapse control; omit to hide the chevron. */
   onToggleCollapse?: () => void;
+  /** Self-ping: floats the caller to the top of the roster for 30 s. */
+  onPingAttention?: () => void;
 }
 
 export function FeedHeader({
   onOpenSearch,
   onRefresh,
   sortTabs,
-  colsControls,
+  layoutToggle,
   onToggleCollapse,
+  onPingAttention,
 }: FeedHeaderProps) {
   return (
-    <header className="sticky top-0 z-30 w-full glass-toolbar border-0 border-b border-border-glass rounded-none px-3 sm:px-6 py-1.5 flex items-center justify-between gap-2">
+    <header className="sticky top-0 z-30 w-full glass-toolbar border-0 border-b border-edge rounded-none px-3 sm:px-6 py-1.5 flex items-center justify-between gap-2">
       <div className="flex items-center gap-2 shrink-0">
         {sortTabs}
       </div>
 
       <div className="flex items-center gap-1 shrink-0">
-        {colsControls}
+        {layoutToggle}
+
+        {onPingAttention && (
+          <button
+            type="button"
+            onClick={() => { playPress(880); onPingAttention(); }}
+            title="Ping: put yourself at the top of the roster for 30s"
+            aria-label="Ping for attention"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold text-retro-body hover:text-retro-fg hover:bg-glass-w8 transition-colors cursor-pointer"
+          >
+            <Radio className="w-4 h-4" />
+            <span className="hidden sm:inline">Ping</span>
+          </button>
+        )}
 
         {onRefresh && (
           <button
@@ -43,7 +59,7 @@ export function FeedHeader({
             aria-label="Reload feed toolbar"
             className="p-2 rounded-md text-retro-body hover:bg-glass-w8 transition-colors cursor-pointer"
           >
-            <RefreshCw className="w-5 h-5" />
+            <RefreshCw className="w-4 h-4" />
           </button>
         )}
 
@@ -54,7 +70,7 @@ export function FeedHeader({
           aria-label="Search"
           className="p-2 rounded-md text-retro-body hover:bg-glass-w8 transition-colors cursor-pointer"
         >
-          <Search className="w-5 h-5" />
+          <Search className="w-4 h-4" />
         </button>
 
         {onToggleCollapse && (

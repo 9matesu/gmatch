@@ -1,6 +1,7 @@
 "use client";
 
 import type { SocialOperation } from '@orbit/protocol'
+import type { PeerAttentionEvent } from '../utils/notifications'
 import type { LoggedOperation } from './socialOperationLog'
 
 /**
@@ -87,6 +88,62 @@ export function projectReactions(entries: readonly LoggedOperation[]): Map<strin
 }
 
 /**
+ * The peer social graph, in both directions of intent: what each actor
+ * actively follows, AND which targets their own removal superseded.
+ *
+ * `removed` exists because the node keeps its own follower rows. A player who
+ * followed someone through the node and then unfollowed them off-node (or
+ * whose unfollow never reached the node) still has the stale node row; the
+ * operation is the newer intent, so a reader must be able to MASK it instead of
+ * resurrecting it. A later re-follow adds a fresh `follow.add`, which is active
+ * again — the caller resolves that by letting `following` win over `removed`.
+ */
+export interface ProjectedFollowState {
+  /** follower actor id -> the target ids they actively follow. */
+  following: Map<string, Set<string>>
+  /** follower actor id -> target ids whose add a removal superseded. */
+  removed: Map<string, Set<string>>
+}
+
+export function projectFollowState(entries: readonly LoggedOperation[]): ProjectedFollowState {
+  const operations = operationsOf(entries)
+
+  // add operation id -> what it claimed, so a removal can name it back.
+  const adds = new Map<string, { actorId: string; targetId: string }>()
+  for (const operation of operations) {
+    if (operation.type !== 'follow.add') continue
+    const targetId = (operation.payload as { targetId?: unknown }).targetId
+    if (typeof targetId !== 'string') continue
+    adds.set(operation.operationId, { actorId: operation.actorId, targetId })
+  }
+
+  const removedOperationIds = new Set<string>()
+  for (const operation of operations) {
+    if (operation.type !== 'follow.remove') continue
+    const ids = (operation.payload as { targetAddOperationIds?: unknown }).targetAddOperationIds
+    if (Array.isArray(ids)) for (const id of ids) if (typeof id === 'string') removedOperationIds.add(id)
+  }
+
+  const following = new Map<string, Set<string>>()
+  const withdrawn = new Map<string, Set<string>>()
+  for (const [operationId, { actorId, targetId }] of adds) {
+    const bucket = removedOperationIds.has(operationId) ? withdrawn : following
+    const set = bucket.get(actorId) ?? new Set<string>()
+    set.add(targetId)
+    bucket.set(actorId, set)
+  }
+  // A re-follow creates a FRESH add, so one target can be both withdrawn (by
+  // the old add) and active. The live follow is the intent: a target that is
+  // actively followed is not "removed", so the two sets are always disjoint.
+  for (const [actorId, withdrawnTargets] of withdrawn) {
+    const active = following.get(actorId)
+    if (!active) continue
+    for (const targetId of active) withdrawnTargets.delete(targetId)
+  }
+  return { following, removed: withdrawn }
+}
+
+/**
  * The peer social graph: follower id -> the ids they follow.
  *
  * A follow is active until some removal references its add operation. Only
@@ -94,24 +151,56 @@ export function projectReactions(entries: readonly LoggedOperation[]): Map<strin
  * their behalf).
  */
 export function projectFollows(entries: readonly LoggedOperation[]): Map<string, Set<string>> {
-  const operations = operationsOf(entries)
-  const removed = new Set<string>()
-  for (const operation of operations) {
-    if (operation.type !== 'follow.remove') continue
-    const ids = (operation.payload as { targetAddOperationIds?: unknown }).targetAddOperationIds
-    if (Array.isArray(ids)) for (const id of ids) if (typeof id === 'string') removed.add(id)
+  return projectFollowState(entries).following
+}
+
+/**
+ * The follow edges around ONE player — the two tabs of their profile.
+ *
+ * The node's `Followers`/`Following` tables are bookkeeping that can lag behind
+ * what the peers actually signed: a follow made while the node was unreachable
+ * never reached it, and an unfollow that stayed off-node leaves a stale row
+ * behind. The operation log is the newer intent, so a reader needs BOTH sides
+ * of it: the ids to ADD and the ids to MASK.
+ */
+export interface ProjectedFollowEdges {
+  /** Actors with an ACTIVE follow of this player. */
+  followers: Set<string>
+  /** Who this player actively follows. */
+  following: Set<string>
+  /** Actors whose follow of this player a removal superseded (mask a node row). */
+  withdrawnFollowers: Set<string>
+  /** Who this player unfollowed, per their own operations (mask a node row). */
+  withdrawnFollowing: Set<string>
+}
+
+export function projectFollowEdgesFor(
+  entries: readonly LoggedOperation[],
+  targetId: string,
+): ProjectedFollowEdges {
+  const edges: ProjectedFollowEdges = {
+    followers: new Set(),
+    following: new Set(),
+    withdrawnFollowers: new Set(),
+    withdrawnFollowing: new Set(),
   }
-  const out = new Map<string, Set<string>>()
-  for (const operation of operations) {
-    if (operation.type !== 'follow.add') continue
-    if (removed.has(operation.operationId)) continue
-    const targetId = (operation.payload as { targetId?: unknown }).targetId
-    if (typeof targetId !== 'string') continue
-    const followees = out.get(operation.actorId) ?? new Set<string>()
-    followees.add(targetId)
-    out.set(operation.actorId, followees)
+  if (!targetId) return edges
+
+  const { following, removed } = projectFollowState(entries)
+  for (const id of following.get(targetId) ?? []) edges.following.add(id)
+  for (const id of removed.get(targetId) ?? []) edges.withdrawnFollowing.add(id)
+  for (const [actorId, targets] of following) {
+    if (targets.has(targetId)) edges.followers.add(actorId)
   }
-  return out
+  for (const [actorId, targets] of removed) {
+    if (targets.has(targetId)) edges.withdrawnFollowers.add(actorId)
+  }
+  // A live follow always wins over a withdrawn one: a re-follow creates a fresh
+  // add, and the projection keeps the per-actor sets disjoint — this loop only
+  // guarantees the merged reader cannot resurrect a mask it should ignore.
+  for (const id of edges.followers) edges.withdrawnFollowers.delete(id)
+  for (const id of edges.following) edges.withdrawnFollowing.delete(id)
+  return edges
 }
 
 /** A report about content, as the author sees it. */
@@ -154,6 +243,155 @@ export function projectReportsFor(entries: readonly LoggedOperation[], authorId:
     })
   }
   return out.sort((a, b) => a.createdAt - b.createdAt)
+}
+
+/**
+ * The peer notification lane: signed operations OTHER actors aimed at MY
+ * content or at me — a follow, a like, a comment, a reply, a report.
+ *
+ * Pure and deterministic, derived only from ACCEPTED operations. The rules are
+ * the honest ones:
+ *  - never notify yourself (an operation the viewer authored is not news);
+ *  - a like or a follow a removal superseded is not an event;
+ *  - a tombstoned post/comment is nothing to notify about;
+ *  - the row opens what it is ABOUT: a follow opens the actor's profile, and
+ *    a reply opens both its post and its comment (a comment id alone lands the
+ *    deep link nowhere).
+ */
+export function projectPeerAttentionFor(
+  entries: readonly LoggedOperation[],
+  selfId: string,
+): PeerAttentionEvent[] {
+  if (!selfId) return []
+  const operations = operationsOf(entries)
+
+  // Tombstones hide the operation they target.
+  const deletedOperationIds = new Set<string>()
+  for (const operation of operations) {
+    if (operation.type !== 'comment.delete' && operation.type !== 'post.delete') continue
+    const target = (operation.payload as { targetOperationId?: unknown }).targetOperationId
+    if (typeof target === 'string') deletedOperationIds.add(target)
+  }
+
+  // Authorship (the "is this mine?" test) and where a comment lives.
+  const postAuthor = new Map<string, string>()
+  const deletedPosts = new Set<string>()
+  const commentAuthor = new Map<string, string>()
+  const commentPost = new Map<string, string>()
+  const deletedComments = new Set<string>()
+  for (const operation of operations) {
+    if (operation.type === 'post.create') {
+      if (!postAuthor.has(operation.objectId)) postAuthor.set(operation.objectId, operation.actorId)
+      if (deletedOperationIds.has(operation.operationId)) deletedPosts.add(operation.objectId)
+      continue
+    }
+    if (operation.type !== 'comment.create') continue
+    if (!commentAuthor.has(operation.objectId)) commentAuthor.set(operation.objectId, operation.actorId)
+    if (deletedOperationIds.has(operation.operationId)) {
+      deletedComments.add(operation.objectId)
+      continue
+    }
+    const postId = (operation.payload as { postId?: unknown }).postId
+    if (typeof postId === 'string') commentPost.set(operation.objectId, postId)
+  }
+
+  // Withdrawn likes / undone follows announce nothing.
+  const withdrawn = new Set<string>()
+  for (const operation of operations) {
+    if (operation.type !== 'reaction.remove' && operation.type !== 'follow.remove') continue
+    const ids = (operation.payload as { targetAddOperationIds?: unknown }).targetAddOperationIds
+    if (Array.isArray(ids)) for (const id of ids) if (typeof id === 'string') withdrawn.add(id)
+  }
+
+  const isMinePost = (postId: string): boolean =>
+    postAuthor.get(postId) === selfId && !deletedPosts.has(postId)
+  const isMineComment = (commentId: string): boolean =>
+    commentAuthor.get(commentId) === selfId && !deletedComments.has(commentId)
+
+  const out: PeerAttentionEvent[] = []
+  for (const operation of operations) {
+    // An operation I authored is not news to me.
+    if (operation.actorId === selfId) continue
+    const base = { operationId: operation.operationId, actorId: operation.actorId, createdAt: operation.createdAt }
+
+    switch (operation.type) {
+      case 'follow.add': {
+        const targetId = (operation.payload as { targetId?: unknown }).targetId
+        if (targetId !== selfId || withdrawn.has(operation.operationId)) break
+        out.push({ ...base, kind: 'follow', targetType: 'user', targetId: operation.actorId })
+        break
+      }
+
+      case 'report.create': {
+        const payload = operation.payload as { targetType?: unknown; targetId?: unknown; reason?: unknown }
+        if (payload.targetType !== 'post' && payload.targetType !== 'comment') break
+        if (typeof payload.targetId !== 'string') break
+        const mine = payload.targetType === 'post'
+          ? isMinePost(payload.targetId)
+          : isMineComment(payload.targetId)
+        if (!mine) break
+        out.push({
+          ...base,
+          kind: 'report',
+          targetType: payload.targetType,
+          targetId: payload.targetId,
+          postId: payload.targetType === 'comment' ? commentPost.get(payload.targetId) : undefined,
+          note: typeof payload.reason === 'string' ? payload.reason : '',
+        })
+        break
+      }
+
+      case 'reaction.add': {
+        if (withdrawn.has(operation.operationId)) break
+        const payload = operation.payload as { targetType?: unknown; targetId?: unknown }
+        if (typeof payload.targetId !== 'string') break
+        if (payload.targetType === 'post') {
+          if (!isMinePost(payload.targetId)) break
+          out.push({ ...base, kind: 'like', targetType: 'post', targetId: payload.targetId })
+        } else if (payload.targetType === 'comment') {
+          if (!isMineComment(payload.targetId)) break
+          out.push({
+            ...base,
+            kind: 'like',
+            targetType: 'comment',
+            targetId: payload.targetId,
+            postId: commentPost.get(payload.targetId),
+          })
+        }
+        break
+      }
+
+      case 'comment.create': {
+        if (deletedOperationIds.has(operation.operationId)) break
+        const payload = operation.payload as { postId?: unknown; parentCommentId?: unknown; body?: unknown }
+        if (typeof payload.postId !== 'string') break
+        if (deletedPosts.has(payload.postId)) break
+        const note = typeof payload.body === 'string' ? payload.body : undefined
+        const parentId = typeof payload.parentCommentId === 'string' ? payload.parentCommentId : null
+        if (parentId) {
+          // A reply is news to the comment's author, not to the post's.
+          if (!isMineComment(parentId)) break
+          out.push({
+            ...base,
+            kind: 'reply',
+            targetType: 'comment',
+            targetId: operation.objectId,
+            postId: payload.postId,
+            note,
+          })
+        } else {
+          if (!isMinePost(payload.postId)) break
+          out.push({ ...base, kind: 'comment', targetType: 'post', targetId: payload.postId, note })
+        }
+        break
+      }
+
+      default:
+        break
+    }
+  }
+
+  return out.sort((a, b) => a.createdAt - b.createdAt || (a.operationId < b.operationId ? -1 : 1))
 }
 
 /** Comment threads per post. Deleted comments are hidden; a reply whose

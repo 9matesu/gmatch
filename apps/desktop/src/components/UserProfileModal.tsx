@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { parseTags, type User, type OrbitObject } from '@orbit/shared';
-import { X, Copy, Check, Star, Ban, Send, Grid, MessageCircle, Play, Swords, Flag } from 'lucide-react';
+import { X, Copy, Check, Star, Ban, Send, Grid, MessageCircle, Play, Swords, Flag, Bell } from 'lucide-react';
 import { playPress } from '../utils/sounds';
 import { resolveMediaUrl } from '../utils/media';
 import { ObjectImage } from './ObjectImage';
@@ -33,6 +33,9 @@ interface UserProfileModalProps {
   onInviteToGame?: (userId: string) => void;
   onOpenFollowers?: (tab: 'followers' | 'following') => void;
   onReportUser?: (userId: string, name: string) => void;
+  /** Raise the caller's own attention flag (the node floats them to the top
+   *  of the roster for 30s). Only offered on your OWN profile. */
+  onPingAttention?: () => void;
   followingIds?: string[];
   /**
    * Roster for presence cross-checking. Typed with the presence fields
@@ -47,6 +50,8 @@ interface UserProfileModalProps {
   onPersistComment?: (postId: string, text: string) => Promise<PostComment | null>;
   onCopyLink?: (post: FeedPost) => void;
   onReportPost?: (post: FeedPost) => void;
+  /** Edit the caption of an own post. The caller owns the request + the toast. */
+  onEditPost?: (post: FeedPost) => void;
   toast?: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 }
 
@@ -70,6 +75,7 @@ export function UserProfileModal({
   onInviteToGame,
   onOpenFollowers,
   onReportUser,
+  onPingAttention,
   followingIds = [],
   users = [],
   shareGroups = [],
@@ -79,6 +85,7 @@ export function UserProfileModal({
   onPersistComment,
   onCopyLink,
   onReportPost,
+  onEditPost,
   toast,
 }: UserProfileModalProps) {
   const [showPic, setShowPic] = useState(false);
@@ -113,7 +120,8 @@ export function UserProfileModal({
     onSendDm,
     onCopyLink,
     onReportPost,
-    zIndexClass: 'z-[90]',
+    onEditPost,
+    zIndexClass: 'z-[var(--z-modal)]',
   });
 
   // Fetch follower/following counts for every profile INCLUDING your own:
@@ -250,20 +258,20 @@ export function UserProfileModal({
         role="dialog"
         aria-modal="true"
         aria-label={`Profile of ${user.display_name?.trim() || 'user'}`}
-        className="fixed inset-0 z-[var(--z-system)] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 pb-[var(--island-clearance)] sm:p-4 sm:pb-[calc(1rem+var(--island-clearance))] animate-orbit-fade-in select-none font-sans"
+        className="fixed inset-0 z-[var(--z-modal)] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 pb-[var(--island-clearance)] sm:p-4 sm:pb-[calc(1rem+var(--island-clearance))] animate-orbit-fade-in select-none font-sans"
         onClick={onClose}
       >
         <div
-          className="bg-retro-panel border border-border-glass w-full max-w-4xl overflow-hidden shadow-2xl rounded-t-2xl sm:rounded-xl animate-orbit-pop text-retro-fg max-h-[calc(100dvh-var(--island-clearance))] sm:max-h-[calc(100vh-var(--island-clearance)-2rem)] flex flex-col"
+          className="bg-retro-panel border border-edge w-full max-w-4xl overflow-hidden shadow-2xl rounded-t-2xl sm:rounded-xl animate-orbit-pop text-retro-fg max-h-[calc(100dvh-var(--island-clearance))] sm:max-h-[calc(100dvh-var(--island-clearance)-2rem)] flex flex-col"
           role="dialog"
           aria-modal="true"
           aria-label={`${displayName} profile`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border-glass shrink-0">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-edge shrink-0">
             <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-glass-w20'}`} />
+              <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-success' : 'bg-glass-w20'}`} />
               <span className="text-xs font-medium text-retro-muted">
                 {isOnline ? 'Online' : 'Offline'}
               </span>
@@ -295,8 +303,8 @@ export function UserProfileModal({
                   title={hasStories ? 'Watch story' : 'View picture'}
                   className={`w-18 h-18 sm:w-20 sm:h-20 rounded-full overflow-hidden cursor-pointer group transition-transform hover:scale-105 border-2 ${
                     hasStories
-                      ? 'border-border-glass'
-                      : 'border-border-glass'
+                      ? 'border-edge'
+                      : 'border-edge'
                   }`}
                 >
                   {profilePic ? (
@@ -309,23 +317,25 @@ export function UserProfileModal({
                 </button>
 
                 {hasStories && (
-                  <div
+                  <button
+                    type="button"
                     onClick={handleStoryBadgeClick}
-                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-white text-retro-bg text-[10px] font-semibold flex items-center gap-0.5 cursor-pointer shadow-xs"
+                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-retro-accent text-retro-bg text-2xs font-semibold flex items-center gap-0.5 cursor-pointer shadow-xs"
                   >
                     <Play className="w-2 h-2 fill-current" />
                     <span>Story</span>
-                  </div>
+                  </button>
                 )}
               </div>
 
               <div className="flex-1 flex items-center justify-around text-center">
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold text-retro-fg font-mono tabular-nums">{userPosts.length}</span>
-                  <span className="text-[10px] text-retro-muted">posts</span>
+                  <span className="text-2xs text-retro-muted">posts</span>
                 </div>
 
-                <div
+                <button
+                  type="button"
                   className="flex flex-col cursor-pointer"
                   onClick={() => {
                     playPress(700);
@@ -336,10 +346,11 @@ export function UserProfileModal({
                   <span className="text-sm font-semibold text-retro-fg group-hover:underline font-mono tabular-nums">
                     {followersCount !== null ? followersCount : (user.likes_received ?? 0)}
                   </span>
-                  <span className="text-[10px] text-retro-muted">followers</span>
-                </div>
+                  <span className="text-2xs text-retro-muted">followers</span>
+                </button>
 
-                <div
+                <button
+                  type="button"
                   className="flex flex-col cursor-pointer"
                   onClick={() => {
                     playPress(700);
@@ -350,8 +361,8 @@ export function UserProfileModal({
                   <span className="text-sm font-semibold text-retro-fg font-mono tabular-nums">
                     {followingCount !== null ? followingCount : (user.following_count ?? 0)}
                   </span>
-                  <span className="text-[10px] text-retro-muted">following</span>
-                </div>
+                  <span className="text-2xs text-retro-muted">following</span>
+                </button>
               </div>
             </div>
 
@@ -363,10 +374,10 @@ export function UserProfileModal({
                 <button
                   type="button"
                   onClick={handleCopy}
-                  className="text-[10px] text-retro-muted hover:text-retro-fg px-2 py-0.5 border border-border-glass bg-retro-bg rounded-md cursor-pointer flex items-center gap-1 shrink-0 transition-colors"
+                  className="text-2xs text-retro-muted hover:text-retro-fg px-2 py-0.5 border border-edge bg-retro-bg rounded-md cursor-pointer flex items-center gap-1 shrink-0 transition-colors"
                   title="Copy ID"
                 >
-                  {copied ? <Check className="w-2.5 h-2.5 text-emerald-400" /> : <Copy className="w-2.5 h-2.5" />}
+                  {copied ? <Check className="w-2.5 h-2.5 text-success-fg" /> : <Copy className="w-2.5 h-2.5" />}
                   <span>{copied ? 'Copied' : 'Copy'}</span>
                 </button>
               </div>
@@ -378,7 +389,7 @@ export function UserProfileModal({
                 {tags.map((tag) => (
                   <span
                     key={tag}
-                    className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-md bg-retro-bg border border-border-glass text-retro-muted"
+                    className="text-2xs font-mono font-medium px-2 py-0.5 rounded-md bg-retro-bg border border-edge text-retro-muted"
                   >
                     #{tag}
                   </span>
@@ -397,7 +408,7 @@ export function UserProfileModal({
                     onSendCard(user.id);
                     onClose();
                   }}
-                  className="py-2 px-3 bg-white hover:bg-retro-fg text-retro-bg font-semibold text-xs rounded-md transition-all duration-150 active:scale-[0.96] shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
+                  className="py-2 px-3 bg-retro-accent hover:bg-retro-fg text-retro-bg font-semibold text-xs rounded-md transition duration-150 active:scale-(--scale-press-sm) shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <Send className="w-3.5 h-3.5 stroke-[2]" />
                   <span>Send Card</span>
@@ -411,7 +422,7 @@ export function UserProfileModal({
                     onStartPm({ id: user.id, display_name: displayName });
                     onClose();
                   }}
-                  className="py-2 px-3 bg-glass-w12 hover:bg-glass-w20 border border-border-glass text-retro-fg font-semibold text-xs rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5"
+                  className="py-2 px-3 bg-glass-w12 hover:bg-glass-w20 border border-edge text-retro-fg font-semibold text-xs rounded-md transition duration-150 active:scale-(--scale-press-sm) cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <MessageCircle className="w-3.5 h-3.5 stroke-[1.75]" />
                   <span>Message</span>
@@ -422,27 +433,39 @@ export function UserProfileModal({
                 <button
                   type="button"
                   onClick={() => onInviteToGame(user.id)}
-                  className="py-2 px-3 bg-glass-w12 hover:bg-glass-w12 border border-border-glass text-retro-fg font-semibold text-xs rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5"
+                  className="py-2 px-3 bg-glass-w12 hover:bg-glass-w12 border border-edge text-retro-fg font-semibold text-xs rounded-md transition duration-150 active:scale-(--scale-press-sm) cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <Swords className="w-3.5 h-3.5 stroke-[1.75]" />
                   <span>Invite to Game</span>
                 </button>
               )}
+
+              {onPingAttention && (
+                <button
+                  type="button"
+                  onClick={onPingAttention}
+                  title="Float your profile to the top of the roster for 30 seconds"
+                  className="py-2 px-3 bg-glass-w12 hover:bg-glass-w20 border border-edge text-retro-fg font-semibold text-xs rounded-md transition duration-150 active:scale-(--scale-press-sm) cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <Bell className="w-3.5 h-3.5 stroke-[1.75]" />
+                  <span>Ping</span>
+                </button>
+              )}
             </div>
 
             {/* Secondary Actions */}
-            <div className="flex items-center gap-2 border-t border-border-glass pt-3">
+            <div className="flex items-center gap-2 border-t border-edge pt-3">
               {followHandler && (
                 <button
                   type="button"
                   onClick={() => followHandler(user.id)}
-                  className={`flex-1 py-2 px-3 border text-xs font-semibold rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5 ${
+                  className={`flex-1 py-2 px-3 border text-xs font-semibold rounded-md transition duration-150 active:scale-(--scale-press-sm) cursor-pointer flex items-center justify-center gap-1.5 ${
                      following
-                       ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
-                      : 'border-border-glass bg-retro-bg text-retro-fg hover:border-border-glass hover:bg-retro-panel'
+                       ? 'border-warning/30 bg-warning/10 text-warning-fg'
+                      : 'border-edge bg-retro-bg text-retro-fg hover:border-edge hover:bg-retro-panel'
                   }`}
                 >
-                   <Star className={`w-3.5 h-3.5 ${following ? 'fill-amber-400 text-amber-400' : ''}`} />
+                   <Star className={`w-3.5 h-3.5 ${following ? 'fill-warning text-warning-fg' : ''}`} />
                    <span>{following ? 'Following' : 'Follow'}</span>
                 </button>
               )}
@@ -454,7 +477,7 @@ export function UserProfileModal({
                     onBlockUser(user.id);
                     onClose();
                   }}
-                  className="py-2 px-3 border border-red-500/25 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-medium rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5"
+                  className="py-2 px-3 border border-danger/25 bg-danger/10 hover:bg-danger/20 text-danger-fg text-xs font-medium rounded-md transition duration-150 active:scale-(--scale-press-sm) cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <Ban className="w-3.5 h-3.5" />
                   <span>Block</span>
@@ -467,7 +490,7 @@ export function UserProfileModal({
                     onReportUser(user.id, user.display_name?.trim() || 'Unknown User');
                     onClose();
                   }}
-                  className="py-2 px-3 border border-red-500/25 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-medium rounded-md transition-all duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1.5"
+                  className="py-2 px-3 border border-danger/25 bg-danger/10 hover:bg-danger/20 text-danger-fg text-xs font-medium rounded-md transition duration-150 active:scale-(--scale-press-sm) cursor-pointer flex items-center justify-center gap-1.5"
                   title="Report this user"
                 >
                   <Flag className="w-3.5 h-3.5" />
@@ -478,7 +501,7 @@ export function UserProfileModal({
 
             {/* Posts Gallery: public posts are the primary profile content. */}
             {userPosts.length > 0 && (
-              <div className="space-y-2 border-t border-border-glass pt-3">
+              <div className="space-y-2 border-t border-edge pt-3">
                 <span className="text-xs font-medium text-retro-body flex items-center gap-1.5">
                   <Grid className="w-3.5 h-3.5" />
                   <span>Posts ({userPosts.length})</span>
@@ -495,7 +518,7 @@ export function UserProfileModal({
                         setActivePostId(post.id);
                         openPost(post);
                       }}
-                      className={`aspect-square bg-surface-interactive rounded-lg overflow-hidden border cursor-pointer group hover:opacity-90 transition-opacity ${activePostId === post.id ? 'border-retro-accent/70' : 'border-border-glass'}`}
+                      className={`aspect-square bg-surface-interactive rounded-lg overflow-hidden border cursor-pointer group hover:opacity-90 transition-opacity ${activePostId === post.id ? 'border-retro-accent/70' : 'border-edge'}`}
                     >
                       <ObjectImage
                         contentUrl={post.url}
@@ -504,6 +527,8 @@ export function UserProfileModal({
                         mimeType={(post as any).mime_type}
                         alt={post.caption || ''}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        // Dense profile grid: bounded thumbnails only.
+                        thumb
                       />
                     </button>
                   ))}
@@ -513,7 +538,7 @@ export function UserProfileModal({
 
             {/* Cards Gallery */}
             {userCards.length > 0 && (
-              <div className="space-y-2 border-t border-border-glass pt-3">
+              <div className="space-y-2 border-t border-edge pt-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-retro-body flex items-center gap-1.5">
                     <Grid className="w-3.5 h-3.5" />
@@ -526,7 +551,7 @@ export function UserProfileModal({
                     <div
                       key={card.id}
                       onClick={() => setSelectedCardImage(card.content_url || (card as any).data || (card as any).url || `/api/objects/${card.id}`)}
-                      className="aspect-square bg-surface-interactive rounded-lg overflow-hidden border border-border-glass cursor-pointer group hover:opacity-90 transition-opacity"
+                      className="aspect-square bg-surface-interactive rounded-lg overflow-hidden border border-edge cursor-pointer group hover:opacity-90 transition-opacity"
                     >
                       <ObjectImage
                         contentUrl={card.content_url || (card as any).data || (card as any).url || `/api/objects/${card.id}`}
@@ -535,6 +560,7 @@ export function UserProfileModal({
                         mimeType={(card as any).mime_type}
                         alt=""
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        thumb
                       />
                     </div>
                   ))}
@@ -545,7 +571,7 @@ export function UserProfileModal({
 
               {/* Right pane: the post opened from the grid, kept mounted while
                   presence and feed updates land. */}
-              <div data-testid="profile-post-pane" className="border-t md:border-t-0 md:border-l border-border-glass px-4 py-3 sm:p-4 md:h-full md:overflow-y-auto styled-scrollbar">
+              <div data-testid="profile-post-pane" className="border-t md:border-t-0 md:border-l border-edge px-4 py-3 sm:p-4 md:h-full md:overflow-y-auto styled-scrollbar">
                 {activePostId ? (
                   expandedNode
                 ) : (
@@ -565,15 +591,15 @@ export function UserProfileModal({
       {/* Full Picture Modal */}
       {showPic && profilePic && (
         <div
-          className="fixed inset-0 z-[var(--z-system)] flex items-center justify-center bg-black/70 p-4 cursor-pointer"
+          className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 p-4 cursor-pointer"
           onClick={() => setShowPic(false)}
         >
-          <div className="relative max-w-sm max-h-[80vh]" onClick={(e) => e.stopPropagation()}>
-            <img src={resolveMediaUrl(profilePic)} alt={displayName} className="max-w-full max-h-[80vh] rounded-lg border border-border-glass shadow-xl object-contain" />
+          <div className="relative max-w-sm max-h-(--max-h-panel)" onClick={(e) => e.stopPropagation()}>
+            <img src={resolveMediaUrl(profilePic)} alt={displayName} className="max-w-full max-h-(--max-h-panel) rounded-lg border border-edge shadow-xl object-contain" />
             <button
               type="button"
               onClick={() => setShowPic(false)}
-              className="absolute top-3 right-3 text-white bg-black/70 p-1.5 rounded hover:bg-black transition-colors"
+              className="absolute top-3 right-3 text-retro-fg bg-black/70 p-1.5 rounded hover:bg-retro-bg transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
@@ -584,22 +610,22 @@ export function UserProfileModal({
       {/* Card Image Lightbox */}
       {selectedCardImage && (
         <div
-          className="fixed inset-0 z-[var(--z-system)] flex items-center justify-center bg-black/70 p-4 cursor-pointer"
+          className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 p-4 cursor-pointer"
           onClick={() => setSelectedCardImage(null)}
         >
-          <div className="relative max-w-md max-h-[85vh]" onClick={(e) => e.stopPropagation()}>
+          <div className="relative max-w-md max-h-(--max-h-dialog-sm)" onClick={(e) => e.stopPropagation()}>
             <ObjectImage
               contentUrl={selectedCardImage}
               identity={null}
               alt="Card preview"
-              className="max-w-full max-h-[85vh] rounded-lg border border-border-glass shadow-xl object-contain"
+              className="max-w-full max-h-(--max-h-dialog-sm) rounded-lg border border-edge shadow-xl object-contain"
               controls
               autoPlay
             />
             <button
               type="button"
               onClick={() => setSelectedCardImage(null)}
-              className="absolute top-3 right-3 text-white bg-black/70 p-1.5 rounded hover:bg-black transition-colors"
+              className="absolute top-3 right-3 text-retro-fg bg-black/70 p-1.5 rounded hover:bg-retro-bg transition-colors"
             >
               <X className="w-4 h-4" />
             </button>

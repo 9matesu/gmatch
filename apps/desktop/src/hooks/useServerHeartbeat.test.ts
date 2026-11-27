@@ -4,7 +4,15 @@ import { renderHook } from '@testing-library/react';
 import { useServerHeartbeat } from './useServerHeartbeat';
 
 const orbitFetch = vi.fn();
-vi.mock('../utils/api', () => ({ orbitFetch: (...a: unknown[]) => orbitFetch(...a) }));
+const api = vi.hoisted(() => ({ base: '' }));
+vi.mock('../utils/api', () => ({
+  orbitFetch: (...a: unknown[]) => orbitFetch(...a),
+  getApiBaseUrl: () => api.base,
+  isLoopbackApiUrl: (u: string | null | undefined) => {
+    if (!u) return false;
+    return /^(https?:\/\/)?(127\.0\.0\.1|localhost|\[::1\])(:\d+)?/i.test(u.trim());
+  },
+}));
 vi.mock('../utils/central', () => ({ getCentralApiUrl: () => 'https://central.test' }));
 
 const store = new Map<string, string>();
@@ -25,13 +33,21 @@ function stubHostState(lanUrls: string[]) {
   });
 }
 
+/** The POST that publishes this machine to the directory. */
+function findPublish() {
+  return orbitFetch.mock.calls.find(
+    ([u, o]) => String(u).startsWith('https://central.test/api/servers') && (o as { method?: string })?.method === 'POST',
+  );
+}
+
 beforeEach(() => {
   store.clear();
   stubStorage();
+  api.base = '';
   orbitFetch.mockReset();
   orbitFetch.mockImplementation(async (url: string) => {
     if (String(url).includes('/api/servers/node')) {
-      return { ok: true, json: async () => ({ name: 'My Box', description: 'd', isAdmin: true }) };
+      return { ok: true, json: async () => ({ name: 'My Box', description: 'd', isAdmin: true, mode: 'host', lanUrls: ['http://192.168.5.2:8790'] }) };
     }
     if (String(url).includes('/api/servers/dashboard')) {
       return { ok: true, json: async () => ({ users: [], posts_24h: 0, members_total: 3 }) };
@@ -50,17 +66,12 @@ describe('useServerHeartbeat', () => {
     stubHostState(['http://192.168.0.9:8790']);
     renderHook(() => useServerHeartbeat(identity));
     await vi.waitFor(() => {
-      const post = orbitFetch.mock.calls.find(
-        ([u, o]) => String(u).startsWith('https://central.test/api/servers') && (o as { method?: string })?.method === 'POST',
-      );
-      expect(post).toBeTruthy();
+      expect(findPublish()).toBeTruthy();
     });
-    const post = orbitFetch.mock.calls.find(
-      ([u, o]) => String(u).startsWith('https://central.test/api/servers') && (o as { method?: string })?.method === 'POST',
-    )!;
+    const post = findPublish()!;
     const body = JSON.parse((post[1] as { body: string }).body);
     expect(body.name).toBe('My Box');
-    expect(body.endpoint_hint).toBe('192.168.0.9:8790');
+    expect(body.endpoint_hint).toBe('http://192.168.0.9:8790');
     expect(store.get('gmatch.server.register')).toBeTruthy();
   });
 
@@ -70,14 +81,42 @@ describe('useServerHeartbeat', () => {
     stubHostState([]);
     renderHook(() => useServerHeartbeat(identity));
     await vi.waitFor(() => {
-      const post = orbitFetch.mock.calls.find(
-        ([u, o]) => String(u).startsWith('https://central.test/api/servers') && (o as { method?: string })?.method === 'POST',
-      );
-      expect(post).toBeTruthy();
+      expect(findPublish()).toBeTruthy();
     });
-    const post = orbitFetch.mock.calls.find(
-      ([u, o]) => String(u).startsWith('https://central.test/api/servers') && (o as { method?: string })?.method === 'POST',
-    )!;
+    const post = findPublish()!;
     expect(JSON.parse((post[1] as { body: string }).body).owner_name).toBe('Alice');
+  });
+
+  it('browser build: replays the registration the user made and fills in the node address', async () => {
+    // No Electron bridge: the node answers for itself.
+    store.set('gmatch.server.register', JSON.stringify({ name: 'My Realm', description: 'd', endpoint_hint: '', password_required: false }));
+    renderHook(() => useServerHeartbeat(identity));
+    await vi.waitFor(() => {
+      expect(findPublish()).toBeTruthy();
+    });
+    const body = JSON.parse((findPublish()![1] as { body: string }).body);
+    expect(body.name).toBe('My Realm');
+    expect(body.endpoint_hint).toBe('http://192.168.5.2:8790');
+    // the filled address is kept, so the Servers screen shows the same one
+    expect(JSON.parse(store.get('gmatch.server.register') || '{}').endpoint_hint).toBe('http://192.168.5.2:8790');
+  });
+
+  it('browser build: never invents a registration of its own', async () => {
+    renderHook(() => useServerHeartbeat(identity));
+    await vi.waitFor(() => {
+      expect(orbitFetch.mock.calls.some(([u]) => String(u).includes('/api/servers/node'))).toBe(true);
+    });
+    expect(findPublish()).toBeFalsy();
+    expect(store.get('gmatch.server.register')).toBeFalsy();
+  });
+
+  it('browser build pointed at another machine node does not publish this machine', async () => {
+    api.base = 'http://192.168.1.50:8790';
+    store.set('gmatch.server.register', JSON.stringify({ name: 'My Realm', description: '', endpoint_hint: '', password_required: false }));
+    renderHook(() => useServerHeartbeat(identity));
+    await vi.waitFor(() => {
+      expect(orbitFetch.mock.calls.some(([u]) => String(u).includes('/api/servers/node'))).toBe(true);
+    });
+    expect(findPublish()).toBeFalsy();
   });
 });

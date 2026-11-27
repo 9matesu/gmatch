@@ -13,10 +13,6 @@ export interface LocalMeshLabel {
 
 export const MESH_LABELS_KEY = 'gmatch.meshLabels.v1'
 
-export function shortOwner(id: string): string {
-  return (id || '').slice(0, 8)
-}
-
 export function createLabel(name: string, ownerOrbitId: string): LocalMeshLabel {
   const clean = String(name || '').trim().slice(0, 40) || 'My mesh'
   const id = typeof crypto !== 'undefined' && 'randomUUID' in crypto

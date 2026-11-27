@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { useGame } from '../game/store'
 import { MAX_TAG_LEVEL, tagCost } from '../game/tags'
-import { CAPS, capEffectLabel, capStacks } from '../game/caps'
-import type { CapId } from '../game/types'
+import { ALL_CAP_IDS, CAPS, capEffectLabel, capStacks } from '../game/caps'
 import {
   PRESTIGE_MIN_TIER,
   canBrainmelt,
@@ -10,24 +9,13 @@ import {
   tierForXp,
 } from '../game/prestige'
 import { ACHIEVEMENTS } from '../game/achievements'
-import { CAP_SKINS } from './capSkins'
 import { formatNum } from './format'
 import { Skeleton } from '../components/Skeleton'
-import {
-  BTN,
-  BTN_DANGER,
-  BTN_SMALL,
-  DISPLAY,
-  MONO,
-  MUTED,
-  PLATE,
-  SKIN,
-} from './styles'
+import { MONO, PLATE } from './styles'
 import {
   Tag as TagIcon,
   Lightning,
   Fire,
-  MagnifyingGlass,
   Plus,
   ArrowClockwise,
   X,
@@ -51,7 +39,7 @@ function loadSavedTab(): ShopTab {
 
 /** Tag search / filter input — Cyber-Slate styling. */
 const TAG_INPUT =
-  'min-w-0 flex-1 rounded-xl border border-border-glass bg-black/40 px-3 py-1.5 text-xs text-retro-fg outline-none placeholder:text-retro-muted focus:border-retro-accent/60 transition-colors font-mono'
+  'min-w-0 flex-1 rounded-xl border border-edge bg-black/40 px-3 py-1.5 text-xs text-retro-fg outline-none placeholder:text-retro-muted focus:border-retro-accent/60 transition-colors font-mono'
 
 function TagsTab() {
   const tags = useGame((s) => s.tags)
@@ -95,63 +83,69 @@ function TagsTab() {
     const afford = !maxed && points >= cost
 
     return (
-      <span key={t.name} className="relative inline-flex group">
-        <button
-          type="button"
-          onClick={() => {
-            playPress(740)
-            if (mergeSel && isOwned) {
-              if (mergeSel === t.name) setMergeSel(null)
-              else { mergeTags(mergeSel, t.name); setMergeSel(null) }
-            } else if (!mergeSel) {
-              if (isOwned) toggleTag(t.name)
-              else buyTag(t.name)
-            }
-          }}
-          onDoubleClick={() => {
-            if (isOwned) { setMergeSel(mergeSel === t.name ? null : t.name) }
-          }}
-          onContextMenu={(e) => {
-            if (isOwned) { e.preventDefault(); soloTag(t.name) }
-          }}
-          title={
-            isOwned
-              ? `${t.name} · Lv${t.level} · +${formatNum(t.income)}/s · click ${on ? 'OFF' : 'ON'} · right-click = solo · double-click = pick for merge`
-              : `${t.name} · buy for ${formatNum(cost)} pts`
-          }
-          className={`inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-all duration-150 ${
+      // The pill is a plain container, NOT a button: it holds two real buttons
+      // (the tag action and its delete). A <button> inside a <button> is
+      // invalid HTML and React logs a hydration error for it.
+      <span key={t.name} className="relative inline-flex max-w-full group">
+        <div
+          className={`inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition duration-150 ${
             on
               ? 'border-retro-accent/50 bg-retro-accent/15 text-retro-fg'
               : isOwned
-                ? 'border-border-glass bg-glass-w5 text-retro-muted hover:text-retro-fg hover:border-border-strong'
-                : 'border-dashed border-border-strong bg-transparent text-retro-muted hover:border-retro-accent/40 hover:text-retro-fg'
+                ? 'border-edge bg-glass-w5 text-retro-muted hover:text-retro-fg hover:border-edge-strong'
+                : 'border-dashed border-edge-strong bg-transparent text-retro-muted hover:border-retro-accent/40 hover:text-retro-fg'
           } ${!isOwned && !afford ? 'opacity-40' : ''} ${mergeSel === t.name ? 'ring-1 ring-retro-accent' : ''}`}
         >
-          <span
-            className={`h-1.5 w-1.5 shrink-0 rounded-full transition-colors ${
-              on
-                ? 'bg-emerald-400'
-                : isOwned
-                  ? 'bg-glass-w20'
-                  : afford
-                    ? 'bg-retro-accent'
-                    : 'bg-glass-w20'
-            }`}
-            aria-hidden="true"
-          />
-          <span className="truncate font-medium">{t.name}</span>
-          {isOwned && (
+          <button
+            type="button"
+            onClick={() => {
+              playPress(740)
+              if (mergeSel && isOwned) {
+                if (mergeSel === t.name) setMergeSel(null)
+                else { mergeTags(mergeSel, t.name); setMergeSel(null) }
+              } else if (!mergeSel) {
+                if (isOwned) toggleTag(t.name)
+                else buyTag(t.name)
+              }
+            }}
+            onDoubleClick={() => {
+              if (isOwned) { setMergeSel(mergeSel === t.name ? null : t.name) }
+            }}
+            onContextMenu={(e) => {
+              if (isOwned) { e.preventDefault(); soloTag(t.name) }
+            }}
+            title={
+              isOwned
+                ? `${t.name} · Lv${t.level} · Lv${t.level} owned · click ${on ? 'OFF' : 'ON'} · right-click = solo · double-click = pick for merge`
+                : `${t.name} · buy for ${formatNum(cost)} pts`
+            }
+            className="inline-flex min-w-0 cursor-pointer items-center gap-1.5"
+          >
             <span
-              role="button"
-              tabIndex={-1}
+              className={`h-1.5 w-1.5 shrink-0 rounded-full transition-colors ${
+                on
+                  ? 'bg-success'
+                  : isOwned
+                    ? 'bg-glass-w20'
+                    : afford
+                      ? 'bg-retro-accent'
+                      : 'bg-glass-w20'
+              }`}
+              aria-hidden="true"
+            />
+            <span className="truncate font-medium">{t.name}</span>
+          </button>
+          {isOwned && (
+            <button
+              type="button"
               aria-label={`Delete ${t.name}`}
-              onClick={(e) => { e.stopPropagation(); deleteTag(t.name) }}
-              className="-mr-1 hidden shrink-0 rounded p-0.5 text-retro-muted hover:text-rose-400 group-hover:inline-flex"
+              onClick={() => deleteTag(t.name)}
+              className="-mr-1 hidden shrink-0 cursor-pointer rounded p-0.5 text-retro-muted hover:text-danger-fg group-hover:inline-flex"
             >
               <X className="h-3 w-3" />
-            </span>
+            </button>
           )}
-        </button>
+        </div>
       </span>
     )
   }
@@ -159,15 +153,15 @@ function TagsTab() {
   return (
     <div className="space-y-3">
       {/* Category separation tags: REAL / HENTAI */}
-      <div className="flex items-center justify-between gap-2 pb-1 border-b border-border-glass">
+      <div className="flex items-center justify-between gap-2 pb-1 border-b border-edge">
         <div className="flex items-center gap-1.5">
           <button
             type="button"
             onClick={() => { playPress(760); toggleFeedCategory('real'); }}
-            className={`px-3 py-1 rounded-full text-xs font-mono font-bold tracking-wider transition-all duration-150 cursor-pointer border ${
+            className={`px-3 py-1 rounded-full text-xs font-mono font-bold tracking-wider transition duration-150 cursor-pointer border ${
               allowReal
                 ? 'border-retro-accent/60 bg-retro-accent/20 text-retro-fg'
-                : 'border-border-glass bg-glass-w5 text-retro-muted hover:text-retro-fg hover:border-border-strong'
+                : 'border-edge bg-glass-w5 text-retro-muted hover:text-retro-fg hover:border-edge-strong'
             }`}
             title={allowReal ? 'Real sources active (click to toggle)' : 'Real sources disabled (click to enable)'}
           >
@@ -176,17 +170,17 @@ function TagsTab() {
           <button
             type="button"
             onClick={() => { playPress(760); toggleFeedCategory('hentai'); }}
-            className={`px-3 py-1 rounded-full text-xs font-mono font-bold tracking-wider transition-all duration-150 cursor-pointer border ${
+            className={`px-3 py-1 rounded-full text-xs font-mono font-bold tracking-wider transition duration-150 cursor-pointer border ${
               allowHentai
                 ? 'border-retro-accent/60 bg-retro-accent/20 text-retro-fg'
-                : 'border-border-glass bg-glass-w5 text-retro-muted hover:text-retro-fg hover:border-border-strong'
+                : 'border-edge bg-glass-w5 text-retro-muted hover:text-retro-fg hover:border-edge-strong'
             }`}
             title={allowHentai ? 'Hentai sources active (click to toggle)' : 'Hentai sources disabled (click to enable)'}
           >
             HENTAI
           </button>
         </div>
-        <span className="text-[10px] font-mono uppercase tracking-wider text-retro-muted">
+        <span className="text-2xs font-mono uppercase tracking-wider text-retro-muted">
           Feed Pool
         </span>
       </div>
@@ -199,7 +193,7 @@ function TagsTab() {
         <button
           type="button"
           onClick={() => { playPress(720); setSearchOpen((v) => !v); }}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-border-glass bg-glass-w5 hover:bg-glass-w10 text-xs font-medium text-retro-muted hover:text-retro-fg transition-colors cursor-pointer"
+          className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-edge bg-glass-w5 hover:bg-glass-w10 text-xs font-medium text-retro-muted hover:text-retro-fg transition-colors cursor-pointer"
         >
           {searchOpen ? <X className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
           <span>{searchOpen ? 'Close' : 'Add Tag'}</span>
@@ -208,7 +202,7 @@ function TagsTab() {
 
       {/* Custom Tag Search Input Box */}
       {searchOpen && (
-        <div className="space-y-2 rounded-xl border border-border-glass bg-black/40 p-2.5 shadow-inner">
+        <div className="space-y-2 rounded-xl border border-edge bg-black/40 p-2.5 shadow-inner">
           <div className="flex items-center gap-1.5">
             <input
               className={TAG_INPUT}
@@ -236,7 +230,7 @@ function TagsTab() {
               type="button"
               disabled={fetching}
               onClick={() => { playPress(700); void refreshTagMarket(); }}
-              className="p-1.5 rounded-xl border border-border-glass bg-glass-w5 hover:bg-glass-w10 text-retro-muted hover:text-retro-fg transition-colors cursor-pointer disabled:opacity-40"
+              className="p-1.5 rounded-xl border border-edge bg-glass-w5 hover:bg-glass-w10 text-retro-muted hover:text-retro-fg transition-colors cursor-pointer disabled:opacity-40"
               title="Refresh market offers"
             >
               <ArrowClockwise className="w-3.5 h-3.5" />
@@ -267,8 +261,8 @@ function TagsTab() {
 
       {/* Market Offers Section */}
       {marketTags.length > 0 && (
-        <div className="pt-2 border-t border-border-glass space-y-1.5">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-retro-muted flex items-center justify-between">
+        <div className="pt-2 border-t border-edge space-y-1.5">
+          <span className="text-2xs font-bold uppercase tracking-wider text-retro-muted flex items-center justify-between">
             <span>Market Discoveries ({marketTags.length})</span>
           </span>
           <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto styled-scrollbar pr-0.5">
@@ -292,13 +286,13 @@ function CapsTab() {
         <span className="text-xs font-bold uppercase tracking-wider text-retro-muted">
           Permanent Overclocks
         </span>
-        <span className="text-[10px] font-mono text-retro-muted">
+        <span className="text-2xs font-mono text-retro-muted">
           Stacks compound
         </span>
       </div>
 
       <div className="flex flex-col gap-2">
-        {(Object.keys(CAPS) as CapId[]).map((id, idx) => {
+        {ALL_CAP_IDS.map((id, idx) => {
           const def = CAPS[id]
           const afford = points >= def.cost
           const st = capStacks(caps, id, now)
@@ -306,14 +300,14 @@ function CapsTab() {
           return (
             <div
               key={id}
-              className={`flex items-center justify-between gap-3 rounded-xl border p-2.5 transition-all duration-150 ${
+              className={`flex items-center justify-between gap-3 rounded-xl border p-2.5 transition duration-150 ${
                 st.count > 0
-                  ? 'border-pink-500/30 bg-pink-500/[0.04]'
-                  : 'border-border-glass bg-glass-w5 hover:border-border-strong'
+                  ? 'border-chrome-pink/30 bg-chrome-pink/[0.04]'
+                  : 'border-edge bg-glass-w5 hover:border-edge-strong'
               }`}
             >
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                <div className="w-6 h-6 rounded-lg bg-black/50 border border-border-glass flex items-center justify-center font-mono text-xs font-bold text-retro-muted shrink-0">
+                <div className="w-6 h-6 rounded-lg bg-black/50 border border-edge flex items-center justify-center font-mono text-xs font-bold text-retro-muted shrink-0">
                   {idx + 1}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -322,12 +316,12 @@ function CapsTab() {
                       {def.name}
                     </span>
                     {st.count > 0 && (
-                      <span className={`${MONO} text-[10px] font-black text-pink-400 bg-pink-500/15 px-1.5 py-0.2 rounded-full`}>
+                      <span className={`${MONO} text-2xs font-black text-chrome-pink bg-chrome-pink/15 px-1.5 py-0.2 rounded-full`}>
                         x{st.count}
                       </span>
                     )}
                   </div>
-                  <p className="text-[10px] text-retro-muted truncate mt-0.5">
+                  <p className="text-2xs text-retro-muted truncate mt-0.5">
                     {capEffectLabel(id)}
                   </p>
                 </div>
@@ -335,10 +329,10 @@ function CapsTab() {
 
               <button
                 type="button"
-                className={`px-3 py-1.5 rounded-lg border text-xs font-mono font-bold transition-all cursor-pointer shrink-0 ${
+                className={`px-3 py-1.5 rounded-lg border text-xs font-mono font-bold transition cursor-pointer shrink-0 ${
                   afford
                     ? 'border-retro-accent/50 bg-retro-accent/20 text-retro-fg hover:bg-retro-accent/30'
-                    : 'border-border-glass bg-glass-w5 text-retro-muted opacity-40 cursor-not-allowed'
+                    : 'border-edge bg-glass-w5 text-retro-muted opacity-40 cursor-not-allowed'
                 }`}
                 disabled={!afford}
                 onClick={() => { playPress(800); popCap(id); }}
@@ -366,47 +360,47 @@ function PrestigeTab() {
   return (
     <div className="space-y-3">
       {/* Brainmelt Terminal Card */}
-      <div className="rounded-lg border border-border-glass bg-glass-w5 p-3.5 space-y-3">
+      <div className="rounded-lg border border-edge bg-glass-w5 p-3.5 space-y-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-purple-300 font-bold text-xs">
-            <Sparkle className="w-4 h-4 text-purple-400" weight="fill" />
+          <div className="flex items-center gap-1.5 text-chrome-lav font-bold text-xs">
+            <Sparkle className="w-4 h-4 text-chrome-lav" weight="fill" />
             <span>Corruption Shards</span>
           </div>
-          <span className={`${MONO} text-xs font-bold text-purple-300 bg-purple-500/20 px-2 py-0.5 rounded-full border border-purple-500/30`}>
+          <span className={`${MONO} text-xs font-bold text-chrome-lav bg-chrome-lav/20 px-2 py-0.5 rounded-full border border-chrome-lav/30`}>
             Held: {shards}
           </span>
         </div>
 
         <p className="text-xs text-retro-muted leading-relaxed">
-          Brainmelt burns your current run to forge permanent Corruption Shards. Each granting <b className="text-white">+10% passive multiplier</b> across all future runs.
+          Brainmelt burns your current run to forge permanent Corruption Shards. Each granting <b className="text-retro-fg">+10% passive multiplier</b> across all future runs.
         </p>
 
         {/* Reset vs Keep Rules */}
-        <div className="grid grid-cols-2 gap-2 text-[10px] bg-black/40 rounded-xl p-2 border border-border-glass">
+        <div className="grid grid-cols-2 gap-2 text-2xs bg-black/40 rounded-xl p-2 border border-edge">
           <div className="space-y-1">
-            <div className="font-bold text-rose-400 flex items-center gap-1">
+            <div className="font-bold text-danger-fg flex items-center gap-1">
               <WarningCircle className="w-3 h-3" /> Resets
             </div>
             <div className="text-retro-muted">Points, XP, Tags, Caps</div>
           </div>
           <div className="space-y-1">
-            <div className="font-bold text-emerald-400 flex items-center gap-1">
+            <div className="font-bold text-success-fg flex items-center gap-1">
               <CheckCircle className="w-3 h-3" /> Keeps
             </div>
             <div className="text-retro-muted">Keepsakes, Shards, Trophies</div>
           </div>
         </div>
 
-        <div className={`${MONO} text-center text-xs font-bold text-amber-300 bg-amber-500/10 py-1 rounded-lg border border-amber-500/20`}>
+        <div className={`${MONO} text-center text-xs font-bold text-warning-fg bg-warning/10 py-1 rounded-lg border border-warning/20`}>
           +{preview} shards on melt
         </div>
 
         <button
           type="button"
-          className={`w-full py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold tracking-wider uppercase transition-all cursor-pointer ${
+          className={`w-full py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold tracking-wider uppercase transition cursor-pointer ${
             ready
-              ? 'bg-rose-600 hover:bg-rose-500 text-retro-fg'
-              : 'border border-border-glass bg-glass-w5 text-retro-muted opacity-40 cursor-not-allowed'
+              ? 'bg-danger hover:bg-danger text-retro-fg'
+              : 'border border-edge bg-glass-w5 text-retro-muted opacity-40 cursor-not-allowed'
           }`}
           disabled={!ready}
           onClick={() => { playPress(900); brainmelt(); }}
@@ -418,7 +412,7 @@ function PrestigeTab() {
 
       {/* Achievements Showcase */}
       <div className="space-y-1.5 pt-1">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-retro-muted flex items-center justify-between">
+        <span className="text-2xs font-bold uppercase tracking-wider text-retro-muted flex items-center justify-between">
           <span>Achievements ({achievements.length}/{ACHIEVEMENTS.length})</span>
         </span>
         <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto styled-scrollbar pr-0.5">
@@ -429,12 +423,12 @@ function PrestigeTab() {
                 key={a.id}
                 className={`flex items-center gap-2 rounded-xl border p-2 text-xs transition-colors ${
                   got
-                    ? 'border-amber-500/30 bg-amber-500/[0.05] text-amber-200'
-                    : 'border-border-glass bg-glass-w5 text-retro-muted opacity-50'
+                    ? 'border-warning/30 bg-warning/[0.05] text-warning-fg'
+                    : 'border-edge bg-glass-w5 text-retro-muted opacity-50'
                 }`}
                 title={got ? 'Unlocked Trophy' : 'Locked Trophy'}
               >
-                <Trophy className={`w-3.5 h-3.5 shrink-0 ${got ? 'text-amber-400' : 'text-retro-muted'}`} weight={got ? 'fill' : 'regular'} />
+                <Trophy className={`w-3.5 h-3.5 shrink-0 ${got ? 'text-warning-fg' : 'text-retro-muted'}`} weight={got ? 'fill' : 'regular'} />
                 <span className="truncate text-xs font-medium">{a.name}</span>
               </div>
             )
@@ -461,19 +455,19 @@ export default function ShopPanel() {
   }
 
   const ownedTagsCount = tags.filter((t) => t.level > 0).length
-  const totalCapsStacks = Object.keys(CAPS).reduce((acc, k) => acc + capStacks(caps, k as CapId, now).count, 0)
+  const totalCapsStacks = ALL_CAP_IDS.reduce((acc, id) => acc + capStacks(caps, id, now).count, 0)
   const currentTier = tierForXp(xp)
 
   return (
     <aside className={`${PLATE} flex min-h-0 flex-1 flex-col p-3.5 space-y-3`}>
       {/* 3-Tab Segmented Switcher */}
-      <div className="flex items-center p-1 rounded-xl bg-black/50 border border-border-glass" role="tablist">
+      <div className="flex items-center p-1 rounded-xl bg-black/50 border border-edge" role="tablist">
         <button
           type="button"
           role="tab"
           aria-selected={tab === 'tags'}
           onClick={() => handleTab('tags')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition cursor-pointer ${
             tab === 'tags'
               ? 'bg-glass-w10 text-retro-fg shadow-sm'
               : 'text-retro-muted hover:text-retro-fg'
@@ -482,7 +476,7 @@ export default function ShopPanel() {
           <TagIcon className="w-3.5 h-3.5" />
           <span>Tags</span>
           {ownedTagsCount > 0 && (
-            <span className="font-mono text-[10px] px-1 rounded-full bg-glass-w10 text-retro-fg">
+            <span className="font-mono text-2xs px-1 rounded-full bg-glass-w10 text-retro-fg">
               {ownedTagsCount}
             </span>
           )}
@@ -493,7 +487,7 @@ export default function ShopPanel() {
           role="tab"
           aria-selected={tab === 'caps'}
           onClick={() => handleTab('caps')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition cursor-pointer ${
             tab === 'caps'
               ? 'bg-glass-w10 text-retro-fg shadow-sm'
               : 'text-retro-muted hover:text-retro-fg'
@@ -502,7 +496,7 @@ export default function ShopPanel() {
           <Lightning className="w-3.5 h-3.5" />
           <span>Caps</span>
           {totalCapsStacks > 0 && (
-            <span className="font-mono text-[10px] px-1 rounded-full bg-pink-500/20 text-pink-400 font-bold">
+            <span className="font-mono text-2xs px-1 rounded-full bg-chrome-pink/20 text-chrome-pink font-bold">
               {totalCapsStacks}
             </span>
           )}
@@ -513,7 +507,7 @@ export default function ShopPanel() {
           role="tab"
           aria-selected={tab === 'prestige'}
           onClick={() => handleTab('prestige')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition cursor-pointer ${
             tab === 'prestige'
               ? 'bg-glass-w10 text-retro-fg shadow-sm'
               : 'text-retro-muted hover:text-retro-fg'
@@ -521,7 +515,7 @@ export default function ShopPanel() {
         >
           <Fire className="w-3.5 h-3.5" />
           <span>Prestige</span>
-          <span className="font-mono text-[10px] px-1 rounded-full bg-purple-500/20 text-purple-300 font-bold">
+          <span className="font-mono text-2xs px-1 rounded-full bg-chrome-lav/20 text-chrome-lav font-bold">
             T{currentTier}
           </span>
         </button>

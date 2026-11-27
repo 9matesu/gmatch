@@ -43,20 +43,22 @@ describe('view routing (hash <-> view)', () => {
     expect(hashForView('watch')).toBe('#/watch')
   })
 
-  it('resolveInitialView: hash wins, then saved view, then the feed', () => {
-    // Fresh boot: no hash, nothing saved -> feed (never servers/profile).
+  it('resolveInitialView: hash wins, then the feed (never the last view)', () => {
+    // Fresh boot: no hash -> feed (never servers/profile).
     expect(resolveInitialView('', null)).toBe('feed')
-    // Unknown hash + nothing saved -> feed.
+    // Unknown hash -> feed.
     expect(resolveInitialView('#/nonsense', null)).toBe('feed')
-    // Saved view beats the default.
-    expect(resolveInitialView('', 'grid')).toBe('grid')
-    expect(resolveInitialView('', 'profile')).toBe('profile')
-    // Unroutable saved value falls back to feed.
+    // The last-visited view is IGNORED on purpose: the app's home is the
+    // timeline, so a relaunch lands on the feed even when the last view was
+    // the grid or the profile.
+    expect(resolveInitialView('', 'grid')).toBe('feed')
+    expect(resolveInitialView('', 'profile')).toBe('feed')
+    // Unroutable saved value also falls back to feed.
     expect(resolveInitialView('', 'admin')).toBe('feed')
-    // Hash beats saved.
+    // Hash beats the feed default.
     expect(resolveInitialView('#/grid', 'profile')).toBe('grid')
     // Legacy messages alias normalises to rooms in both slots.
     expect(resolveInitialView('#/dm', null)).toBe('rooms')
-    expect(resolveInitialView('', 'messages')).toBe('rooms')
+    expect(resolveInitialView('', 'messages')).toBe('feed')
   })
 })

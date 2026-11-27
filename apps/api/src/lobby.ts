@@ -25,11 +25,10 @@ import {
   type CardRarity,
 } from '@orbit/shared'
 import { applyLikeDecision, addPoints } from './game'
+import { findDisplayName, displayNameFor } from './common/userLookup'
 import { EconomyService } from './economy'
 import { broadcastToUser, broadcastToRoom } from './ws-bus'
 import { advanceRooms } from './rooms'
-import { pickBotDuelCard } from './bot-image-api'
-import { generateFallbackName } from '@orbit/shared'
 import crypto from 'node:crypto'
 import { encryptBlob } from './crypto'
 import type { LocalBlobStore } from './blob'
@@ -72,41 +71,6 @@ export function withMatchLock<T>(fn: () => Promise<T>): Promise<T> {
   return run
 }
 
-export function isBotUser(userId: string | null | undefined): boolean {
-  if (!userId) return false
-  return userId.startsWith('bot_')
-}
-
-export async function ensureBotReady(db: D1Turso, bot: { id: string; name: string; tags: string[]; col?: string; pfp_url?: string | null }): Promise<void> {
-  await db.prepare(`
-    INSERT INTO Users (id, public_key, display_name, tags, pfp_url, last_seen, is_admin)
-    VALUES (?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), 0)
-    ON CONFLICT(id) DO UPDATE SET
-      display_name = excluded.display_name,
-      tags = excluded.tags,
-      pfp_url = COALESCE(excluded.pfp_url, Users.pfp_url),
-      last_seen = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-  `).bind(bot.id, bot.id, bot.name, JSON.stringify(bot.tags), bot.pfp_url || null).run().catch(() => { })
-
-  // Purge any legacy bot placeholder cards from Objects table (so they never pollute storage or admin panel)
-  await db.prepare("DELETE FROM Objects WHERE owner_id LIKE 'bot_%'").run().catch(() => { })
-}
-
-async function pickBotCard(db: D1Turso, matchId: string, botId: string, opponentTags: string[] = []): Promise<string | null> {
-  const botRow = await db.prepare('SELECT display_name FROM Users WHERE id = ?').bind(botId).first<{ display_name: string }>()
-  const botName = botRow?.display_name || 'Bot Duelist'
-  const duelCard = await pickBotDuelCard(db, botId, botName, opponentTags).catch(() => null)
-  const url = duelCard?.url || `data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iNTYwIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjU2MCIgZmlsbD0iIzA5MDkwYiIvPjx0ZXh0IHg9IjIwMCIgeT0iMjg4IiBmaWxsPSIjZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5EdWVsIENhcmQ8L3RleHQ+PC9zdmc+`
-  // Store the bot card as a match-local MatchCards row so the match never
-  // writes remote/data URLs into card_a/card_b and human decision validation
-  // can resolve it the same way it resolves a real Object.
-  const cardId = crypto.randomUUID()
-  await db
-    .prepare('INSERT INTO MatchCards (id, room_id, owner_id, content_url) VALUES (?, ?, ?, ?)')
-    .bind(cardId, matchId, botId, url)
-    .run()
-  return cardId
-}
 
 /** Resolve a card (match-local or deck Object) to its display URL. */
 export async function resolveCardUrl(db: D1Turso, id: string | null | undefined): Promise<string | null> {
@@ -230,7 +194,7 @@ async function opponentProfile(db: D1Turso, opponentId: string): Promise<{ displ
     .prepare('SELECT display_name, pfp_url FROM Users WHERE id = ?')
     .bind(opponentId)
     .first<{ display_name: string | null; pfp_url: string | null }>()
-  return { display_name: u?.display_name?.trim() || generateFallbackName(opponentId), pfp_url: u?.pfp_url ?? null }
+  return { display_name: displayNameFor(u?.display_name, opponentId), pfp_url: u?.pfp_url ?? null }
 }
 
 /** True when the duel produced at least one mutual-like round (a "successful match"). */
@@ -630,7 +594,7 @@ async function pushMatchEvent(db: D1Turso, match: GameMatch, action: MatchAction
 // ---------------------------------------------------------------------------
 
 /** Create fresh matches for all pairs of eligible waiting players. */
-async function pairFromQueue(db: D1Turso, now: number, _skipBots = false): Promise<boolean> {
+async function pairFromQueue(db: D1Turso, now: number): Promise<boolean> {
   // Find users currently in active matches
   const activeRows = await db
     .prepare("SELECT user_a, user_b FROM GameMatches WHERE status IN ('lobby', 'playing')")
@@ -895,83 +859,6 @@ export async function resolveMatch(db: D1Turso, match: GameMatch, now: number, r
   }
 }
 
-async function advanceBotMoves(db: D1Turso, match: GameMatch, now: number): Promise<boolean> {
-  const isA = isBotUser(match.user_a)
-  const isB = isBotUser(match.user_b)
-  if (!isA && !isB) return false
-
-  let modified = false
-
-  if (match.phase === 'pick') {
-    if (isA && !match.card_a) {
-      let opponentTags: string[] = []
-      try {
-        const uRow = await db.prepare('SELECT tags FROM Users WHERE id = ?').bind(match.user_b).first<{ tags: string }>()
-        if (uRow?.tags) {
-          const parsed = JSON.parse(uRow.tags)
-          if (Array.isArray(parsed)) opponentTags = parsed
-        }
-      } catch { }
-
-      const card = await pickBotCard(db, match.id, match.user_a, opponentTags)
-      if (card) {
-        match.card_a = card
-        const played: string[] = JSON.parse(match.played_cards_a || '[]')
-        if (!played.includes(card)) played.push(card)
-        match.played_cards_a = JSON.stringify(played)
-        match.phase_version += 1
-        await db.prepare('UPDATE GameMatches SET card_a = ?, played_cards_a = ?, phase_version = ? WHERE id = ?').bind(card, match.played_cards_a, match.phase_version, match.id).run()
-        modified = true
-      }
-    }
-    if (isB && !match.card_b) {
-      let opponentTags: string[] = []
-      try {
-        const uRow = await db.prepare('SELECT tags FROM Users WHERE id = ?').bind(match.user_a).first<{ tags: string }>()
-        if (uRow?.tags) {
-          const parsed = JSON.parse(uRow.tags)
-          if (Array.isArray(parsed)) opponentTags = parsed
-        }
-      } catch { }
-
-      const card = await pickBotCard(db, match.id, match.user_b, opponentTags)
-      if (card) {
-        match.card_b = card
-        const played: string[] = JSON.parse(match.played_cards_b || '[]')
-        if (!played.includes(card)) played.push(card)
-        match.played_cards_b = JSON.stringify(played)
-        match.phase_version += 1
-        await db.prepare('UPDATE GameMatches SET card_b = ?, played_cards_b = ?, phase_version = ? WHERE id = ?').bind(card, match.played_cards_b, match.phase_version, match.id).run()
-        modified = true
-      }
-    }
-    if (match.card_a && match.card_b) {
-      await setPhase(match, 'reveal', now + REVEAL_MS)
-      await persistPhase(db, match)
-      await pushMatchEvent(db, match, 'reveal')
-      return true
-    }
-  }
-
-  if (match.phase === 'decide') {
-    if (isA && !match.decision_a) {
-      const dec = Math.random() < 0.85 ? 'like' : (Math.random() < 0.5 ? 'boost' : 'reject')
-      match.decision_a = dec
-      match.phase_version += 1
-      await db.prepare('UPDATE GameMatches SET decision_a = ?, phase_version = ? WHERE id = ?').bind(dec, match.phase_version, match.id).run()
-      modified = true
-    }
-    if (isB && !match.decision_b) {
-      const dec = Math.random() < 0.85 ? 'like' : (Math.random() < 0.5 ? 'boost' : 'reject')
-      match.decision_b = dec
-      match.phase_version += 1
-      await db.prepare('UPDATE GameMatches SET decision_b = ?, phase_version = ? WHERE id = ?').bind(dec, match.phase_version, match.id).run()
-      modified = true
-    }
-  }
-
-  return modified
-}
 
 /**
  * Advance in-progress matches based on phase deadlines.
@@ -983,16 +870,6 @@ async function advanceMatches(db: D1Turso, now: number): Promise<void> {
     .all<GameMatch>()
 
   for (const match of matches.results) {
-    const phaseAdvanced = await advanceBotMoves(db, match, now)
-
-    // Re-fetch if bot advanced the phase so we process the new phase in this tick
-    if (phaseAdvanced) {
-      const refreshed = await fetchMatch(db, match.id)
-      if (refreshed) {
-        // Copy refreshed state back to match for continued processing
-        Object.assign(match, refreshed)
-      }
-    }
 
     if (now < match.phase_deadline) continue
 
@@ -1161,7 +1038,7 @@ export async function expireIdleSpecialMatches(db: D1Turso, now: number = Date.n
 }
 
 /** Unlocked core of advanceLobby — call inside withMatchLock only. */
-export async function advanceLobbyUnlocked(db: D1Turso, now: number = Date.now(), skipBots = false): Promise<void> {
+export async function advanceLobbyUnlocked(db: D1Turso, now: number = Date.now()): Promise<void> {
   await db.prepare("INSERT OR IGNORE INTO Lobbies (id, status) VALUES (?, 'waiting')").bind(LOBBY_ID).run()
   await cleanStalePlayers(db, now)
   await expireIdleSpecialMatches(db, now)
@@ -1193,12 +1070,7 @@ export async function advanceLobbyUnlocked(db: D1Turso, now: number = Date.now()
       .bind(...endedIds)
       .run()
   }
-  await pairFromQueue(db, now, skipBots)
-}
-
-/** Advance lobby with option to skip bot pairing (for admin force-match). */
-export async function advanceLobbyWithOptions(db: D1Turso, now: number = Date.now(), skipBots = false): Promise<void> {
-  await withMatchLock(() => advanceLobbyUnlocked(db, now, skipBots))
+  await pairFromQueue(db, now)
 }
 
 export async function advanceLobby(db: D1Turso, now: number = Date.now()): Promise<void> {
@@ -1624,11 +1496,7 @@ export async function setLobbyImage(
   const tags = Array.isArray(opts.tags) ? JSON.stringify(opts.tags) : null
   // Lookup uploader display_name once so the LIST endpoint can show "uploaded
   // by <name>" without a join per row.
-  const uploader = await db
-    .prepare("SELECT display_name FROM Users WHERE id = ?")
-    .bind(ownerId)
-    .first<{ display_name: string | null }>()
-  const uploaderName = uploader?.display_name || null
+  const uploaderName = (await findDisplayName(db, ownerId)) || null
   await db
     .prepare(
       "INSERT INTO LobbyImages (id, owner_id, content_url, mime_type, caption, tags, expires_at, uploader_name, is_proxied, proxied_mime) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
@@ -1756,11 +1624,8 @@ export async function addLobbyComment(
     .prepare("INSERT INTO LobbyComments (id, image_id, user_id, body) VALUES (?, ?, ?, ?)")
     .bind(id, imageId, userId, body)
     .run()
-  const uploader = await db
-    .prepare("SELECT display_name FROM Users WHERE id = ?")
-    .bind(userId)
-    .first<{ display_name: string | null }>()
-  return { id, image_id: imageId, user_id: userId, body, created_at: createdAt, display_name: uploader?.display_name || null }
+  const uploaderName = (await findDisplayName(db, userId)) || null
+  return { id, image_id: imageId, user_id: userId, body, created_at: createdAt, display_name: uploaderName }
 }
 
 export async function getLobbyComments(db: D1Turso, imageId: string): Promise<{ id: string; user_id: string; body: string; created_at: string; display_name: string | null }[]> {

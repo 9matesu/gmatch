@@ -51,7 +51,7 @@ function Checkbox({ checked, indeterminate, onChange, className, ...props }: {
       type="checkbox"
       checked={checked}
       onChange={e => onChange?.(e.target.checked)}
-      className={cn("w-4 h-4 accent-cyan-500 rounded border border-border-glass bg-surface-canvas cursor-pointer", className)}
+      className={cn("w-4 h-4 accent-info rounded border border-edge bg-surface-canvas cursor-pointer", className)}
       {...props}
     />
   );
@@ -89,7 +89,7 @@ function AdminActionMenu<T>({ actions, row }: { actions: RowAction<T>[]; row: T 
         <MoreHorizontal className="w-4 h-4" />
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 min-w-[160px] bg-surface-elevated border border-border-glass rounded-lg shadow-lg overflow-hidden animate-orbit-pop">
+        <div className="absolute right-0 top-full mt-1 z-50 min-w-[160px] bg-surface-elevated border border-edge rounded-lg shadow-lg overflow-hidden animate-orbit-pop">
           {visibleActions.map((action, _index) => {
               const actionIcon = action.icon;
               const isIconFunction = typeof actionIcon === 'function';
@@ -106,8 +106,8 @@ function AdminActionMenu<T>({ actions, row }: { actions: RowAction<T>[]; row: T 
                   disabled={action.disabled?.(row)}
                   className={cn(
                     "w-full px-3 py-2 text-left text-xs flex items-center gap-2 transition-colors",
-                    actionVariant === "danger" && "text-red-300 hover:bg-red-500/10",
-                    actionVariant === "primary" && "text-cyan-300 hover:bg-cyan-500/10",
+                    actionVariant === "danger" && "text-danger-fg hover:bg-danger/10",
+                    actionVariant === "primary" && "text-info-fg hover:bg-info/10",
                     actionVariant === "ghost" && "text-retro-muted hover:text-retro-fg hover:bg-glass-w5",
                     (!actionVariant || actionVariant === "default") && "text-retro-fg hover:bg-glass-w10",
                     "disabled:opacity-40 disabled:cursor-not-allowed"
@@ -295,19 +295,20 @@ export function AdminTable<T extends Record<string, unknown>>({
     <div className={cn("overflow-auto", className)}>
       <div className="relative">
         <table className="w-full border-collapse text-xs" role="grid">
-          <thead className="sticky top-0 bg-surface-raised border-b border-border-glass">
+          <thead className="sticky top-0 bg-surface-raised border-b border-edge">
             <tr>
               {config.columns.map(col => (
                 <th
                   key={col.accessorKey}
-                  className={cn(
-                    "px-3 py-2 text-left font-bold uppercase tracking-wider text-retro-muted bg-surface-raised border-b border-border-glass",
-                    col.enableSorting !== false && "cursor-pointer hover:text-retro-fg select-none"
-                  )}
-                  onClick={col.enableSorting !== false ? () => handleSort(col.accessorKey as string) : undefined}
+                  className="px-3 py-2 text-left font-bold uppercase tracking-wider text-retro-muted bg-surface-raised border-b border-edge"
                   style={{ width: col.size, minWidth: col.minSize, maxWidth: col.maxSize }}
                 >
-                  <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={col.enableSorting === false}
+                    onClick={() => handleSort(col.accessorKey as string)}
+                    className="flex items-center gap-1.5 uppercase tracking-wider text-left enabled:cursor-pointer enabled:hover:text-retro-fg select-none"
+                  >
                     {col.header}
                     {sorting?.column === col.accessorKey && (
                       sorting.direction === 'asc' ? (
@@ -316,7 +317,7 @@ export function AdminTable<T extends Record<string, unknown>>({
                         <ChevronDown className="w-3.5 h-3.5 text-retro-accent" />
                       )
                     )}
-                  </div>
+                  </button>
                 </th>
               ))}
               {config.enableRowSelection && (
@@ -346,7 +347,7 @@ export function AdminTable<T extends Record<string, unknown>>({
                         value={(columnFilters[col.accessorKey] as string) || ""}
                         onChange={e => handleFilterChange(col.accessorKey as string, e.target.value)}
                         onClick={e => e.stopPropagation()}
-                        className="w-full bg-surface-canvas border border-border-glass rounded px-2 py-1 text-[10px] outline-none focus:border-retro-accent"
+                        className="w-full bg-surface-canvas border border-edge rounded px-2 py-1 text-2xs outline-none focus:border-retro-accent"
                       />
                     )}
                   </th>
@@ -356,7 +357,7 @@ export function AdminTable<T extends Record<string, unknown>>({
               </tr>
             )}
           </thead>
-          <tbody className="divide-y divide-border-subtle">
+          <tbody className="divide-y divide-edge-subtle">
             {paginatedData.map(row => {
               const rowId = getRowId(row);
               return (
@@ -368,7 +369,7 @@ export function AdminTable<T extends Record<string, unknown>>({
                   )}
                 >
                   {config.columns.map(col => (
-                    <td key={col.accessorKey} className="px-3 py-2 border-r border-border-subtle/50 last:border-0">
+                    <td key={col.accessorKey} className="px-3 py-2 border-r border-edge-subtle/50 last:border-0">
                       {col.cell ? col.cell((row as Record<string, unknown>)[col.accessorKey as string], row) : String((row as Record<string, unknown>)[col.accessorKey as string] ?? "")}
                     </td>
                   ))}
@@ -403,7 +404,7 @@ export function AdminTable<T extends Record<string, unknown>>({
         </table>
       </div>
 
-      <div className="flex items-center justify-between px-3 py-3 border-t border-border-glass bg-surface-raised mt-2">
+      <div className="flex items-center justify-between px-3 py-3 border-t border-edge bg-surface-raised mt-2">
         <div className="flex items-center gap-3 text-xs text-retro-muted">
           {config.enableRowSelection && selectedCount > 0 && (
             <span className="font-mono">{selectedCount} selected</span>
@@ -419,10 +420,10 @@ export function AdminTable<T extends Record<string, unknown>>({
                   )}
                   disabled={action.disabled?.(data.filter(row => rowSelection[getRowId(row)]))}
                   className={cn(
-                    "px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-colors",
-                    action.variant === "danger" && "bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30",
-                    action.variant === "primary" && "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/30",
-                    action.variant !== "danger" && action.variant !== "primary" && "bg-surface-interactive text-retro-fg border border-border-glass hover:bg-glass-w10"
+                    "px-2 py-1 rounded text-2xs font-bold uppercase tracking-wider transition-colors",
+                    action.variant === "danger" && "bg-danger/20 text-danger-fg border border-danger/30 hover:bg-danger/30",
+                    action.variant === "primary" && "bg-info/20 text-info-fg border border-info/30 hover:bg-info/30",
+                    action.variant !== "danger" && action.variant !== "primary" && "bg-surface-interactive text-retro-fg border border-edge hover:bg-glass-w10"
                   )}
                 >
                   {action.icon && <action.icon className="w-3.5 h-3.5 mr-1" />}
@@ -437,7 +438,7 @@ export function AdminTable<T extends Record<string, unknown>>({
           <select
             value={pagination.pageSize}
             onChange={e => handlePageSizeChange(Number(e.target.value))}
-            className="bg-surface-canvas border border-border-glass rounded px-2 py-1 text-xs outline-none focus:border-retro-accent"
+            className="bg-surface-canvas border border-edge rounded px-2 py-1 text-xs outline-none focus:border-retro-accent"
           >
             {[25, 50, 100, 200].map(size => (
               <option key={size} value={size}>{size} per page</option>
@@ -449,7 +450,7 @@ export function AdminTable<T extends Record<string, unknown>>({
               type="button"
               onClick={() => handlePageChange(pagination.page - 1)}
               disabled={pagination.page <= 1}
-              className="p-1.5 rounded border border-border-glass text-retro-muted hover:text-retro-fg disabled:opacity-40 disabled:cursor-not-allowed"
+              className="p-1.5 rounded border border-edge text-retro-muted hover:text-retro-fg disabled:opacity-40 disabled:cursor-not-allowed"
               aria-label="Previous page"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -461,7 +462,7 @@ export function AdminTable<T extends Record<string, unknown>>({
               type="button"
               onClick={() => handlePageChange(pagination.page + 1)}
               disabled={pagination.page >= totalPages}
-              className="p-1.5 rounded border border-border-glass text-retro-muted hover:text-retro-fg disabled:opacity-40 disabled:cursor-not-allowed"
+              className="p-1.5 rounded border border-edge text-retro-muted hover:text-retro-fg disabled:opacity-40 disabled:cursor-not-allowed"
               aria-label="Next page"
             >
               <ChevronRight className="w-4 h-4" />

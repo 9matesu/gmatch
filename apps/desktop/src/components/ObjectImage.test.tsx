@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 // Signed objects render from a fetched blob; the placeholder must not claim
 // "No preview" while that fetch is simply still in flight (T-W3).
@@ -24,7 +24,12 @@ vi.mock('../hooks/useObjectImage', () => ({
 }))
 vi.mock('../services/vault', () => ({
   useVaultUrl: () => null,
+  // ONE lookup drives both the URL and the reveal gate. The vault is off in
+  // these tests, so the lookup is settled with no local copy from the start.
+  useVaultLookup: () => ({ local: null, settled: true }),
   useVaultHttpUrls: () => ({}),
+  vaultGet: async () => null,
+  vaultOptIn: () => false,
 }))
 
 import { ObjectImage } from './ObjectImage'
@@ -102,5 +107,50 @@ describe('ObjectImage placeholder (T-W3)', () => {
     )
     expect(screen.queryByText('No preview')).toBeNull()
     expect(container.firstChild).toBeNull()
+  })
+
+  it('says "No preview" (never an endless "Loading media...") for a descriptor with no id', () => {
+    rec.cardId = null
+    // A magnet is a descriptor, not an id: there is nothing to request, so
+    // the tile must state the terminal truth instead of spinning forever.
+    const { container } = render(
+      <ObjectImage contentUrl="magnet:?xt=urn:btih:abc123def456" identity={identity} />
+    )
+    expect(screen.getByText('No preview')).toBeInTheDocument()
+    expect(screen.queryByText('Loading media...')).toBeNull()
+    expect(rec.cardId).toBeNull()
+    expect(container.querySelector('img')).toBeNull()
+  })
+
+  it('addresses the node local copy by the id inside a urn:sha256 descriptor', () => {
+    const uuid = 'e66d0889-8c2a-4bd3-84d5-a7a29273db0f'
+    rec.cardId = null
+    render(<ObjectImage contentUrl={`urn:sha256:${uuid}`} identity={identity} />)
+    // The urn carries the canonical object id; the raw urn is not requestable.
+    expect(rec.cardId).toBe(uuid)
+  })
+
+  it('addresses a sha256-hex urn by its hex object id', () => {
+    const hex = 'a'.repeat(64)
+    rec.cardId = null
+    render(<ObjectImage contentUrl={`urn:sha256:${hex}`} identity={identity} />)
+    expect(rec.cardId).toBe(hex)
+  })
+})
+
+describe('ObjectImage strict availability (2026-11-24)', () => {
+  it('never collapses a tile while the signed fetch is still in flight', () => {
+    // The 6s availability timer used to fire while useObjectImage was still
+    // fetching, and hideUnavailable then removed the tile: every profile image
+    // "disappeared" mid-load. A fetch in flight is waiting, not unavailable.
+    vi.useFakeTimers()
+    try {
+      render(<ObjectImage contentUrl="/api/objects/pending" identity={identity} hideUnavailable />)
+      act(() => { vi.advanceTimersByTime(30_000) })
+      expect(screen.getByText('Loading media...')).toBeInTheDocument()
+      expect(screen.queryByText('Image unavailable')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

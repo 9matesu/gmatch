@@ -244,10 +244,10 @@ export function WatchPartySlot({
       <button
         type="button"
         onClick={onEmptyClick}
-        className="relative aspect-video border border-dashed border-border-glass bg-glass-w5 hover:bg-glass-w10 flex flex-col items-center justify-center gap-2 text-retro-muted transition-colors cursor-pointer"
+        className="relative aspect-video border border-dashed border-edge bg-glass-w5 hover:bg-glass-w10 flex flex-col items-center justify-center gap-2 text-retro-muted transition-colors cursor-pointer"
       >
         <Plus className="w-6 h-6" />
-        <span className="text-[10px] font-bold uppercase tracking-wider">Start playing</span>
+        <span className="text-2xs font-bold uppercase tracking-wider">Start playing</span>
       </button>
     )
   }
@@ -283,8 +283,8 @@ export function WatchPartySlot({
       ref={wrapRef}
       data-active={active ? 'true' : 'false'}
       onClick={onSelect}
-      className={`watch-party-slot relative ${fill ? 'w-full h-full' : 'aspect-video'} bg-black cursor-pointer overflow-hidden flex items-center justify-center ${
-        active ? '' : 'border border-border-glass'
+      className={`watch-party-slot relative ${fill ? 'w-full h-full' : 'aspect-video'} bg-retro-bg cursor-pointer overflow-hidden flex items-center justify-center ${
+        active ? '' : 'border border-edge'
       }`}
     >
       {videoSrc ? (
@@ -342,16 +342,16 @@ export function WatchPartySlot({
                   e.stopPropagation()
                   togglePlayback()
                 }}
-                className="pointer-events-auto w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-black/60 hover:bg-black/80 border border-border-glass text-white flex items-center justify-center shadow-lg transition-transform duration-150 active:scale-95 cursor-pointer"
+                className="pointer-events-auto w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-black/60 hover:bg-black/80 border border-edge text-retro-fg flex items-center justify-center shadow-lg transition-transform duration-150 active:scale-95 cursor-pointer"
               >
-                <Play className="w-7 h-7 sm:w-8 sm:h-8 fill-white text-white translate-x-0.5" />
+                <Play className="w-7 h-7 sm:w-8 sm:h-8 fill-white text-retro-fg translate-x-0.5" />
               </button>
             </div>
           )}
         </>
       ) : (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-4 text-center">
-          <span className="text-[10px] uppercase tracking-wider text-retro-muted">
+          <span className="text-2xs uppercase tracking-wider text-retro-muted">
             {media.failed ? 'Media unavailable' : 'Loading...'}
           </span>
           {/* Say WHY, not just that it failed. "Media unavailable" is
@@ -360,7 +360,7 @@ export function WatchPartySlot({
               to diagnose from the UI. The real element state is right here. */}
           {diag && (
             <span
-              className="text-[9px] font-mono text-retro-muted/70 tabular-nums"
+              className="text-2xs font-mono text-retro-muted/70 tabular-nums"
               data-testid="watch-media-diag"
               title="readyState / networkState — 0 = nothing requested, 1 = loading, 4 = enough data"
             >
@@ -368,7 +368,7 @@ export function WatchPartySlot({
             </span>
           )}
           {media.failed && !diag && (
-            <span className="text-[9px] font-mono text-retro-muted/70">{videoSrc?.slice(0, 60)}</span>
+            <span className="text-2xs font-mono text-retro-muted/70">{videoSrc?.slice(0, 60)}</span>
           )}
         </div>
       )}
@@ -382,7 +382,7 @@ export function WatchPartySlot({
           transfer.status === 'failed' ||
           transfer.status === 'cancelled') && (
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-1.5 bg-black/70 px-4 text-center">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-retro-fg">
+            <span className="text-2xs font-bold uppercase tracking-wider text-retro-fg">
               {transfer.status === 'receiving'
                 ? 'Receiving from the sharer…'
                 : transfer.status === 'failed'
@@ -392,18 +392,18 @@ export function WatchPartySlot({
                     : 'Waiting for the sharer…'}
             </span>
             {transfer.status === 'receiving' && transfer.total > 0 && (
-              <span className="font-mono text-[10px] text-retro-muted tabular-nums">
+              <span className="font-mono text-2xs text-retro-muted tabular-nums">
                 {Math.round((transfer.received / transfer.total) * 100)}% · {formatBytes(transfer.received)} / {formatBytes(transfer.total)}
               </span>
             )}
             {transfer.status === 'failed' && (
-              <span className="text-[10px] text-rose-300">{transfer.error || 'No peer answered.'}</span>
+              <span className="text-2xs text-danger-fg">{transfer.error || 'No peer answered.'}</span>
             )}
             {(transfer.status === 'failed' || transfer.status === 'cancelled' || transfer.status === 'idle') && (
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); void transfer.receive() }}
-                className="mt-1 rounded-md border border-border-glass bg-glass-w10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-retro-fg hover:bg-glass-w10/80 cursor-pointer"
+                className="mt-1 rounded-md border border-edge bg-glass-w10 px-2 py-1 text-2xs font-bold uppercase tracking-wider text-retro-fg hover:bg-glass-w10/80 cursor-pointer"
               >
                 Retry transfer
               </button>

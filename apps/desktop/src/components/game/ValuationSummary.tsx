@@ -205,11 +205,11 @@ export function ValuationSummary({
   const spotlightCard = summary.cardOfTheMatch;
 
   return (
-    <div className="space-y-4 animate-orbit-slide-up bg-surface-canvas/70 border border-border-glass rounded-xl p-4 font-sans text-retro-fg backdrop-blur-md">
+    <div className="space-y-4 animate-orbit-slide-up bg-surface-canvas/70 border border-edge rounded-xl p-4 font-sans text-retro-fg backdrop-blur-md">
       {/* Header: Social Valuation Summary banner */}
-      <div className="p-4 bg-surface-canvas/60 border border-border-glass rounded-xl text-center space-y-2">
+      <div className="p-4 bg-surface-canvas/60 border border-edge rounded-xl text-center space-y-2">
         <div className="flex items-center justify-center gap-1.5 text-xs font-bold uppercase tracking-wider text-retro-body">
-          <Trophy className="w-4 h-4 text-amber-400" />
+          <Trophy className="w-4 h-4 text-warning-fg" />
           <span>Match Valuation Complete</span>
         </div>
         <div className="text-xl font-extrabold tracking-tight flex items-center justify-center gap-2 flex-wrap">
@@ -217,7 +217,7 @@ export function ValuationSummary({
           <span className="font-mono text-retro-body">{summary.prevDeckValue.toLocaleString()}</span>
           <ArrowRight className="w-4 h-4 text-retro-muted" />
           <span className="font-mono text-retro-fg">{(summary.prevDeckValue + summary.myDelta).toLocaleString()}</span>
-          <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full border ${summary.myDelta >= 0 ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40' : 'bg-red-950/40 text-red-300 border-red-500/40'}`}>
+          <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full border ${summary.myDelta >= 0 ? 'bg-success/40 text-success-fg border-success/40' : 'bg-danger/40 text-danger-fg border-danger/40'}`}>
             {summary.myDelta >= 0 ? `+${summary.myDelta}` : summary.myDelta} PTS
           </span>
         </div>
@@ -228,14 +228,14 @@ export function ValuationSummary({
 
       {/* Rarity Promotions Fanfare */}
       {summary.promotions.length > 0 && (
-        <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-center space-y-1">
-          <div className="flex items-center justify-center gap-1.5 text-xs font-bold uppercase text-amber-300 tracking-wider">
-            <Sparkles className="w-4 h-4 text-amber-400" />
+        <div className="p-3 bg-warning/10 border border-warning/30 rounded-xl text-center space-y-1">
+          <div className="flex items-center justify-center gap-1.5 text-xs font-bold uppercase text-warning-fg tracking-wider">
+            <Sparkles className="w-4 h-4 text-warning-fg" />
             <span>Rarity Promotion Unlocked</span>
           </div>
           {summary.promotions.map((p) => (
             <div key={p.id} className="text-xs font-medium text-retro-body">
-              Card upgraded from <span className="uppercase tracking-wider text-amber-300 font-bold">{p.oldRarity}</span> to <span className="uppercase text-amber-400 font-extrabold">{p.newRarity}</span>
+              Card upgraded from <span className="uppercase tracking-wider text-warning-fg font-bold">{p.oldRarity}</span> to <span className="uppercase text-warning-fg font-extrabold">{p.newRarity}</span>
             </div>
           ))}
         </div>
@@ -243,8 +243,8 @@ export function ValuationSummary({
 
       {/* Card of the Match Spotlight */}
       {spotlightCard && spotlightCard.delta > 0 && (
-        <div className="flex items-center gap-3 p-3 bg-surface-canvas/50 border border-border-glass rounded-xl">
-          <div className="w-14 h-14 rounded-lg border border-border-glass overflow-hidden shrink-0 bg-black">
+        <div className="flex items-center gap-3 p-3 bg-surface-canvas/50 border border-edge rounded-xl">
+          <div className="w-14 h-14 rounded-lg border border-edge overflow-hidden shrink-0 bg-retro-bg">
             <ObjectImage
               contentUrl={spotlightCard.url}
               objectId={spotlightCard.id}
@@ -253,14 +253,14 @@ export function ValuationSummary({
             />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-amber-400">
+            <div className="flex items-center gap-1 text-2xs font-bold uppercase tracking-wider text-warning-fg">
               <Award className="w-3.5 h-3.5" />
               <span>Card of the Match</span>
             </div>
             <div className="text-xs font-bold text-retro-fg truncate mt-0.5">
               {spotlightCard.isMine ? 'Your Card' : `${opponentName}'s Card`}
             </div>
-            <div className="text-xs text-emerald-400 font-mono font-bold">
+            <div className="text-xs text-success-fg font-mono font-bold">
               +{spotlightCard.delta} Points Gain
             </div>
           </div>
@@ -269,14 +269,14 @@ export function ValuationSummary({
 
       {/* Per-Round Valuation Breakdown */}
       <div className="space-y-2">
-        <div className="text-[10px] font-bold uppercase tracking-wider text-retro-muted flex justify-between px-1">
+        <div className="text-2xs font-bold uppercase tracking-wider text-retro-muted flex justify-between px-1">
           <span>Card Valuation Breakdown</span>
           <span>{rounds.length} Rounds Played</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {/* My Played Cards */}
-          <div className="p-3 bg-surface-canvas/50 border border-border-glass rounded-xl space-y-2">
-            <div className="text-xs font-bold text-retro-body border-b border-border-glass pb-1.5">
+          <div className="p-3 bg-surface-canvas/50 border border-edge rounded-xl space-y-2">
+            <div className="text-xs font-bold text-retro-body border-b border-edge pb-1.5">
               Your Cards Valuation:
             </div>
             {summary.myCardDeltas.map((c) => {
@@ -285,13 +285,13 @@ export function ValuationSummary({
                 <div key={c.round} className="flex items-center justify-between text-xs py-0.5">
                   <div className="flex items-center gap-1.5">
                     <span className="font-mono text-retro-muted text-xs">R{c.round}:</span>
-                    <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold uppercase tracking-wider ${rarity.badgeClass}`}>{rarity.label}</span>
+                    <span className={`px-1.5 py-0.2 rounded text-2xs font-bold uppercase tracking-wider ${rarity.badgeClass}`}>{rarity.label}</span>
                     <span className="text-retro-muted text-xs flex items-center gap-1">
-                      {c.vote === 'boost' ? <><Zap className="w-3 h-3 text-amber-400" /> Boosted</> : c.vote === 'like' ? <><Heart className="w-3 h-3 text-amber-400 fill-rose-400" /> Liked</> : <><X className="w-3 h-3 text-retro-muted" /> Rejected</>}
-                      {c.auto && <span className="text-[10px] font-mono text-retro-muted border border-border-glass rounded px-1">auto · +0</span>}
+                      {c.vote === 'boost' ? <><Zap className="w-3 h-3 text-warning-fg" /> Boosted</> : c.vote === 'like' ? <><Heart className="w-3 h-3 text-warning-fg fill-danger" /> Liked</> : <><X className="w-3 h-3 text-retro-muted" /> Rejected</>}
+                      {c.auto && <span className="text-2xs font-mono text-retro-muted border border-edge rounded px-1">auto · +0</span>}
                     </span>
                   </div>
-                  <span className={`font-mono font-bold text-xs ${c.delta >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  <span className={`font-mono font-bold text-xs ${c.delta >= 0 ? 'text-success-fg' : 'text-danger-fg'}`}>
                     {c.delta >= 0 ? `+${c.delta}` : c.delta}
                   </span>
                 </div>
@@ -300,8 +300,8 @@ export function ValuationSummary({
           </div>
 
           {/* Opponent Cards */}
-          <div className="p-3 bg-surface-canvas/50 border border-border-glass rounded-xl space-y-2">
-            <div className="text-xs font-bold text-retro-muted border-b border-border-glass pb-1.5">
+          <div className="p-3 bg-surface-canvas/50 border border-edge rounded-xl space-y-2">
+            <div className="text-xs font-bold text-retro-muted border-b border-edge pb-1.5">
               {opponentName}&apos;s Cards:
             </div>
             {summary.oppCardDeltas.map((c) => (
@@ -309,11 +309,11 @@ export function ValuationSummary({
                 <div className="flex items-center gap-1.5">
                   <span className="font-mono text-retro-muted text-xs">R{c.round}:</span>
                   <span className="text-retro-muted text-xs flex items-center gap-1">
-                    {c.vote === 'boost' ? <><Zap className="w-3 h-3 text-amber-400" /> You Boosted</> : c.vote === 'like' ? <><Heart className="w-3 h-3 text-amber-400 fill-rose-400" /> You Liked</> : <><X className="w-3 h-3 text-retro-muted" /> You Rejected</>}
-                    {c.auto && <span className="text-[10px] font-mono text-retro-muted border border-border-glass rounded px-1">auto · +0</span>}
+                    {c.vote === 'boost' ? <><Zap className="w-3 h-3 text-warning-fg" /> You Boosted</> : c.vote === 'like' ? <><Heart className="w-3 h-3 text-warning-fg fill-danger" /> You Liked</> : <><X className="w-3 h-3 text-retro-muted" /> You Rejected</>}
+                    {c.auto && <span className="text-2xs font-mono text-retro-muted border border-edge rounded px-1">auto · +0</span>}
                   </span>
                 </div>
-                <span className={`font-mono font-bold text-xs ${c.delta >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                <span className={`font-mono font-bold text-xs ${c.delta >= 0 ? 'text-success-fg' : 'text-danger-fg'}`}>
                   {c.delta >= 0 ? `+${c.delta}` : c.delta}
                 </span>
               </div>
@@ -328,7 +328,7 @@ export function ValuationSummary({
           type="button"
           onClick={onReturnToLobby}
           disabled={submitting}
-          className="flex-1 py-2.5 text-xs font-semibold uppercase tracking-wider bg-surface-canvas hover:bg-surface-elevated text-retro-body border border-border-glass rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+          className="flex-1 py-2.5 text-xs font-semibold uppercase tracking-wider bg-surface-canvas hover:bg-surface-elevated text-retro-body border border-edge rounded-lg transition-colors cursor-pointer disabled:opacity-50"
         >
           Return to Lobby
         </button>

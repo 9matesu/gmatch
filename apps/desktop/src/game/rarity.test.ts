@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  RARITY_INCOME,
-  imageBuyCost,
-  imageRarity,
-  rarityFor,
-  rarityIncome,
-} from './rarity'
+import { imageBuyCost, imageRarity, rarityFor } from './rarity'
 
 describe('rarity ladder (SPEC §4)', () => {
   it('thresholds: Common 0-99, Copper 100-499, Silver 500-1499, Gold 1500-4999, Diamond 5000+', () => {
@@ -21,12 +15,7 @@ describe('rarity ladder (SPEC §4)', () => {
     expect(rarityFor(999_999)).toBe('Diamond')
   })
 
-  it('income per rarity 1/3/10/30/100', () => {
-    expect(RARITY_INCOME).toEqual({
-      Common: 1, Copper: 3, Silver: 10, Gold: 30, Diamond: 100,
-    })
-    expect(rarityIncome('Diamond')).toBe(100)
-  })
+
 })
 
 describe('imageBuyCost (SPEC §4)', () => {

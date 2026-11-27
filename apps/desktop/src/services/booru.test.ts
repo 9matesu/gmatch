@@ -53,9 +53,24 @@ describe('fetchPosts (SPEC §6/§8)', () => {
     })
     vi.stubGlobal('window', { gmatch: { booruFetch } })
     const res = await fetchPosts({ tags: 'gangbang', limit: 10 })
-    expect(booruFetch).toHaveBeenCalledWith({ tags: 'gangbang', limit: 10 })
+    expect(booruFetch).toHaveBeenCalledWith({ tags: 'gangbang', limit: 10, excludes: [] })
     expect(res.ok).toBe(true)
     expect(res.source).toBe('tbib')
+  })
+
+  it('sends the player excludes so the provider query carries -term', async () => {
+    // The excludes used to stop at the renderer: the source offered the
+    // excluded content, we paid to download it, and only then threw it away.
+    setUserExcludes(['yaoi', 'feet'])
+    const booruFetch = vi.fn().mockResolvedValue({ posts: [], source: 'tbib', ok: true })
+    vi.stubGlobal('window', { gmatch: { booruFetch } })
+    await fetchPosts({ tags: 'blonde', limit: 10 })
+    expect(booruFetch).toHaveBeenCalledWith({
+      tags: 'blonde',
+      limit: 10,
+      excludes: ['yaoi', 'feet'],
+    })
+    setUserExcludes([])
   })
 
   it('returns offline:true when the bridge reports failure', async () => {
@@ -163,12 +178,25 @@ describe('fetchPosts (SPEC §6/§8)', () => {
     expect(res.ok).toBe(false)
   })
 
-  it('browser mode falls back to narrower variants when combos truncate', async () => {
+  it('browser mode over-fetches narrower variants but gates on the FULL query', async () => {
     vi.stubGlobal('window', {})
-    const good = {
+    // A post that answers EVERY one of the five tags, recovered from the top-2
+    // over-fetch — this one must survive.
+    const full = {
       id: 99,
       directory: 5,
       image: 'good-variant-fallback.jpg',
+      width: 900,
+      height: 900,
+      rating: 'explicit',
+      tags: 'gangbang creampie ahegao deepthroat anal',
+    }
+    // A post that answers only the top-2 variant must NOT be served under the
+    // 5-tag query — that is exactly the "picture doesn't match the tags" bug.
+    const loose = {
+      id: 100,
+      directory: 5,
+      image: 'loose.jpg',
       width: 900,
       height: 900,
       rating: 'explicit',
@@ -179,15 +207,17 @@ describe('fetchPosts (SPEC §6/§8)', () => {
       // full 5-tag query comes back truncated on both mirrors…
       .mockResolvedValueOnce({ ok: true, json: () => Promise.reject(new Error('truncated')) })
       .mockResolvedValueOnce({ ok: true, json: () => Promise.reject(new Error('truncated')) })
-      // …top-2 variant on tbib hits
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([good]) })
+      // …top-2 variant on tbib hits, carrying both a full and a loose post
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([loose, full]) })
     vi.stubGlobal('fetch', fetchMock)
     const res = await fetchPosts({ tags: 'gangbang creampie ahegao deepthroat anal', limit: 10 })
-    expect(res.ok).toBe(true)
-    expect(res.posts).toHaveLength(1)
+    // The narrower variant was still requested (over-fetch)…
     const urls = fetchMock.mock.calls.map((c) => decodeURIComponent(String(c[0])))
     expect(urls[0]).toContain('gangbang creampie ahegao deepthroat anal')
     expect(urls[1]).toContain('gangbang creampie rating:explicit')
+    // …but only the post answering EVERY tag survives.
+    expect(res.ok).toBe(true)
+    expect(res.posts.map((p) => String(p.id))).toEqual(['99'])
   })
 
   it('browser mode uses paheal single-tag when danbooru mirrors yield nothing', async () => {

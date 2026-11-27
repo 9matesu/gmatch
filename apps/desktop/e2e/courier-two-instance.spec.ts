@@ -133,14 +133,18 @@ async function openDmTo(page: Page, peerName: string): Promise<void> {
   // 404s, so the ONLY source is the beacon roster we ingest in App.tsx.
   const row = page.getByTestId('chat-player-list').getByText(peerName, { exact: true });
   await expect(row).toBeVisible({ timeout: 120_000 });
-  await row.click();
+  // Online rows pulse (CSS animation) — Playwright's "element is stable"
+  // actionability wait never settles on it. A real user clicks it fine;
+  // force skips only that artificial gate.
+  await row.click({ force: true });
   // The player row opens the profile modal; its Message button starts the PM.
-  await page.getByRole('button', { name: 'Message' }).click();
+  // A row-hover action AND the open profile both expose a Message button —
+  // the profile modal's is the one addressed here (first is sufficient).
+  await page.getByRole('button', { name: 'Message' }).first().click();
 }
 
-test.fixme(
+test(
   'two instances bootstrap sealed DMs from presence beacons alone',
-  'WIP: the courier sidecar boots and both instances open, but the beacon roster never reaches the chat player list yet. Fixed along the way: App.tsx feeds roster keys into the TOFU registry and ingests the roster into the presence store; useP2P now detects swarm-couriers via /api/health mode instead of the hostname; computeApiBase honors gmatch.api.url on localhost. Next: instrument in-page (dump the roster response and the presence store) to find where the chain still drops.',
   async ({ browser }) => {
   test.setTimeout(300_000);
   // Cold schema+VACUUM on a brand-new database — same budget rationale as

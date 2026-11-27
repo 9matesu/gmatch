@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   House,
   SquaresFour,
@@ -21,16 +21,16 @@ import {
   FilmSlate,
   User,
   UsersThree,
+  Bell,
 } from '@phosphor-icons/react';
 import { playPress } from '../../utils/sounds';
 import { useCommunityInvite, openCommunityInvite } from '../../services/community';
 import { resolveMediaUrl } from '../../utils/media';
 import { CountBadge } from './CountBadge';
-import { formatCount } from '../../ui/format';
+import { MediaPickerPanel } from '../media/MediaPickerModal';
+import type { MediaSelection } from '../media/picker';
 import type { ViewMode } from '../../game/types';
 export type MainViewType = 'feed' | 'games' | 'create' | 'messages' | 'profile' | 'game' | 'gallery' | 'store' | 'pc_domination' | 'grid' | 'rooms' | 'servers' | 'watch';
-
-export type GamesNavTab = 'duel' | 'cards' | 'babecock' | 'ranks' | 'idle';
 
 export interface ActiveHackSession {
   itemId: string;
@@ -55,7 +55,6 @@ function readSatelliteOpen(): boolean {
 export interface CommandIslandProps {
   mainView: MainViewType;
   setMainView: (view: MainViewType) => void;
-  balance?: number;
   wsConnected?: boolean;
   unreadMessagesCount?: number;
   /** Live players in queue + in match (Arena badge). Hidden at 0. */
@@ -70,6 +69,9 @@ export interface CommandIslandProps {
   displayName?: string;
   profilePic?: string;
   onOpenCreatePost?: () => void;
+  /** A media pick from the Post bubble goes straight into the post creator
+   *  pre-attached. Omitted → the bubble is not offered (tests / embeds). */
+  onPickMedia?: (sel: MediaSelection) => void;
   onOpenSettings?: () => void;
   /** Open the Help & documentation modal. */
   onOpenHelp?: () => void;
@@ -89,12 +91,16 @@ export interface CommandIslandProps {
   /** Active Clicker layout; the pill only renders when this prop pair is given. */
   gridSize?: ViewMode;
   onGridSizeChange?: (mode: ViewMode) => void;
+  /** Unread notification count for the pill (0 hides it). */
+  notificationCount?: number;
+  /** Toggle the left notification sidebar. */
+  onToggleNotifications?: () => void;
+  notificationsOpen?: boolean;
 }
 
 export function CommandIsland({
   mainView,
   setMainView,
-  balance = 0,
   wsConnected: _wsConnected = false,
   unreadMessagesCount = 0,
   gamesOnlineCount = 0,
@@ -104,6 +110,7 @@ export function CommandIsland({
   displayName = 'You',
   profilePic,
   onOpenCreatePost,
+  onPickMedia,
   onOpenSettings,
   onOpenHelp,
   settingsOpen = false,
@@ -116,12 +123,50 @@ export function CommandIsland({
   onOpenProfile,
   onOpenAdmin,
   showAdmin,
-  onOpenCreateCard,
   gridSize: _gridSize,
   onGridSizeChange: _onGridSizeChange,
+  notificationCount = 0,
+  onToggleNotifications,
+  notificationsOpen = false,
 }: CommandIslandProps) {
   const [satelliteOpen, setSatelliteOpen] = useState<boolean>(readSatelliteOpen);
+  const [postPickerOpen, setPostPickerOpen] = useState(false);
+  // The media balloon is STABLE: a click opens it, it stays put while the player
+  // switches panes, and only an explicit pick / close / Escape / outside click
+  // dismisses it. It used to open on hover and close on mouse-leave, so moving
+  // the pointer onto a tab could dismiss the very thing about to be clicked.
+  const pickerTriggerRef = useRef<HTMLDivElement | null>(null);
+  const pickerBubbleRef = useRef<HTMLDivElement | null>(null);
   const communityUrl = useCommunityInvite();
+
+  /** Every close goes through here. */
+  const closePicker = useCallback(() => setPostPickerOpen(false), []);
+  const togglePicker = () => {
+    playPress(900);
+    setPostPickerOpen((v) => !v);
+  };
+
+  // Outside click + Escape. The trigger is excluded so a second click on the
+  // Post button toggles rather than closing and instantly re-opening.
+  useEffect(() => {
+    if (!postPickerOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target as Node | null;
+      if (!target) return;
+      if (pickerBubbleRef.current?.contains(target)) return;
+      if (pickerTriggerRef.current?.contains(target)) return;
+      closePicker();
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closePicker();
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [postPickerOpen, closePicker]);
 
   const toggleSatellite = () => {
     playPress(760);
@@ -182,77 +227,21 @@ export function CommandIsland({
     },
   ];
 
-  // Contextual action depending on current view
-  const renderContextualAction = () => {
-    if (mainView === 'feed') {
-      return (
-        <button
-          type="button"
-          onClick={() => {
-            playPress(920);
-            onOpenCreatePost?.();
-          }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-retro-accent text-retro-accent-text hover:bg-retro-accent-hover active:scale-95 transition-all text-xs font-semibold"
-          title="Create Post"
-          aria-label="Create Post"
-        >
-          <Plus className="w-3.5 h-3.5" weight="bold" />
-          <span className="hidden sm:inline">Post</span>
-        </button>
-      );
-    }
-
-    if (mainView === 'gallery') {
-      return (
-        <button
-          type="button"
-          onClick={() => {
-            playPress(900);
-            onOpenCreateCard?.();
-          }}
-          className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full bg-retro-accent text-retro-accent-text hover:bg-retro-accent-hover active:scale-[0.98] transition-all text-xs font-semibold"
-          title="Forge Card"
-          aria-label="Forge Card"
-        >
-          <Plus className="w-3.5 h-3.5" weight="bold" />
-          <span className="hidden sm:inline">Forge</span>
-        </button>
-      );
-    }
-
-    // There is deliberately no "Play" button here for the Arena view. It used
-    // to render one that called handleNavClick('games') from inside the branch
-    // that only renders when mainView is ALREADY 'games' — so it set the view
-    // to the value it already had and did nothing but make a noise. Labelled
-    // "Play" and styled as the primary green CTA, that is worse than no button:
-    // it is the most prominent control on the screen and it does not work. The
-    // real action is "Queue for Perverts" in the Arena itself, and the Help >
-    // Card Duels guide now says so.
-
-    return null;
-  };
 
   return (
     <>
-      {/* Primary Floating Command Island Dock */}
+      {/* Primary Floating Command Island Dock.
+          `left-1/2` alone was the bug: it moved the box's LEFT EDGE to the
+          midline, so a dock wider than half the viewport hung off the right
+          side (measured: right edge 853 at a 768px viewport). The inset pair
+          centres the box on both axes and lets `w-max` shrink to the content. */}
       <nav
         aria-label="Command Island"
-        className={`command-island fixed bottom-5 left-1/2 -translate-x-1/2 z-[var(--z-dropdown)] flex max-w-[calc(100vw-1.5rem)] items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full select-none transition-all duration-300 overflow-hidden flex-nowrap ${recessed ? 'island-recessed' : ''}`}
+        className={`command-island fixed bottom-5 inset-x-0 mx-auto w-max max-w-[calc(100vw-1.5rem)] z-[var(--z-dropdown)] flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full select-none transition duration-300 overflow-x-auto flex-nowrap ${recessed ? 'island-recessed' : ''}`}
       >
-        {/* Left Telemetry: $G Balance */}
-        <div
-          aria-label={`Balance: ${formatCount(balance)} dollars`}
-          className="flex items-center px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full bg-glass-w5 border border-border-glass text-xs font-mono tabular-nums text-retro-body shrink-0"
-        >
-          <span className="font-semibold text-retro-fg tracking-tight">
-            ${formatCount(balance)}
-          </span>
-        </div>
-
-        <div className="h-4 w-[1px] bg-glass-w10 mx-0.5 shrink-0" />
-
-        {/* Center Primary Nav Tabs */}
-        <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
+        {/* Left zone: primary nav tabs, kept intact (shrink-0) so a narrow
+            window scrolls the dock instead of squashing the icons. */}
+        <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 justify-end">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = item.active;
@@ -264,10 +253,10 @@ export function CommandIsland({
                 onClick={() => handleNavClick(item.id)}
                 aria-label={item.label}
                 aria-current={isActive ? 'page' : undefined}
-                className={`relative flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full text-xs font-medium transition-all ${
+                className={`relative flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full text-xs font-medium transition ${
                   isActive
-                    ? 'bg-retro-accent text-retro-accent-text'
-                    : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
+                    ? 'bg-glass-w15 text-retro-fg'
+                    : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-(--scale-press)'
                 }`}
               >
                 <Icon className="w-4 h-4" weight={isActive ? 'fill' : 'regular'} />
@@ -280,9 +269,55 @@ export function CommandIsland({
               </button>
             );
           })}
+        </div>
 
-          {/* The notification bell lives in the header now (single entry point);
-              the footer island no longer duplicates it. */}
+        <div className="h-4 w-[1px] bg-glass-w10 mx-0.5 shrink-0" />
+
+        {/* Center: THE Post button — one focal point in the island. A CLICK
+            opens the SAME media-picker balloon (never two different modals);
+            a pick flows into the composer pre-attached. The balance counter is
+            gone: the g$ ledger lives in the Vault, not the chrome. */}
+        {onOpenCreatePost && (
+          <div
+            ref={pickerTriggerRef}
+            className="relative shrink-0"
+            onKeyDown={(e) => { if (e.key === 'Escape') closePicker(); }}
+          >
+            <button
+              type="button"
+              onClick={togglePicker}
+              aria-label="Create a post"
+              aria-haspopup={onPickMedia ? 'dialog' : undefined}
+              aria-expanded={onPickMedia ? postPickerOpen : undefined}
+              title="Create a post — opens the media picker"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-retro-accent text-retro-accent-text hover:bg-retro-accent-hover hover:-translate-y-0.5 hover: active:scale-95 active:translate-y-0 transition text-xs font-bold tracking-wide"
+            >
+              <Plus className="w-3.5 h-3.5" weight="bold" />
+              <span className="hidden sm:inline">Post</span>
+            </button>
+          </div>
+        )}
+
+        <div className="h-4 w-[1px] bg-glass-w10 mx-0.5 shrink-0" />
+
+        {/* Right zone: chat, profile, contextual action, extra tools. */}
+        <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 justify-start">
+
+          {/* Notifications: chat-style button + unread pill, opens the left sidebar. */}
+          {onToggleNotifications && (
+            <button
+              type="button"
+              onClick={() => { playPress(760); onToggleNotifications(); }}
+              aria-label="Notifications"
+              aria-expanded={notificationsOpen}
+              className={`relative flex items-center gap-1 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full text-xs font-medium transition ${notificationsOpen ? 'bg-glass-w15 text-retro-fg' : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-(--scale-press)'}`}
+            >
+              <Bell className="w-4 h-4" weight={notificationsOpen ? 'fill' : 'regular'} />
+              {notificationCount > 0 && (
+                <CountBadge count={notificationCount} label={`${notificationCount} unread notifications`} />
+              )}
+            </button>
+          )}
 
           {/* Messages Drawer Toggle Button */}
           <button
@@ -296,10 +331,10 @@ export function CommandIsland({
               }
             }}
             aria-label="Messages"
-            className={`relative flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full text-xs font-medium transition-all ${
+            className={`relative flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full text-xs font-medium transition ${
               messagesOpen || mainView === 'messages' || mainView === 'rooms'
-                ? 'bg-retro-accent text-retro-accent-text'
-                : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
+                ? 'bg-glass-w15 text-retro-fg'
+                : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-(--scale-press)'
             }`}
           >
             <ChatCircleText
@@ -321,13 +356,13 @@ export function CommandIsland({
             aria-label="Profile"
             aria-current={mainView === 'profile' ? 'page' : undefined}
             title={`Profile (${displayName})`}
-            className={`relative flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+            className={`relative flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full text-xs font-medium transition ${
               mainView === 'profile'
-                ? 'bg-retro-accent text-retro-accent-text'
-                : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
+                ? 'bg-glass-w15 text-retro-fg'
+                : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-(--scale-press)'
             }`}
           >
-            <div className="w-5 h-5 rounded-full overflow-hidden border border-white/20 bg-black/40 flex items-center justify-center shrink-0">
+            <div className="w-5 h-5 rounded-full overflow-hidden border border-edge bg-black/40 flex items-center justify-center shrink-0">
               {profilePic ? (
                 <img src={resolveMediaUrl(profilePic)} alt="" className="w-full h-full object-cover" />
               ) : (
@@ -336,17 +371,8 @@ export function CommandIsland({
             </div>
             <span className="text-xs font-medium hidden md:inline">Profile</span>
           </button>
-        </div>
 
-        {/* Contextual Capsule */}
-        {renderContextualAction() && (
-          <>
-            <div className="h-4 w-[1px] bg-glass-w10 mx-0.5 shrink-0" />
-            <div className="flex items-center gap-1 shrink-0">
-              {renderContextualAction()}
-            </div>
-          </>
-        )}
+
 
         <div className="h-4 w-[1px] bg-glass-w10 mx-0.5 shrink-0" />
 
@@ -357,7 +383,7 @@ export function CommandIsland({
           aria-label="More options"
           aria-pressed={satelliteOpen}
           title={satelliteOpen ? 'Collapse extra tools' : 'Expand extra tools to the right'}
-          className={`p-1.5 rounded-full transition-all shrink-0 active:scale-[0.98] ${
+          className={`p-1.5 rounded-full transition shrink-0 active:scale-(--scale-press) ${
             satelliteOpen
               ? 'bg-glass-w15 text-retro-fg shadow-inner'
               : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8'
@@ -384,10 +410,10 @@ export function CommandIsland({
               aria-label="Store"
               aria-current={mainView === 'store' ? 'page' : undefined}
               title="Store & Boosters"
-              className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition ${
                 mainView === 'store'
-                  ? 'bg-retro-accent text-retro-accent-text'
-                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
+                  ? 'bg-glass-w15 text-retro-fg'
+                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-(--scale-press)'
               }`}
             >
               <ShoppingBag className="w-3.5 h-3.5 shrink-0" weight={mainView === 'store' ? 'fill' : 'regular'} />
@@ -401,10 +427,10 @@ export function CommandIsland({
               aria-label="Servers"
               aria-current={mainView === 'servers' ? 'page' : undefined}
               title="Public & Private Servers"
-              className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition ${
                 mainView === 'servers'
-                  ? 'bg-retro-accent text-retro-accent-text'
-                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
+                  ? 'bg-glass-w15 text-retro-fg'
+                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-(--scale-press)'
               }`}
             >
               <HardDrives className="w-3.5 h-3.5 shrink-0" weight={mainView === 'servers' ? 'fill' : 'regular'} />
@@ -418,10 +444,10 @@ export function CommandIsland({
               aria-label="Domination"
               aria-current={mainView === 'pc_domination' ? 'page' : undefined}
               title="PC Domination Battles"
-              className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition ${
                 mainView === 'pc_domination'
-                  ? 'bg-retro-accent text-retro-accent-text'
-                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
+                  ? 'bg-glass-w15 text-retro-fg'
+                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-(--scale-press)'
               }`}
             >
               <Monitor className="w-3.5 h-3.5 shrink-0" weight={mainView === 'pc_domination' ? 'fill' : 'regular'} />
@@ -439,10 +465,10 @@ export function CommandIsland({
               aria-label="Wallpaper"
               aria-pressed={themeOpen}
               title="Custom Wallpaper Settings"
-              className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition ${
                 themeOpen
-                  ? 'bg-retro-accent text-retro-accent-text'
-                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
+                  ? 'bg-glass-w15 text-retro-fg'
+                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-(--scale-press)'
               }`}
             >
               <PaintBrush className="w-3.5 h-3.5 shrink-0" weight={themeOpen ? 'fill' : 'regular'} />
@@ -460,10 +486,10 @@ export function CommandIsland({
               aria-label="Settings"
               aria-pressed={settingsOpen}
               title="Application Settings"
-              className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition ${
                 settingsOpen
-                  ? 'bg-retro-accent text-retro-accent-text'
-                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98]'
+                  ? 'bg-glass-w15 text-retro-fg'
+                  : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-(--scale-press)'
               }`}
             >
               <Gear className="w-3.5 h-3.5 shrink-0" weight={settingsOpen ? 'fill' : 'regular'} />
@@ -480,7 +506,7 @@ export function CommandIsland({
               }}
               aria-label="Help"
               title="Help & documentation"
-              className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98] transition-all"
+              className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-(--scale-press) transition"
             >
               <Question className="w-3.5 h-3.5 shrink-0" />
               <span className="text-xs hidden xl:inline">Help</span>
@@ -497,7 +523,7 @@ export function CommandIsland({
               }}
               aria-label="Community"
               title="Join the community"
-              className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98] transition-all"
+              className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-(--scale-press) transition"
             >
               <UsersThree className="w-3.5 h-3.5 shrink-0" />
               <span className="text-xs hidden xl:inline">Community</span>
@@ -515,7 +541,7 @@ export function CommandIsland({
                 }}
                 aria-label="Admin"
                 title="Admin Control Panel"
-                className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98] transition-all"
+                className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-(--scale-press) transition"
               >
                 <ShieldCheck className="w-3.5 h-3.5 shrink-0" weight="regular" />
                 <span className="text-xs hidden xl:inline">Admin</span>
@@ -534,7 +560,7 @@ export function CommandIsland({
                   }}
                   aria-label="Log out"
                   title="Log out"
-                  className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-[0.98] transition-all"
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 active:scale-(--scale-press) transition"
                 >
                   <SignOut className="w-3.5 h-3.5 shrink-0" />
                   <span className="text-xs hidden xl:inline">Logout</span>
@@ -543,7 +569,36 @@ export function CommandIsland({
             )}
           </div>
         )}
+        </div>
       </nav>
+
+      {/* The picker bubble renders OUTSIDE the pill so the island's own
+          overflow/transform can never clip it; fixed above the island's
+          center — the same spot as the Post button it belongs to. */}
+        {postPickerOpen && onPickMedia && (
+          <div
+            ref={pickerBubbleRef}
+            role="dialog"
+            aria-label="Pick post media"
+            className="fixed bottom-[calc(1.25rem+60px)] left-1/2 -translate-x-1/2 z-[var(--z-picker)] w-[340px] max-w-[calc(100vw-1.5rem)] animate-orbit-pop origin-bottom"
+          >
+            <MediaPickerPanel
+              compact
+              options={{ accept: ['image', 'video'], sources: ['browse', 'upload', 'url'], title: 'Pick post media' }}
+              onPick={(sel) => { closePicker(); onPickMedia(sel); }}
+              onClose={closePicker}
+            />
+            {/* Text-only posts have no media: one click opens the composer
+                with an empty body instead of forcing a pick first. */}
+            <button
+              type="button"
+              onClick={() => { closePicker(); onOpenCreatePost?.(); }}
+              className="mt-1.5 w-full px-3 py-1.5 rounded-lg text-2xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w10 transition-colors cursor-pointer"
+            >
+              Write a text post
+            </button>
+          </div>
+        )}
     </>
   );
 }

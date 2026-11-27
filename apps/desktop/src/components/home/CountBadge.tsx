@@ -23,7 +23,7 @@ export function CountBadge({ count = 0, max = 99, label, className = '' }: Count
     <span
       role="status"
       aria-label={label ?? `${n} unread`}
-      className={`absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-retro-error text-white text-[10px] font-bold leading-[18px] text-center tabular-nums ring-2 ring-retro-panel inline-flex items-center justify-center pointer-events-none ${className}`}
+      className={`absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-retro-error text-retro-fg text-2xs font-bold leading-[18px] text-center tabular-nums ring-2 ring-retro-panel inline-flex items-center justify-center pointer-events-none ${className}`}
     >
       {text}
     </span>

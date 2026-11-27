@@ -7,7 +7,7 @@
 // in AddWorldDialog; this is the secondary management flow for labels alone.
 import { useEffect, useState } from 'react'
 import { createLabel, isOwnLabel, type LocalMeshLabel } from './meshLabels'
-import { Modal } from '../Modal'
+import { Modal } from '../../ui/kit'
 
 export function GroupsDialog({
   open,
@@ -32,7 +32,7 @@ export function GroupsDialog({
   return (
     <Modal title="Local groups" onClose={onClose} maxWidth="max-w-sm">
       <div className="space-y-3">
-        <p className="text-[10px] text-retro-muted">
+        <p className="text-2xs text-retro-muted">
           A label on this device for peers you keep track of. It adds no network and is
           visible to nobody else.
         </p>
@@ -68,9 +68,9 @@ export function GroupsDialog({
         </form>
 
         {labels.length === 0 ? (
-          <p className="text-[10px] text-retro-muted">None yet.</p>
+          <p className="text-2xs text-retro-muted">None yet.</p>
         ) : (
-          <ul className="rounded-lg border border-border-glass divide-y divide-border-subtle overflow-hidden">
+          <ul className="rounded-lg border border-edge divide-y divide-edge-subtle overflow-hidden">
             {labels.map((l) => (
               <li key={l.id} className="flex items-center justify-between gap-2 px-3 py-2 text-xs">
                 <span className="truncate text-retro-fg">
@@ -79,7 +79,7 @@ export function GroupsDialog({
                     · {l.memberOrbitIds.length} peers{l.nodeCodes.length ? ` · ${l.nodeCodes.length} codes` : ''}
                   </span>
                   {isOwnLabel(l, ownerId) && (
-                    <span className="ml-1 text-[10px] text-retro-muted">(this device)</span>
+                    <span className="ml-1 text-2xs text-retro-muted">(this device)</span>
                   )}
                 </span>
                 <button
@@ -87,7 +87,7 @@ export function GroupsDialog({
                   aria-label={`Forget group ${l.name}`}
                   title="Forget this group (local only, removes nothing remotely)"
                   onClick={() => onSave(labels.filter((x) => x.id !== l.id))}
-                  className="px-1.5 py-0.5 rounded text-[10px] text-retro-muted hover:text-retro-error hover:bg-glass-w8 cursor-pointer transition-colors"
+                  className="px-1.5 py-0.5 rounded text-2xs text-retro-muted hover:text-retro-error hover:bg-glass-w8 cursor-pointer transition-colors"
                 >
                   Forget
                 </button>
@@ -99,3 +99,4 @@ export function GroupsDialog({
     </Modal>
   )
 }
+

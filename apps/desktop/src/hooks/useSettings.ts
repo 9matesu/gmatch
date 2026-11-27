@@ -5,17 +5,22 @@ import { useState, useEffect, useCallback } from 'react'
 const STORAGE_KEY = 'goonmatch-settings'
 const SFX_MIGRATED_KEY = 'goonmatch-settings-sfx-on'
 const OPACITY_MIGRATED_KEY = 'gmatch.opacity_migrated.v2'
+// One-time layout nudge: the single-column timeline made an older feed read as
+// an endless scroll. Two columns is the shipping default now, and installs
+// still sitting on the old default ('1') move with it exactly once.
+const FEED_COLS_MIGRATED_KEY = 'gmatch.feed_cols_migrated.v1'
 
 export interface AppSettings {
   galleryCols: '2' | '3'
   feedCols: '1' | '2' | '3' | '4' | '5'
+  /** Timeline shape: a Twitter-style column or a justified image grid. */
+  feedLayout: 'list' | 'grid'
   hideDuplicates: boolean
   soundEffects: boolean
+  /** Toast text is withheld on the lock screen (the OS may show it there). */
+  hideNotificationContent: boolean
   watchPartyEnabled: boolean
   autoRefresh: boolean
-  advancedMode: boolean
-  maximumGooner: boolean
-  maximumGooning: boolean
   allowRemoteWallpaper: boolean
   wallpaperUrl: string
   wallpaperPreset: string
@@ -24,7 +29,6 @@ export interface AppSettings {
   wallpaperSlideshowInterval: number
   wallpaperMime: string
   autoOpenImages: boolean
-  autoForwardAll: boolean
   sidebarVisible: boolean
   headerVisible: boolean
   idleTimeout: number
@@ -54,30 +58,41 @@ export interface AppSettings {
   dominationIntensity: 'mild' | 'medium' | 'extreme'
   /** Panic pause: inbound effects are dropped until this timestamp (ms). */
   dominationInboundMutedUntil: number
-  // Creative Enhancements
-  streamerMode: boolean
   audioPack: 'chiptune' | 'arcade' | 'minimal' | 'silent'
   chatNotificationSfx: boolean
   duelPacing: 'instant' | 'fast' | 'dramatic'
   accentColor: 'pink' | 'cyan' | 'gold' | 'emerald' | 'violet'
-  theme: 'dark' | 'instagram-white'
+  theme: 'dark' | 'light'
   /**
    * Opt-in local media vault: gallery keeps + card bytes stored on disk
    * (userData/media-vault, 3GB LRU). Off = memory-only, nothing hits disk.
    */
   localVault: boolean
+  /**
+   * Mesh discovery: announce this install on public WebTorrent trackers
+   * (rotating infohash) so peers on other machines can find each other.
+   * Off = no announce, no tracker traffic.
+   */
+  meshEnabled: boolean
+  /**
+   * Community key: the default is the OPEN mesh (a shared secret baked
+   * into the build — it stops casual enumeration, not someone reading the
+   * code). An invite key closes the mesh to that group.
+   */
+  meshCommunityKey: string
+  /** Advertise availability as a salted hash instead of plain ids. */
+  meshObfuscateHave: boolean
 }
 
 const DEFAULTS: AppSettings = {
   galleryCols: '2',
-  feedCols: '1',
+  feedCols: '2',
+  feedLayout: 'list',
   hideDuplicates: false,
   soundEffects: true,
+  hideNotificationContent: false,
   watchPartyEnabled: true,
   autoRefresh: true,
-  advancedMode: false,
-  maximumGooner: false,
-  maximumGooning: false,
   allowRemoteWallpaper: true,
   wallpaperUrl: '',
   wallpaperPreset: 'default',
@@ -86,7 +101,6 @@ const DEFAULTS: AppSettings = {
   wallpaperSlideshowInterval: 8000,
   wallpaperMime: '',
   autoOpenImages: false,
-  autoForwardAll: false,
   sidebarVisible: false,
   headerVisible: false,
   idleTimeout: 5,
@@ -108,12 +122,14 @@ const DEFAULTS: AppSettings = {
   cameraPermissionMode: 'prompt',
   dominationIntensity: 'medium',
   dominationInboundMutedUntil: 0,
-  streamerMode: false,
   audioPack: 'arcade',
   chatNotificationSfx: true,
   duelPacing: 'fast',
   accentColor: 'pink',
   theme: 'dark',
+  meshEnabled: true,
+  meshCommunityKey: 'gmatch-open-mesh-v1',
+  meshObfuscateHave: false,
   localVault: true,
 }
 
@@ -137,6 +153,13 @@ function load(): AppSettings {
       localStorage.setItem(OPACITY_MIGRATED_KEY, '1')
       save(stored)
     }
+    // Move the old single-column timeline to the denser two-column default
+    // once. After this run the picker owns the choice again.
+    if (!localStorage.getItem(FEED_COLS_MIGRATED_KEY)) {
+      if (stored.feedCols === '1') stored.feedCols = '2'
+      localStorage.setItem(FEED_COLS_MIGRATED_KEY, '1')
+      save(stored)
+    }
     return stored
   } catch {}
   return DEFAULTS
@@ -148,14 +171,22 @@ function save(settings: AppSettings) {
   } catch {}
 }
 
+/** Synchronous read for callers outside React (the mesh starts in an effect). */
+export function readSettings(): AppSettings {
+  return load();
+}
+
 export function useSettings() {
   const [settings, setSettings] = useState<AppSettings>(load)
 
   useEffect(() => {
     save(settings)
     if (typeof document !== 'undefined') {
-      document.documentElement.classList.remove('theme-instagram-white')
-      document.documentElement.setAttribute('data-theme', 'dark')
+      // One switch, one class: the whole light theme lives in globals.css
+      // under .theme-light (tokens only, no per-component override).
+      const light = settings.theme === 'light'
+      document.documentElement.classList.toggle('theme-light', light)
+      document.documentElement.setAttribute('data-theme', light ? 'light' : 'dark')
     }
   }, [settings])
 

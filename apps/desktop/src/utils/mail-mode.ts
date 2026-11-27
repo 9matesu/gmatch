@@ -10,31 +10,21 @@
  * sealed-envelope path is the only one that still works everywhere).
  *
  * Bases that can only ever run current code skip the wire probe entirely:
- * the Cloudflare courier (isKnownSiteCourier) and the bundled loopback
- * sidecar (staticMailMode). Probing them only produced console 404 noise.
- * A bare/relative base (browser-dev proxy) is NOT short-circuited: with the
- * directory disabled it may front a legacy node, and the probe is the only
- * way to tell.
+ * the bundled loopback sidecar (staticMailMode). Probing it only produced
+ * console 404 noise. A bare/relative base (browser-dev proxy) is NOT
+ * short-circuited: it may front a legacy node, and the probe is the only way
+ * to tell.
+ *
+ * There is no longer a hosted courier to short-circuit. The Pages origin used
+ * to run the blind rendezvous and was treated as a courier without a probe —
+ * that claimed a service that no longer exists, so it is probed like any
+ * other host and a stale pointer to it is dropped upstream (utils/central.ts).
  */
 
 export type MailMode = 'courier' | 'legacy'
 
 const cache = new Map<string, MailMode>()
 const inflight = new Map<string, Promise<MailMode>>()
-
-/**
- * Hosted nodes we know run current code — no wire probe needed. Cloudflare
- * Pages serves the release page and the blind courier on the same origin,
- * preview subdomains included.
- */
-export function isKnownSiteCourier(url: string): boolean {
-  try {
-    const host = new URL(url.startsWith('http') ? url : `http://${url}`).hostname.toLowerCase()
-    return /(^|\.)gmatch\.pages\.dev$/.test(host)
-  } catch {
-    return false
-  }
-}
 
 /** Loopback (the bundled sidecar / dev node): current code, always courier. */
 export function staticMailMode(apiBase: string): MailMode | undefined {
@@ -61,9 +51,9 @@ export async function detectMailMode(
   if (ongoing) return ongoing
   const p = (async (): Promise<MailMode> => {
     try {
-      // 1. Cloudflare courier / loopback sidecar run current code: courier,
-      //    no wire probe.
-      if (isKnownSiteCourier(base) || staticMailMode(base)) {
+      // 1. The bundled loopback sidecar runs current code: courier, no wire
+      //    probe.
+      if (staticMailMode(base)) {
         cache.set(base, 'courier')
         return 'courier'
       }

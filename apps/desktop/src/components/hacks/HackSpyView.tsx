@@ -124,16 +124,16 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
   return (
     <div className="relative w-full h-full flex flex-col font-sans select-none overflow-hidden bg-surface-canvas text-retro-fg">
       {flashWhite && (
-        <div className="fixed inset-0 z-[var(--z-system)] bg-glass-w20 pointer-events-none" />
+        <div className="fixed inset-0 z-[var(--z-lightbox)] bg-glass-w20 pointer-events-none" />
       )}
 
       {/* Session header */}
-      <div className="relative z-30 flex items-center justify-between px-4 py-3 bg-retro-panel border-b border-border-glass shrink-0">
+      <div className="relative z-30 flex items-center justify-between px-4 py-3 bg-retro-panel border-b border-edge shrink-0">
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={() => { playPress(750); onBack(); }}
-            className="px-2.5 py-1 rounded-xl bg-surface-interactive hover:border-retro-accent/40 text-retro-fg flex items-center gap-1.5 text-xs font-bold transition-colors cursor-pointer border border-border-glass"
+            className="px-2.5 py-1 rounded-xl bg-surface-interactive hover:border-retro-accent/40 text-retro-fg flex items-center gap-1.5 text-xs font-bold transition-colors cursor-pointer border border-edge"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Back</span>
@@ -149,7 +149,7 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
         </div>
 
         <div className={`flex items-center gap-2 px-3 py-1 rounded-xl border text-xs font-mono font-bold tabular-nums ${
-          secondsRemaining < 30 ? 'bg-red-950/40 border-red-500/40 text-red-300' : 'bg-surface-interactive border-border-glass text-retro-fg'
+          secondsRemaining < 30 ? 'bg-danger/40 border-danger/40 text-danger-fg' : 'bg-surface-interactive border-edge text-retro-fg'
         }`}>
           <Clock className="w-3.5 h-3.5" />
           <span>{formatTimer(secondsRemaining)}</span>
@@ -158,36 +158,36 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
 
       {/* Content */}
       <div className="relative z-10 flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 styled-scrollbar">
-        <div className="glass-surface border border-border-glass rounded-xl p-5 sm:p-6 shadow-2xl space-y-4">
-          <div className="flex items-center justify-between border-b border-border-glass pb-3">
+        <div className="glass-surface border border-edge rounded-xl p-5 sm:p-6 shadow-2xl space-y-4">
+          <div className="flex items-center justify-between border-b border-edge pb-3">
             <div>
-              <span className="text-[10px] font-mono text-retro-muted uppercase tracking-wider">In session</span>
+              <span className="text-2xs font-mono text-retro-muted uppercase tracking-wider">In session</span>
               <h2 className="text-base font-bold text-retro-fg">{session.itemName}</h2>
             </div>
-            <span className={`px-3 py-1 rounded-full font-mono text-[10px] font-bold tracking-wider border ${
+            <span className={`px-3 py-1 rounded-full font-mono text-2xs font-bold tracking-wider border ${
               feedError
-                ? 'bg-glass-w5 border-border-glass text-retro-muted'
-                : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                ? 'bg-glass-w5 border-edge text-retro-muted'
+                : 'bg-success/10 border-success/30 text-success-fg'
             }`}>
               {feedError ? 'OFFLINE' : 'LIVE'}
             </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-            <div className="bg-black/40 p-3.5 rounded-xl border border-border-glass space-y-1">
-              <span className="text-retro-muted block text-[10px] uppercase tracking-wider font-bold">Player</span>
+            <div className="bg-black/40 p-3.5 rounded-xl border border-edge space-y-1">
+              <span className="text-retro-muted block text-2xs uppercase tracking-wider font-bold">Player</span>
               <p className="text-retro-fg font-bold truncate">{feed?.target?.display_name || session.targetUserName}</p>
               {feed?.target?.bio ? (
-                <p className="text-[10px] text-retro-body italic mt-1 line-clamp-2">&quot;{feed.target.bio}&quot;</p>
+                <p className="text-2xs text-retro-body italic mt-1 line-clamp-2">&quot;{feed.target.bio}&quot;</p>
               ) : null}
             </div>
 
-            <div className="bg-black/40 p-3.5 rounded-xl border border-border-glass space-y-1">
-              <span className="text-retro-muted block text-[10px] uppercase tracking-wider font-bold">Session</span>
-              <p className={feedError ? 'text-amber-300 font-bold' : 'text-emerald-300 font-bold'}>
+            <div className="bg-black/40 p-3.5 rounded-xl border border-edge space-y-1">
+              <span className="text-retro-muted block text-2xs uppercase tracking-wider font-bold">Session</span>
+              <p className={feedError ? 'text-warning-fg font-bold' : 'text-success-fg font-bold'}>
                 {feedError || 'Live'}
               </p>
-              <p className="text-[10px] text-retro-muted">Their public posts are visible while the timer runs</p>
+              <p className="text-2xs text-retro-muted">Their public posts are visible while the timer runs</p>
             </div>
           </div>
         </div>
@@ -198,7 +198,7 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
             docs/ADMIN-SUITE.md and the security-greps gate). So this card is
             permanently empty, and the copy above used to advertise "recent
             messages" for something the server will never hand over. */}
-        <div className="glass-surface border border-border-glass rounded-xl p-5 space-y-4 shadow-2xl">
+        <div className="glass-surface border border-edge rounded-xl p-5 space-y-4 shadow-2xl">
           <div className="flex items-center gap-2 text-xs font-bold text-retro-fg tracking-wide">
             <MessageSquare className="w-4 h-4 text-retro-muted" />
             <span>Messages</span>
@@ -207,8 +207,8 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
           {feed && feed.intercepted.length > 0 ? (
             <div className="space-y-3 text-xs">
               {feed.intercepted.map((m, i) => (
-                <div key={`${m.created_at}-${i}`} className="p-3 rounded-xl bg-black/40 border border-border-glass space-y-1">
-                  <div className="flex items-center justify-between text-[10px] text-retro-muted">
+                <div key={`${m.created_at}-${i}`} className="p-3 rounded-xl bg-black/40 border border-edge space-y-1">
+                  <div className="flex items-center justify-between text-2xs text-retro-muted">
                     <span className="font-bold text-retro-fg">{feed.target.display_name}</span>
                     <span>{timeAgo(m.created_at)}</span>
                   </div>
@@ -226,7 +226,7 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
         </div>
 
         {/* Their posts (real) */}
-        <div className="glass-surface border border-border-glass rounded-xl p-5 space-y-4 shadow-2xl">
+        <div className="glass-surface border border-edge rounded-xl p-5 space-y-4 shadow-2xl">
           <div className="flex items-center gap-2 text-xs font-bold text-retro-fg tracking-wide">
             <ImageIcon className="w-4 h-4 text-retro-muted" />
             <span>Their posts</span>
@@ -235,11 +235,11 @@ export function HackSpyView({ session, identity, onBack, onExpire }: HackSpyView
           {feed && feed.posts.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {feed.posts.map((p) => (
-                <div key={p.id} className="p-3 rounded-xl bg-black/40 border border-border-glass space-y-1">
+                <div key={p.id} className="p-3 rounded-xl bg-black/40 border border-edge space-y-1">
                   <p className="text-xs text-retro-body line-clamp-2 break-words">
                     {p.caption || <span className="text-retro-muted italic">(no caption)</span>}
                   </p>
-                  <div className="flex items-center justify-between text-[10px] text-retro-muted">
+                  <div className="flex items-center justify-between text-2xs text-retro-muted">
                     <span className="inline-flex items-center gap-1">
                       <Heart className="w-3 h-3" /> {p.likes}
                     </span>

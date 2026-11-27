@@ -13,7 +13,7 @@
  */
 
 export const DM_SEARCH_MAX_INDEX = 5_000
-export const DM_SEARCH_MAX_RESULTS = 50
+const DM_SEARCH_MAX_RESULTS = 50
 
 export interface SearchableMessage {
   id: string
@@ -33,12 +33,6 @@ export interface DmSearchHit {
   messageId: string
   text: string
   ts: number
-}
-
-export interface DmSearchResult {
-  hits: DmSearchHit[]
-  /** True when the archive was larger than the index budget. */
-  truncated: boolean
 }
 
 /** Flatten threads into one bounded, newest-first index. */

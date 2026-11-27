@@ -21,7 +21,6 @@ export function GameView({
   soundEnabled,
   users,
   profilePics,
-  spinTarget,
   selectedIds,
   setSelectedIds,
   sendPanelRef,
@@ -48,7 +47,6 @@ export function GameView({
   soundEnabled: boolean;
   users: User[];
   profilePics?: Record<string, string>;
-  spinTarget: User | null;
   selectedIds: Set<string>;
   setSelectedIds: React.Dispatch<React.SetStateAction<Set<string>>>;
   sendPanelRef: React.RefObject<SendPanelHandle | null>;
@@ -89,7 +87,7 @@ export function GameView({
         profilePics={profilePics}
       />
 
-      {(spinTarget || selectedIds.size > 0) && (
+      {selectedIds.size > 0 && (
         <div className="w-full max-w-2xl mx-auto mb-6 module">
           <SendPanel
             ref={sendPanelRef}

@@ -6,6 +6,7 @@ import { purgeObjectLikes } from '../game'
 import { reportContent, ReportError } from '../reports'
 import { promoteLobbyImageToPost } from '../lobby'
 import { generateFallbackName } from '@orbit/shared'
+import { findDisplayName } from '../common/userLookup'
 
 type Bindings = {
   DB: D1Turso
@@ -61,12 +62,18 @@ async function postRow(db: D1Turso, orbitId: string, id: string): Promise<any> {
 }
 
 function serializePost(row: any): any {
+  // Prefer a resolvable media URL: content_url may be urn:sha256:/magnet: from
+  // imported posts; fall back to the canonical /api/objects/<id> route so the
+  // client can always stream the local P2P copy.
+  const mediaUrl = /^https?:/i.test(row.content_url || '')
+    ? row.content_url
+    : `/api/objects/${row.id}`;
   return {
     id: row.id,
     author_id: row.owner_id,
     author_name: row.author_name?.trim() || generateFallbackName(row.owner_id),
     author_avatar: row.author_pfp || null,
-    url: row.content_url || `/api/objects/${row.id}`,
+    url: mediaUrl,
     mime_type: row.mime_type || 'image/jpeg',
     media: Array.isArray(row.media) && row.media.length > 0 ? row.media : undefined,
     caption: row.caption || null,
@@ -107,12 +114,14 @@ export async function broadcastNewPost(db: D1Turso, objectId: string): Promise<v
 
 // Public feed. Supports ?following=1 (only authors the caller follows),
 // ?author_id=... (a single user's public profile posts),
+// ?saved=1 (only the posts the caller saved — the profile "Saved" tab),
 // ?q= search over captions + tags, ?sort=latest|trending (default latest),
 // ?tag= single tag filter, and ?limit/?offset pagination.
 posts.get('/', async (c) => {
   const db = c.env.DB
   const orbitId = c.get('orbitId')
   const following = c.req.query('following') === '1'
+  const savedOnly = c.req.query('saved') === '1'
   const authorId = (c.req.query('author_id') || '').trim()
   const q = (c.req.query('q') || '').trim().toLowerCase()
   const sort = c.req.query('sort') || 'latest'
@@ -125,6 +134,12 @@ posts.get('/', async (c) => {
 
   if (following) {
     where.push('EXISTS (SELECT 1 FROM Followers f WHERE f.follower_id = ? AND f.followee_id = o.owner_id AND f.accepted = 1)')
+    args.push(orbitId)
+  }
+  if (savedOnly) {
+    // The caller's OWN saved posts. Scoped by user_id, so one player's list
+    // never leaks into another's.
+    where.push('EXISTS (SELECT 1 FROM Saves s WHERE s.object_id = o.id AND s.user_id = ?)')
     args.push(orbitId)
   }
   if (authorId) {
@@ -314,8 +329,7 @@ posts.post('/:id/like', async (c) => {
     try {
       const postOwner = obj.owner_id
       if (postOwner && postOwner !== orbitId) {
-        const liker = await db.prepare('SELECT display_name FROM Users WHERE id = ?').bind(orbitId).first<{ display_name: string | null }>()
-        const name = liker?.display_name?.trim() || 'Someone'
+        const name = (await findDisplayName(db, orbitId))?.trim() || 'Someone'
         const { createNotification } = await import('../notifications')
         const { broadcastToUser } = await import('../ws-bus')
         const notif = await createNotification(db, postOwner, 'like', `${name} liked your post`, null, { post_id: id, liker_id: orbitId, actor_id: orbitId, actor_name: name })
@@ -464,8 +478,7 @@ posts.post('/:id/comments', async (c) => {
   await db.prepare('UPDATE Objects SET comment_count = comment_count + 1 WHERE id = ?').bind(id).run()
 
   try {
-    const commenter = await db.prepare('SELECT display_name FROM Users WHERE id = ?').bind(orbitId).first<{ display_name: string | null }>()
-    const name = commenter?.display_name?.trim() || 'Someone'
+    const name = (await findDisplayName(db, orbitId))?.trim() || 'Someone'
     const { createNotification, findMentionedUserIds } = await import('../notifications')
     const { broadcastToUser } = await import('../ws-bus')
 
@@ -558,8 +571,7 @@ posts.post('/:id/comments/:commentId/like', async (c) => {
       // Only the first like notifies; INSERT OR IGNORE above already makes the
       // counter idempotent, and the event key makes the row idempotent too.
       if (comment.author_id && comment.author_id !== orbitId) {
-        const liker = await db.prepare('SELECT display_name FROM Users WHERE id = ?').bind(orbitId).first<{ display_name: string | null }>()
-        const name = liker?.display_name?.trim() || 'Someone'
+        const name = (await findDisplayName(db, orbitId))?.trim() || 'Someone'
         const { createNotification } = await import('../notifications')
         const { broadcastToUser } = await import('../ws-bus')
         const notif = await createNotification(db, comment.author_id, 'comment_like', `${name} liked your comment`, null, {
@@ -622,6 +634,45 @@ posts.post('/:id/report', async (c) => {
 })
 
 // Delete a post (owner only)
+/**
+ * Edit a post's caption.
+ *
+ * Owner-only: a caption is the author's own words, and the server stores it
+ * verbatim (it never hard-blocks content — the desktop client's blocklist
+ * does that). An EMPTY caption clears the text: the row keeps an empty
+ * `post_caption` rather than NULL, because the read path is
+ * `COALESCE(post_caption, caption)` and a NULL would resurrect the legacy
+ * `caption` column instead of clearing anything.
+ */
+posts.patch('/:id', async (c) => {
+  const db = c.env.DB
+  const orbitId = c.get('orbitId')
+  const id = c.req.param('id')
+
+  const obj = await db.prepare('SELECT owner_id FROM Objects WHERE id = ?').bind(id).first<{ owner_id: string }>()
+  if (!obj) return c.json({ error: 'Post not found' }, 404)
+  if (obj.owner_id !== orbitId) return c.json({ error: 'Forbidden' }, 403)
+
+  let body: unknown
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400)
+  }
+  const caption = (body as { caption?: unknown })?.caption
+  if (typeof caption !== 'string') return c.json({ error: 'caption must be a string' }, 400)
+  // The protocol caps a post caption at 2000 chars (packages/protocol
+  // social-operation.ts); the node must not be looser than the wire.
+  if (caption.length > 2000) return c.json({ error: 'Caption too long' }, 400)
+
+  const trimmed = caption.trim()
+  await db.prepare('UPDATE Objects SET post_caption = ? WHERE id = ?').bind(trimmed, id).run()
+  // The read path serializes an empty caption as null (serializePost: a
+  // caption is text or absent). Answer the same shape so the client can
+  // apply the response without a second special case.
+  return c.json({ success: true, caption: trimmed || null })
+})
+
 posts.delete('/:id', async (c) => {
   const db = c.env.DB
   const orbitId = c.get('orbitId')

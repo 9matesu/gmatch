@@ -71,7 +71,7 @@ describe('GoonPanel click feedback', () => {
     const video = container.querySelector('video')!
     expect(video).toBeTruthy()
 
-    fireEvent.click(container.querySelector('[role="button"][aria-label="Attack the current foe"]')!)
+    fireEvent.click(container.querySelector('button[aria-label="Attack the current foe"]')!)
 
     // Same node object, not merely an equivalent one.
     expect(container.querySelector('video')).toBe(video)
@@ -83,7 +83,7 @@ describe('GoonPanel click feedback', () => {
     const img = container.querySelector('img[alt="goon feed"]')!
     expect(img).toBeTruthy()
 
-    fireEvent.click(container.querySelector('[role="button"][aria-label="Attack the current foe"]')!)
+    fireEvent.click(container.querySelector('button[aria-label="Attack the current foe"]')!)
 
     expect(container.querySelector('img[alt="goon feed"]')).toBe(img)
   })
@@ -142,7 +142,7 @@ describe('GoonPanel click feedback', () => {
   it('emits a per-hit flash above the media and keeps it hit-restartable', () => {
     seedSingle(100, 100)
     const { container } = render(<GoonPanel />)
-    const stage = container.querySelector('[role="button"][aria-label="Attack the current foe"]')!
+    const stage = container.querySelector('button[aria-label="Attack the current foe"]')!
     // Scoring is gated on the picture having painted; jsdom never loads
     // images, so fire the load the browser would.
     fireEvent.load(container.querySelector('img[alt="goon feed"]')!)
@@ -172,7 +172,7 @@ describe('GoonPanel click feedback', () => {
     // known click count rather than whatever ran before.
     useGame.setState({ clicks: 0, crits: 0, foeClicks: 0 } as never)
     const { container } = render(<GoonPanel />)
-    const stage = container.querySelector('[role="button"][aria-label="Attack the current foe"]')!
+    const stage = container.querySelector('button[aria-label="Attack the current foe"]')!
     expect(useGame.getState().imageReady).toBe(false)
 
     fireEvent.click(stage)
@@ -188,6 +188,41 @@ describe('GoonPanel click feedback', () => {
     expect(useGame.getState().clicks).toBe(1)
   })
 
+
+  it('scores on press, ignores the follow-up click, and keeps keyboard activation', () => {
+    seedSingle(100, 100)
+    useGame.setState({ clicks: 0, crits: 0, foeClicks: 0 } as never)
+    const { container } = render(<GoonPanel />)
+    const stage = container.querySelector('button[aria-label="Attack the current foe"]')!
+    // Scoring is gated on the picture painting; jsdom never loads images.
+    fireEvent.load(container.querySelector('img[alt="goon feed"]')!)
+    expect(useGame.getState().imageReady).toBe(true)
+
+    // Press (pointerdown) scores immediately…
+    stage.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+    expect(useGame.getState().clicks).toBe(1)
+    // …and the click that follows a real press (detail > 0) does NOT double-count.
+    stage.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
+    expect(useGame.getState().clicks).toBe(1)
+    // Keyboard activation (detail 0) still scores exactly once.
+    stage.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 }))
+    expect(useGame.getState().clicks).toBe(2)
+  })
+
+  // The stage is a BOX, not a button: it holds <video controls> and the
+  // prev/next/purge buttons, and interactive content must never nest inside a
+  // button. The click target is a real button layered over the media.
+  it('layers the click target over the stage instead of nesting it', () => {
+    useGame.setState({ viewMode: '1x1', current: post('foe-1', 'video'), foeHp: 100, foeMaxHp: 100, imageReady: true } as never)
+    const { container } = render(<GoonPanel />)
+    const target = container.querySelector('button[aria-label="Attack the current foe"]')
+    expect(target).toBeTruthy()
+    expect(target!.querySelector('video')).toBeNull()
+    expect(target!.querySelector('button')).toBeNull()
+    const video = container.querySelector('video')
+    expect(video).toBeTruthy()
+    expect(video!.closest('button')).toBeNull()
+  })
   it('applies a damage wash per grid tile based on that tile own HP', () => {
     seedGrid([cell('g1', 100, 100), cell('g2', 10, 100), cell('g3', 100, 100), cell('g4', 100, 100)])
     render(<GoonPanel />)

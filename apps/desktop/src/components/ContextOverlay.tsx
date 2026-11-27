@@ -12,19 +12,11 @@ import {
   CheckSquare,
   RefreshCw,
   ArrowUp,
-  Download,
   Trash2,
   Search,
-  Image as ImageIcon,
-  Video as VideoIcon,
-  Monitor,
-  Repeat,
-  Play,
-  Pause,
-  Volume2,
-  VolumeX,
 } from 'lucide-react';
-import { downloadMedia, copyImageToClipboard, isMediaVideo, resolveMediaUrl } from '../utils/media';
+import { MediaContextMenu } from './ContextMenuMedia';
+import { isMediaVideo } from '../utils/media';
 
 export type ContextMenuType = 'user' | 'item' | 'media' | 'input' | 'selection' | 'link' | 'general';
 
@@ -106,6 +98,20 @@ export function ContextOverlay({
 
   if (!contextMenu) return null;
 
+  // Media is the one menu every surface needs (feed, chat, cards, gallery), and
+  // the one that takes parameters. It is DATA: see MediaContextMenu below.
+  if (contextMenu.type === 'media') {
+    return (
+      <MediaContextMenu
+        ctx={contextMenu}
+        onDismiss={onDismiss}
+        toast={toast}
+        onRepostImage={onRepostImage}
+        onSetWallpaper={onSetWallpaper}
+      />
+    );
+  }
+
   const menuWidth = 220;
   const menuHeight = contextMenu.type === 'item' ? 320 : contextMenu.type === 'user' ? 280 : 220;
   const left = typeof window !== 'undefined'
@@ -117,7 +123,7 @@ export function ContextOverlay({
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-system)] bg-black/10 select-none"
+      className="fixed inset-0 z-[var(--z-lightbox)] bg-black/10 select-none"
       onClick={onDismiss}
       onContextMenu={(e) => {
         e.preventDefault();
@@ -130,208 +136,17 @@ export function ContextOverlay({
         role="menu"
         aria-label="Context menu"
         data-testid="context-menu"
-        className="fixed bg-retro-panel/95 backdrop-blur-md border border-border-glass rounded-xl shadow-2xl p-1.5 w-56 text-xs z-[var(--z-system)] space-y-0.5 animate-orbit-fade-in text-retro-fg"
+        className="fixed bg-retro-panel/95 backdrop-blur-md border border-edge rounded-xl shadow-2xl p-1.5 w-56 text-xs z-[var(--z-lightbox)] space-y-0.5 animate-orbit-fade-in text-retro-fg"
         style={{ top, left }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* ─── MEDIA CONTEXT MENU (Images, Videos) ─── */}
-        {contextMenu.type === 'media' && (() => {
-          const { src, originalUrl, isVideo, videoEl, noWallpaper, keepsakeId } = contextMenu.data;
-          const resolved = resolveMediaUrl(src);
-          const wallpaperUrl = originalUrl || src;
-          const wallpaperMime = isVideo ? 'video/mp4' : 'image/jpeg';
-
-          return (
-            <>
-              <div className="px-2.5 py-1 flex items-center justify-between text-[10px] font-semibold text-retro-muted uppercase tracking-wider border-b border-border-glass/40 mb-1">
-                <span className="flex items-center gap-1">
-                  {isVideo ? <VideoIcon className="w-3 h-3 text-retro-accent" /> : <ImageIcon className="w-3 h-3 text-retro-accent" />}
-                  {isVideo ? 'Video' : 'Image'}
-                </span>
-                <span className="font-mono text-[10px] truncate max-w-[100px]" title={src}>
-                  {src ? src.split('/').pop()?.split('?')[0] : ''}
-                </span>
-              </div>
-
-              {/* Video Specific Controls */}
-              {isVideo && videoEl && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (videoEl.paused) videoEl.play();
-                      else videoEl.pause();
-                      onDismiss();
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2">
-                      {videoEl.paused ? <Play className="w-3.5 h-3.5 fill-current text-retro-accent" /> : <Pause className="w-3.5 h-3.5 fill-current text-retro-accent" />}
-                      <span>{videoEl.paused ? 'Play Video' : 'Pause Video'}</span>
-                    </div>
-                    <span className="text-[10px] text-retro-muted font-mono">Space</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      videoEl.muted = !videoEl.muted;
-                      onDismiss();
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2">
-                      {videoEl.muted ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5 text-retro-muted" />}
-                      <span>{videoEl.muted ? 'Unmute Audio' : 'Mute Audio'}</span>
-                    </div>
-                    <span className="text-[10px] text-retro-muted font-mono">M</span>
-                  </button>
-
-                  <div className="my-1 border-t border-border-glass/50" />
-                </>
-              )}
-
-              {/* Save Media As */}
-              <button
-                type="button"
-                onClick={async () => {
-                  toast('Downloading media...', 'info');
-                  const ok = await downloadMedia(src);
-                  if (ok) toast('Media download started', 'success');
-                  else toast('Download failed', 'error');
-                  onDismiss();
-                }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <Download className="w-3.5 h-3.5 text-retro-accent" />
-                  <span>{isVideo ? 'Save Video As...' : 'Save Image As...'}</span>
-                </div>
-              </button>
-
-              {/* Copy Image / Video Link */}
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(resolved);
-                  toast(isVideo ? 'Video link copied' : 'Image link copied', 'info');
-                  onDismiss();
-                }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <Copy className="w-3.5 h-3.5 text-retro-muted" />
-                  <span>{isVideo ? 'Copy Video Link' : 'Copy Image Link'}</span>
-                </div>
-              </button>
-
-              {/* Copy Image to Clipboard (PNG) */}
-              {!isVideo && (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    toast('Copying image to clipboard...', 'info');
-                    const ok = await copyImageToClipboard(src);
-                    if (ok) toast('Image copied to clipboard', 'success');
-                    else toast('Could not copy image bytes (link copied)', 'warning');
-                    onDismiss();
-                  }}
-                  className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer"
-                >
-                  <div className="flex items-center gap-2">
-                    <Clipboard className="w-3.5 h-3.5 text-retro-muted" />
-                    <span>Copy Image</span>
-                  </div>
-                </button>
-              )}
-
-              {/* Open in New Tab */}
-              <button
-                type="button"
-                onClick={() => {
-                  // Keepsakes resolve local-only through the gallery (never the
-                  // raw tile src, which may be an unresolved remote preview).
-                  if (keepsakeId) {
-                    window.dispatchEvent(
-                      new CustomEvent('gmatch:open-keepsake', { detail: { keepsakeId } }),
-                    );
-                    onDismiss();
-                    return;
-                  }
-                  window.open(resolved, '_blank', 'noopener,noreferrer');
-                  onDismiss();
-                }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <ExternalLink className="w-3.5 h-3.5 text-retro-muted" />
-                  <span>Open in New Window</span>
-                </div>
-              </button>
-
-              {/* Repost to Feed CTA */}
-              {onRepostImage && (
-                <>
-                  <div className="my-1 border-t border-border-glass/50" />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onRepostImage(resolved);
-                      onDismiss();
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer text-retro-accent"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Repeat className="w-3.5 h-3.5 text-retro-accent" />
-                      <span>Repost to Feed</span>
-                    </div>
-                  </button>
-                </>
-              )}
-
-              {/* Wallpaper (content images only — avatars/icons opt out) */}
-              {onSetWallpaper && !noWallpaper && (
-                <>
-                  <div className="my-1 border-t border-border-glass/50" />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onSetWallpaper(wallpaperUrl, 'app', wallpaperMime);
-                      onDismiss();
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2">
-                      <ImageIcon className="w-3.5 h-3.5 text-retro-muted" />
-                      <span>Set as app background</span>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onSetWallpaper(wallpaperUrl, 'os', wallpaperMime);
-                      onDismiss();
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg flex items-center justify-between transition-colors font-medium cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Monitor className="w-3.5 h-3.5 text-retro-muted" />
-                      <span>Set as OS wallpaper</span>
-                    </div>
-                  </button>
-                </>
-              )}
-            </>
-          );
-        })()}
-
         {/* ─── INPUT / TEXTAREA CONTEXT MENU ─── */}
         {contextMenu.type === 'input' && (() => {
           const { element, hasSelection } = contextMenu.data;
 
           return (
             <>
-              <div className="px-2.5 py-1 text-[10px] font-semibold text-retro-muted uppercase tracking-wider border-b border-border-glass/40 mb-1">
+              <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-edge/40 mb-1">
                 Edit
               </div>
 
@@ -355,7 +170,7 @@ export function ContextOverlay({
                   <Scissors className="w-3.5 h-3.5" />
                   <span>Cut</span>
                 </div>
-                <span className="text-[10px] text-retro-muted font-mono">Ctrl+X</span>
+                <span className="text-2xs text-retro-muted font-mono">Ctrl+X</span>
               </button>
 
               {/* Copy */}
@@ -378,7 +193,7 @@ export function ContextOverlay({
                   <Copy className="w-3.5 h-3.5" />
                   <span>Copy</span>
                 </div>
-                <span className="text-[10px] text-retro-muted font-mono">Ctrl+C</span>
+                <span className="text-2xs text-retro-muted font-mono">Ctrl+C</span>
               </button>
 
               {/* Paste */}
@@ -414,10 +229,10 @@ export function ContextOverlay({
                   <Clipboard className="w-3.5 h-3.5" />
                   <span>Paste</span>
                 </div>
-                <span className="text-[10px] text-retro-muted font-mono">Ctrl+V</span>
+                <span className="text-2xs text-retro-muted font-mono">Ctrl+V</span>
               </button>
 
-              <div className="my-1 border-t border-border-glass/50" />
+              <div className="my-1 border-t border-edge/50" />
 
               {/* Select All */}
               <button
@@ -435,7 +250,7 @@ export function ContextOverlay({
                   <CheckSquare className="w-3.5 h-3.5 text-retro-muted" />
                   <span>Select All</span>
                 </div>
-                <span className="text-[10px] text-retro-muted font-mono">Ctrl+A</span>
+                <span className="text-2xs text-retro-muted font-mono">Ctrl+A</span>
               </button>
 
               {/* Clear */}
@@ -465,7 +280,7 @@ export function ContextOverlay({
 
           return (
             <>
-              <div className="px-2.5 py-1 text-[10px] font-semibold text-retro-muted uppercase tracking-wider border-b border-border-glass/40 mb-1 truncate">
+              <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-edge/40 mb-1 truncate">
                 &ldquo;{text.slice(0, 18)}&rdquo;
               </div>
 
@@ -483,7 +298,7 @@ export function ContextOverlay({
                   <Copy className="w-3.5 h-3.5 text-retro-accent" />
                   <span>Copy</span>
                 </div>
-                <span className="text-[10px] text-retro-muted font-mono">Ctrl+C</span>
+                <span className="text-2xs text-retro-muted font-mono">Ctrl+C</span>
               </button>
 
               {/* Search on gMatch */}
@@ -516,7 +331,7 @@ export function ContextOverlay({
                   <CheckSquare className="w-3.5 h-3.5 text-retro-muted" />
                   <span>Select All</span>
                 </div>
-                <span className="text-[10px] text-retro-muted font-mono">Ctrl+A</span>
+                <span className="text-2xs text-retro-muted font-mono">Ctrl+A</span>
               </button>
             </>
           );
@@ -528,7 +343,7 @@ export function ContextOverlay({
 
           return (
             <>
-              <div className="px-2.5 py-1 text-[10px] font-semibold text-retro-muted uppercase tracking-wider border-b border-border-glass/40 mb-1 truncate">
+              <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-edge/40 mb-1 truncate">
                 Link
               </div>
 
@@ -567,7 +382,7 @@ export function ContextOverlay({
         {/* ─── GENERAL / BACKGROUND CONTEXT MENU ─── */}
         {contextMenu.type === 'general' && (
           <>
-            <div className="px-2.5 py-1 text-[10px] font-semibold text-retro-muted uppercase tracking-wider border-b border-border-glass/40 mb-1">
+            <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-edge/40 mb-1">
               gMatch
             </div>
 
@@ -585,7 +400,7 @@ export function ContextOverlay({
                 <RefreshCw className="w-3.5 h-3.5 text-retro-accent" />
                 <span>Reload</span>
               </div>
-              <span className="text-[10px] text-retro-muted font-mono">Ctrl+R</span>
+              <span className="text-2xs text-retro-muted font-mono">Ctrl+R</span>
             </button>
 
             <button
@@ -622,7 +437,7 @@ export function ContextOverlay({
         {/* ─── USER CONTEXT MENU ─── */}
         {contextMenu.type === 'user' && (
           <>
-            <div className="px-2.5 py-1 text-[10px] font-semibold text-retro-muted uppercase tracking-wider border-b border-border-glass/40 mb-1">
+            <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-edge/40 mb-1">
               User: {contextMenu.data.display_name || 'Peer'}
             </div>
 
@@ -686,7 +501,7 @@ export function ContextOverlay({
                   onSendPm(contextMenu.data);
                   onDismiss();
                 }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg text-purple-300 font-bold transition-colors cursor-pointer"
+                className="w-full text-left px-2.5 py-1.5 hover:bg-glass-w12 rounded-lg text-chrome-lav font-bold transition-colors cursor-pointer"
               >
                 Send PM
               </button>
@@ -723,7 +538,7 @@ export function ContextOverlay({
         {/* ─── ITEM CONTEXT MENU ─── */}
         {contextMenu.type === 'item' && (
           <>
-            <div className="px-2.5 py-1 text-[10px] font-semibold text-retro-muted uppercase tracking-wider border-b border-border-glass/40 mb-1">
+            <div className="px-2.5 py-1 text-2xs font-semibold text-retro-muted uppercase tracking-wider border-b border-edge/40 mb-1">
               Keepsake
             </div>
 
@@ -911,15 +726,15 @@ export function ReportModal({
         className="bg-retro-panel border border-retro-error max-w-sm w-full p-5 space-y-3"
         onClick={e => e.stopPropagation()}
       >
-        <h3 className="text-sm font-bold text-retro-error uppercase tracking-wider">
+        <h3 className="text-sm font-bold text-retro-error tracking-wider">
           Report User: {reportModal.name}
         </h3>
         {reportModal.objectId && (
-          <p className="text-[10px] text-retro-muted font-sans truncate" title={reportModal.objectId}>
+          <p className="text-2xs text-retro-muted font-sans truncate" title={reportModal.objectId}>
             Attached evidence: {reportModal.objectId}
           </p>
         )}
-        <div className="flex flex-wrap gap-1.5 text-[10px]">
+        <div className="flex flex-wrap gap-1.5 text-2xs">
           {(['inappropriate', 'harassment', 'spam', 'abuse'] as const).map(cat => (
             <button
               key={cat}
@@ -927,8 +742,8 @@ export function ReportModal({
               onClick={() => setReportCategory(cat)}
               className={`px-3 py-1 border font-bold uppercase tracking-wider transition-colors ${
                 reportCategory === cat
-                  ? 'bg-retro-accent text-black border-retro-accent'
-                  : 'bg-retro-bg text-retro-muted border-border-glass hover:text-retro-fg'
+                  ? 'bg-retro-accent text-retro-accent-text border-retro-accent'
+                  : 'bg-retro-bg text-retro-muted border-edge hover:text-retro-fg'
               }`}
             >
               {cat}
@@ -940,13 +755,13 @@ export function ReportModal({
           value={reportReason}
           onChange={e => setReportReason(e.target.value)}
           placeholder="Describe the issue (optional)..."
-          className="w-full p-2.5 bg-retro-bg border border-border-glass text-xs text-retro-fg placeholder:text-retro-muted focus:outline-none"
+          className="w-full p-2.5 bg-retro-bg border border-edge text-xs text-retro-fg placeholder:text-retro-muted focus:outline-none"
           maxLength={200}
         />
         <div className="flex gap-2 pt-1">
           <button
             onClick={() => onSubmit(reportModal.id, { objectId: reportModal.objectId })}
-            className="flex-1 bg-retro-error hover:bg-retro-red text-white font-bold py-2 text-xs transition-colors"
+            className="flex-1 bg-retro-error hover:bg-retro-red text-retro-fg font-bold py-2 text-xs transition-colors"
           >
             Submit Report & Block
           </button>

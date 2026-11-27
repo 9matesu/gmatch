@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
-import type { User, OrbitObject, Relationship } from '@orbit/shared';
+import type { User, OrbitObject } from '@orbit/shared';
 import type { OrbitIdentity } from '@orbit/crypto';
 import {
   X,
@@ -16,6 +16,8 @@ import {
 import { playPress } from '../../utils/sounds';
 import { resolveMediaUrl } from '../../utils/media';
 import { orbitFetch } from '../../utils/api';
+import { mergeFollowIds, mergeFollowRows, type FollowListRow, type FollowListSourceRow } from '../../utils/followList';
+import { usePeerFollowEdges } from '../../hooks/usePeerFollows';
 
 export interface FollowersFollowingModalProps {
   isOpen: boolean;
@@ -24,7 +26,6 @@ export interface FollowersFollowingModalProps {
   currentUserId?: string;
   users: User[];
   followingIds: string[];
-  relationships?: Relationship[];
   profilePics?: Record<string, string>;
   stories?: OrbitObject[];
   onToggleFollow?: (userId: string) => void;
@@ -38,19 +39,12 @@ export interface FollowersFollowingModalProps {
   targetDisplayName?: string | null;
 }
 
-interface NetworkUser {
-  id: string;
-  display_name: string | null;
-  pfp_url: string | null;
-  online: boolean;
-  is_following: boolean;
-}
-
 export function FollowersFollowingModal({
   isOpen,
   onClose,
   initialTab = 'followers',
   currentUserId = '',
+  users,
   followingIds = [],
   profilePics = {},
   stories = [],
@@ -65,15 +59,20 @@ export function FollowersFollowingModal({
 }: FollowersFollowingModalProps) {
   const [activeTab, setActiveTab] = useState<'followers' | 'following'>(initialTab);
   const [searchQuery, setSearchQuery] = useState('');
-  const [networkFollowers, setNetworkFollowers] = useState<NetworkUser[]>([]);
-  const [networkFollowing, setNetworkFollowing] = useState<NetworkUser[]>([]);
+  const [networkFollowers, setNetworkFollowers] = useState<FollowListSourceRow[]>([]);
+  const [networkFollowing, setNetworkFollowing] = useState<FollowListSourceRow[]>([]);
   const [networkLoading, setNetworkLoading] = useState(false);
+  // This modal's own optimistic nudge for the Follow button. The durable truth
+  // is `followingIds` (already the node list merged with my signed follows); the
+  // override only keeps the button from lagging one render behind the click.
+  const [followOverrides, setFollowOverrides] = useState<Record<string, boolean>>({});
 
   // Keep activeTab in sync with initialTab when opened
   React.useEffect(() => {
     if (isOpen) {
       setActiveTab(initialTab);
       setSearchQuery('');
+      setFollowOverrides({});
     }
   }, [isOpen, initialTab]);
 
@@ -81,6 +80,8 @@ export function FollowersFollowingModal({
   // derivation (relationships + users.slice(0,5) fallback) showed a stale,
   // fabricated network — the "modal desatualizado" bug. Own profile fetches
   // under currentUserId; viewing someone else fetches under targetUserId.
+  // The node's rows are then merged with the peer operation log below, because
+  // a follow made while the node was unreachable never reached that table.
   const listUserId = targetUserId || currentUserId
   useEffect(() => {
     if (!isOpen || !listUserId || !identity) {
@@ -112,9 +113,40 @@ export function FollowersFollowingModal({
     };
   }, [isOpen, listUserId, identity]);
 
-  // Server list for both own and other profiles (one source of truth).
-  const activeList: Array<User | NetworkUser> =
-    activeTab === 'followers' ? networkFollowers : networkFollowing;
+  // Both tabs are local-first: the node's list UNION what the peers signed,
+  // MINUS what the peers withdrew. An id that exists only as an operation still
+  // gets a row (named from the roster, never a truncated hash), so a follow made
+  // off-node shows up here instead of vanishing until the next successful sync.
+  const peerEdges = usePeerFollowEdges(isOpen ? listUserId : null);
+
+  const followerRows = useMemo(
+    () => mergeFollowRows(
+      networkFollowers,
+      mergeFollowIds(networkFollowers.map((u) => u.id), {
+        added: peerEdges.followers,
+        removed: peerEdges.withdrawnFollowers,
+      }),
+      users,
+      profilePics,
+    ),
+    [networkFollowers, peerEdges, users, profilePics],
+  );
+
+  const followingRows = useMemo(
+    () => mergeFollowRows(
+      networkFollowing,
+      mergeFollowIds(networkFollowing.map((u) => u.id), {
+        added: peerEdges.following,
+        removed: peerEdges.withdrawnFollowing,
+      }),
+      users,
+      profilePics,
+    ),
+    [networkFollowing, peerEdges, users, profilePics],
+  );
+
+  const activeList: FollowListRow[] =
+    activeTab === 'followers' ? followerRows : followingRows;
 
   const isTargetMode = Boolean(targetUserId);
 
@@ -125,7 +157,7 @@ export function FollowersFollowingModal({
     return activeList.filter((u) => {
       const name = (u.display_name || '').toLowerCase();
       const id = (u.id || '').toLowerCase();
-      const tags = (Array.isArray((u as any).tags) ? (u as any).tags.join(' ') : (u as any).tags || '').toLowerCase();
+      const tags = (Array.isArray(u.tags) ? u.tags.join(' ') : '').toLowerCase();
       return name.includes(q) || id.includes(q) || tags.includes(q);
     });
   }, [activeList, searchQuery]);
@@ -146,26 +178,24 @@ export function FollowersFollowingModal({
     }
   };
 
-  const handleToggleFollow = (u: User | NetworkUser) => {
+  const handleToggleFollow = (u: FollowListRow) => {
     playPress(800);
     onToggleFollow?.(u.id);
-    const flip = (arr: NetworkUser[]) =>
-      arr.map((x) => (x.id === u.id ? { ...x, is_following: !x.is_following } : x));
-    if (activeTab === 'followers') setNetworkFollowers(flip);
-    else setNetworkFollowing(flip);
+    const current = followOverrides[u.id] ?? followingIds.includes(u.id);
+    setFollowOverrides((prev) => ({ ...prev, [u.id]: !current }));
   };
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-system)] flex items-center justify-center bg-black/70 backdrop-blur-sm p-3 sm:p-4 select-none font-sans animate-orbit-fade-in"
+      className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 backdrop-blur-sm p-3 sm:p-4 select-none font-sans animate-orbit-fade-in"
       onClick={onClose}
     >
       <div
-        className="bg-glass backdrop-blur-2xl border border-border-glass w-full max-w-md rounded-xl overflow-hidden shadow-2xl flex flex-col text-retro-fg max-h-[88vh] animate-orbit-slide-up"
+        className="bg-glass backdrop-blur-2xl border border-edge w-full max-w-md rounded-xl overflow-hidden shadow-2xl flex flex-col text-retro-fg max-h-[88vh] animate-orbit-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header Bar */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border-glass shrink-0">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-edge shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <Users className="w-4 h-4 text-retro-muted shrink-0" />
             <div className="min-w-0">
@@ -173,7 +203,7 @@ export function FollowersFollowingModal({
                 {activeTab}
               </h3>
               {isTargetMode && targetDisplayName && (
-                <p className="text-[10px] text-retro-muted truncate">
+                <p className="text-2xs text-retro-muted truncate">
                   @{targetDisplayName}
                 </p>
               )}
@@ -191,7 +221,7 @@ export function FollowersFollowingModal({
         </div>
 
         {/* Tab Selector */}
-        <div className="flex border-b border-border-glass shrink-0">
+        <div className="flex border-b border-edge shrink-0">
           <button
             type="button"
             onClick={() => {
@@ -203,7 +233,7 @@ export function FollowersFollowingModal({
                 : 'text-retro-muted hover:text-retro-fg'
               }`}
           >
-            <span>{networkFollowers.length} Followers</span>
+            <span>{followerRows.length} Followers</span>
           </button>
 
           <button
@@ -217,13 +247,13 @@ export function FollowersFollowingModal({
                 : 'text-retro-muted hover:text-retro-fg'
               }`}
           >
-            <span>{networkFollowing.length} Following</span>
+            <span>{followingRows.length} Following</span>
           </button>
         </div>
 
         {/* Search Bar Input */}
-        <div className="px-3 py-2 border-b border-border-glass shrink-0">
-          <div className="flex items-center gap-2 bg-surface-interactive rounded-lg px-3 py-1.5 text-xs text-retro-fg focus-within:border-border-glass border border-border-glass transition-colors">
+        <div className="px-3 py-2 border-b border-edge shrink-0">
+          <div className="flex items-center gap-2 bg-surface-interactive rounded-lg px-3 py-1.5 text-xs text-retro-fg focus-within:border-edge border border-edge transition-colors">
             <Search className="w-3.5 h-3.5 text-retro-muted shrink-0" />
             <input
               type="text"
@@ -249,14 +279,12 @@ export function FollowersFollowingModal({
           {networkLoading && filteredList.length === 0 && (
             <div className="py-14 text-center space-y-3">
               <div className="w-7 h-7 border-2 border-retro-accent border-t-transparent rounded-full animate-spin mx-auto" />
-              <p className="text-xs text-retro-muted">Loading {activeTab}…</p>
+              <p className="text-xs text-retro-muted">Loading {activeTab}...</p>
             </div>
           )}
           {filteredList.map((user) => {
-            const isFollowing = Boolean((user as NetworkUser).is_following)
-              || followingIds.includes(user.id) || followingIds.includes((user as any).orbitId);
-            const userPfp = (user as NetworkUser).pfp_url
-              || profilePics[user.id] || (user as any).avatar_url;
+            const isFollowing = followOverrides[user.id] ?? followingIds.includes(user.id);
+            const userPfp = user.pfp_url;
             const hasStory = (stories || []).some(
               (s) => s.owner_id === user.id || (s as any).user_id === user.id
             );
@@ -282,7 +310,7 @@ export function FollowersFollowingModal({
                         : 'bg-glass-w20'
                       }`}
                   >
-                    <div className="w-full h-full rounded-full bg-surface-raised overflow-hidden border border-white flex items-center justify-center text-xs font-black text-retro-fg">
+                    <div className="w-full h-full rounded-full bg-surface-raised overflow-hidden border border-edge flex items-center justify-center text-xs font-black text-retro-fg">
                       {userPfp ? (
                         <img src={resolveMediaUrl(userPfp)} alt="" className="w-full h-full object-cover" />
                       ) : (
@@ -297,18 +325,18 @@ export function FollowersFollowingModal({
                         @{user.display_name?.trim() || 'Unknown User'}
                       </span>
                       {user.online && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-success shrink-0" />
                       )}
-                      {(user as any).matches_won > 5 && (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-blue-500 fill-blue-500 shrink-0" />
+                      {(user.matches_won ?? 0) > 5 && (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-info-fg fill-info shrink-0" />
                       )}
                     </div>
 
                     <div className="flex items-center gap-2 text-xs text-retro-muted truncate font-mono">
                       <span>{user.id.slice(0, 12)}...</span>
-                      {(user as any).score ? (
-                        <span className="text-amber-600 font-bold font-sans">
-                          g$ {(user as any).score}
+                      {user.score ? (
+                        <span className="text-warning-fg font-bold font-sans">
+                          g$ {user.score}
                         </span>
                       ) : null}
                     </div>
@@ -343,7 +371,7 @@ export function FollowersFollowingModal({
                         onSendCard(user.id);
                       }}
                       title="Send Duel Card"
-                      className="p-2 text-retro-muted hover:text-cyan-400 rounded-xl hover:bg-amber-500/20 transition-colors cursor-pointer"
+                      className="p-2 text-retro-muted hover:text-info-fg rounded-xl hover:bg-warning/20 transition-colors cursor-pointer"
                     >
                       <Send className="w-4 h-4" />
                     </button>
@@ -354,8 +382,8 @@ export function FollowersFollowingModal({
                     <button
                       type="button"
                       onClick={() => handleToggleFollow(user)}
-                      className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1 ${isFollowing
-                          ? 'bg-surface-interactive hover:bg-rose-50 text-retro-fg hover:text-rose-600 border border-border-glass'
+                      className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1 ${isFollowing
+                          ? 'bg-surface-interactive hover:bg-danger text-retro-fg hover:text-danger-fg border border-edge'
                           : 'bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text shadow-xs'
                         }`}
                     >

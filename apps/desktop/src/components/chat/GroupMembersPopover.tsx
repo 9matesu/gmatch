@@ -81,7 +81,7 @@ export function GroupMembersPopover({
     <div className="p-2 space-y-1" role="list" aria-label="Group members">
       {members.map((m) => (
         <div key={m.id} role="listitem" className="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs">
-          <span className="w-6 h-6 rounded-full bg-surface-raised border border-border-glass flex items-center justify-center text-[10px] font-bold text-retro-muted shrink-0">
+          <span className="w-6 h-6 rounded-full bg-surface-raised border border-edge flex items-center justify-center text-2xs font-bold text-retro-muted shrink-0">
             {m.display_name.charAt(0).toUpperCase()}
           </span>
           <span className="truncate text-retro-body">
@@ -89,7 +89,7 @@ export function GroupMembersPopover({
             {m.id === meId && <span className="text-retro-muted"> (you)</span>}
           </span>
           {m.is_owner === 1 && (
-            <span className="ml-auto flex items-center gap-1 text-[10px] text-amber-400 shrink-0">
+            <span className="ml-auto flex items-center gap-1 text-2xs text-warning-fg shrink-0">
               <Crown className="w-3 h-3" /> owner
             </span>
           )}
@@ -97,8 +97,8 @@ export function GroupMembersPopover({
       ))}
 
       {isOwner && nonMemberPeers.length > 0 && (
-        <div className="pt-2 border-t border-border-glass mt-2 space-y-1">
-          <div className="text-[10px] uppercase tracking-wider text-retro-muted px-2">Add people</div>
+        <div className="pt-2 border-t border-edge mt-2 space-y-1">
+          <div className="text-2xs uppercase tracking-wider text-retro-muted px-2">Add people</div>
           {nonMemberPeers.map((p) => (
             <button
               key={p.orbitId}
@@ -126,7 +126,7 @@ export function GroupMembersPopover({
               type="button"
               onClick={() => void confirmAdd(Array.from(selected))}
               disabled={adding}
-              className="w-full mt-1 px-3 py-1.5 rounded-md bg-retro-accent text-black text-xs font-bold cursor-pointer disabled:opacity-50"
+              className="w-full mt-1 px-3 py-1.5 rounded-md bg-retro-accent text-retro-accent-text text-xs font-bold cursor-pointer disabled:opacity-50"
             >
               {adding ? 'Adding…' : `Add ${selected.size} to group`}
             </button>

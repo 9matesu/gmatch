@@ -20,10 +20,10 @@ Two topologies, chosen once per launch in Settings → Server
   friends. No cloud account, no telemetry, no hosted dependency — the machine
   you are sitting at IS the node.
 - **client (opt-in):** talks to someone else's node (a friend's machine, or any
-  `http(s)://host[:port]` you were given). There is no hosted data default: the
-  Cloudflare project at `gmatch.pages.dev` is only a directory/mail rendezvous,
-  so a packaged build with no stored mode starts its own server instead of
-  dialing a host that cannot hold a world.
+  `http(s)://host[:port]` you were given). There is no hosted data default and
+  no hosted rendezvous: the node a client is connected to is the directory and
+  the sealed-mail relay for its clients, so a packaged build with no stored mode
+  starts its own node instead of dialing a host that cannot hold a world.
 - **A stored client pointer is resolved, never assumed.** Two shapes, two rules,
   because provenance and reachability answer different questions. A pointer
   written by an **older app** carries no `v` stamp and is **not dialed at all**:
@@ -38,17 +38,18 @@ Two topologies, chosen once per launch in Settings → Server
   so Settings → Server explains which of the two happened and offers Reconnect /
   Forget it. No hostname list exists; nothing is deleted.
 
-## Running with no hosted world (2026-10-24)
+## Running with no hosted world or rendezvous (2026-10-24, host-free since 2026-11-26)
 
 There is no hosted full node, so the app is self-sufficient: **host mode is the
-default** and the bundled node is the world. The only shared infrastructure is
-the Cloudflare rendezvous at `gmatch.pages.dev` (a signed node directory plus
-sealed mail in D1), which can be disabled with `gmatch.central.url = none`.
-Nothing else in the client resolves to a hosted address — the API base falls
-back to `http://127.0.0.1:8790`, a stored node is kept only while it answers
-(the launch probe above; the renderer also drops a stored base that fails its
-own `/api/health` probe), and the server directory is read from the node you
-are on.
+default** and the bundled node is the world. There is no hosted rendezvous
+either — the node you are connected to serves the signed node directory and the
+sealed-mail relay for its clients, and gossips them onward. A shared hub is
+opt-in (`gmatch.central.url` / `VITE_CENTRAL_URL` pointing at a node you run)
+and defaults to `none`. Nothing else in the client resolves to a hosted
+address — the API base falls back to `http://127.0.0.1:8790`, a stored node is
+kept only while it answers (the launch probe above; the renderer also drops a
+stored base that fails its own `/api/health` probe), and the server directory is
+read from the node you are on.
 
 What the local node gives you, with no third party involved:
 
@@ -75,17 +76,17 @@ yours and your friend's must be reachable from each other:
    the sealed messages pass through it (it cannot read them) and the media and
    the signed operations travel **directly** between the two apps over WebRTC.
 
-**Updates from a page and from peers.** The public manifest is
-`https://gmatch.pages.dev/release.json`, staged from the shipped exe so its
-sha256 describes the bytes users download. A node can also serve
-`/release.json` and `/releases/<file>` from `userData/releases`: `npm run dist`
-ends with `stage:release`, which copies the built exe there and writes the
-manifest (version + sha256 + size), so the builder's own node serves the new
-build to its peers. The updater asks the node this install is connected to
-first, then the Pages manifest (skipped when it does not answer). The sha256
-in the manifest is what makes it safe: the updater verifies it and discards a
-mismatch. A plain-http feed is accepted only for a host on the user's own
-network (loopback or a private LAN address).
+**Updates from a release and from peers.** The public feed is the project's
+**GitHub Release**, whose asset carries a `digest` (`sha256:<hex>`) and a size.
+A node can also serve `/release.json` and `/releases/<file>` from
+`userData/releases`: `npm run dist` ends with `stage:release`, which copies the
+built exe there and writes the manifest (version + sha256 + size), so the
+builder's own node serves the new build to its peers. The updater asks every
+feed in parallel — the node this install is connected to and the GitHub Release
+(skipped when it does not answer). The sha256 in the manifest is what makes it
+safe: the updater verifies it and discards a mismatch. A plain-http feed is
+accepted only for a host on the user's own network (loopback or a private LAN
+address).
 
 **The honest limits.** Two nodes that are both unreachable from the public
 internet cannot meet — that is NAT, not architecture, and no client-side code
@@ -94,12 +95,61 @@ node or a TURN relay. And when the direct WebRTC channel is blocked, the
 swarm falls back to the node's WebSocket relay: the media still arrives, but
 it travels through that node in the clear (the chunks are hash-verified, not
 sealed — the DMs and the room messages stay sealed either way). The direct
-path is what keeps the media private from the node. When neither the Pages
-manifest nor the connected node answers, the updater says "no host answered"
+path is what keeps the media private from the node. When neither the GitHub
+Release nor the connected node answers, the updater says "no host answered"
 rather than pretend the app is current, and the artifact can still be copied
 by hand.
 
 ## Boot flow (`electron/main.cjs`)
+
+`main.cjs` is the composition root: it owns startup, the window and the
+lifecycle, and registers the IPC handlers from `electron/ipc/*.cjs`, one module
+per capability with its dependencies injected (`secure`, `cache`, `vault`,
+`window`, `server`, `notify`, `app`, `booru`, `update`,
+`domination-media`). A handler group is read in one file instead of inside a
+2k-line orchestrator; `node --check` + `eslint electron` cover them (there is no
+tsc for `.cjs`).
+
+**Bounded runtime:** `main.cjs` caps the renderer heap at 256MB. The Goon Panel
+renders without the old blurred cover and videos do not autoplay. GPU
+acceleration stays ON: forcing software composition stalled the UI. Normal API
+calls time out in 8s with one short retry (media exempt); pollers are deliberate
+(lobby 5/8/12s, heartbeat 20s) because a retry storm freezes the renderer more
+than any GPU process ever did.
+
+**Media never eats the connection pool:** a signed `/api/objects/:id` stream
+keeps the 120s budget, but `useObjectImage` runs at most 3 at once
+(`MAX_CONCURRENT_OBJECT_FETCHES`). Chromium opens 6 connections per host, so an
+unbounded start-them-all (a profile grid) left every other call — feed, lobby,
+notifications, DELETE — queued behind media and dying at 8s. The budget is the
+whole reason "nothing loads / nothing deletes" disappeared. Profile grid tiles
+also load lazily (`IntersectionObserver`, 400px): only the avatar is eager.
+`deletePostOnServer` reports `failed` (and keeps the tile) when a row the node
+serves cannot be confirmed deleted, so a post never vanishes and reappears.
+
+The local Bun API sidecar is supervised (`electron/sidecarSupervision.cjs`): a
+crash or a failed health probe restarts it with capped exponential backoff, and
+the attempt budget resets after a healthy minute — so a sidecar that died while
+the app sat idle is brought back instead of leaving the profile empty. It
+debounces failed probes (3 in a row), resets after any healthy answer, and stops
+a hung child before respawning so two Bun processes never fight over :8790.
+
+The `booru` group also exposes `booru:timings` (read-only feed search metrics
+from `electron/feedMetrics.cjs`). Its fetch path may include an optional
+**mediaq** content provider (`electron/providers/mediaq.cjs`) at
+`GMATCH_MEDIAQ_URL` (default `http://127.0.0.1:8765`); it auto-probes and is
+silently skipped when absent, so a build with no mediaq behaves as before (local
+sources only).
+
+**mediaq setup suite (one-shot).** A first-run modal
+(`src/components/mediaq/`) offers to install mediaq once.
+`electron/mediaqInstaller.cjs` downloads `uv` (a single binary from Astral) and
+runs `uv tool install --python 3.12 mediaq`, which pulls a managed CPython — so
+Python is never bundled and nothing is installed system-wide.
+`electron/mediaqSidecar.cjs` then runs the server on 127.0.0.1:8765 and stops it
+on quit. The `mediaq` IPC group (`mediaq:status` / `mediaq:install` /
+`mediaq:start`, with `mediaq:progress` events) drives the suite. A skipped or
+failed install is a no-op for the feed.
 
 1. `requestSingleInstanceLock` — duplicate launches exit after focusing.
 2. `migrateUserData()` — one-shot move from the legacy `@goongrid` profile.
@@ -165,9 +215,9 @@ Two edges matter when debugging a user's "my keepsake is gone":
   probes this before asking the node (which stores no media) or a peer.
 - **Terminal miss:** when the vault has no bytes, the path is a P2P descriptor
   and the bounded swarm ask times out, the tile reports a miss instead of
-  "waiting for poster" forever. The feed hides posts in that state behind
-  `N posts hidden - media not on this device` with Show/Hide (Show remounts the
-  tiles for one explicit retry); nothing is deleted.
+  "waiting for poster" forever. The row itself stays on the timeline (author,
+  caption, counts are real even when the bytes are not on this device); only the
+  media frame says "No preview". Nothing is deleted or fabricated.
 
 ## Failure paths (what the user sees when each layer breaks)
 
@@ -191,8 +241,9 @@ Two edges matter when debugging a user's "my keepsake is gone":
 
 ## Self-update (`electron/updater.cjs`, `updater-core.cjs`)
 
-Feed: the project site's `release.json` at
-`https://gmatch.pages.dev/release.json`, plus the manifest of the node this
+Feed: the project's GitHub Release
+(`https://api.github.com/repos/9matesu/gmatch/releases/latest`), plus the
+manifest of the node this
 install talks to when that node serves one. Both are asked on every check; the
 winner is the highest version among the hosts that answered. The manifest
 carries the absolute `downloadUrl` (the GitHub Release asset) plus the

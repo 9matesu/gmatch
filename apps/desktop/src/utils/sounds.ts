@@ -38,7 +38,7 @@ export function throttled<T extends (...a: never[]) => unknown>(
   }) as unknown as T;
 }
 
-export const MUTE_KEY = '***';
+const MUTE_KEY = '***';
 
 export function isAudioMuted(): boolean {
   try { return localStorage.getItem(MUTE_KEY) === 'true'; } catch { return false; }
@@ -67,7 +67,7 @@ function ensureCtx(): AudioContext | null {
  * Atonal click: very short noise-based rimshot click with NO tonal oscillator,
  * at a subtle, comfortable lower volume.
  */
-export function playAtonalClick(gainVol = 0.12, duration = 0.025) {
+function playAtonalClick(gainVol = 0.12, duration = 0.025) {
   const audio = ensureCtx();
   if (!audio) return;
   const now = audio.currentTime;
@@ -111,12 +111,8 @@ export function playPress(_freq?: number) {
   playAtonalClick(0.12, 0.022);
 }
 
-export function playBeep() {
-  playPress();
-}
-
 /** Short rimshot click (atonal noise crack, lower volume, no tonal oscillator) */
-export function playRimshot() {
+function playRimshot() {
   playAtonalClick(0.15, 0.032);
 }
 
@@ -157,32 +153,8 @@ export function playChime() {
   });
 }
 
-export const playNotification = playChime;
-
-/** Uplifting like ding */
-export function playLike() {
-  const audio = ensureCtx();
-  if (!audio) return;
-  const now = audio.currentTime;
-  [523.25, 783.99].forEach((freq, idx) => {
-    const osc = audio.createOscillator();
-    const gain = audio.createGain();
-    const start = now + idx * 0.05;
-
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(freq, start);
-
-    gain.gain.setValueAtTime(0.35, start);
-    gain.gain.exponentialRampToValueAtTime(0.001, start + 0.2);
-
-    osc.connect(gain).connect(audio.destination);
-    osc.start(start);
-    osc.stop(start + 0.22);
-  });
-}
-
 /** Low descending buzz for reject */
-export function playReject() {
+function playReject() {
   const audio = ensureCtx();
   if (!audio) return;
   const now = audio.currentTime;
@@ -229,7 +201,7 @@ export const playWin = playMatch;
 export const playMatchFound = playMatch;
 
 /** Rising cascade for Tier Advance */
-export function playTierUp() {
+function playTierUp() {
   const audio = ensureCtx();
   if (!audio) return;
   const now = audio.currentTime;
@@ -252,29 +224,8 @@ export function playTierUp() {
   });
 }
 
-/** Round start gong */
-export function playRoundStart() {
-  const audio = ensureCtx();
-  if (!audio) return;
-  const now = audio.currentTime;
-
-  const osc = audio.createOscillator();
-  const gain = audio.createGain();
-
-  osc.type = 'square';
-  osc.frequency.setValueAtTime(440, now);
-  osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);
-
-  gain.gain.setValueAtTime(0.3, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
-
-  osc.connect(gain).connect(audio.destination);
-  osc.start(now);
-  osc.stop(now + 0.22);
-}
-
 /** Clock tick */
-export function playCountdown() {
+function playCountdown() {
   const audio = ensureCtx();
   if (!audio) return;
   const now = audio.currentTime;
@@ -293,7 +244,7 @@ export function playCountdown() {
 }
 
 /** Heavy warning thud */
-export function playTimeout() {
+function playTimeout() {
   const audio = ensureCtx();
   if (!audio) return;
   const now = audio.currentTime;
@@ -344,5 +295,4 @@ export const playMatchOnce = /* @__PURE__ */ throttled(playMatch, 1500, 'match')
 export const playTierUpOnce = /* @__PURE__ */ throttled(playTierUp, 1500, 'tier');
 export const playCountdownOnce = /* @__PURE__ */ throttled(playCountdown, 900, 'countdown');
 export const playTimeoutOnce = /* @__PURE__ */ throttled(playTimeout, 1500, 'timeout');
-export const playLikeOnce = /* @__PURE__ */ throttled(playLike, 300, 'like');
 export const playRejectOnce = /* @__PURE__ */ throttled(playReject, 300, 'reject');

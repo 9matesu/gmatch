@@ -65,8 +65,9 @@ export type ViewMode = 'single' | 'grid' | '1x1' | '1x2' | '2x2' | '3x3'
 export interface KoDrop {
   id: string
   foeTitle: string
-  suggestedTag?: string
-  suggestedAntiTag?: string
+  /** Every actionable foe tag: valid, not already owned, not already excluded.
+   *  Each can be adopted (+) or banned (✕) individually. */
+  tags: string[]
   timestamp: number
 }
 

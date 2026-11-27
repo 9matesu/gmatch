@@ -31,6 +31,24 @@ describe('updater-core (portable self-update)', () => {
     expect(parseDigest(undefined)).toBe(null)
   })
 
+  // GitHub serves `"digest":"sha256:<hex>"` (COLON). The dash-only regex made
+  // every real asset hash parse to null, so the download was refused as
+  // unverified and the update never installed.
+  it('parseDigest accepts the real GitHub colon form', () => {
+    expect(parseDigest(`sha256:${'cd'.repeat(32)}`)).toBe('cd'.repeat(32))
+    expect(parseDigest(`SHA256:${'ef'.repeat(32)}`)).toBe('ef'.repeat(32))
+    expect(parseDigest(`sha256:${'ab'.repeat(20)}`)).toBe(null) // not 64 hex
+    expect(parseDigest('sha256:')).toBe(null)
+  })
+
+  it('a real GitHub asset digest reaches the download plan', () => {
+    const plan = planCheck(
+      { assets: [asset('gMatch-1.2.0-portable.exe', undefined, `sha256:${'9d'.repeat(32)}`)] },
+      '1.1.3',
+    )
+    expect(plan).toMatchObject({ action: 'download', digest: '9d'.repeat(32) })
+  })
+
   it('parseRelease picks the highest portable asset', () => {
     const rel = parseRelease({ assets: [asset('gMatch-1.2.10-portable.exe'), asset('gMatch-1.2.9-portable.exe')] })
     expect(rel?.version).toBe('1.2.10')
@@ -52,6 +70,18 @@ describe('updater-core (portable self-update)', () => {
     const rel = { assets: [{ name: 'gMatch-2.0.0-portable.exe', browser_download_url: 'http://127.0.0.1:9/gMatch-2.0.0-portable.exe' }] }
     expect(planCheck(rel, '1.1.3').action).toBe('error')
     expect(planCheck(rel, '1.1.3', { insecure: true }).action).toBe('download')
+  })
+
+  it('a node manifest with no downloadUrl resolves against the node that served it', () => {
+    // The node's own release.json (scripts/stage-release.cjs) has no absolute
+    // URL: the artifact lives at /releases/<file> on THAT node.
+    const manifest = { file: 'gMatch-1.7.0-portable.exe', version: '1.7.0', sha256: 'ab'.repeat(32), sizeBytes: 10 }
+    expect(planCheck(manifest, '1.6.8', { base: 'http://192.168.1.10:8790', insecure: true })).toMatchObject({
+      action: 'download',
+      url: 'http://192.168.1.10:8790/releases/gMatch-1.7.0-portable.exe',
+    })
+    // No absolute URL and no base: not a usable source, so it never invents a host.
+    expect(planCheck(manifest, '1.6.8', {})).toMatchObject({ action: 'error' })
   })
 
   it('shaFromReleaseJson matches the same version only', () => {
@@ -77,13 +107,15 @@ describe('updater-core (portable self-update)', () => {
     expect(s).toContain('C:\\log\\main.log')
   })
 
-  it('site release.json shape (private-repo reality): version, url, verified digest', () => {
+  it('release.json shape: version, url, verified digest', () => {
     const meta = { file: 'gMatch-1.2.0-portable.exe', version: '1.2.0', sha256: 'ef'.repeat(32) }
-    const plan = planCheck(meta, '1.1.3')
+    // The manifest is served by a node: the artifact lives at /releases/<file>
+    // on THAT node, never on a hosted page.
+    const plan = planCheck(meta, '1.1.3', { base: 'http://127.0.0.1:8790', insecure: true })
     expect(plan.action).toBe('download')
-    expect(plan).toMatchObject({ version: '1.2.0', url: 'https://gmatch.pages.dev/releases/gMatch-1.2.0-portable.exe', digest: 'ef'.repeat(32) })
+    expect(plan).toMatchObject({ version: '1.2.0', url: 'http://127.0.0.1:8790/releases/gMatch-1.2.0-portable.exe', digest: 'ef'.repeat(32) })
     expect(planCheck({ ...meta, downloadUrl: 'https://example.test/a/gMatch-1.2.0-portable.exe' }, '1.1.3')).toMatchObject({ url: 'https://example.test/a/gMatch-1.2.0-portable.exe' })
-    expect(planCheck(meta, '1.2.0').action).toBe('current')
+    expect(planCheck(meta, '1.2.0', { base: 'http://127.0.0.1:8790', insecure: true }).action).toBe('current')
     expect(planCheck({ file: 'evil.zip', version: '9.9.9' }, '1.1.3').action).toBe('error')
     expect(planCheck({ version: '1.2.0', downloadUrl: 'http://x/y.exe' }, '1.1.3').action).toBe('error')
     expect(planCheck({ version: '1.2.0', downloadUrl: 'http://x/y.exe' }, '1.1.3', { insecure: true })).toMatchObject({ action: 'download', name: 'y.exe' })

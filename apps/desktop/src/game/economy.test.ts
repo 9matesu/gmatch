@@ -1,21 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { BASE_CLICK, CRIT_EVERY, clickGain, clickPower, galleryIncome, isCrit, passiveGps, shardMultiplier, tagIncome, type EconomyInput, heatMultiplier, heatStreakAfter, HEAT_WINDOW_MS } from './economy'
-import type { ActiveCap, GalleryImage, OwnedTag, Rarity } from './types'
+import { BASE_CLICK, CRIT_EVERY, clickGain, clickPower, isCrit, shardMultiplier, type EconomyInput, heatMultiplier, heatStreakAfter, HEAT_WINDOW_MS } from './economy'
+import type { ActiveCap } from './types'
 
 const NOW = 1_000_000
-
-function tag(name: string, level: number, income: number): OwnedTag {
-  return { name, level, income, base: income * 20, weight: 1 }
-}
-
-function img(rarity: Rarity): GalleryImage {
-  return { id: rarity, url: '', tags: [], rarityBase: 1, clicks: 0, rarity }
-}
 
 function caps(...specs: [ActiveCap['capId'], number][]): ActiveCap[] {
   return specs.map(([capId, expiresAt]) => ({ capId, expiresAt }))
 }
-
 const base: EconomyInput = {
   shards: 0,
   achievementsEarned: 0,
@@ -66,28 +57,6 @@ describe('click power', () => {
   })
 })
 
-describe('passive g$/s (SPEC §3/§4)', () => {
-  it('tags pay income * level', () => {
-    expect(tagIncome([tag('wet', 3, 2), tag('solo', 1, 5)])).toBe(11)
-  })
-
-  it('gallery pays by rarity 1/3/10/30/100', () => {
-    expect(galleryIncome([img('Common'), img('Copper'), img('Silver'), img('Gold'), img('Diamond')])).toBe(144)
-  })
-
-  it('passive scales with shards and Pornmeat, not with click caps (quartered)', () => {
-    const input: EconomyInput = {
-      ...base,
-      tags: [tag('wet', 2, 5)],
-      gallery: [img('Gold')],
-    }
-    expect(passiveGps(input, NOW)).toBe(10)
-    expect(passiveGps({ ...input, shards: 2 }, NOW)).toBeCloseTo(12)
-    expect(passiveGps({ ...input, caps: caps(['hypno', NOW + 1]) }, NOW)).toBe(20)
-    expect(passiveGps({ ...input, caps: caps(['blue', NOW + 1]) }, NOW)).toBe(10)
-    expect(passiveGps({ ...input, caps: caps(['melt', NOW + 1]) }, NOW)).toBe(100)
-  })
-})
 
 describe('heat combo', () => {
   it('stacks +0.25 per 10-click streak, capped at x3', () => {

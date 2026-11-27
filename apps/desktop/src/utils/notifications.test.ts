@@ -4,6 +4,8 @@ import {
   parseNotificationData,
   serverRowToAppNotification,
   deriveConversationNotifications,
+  derivePeerNotifications,
+  peerNotificationSubject,
   mergeNotifications,
   unreadCountOf,
   unreadByTypeOf,
@@ -173,17 +175,16 @@ describe('deriveConversationNotifications', () => {
     expect(item.actorName).toBe('Payload Name')
   })
 
-  it('falls back to the readable handle, never a truncated raw id', () => {
+  it('does NOT fabricate a notification for an unnamed peer (no random "User_…")', () => {
     const peerId = 'A1B2C3D4E5F60718293A4B5C6D7E8F90'
-    const [item] = deriveConversationNotifications({
+    const items = deriveConversationNotifications({
       threads: { [peerId]: [{ id: 'm', text: 'hi', ts: 5 }] },
       dmSeen: {},
       selfId: 'self',
     })
-    expect(item.actorName).toBe('User_a1b2c3')
-    expect(item.title).toBe('User_a1b2c3 sent you a message')
-    // Regression: a slice of the internal hash names nobody.
-    expect(item.actorName).not.toBe(peerId.slice(0, 10))
+    // The chat badge still shows the thread; the notification centre must not
+    // invent a random alert for a peer with no real display name.
+    expect(items).toHaveLength(0)
   })
 
   it('derives a room row from inbound-only messages', () => {
@@ -255,5 +256,90 @@ describe('merge / unread / latest', () => {
       { ...mk('c', '2026-10-18T10:00:00Z'), type: 'like', read: true },
     ]
     expect(unreadByTypeOf(items)).toEqual({ dm: 2 })
+  })
+})
+
+describe('derivePeerNotifications (the peer lane)', () => {
+  const report = {
+    operationId: 'op-1',
+    kind: 'report' as const,
+    targetType: 'post' as const,
+    targetId: 'post-9',
+    actorId: 'peer-1',
+    createdAt: 1_700_000_000_000,
+    note: 'not ok',
+  }
+
+  it('turns a peer event into a row that opens the report target', () => {
+    const [row] = derivePeerNotifications([report], { resolveName: () => 'Kenny' })
+    expect(row.key).toBe('local:peer-op-1')
+    expect(row.id).toBe('op-1')
+    expect(row.type).toBe('report')
+    expect(row.title).toBe('Kenny reported your post')
+    expect(row.body).toBe('not ok')
+    expect(row.target).toEqual({ postId: 'post-9' })
+    expect(row.read).toBe(false)
+  })
+
+  it('targets a comment when the report is about a comment', () => {
+    const [row] = derivePeerNotifications([{ ...report, targetType: 'comment', targetId: 'c-1' }])
+    expect(row.target).toEqual({ commentId: 'c-1' })
+  })
+
+  it('marks a row read from the durable read set (so the badge can clear)', () => {
+    const rows = derivePeerNotifications([report], { readIds: new Set(['op-1']) })
+    expect(rows[0].read).toBe(true)
+  })
+
+  it('opens both the post and the comment for a comment target', () => {
+    const [row] = derivePeerNotifications([
+      { ...report, targetType: 'comment', targetId: 'c-1', postId: 'post-9' },
+    ])
+    expect(row.target).toEqual({ postId: 'post-9', commentId: 'c-1' })
+  })
+
+  it('a follow opens the follower profile and says so', () => {
+    const [row] = derivePeerNotifications([
+      { operationId: 'op-f', kind: 'follow', targetType: 'user', targetId: 'peer-1', actorId: 'peer-1', createdAt: 1 },
+    ], { resolveName: () => 'Kenny' })
+    expect(row.type).toBe('follow')
+    expect(row.title).toBe('Kenny started following you')
+    expect(row.target).toEqual({ userId: 'peer-1' })
+    expect(row.body).toBeNull()
+  })
+
+  it('a like names the right thing and opens it', () => {
+    const [onPost] = derivePeerNotifications([
+      { operationId: 'op-l1', kind: 'like', targetType: 'post', targetId: 'post-9', actorId: 'p', createdAt: 1 },
+    ], { resolveName: () => 'Kenny' })
+    expect(onPost.title).toBe('Kenny liked your post')
+    expect(onPost.target).toEqual({ postId: 'post-9' })
+
+    const [onComment] = derivePeerNotifications([
+      { operationId: 'op-l2', kind: 'like', targetType: 'comment', targetId: 'c-1', postId: 'post-9', actorId: 'p', createdAt: 1 },
+    ], { resolveName: () => 'Kenny' })
+    expect(onComment.title).toBe('Kenny liked your comment')
+    expect(onComment.target).toEqual({ postId: 'post-9', commentId: 'c-1' })
+  })
+
+  it('a comment carries its text; a reply opens its own comment', () => {
+    const [comment] = derivePeerNotifications([
+      { operationId: 'op-c', kind: 'comment', targetType: 'post', targetId: 'post-9', actorId: 'p', createdAt: 1, note: 'nice' },
+    ], { resolveName: () => 'Kenny' })
+    expect(comment.title).toBe('Kenny commented on your post')
+    expect(comment.body).toBe('nice')
+
+    const [reply] = derivePeerNotifications([
+      { operationId: 'op-r', kind: 'reply', targetType: 'comment', targetId: 'c-new', postId: 'post-9', actorId: 'p', createdAt: 1 },
+    ], { resolveName: () => 'Kenny' })
+    expect(reply.title).toBe('Kenny replied to your comment')
+    expect(reply.target).toEqual({ postId: 'post-9', commentId: 'c-new' })
+  })
+
+  it('peerNotificationSubject extracts exactly the operation id', () => {
+    expect(peerNotificationSubject('local:peer-op-1')).toBe('op-1')
+    expect(peerNotificationSubject('dm:bob')).toBeNull()
+    expect(peerNotificationSubject('room:r1')).toBeNull()
+    expect(peerNotificationSubject('local:peer-')).toBeNull()
   })
 })

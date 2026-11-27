@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useProfilePostLightbox } from './useProfilePostLightbox';
 import type { FeedPost } from './GMatchFeed';
@@ -102,14 +102,21 @@ describe('useProfilePostLightbox (inline expansion, no modal)', () => {
     expect(onPersistLike).toHaveBeenCalledWith('prof-1', true);
   });
 
-  it('options button opens the linked options sheet', async () => {
+  it('right-clicking the expanded card opens the context menu', async () => {
     render(<Harness />);
     await userEvent.click(screen.getByRole('button', { name: 'open-a' }));
     await screen.findByPlaceholderText(/add a comment/i);
-    const optionsBtn = document.body.querySelector('button:has(.lucide-ellipsis)') as HTMLElement;
-    await userEvent.click(optionsBtn);
+    // The three-dots button is gone: the options live in a right-click menu.
+    expect(document.body.querySelector('button:has(.lucide-ellipsis)')).toBeNull();
+    const card = document.body.querySelector('article[data-expanded-post="prof-1"]') as HTMLElement;
+    expect(card).not.toBeNull();
+    fireEvent.contextMenu(card, { clientX: 40, clientY: 60 });
+    // Copy Link works here (the lightbox wires onCopyLink).
     expect(await screen.findByText(/copy link/i)).toBeInTheDocument();
-    expect(await screen.findByText(/repost to profile/i)).toBeInTheDocument();
+    // Repost does NOT: this surface never passes onRepost. The row used to
+    // render anyway and fire a "Post shared to your profile feed!" toast while
+    // nothing happened - the bug this assertion now pins shut.
+    expect(screen.queryByText(/repost to profile/i)).not.toBeInTheDocument();
   });
 
   it('send button opens the share sheet', async () => {

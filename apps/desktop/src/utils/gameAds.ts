@@ -1,5 +1,3 @@
-import type { FeedPost } from '../components/feed/GMatchFeed';
-
 export type GameMode = 'duel' | 'babecock' | 'ranks' | 'store' | 'discord' | 'coffee';
 
 export interface GameAdTemplate {
@@ -10,13 +8,6 @@ export interface GameAdTemplate {
   gradient: string;
   icon: string;
   badge: string;
-}
-
-export interface SponsoredFeedPost extends FeedPost {
-  is_sponsored: true;
-  game_mode: GameMode;
-  players_playing: number;
-  cta_label: string;
 }
 
 export const GAME_AD_TEMPLATES: GameAdTemplate[] = [
@@ -76,64 +67,4 @@ export const GAME_AD_TEMPLATES: GameAdTemplate[] = [
   },
 ];
 
-export function pickRandomTemplate(seed: number): GameAdTemplate {
-  const idx = Math.abs(Math.floor(seed)) % GAME_AD_TEMPLATES.length;
-  return GAME_AD_TEMPLATES[idx];
-}
 
-function seededRandom(seed: number): () => number {
-  let s = seed % 2147483647;
-  if (s <= 0) s += 2147483646;
-  return () => {
-    s = (s * 16807) % 2147483647;
-    return (s - 1) / 2147483646;
-  };
-}
-
-const IDS = ['post_ad_discord', 'post_ad_coffee', 'post_ad_duel', 'post_ad_babecock', 'post_ad_ranks', 'post_ad_store'];
-
-export function buildSponsoredPost(seed: number): SponsoredFeedPost {
-  const template = pickRandomTemplate(seed);
-  const players = 340 + Math.floor(seededRandom(seed + 7)() * 2480);
-  return {
-    id: `${IDS[GAME_AD_TEMPLATES.indexOf(template)]}_${seed}`,
-    author_id: 'gMatch_ads',
-    author_name: 'gMatch Arcade',
-    author_avatar: null,
-    url: '',
-    caption: `${template.tagline} #${template.badge.toLowerCase().replace(/[^a-z0-9]+/g, '')}`,
-    location: 'gMatch Arcade',
-    tags: ['sponsored', 'games', template.mode],
-    created_at: new Date().toISOString(),
-    like_count: 0,
-    comment_count: 0,
-    is_sponsored: true,
-    game_mode: template.mode,
-    players_playing: players,
-    cta_label: template.ctaLabel,
-  };
-}
-
-/**
- * Periodic ad injection: returns a new array with ~1 sponsored post per every
- * 5-6 real posts. Guarantees ads appear at natural intervals during endless scrolling.
- */
-export function injectSponsoredPosts(posts: FeedPost[], seed: number): FeedPost[] {
-  if (posts.length < 3) return posts;
-
-  const result: FeedPost[] = [];
-  let adCount = 0;
-  const adInterval = 5;
-
-  for (let i = 0; i < posts.length; i++) {
-    const post = posts[i];
-    result.push(post);
-    if ((i + 1) % adInterval === 0 && i + 1 < posts.length) {
-      const adSeed = seed + adCount * 79 + (i + 1);
-      result.push(buildSponsoredPost(adSeed));
-      adCount++;
-    }
-  }
-
-  return result;
-}

@@ -34,7 +34,7 @@ export default function OfflineCard({ fetching, feedOffline, emptyFresh = false,
           : 'No image. Pull the feed'
   return (
     <div
-      className="pointer-events-auto absolute left-1/2 top-1/2 z-[4] flex -translate-x-1/2 -translate-y-1/2 items-center gap-2.5 rounded-xl border border-border-glass bg-glass-strong px-4 py-3"
+      className="pointer-events-auto absolute left-1/2 top-1/2 z-[4] flex -translate-x-1/2 -translate-y-1/2 items-center gap-2.5 rounded-xl border border-edge bg-glass-strong px-4 py-3"
       role="status"
       aria-live="polite"
       onClick={(e) => e.stopPropagation()}
@@ -43,7 +43,7 @@ export default function OfflineCard({ fetching, feedOffline, emptyFresh = false,
         className={`h-3 w-3 flex-none rounded-full ${DOT_COLOR[state]}`}
         aria-hidden="true"
       />
-      <span className="whitespace-nowrap text-[13px] text-retro-fg">{label}</span>
+      <span className="whitespace-nowrap text-field text-retro-fg">{label}</span>
       <button type="button" className={`${BTN} ${BTN_SMALL}`} disabled={fetching} onClick={onRetry}>
         {fetching ? 'Retrying…' : 'Retry'}
       </button>

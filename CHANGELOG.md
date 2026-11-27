@@ -1,5 +1,421 @@
 # Changelog
 
+## Unreleased — the requests that were coded but never worked
+
+Every item below was requested, was already "implemented" in some form, and
+did not actually work in the running app. Each one is now built, tested and
+verified live.
+
+- **There is no clicker startup tag picker.** The clicker used to open behind a
+  "Feed tune" step that collected exactly 4 starter tags before the game would
+  run (`FeedTuneStep`, driven by `setupComplete`). The step, its store API
+  (`completeSetup` / `updateSetup` / `SETUP_TAG_COUNT`), the `setupComplete`
+  save flag, the Settings "Starter picks" recap and the `!setupComplete` gate in
+  `GridWorkspace` are all gone. The clicker opens straight into the game, and a
+  feed begins in ONE place — the Tags tab, whose custom-tag add is
+  validity-gated, live-probed and now starts the feed itself
+  (`addCustomTag` → `fetchFeed`), so the market/first fetch needs no separate
+  setup step. Drained-foe discovery (`discoverTags`) and bought tags still seed
+  a feed as before.
+- **The feed never shows a "No preview" post.** A row whose media bytes cannot
+  be resolved used to sit in the timeline as an empty frame or a "No preview"
+  strip. It is now dropped until its bytes actually exist — and the hide is
+  REVERSIBLE, not a tombstone: the tile reports a terminal miss
+  (`onMediaUnavailable`) and the id joins `GMatchFeed`'s `deadPosts`; the same
+  row's media loading (`onLoad`) promotes it straight back, and a peer coming
+  online (`PEER_ONLINE_EVENT`) clears the hidden set so every row is re-checked
+  (a peer can deliver bytes that were absent). Text-only and captioned rows are
+  untouched — words are content, so they always show. Both the timeline
+  (`hideUnavailable` on `ObjectImage`) and the grid
+  (`FeedGrid`'s `onMediaReady`/`onMediaDead`) feed the same set.
+  `GMatchFeed.missing-media.test.tsx` pins the hide and the promote-on-peer-online.
+- **One media balloon, fixed size, for every media input — including the avatar.**
+  `MediaPickerPanel` was content-sized, so switching panes resized and moved it
+  under the pointer; the navbar Post bubble opened on hover and closed on
+  mouse-leave, so moving onto a tab could dismiss what you were about to click.
+  The panel is now a fixed footprint (`h-[560px]` default, `h-[420px]` compact,
+  body the only scroller), the bubble opens on CLICK and closes on a pick / its
+  close button / Escape / an outside pointerdown (the trigger excluded, so a
+  second click toggles), and the profile-photo modal (`ProfilePicModal`) is the
+  SAME picker plus a crop/apply step — it launches the picker on open (one click
+  to a keepsake), keeps Camera as a capture surface, and the dead bespoke hidden
+  `<input type=file>` avatar path (`pfpInputRef` / `handleSetProfilePic` in
+  `App.tsx` + `GlobalModals.tsx`) is gone. A new `--z-picker: 65` token puts the
+  balloon above the profile-photo lightbox (60) it is opened from.
+  `CommandIsland.test.tsx` pins stay-open-on-pane-switch plus
+  outside-click/Escape close, and `ProfilePicModal.test.tsx` the auto-open picker.
+
+- **The profile's Followers/Following tabs tell the truth about the peer graph.**
+  Both tabs rendered the node's `Followers` table verbatim, so a follow made
+  while the node was unreachable existed in the durable operation log and nowhere
+  else — invisible on the very profile that should show it — while an unfollow
+  that stayed off-node left a row nothing could remove. `projectFollowEdgesFor`
+  (`services/socialInteractionProjection.ts`) now derives the four edges around
+  ONE profile (who follows them, who they follow, and the two masked sets) from
+  the accepted operations, `hooks/usePeerFollows.ts` exposes it as
+  `usePeerFollowEdges` over the shared log-read lifecycle, and
+  `utils/followList.ts` holds the merge rules: the node's order is kept,
+  operations ADD what the node does not know and MASK what it still lists (a live
+  follow beats a stale withdrawal), and an id that exists ONLY as an operation
+  still gets a row — named from the roster, or the shared `generateFallbackName`,
+  never a truncated hash. The Follow button follows `followingIds` (already the
+  merged own-follow list), so a lagging per-row node flag cannot contradict it.
+  `utils/followList.test.ts` pins both merge rules,
+  `socialInteraction.followReport.test.ts` the four edges (including the re-follow
+  that clears a mask), and `FollowersFollowingModal.test.tsx` drives the wired
+  modal with the node unreachable.
+- **Peer activity aimed at you actually reaches you - and can be dismissed.**
+  A report, a follow, a like, a comment and a reply about peer-replicated
+  content are signed operations that travel between the peers, and the AUTHOR of
+  the content is the one who can act (a mesh has no admin and no central
+  like/comment service), so they belong in the author's notification centre.
+  Those rows were only merged into the list the BADGE counts, while the panel
+  draws server rows and courier rows separately, so the peer row never appeared -
+  the bell said "1" with nothing behind it, and because a derived row has no node
+  `read` flag and no chat seen stamp, that "1" could never clear. The peer lane is
+  now its own section ("From your peers") fed by
+  `hooks/usePeerAttention.ts` over `projectPeerAttentionFor`
+  (`services/socialInteractionProjection.ts`), which tells the truth: an
+  operation you authored is never news to you, a withdrawn like or an undone
+  follow is not an event, and a tombstoned post/comment has nothing to say. A
+  follow opens the follower's profile; a reply and a comment-targeted
+  like/report carry BOTH the post and the comment, because a comment id alone
+  lands the deep link nowhere. `hooks/useNotificationCenter.ts` exposes
+  `peerItems`, and the read state is durable and identity-scoped
+  (`utils/peerNotifications.ts`, keyed by the operation id) so tapping a row
+  marks exactly it read and the badge follows. "Mark all read" clears peer rows
+  (alerts) but still leaves DMs/rooms alone (a DM is a real unread message,
+  cleared by opening it).
+  `utils/notifications.test.ts` pins every title/target and the read flag,
+  `peerNotifications.test.ts` / `usePeerNotificationReads.test.tsx` the durable
+  store, `socialInteraction.peerAttention.test.ts` the projection rules, and
+  `NotificationCenter.test.tsx` the rendered row, its "From your peers" section,
+  and that a peer-only inbox no longer claims "No notifications".
+
+- **"Stored on N devices" is now real — a peer's signed receipt, not a guess.**
+  The swarm has proved durable custody for a while: a seeding node mints a
+  challenge when it serves bytes, the fetching node signs a receipt only after
+  it reads those bytes back from its own persistent store, and the seeder keeps
+  a receipt that matches the challenge it minted. That evidence was written to
+  memory and to IndexedDB and then shown NOWHERE — a peer could confirm it held
+  your media and the app could not say so. `utils/p2pSwarm.ts` now emits
+  `DURABLE_REPLICATION_EVENT` when a new attestation lands,
+  `hooks/useDurableCustody.ts` reads the distinct-holder count and re-reads on
+  that signal, and `utils/durableCustody.ts` turns it into a claim that is
+  **silent at one holder** — this node alone is not replication — and
+  `Stored on N devices` from two. The post detail sheet shows it, keyed by the
+  row's `content_hash`. Nothing else counts: a HAVE, a download still in
+  flight or a peer that is merely online never reaches the label.
+  `e2e/post-two-peer.spec.ts` asserts the machine truth (the seeder's count goes
+  1 → 2 after the fetcher stores and attests) and
+  `ProfileExpandedPost.test.tsx` pins the rendered line and its silence at one
+  holder.
+
+- **A follow made offline survives a restart.** A follow was already a signed
+  operation, committed durably before any network call - but nothing read it
+  back: `followingIds` came from `GET /api/users/:id/following` alone. With the
+  node unreachable the list came back empty, so the follow was invisible on the
+  next launch: the feed re-suggested people you already follow and every
+  followed profile offered "Follow" again. `hooks/usePeerFollows.ts` projects
+  your own signed follows into what you follow and what your own removal
+  withdrew (a live follow always wins), and `mergeFollowing` resolves the two
+  sources: node list UNION operation follows MINUS withdrawn ones, so a stale
+  node row can neither hide a follow nor resurrect an unfollow.
+  `e2e/follow-offline.spec.ts` aborts both follow endpoints, follows a peer from
+  the empty feed's suggestions, reloads, and proves the suggestion stays gone
+  while an unfollowed peer is still offered.
+
+- **Bookmarking a peer's post sticks - it used to be a silent 404.** Saving a
+  post was one call for every post: `POST /api/posts/:id/save`. A post
+  replicated from a peer has no row on your node, so the node answered
+  `404 Post not found`, the bookmark icon stayed hollow, and the save was gone
+  on the next launch - and the profile's Saved tab could never list such a post.
+  `savePersistenceRoute` now splits on the row's origin exactly like likes and
+  comments already did. The peer half is deliberately LOCAL, not a signed
+  operation: a bookmark is the reader's private intent with no shared signal
+  (a like's count is public and travels), so it lives in a durable,
+  identity-scoped store (`utils/peerSaves.ts`) and the peer projection folds
+  `is_saved` back into the row. The Saved tab merges the node query with the
+  locally-bookmarked peer rows. `e2e/save-peer-post.spec.ts` builds a genuine
+  peer row (signed `post.create` from another identity, bytes seeded, nothing
+  registered on the node), pins the node's 404, saves through the real button,
+  and asserts the bookmark survives a reload.
+
+- **Your older posts can be shared with peers - one button, on purpose.**
+  Everything published before the local-first path existed lives only as a row
+  on your node, so no peer can address it and it disappears from the feed the
+  moment the node stops answering. The roadmap described a
+  `services/socialPostImport.ts` that was never written. It exists now:
+  Settings → Preferences → "Share my existing posts" turns your own public feed
+  posts into signed `post.create` operations and seeds their bytes locally
+  first, so a peer that receives the operation has a seeder. It never runs at
+  boot and never deletes or re-uploads anything. Each row is gated exactly like
+  a fresh publish (stories, avatars, chat attachments and private rows stay
+  out), skipped when it is tombstoned or already in the log, and its bytes must
+  actually be readable — local swarm/vault first, otherwise this node, whose
+  answer for a row it does not hold is a `p2p` JSON descriptor that the import
+  refuses so descriptor text is never imported as a picture. A declared
+  `content_hash` must match the bytes (a mismatch is skipped, never
+  re-addressed); with none, the computed hash becomes the address.
+  `socialPostImport.test.ts` pins all ten rules.
+
+- **A post made while a friend is online actually reaches them.** The outbound
+  operation wave ran only on boot and on peer-online, so a `post.create` (or a
+  like, comment, edit, delete) appended while a peer was already connected sat
+  `committed` in the durable log until one of the two reconnected — you could
+  post in front of someone who never saw it, and the media was irrelevant
+  because the metadata never left the machine. The log already announces every
+  write, so `services/socialOpBroadcast.ts` now listens and hands the new entry
+  to the swarm immediately, coalescing a burst into one wave. The wave selects
+  only entries never handed out: broadcasting advances an entry to `sending`
+  and writes, and every write announces again, so a wider selection would
+  re-send on its own announcement forever (boot/peer-online waves keep the
+  wider selection, since retrying a stuck entry is what they are for). Delivery
+  is still only claimed on a peer's ACK. `e2e/post-two-peer.spec.ts` runs it on
+  the production path with two independent clients: A publishes while B is
+  online, B's operation log — which the node never stores — receives the signed
+  `post.create`, B projects the row and pulls byte-identical media by content
+  hash. With the subscriber disabled the operation never arrives.
+
+- **A peer's post loads from the peer, not from a node.** A `post.create`
+  operation carries the sha256 of its own bytes, and nothing in the media
+  ladder ever used it: the feed row knew only `/api/objects/<objectId>`. With
+  the node's data routes unavailable the picture simply failed, and the one
+  swarm fallback that ran asked by object id with no expected hash — so it
+  could accept whatever a peer sent and could not address bytes stored under
+  their content hash (the durable key). The content address now travels with
+  the row (`FeedPost.content_hash`) into `utils/contentAddressedMedia.ts`,
+  which tries local bytes under the object id and the content hash (each
+  hash-verified), then asks the swarm for the content hash with `expectedHash`,
+  then for the object-id alias with the same expectation — no `/api/objects`
+  call at all. Bytes that do not hash to the address are refused, from disk or
+  from a peer, and a legacy row with no content hash keeps the old ladder.
+  `services/socialFeedJoin.test.ts` runs the whole path with no node: A
+  publishes and seeds only the hash, B accepts the operation, projects the row
+  and pulls byte-identical verified media; a peer serving other bytes is
+  refused.
+
+- **The profile's "Saved" tab reads the NODE, not the timeline.** It was fed
+  by `feedPosts.filter((p) => p.is_saved)` — the 50-row timeline snapshot — so
+  a post saved days ago was invisible forever. `GET /api/posts?saved=1` is now
+  a dedicated, user-scoped query (`EXISTS … Saves`), and the profile loads it
+  on open and after every save/un-save.
+- **A deleted post stays deleted across a reload.** The tombstone set started
+  EMPTY on every launch, so a post deleted yesterday came back the next
+  morning. It is re-read at boot, the node is always asked (a 404 is the goal
+  state, not a failure), and the cached posts snapshot is invalidated on every
+  confirmed delete.
+- **Clicking out of the side sheet closes it.** The overlay was a wrapper
+  carrying `pointer-events-none`, so an outside click could never reach a
+  handler. The click-catcher is now a SIBLING of the panel: it covers exactly
+  the page area beside it and never the panel itself. The feed and the profile
+  share the same `SideSheet`, so both dismiss the same way.
+- **The vault no longer flickers.** The guard read a MODULE-level
+  "lookup settled" set, so a URL looked up on a previous visit read as settled
+  instantly and the remote frame painted before the local copy landed. The
+  settled set is now per-mount, and `ObjectImage` runs ONE lookup driving both
+  the URL and the reveal gate (two independent lookups could resolve out of
+  order and open the gate on the remote src).
+- **The tag browser's viewer actually plays the clip.** The grid tile played;
+  the VIEWER modal was `muted={false}` with no `preload`, so Chromium refused
+  to autoplay it and opening a clip showed a black, paused first frame. The
+  viewer is muted + `preload="auto"` + `controls`, and both videos resolve
+  their URL through `redgifsPlayable()`.
+- **Banning a tag is DURABLE — it lands in `blocklist.json`.** The renderer
+  used to send its own stale full list, silently clobbering whatever main had
+  written. The main process now owns the file (read-modify-write on the
+  authoritative list) and the renderer sends only the TERMS. The durable write
+  is primary: the 100-cap runtime exclude list can no longer veto a ban, a
+  failed write is reported instead of swallowed, and the player's excludes
+  reach the provider as `-term` query negatives — so "ban yaoi" means yaoi
+  never appears again.
+- **The clicker's picture cache is a real cache.** Moving on used to EVICT the
+  picture that had just been cached, so the cache was permanently empty, the
+  viewer had nothing to show, and the BACK arrow re-downloaded the very
+  picture the player had just seen. Moving on is not rejecting: the BACK arrow
+  serves the last pictures from disk, and a new "Cache" viewer (in the
+  clicker header) lists what the device holds and saves a tile straight to the
+  gallery. The url→file map is now PERSISTED next to the bytes
+  (`imgcache/index.json`), so the cache survives a restart instead of being
+  write-only.
+- **Post options are a RIGHT-CLICK context menu; a caption can be edited.**
+  The three-dots button is gone. Right-click a post (in the timeline or in
+  the detail sidepanel) and the menu opens at the cursor, clamped to the
+  viewport, carrying every action the post has — like, save, save-to-vault,
+  repost, share, copy link, edit, archive, delete, report. Each row is gated
+  on its handler, and the menu never claims an outcome. Editing a caption is
+  owner-only: a node post is edited with `PATCH /api/posts/:id`, a
+  peer-replicated post with the protocol's `post.edit` operation.
+- **An edited caption actually shows up.** The server had the new caption and
+  the tile still showed the old one: the durable publish outbox — the render
+  source for the window BEFORE the node echoes a post back — was merged ahead
+  of the node's row and never deduped against the node's ids, so the stale
+  local copy shadowed the edited row. The node is the authority once it
+  carries the row; the outbox now yields to it, and the local copy is synced
+  after an edit so the pre-echo window and a pending re-register carry the new
+  text too.
+- **The clicker's modals close on Escape.** The Keepsakes Gallery, the Tag
+  Browser and the Picture Cache are hand-rolled shells with no key handler, so
+  they could only be left with the mouse — a trap. One shared
+  `useEscapeClose` hook now covers all three.
+- **A closed stdout/stderr pipe no longer kills the app.** `console.log` into
+  a closed pipe raises EPIPE as an async `'error'` EVENT on the stream, so the
+  try/catch around the sidecar's logging could never catch it — the main
+  process died with "uncaught: Error: EPIPE: broken pipe, write". The guard
+  now lives on the stream itself (`electron/stdio-guard.cjs`).
+- **The idle clock stops re-rendering the app every second.** `tick()` wrote
+  `lastSeenAt` into the zustand store on each 1 s beat, re-rendering the whole
+  idle UI for a field NOBODY reads (only `save()` serializes it, and it already
+  stamps it). A tick with no cap to expire now returns without touching the
+  store, so an idle app does no render work at all (`store.test.ts` pins both
+  halves: zero writes when nothing expired, exactly one when a cap does).
+- **The app stops burning CPU while you are NOT using it.** Measured on a
+  3-hour session: renderer ~495 s CPU, main ~433 s, GPU process 878 MB RAM,
+  and 70 pictures decoded to 309 megapixels (~1.2 GB of bitmaps). Four causes,
+  four fixes:
+  - the **watch theater stayed mounted (CSS-hidden) on every screen**, so a
+    room's 250 ms sync tick and its stream `<video>` ran on the Feed, the
+    Clicker and the Vault. It is now mounted only while the Watch tab is
+    open — the room lives in the store, so leaving the tab is not leaving the
+    room, and returning re-syncs to the live frame;
+  - **grids autoplayed videos**: a tag-browser tile played its clip and every
+    timeline video started decoding on its own. A tile now shows its poster
+    and plays only under the pointer; a timeline video shows its first frame
+    until the player presses play (the clip the player explicitly opens still
+    plays by itself);
+  - **every countdown owned a private 1 s timer**. `useNow` is now ONE shared
+    clock for the whole app: it starts with the first subscriber, stops with
+    the last, and is paused while the window is hidden;
+  - **a hidden/minimized window kept compositing**. Chromium's background
+    throttling is now enabled exactly while the window is hidden/minimized
+    (and switched off, with an explicit repaint, before it can be seen again)
+    — the global default stays as it was, because a permanently throttled
+    window used to come back with a stale frame.
+- **Thumbnails instead of full-size pictures — on every dense grid.** The
+  grids mounted every tile at full resolution — the 309-megapixel spike above.
+  Two halves, one ladder:
+  - **`gmcache://` media** (the clicker's encrypted disk cache) is served as a
+    ≤360px copy by the MAIN process on demand (`gmcache://thumb/<key>`,
+    generated with Electron's built-in `nativeImage`, kept in a bounded RAM
+    LRU). The encrypted originals stay the only durable copy.
+  - **`blob:` / `vault://` / loopback-http media** (keepsakes, signed object
+    fetches, gallery tiles) has no server-side resizer, so the RENDERER
+    generates the small copy once (`utils/mediaThumb.ts`: one decode, resize on
+    the longest edge, a bounded 48-entry LRU of small blobs, revoke-on-evict,
+    in-flight dedupe and a 60 s failure TTL). A tile whose thumbnail is still
+    being made paints NOTHING rather than decoding the full-size original and
+    swapping a frame later; a thumbnail that FAILS drops to the full original
+    (a broken thumbnail is not a broken picture). Remote `http(s)` sources are
+    deliberately NOT thumbnailed — that would download the bytes twice — they
+    become `gmcache://` once cached and take the native path. A runtime with no
+    `createImageBitmap` (a test/embedded environment) skips the gate entirely
+    and renders immediately. The grids ask for the small copy — feed tiles,
+    profile posts and cards, DM attachments, market tiles, search results and
+    the match cards — and the viewer/opened post/single foe still get the real
+    picture. The cache viewer also mounts a bounded window (60 tiles + "Show
+    more") instead of the whole cache at once.
+- **ONE roster owns "who is online".** Four discovery stacks found peers — the
+  node roster, the swarm `PRESENCE` frame, the `PROFILE` frame and the tracker
+  mesh — and each kept its own bookkeeping, so a peer was described differently
+  depending on who found it, and the tracker-mesh path had no way in at all (the
+  only roster writer was a closure trapped inside the WebSocket effect). They
+  now write through one store (`utils/peerRoster.ts`): one map, one merge rule
+  ("an empty field never erases; a real field always wins"), one change event.
+  The store owns the node-roster merge (and reports who just came online), the
+  24h ghost sweep, the persistence (online peers first, so a late joiner is not
+  pushed out) and the hydration (a peer we already know is never overwritten, so
+  a world switch cannot replace a live peer with its stale copy). The duplicate
+  peer comparator is gone — the shared one is a strict superset.
+- **The torrent-style mesh actually connects, and its peers are VISIBLE.** The
+  tracker path (rotating infohash → public tracker → WebRTC → signed HELLO →
+  PEX) was broken in three places and looked alive the whole time, because it
+  carried bytes over a DataChannel nobody could see in the roster:
+  1. **the offer id never matched** — the wire carries it as 20 binary
+     characters while the mesh keyed its pending offers by the 40-char hex id,
+     so the tracker's answer named an offer the mesh did not know and the
+     connection was silently never made;
+  2. **the wire was not the reference protocol** — the tracker runs the
+     reference `bittorrent-tracker` protocol, and our announce deviated from it
+     in four ways that all fail silently (the tracker simply never answers):
+     the SDP travels as an OBJECT (`{type,sdp}`), never base64 and never a JSON
+     string; an inbound offer/answer arrives SINGULAR (`offer` / `answer`),
+     never as an array; an answer MUST carry `to_peer_id` (the server parser
+     throws without it and drops the message, so the peer that offered never
+     hears back); and the tracker peer id must be stable for the session — a
+     fresh id per announce made the tracker see a new peer every time, so the
+     answer to our own offer could not be routed back to us. The answer rides
+     its own announce and goes back through the socket that delivered the
+     offer. (The tracker ignores the `numwant` we send: it derives the peer
+     count from the number of offers we publish — publishing an offer is what
+     gets us peers.)
+  3. **a verified peer had no way into the roster** — the signed HELLO proved
+     the peer's key, and the peer was still invisible. The mesh now reports the
+     peer and the roster admits it, with the same trust as a peer the node
+     listed. A peer with no proven key is not shown.
+- **No Cloudflare dependency is left.** The blind rendezvous that gmatch 2.1 put
+  on Cloudflare Pages — a KV-backed mailbox + directory in `site/functions/` —
+  is deleted, and the page is static again (CDN-cached, zero cost at any
+  population). What that changes:
+  - **`central.url` has no default.** It used to point at that origin. The node
+    you are connected to IS the directory and the sealed-mail relay; a shared
+    hub is opt-in (`gmatch.central.url` / `VITE_CENTRAL_URL`) and points at a
+    node you run.
+  - **A stored `*.gmatch.pages.dev` pointer is DROPPED, never dialed**
+    (`isRetiredRendezvous` in `utils/central.ts`), stored or from the env.
+  - **`isKnownSiteCourier` is gone.** It claimed a courier that no longer exists
+    and short-circuited the mail-mode probe for that host. `MailClient` opens
+    one watch socket per mailbox base and falls back to polling a box only after
+    a socket dies **twice without ever opening** — a proxy that drops the
+    upgrade, not a node that went away. `deploy-pages.mjs` ships no function, no
+    `wrangler.toml` and no KV binding, and refuses to run if `site/functions/`
+    comes back.
+  - **The updater asks the GitHub Release, and its digest parses.** GitHub
+    serves `"digest":"sha256:<hex>"` (COLON) and the parser only accepted
+    `sha256-<hex>` (DASH), so every real asset hash read as `null` and every
+    update was refused as unverified — it could never have installed anything.
+    Both forms are accepted now.
+  - **The site manifest is honest again.** `release.json` described a build that
+    was never published (different hash AND size from the GitHub asset), so a
+    download verification would fail. The manifest and the page's hash blocks
+    were regenerated from the published bytes, and `site/check.mjs` passes.
+- **No more `<button>` inside a `<button>`.** The clicker's owned-tag pill
+  wrapped its delete control in the tag button, and the Store's market tile
+  wrapped the seller's profile link in the view-card button. Both are invalid
+  HTML, so React logged a hydration error on boot — which the E2E network
+  guard correctly treated as a failure. Both now use real SIBLING buttons
+  (`ShopPanel.tsx`, `StoreTab.tsx`), pinned by tests that assert
+  `button button` finds nothing and by the live-clicker E2E assertion.
+  The guard also stopped counting a DOWN third-party WebSocket (a public
+  WebRTC tracker) as an app failure, which is the same rule it already applied
+  to down booru mirrors and P2P peers; the node's own `/api/...` socket still
+  surfaces.
+
+## Unreleased — gmatch 2.0: no hosted service; the own node is the world
+
+- **Nothing hosted is contacted.** The client defaults to `central = none`
+  (`apps/desktop/src/utils/central.ts`): the node you are connected to is the
+  directory, the sealed-mail relay and the swarm rendezvous. A shared hub is
+  opt-in (`gmatch.central.url` / `VITE_CENTRAL_URL`) and points at a node you
+  run. A pointer to the retired `*.gmatch.pages.dev` rendezvous is dropped
+  instead of dialed, so an old install cannot keep talking to a service that no
+  longer exists.
+- **The hosted courier is gone.** The Cloudflare Pages function and its D1
+  (`Mail` + `ServerDirectory` rows) were removed; the D1 was emptied and then
+  deleted. `gmatch.pages.dev` is a static release page again: no function, no
+  database, no mailbox, no listing. `/api/*` on that origin returns the page,
+  never courier JSON.
+- **All local data was wiped.** Local node DB + blob store, the Electron
+  `userData` tree, browser storage, the e2e scratch directory and the scratch
+  identity were cleared. The app now starts from an empty world — which is the
+  honest starting point for a system with no hosted data node.
+- **The legal corpus says what is true.** Terms, privacy, community, abuse,
+  records and the E2E disclaimer now name the node you run (or the node you
+  joined) as the controller, instead of an official hosted courier. Version
+  `2026-11-07.1`; every account re-accepts once.
+- **The site stops claiming a directory.** `site/index.html` and the legal
+  pages describe the gmatch 2.0 topology: a download page that stores nothing,
+  and a client that talks to its own node.
+
 ## 1.6.7 - local media is found again; missing media stops spinning
 
 - **The vault answers by object id, not just by the old URL.** The media vault

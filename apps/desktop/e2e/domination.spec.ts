@@ -162,13 +162,33 @@ test('a consented domination effect is delivered to the target', async ({ page, 
     // keys, so consent correctly selects the free sealed-mesh path. Hide only
     // the sender's roster keys after target selection to exercise the paid
     // server route; the victim remains online and still receives the effect.
+    //
+    // The mesh's `peerAddressable` reads the courier TOFU store
+    // (`orbit_mail_peerkeys_v1`), not `orbit_users`, so both must be cleared:
+    // clearing only the roster left the paid path at the mercy of whether the
+    // directory had already taught the sender the victim's keys.
     await page.evaluate((id: string) => {
       const raw = localStorage.getItem('orbit_users')
-      if (!raw) return
-      const users = JSON.parse(raw) as Array<Record<string, unknown>>
-      localStorage.setItem('orbit_users', JSON.stringify(users.map((u) =>
-        u.id === id ? { ...u, public_key: '', encryption_pub_key: '' } : u,
-      )))
+      if (raw) {
+        const users = JSON.parse(raw) as Array<Record<string, unknown>>
+        localStorage.setItem('orbit_users', JSON.stringify(users.map((u) =>
+          u.id === id ? { ...u, public_key: '', encryption_pub_key: '' } : u,
+        )))
+      }
+      // The courier TOFU store is scoped per identity
+      // (`orbit_mail_peerkeys_v1:<orbitId[0..16]>`), so walk every scoped key
+      // instead of guessing which one this sender wrote.
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const key = localStorage.key(i)
+        if (!key || !key.startsWith('orbit_mail_peerkeys_v1')) continue
+        const keysRaw = localStorage.getItem(key)
+        if (!keysRaw) continue
+        const keys = JSON.parse(keysRaw) as Record<string, unknown>
+        if (id in keys) {
+          delete keys[id]
+          localStorage.setItem(key, JSON.stringify(keys))
+        }
+      }
     }, victim.id.orbitId)
     await dialog.getByRole('button', { name: 'Send', exact: true }).click()
 

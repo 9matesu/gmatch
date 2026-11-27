@@ -125,7 +125,6 @@ import { notifications, matchInvites } from './routes/notifications'
 import { posts } from './routes/posts'
 import { gossip } from './routes/gossip'
 import { moderation } from './routes/moderation'
-import { starterDeck } from './routes/starter-deck'
 import { economy } from './routes/economy'
 import { cards } from './routes/cards'
 import { decks } from './routes/decks'
@@ -157,8 +156,6 @@ app.route('/api/inbox', inbox)
 app.route('/api/users', users)
 app.route('/api/og', og)
 app.route('/api/admin', admin)
-app.route('/api/admin/settings/starter-cards', starterDeck)
-app.route('/api/starter-deck', starterDeck)
 app.route('/api/announcements', announcements)
 app.route('/api/signal', signal)
 app.route('/api/recommendations', recommendations)

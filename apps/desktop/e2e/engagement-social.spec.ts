@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { seedApp, firstRunOverlayKeys } from './helpers'
+import { seedApp, firstRunOverlayKeys, expectToast } from './helpers'
 import { generateIdentity } from '../src/identity.cjs'
 import { legalVersionKey } from '../src/legal/documents'
 
@@ -68,17 +68,19 @@ async function bootPeer(page: Page, name?: string) {
 /** The real composer flow (mirrors social.spec.ts, incl. the crop step). */
 async function publishPost(page: Page, caption: string): Promise<void> {
   await page.goto('/#/feed')
-  await page.getByRole('button', { name: 'Create Post', exact: true }).click()
-  const drop = page.getByText('Drag & drop photos or click to browse')
+  await page.getByRole('button', { name: 'Create a post', exact: true }).click()
+  // One media picker for every entry point: choose Upload, then drop.
+  await page.getByRole('button', { name: 'Upload', exact: true }).click()
+  const drop = page.getByText('Drop a file, click to browse, or paste from the clipboard')
   await expect(drop).toBeVisible({ timeout: 20_000 })
   const [chooser] = await Promise.all([page.waitForEvent('filechooser'), drop.click()])
   await chooser.setFiles({ name: 'e2e-post.png', mimeType: 'image/png', buffer: PNG_1x1 })
-  const apply = page.getByRole('button', { name: 'Apply', exact: true })
+  const apply = page.getByRole('button', { name: 'Use this media', exact: true })
   await expect(apply).toBeVisible({ timeout: 10_000 })
   await apply.click()
   await page.getByPlaceholder('Write a caption...').fill(caption)
   await page.getByRole('button', { name: 'Share', exact: true }).click()
-  await expect(page.getByText('Post shared.')).toBeVisible({ timeout: 20_000 })
+  await expectToast(page, 'Post shared.')
   await page.waitForTimeout(3500) // outlast the 3s orbitFetch GET cache
 }
 
@@ -106,7 +108,10 @@ async function postIdFor(page: Page, caption: string): Promise<string> {
 async function likePostFromPeer(peerPage: Page, postId: string) {
   await peerPage.goto(`/#/feed?post=${encodeURIComponent(postId)}`)
   const article = peerPage.locator(`[data-post-id="${postId}"]`)
-  await expect(article.getByPlaceholder('Add a comment...')).toBeVisible({ timeout: 30_000 })
+  // The card has no "Add a comment..." label any more: the comment icon in the
+  // action row opens the same thread. What this journey needs is the card being
+  // fully rendered (its action row present), so that is what it waits for.
+  await expect(article.getByRole('button', { name: 'Comment' })).toBeVisible({ timeout: 30_000 })
   const like = article.getByRole('button', { name: 'Like post' })
   await expect(like).toHaveAttribute('aria-pressed', 'false')
   await like.click()

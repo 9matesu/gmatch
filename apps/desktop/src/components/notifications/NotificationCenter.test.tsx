@@ -81,4 +81,47 @@ describe('NotificationCenter (header)', () => {
     fireEvent.click(screen.getByLabelText(/Notifications/));
     expect(screen.getByText('No notifications')).toBeInTheDocument();
   });
+
+  it('renders a peer-lane row (a report) and opens its target, marking it read', () => {
+    // The regression this pins: a peer report was counted by the badge but never
+    // rendered (it lived only in the merged `items`, not in a list the panel
+    // draws), so the badge could never clear.
+    const peerItem: AppNotification = {
+      key: 'local:peer-op-1',
+      id: 'op-1',
+      source: 'local',
+      type: 'report',
+      title: 'Kenny reported your post',
+      body: 'not ok',
+      createdAt: new Date().toISOString(),
+      read: false,
+      target: { postId: 'post-9' },
+      marks: [],
+    };
+    const props = renderCenter({ peerItems: [peerItem], unreadCount: 1 });
+    fireEvent.click(screen.getByLabelText(/Notifications/));
+    expect(screen.getByText('From your peers')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Kenny reported your post'));
+    expect(props.onMarkLocalRead).toHaveBeenCalledWith(['local:peer-op-1']);
+    expect(props.onOpenTarget).toHaveBeenCalledWith({ postId: 'post-9' });
+  });
+
+  it('does not claim "No notifications" when only a peer row exists', () => {
+    const peerItem: AppNotification = {
+      key: 'local:peer-op-2',
+      id: 'op-2',
+      source: 'local',
+      type: 'report',
+      title: 'Bob reported your comment',
+      body: null,
+      createdAt: new Date().toISOString(),
+      read: false,
+      target: { commentId: 'c-1' },
+      marks: [],
+    };
+    renderCenter({ peerItems: [peerItem] });
+    fireEvent.click(screen.getByLabelText(/Notifications/));
+    expect(screen.queryByText('No notifications')).toBeNull();
+    expect(screen.getByText('Bob reported your comment')).toBeInTheDocument();
+  });
 });

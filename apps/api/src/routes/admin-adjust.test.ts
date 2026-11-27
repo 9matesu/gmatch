@@ -58,6 +58,28 @@ describe('admin user adjustment (metric-specific)', () => {
     expect(res.status).toBe(409)
   })
 
+  it('a refused wallet debit leaves NO half-applied adjustment behind', async () => {
+    // The Users row used to be updated BEFORE the wallet debit, so a 409
+    // "Insufficient wallet funds" was a lie: the score and the admin flag had
+    // already been committed. The wallet is the fallible half and runs first.
+    const before = await env.DB.prepare('SELECT score, score_total, is_moderator FROM Users WHERE id = ?')
+      .bind(target.orbitId).first<{ score: number; score_total: number; is_moderator: number }>()
+
+    const body = JSON.stringify({ add_score: 25, add_reputation: 25, is_moderator: true, add_gcoins: -1000 })
+    const res = await app.request(`/api/admin/users/${target.orbitId}/adjust`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders(admin, 'POST', `/api/admin/users/${target.orbitId}/adjust`, body) },
+      body,
+    }, env)
+    expect(res.status).toBe(409)
+
+    const after = await env.DB.prepare('SELECT score, score_total, is_moderator FROM Users WHERE id = ?')
+      .bind(target.orbitId).first<{ score: number; score_total: number; is_moderator: number }>()
+    expect(Number(after?.score || 0)).toBe(Number(before?.score || 0))
+    expect(Number(after?.score_total || 0)).toBe(Number(before?.score_total || 0))
+    expect(Number(after?.is_moderator || 0)).toBe(Number(before?.is_moderator || 0))
+  })
+
   it('exposes wallet balance and score in the admin users list', async () => {
     const res = await app.request('/api/admin/users', { headers: authHeaders(admin, 'GET', '/api/admin/users') }, env)
     expect(res.status).toBe(200)
@@ -67,5 +89,30 @@ describe('admin user adjustment (metric-specific)', () => {
     expect(row.balance).toBe(100)
     expect(typeof row.score).toBe('number')
     expect(row.followers_count).toBe(0)
+  })
+
+  it('cannot fabricate a follower count — the number is a COUNT(*) over Followers', async () => {
+    // The admin panel used to EDIT Users.followers_count, a column no public
+    // read path used. A typed-in number could never be true, so the field is
+    // gone and the list derives the count from the Followers table.
+    await env.DB.prepare('INSERT INTO Followers (follower_id, followee_id, accepted) VALUES (?, ?, 1)')
+      .bind('someone-else', target.orbitId).run()
+
+    const listRes = await app.request('/api/admin/users', { headers: authHeaders(admin, 'GET', '/api/admin/users') }, env)
+    const list: any = await listRes.json()
+    const row = list.find((u: any) => u.id === target.orbitId)
+    expect(row.followers_count).toBe(1)
+
+    const body = JSON.stringify({ followers_count: 999, add_followers: 500 })
+    const res = await app.request(`/api/admin/users/${target.orbitId}/adjust`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders(admin, 'POST', `/api/admin/users/${target.orbitId}/adjust`, body) },
+      body,
+    }, env)
+    expect(res.status).toBe(200)
+
+    const afterRes = await app.request('/api/admin/users', { headers: authHeaders(admin, 'GET', '/api/admin/users') }, env)
+    const after: any = await afterRes.json()
+    expect(after.find((u: any) => u.id === target.orbitId).followers_count).toBe(1)
   })
 })

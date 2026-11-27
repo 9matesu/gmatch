@@ -27,7 +27,7 @@ const mockedMulti = vi.mocked(fetchPostsMulti)
 const offline: BooruResponse = { posts: [], source: null, ok: false, offline: true }
 const foe = (id: string): BooruPost => ({ id, url: `https://x/${id}.jpg`, tags: ['gangbang'] })
 const post = (id: string) => ({ id, url: `https://x/${id}.jpg`, tags: ['gangbang'] })
-const dozen = () => Array.from({ length: 12 }, (_, i) => post(`pts{i}`))
+const dozen = () => Array.from({ length: 12 }, (_, i) => post(`pts${i}`))
 const settle = async (): Promise<void> => {
   for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r, 0))
 }
@@ -409,39 +409,25 @@ describe('clickCell / dropCell edges', () => {
 describe('tick auto-battle paths', () => {
   const filterCap = [{ capId: 'filter' as const, expiresAt: Number.POSITIVE_INFINITY }]
 
-  it('grid mode: tick banks points without auto-attacking foes (only manual clicks attack)', () => {
+  it('grid mode: the tick touches no foe and pays nothing (only clicks attack)', () => {
     useGame.setState({ queue: dozen(), grid: [] })
     useGame.getState().setViewMode('grid')
     useGame.setState({
       caps: filterCap,
+      points: 7,
       grid: useGame.getState().grid.map((c, i) => (i === 0 ? { ...c, hp: 1 } : c)),
     })
-    const points = useGame.getState().points
     useGame.getState().tick(1000)
     const s = useGame.getState()
     expect(s.defeated).toBe(0)
     expect(s.gallery).toHaveLength(0)
-    expect(s.points).toBeGreaterThan(points)
+    expect(s.points).toBe(7)
     expect(s.grid).toHaveLength(GRID_SIZE)
     expect(s.grid[0].hp).toBe(1)
   })
 
-  it('grid mode without auto-clicks just banks passive income', () => {
-    useGame.setState({
-      viewMode: 'grid',
-      grid: [{ post: foe('g'), hp: 5, maxHp: 8, clicks: 0 }],
-      queue: [],
-      tags: [{ name: 'wet', level: 2, base: 10, income: 5, weight: 2 }],
-      caps: [],
-    })
-    const before = useGame.getState().points
-    useGame.getState().tick(1000)
-    const s = useGame.getState()
-    expect(s.points).toBeGreaterThan(before)
-    expect(s.grid[0].hp).toBe(5) // untouched
-  })
 
-  it('single mode: tick banks points without chipping foe or KOing (only clicks attack)', () => {
+  it('single mode: the tick leaves the foe and the purse alone (only clicks attack)', () => {
     mocked.mockClear()
     useGame.setState({
       tags: [setupTag('aaa')],
@@ -452,31 +438,16 @@ describe('tick auto-battle paths', () => {
       foeHp: 1,
       foeMaxHp: 8,
       defeated: 0,
-      points: 0,
+      points: 5,
     })
     useGame.getState().tick(1000)
     const s = useGame.getState()
     expect(s.defeated).toBe(0)
     expect(s.gallery).toHaveLength(0)
     expect(s.foeHp).toBe(1)
-    expect(s.points).toBeGreaterThan(0)
+    expect(s.points).toBe(5)
   })
 
-  it('single mode: auto-clicks generate passive points while preserving foe HP', () => {
-    useGame.setState({
-      caps: filterCap,
-      current: foe('t2'),
-      foeHp: 100,
-      foeMaxHp: 100,
-      defeated: 0,
-      points: 0,
-    })
-    useGame.getState().tick(1000)
-    const s = useGame.getState()
-    expect(s.foeHp).toBe(100)
-    expect(s.defeated).toBe(0)
-    expect(s.points).toBeGreaterThan(0)
-  })
 })
 
 describe('load edges', () => {
@@ -506,15 +477,8 @@ describe('load edges', () => {
       }),
     )
     useGame.getState().load()
-    expect(useGame.getState().offlineGain).toBe(0)
   })
 
-  it('collectOffline is a no-op without a pending gain', () => {
-    useGame.setState({ offlineGain: 0, points: 7 })
-    useGame.getState().collectOffline()
-    expect(useGame.getState().points).toBe(7)
-    expect(useGame.getState().collectedOfflineEarnings).toBe(false)
-  })
 })
 
 describe('setup / excludes edges', () => {
@@ -524,13 +488,6 @@ describe('setup / excludes edges', () => {
     expect(mem.has(SAVE_KEY)).toBe(true)
   })
 
-  it('completeSetup refuses a second time', () => {
-    expect(
-      useGame.getState().completeSetup(['bimbo', 'creampie', 'ahegao', 'doggystyle'], []).ok,
-    ).toBe(true)
-    const again = useGame.getState().completeSetup(['a', 'b', 'c', 'd'], [])
-    expect(again).toEqual({ ok: false, message: 'Setup already done.' })
-  })
 
   it('addUserExclude rejects blanks and over-long terms', () => {
     expect(useGame.getState().addUserExclude('   ')).toBe(false)

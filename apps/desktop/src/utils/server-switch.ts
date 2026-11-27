@@ -52,7 +52,7 @@ export async function switchClientWorld(
   const raw = (target.endpointHint || '').trim()
   if (!raw) { toast('This world has no address to join (owner is offline?)', 'warning'); return 'failed' }
   const url = normalizeServerUrl(raw) || normalizeServerUrl('http://' + raw) || raw
-  if (isCourierApiUrl(url)) { toast('The courier is a directory, not a world — pick a server.', 'warning'); return 'failed' }
+  if (isCourierApiUrl(url)) { toast('That is a static release page, not a server — pick a node.', 'warning'); return 'failed' }
 
   // 1. Liveness: the node answers health within budget.
   try {

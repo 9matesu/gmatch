@@ -112,7 +112,7 @@ describe('GMatchDMs composer paste', () => {
     pasteInto(composer, { text: 'https://cdn.example/a.jpg' })
 
     await waitFor(() => expect(onOpenAttachment).toHaveBeenCalledTimes(1))
-    const [target, peerId, groupId, replyToId, files, url] = onOpenAttachment.mock.calls[0]
+    const [target, peerId, , , files, url] = onOpenAttachment.mock.calls[0]
     expect(target).toBe('pm')
     expect(peerId).toBe(PEER.orbitId)
     expect(files).toBeUndefined()
@@ -153,7 +153,7 @@ describe('GMatchDMs composer paste', () => {
     await waitFor(() => expect(document.querySelector('[role="status"]')?.textContent).toMatch(/text only/i))
   })
 
-  it('refuses attachments in the public lobby and says so', async () => {
+  it('routes a pasted image into the public lobby (photos are supported there)', async () => {
     const onOpenAttachment = vi.fn()
     render(
       <GMatchDMs
@@ -166,10 +166,9 @@ describe('GMatchDMs composer paste', () => {
     const composer = document.querySelector('textarea') as HTMLTextAreaElement
     pasteInto(composer, { files: [png()] })
 
-    expect(onOpenAttachment).not.toHaveBeenCalled()
-    await waitFor(() =>
-      expect(document.querySelector('[role="status"]')?.textContent).toMatch(/direct message or a group/i),
-    )
+    await waitFor(() => expect(onOpenAttachment).toHaveBeenCalledTimes(1))
+    expect(onOpenAttachment.mock.calls[0][0]).toBe('lobby')
+    expect(document.querySelector('[role="status"]')).toBeNull()
   })
 
   it('Enter sends, Shift+Enter inserts a newline', () => {

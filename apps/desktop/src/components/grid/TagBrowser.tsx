@@ -5,12 +5,26 @@ import type { BooruPost } from '../../game/types'
 import { browseQuery, dedupePosts, provenanceLabel } from '../../game/tagBrowse'
 import { fetchPosts } from '../../services/booru'
 import { offlineSvg } from '../../services/offlineSvg'
+import { redgifsPlayable } from '../../services/redgifs'
 import CachedImg from '../../ui/CachedImg'
 import MediaViewerModal from '../../ui/MediaViewerModal'
 import { EmptyState } from '../EmptyState'
 import { MUTED } from '../../ui/styles'
 
 const PAGE_LIMIT = 30
+
+/** Providers the browser can pin to (the main process owns the real list). */
+const SOURCE_OPTIONS: { id: string; label: string }[] = [
+  { id: '', label: 'All sources' },
+  { id: 'imhentai', label: 'imhentai' },
+  { id: 'tbib', label: 'tbib' },
+  { id: 'xbooru', label: 'xbooru' },
+  { id: 'realbooru', label: 'realbooru' },
+  { id: 'paheal', label: 'paheal' },
+  { id: 'redgifs', label: 'redgifs' },
+  { id: 'babesource', label: 'babesource' },
+  { id: 'mediaq', label: 'mediaq' },
+]
 
 /**
  * Tag-picker gallery browser.
@@ -34,6 +48,7 @@ export default function TagBrowser({ onClose }: { onClose?: () => void }) {
   const [loading, setLoading] = useState(false)
   const [viewerId, setViewerId] = useState<string | null>(null)
   const [retry, setRetry] = useState(0)
+  const [source, setSource] = useState('')
 
   // Discards stale responses: a slow round must not overwrite a newer one.
   const requestRef = useRef(0)
@@ -59,7 +74,7 @@ export default function TagBrowser({ onClose }: { onClose?: () => void }) {
     }
     const reqId = ++requestRef.current
     setLoading(true)
-    void fetchPosts({ tags: query, limit: PAGE_LIMIT, silent: true })
+    void fetchPosts({ tags: query, limit: PAGE_LIMIT, silent: true, source: source || undefined })
       .then((res) => {
         if (reqId !== requestRef.current) return // a newer query won
         const clean = dedupePosts(res.posts || [])
@@ -72,14 +87,14 @@ export default function TagBrowser({ onClose }: { onClose?: () => void }) {
       .finally(() => {
         if (reqId === requestRef.current) setLoading(false)
       })
-  }, [query, retry])
+  }, [query, retry, source])
 
   const viewer = viewerId ? posts.find((p) => p.id === viewerId) || null : null
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Tag picker */}
-      <div className="shrink-0 border-b border-border-glass p-3">
+      <div className="shrink-0 border-b border-edge p-3">
         <div className="flex items-center gap-2 pb-2 text-xs text-retro-muted">
           <Tag className="h-3.5 w-3.5" />
           <span className="font-semibold uppercase tracking-wider">Browse by tag</span>
@@ -94,6 +109,16 @@ export default function TagBrowser({ onClose }: { onClose?: () => void }) {
             </button>
           )}
         </div>
+        <select
+          value={source}
+          onChange={(e) => setSource(e.target.value)}
+          aria-label="Search source"
+          className="mb-2 w-full cursor-pointer rounded-md border border-edge bg-retro-bg px-2 py-1 text-xs text-retro-fg focus:outline-none focus:border-retro-accent"
+        >
+          {SOURCE_OPTIONS.map((s) => (
+            <option key={s.id} value={s.id}>{s.label}</option>
+          ))}
+        </select>
         {owned.length === 0 ? (
           <p className={`${MUTED} text-xs`}>Own tags in the Tag Market first; they seed the picker.</p>
         ) : (
@@ -109,7 +134,7 @@ export default function TagBrowser({ onClose }: { onClose?: () => void }) {
                   className={`cursor-pointer rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors ${
                     on
                       ? 'border-retro-accent/70 bg-retro-accent/20 text-retro-fg'
-                      : 'border-border-glass text-retro-muted hover:text-retro-body'
+                      : 'border-edge text-retro-muted hover:text-retro-body'
                   }`}
                 >
                   {t.name} <span className="opacity-50">L{t.level}</span>
@@ -152,16 +177,22 @@ export default function TagBrowser({ onClose }: { onClose?: () => void }) {
                 onClick={() => setViewerId(p.id)}
                 title={p.tags.slice(0, 6).join(' ')}
                 aria-label={`View image tagged ${p.tags.slice(0, 3).join(' ') || 'booru post'}`}
-                className="group relative aspect-square cursor-pointer overflow-hidden rounded-[10px] border border-border-glass bg-black"
+                className="group relative aspect-square cursor-pointer overflow-hidden rounded-lg border border-edge bg-retro-bg"
               >
                 {p.kind === 'video' ? (
+                  // No autoplay: a gallery of decoders is the single largest
+                  // GPU/energy cost in the app. The tile shows its POSTER and
+                  // only decodes while the pointer is over it.
                   <video
                     className="block h-full w-full object-cover"
-                    src={p.url}
-                    poster={p.preview || undefined}
+                    src={redgifsPlayable(p.url)}
+                    poster={p.preview ? redgifsPlayable(p.preview) : undefined}
+                    loop
                     muted
-                    preload="metadata"
                     playsInline
+                    preload="none"
+                    onMouseEnter={(e) => { void e.currentTarget.play().catch(() => {}) }}
+                    onMouseLeave={(e) => { e.currentTarget.pause() }}
                   />
                 ) : (
                   <CachedImg
@@ -171,6 +202,7 @@ export default function TagBrowser({ onClose }: { onClose?: () => void }) {
                     alt={p.tags.slice(0, 3).join(' ') || 'booru post'}
                     referrerPolicy="no-referrer"
                     loading="lazy"
+                    thumb
                   />
                 )}
               </button>
@@ -181,23 +213,29 @@ export default function TagBrowser({ onClose }: { onClose?: () => void }) {
 
       {viewer && (
         <MediaViewerModal onClose={() => setViewerId(null)} label="Tag browser viewer">
-          <figure className="relative flex max-h-[80vh] min-h-0 w-auto max-w-full flex-col items-center">
+          <figure className="relative flex max-h-(--max-h-panel) min-h-0 w-auto max-w-full flex-col items-center">
             {viewer.kind === 'video' ? (
               <video
-                src={viewer.url}
-                poster={viewer.preview || undefined}
-                className="max-h-[70vh] w-auto max-w-full rounded-lg object-contain"
+                src={redgifsPlayable(viewer.url)}
+                poster={viewer.preview ? redgifsPlayable(viewer.preview) : undefined}
+                className="max-h-(--max-h-sheet) w-auto max-w-full rounded-lg object-contain"
                 controls
                 autoPlay
-                muted={false}
+                // Chromium refuses to autoplay an UNMUTED video without a user
+                // gesture, so the viewer sat on a black, paused first frame —
+                // the clicker's video was already muted and did play. The
+                // viewer now matches it exactly; `controls` lets the player
+                // turn the sound on by hand.
+                muted
                 loop
                 playsInline
+                preload="auto"
               />
             ) : (
               <img
                 src={viewer.url || offlineSvg(viewer.tags)}
                 alt={viewer.tags.slice(0, 3).join(' ') || 'booru post'}
-                className="max-h-[70vh] w-auto max-w-full rounded-lg object-contain"
+                className="max-h-(--max-h-sheet) w-auto max-w-full rounded-lg object-contain"
                 referrerPolicy="no-referrer"
               />
             )}
@@ -209,7 +247,7 @@ export default function TagBrowser({ onClose }: { onClose?: () => void }) {
       )}
 
       {onClose && (
-        <div className="shrink-0 border-t border-border-glass p-2 text-center">
+        <div className="shrink-0 border-t border-edge p-2 text-center">
           <button
             type="button"
             onClick={onClose}

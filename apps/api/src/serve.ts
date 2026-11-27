@@ -47,6 +47,10 @@ const dbReadyPromise = (async () => {
     // pre-existing DB file auto_vacuum only takes effect after one VACUUM —
     // the guard makes that happen exactly once per DB lifetime.
     await client.execute('PRAGMA journal_mode = WAL')
+    // A busy/locked DB (a concurrent writer, a WAL checkpoint) must WAIT, not
+    // fail: SQLITE_BUSY surfaced as a 503 made a DELETE that actually applied
+    // read as "could not delete" (the row vanished on the next refresh).
+    await client.execute('PRAGMA busy_timeout = 5000')
     const av = await client.execute('PRAGMA auto_vacuum')
     const avValue = Number(Object.values((av.rows[0] ?? {}) as Record<string, unknown>)[0] ?? 0)
     if (!avValue) {
@@ -267,6 +271,12 @@ Bun.serve({
     ) {
       if (url.pathname === '/api/health') {
         const status = dbReady ? 200 : dbInitError ? 500 : 503
+        // CORS on the fast path: the browser (browser dev / a web-page peer
+        // pointing at a remote node) runs the useP2P health probe from
+        // ANOTHER origin, and without these headers the response is
+        // undecipherable — a cross-origin client then never learns the node
+        // is a courier, skips the beacon lane and shows no presence.
+        const origin = req.headers.get('Origin') || '*'
         return Response.json({
           status: dbReady ? 'ok' : dbInitError ? 'error' : 'starting',
           db_ready: dbReady,
@@ -274,7 +284,7 @@ Bun.serve({
           timestamp: new Date().toISOString(),
           mode: siteServices ? 'courier' : 'legacy',
           services: siteServices ? Array.from(siteServices) : ['all'],
-        }, { status })
+        }, { status, headers: { 'Access-Control-Allow-Origin': origin, Vary: 'Origin' } })
       }
       if (!dbReady) {
         return Response.json({ error: 'API is starting. Try again shortly.' }, { status: 503 })

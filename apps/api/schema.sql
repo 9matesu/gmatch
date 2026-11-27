@@ -33,7 +33,6 @@ CREATE TABLE IF NOT EXISTS Users (
   objects_sent_count INTEGER DEFAULT 0,
   gacha_downloads_received INTEGER DEFAULT 0,
   gacha_items_collected INTEGER DEFAULT 0,
-  maximum_gooner INTEGER DEFAULT 0,
   pc_domination_enabled INTEGER DEFAULT 0,
   pc_domination_settings TEXT DEFAULT '{}',
   is_admin INTEGER DEFAULT 0,
@@ -50,8 +49,6 @@ CREATE TABLE IF NOT EXISTS Users (
   is_private INTEGER NOT NULL DEFAULT 0,
   bio TEXT,
   website TEXT,
-  followers_count INTEGER NOT NULL DEFAULT 0,
-  following_count INTEGER NOT NULL DEFAULT 0,
   posts_count INTEGER NOT NULL DEFAULT 0,
   is_moderator INTEGER NOT NULL DEFAULT 0,
   hidden_at DATETIME
@@ -457,7 +454,8 @@ CREATE TABLE IF NOT EXISTS LobbyChat (
   body TEXT NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   channel TEXT NOT NULL DEFAULT 'global_lobby',
-  hidden_at DATETIME
+  hidden_at DATETIME,
+  attachment_id TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_lobbychat_created ON LobbyChat(created_at);
 CREATE INDEX IF NOT EXISTS idx_lobbychat_channel ON LobbyChat(channel, created_at);
@@ -761,7 +759,6 @@ CREATE INDEX IF NOT EXISTS idx_objects_public_feed ON Objects(is_public, created
 CREATE INDEX IF NOT EXISTS idx_objects_trending ON Objects(is_public, like_count, comment_count, created_at);
 CREATE INDEX IF NOT EXISTS idx_objects_shared_from ON Objects(shared_from);
 CREATE INDEX IF NOT EXISTS idx_users_is_private ON Users(is_private);
-CREATE INDEX IF NOT EXISTS idx_users_followers_count ON Users(followers_count);
 CREATE INDEX IF NOT EXISTS idx_users_is_moderator ON Users(is_moderator);
 CREATE INDEX IF NOT EXISTS idx_objects_is_sensitive ON Objects(is_sensitive);
 

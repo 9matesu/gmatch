@@ -72,7 +72,7 @@ describe('CentralAdminPanel', () => {
 
   it('allows unlocking central admin with PIN and renders dashboard upon verification', async () => {
     let unlocked = false
-    stubFetch(async (url, init) => {
+    stubFetch(async (url) => {
       if (url.includes('/api/admin/verify-pin')) {
         unlocked = true
         return json({ success: true })

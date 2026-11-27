@@ -30,7 +30,7 @@ Data: 2026-09-09 · Status: aceito · Plano: `.hermes/plans/2026-09-09_161233-po
 Sem mudanca de protocolo: e a mesma federacao, com uma superficie que diz a verdade.
 
 - **Uma lista, uma linha por servidor.** Um no que hospeda um mundo E um servidor, seja de quem for, incluindo o que roda **nesta maquina**. Ele aparece uma unica vez, na posicao normal da lista, chaveado pelo endereco (`serverKey` em `directoryMerge.ts`), de modo que o registro do diretorio e a linha sintetica colapsam num so item. Nunca se deduplica por nome de exibicao: dois servidores diferentes podem chamar-se igual.
-- **Courier nao e destino.** O diretorio do Cloudflare (`gmatch.pages.dev`) — e qualquer no que hospede so mail/diretorio — e infraestrutura: sai da lista, junto com o badge de transporte e a chamada de presenca. Nao ha mundo embutido: a lista mostra o no desta maquina (com probe proprio de saude) e os nos que o diretorio conhece; a linha do no local fica offline se o probe falhar.
+- **Courier nao e destino.** O diretorio — e qualquer no que hospede so mail/diretorio — e infraestrutura: sai da lista, junto com o badge de transporte e a chamada de presenca. Desde gmatch 2.0 nao existe mais um diretorio hospedado (`gmatch.pages.dev` virou pagina estatica): o padrao e o no desta maquina, e um hub compartilhado e opt-in. Nao ha mundo embutido: a lista mostra o no desta maquina (com probe proprio de saude) e os nos que o diretorio conhece; a linha do no local fica offline se o probe falhar.
 - **Um cabecalho, uma acao primaria.** `Servers` + `+ Add server` (o unico preenchido) + busca discreta + refresh discreto; a engrenagem de diretorio guarda o endereco central, o painel admin e o chaveamento de dev. Sumiram: o card do mundo atual, as secoes `Destinations`/`Hosted servers`, a secao permanente de grupos locais, o aviso de privacidade, o toolbar de ordenacao, o filtro de senha e os botoes de linha duplicados. O drill-in do hub entra pelo menu da propria linha (`Open dashboard`).
 - **A linha** (`WorldRow.tsx`): ponto de estado + nome + no maximo UMA etiqueta quieta (`P2P`, so para o no desta maquina) + `Current`/`Connecting`/`Unavailable`; segunda linha com `descricao · dominio · listed Nm ago`, sem IP cru, sem transporte, sem diagnostico. Clicar a linha entra/troca; a linha atual e inerte e nao reconecta. Um unico menu de tres pontos (`Open dashboard`, `Server settings`, privacidade, `Copy code`, `unregister`, `Delete / Forget`) — so as operacoes que a arquitetura atual sustenta.
 - **Estados honestos**: `Current` / `Connecting` / `Unavailable`. Um numero sem dado real por tras nao vira `— / —`; um fetch falho do diretorio mantem o que ja se conhece e mostra retry; uma linha `Unavailable` nao se oferece como pronta para conectar.
@@ -38,3 +38,21 @@ Sem mudanca de protocolo: e a mesma federacao, com uma superficie que diz a verd
 - **Grupos locais** (rotulo **so deste dispositivo**) sairam da lista: um rotulo nao e servidor nem destino. Ficam atras de um link discreto no rodape (`GroupsDialog.tsx`): listar, criar, `Forget`. `Local groups` nao cria rede alguma.
 - `create`/`join`/`switchTo`/`joinByCode`/`leave`/`switchClientWorld`/`shareServer`/`unregister` continuam intocados; o polling de 30s segue silencioso e o guard de conexao (`connectingId`) impede joins concorrentes.
 - Docs do que a tela promete: `docs/BROWSER-PERF.md` §10; contrato de comportamento em `ServersView.test.tsx` + `GroupsDialog.test.tsx` + `directoryMerge.test.ts` (identidade) e paridade de JSX em `ServersView.mask.test.ts` (sobre `ServersView.tsx` + `WorldRow.tsx`).
+
+## Mundos com identidade + transicao de entrada (revisao 1.6.8)
+
+Sem mudanca de protocolo; a lista continua sendo a mesma federacao.
+
+- **Identidade visual deterministica** (`worldIdentity.ts`): cada mundo ganha uma matiz estavel derivada da *chave canonica* (`serverKey`, nunca do nome) e um glifo com a primeira letra. E chrome, nao dado: nao afirma alcance, lotacao nem dono, e renomear nao repinta o mundo. O ponto de estado medido fica sobre o tile.
+- **O mundo conectado tem trilho de cor** (`WorldRow.tsx`): "onde eu estou" se le pela cor, sem depender de rotulo.
+- **Entrar num mundo pesa** (`ServersView.tsx`): enquanto `connectingId` estiver ativo, a lista escurece atras de um veu com o tile do mundo-alvo, o nome e a espera dita em texto (`Entering <world>…`). Nada e inventado — o veu existe somente durante a conexao real.
+- O teste de privacidade (`ServersView.mask.test.ts`) continua valendo: nem endereco nem `owner_name` chegam ao JSX.
+
+## Endereco do no + build de navegador (2026-11-07)
+
+- **O no sabe o proprio endereco.** Ele escuta em `0.0.0.0` e e dono da porta, entao `GET /api/servers/node` responde `lanUrls` (IPv4 nao-interno, sem link-local). O shell empacotado ja tinha a mesma lista pela ponte Electron (`server-mode.cjs#lanUrls`); um build de navegador nao tem ponte, entao usa a do no.
+- **Hint publicado = endereco discavel.** `pickShareableHint` (`src/utils/serverAddress.ts`) prefere a LAN de casa (10/8, 192.168/16), depois 172.16/12 (que costuma ser adaptador virtual), e nunca publica loopback nem link-local.
+- **Build de navegador REPETE, nao inventa.** O heartbeat (`useServerHeartbeat`) le modo e enderecos do no e so republica um registro que ja existe (`gmatch.server.register`). Publicar esta maquina no diretorio publico e ato explicito (Servers -> Add server -> Host a server): um build que se auto-declarasse colocaria toda maquina de dev online. Um browser apontado para o no de OUTRA maquina (cookie `gmatch_server_url` do proxy de dev) e cliente la — e nao publica o endereco daqui.
+- **A migracao de boot nao mata mais um listing vivo.** Um registro so se aposenta quando o endereco e um que ninguem mais consegue discar (loopback, courier). Antes, qualquer mencao a porta 8790 (a porta de todo no padrao) apagava o claim — e o listing morria no boot seguinte.
+- **Linha chamada "gmatch" com endereco real aparece.** O nome padrao do no escondia a propria maquina de todo mundo; so a linha legada, sem endereco proprio, continua fora da lista.
+

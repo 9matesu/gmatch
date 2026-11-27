@@ -26,11 +26,13 @@ function VaultUsage() {
   return <span className="text-xs text-retro-muted">{label}</span>;
 }
 import { useGame, MAX_USER_EXCLUDES } from '../../game/store';
-import { FeedTuneStep } from '../../firstRun/FeedTuneStep';
 import { DeleteAccountSection } from './DeleteAccountSection';
+import { PasskeyManager } from '../PasskeyManager';
 import { UpdateSection } from './UpdateSection';
 import { CommunitySection } from './CommunitySection';
+import { ImportPostsSection } from './ImportPostsSection';
 import { BlocklistSection } from './BlocklistSection';
+import { CacheViewer } from './CacheViewer';
 import {
   Settings,
   User,
@@ -84,13 +86,10 @@ function FeedSettingsTab({
   toast?: (msg: string, type?: string) => void
   onNavigateTab?: (tab: SettingsTabId) => void
 }) {
-  const tags = useGame((s) => s.tags);
   const userExcludes = useGame((s) => s.userExcludes);
   const addUserExclude = useGame((s) => s.addUserExclude);
   const removeUserExclude = useGame((s) => s.removeUserExclude);
   const [draft, setDraft] = useState('');
-  const [showPicksEditor, setShowPicksEditor] = useState(false);
-  const owned = tags.filter((t) => t.level === 0 && t.selected !== false);
 
   const add = () => {
     const parts = draft
@@ -113,42 +112,11 @@ function FeedSettingsTab({
 
   return (
     <div className="space-y-6 animate-orbit-fade-in">
-      <div className="p-4 bg-glass-w5 border border-border-glass rounded-lg space-y-3">
-        <h4 className="text-xs font-medium text-retro-fg">Starter picks</h4>
-        {owned.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5">
-            {owned.map((t) => (
-              <span
-                key={t.name}
-                className="inline-flex items-center rounded-full border border-border-glass bg-glass-w5 px-2.5 py-1 text-xs font-mono text-retro-fg"
-              >
-                {t.name}
-              </span>
-            ))}
-          </div>
-        ) : (
-          <p className="text-xs text-retro-muted">
-            No starter tags selected.
-          </p>
-        )}
+      <div className="p-4 bg-glass-w5 border border-edge rounded-lg space-y-3">
+        <h4 className="text-xs font-medium text-retro-fg">Excluded tags</h4>
         <p className="text-xs text-retro-muted">
           Active excluded tags ({userExcludes.length}/{MAX_USER_EXCLUDES}).
         </p>
-        {showPicksEditor ? (
-          <FeedTuneStep onFinished={() => setShowPicksEditor(false)} />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setShowPicksEditor(true)}
-            className="px-3 py-1.5 rounded-lg border border-border-glass text-xs font-semibold text-retro-fg hover:bg-glass-w10 cursor-pointer active:scale-[0.98] transition-colors"
-          >
-            Change starter tags
-          </button>
-        )}
-      </div>
-
-      <div className="p-4 bg-glass-w5 border border-border-glass rounded-lg space-y-3">
-        <h4 className="text-xs font-medium text-retro-fg">Excluded tags</h4>
         <div className="flex gap-2">
           <input
             type="text"
@@ -162,13 +130,13 @@ function FeedSettingsTab({
                 add();
               }
             }}
-            className="flex-1 bg-surface-raised border border-border-glass rounded-lg px-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent placeholder:text-retro-muted/60"
+            className="flex-1 bg-surface-raised border border-edge rounded-lg px-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent placeholder:text-retro-muted/60"
           />
           <button
             type="button"
             disabled={!draft.trim()}
             onClick={add}
-            className="px-4 py-2 bg-retro-accent hover:bg-retro-accent-hover disabled:opacity-40 text-retro-accent-text rounded-lg text-xs font-semibold cursor-pointer shrink-0 active:scale-[0.98] transition-colors"
+            className="px-4 py-2 bg-retro-accent hover:bg-retro-accent-hover disabled:opacity-40 text-retro-accent-text rounded-lg text-xs font-semibold cursor-pointer shrink-0 active:scale-(--scale-press) transition-colors"
           >
             Add
           </button>
@@ -180,7 +148,7 @@ function FeedSettingsTab({
             {userExcludes.map((x) => (
               <span
                 key={x}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border-glass bg-glass-w5 px-2.5 py-1 text-xs font-mono text-retro-fg"
+                className="inline-flex items-center gap-1.5 rounded-full border border-edge bg-glass-w5 px-2.5 py-1 text-xs font-mono text-retro-fg"
               >
                 {x}
                 <button
@@ -198,20 +166,15 @@ function FeedSettingsTab({
         )}
       </div>
 
-      <div className="p-4 bg-glass-w5 border border-border-glass rounded-lg space-y-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h4 className="text-xs font-medium text-retro-fg">Content Blocklist (blocklist.json)</h4>
-          <p className="text-xs text-retro-muted">
-            Configure hard blocked terms, suggested exclude categories, and noise filter tags.
-          </p>
-        </div>
+      <div className="p-4 bg-glass-w5 border border-edge rounded-lg space-y-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <h4 className="text-xs font-medium text-retro-fg">Content blocklist</h4>
         {onNavigateTab && (
           <button
             type="button"
             onClick={() => onNavigateTab('blocklist')}
-            className="px-3.5 py-2 bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text rounded-lg text-xs font-semibold cursor-pointer shrink-0 active:scale-[0.98] transition-colors"
+            className="px-3.5 py-2 bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text rounded-lg text-xs font-semibold cursor-pointer shrink-0 active:scale-(--scale-press) transition-colors"
           >
-            Configure blocklist.json
+            Configure
           </button>
         )}
       </div>
@@ -231,10 +194,33 @@ export function GMatchSettingsModal({
   initialTab = 'preferences',
 }: GMatchSettingsModalProps) {
   const [activeTab, setActiveTab] = useState<SettingsTabId>(() => resolveTab(initialTab));
+  const [appVer, setAppVer] = useState('');
+  useEffect(() => {
+    let dead = false
+    void window.gmatch?.appVersion?.().then((v) => { if (!dead) setAppVer(String(v || '')); }).catch(() => {})
+    return () => { dead = true }
+  }, []);
+  const accountName = (() => { try { return localStorage.getItem('orbit_display_name') || ''; } catch { return ''; } })();
   const [showLegalCenter, setShowLegalCenter] = useState(false);
   const [wallpaperExpanded, setWallpaperExpanded] = useState(() => initialTab === 'wallpaper');
   const [copiedId, setCopiedId] = useState(false);
   const [customWallpaperInput, setCustomWallpaperInput] = useState(settings.wallpaperUrl || '');
+  // Community key: draft while typing, commit on blur so one keystroke does
+  // not restart the mesh. Invalid keys are refused (and the draft resets).
+  const [meshKeyDraft, setMeshKeyDraft] = useState(settings.meshCommunityKey);
+  const commitMeshKey = () => {
+    const value = meshKeyDraft.trim();
+    if (!/^[A-Za-z0-9_-]{16,64}$/.test(value)) {
+      setMeshKeyDraft(settings.meshCommunityKey);
+      toast?.('Community key must be 16-64 letters, numbers, - or _', 'warning');
+      return;
+    }
+    if (value === settings.meshCommunityKey) return;
+    updateSettings('meshCommunityKey', value);
+    // Announce on the new infohash now, not up to 30 minutes later.
+    window.dispatchEvent(new CustomEvent('gmatch:mesh-reannounce'));
+    toast?.('Community key updated — announcing again', 'success');
+  };
 
   useEffect(() => {
     setActiveTab(resolveTab(initialTab));
@@ -346,7 +332,7 @@ export function GMatchSettingsModal({
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 pb-[calc(var(--island-clearance)+1.5rem)] select-none font-sans animate-orbit-fade-in"
+      className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 pb-[calc(var(--island-clearance)+1.5rem)] select-none font-sans animate-orbit-fade-in"
       onClick={onClose}
     >
       <div
@@ -357,14 +343,19 @@ export function GMatchSettingsModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Left Navigation Sidebar */}
-        <div className="w-full md:w-56 border-b md:border-b-0 md:border-r border-border-glass bg-glass-w5 flex flex-col shrink-0">
+        <div className="w-full md:w-56 border-b md:border-b-0 md:border-r border-edge bg-glass-w5 flex flex-col shrink-0">
           {/* Header */}
-          <div className="p-4 border-b border-border-glass flex items-center justify-between">
+          <div className="p-4 border-b border-edge flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-glass-w10 flex items-center justify-center text-retro-muted">
                 <Settings className="w-4 h-4" />
               </div>
-              <h2 id="settings-title" className="text-sm font-medium text-retro-fg">Settings</h2>
+              <div className="min-w-0">
+                <h2 id="settings-title" className="text-base font-black tracking-tight text-retro-fg">Settings</h2>
+                <div className="text-2xs text-retro-muted truncate max-w-[8rem]">
+                  {accountName || 'Guest'}{appVer ? ` · v${appVer}` : ''}
+                </div>
+              </div>
             </div>
 
             <button
@@ -406,25 +397,25 @@ export function GMatchSettingsModal({
           </div>
 
           {/* User Profile Mini Footer */}
-          <div className="hidden md:flex mt-auto p-3 border-t border-border-glass items-center justify-between">
+          <div className="hidden md:flex mt-auto p-3 border-t border-edge items-center justify-between">
             <div className="flex items-center gap-2 min-w-0">
               <div className="w-7 h-7 rounded-full bg-glass-w10 flex items-center justify-center font-medium text-xs text-retro-muted">
                 {identity?.orbitId?.substring(0, 1).toUpperCase() || 'U'}
               </div>
               <div className="min-w-0">
                 <span className="text-xs font-medium block truncate">{identity?.orbitId ? `@${identity.orbitId.substring(0, 8)}` : 'Guest'}</span>
-                <span className="text-[10px] text-retro-online">Online</span>
+                <span className="text-2xs text-retro-online">Online</span>
               </div>
             </div>
-            <span className="text-[10px] font-mono text-retro-muted">v1.0.0</span>
+            <span className="text-2xs font-mono text-retro-muted">v1.0.0</span>
           </div>
         </div>
 
         {/* Right Main Content Pane */}
         <div className="flex-1 flex flex-col h-full overflow-hidden bg-transparent">
           {/* Top Bar */}
-          <div className="hidden md:flex items-center justify-between px-5 py-3.5 border-b border-border-glass bg-glass-w5">
-            <h3 className="text-sm font-medium text-retro-fg">
+          <div className="hidden md:flex items-center justify-between px-5 py-3.5 border-b border-edge bg-glass-w5">
+            <h3 className="text-lg font-black tracking-tight text-retro-fg">
               {navItems.find((n) => n.id === activeTab)?.label}
             </h3>
             <button
@@ -443,8 +434,28 @@ export function GMatchSettingsModal({
             {activeTab === 'preferences' && (
               <div className="space-y-6 animate-orbit-fade-in">
                 {/* Display & Layout */}
-                <div className="p-4 bg-glass-w5 border border-border-glass rounded-lg space-y-4">
+                <div className="p-4 bg-glass-w5 border border-edge rounded-lg space-y-4">
                   <h4 className="text-xs font-medium text-retro-fg">Display &amp; layout</h4>
+
+                  {/* Theme: one switch, the whole light theme is a token block. */}
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs text-retro-muted">Theme</span>
+                    <div className="flex items-center gap-1 p-0.5 rounded-lg bg-glass-w5 border border-edge" role="group" aria-label="Theme">
+                      {(['dark', 'light'] as const).map((mode) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          aria-pressed={settings.theme === mode}
+                          onClick={() => { playPress(760); updateSettings('theme', mode); }}
+                          className={`px-2.5 py-1 rounded-md text-2xs font-semibold capitalize transition-colors cursor-pointer ${
+                            settings.theme === mode ? 'bg-retro-accent text-retro-accent-text' : 'text-retro-muted hover:text-retro-fg'
+                          }`}
+                        >
+                          {mode}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
                   {/* Panel opacity */}
                   <div className="space-y-1.5">
@@ -462,7 +473,7 @@ export function GMatchSettingsModal({
                       onChange={(e) => updateSettings('panelOpacity', Number(e.target.value) / 100)}
                       className="w-full accent-retro-accent cursor-pointer"
                     />
-                    <p className="text-[10px] text-retro-body">Makes panels and cards more see-through. Text keeps its backing.</p>
+                    <p className="text-2xs text-retro-body">Panel and card transparency. Text keeps its backing.</p>
                   </div>
 
                   {/* Glass blur */}
@@ -481,14 +492,14 @@ export function GMatchSettingsModal({
                       onChange={(e) => updateSettings('glassBlur', Number(e.target.value) / 100)}
                       className="w-full accent-retro-accent cursor-pointer"
                     />
-                    <p className="text-[10px] text-retro-body">Backdrop frost strength. Lower is faster on weak GPUs; 0% disables it entirely.</p>
+                    <p className="text-2xs text-retro-body">Backdrop blur strength. 0% disables it.</p>
                   </div>
 
                   {/* Animated chrome (perf gate) */}
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <div className="text-xs font-medium text-retro-fg">Animated chrome</div>
-                      <div className="text-xs text-retro-body">Moving shine on accent buttons/headings. Off is faster; enable for the sparkle.</div>
+                      <div className="text-xs text-retro-body">Shine on accent buttons and headings. Off is faster.</div>
                     </div>
                     <Switch label="Animated chrome" checked={settings.animatedChrome} onChange={() => updateSettings('animatedChrome', !settings.animatedChrome)} />
                   </div>
@@ -508,7 +519,7 @@ export function GMatchSettingsModal({
                       <div className="text-xs font-medium text-retro-fg">Feed Columns</div>
                       <div className="text-xs text-retro-muted">Columns for the main media feed</div>
                     </div>
-                    <div className="flex bg-glass-w5 border border-border-glass rounded-lg p-0.5 text-xs font-semibold">
+                    <div className="flex bg-glass-w5 border border-edge rounded-lg p-0.5 text-xs font-semibold">
                       {(['1', '2', '3', '4', '5'] as const).map((col) => (
                         <button
                           key={col}
@@ -529,12 +540,12 @@ export function GMatchSettingsModal({
                   </div>
 
                   {/* Gallery Columns */}
-                  <div className="flex items-center justify-between gap-4 pt-2 border-t border-border-glass">
+                  <div className="flex items-center justify-between gap-4 pt-2 border-t border-edge">
                     <div>
                       <div className="text-xs font-medium text-retro-fg">Gallery Columns</div>
                       <div className="text-xs text-retro-muted">Columns displayed in card collection grid</div>
                     </div>
-                    <div className="flex bg-glass-w5 border border-border-glass rounded-lg p-0.5 text-xs font-semibold">
+                    <div className="flex bg-glass-w5 border border-edge rounded-lg p-0.5 text-xs font-semibold">
                       {(['2', '3'] as const).map((col) => (
                         <button
                           key={col}
@@ -555,7 +566,7 @@ export function GMatchSettingsModal({
                   </div>
 
                   {/* Display Toggles */}
-                  <div className="space-y-3 pt-2 border-t border-border-glass divide-y divide-border-glass">
+                  <div className="space-y-3 pt-2 border-t border-edge divide-y divide-edge">
                     {([
                       {
                         label: 'Auto-Refresh Heartbeat Sync',
@@ -566,11 +577,6 @@ export function GMatchSettingsModal({
                         label: 'Hide Duplicate Cards',
                         desc: 'Filter redundant images in the public gallery deck',
                         key: 'hideDuplicates' as const,
-                      },
-                      {
-                        label: 'Streamer Privacy Masking',
-                        desc: 'Mask peer cryptographic hashes and identifiers',
-                        key: 'streamerMode' as const,
                       },
                     ]).map((item) => {
                       const isOn = Boolean(settings[item.key]);
@@ -596,7 +602,7 @@ export function GMatchSettingsModal({
                 </div>
 
                 {/* Match Pacing & Audio */}
-                <div className="p-4 bg-glass-w5 border border-border-glass rounded-lg space-y-4">
+                <div className="p-4 bg-glass-w5 border border-edge rounded-lg space-y-4">
                   <h4 className="text-xs font-medium text-retro-fg">Match pacing &amp; audio</h4>
 
                   <div className="flex items-center justify-between gap-4">
@@ -615,7 +621,7 @@ export function GMatchSettingsModal({
                           }}
                           className={`px-2.5 py-1 rounded-lg border text-xs font-semibold capitalize transition-colors cursor-pointer text-center ${settings.duelPacing === pacing
                               ? 'bg-retro-accent text-retro-accent-text border-transparent font-bold'
-                              : 'bg-glass-w5 text-retro-muted border-border-glass hover:text-retro-fg hover:bg-glass-w10'
+                              : 'bg-glass-w5 text-retro-muted border-edge hover:text-retro-fg hover:bg-glass-w10'
                             }`}
                         >
                           {pacing}
@@ -624,7 +630,7 @@ export function GMatchSettingsModal({
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between gap-4 pt-2 border-t border-border-glass">
+                  <div className="flex items-center justify-between gap-4 pt-2 border-t border-edge">
                     <div>
                       <div className="text-xs font-medium text-retro-fg">Chat Notification Sound</div>
                       <div className="text-xs text-retro-body">Audio cue when a new direct message arrives</div>
@@ -642,8 +648,67 @@ export function GMatchSettingsModal({
                   </div>
                 </div>
 
+                {/* Media & Notifications
+                    These four toggles used to live ONLY inside the "Maximum
+                    Gooner Hardcore" modal, which was unreachable (its App
+                    state was a constant `false`). Three of them are live
+                    settings the app reads; the only way to change them was a
+                    modal nobody could open. They live here now. */}
+                <div className="p-4 bg-glass-w5 border border-edge rounded-lg space-y-3">
+                  <h4 className="text-xs font-medium text-retro-fg">Media & notifications</h4>
+
+                  <div className="space-y-3 divide-y divide-edge">
+                    {([
+                      {
+                        label: 'Hide notification content',
+                        desc: 'The toast says how many, never what (lock screens show toasts)',
+                        key: 'hideNotificationContent' as const,
+                      },
+                      {
+                        label: 'Sound effects',
+                        desc: 'Clicks, purchases and unlocks play a sound',
+                        key: 'soundEffects' as const,
+                      },
+                      {
+                        label: 'Auto-open images',
+                        desc: 'Open the lightbox when a peer sends media',
+                        key: 'autoOpenImages' as const,
+                      },
+                      {
+                        label: 'Idle mode',
+                        desc: 'Pause the feed when the window has been inactive',
+                        key: 'idleEnabled' as const,
+                      },
+                      {
+                        label: 'Allow remote wallpaper',
+                        desc: 'Let a peer set this device’s background',
+                        key: 'allowRemoteWallpaper' as const,
+                      },
+                    ]).map((item) => {
+                      const isOn = Boolean(settings[item.key]);
+                      return (
+                        <div key={item.key} className="pt-3 first:pt-0 flex items-center justify-between gap-4">
+                          <div>
+                            <div className="text-xs font-medium text-retro-fg">{item.label}</div>
+                            <div className="text-xs text-retro-body">{item.desc}</div>
+                          </div>
+
+                          <Switch
+                            label={item.label}
+                            checked={isOn}
+                            onChange={() => {
+                              playPress(isOn ? 600 : 900);
+                              updateSettings(item.key, !isOn);
+                            }}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 {/* Wallpaper & Background Section */}
-                <div className="p-4 bg-glass-w5 border border-border-glass rounded-lg space-y-3">
+                <div className="p-4 bg-glass-w5 border border-edge rounded-lg space-y-3">
                   <button
                     type="button"
                     onClick={() => setWallpaperExpanded(!wallpaperExpanded)}
@@ -661,7 +726,7 @@ export function GMatchSettingsModal({
                   </button>
 
                   {wallpaperExpanded && (
-                    <div className="space-y-4 pt-3 border-t border-border-glass animate-orbit-fade-in">
+                    <div className="space-y-4 pt-3 border-t border-edge animate-orbit-fade-in">
                       {/* Upload or URL */}
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
@@ -677,10 +742,10 @@ export function GMatchSettingsModal({
                           )}
                         </div>
 
-                        <label className="border border-dashed border-border-glass hover:border-retro-accent rounded-lg bg-glass-w5 p-3 flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors text-center">
+                        <label className="border border-dashed border-edge hover:border-retro-accent rounded-lg bg-glass-w5 p-3 flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors text-center">
                           <Upload className="w-5 h-5 text-retro-muted" />
                           <span className="text-xs font-semibold text-retro-body">Browse file to upload</span>
-                          <span className="text-[10px] text-retro-muted">JPG, PNG, WebP, GIF, MP4 (downscaled to 1920px)</span>
+                          <span className="text-2xs text-retro-muted">JPG, PNG, WebP, GIF, MP4 (downscaled to 1920px)</span>
                           <input type="file" accept="image/*,video/*" onChange={handleWallpaperFile} className="hidden" />
                         </label>
 
@@ -690,12 +755,12 @@ export function GMatchSettingsModal({
                             value={customWallpaperInput}
                             onChange={(e) => setCustomWallpaperInput(e.target.value)}
                             placeholder="Direct image or video URL (https://...)"
-                            className="flex-1 bg-surface-raised border border-border-glass rounded-lg px-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent"
+                            className="flex-1 bg-surface-raised border border-edge rounded-lg px-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent"
                           />
                           <button
                             type="button"
                             onClick={applyCustomWallpaper}
-                            className="px-4 py-2 bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text rounded-lg text-xs font-semibold cursor-pointer active:scale-[0.98] transition-colors"
+                            className="px-4 py-2 bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text rounded-lg text-xs font-semibold cursor-pointer active:scale-(--scale-press) transition-colors"
                           >
                             Apply
                           </button>
@@ -717,7 +782,7 @@ export function GMatchSettingsModal({
                               onClick={() => { playPress(700); updateSettings('wallpaperFit', mode.id); }}
                               className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${settings.wallpaperFit === mode.id
                                   ? 'bg-retro-accent text-retro-accent-text border-transparent font-bold'
-                                  : 'bg-glass-w5 text-retro-muted border-border-glass hover:text-retro-fg hover:bg-glass-w10'
+                                  : 'bg-glass-w5 text-retro-muted border-edge hover:text-retro-fg hover:bg-glass-w10'
                                 }`}
                             >
                               {mode.label}
@@ -727,7 +792,7 @@ export function GMatchSettingsModal({
                       </div>
 
                       {/* Slideshow */}
-                      <div className="flex items-center justify-between pt-2 border-t border-border-glass">
+                      <div className="flex items-center justify-between pt-2 border-t border-edge">
                         <div>
                           <div className="text-xs font-medium text-retro-fg">Card Slideshow</div>
                           <div className="text-xs text-retro-body">Cycle collected cards as background</div>
@@ -756,7 +821,7 @@ export function GMatchSettingsModal({
                               const s = Math.max(3, Math.min(120, Number(e.target.value) || 8));
                               updateSettings('wallpaperSlideshowInterval', s * 1000);
                             }}
-                            className="w-16 bg-surface-raised border border-border-glass rounded-lg px-2 py-1 text-xs text-retro-fg outline-none focus:border-retro-accent"
+                            className="w-16 bg-surface-raised border border-edge rounded-lg px-2 py-1 text-xs text-retro-fg outline-none focus:border-retro-accent"
                           />
                           <span className="text-xs text-retro-muted">seconds</span>
                         </div>
@@ -766,13 +831,13 @@ export function GMatchSettingsModal({
                 </div>
 
                 {/* Local media vault (opt-in): gallery keeps + card bytes on disk */}
-                <div className="p-4 bg-glass-w5 border border-border-glass rounded-lg space-y-3">
+                <div className="p-4 bg-glass-w5 border border-edge rounded-lg space-y-3">
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <h4 className="text-xs font-medium text-retro-fg">Local media vault</h4>
                       <p className="text-xs text-retro-body">
-                        Store kept gallery images and cards on this computer (3 GB cap, oldest unkept goes first).
-                        Off = memory only, nothing is written to disk.
+                        Keeps gallery images and cards on this computer (3 GB cap, oldest unkept goes first).
+                        Off = memory only.
                       </p>
                     </div>
                     <Switch
@@ -788,7 +853,7 @@ export function GMatchSettingsModal({
                     />
                   </div>
                   {settings.localVault && (
-                    <div className="flex items-center justify-between gap-4 pt-1 border-t border-border-glass">
+                    <div className="flex items-center justify-between gap-4 pt-1 border-t border-edge">
                       <VaultUsage />
                       <button
                         type="button"
@@ -800,9 +865,59 @@ export function GMatchSettingsModal({
                     </div>
                   )}
                   {!vaultBridge() && (
-                    <p className="text-[10px] text-retro-muted">Desktop app only. The browser build always streams.</p>
+                    <p className="text-2xs text-retro-muted">Desktop app only. The browser build always streams.</p>
                   )}
+                  <CacheViewer toast={toast} />
                 </div>
+              </div>
+            )}
+
+            {/* Mesh: who this install announces itself to. */}
+            {activeTab === 'preferences' && (
+              <div className="p-4 bg-glass-w5 border border-edge rounded-lg space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-medium text-retro-fg">Mesh discovery</div>
+                    <div className="text-2xs text-retro-muted leading-relaxed">
+                      Announce this install on public trackers so peers on other machines can find you.
+                      Only a rotating daily id and an offer leave the machine — no name, no catalog.
+                      Your IP is visible to the tracker and to the peers you connect to.
+                    </div>
+                  </div>
+                  <Switch
+                    label="Mesh discovery"
+                    checked={settings.meshEnabled}
+                    onChange={() => updateSettings('meshEnabled', !settings.meshEnabled)}
+                  />
+                </div>
+
+                {settings.meshEnabled && (
+                  <>
+                    <label className="block">
+                      <span className="block text-2xs text-retro-muted mb-1">Community key</span>
+                      <input
+                        type="text"
+                        value={meshKeyDraft}
+                        onChange={(e) => setMeshKeyDraft(e.target.value)}
+                        onBlur={commitMeshKey}
+                        placeholder="gmatch-open-mesh-v1"
+                        className="w-full bg-retro-bg border border-edge rounded-md px-2 py-1.5 text-xs font-mono text-retro-fg outline-none"
+                      />
+                      <span className="block text-2xs text-retro-muted mt-1">
+                        Default = open mesh (stops casual enumeration, not someone reading the code).
+                        An invite key closes the mesh to that group.
+                      </span>
+                    </label>
+                    <label className="flex items-center justify-between gap-2 cursor-pointer">
+                      <span className="text-2xs text-retro-muted">Hide which files I hold (salted)</span>
+                      <input
+                        type="checkbox"
+                        checked={settings.meshObfuscateHave}
+                        onChange={(e) => updateSettings('meshObfuscateHave', e.target.checked)}
+                      />
+                    </label>
+                  </>
+                )}
               </div>
             )}
 
@@ -812,13 +927,16 @@ export function GMatchSettingsModal({
             {/* Community invite: node setting with a constant fallback. */}
             {activeTab === 'preferences' && <CommunitySection toast={toast} />}
 
+            {/* Opt-in migration: share posts published before local-first. */}
+            {activeTab === 'preferences' && <ImportPostsSection identity={identity} toast={toast} />}
+
             {/* ──────── 2. ACCOUNT & SECURITY ──────── */}
             {activeTab === 'account' && (
               <div className="space-y-6 animate-orbit-fade-in">
                 {/* Orbit ID Display */}
-                <div className="p-4 bg-glass-w5 border border-border-glass rounded-lg space-y-3">
+                <div className="p-4 bg-glass-w5 border border-edge rounded-lg space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-retro-muted">
+                    <span className="text-2xs font-medium uppercase tracking-wider text-retro-muted">
                       Cryptographic Identity Key
                     </span>
                     <span className="text-xs text-retro-muted font-medium flex items-center gap-1.5">
@@ -826,7 +944,7 @@ export function GMatchSettingsModal({
                     </span>
                   </div>
 
-                  <div className="p-3 bg-surface-raised border border-border-glass rounded-lg flex items-center justify-between gap-3">
+                  <div className="p-3 bg-surface-raised border border-edge rounded-lg flex items-center justify-between gap-3">
                     <span className="font-mono text-xs text-retro-fg break-all select-all">
                       {identity?.orbitId || 'Anonymous Session'}
                     </span>
@@ -834,7 +952,7 @@ export function GMatchSettingsModal({
                     <button
                       type="button"
                       onClick={handleCopyId}
-                      className="px-3 py-1.5 bg-glass-w8 hover:bg-glass-w12 border border-border-glass text-retro-fg rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer shrink-0 transition-colors active:scale-[0.98]"
+                      className="px-3 py-1.5 bg-glass-w8 hover:bg-glass-w12 border border-edge text-retro-fg rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer shrink-0 transition-colors active:scale-(--scale-press)"
                     >
                       {copiedId ? <Check className="w-3.5 h-3.5 text-retro-fg" /> : <Copy className="w-3.5 h-3.5" />}
                       <span>{copiedId ? 'Copied' : 'Copy'}</span>
@@ -847,17 +965,17 @@ export function GMatchSettingsModal({
                 </div>
 
                 {/* Legal Terms */}
-                <div className="p-4 bg-glass-w5 border border-border-glass rounded-lg space-y-3">
+                <div className="p-4 bg-glass-w5 border border-edge rounded-lg space-y-3">
                   <button
                     type="button"
                     onClick={() => { playPress(700); setShowLegalCenter(true); }}
-                    className="w-full text-left p-3 bg-retro-panel/10 border border-border-glass rounded-lg text-xs font-medium text-retro-fg hover:bg-retro-panel/20 transition-colors cursor-pointer active:scale-[0.98]"
+                    className="w-full text-left p-3 bg-retro-panel/10 border border-edge rounded-lg text-xs font-medium text-retro-fg hover:bg-retro-panel/20 transition-colors cursor-pointer active:scale-(--scale-press)"
                   >
                     <div className="flex items-center justify-between">
                       <span>Legal Terms</span>
                       <FileText className="w-3.5 h-3.5" />
                     </div>
-                    <p className="text-[10px] text-retro-muted mt-1">
+                    <p className="text-2xs text-retro-muted mt-1">
                       Terms of Use, Privacy, and related policies. Read-only — no acceptance required here.
                     </p>
                   </button>
@@ -868,9 +986,9 @@ export function GMatchSettingsModal({
                   <button
                     type="button"
                     onClick={() => onOpenIdentityModal?.('export')}
-                    className="p-4 bg-glass-w5 border border-border-glass hover:bg-glass-w10 hover:border-retro-accent rounded-lg text-left space-y-2 transition-all cursor-pointer group active:scale-[0.98]"
+                    className="p-4 bg-glass-w5 border border-edge hover:bg-glass-w10 hover:border-retro-accent rounded-lg text-left space-y-2 transition cursor-pointer group active:scale-(--scale-press)"
                   >
-                    <div className="w-8 h-8 rounded-lg bg-glass-w10 border border-border-glass text-retro-fg flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-lg bg-glass-w10 border border-edge text-retro-fg flex items-center justify-center">
                       <Download className="w-4 h-4" />
                     </div>
                     <div>
@@ -882,9 +1000,9 @@ export function GMatchSettingsModal({
                   <button
                     type="button"
                     onClick={() => onOpenIdentityModal?.('login')}
-                    className="p-4 bg-glass-w5 border border-border-glass hover:bg-glass-w10 hover:border-retro-accent rounded-lg text-left space-y-2 transition-all cursor-pointer group active:scale-[0.98]"
+                    className="p-4 bg-glass-w5 border border-edge hover:bg-glass-w10 hover:border-retro-accent rounded-lg text-left space-y-2 transition cursor-pointer group active:scale-(--scale-press)"
                   >
-                    <div className="w-8 h-8 rounded-lg bg-glass-w10 border border-border-glass text-retro-fg flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-lg bg-glass-w10 border border-edge text-retro-fg flex items-center justify-center">
                       <LogIn className="w-4 h-4" />
                     </div>
                     <div>
@@ -895,7 +1013,7 @@ export function GMatchSettingsModal({
                 </div>
 
                 {/* Active Session & Log Out */}
-                <div className="p-4 bg-glass-w5 border border-border-glass rounded-lg space-y-3">
+                <div className="p-4 bg-glass-w5 border border-edge rounded-lg space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                       <h4 className="text-xs font-semibold text-retro-fg">Active session</h4>
@@ -907,13 +1025,21 @@ export function GMatchSettingsModal({
                     <button
                       type="button"
                       onClick={() => onOpenIdentityModal?.('logout')}
-                      className="px-3.5 py-2 bg-retro-error/15 border border-retro-error/40 text-retro-error hover:bg-retro-error/25 rounded-lg text-xs font-semibold cursor-pointer transition-colors flex items-center justify-center gap-1.5 active:scale-[0.98] shrink-0"
+                      className="px-3.5 py-2 bg-retro-error/15 border border-retro-error/40 text-retro-error hover:bg-retro-error/25 rounded-lg text-xs font-semibold cursor-pointer transition-colors flex items-center justify-center gap-1.5 active:scale-(--scale-press) shrink-0"
                     >
                       <LogOut className="w-3.5 h-3.5" />
                       <span>Log Out</span>
                     </button>
                   </div>
                 </div>
+
+                {/* Vault security — the passkey binds this device's key to a
+                    hardware authenticator. The component existed but was
+                    unreachable (its App.tsx branch was a constant `false`),
+                    so the feature was dead code with a live server route. */}
+                {identity && (
+                  <PasskeyManager identity={identity} />
+                )}
 
                 <DeleteAccountSection
                   identity={identity}

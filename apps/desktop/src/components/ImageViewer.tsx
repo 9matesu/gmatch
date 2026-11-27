@@ -9,6 +9,7 @@ import { computeCardRarity, formatGc } from '@orbit/shared'
 import { MediaBadge } from './MediaBadge'
 import { ObjectImage } from './ObjectImage'
 import { playPress } from '../utils/sounds'
+import { logger } from '../utils/logger'
 import {
   X,
   ZoomIn,
@@ -156,7 +157,7 @@ export function ImageViewer({
   if (!activeItem) {
     return (
       <div
-        className="fixed inset-0 z-[var(--z-system)] bg-surface-canvas/95 backdrop-blur-sm flex flex-col items-center justify-center gap-4 p-6 font-sans animate-orbit-fade-in select-none"
+        className="fixed inset-0 z-[var(--z-modal)] bg-surface-canvas/95 backdrop-blur-sm flex flex-col items-center justify-center gap-4 p-6 font-sans animate-orbit-fade-in select-none"
         onClick={onClose}
       >
         <span className="text-3xl text-retro-muted block">◈</span>
@@ -213,7 +214,9 @@ export function ImageViewer({
         a.click()
         document.body.removeChild(a)
       }
-    } catch {}
+    } catch (err) {
+      logger.warn('[ImageViewer] GET /api/objects/:id failed', err)
+    }
   }
 
   const handleCopyLink = () => {
@@ -223,12 +226,14 @@ export function ImageViewer({
       navigator.clipboard.writeText(imageUrl)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
-    } catch {}
+    } catch (err) {
+      logger.warn('[ImageViewer] GET /api/objects/:id failed', err)
+    }
   }
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-sm flex flex-col justify-between p-2 sm:p-4 md:p-6 overflow-hidden select-none font-sans animate-orbit-fade-in"
+      className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex flex-col justify-between p-2 sm:p-4 md:p-6 overflow-hidden select-none font-sans animate-orbit-fade-in"
       onClick={() => {
         if (!didDragRef.current) onClose()
       }}
@@ -243,7 +248,7 @@ export function ImageViewer({
         <div className="flex items-center gap-2 sm:gap-3 truncate min-w-0">
           <span className="text-xs sm:text-sm font-bold text-retro-fg truncate">{senderName}</span>
           {items.length > 1 && (
-            <span className="text-[10px] sm:text-xs font-mono glass-inset px-2 py-0.5 rounded-full shrink-0">
+            <span className="text-2xs sm:text-xs font-mono glass-inset px-2 py-0.5 rounded-full shrink-0">
               {navIdx + 1} / {items.length}
             </span>
           )}
@@ -328,7 +333,7 @@ export function ImageViewer({
             <div className="glass-card p-8 text-center space-y-2">
               <span className="text-3xl text-retro-muted block">◈</span>
               <p className="text-xs font-bold text-retro-body">Media unavailable or encrypted</p>
-              <p className="text-[10px] text-retro-muted font-mono">ID: {activeItem?.id}</p>
+              <p className="text-2xs text-retro-muted font-mono">ID: {activeItem?.id}</p>
             </div>
           ) : (
             (() => {
@@ -344,7 +349,7 @@ export function ImageViewer({
                 >
                   {isCard && (
                     <div className="absolute top-3 right-3 z-30 flex items-center gap-1.5 pointer-events-none">
-                      <span className="glass-inset text-[10px] font-mono font-bold px-2 py-0.5 rounded-md">
+                      <span className="glass-inset text-2xs font-mono font-bold px-2 py-0.5 rounded-md">
                         {formatGc(cardVal)}
                       </span>
                     </div>
@@ -354,7 +359,7 @@ export function ImageViewer({
                     objectId={activeItem.id}
                     identity={identity}
                     className="max-w-[88vw] max-h-[68vh] object-contain rounded-xl shadow-2xl select-none"
-                    videoClassName="max-w-[88vw] max-h-[68vh] object-contain rounded-xl shadow-2xl bg-black"
+                    videoClassName="max-w-[88vw] max-h-[68vh] object-contain rounded-xl shadow-2xl bg-retro-bg"
                     controls
                     autoPlay
                     loop
@@ -445,7 +450,7 @@ export function ImageViewer({
             }}
             className="glass-action glass-action-danger h-9 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
           >
-            <Trash2 className="w-3.5 h-3.5 text-red-400" />
+            <Trash2 className="w-3.5 h-3.5 text-danger-fg" />
             <span>Delete</span>
           </button>
         )}

@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { playPress } from '../../utils/sounds';
-import { Search, X, MessageCircle, Users, Image as ImageIcon, Hash, Play, Video } from 'lucide-react';
+import { Search, X, MessageCircle, Users, Image as ImageIcon, Hash, Play } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { FeedPost } from './GMatchFeed';
 import { ObjectImage } from '../ObjectImage';
@@ -85,18 +85,18 @@ export function ExploreSearchModal({
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-sm flex items-start sm:items-center justify-center p-0 sm:p-4 font-sans select-none animate-orbit-fade-in"
+      className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-start sm:items-center justify-center p-0 sm:p-4 font-sans select-none animate-orbit-fade-in"
       onClick={onClose}
     >
       <div
-        className="bg-surface-raised w-full sm:max-w-lg h-full sm:h-[80vh] max-h-[80vh] rounded-none sm:rounded-xl border border-border-glass shadow-2xl overflow-hidden flex flex-col text-retro-fg animate-orbit-pop"
+        className="bg-surface-raised w-full sm:max-w-lg h-full sm:h-[80vh] max-h-(--max-h-panel) rounded-none sm:rounded-xl border border-edge shadow-2xl overflow-hidden flex flex-col text-retro-fg animate-orbit-pop"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-4 py-3 border-b border-border-glass flex items-center justify-between bg-surface-raised shrink-0">
+        <div className="px-4 py-3 border-b border-edge flex items-center justify-between bg-surface-raised shrink-0">
           <div className="flex items-center gap-2">
             <Search className="w-5 h-5 text-retro-fg" />
-            <h3 className="text-sm font-black tracking-tight">Explore gMatch</h3>
+            <h3 className="text-base font-black tracking-tight">Explore gMatch</h3>
           </div>
           <button
             type="button"
@@ -108,8 +108,8 @@ export function ExploreSearchModal({
         </div>
 
         {/* Search Input */}
-        <div className="p-3 border-b border-border-glass bg-surface-interactive shrink-0">
-          <div className="flex items-center gap-2 bg-surface-raised border border-border-glass rounded-xl px-3 py-2 focus-within:ring-2 focus-within:ring-cyan-500/30">
+        <div className="p-3 border-b border-edge bg-surface-interactive shrink-0">
+          <div className="flex items-center gap-2 bg-surface-raised border border-edge rounded-xl px-3 py-2 focus-within:ring-2 focus-within:ring-info/30">
             <Search className="w-4 h-4 text-retro-muted shrink-0" />
             <input
               type="text"
@@ -136,7 +136,7 @@ export function ExploreSearchModal({
           {/* Users */}
           {matchedUsers.length > 0 && (
             <div className="space-y-1">
-              <span className="text-[10px] font-black uppercase tracking-wider text-retro-muted px-1">
+              <span className="text-2xs font-black uppercase tracking-wider text-retro-muted px-1">
                 People
               </span>
               {matchedUsers.map((u) => {
@@ -148,7 +148,8 @@ export function ExploreSearchModal({
                     key={id}
                     className="flex items-center justify-between p-2 rounded-xl hover:bg-glass-w5 transition-colors group"
                   >
-                    <div
+                    <button
+                      type="button"
                       className="flex items-center gap-3 cursor-pointer min-w-0 flex-1"
                       onClick={() => {
                         playPress(750);
@@ -167,11 +168,11 @@ export function ExploreSearchModal({
                         <span className="text-xs font-bold text-retro-fg block truncate">
                            {u.display_name?.trim() || 'Unknown User'}
                         </span>
-                        <span className="text-[10px] text-retro-muted block font-mono truncate">
+                        <span className="text-2xs text-retro-muted block font-mono truncate">
                           {id.slice(0, 14)}...
                         </span>
                       </div>
-                    </div>
+                    </button>
                     {!isSelf && onStartPm && (
                       <button
                         type="button"
@@ -195,11 +196,12 @@ export function ExploreSearchModal({
           {/* Posts */}
           {matchedPosts.length > 0 && (
             <div className="space-y-1">
-              <span className="text-[10px] font-black uppercase tracking-wider text-retro-muted px-1">
+              <span className="text-2xs font-black uppercase tracking-wider text-retro-muted px-1">
                 Posts
               </span>
               {matchedPosts.slice(0, 8).map((p) => (
-                <div
+                <button
+                  type="button"
                   key={p.id}
                   className="flex items-center gap-3 p-2 rounded-xl hover:bg-glass-w5 transition-colors cursor-pointer"
                   onClick={() => {
@@ -211,9 +213,9 @@ export function ExploreSearchModal({
                   <div className="w-10 h-10 rounded-xl bg-glass-w20 overflow-hidden shrink-0 flex items-center justify-center relative">
                     {p.url ? (
                       <>
-                        <ObjectImage contentUrl={p.url} identity={identity} alt="" className="w-full h-full object-cover" />
+                        <ObjectImage contentUrl={p.url} identity={identity} alt="" className="w-full h-full object-cover" thumb />
                         {isMediaVideo(p.url) && (
-                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-white pointer-events-none">
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-retro-fg pointer-events-none">
                             <Play className="w-3.5 h-3.5 fill-white" />
                           </div>
                         )}
@@ -226,14 +228,14 @@ export function ExploreSearchModal({
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs font-bold text-retro-fg block truncate">{p.author_name}</span>
                       {isMediaVideo(p.url) && (
-                        <span className="px-1 py-0.2 rounded bg-black/60 border border-white/10 text-[10px] font-mono text-retro-accent uppercase tracking-wider">
+                        <span className="px-1 py-0.2 rounded bg-black/60 border border-edge text-2xs font-mono text-retro-accent uppercase tracking-wider">
                           Video
                         </span>
                       )}
                     </div>
                     {p.caption && <p className="text-xs text-retro-muted truncate">{p.caption}</p>}
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}
@@ -241,7 +243,7 @@ export function ExploreSearchModal({
           {/* Tags */}
           {matchedTags.length > 0 && (
             <div className="space-y-1.5">
-              <span className="text-[10px] font-black uppercase tracking-wider text-retro-muted px-1">
+              <span className="text-2xs font-black uppercase tracking-wider text-retro-muted px-1">
                 Tags
               </span>
               <div className="flex flex-wrap gap-1.5 px-1">
@@ -254,7 +256,7 @@ export function ExploreSearchModal({
                       setQuery('#' + t);
                       toast?.(`Showing posts tagged #${t}`, 'info');
                     }}
-                    className="px-2.5 py-1 rounded-full bg-surface-interactive hover:bg-glass-w12 text-xs font-bold text-retro-body flex items-center gap-1 cursor-pointer transition-colors border border-border-glass"
+                    className="px-2.5 py-1 rounded-full bg-surface-interactive hover:bg-glass-w12 text-xs font-bold text-retro-body flex items-center gap-1 cursor-pointer transition-colors border border-edge"
                   >
                     <Hash className="w-3 h-3 text-retro-muted" />
                     {t}

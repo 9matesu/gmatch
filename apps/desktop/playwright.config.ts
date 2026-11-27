@@ -9,7 +9,10 @@ import { defineConfig, devices } from '@playwright/test'
 // page answered /#/admin). strictPort guarantees we serve our own bundle.
 export default defineConfig({
   testDir: './e2e',
-  timeout: 30_000,
+  // Cold runs transform the whole app graph on the first navigation (30s+ on a
+  // clean cache); once warm, journeys finish in single-digit seconds. The
+  // ceiling has to clear that first load or every run starts with a flake.
+  timeout: 90_000,
   retries: 1,
   // One worker, on purpose. Every spec drives the SAME node: they publish
   // posts, like them, join rooms and read notifications out of one database.
@@ -26,7 +29,10 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
     command: 'node ../../node_modules/vite/bin/vite.js --port 5273 --strictPort',
-    url: 'http://localhost:5273',
+    // Wait for the sidecar too, not just vite's socket: /api/health answers 503
+    // until the cold schema + VACUUM finish, and a test that starts before that
+    // burns its whole budget polling a node that is still booting.
+    url: 'http://127.0.0.1:8791/api/health',
     reuseExistingServer: false,
     // Fresh schema + VACUUM on a cold DB is slower than the default budget.
     timeout: 120_000,

@@ -3,23 +3,24 @@ import {
   ALL_CAP_IDS,
   CAPS,
   activeCaps,
-  capAutoClicksPerSec,
   capClickMult,
   capEffectLabel,
-  capPassiveMult,
   capStacks,
   popCap,
 } from './caps'
 
 const NOW = 10_000
 
+/** Only click caps are sold: the idle economy (passive, auto-click) is gone. */
 describe('cap definitions (SPEC §5)', () => {
-  it('four permanent caps with correct costs/effects', () => {
-    expect(ALL_CAP_IDS).toHaveLength(4)
+  it('two click caps on sale, and the retired ids stay inert for old saves', () => {
+    expect(ALL_CAP_IDS).toEqual(['blue', 'melt'])
     expect(CAPS.blue).toMatchObject({ name: 'E-Girl Spit', cost: 150, clickMult: 2 })
-    expect(CAPS.filter).toMatchObject({ name: 'Braceface', cost: 900, autoClicksPerSec: 1 })
-    expect(CAPS.hypno).toMatchObject({ name: 'Pornmeat', cost: 5_000, passiveMult: 2 })
-    expect(CAPS.melt).toMatchObject({ name: 'Brain Drain', cost: 50_000, clickMult: 10, passiveMult: 10 })
+    expect(CAPS.melt).toMatchObject({ name: 'Brain Drain', cost: 50_000, clickMult: 10 })
+    // A loaded save may still carry `filter`/`hypno`: the lookup must resolve
+    // to a no-op instead of `undefined` (which would crash the panel).
+    expect(CAPS.filter.clickMult).toBe(1)
+    expect(CAPS.hypno.clickMult).toBe(1)
     for (const id of ALL_CAP_IDS) expect(CAPS[id]).not.toHaveProperty('durationMs')
   })
 })
@@ -27,10 +28,9 @@ describe('cap definitions (SPEC §5)', () => {
 describe('stacking rules (SPEC §5)', () => {
   it('different caps stack', () => {
     let active = popCap([], 'blue', NOW)
-    active = popCap(active, 'hypno', NOW)
+    active = popCap(active, 'melt', NOW)
     expect(active).toHaveLength(2)
-    expect(capClickMult(active, NOW)).toBe(2)
-    expect(capPassiveMult(active, NOW)).toBe(2)
+    expect(capClickMult(active, NOW)).toBe(20)
   })
 
   it('same cap STACKS — every pop adds a live entry, mults compound', () => {
@@ -47,24 +47,6 @@ describe('stacking rules (SPEC §5)', () => {
     expect(capClickMult(active, NOW + 1e12)).toBe(10)
     expect(activeCaps(active, NOW + 1e12)).toHaveLength(1)
   })
-
-  it('Brain Drain multiplies everything x10 on top of other caps', () => {
-    let active = popCap([], 'blue', NOW)
-    active = popCap(active, 'melt', NOW)
-    expect(capClickMult(active, NOW)).toBe(20)
-    expect(capPassiveMult(active, NOW)).toBe(10)
-  })
-
-  it('Braceface gives 1 auto-click/s, forever', () => {
-    const active = popCap([], 'filter', NOW)
-    expect(capAutoClicksPerSec(active, NOW)).toBe(1)
-    expect(capAutoClicksPerSec(active, NOW + 1e12)).toBe(1)
-  })
-
-  it('stacked auto-click rates add up', () => {
-    const active = popCap(popCap([], 'filter', NOW), 'filter', NOW)
-    expect(capAutoClicksPerSec(active, NOW)).toBe(2)
-  })
 })
 
 describe('button stats helpers', () => {
@@ -73,7 +55,6 @@ describe('button stats helpers', () => {
       expect(capEffectLabel(id).length).toBeGreaterThan(0)
     }
     expect(capEffectLabel('blue')).toContain('x2 click')
-    expect(capEffectLabel('filter')).toContain('auto/s')
   })
 
   it('capStacks reports the live count', () => {

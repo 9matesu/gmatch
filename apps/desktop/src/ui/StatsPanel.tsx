@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useGame } from '../game/store'
-import { clickPower, passiveGps } from '../game/economy'
+import { CRIT_MULT, clickPower } from '../game/economy'
 import { clearImageCache, imageCacheStats, type ImageCacheStats } from '../services/imageCache'
 import { formatNum } from './format'
 import { MONO, PLATE } from './styles'
@@ -30,7 +30,6 @@ export default function StatsPanel() {
     gallery: s.gallery,
     caps: s.caps,
   }
-  const gps = passiveGps(input, now)
   const cp = clickPower(input, now)
 
   const [cache, setCache] = useState<ImageCacheStats | null>(null)
@@ -61,21 +60,20 @@ export default function StatsPanel() {
     <aside className={`${PLATE} p-3.5 space-y-3`}>
       {/* Modern 2x2 Telemetry Grid */}
       <div className="grid grid-cols-2 gap-1.5">
-        {/* Passive Income */}
-        <div className="rounded-xl border border-border-glass bg-glass-w5 p-2 flex flex-col justify-between">
-          <div className="flex items-center gap-1 text-[10px] font-medium text-retro-muted truncate">
-            <Coins className="w-3.5 h-3.5 text-amber-400 shrink-0" weight="fill" />
-            <span>Passive</span>
+        {/* What a crit is worth: the only number the click game has. */}
+        <div className="rounded-xl border border-edge bg-glass-w5 p-2 flex flex-col justify-between">
+          <div className="flex items-center gap-1 text-2xs font-medium text-retro-muted truncate">
+            <Coins className="w-3.5 h-3.5 text-warning-fg shrink-0" weight="fill" />
+            <span>Per crit</span>
           </div>
           <div className={`${MONO} text-xs font-bold text-retro-fg mt-1`}>
-            +{formatNum(gps)}/s
+            +{formatNum(cp * CRIT_MULT)}
           </div>
         </div>
-
         {/* Click Power */}
-        <div className="rounded-xl border border-border-glass bg-glass-w5 p-2 flex flex-col justify-between">
-          <div className="flex items-center gap-1 text-[10px] font-medium text-retro-muted truncate">
-            <Lightning className="w-3.5 h-3.5 text-cyan-400 shrink-0" weight="fill" />
+        <div className="rounded-xl border border-edge bg-glass-w5 p-2 flex flex-col justify-between">
+          <div className="flex items-center gap-1 text-2xs font-medium text-retro-muted truncate">
+            <Lightning className="w-3.5 h-3.5 text-info-fg shrink-0" weight="fill" />
             <span>Click Power</span>
           </div>
           <div className={`${MONO} text-xs font-bold text-retro-fg mt-1`}>
@@ -84,33 +82,33 @@ export default function StatsPanel() {
         </div>
 
         {/* Clicks & Crits */}
-        <div className="rounded-xl border border-border-glass bg-glass-w5 p-2 flex flex-col justify-between">
-          <div className="flex items-center gap-1 text-[10px] font-medium text-retro-muted truncate">
-            <CursorClick className="w-3.5 h-3.5 text-emerald-400 shrink-0" weight="fill" />
+        <div className="rounded-xl border border-edge bg-glass-w5 p-2 flex flex-col justify-between">
+          <div className="flex items-center gap-1 text-2xs font-medium text-retro-muted truncate">
+            <CursorClick className="w-3.5 h-3.5 text-success-fg shrink-0" weight="fill" />
             <span>Clicks / Crits</span>
           </div>
           <div className={`${MONO} text-xs font-bold text-retro-fg mt-1 truncate`}>
-            {formatNum(s.clicks)} <span className="text-[10px] text-amber-400 font-normal">({formatNum(s.crits)})</span>
+            {formatNum(s.clicks)} <span className="text-2xs text-warning-fg font-normal">({formatNum(s.crits)})</span>
           </div>
         </div>
 
         {/* Corruption Shards */}
-        <div className="rounded-xl border border-border-glass bg-glass-w5 p-2 flex flex-col justify-between">
-          <div className="flex items-center gap-1 text-[10px] font-medium text-retro-muted truncate">
-            <Sparkle className="w-3.5 h-3.5 text-purple-400 shrink-0" weight="fill" />
+        <div className="rounded-xl border border-edge bg-glass-w5 p-2 flex flex-col justify-between">
+          <div className="flex items-center gap-1 text-2xs font-medium text-retro-muted truncate">
+            <Sparkle className="w-3.5 h-3.5 text-chrome-lav shrink-0" weight="fill" />
             <span>Shards</span>
           </div>
-          <div className={`${MONO} text-xs font-bold text-purple-300 mt-1`}>
-            {s.shards} <span className="text-[10px] text-retro-muted font-normal">(+{s.shards * 10}%)</span>
+          <div className={`${MONO} text-xs font-bold text-chrome-lav mt-1`}>
+            {s.shards} <span className="text-2xs text-retro-muted font-normal">(+{s.shards * 10}%)</span>
           </div>
         </div>
       </div>
 
       {/* Cache Telemetry Bar */}
-      <div className="flex items-center justify-between gap-2 pt-1 border-t border-border-glass text-xs text-retro-muted">
+      <div className="flex items-center justify-between gap-2 pt-1 border-t border-edge text-xs text-retro-muted">
         <div className="flex items-center gap-1.5 truncate">
           <Images className="w-3.5 h-3.5 text-retro-muted shrink-0" />
-          <span className="font-mono text-[10px]">
+          <span className="font-mono text-2xs">
             {cache ? `${cache.files} images · ${formatCacheMb(cache.bytes)}` : <Skeleton className="h-3 w-20 inline-block" />}
           </span>
         </div>
@@ -119,7 +117,7 @@ export default function StatsPanel() {
             type="button"
             onClick={handleClearCache}
             disabled={clearing}
-            className="flex items-center gap-1 px-2 py-0.5 rounded-lg border border-border-glass bg-glass-w5 hover:bg-glass-w10 hover:text-rose-300 text-[10px] font-medium text-retro-muted transition-colors cursor-pointer disabled:opacity-40"
+            className="flex items-center gap-1 px-2 py-0.5 rounded-lg border border-edge bg-glass-w5 hover:bg-glass-w10 hover:text-danger-fg text-2xs font-medium text-retro-muted transition-colors cursor-pointer disabled:opacity-40"
             title="Clean local cached picture files"
           >
             <Trash className="w-3 h-3" />

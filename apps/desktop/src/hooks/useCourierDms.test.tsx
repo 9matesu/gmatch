@@ -2,20 +2,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { ReactNode } from 'react'
 import { createElement } from 'react'
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { generateIdentity } from '@orbit/crypto'
 import { seal1to1 } from '@orbit/protocol'
 import { useCourierDms } from './useCourierDms'
 import { encodeDmBody } from '../utils/mail-dm'
 import { _resetMailModeCache } from '../utils/mail-mode'
+import { _resetNodeAddress } from '../utils/serverAddress'
 import type { MailSocket } from '../utils/mail-client'
 
 // Pin the API base to a remote host: the real loopback/dev base is now a
 // known-courier fast path (no wire probe), which would make the "legacy
 // inbox" scenario unreachable in these tests.
+const apiBase = vi.hoisted(() => ({ url: 'http://node.test' }))
 vi.mock('../utils/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../utils/api')>()
-  return { ...actual, getApiBaseUrl: () => 'http://node.test' }
+  return { ...actual, getApiBaseUrl: () => apiBase.url }
 })
 
 const alice = generateIdentity()
@@ -41,13 +43,24 @@ class FakeSocket implements MailSocket {
   close() { /* noop */ }
 }
 
-function mockFetch(box: { value: unknown[] }, acks: unknown[] = [], pmStatus = 404) {
+/**
+ * A courier mock that models the REAL box layout.
+ *
+ * Each delivery token is its OWN mailbox: an envelope addressed to token X
+ * lives only in X's box. The previous mock served every token's box from one
+ * array, so a client that pulls home+cur+prev in parallel saw the same
+ * envelope in all of them and acked it more than once.
+ */
+function mockFetch(box: { value: any[] }, acks: unknown[] = [], pmStatus = 404) {
   return vi.fn(async (input: any, init?: any) => {
     const url = String(input)
     if (url.endsWith('/api/pm')) return new Response('{}', { status: pmStatus })
     if (url.endsWith('/ack')) {
-      acks.push(JSON.parse(String(init.body)))
-      box.value = [] // drain like the real courier
+      const body = JSON.parse(String(init.body))
+      acks.push(body)
+      // The courier drains exactly what was acked.
+      const acked = new Set<string>(body.ids || [])
+      box.value = box.value.filter((e: any) => !acked.has(e.id))
       return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
     if (init?.method === 'PUT') {
@@ -55,7 +68,9 @@ function mockFetch(box: { value: unknown[] }, acks: unknown[] = [], pmStatus = 4
       return new Response(JSON.stringify({ ok: true }), { status: 202, headers: { 'Content-Type': 'application/json' } })
     }
     if (url.includes('/api/mail/')) {
-      return new Response(JSON.stringify({ envelopes: box.value }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      const token = url.split('/api/mail/')[1]?.split('?')[0] ?? ''
+      const envelopes = box.value.filter((e: any) => e.to === token)
+      return new Response(JSON.stringify({ envelopes }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
     return new Response('{}', { status: 404 })
   }) as unknown as typeof fetch
@@ -65,7 +80,9 @@ const wrapper = ({ children }: { children: ReactNode }) => createElement('div', 
 
 beforeEach(() => {
   _resetMailModeCache()
+  _resetNodeAddress()
   localStorage.clear()
+  apiBase.url = 'http://node.test'
 })
 
 describe('useCourierDms', () => {
@@ -100,6 +117,43 @@ describe('useCourierDms', () => {
     const t = result.current.threadFor(bob.orbitId) || []
     expect(t.some((m) => m.text === 'sealed hello' && m.own && m.status === 'sent')).toBe(true)
     expect(JSON.stringify(box.value)).not.toContain('sealed hello')
+  })
+
+  it('a browser build drains its node own box (the dev proxy hides it)', async () => {
+    // The API base is RELATIVE here: the node this client talks to rides the
+    // dev proxy, so it never shows up as a mailbox base. A peer that learned
+    // our node from the signed beacon drops envelopes exactly there, so the
+    // node's real address has to be watched and drained.
+    apiBase.url = ''
+    const seen: string[] = []
+    const watched: string[] = []
+    const f = vi.fn(async (input: any, init?: any) => {
+      const url = String(input)
+      seen.push(url)
+      if (url.includes('/api/servers/node')) {
+        return new Response(JSON.stringify({ lanUrls: ['http://192.168.5.2:8790'] }), { status: 200 })
+      }
+      // The legacy inbox is gone: a current node 404s /api/pm, which is what
+      // puts a relative (browser-dev) base in courier mode.
+      if (url.endsWith('/api/pm')) return new Response('{}', { status: 404 })
+      if (!init?.body) {
+        return new Response(JSON.stringify({ sealed_available: false }), { status: 200 })
+      }
+      return new Response(JSON.stringify({ envelopes: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }) as unknown as typeof fetch
+
+    const { result } = renderHook(
+      () => useCourierDms(alice, {
+        fetchImpl: f,
+        webSocketFactory: (url: string) => { watched.push(url); return new FakeSocket() },
+      }),
+      { wrapper },
+    )
+    await waitFor(() => {
+      expect(watched.some((u) => u.includes('192.168.5.2:8790'))).toBe(true)
+    }, { timeout: 5000 })
+    await result.current.pull()
+    expect(seen.some((u) => u.startsWith('http://192.168.5.2:8790/api/mail/'))).toBe(true)
   })
 
   it('unknown peer -> failed LOUD (held locally, not silently lost)', async () => {
@@ -203,5 +257,33 @@ describe('useCourierDms', () => {
     await waitFor(() => expect(r.result.current.isTyping(alice.orbitId)).toBe(false))
     // Typing never becomes chat history.
     expect(r.result.current.threadFor(alice.orbitId)?.some((m) => m.text === '')).toBe(false)
+  })
+
+  it('a failed message is re-sent when that peer comes online', async () => {
+    // The outbox is the store: a message that never left must have a path back.
+    // Presence is the precise trigger — the addressed box is now being read.
+    const box: { value: unknown[] } = { value: [] }
+    const r = renderHook(
+      () => useCourierDms(alice, { fetchImpl: mockFetch(box), webSocketFactory: () => new FakeSocket() }),
+      { wrapper },
+    )
+    await waitFor(() => expect(r.result.current.courierActive).toBe(true))
+    // No peer keys yet: the send fails LOUD and is held locally.
+    const held = (await r.result.current.send(bob.orbitId, 'held until you appear'))!
+    expect(held.status).toBe('failed')
+
+    // Bob becomes addressable and presence fires.
+    r.result.current.registerPeerKeys(bob.orbitId, bob.publicKeyHex, bob.encryptionPubHex)
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('orbit-peer-online', { detail: { peerId: bob.orbitId } }))
+    })
+
+    await waitFor(() => {
+      const m = r.result.current.threadFor(bob.orbitId)?.find((x) => x.id === held.id)
+      expect(m?.status).toBe('sent')
+    })
+    // One row, not two: the replay updates the existing row by id.
+    const mine = (r.result.current.threadFor(bob.orbitId) || []).filter((m) => m.own)
+    expect(mine).toHaveLength(1)
   })
 })

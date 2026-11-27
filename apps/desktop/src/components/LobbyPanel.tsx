@@ -22,6 +22,7 @@ import { QueueControls } from './lobby/QueueControls'
 import { CardTile } from './home/CardTile'
 import { openCardDetail } from '../utils/openCard'
 
+import { logger } from '../utils/logger'
 type IdentityLike = OrbitIdentity | null;
 
 interface Props {
@@ -70,7 +71,9 @@ const selfId = identity?.orbitId || ''
           const data = await res.json()
           setLeague(data.league || [])
         }
-      } catch { }
+      } catch (err) {
+        logger.warn('[LobbyPanel] GET /api/lobby/league failed', err)
+      }
     }
     loadLeague()
     const id = setInterval(loadLeague, 15000)
@@ -476,7 +479,7 @@ const selfId = identity?.orbitId || ''
           <button
             type="button"
             onClick={() => setDismissedExpired(true)}
-            className="text-xs font-medium text-retro-muted hover:text-retro-fg border border-border-glass px-2 py-1 cursor-pointer rounded transition-colors"
+            className="text-xs font-medium text-retro-muted hover:text-retro-fg border border-edge px-2 py-1 cursor-pointer rounded transition-colors"
           >
             Dismiss
           </button>
@@ -547,7 +550,7 @@ const selfId = identity?.orbitId || ''
                 <button
                   type="button"
                   onClick={onOpenDeckBuilder}
-                  className="border border-border-glass px-2.5 py-1.5 text-xs font-medium text-retro-fg hover:bg-surface-interactive cursor-pointer rounded-lg transition-colors"
+                  className="border border-edge px-2.5 py-1.5 text-xs font-medium text-retro-fg hover:bg-surface-interactive cursor-pointer rounded-lg transition-colors"
                 >
                   Open collection
                 </button>
@@ -561,7 +564,7 @@ const selfId = identity?.orbitId || ''
                     <button
                       type="button"
                       onClick={onOpenCreateCard}
-                      className="px-3 py-1.5 text-xs font-bold bg-retro-accent text-black hover:bg-retro-accent-hover transition-colors cursor-pointer rounded-lg whitespace-nowrap"
+                      className="px-3 py-1.5 text-xs font-bold bg-retro-accent text-retro-accent-text hover:bg-retro-accent-hover transition-colors cursor-pointer rounded-lg whitespace-nowrap"
                     >
                       Create Card
                     </button>

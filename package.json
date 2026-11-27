@@ -17,8 +17,9 @@
     "build": "npm run build -w @gmatch/desktop",
     "serve:api": "npm run serve -w @orbit/api",
     "lint": "npm run lint --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "test": "npm run test --workspaces --if-present && node scripts/run-electron-tests.mjs",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test:electron": "node scripts/run-electron-tests.mjs"
   },
   "allowScripts": {
     "electron@33.4.11": true,

@@ -18,6 +18,7 @@ describe('GMatchFeed author and name click behavior', () => {
     author_name: 'Alice Wonder',
     author_avatar: 'https://example.com/alice.jpg',
     url: 'https://example.com/media.jpg',
+    caption: 'media with words',
     created_at: new Date().toISOString(),
     like_count: 0,
     comment_count: 0,
@@ -80,9 +81,9 @@ describe('GMatchFeed author and name click behavior', () => {
     const nameEl = screen.getByText('Alice Wonder');
     const row = nameEl.closest('div.flex');
     expect(row?.className).toMatch('items-baseline');
-    expect(nameEl.className).toMatch('leading-tight');
+    expect(nameEl.className).toMatch('truncate');
     const timeEl = row?.querySelector('time');
-    expect(timeEl?.className).toMatch('leading-tight');
+    expect(timeEl?.className).toMatch('shrink-0');
     expect(timeEl?.className).toMatch('shrink-0');
   });
 });

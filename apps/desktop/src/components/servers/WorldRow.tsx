@@ -9,7 +9,8 @@
 // never claims reachability it has not measured.
 import { Loader2, Lock, MoreVertical } from 'lucide-react'
 import type { ReactNode } from 'react'
-import type { DirectoryServer } from './directoryMerge'
+import { serverKey, type DirectoryServer } from './directoryMerge'
+import { worldAccentStyle, worldGlyph, worldTileStyle } from './worldIdentity'
 import { MONO } from '../../ui/styles'
 
 export interface WorldRowState {
@@ -86,24 +87,37 @@ export function WorldRow({
 }) {
   const status = state.status
   const current = status === 'Current'
+  const key = serverKey(server)
   const body = (
     <>
-      <span
-        className={`h-2 w-2 shrink-0 rounded-full ${status ? DOT[status] : 'bg-retro-muted/40'}`}
-        aria-hidden
-      />
+      {/* World identity: a deterministic colour + glyph so two worlds are
+          recognisable at a glance. It is chrome, never a reachability claim —
+          the measured status is the dot on the tile's corner. */}
+      <span className="relative shrink-0" aria-hidden>
+        <span
+          className="flex h-9 w-9 items-center justify-center rounded-lg border text-xs font-bold text-retro-fg/90 shadow-inner"
+          style={worldTileStyle(key)}
+        >
+          {worldGlyph(server.name)}
+        </span>
+        <span
+          className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-retro-bg ${
+            status ? DOT[status] : 'bg-retro-muted/40'
+          }`}
+        />
+      </span>
       <span className="min-w-0 flex-1">
         <span className="flex min-w-0 items-baseline gap-2">
           <span className="truncate text-sm font-semibold text-retro-fg group-hover:text-retro-accent transition-colors duration-150">
             {server.name}
           </span>
           {state.kind && (
-            <span className="shrink-0 text-[10px] uppercase tracking-wider text-retro-muted">{state.kind}</span>
+            <span className="shrink-0 text-2xs uppercase tracking-wider text-retro-muted">{state.kind}</span>
           )}
           {status && (
             <span
               data-testid={status === 'Connecting' ? `connecting-${server.id}` : undefined}
-              className={`flex shrink-0 items-center gap-1 text-[10px] uppercase tracking-wider ${STATUS_TONE[status]}`}
+              className={`flex shrink-0 items-center gap-1 text-2xs uppercase tracking-wider ${STATUS_TONE[status]}`}
             >
               {status === 'Connecting' && <Loader2 className="w-3 h-3 animate-spin" aria-hidden />}
               {status}
@@ -113,11 +127,11 @@ export function WorldRow({
             <Lock className="w-3 h-3 shrink-0 text-retro-muted" aria-label="password required" />
           )}
           {!!server.is_private && (
-            <span className="shrink-0 text-[10px] uppercase tracking-wider text-retro-muted">private</span>
+            <span className="shrink-0 text-2xs uppercase tracking-wider text-retro-muted">private</span>
           )}
         </span>
         {state.meta ? (
-          <span className="mt-0.5 block truncate text-[10px] text-retro-muted">{state.meta}</span>
+          <span className="mt-0.5 block truncate text-2xs text-retro-muted">{state.meta}</span>
         ) : null}
       </span>
     </>
@@ -125,12 +139,21 @@ export function WorldRow({
 
   return (
     <li
-      className={`group flex items-center gap-3 px-3 py-2.5 transition-colors duration-150 ${
+      className={`group relative flex items-center gap-3 py-2.5 pl-4 pr-3 transition-colors duration-150 ${
         current ? 'bg-glass-w8' : 'hover:bg-glass-w5'
       }`}
       aria-current={current || undefined}
       aria-busy={status === 'Connecting' || undefined}
     >
+      {/* The connected world keeps a colour rail so "where am I" never needs
+          reading a label. */}
+      {current && (
+        <span
+          aria-hidden
+          className="absolute inset-y-1.5 left-0 w-0.5 rounded-full"
+          style={worldAccentStyle(key)}
+        />
+      )}
       {current ? (
         <span
           data-world-row-focus
@@ -158,7 +181,7 @@ export function WorldRow({
       <div className="flex shrink-0 items-center gap-2">
         {/* Fixed slot so the ⋯ column lines up down the list, whether or not a
             row has a figure the server actually reported. */}
-        <span className={`hidden sm:inline-block w-16 text-right text-[10px] ${MONO} text-retro-muted`}>
+        <span className={`hidden sm:inline-block w-28 text-right text-2xs ${MONO} text-retro-muted`}>
           {state.counts ?? ''}
         </span>
 
@@ -179,7 +202,7 @@ export function WorldRow({
               data-menu-content
               role="menu"
               aria-label={`Actions for ${server.name}`}
-              className="absolute right-0 top-full mt-1 w-52 bg-surface-raised border border-border-glass rounded-lg py-1 shadow-lg z-[var(--z-dropdown)] space-y-0.5 animate-orbit-fade-in"
+              className="absolute right-0 top-full mt-1 w-52 bg-surface-raised border border-edge rounded-lg py-1 shadow-lg z-[var(--z-dropdown)] space-y-0.5 animate-orbit-fade-in"
             >
               {menuItems}
             </div>

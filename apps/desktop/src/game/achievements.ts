@@ -1,3 +1,4 @@
+import { ALL_CAP_IDS } from './caps'
 import type { CapId } from './types'
 
 /** Stats snapshot used to evaluate achievement conditions. */
@@ -11,7 +12,6 @@ export interface AchievementStats {
   prestiges: number
   shards: number
   tier: number
-  collectedOfflineEarnings: boolean
   maxHeatStreak: number
 }
 
@@ -33,17 +33,12 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
   {
     id: 'cap_connoisseur',
     name: 'Cap Connoisseur',
-    check: (s) => (['blue', 'filter', 'hypno', 'melt'] as CapId[]).every((c) => s.capsUsed.includes(c)),
+    check: (s) => ALL_CAP_IDS.every((c) => s.capsUsed.includes(c)),
   },
   { id: 'first_brainmelt', name: 'First Brainmelt', check: (s) => s.prestiges >= 1 },
   { id: 'ten_shards', name: '10 Shards', check: (s) => s.shards >= 10 },
   { id: 'goon_master', name: 'Goon Master', check: (s) => s.tier >= 10 },
   { id: 'heat_demon', name: 'Heat Demon', check: (s) => s.maxHeatStreak >= 80 },
-  {
-    id: 'offline_slut',
-    name: 'Offline Slut',
-    check: (s) => s.collectedOfflineEarnings,
-  },
 ]
 
 export const ACHIEVEMENT_CLICK_BONUS = 0.05

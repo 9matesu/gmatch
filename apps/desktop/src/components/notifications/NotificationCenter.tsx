@@ -1,17 +1,20 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
-import { Bell, CheckCircle2, AlertCircle, AlertTriangle, Info, X } from 'lucide-react';
+import { CheckCircle2, AlertCircle, AlertTriangle, Info, X } from 'lucide-react';
+import { NotificationBell } from '../rare/notification-bell';
 import { useToast, durationFor, type ToastMessage } from '../Toast';
+import { useSettings } from '../../hooks/useSettings';
 import { NotificationsPanel } from '../NotificationsPanel';
 import type { NotificationItem, MatchInviteItem } from '../NotificationsPanel';
 import type { AppNotification, NotificationTarget } from '../../utils/notifications';
+import { useMediaqInstall } from '../../services/mediaqInstall';
 
 function IconFor({ type }: { type: ToastMessage['type'] }) {
   const cls = 'w-3.5 h-3.5 shrink-0';
-  if (type === 'success') return <CheckCircle2 className={`${cls} text-emerald-400`} />;
-  if (type === 'error') return <AlertCircle className={`${cls} text-red-400`} />;
-  if (type === 'warning') return <AlertTriangle className={`${cls} text-amber-400`} />;
+  if (type === 'success') return <CheckCircle2 className={`${cls} text-success-fg`} />;
+  if (type === 'error') return <AlertCircle className={`${cls} text-danger-fg`} />;
+  if (type === 'warning') return <AlertTriangle className={`${cls} text-warning-fg`} />;
   return <Info className={`${cls} text-retro-body`} />;
 }
 
@@ -21,6 +24,8 @@ export interface NotificationCenterProps {
   invites?: MatchInviteItem[];
   /** Courier-derived rows (DMs, sealed rooms). */
   localItems?: AppNotification[];
+  /** Peer-lane rows (reports/interactions about my content). */
+  peerItems?: AppNotification[];
   /** Unified unread — derived from the merged items, never a second scalar. */
   unreadCount?: number;
   unreadByType?: Record<string, number>;
@@ -34,6 +39,8 @@ export interface NotificationCenterProps {
   onRespondInvite?: (inviteId: string, accept: boolean) => void;
   onRespondBabecock?: (inviteId: string, accept: boolean) => void;
   onOpenBabecock?: () => void;
+  /** Open the list by default (the left sidebar renders it expanded). */
+  defaultOpen?: boolean;
 }
 
 /**
@@ -53,6 +60,7 @@ export function NotificationCenter(props: NotificationCenterProps) {
     notifications = [],
     invites = [],
     localItems = [],
+    peerItems = [],
     unreadCount = 0,
     unreadByType = {},
     latestTitle,
@@ -64,13 +72,27 @@ export function NotificationCenter(props: NotificationCenterProps) {
     onRespondInvite,
     onRespondBabecock,
     onOpenBabecock,
+  defaultOpen = false,
   } = props;
 
+  const mediaq = useMediaqInstall();
   const { messages, dismiss, clearAll, overflowCount } = useToast();
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(defaultOpen);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const latestToast = messages.length ? messages[messages.length - 1] : null;
-  const preview = latestTitle || latestToast?.text || 'All quiet';
+  const preview = latestTitle || latestToast?.text || "";
+
+  // One store feeds every surface: the badge, the tray, the overlay and the
+  // native toast. The main process decides what the OS shows with this count.
+  const { settings } = useSettings();
+  useEffect(() => {
+    window.gmatch?.notifySync?.({
+      count: unreadCount,
+      title: latestTitle || "",
+      body: preview || "",
+      hideContent: !!settings.hideNotificationContent,
+    });
+  }, [unreadCount, latestTitle, preview, settings.hideNotificationContent]);
 
   // Auto-expire non-sticky toasts on the header's clock (single owner).
   useEffect(() => {
@@ -103,64 +125,110 @@ export function NotificationCenter(props: NotificationCenterProps) {
 
   return (
     <div
-      className="relative shrink-0 sm:flex-1 sm:min-w-0 max-w-md flex items-center"
+      className="relative flex items-center"
       style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
     >
-      <button
-        ref={triggerRef}
-        type="button"
+      {/* RareUI notification bell: the swing-on-new + rolling count badge.
+          Same toggle contract as before — data-notifications-toggle, the full
+          aria-label and the Escape-focus ref all live on this button. */}
+      <NotificationBell
+        ref={triggerRef as never}
+        count={unreadCount}
+        max={99}
+        size={32}
+        color="red"
         data-notifications-toggle="true"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
-        aria-label={`Notifications${unreadCount > 0 ? `: ${unreadCount} unread` : ''}. ${preview}. Activate to ${expanded ? 'collapse' : 'expand'}.`}
+        aria-label={`Notifications${unreadCount > 0 ? `: ${unreadCount} unread` : ''}${preview ? `. ${preview}` : ''}. Activate to ${expanded ? 'collapse' : 'expand'}.`}
         title="Notifications"
-        className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg border border-border-glass bg-glass-w5 hover:bg-glass-w10 text-left cursor-pointer transition-colors"
-      >
-        <span
-          className={`relative shrink-0 grid place-items-center w-7 h-7 rounded-md transition-colors ${
-            unreadCount > 0
-              ? 'bg-retro-accent text-retro-accent-text'
-              : 'bg-glass-w8 text-retro-fg'
-          }`}
-        >
-          <Bell className="w-4 h-4" />
-          {unreadCount > 0 && (
-            <span aria-hidden className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-retro-accent text-retro-accent-text ring-2 ring-retro-bg text-[10px] font-bold flex items-center justify-center tabular-nums">
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </span>
-          )}
+        className="shrink-0 bg-glass-w8 text-retro-fg hover:bg-glass-w10"
+      />
+      {/* Dynamic only: the newest unread title. The permanent "Notifications"
+          label is gone  it never changed, so it was chrome, not information. */}
+      {preview && (
+        <span aria-live="polite" className="min-w-0 truncate text-xs text-retro-fg/80 px-2">
+          {preview}
         </span>
-        <span aria-live="polite" className="min-w-0 flex-1 hidden sm:block leading-tight">
-          <span className="block text-[9px] font-bold uppercase tracking-wider text-retro-muted">
-            Notifications
-          </span>
-          <span className="block truncate text-[11px] text-retro-fg/80">{preview}</span>
-        </span>
-      </button>
+      )}
 
       {expanded && (
         <div
           role="region"
           aria-label="Notification centre"
-          className="absolute left-1/2 -translate-x-1/2 top-full mt-1 w-[min(420px,92vw)] max-h-[70vh] flex flex-col bg-retro-bg/95 border border-border-glass rounded-lg shadow-2xl backdrop-blur-md z-[var(--z-dropdown)] overflow-hidden"
+          className="absolute left-1/2 -translate-x-1/2 top-full mt-1 w-[min(420px,92vw)] max-h-(--max-h-sheet) flex flex-col bg-retro-bg/95 border border-edge rounded-lg shadow-2xl backdrop-blur-md z-[var(--z-dropdown)] overflow-hidden"
         >
+          {/* Active mediaq setup: the install survives the modal being closed
+              ("Send to background"), so its progress lives here too. */}
+          {mediaq.status !== 'idle' && (
+            <div className="shrink-0 border-b border-edge p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-retro-fg">Media suite</span>
+                <button
+                  type="button"
+                  onClick={() => mediaq.reset()}
+                  aria-label="Dismiss media suite"
+                  className="p-0.5 rounded text-retro-muted hover:text-retro-fg cursor-pointer"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+              {mediaq.status === 'installing' && (
+                <div className="mt-1.5 space-y-1">
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-glass-w8">
+                    {mediaq.percent !== null ? (
+                      <div className="h-full rounded-full bg-retro-accent transition-[width] duration-300" style={{ width: `${mediaq.percent}%` }} />
+                    ) : (
+                      <div className="h-full w-1/3 animate-pulse rounded-full bg-retro-accent" />
+                    )}
+                  </div>
+                  <div className="flex justify-between text-2xs text-retro-muted">
+                    <span className="truncate">{mediaq.message || 'Installing…'}</span>
+                    {mediaq.percent !== null && <span className="tabular-nums">{mediaq.percent}%</span>}
+                  </div>
+                </div>
+              )}
+              {mediaq.status === 'done' && <p className="mt-1 text-2xs text-success-fg">mediaq is ready</p>}
+              {mediaq.status === 'error' && <p className="mt-1 text-2xs text-danger-fg">{mediaq.message}</p>}
+              {mediaq.status === 'cancelled' && <p className="mt-1 text-2xs text-warning-fg">Cancelled</p>}
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => mediaq.openModal()}
+                  className="glass-action px-2 py-0.5 rounded text-2xs cursor-pointer text-retro-muted hover:text-retro-fg"
+                >
+                  Show setup
+                </button>
+                {mediaq.status === 'installing' && (
+                  <button
+                    type="button"
+                    onClick={() => mediaq.cancel()}
+                    className="glass-action px-2 py-0.5 rounded text-2xs cursor-pointer text-danger-fg hover:bg-danger/20"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Transient toasts: an error stays until dismissed, so it needs a
               home inside the same surface rather than a floating overlay. */}
           {messages.length > 0 && (
-            <div className="shrink-0 border-b border-border-glass">
+            <div className="shrink-0 border-b border-edge">
               <div className="flex items-center justify-between px-3 py-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wide text-retro-muted">
+                <span className="text-2xs font-bold uppercase tracking-wide text-retro-muted">
                   Recent{overflowCount > 0 && <span className="font-normal"> · +{overflowCount} more</span>}
                 </span>
-                <button type="button" onClick={clearAll} className="text-[11px] text-retro-muted hover:text-retro-fg cursor-pointer">
+                <button type="button" onClick={clearAll} className="text-xs text-retro-muted hover:text-retro-fg cursor-pointer">
                   Clear
                 </button>
               </div>
-              <ul className="max-h-28 overflow-y-auto styled-scrollbar divide-y divide-border-subtle">
+              <ul className="max-h-28 overflow-y-auto styled-scrollbar divide-y divide-edge-subtle">
                 {[...messages].reverse().map((m) => (
                   <li key={m.id} className="flex items-start gap-2 px-3 py-2">
                     <IconFor type={m.type} />
-                    <span className="flex-1 min-w-0 text-[11px] text-retro-fg break-words">{m.text}</span>
+                    <span className="flex-1 min-w-0 text-xs text-retro-fg break-words">{m.text}</span>
                     <button
                       type="button"
                       onClick={() => dismiss(m.id)}
@@ -183,6 +251,7 @@ export function NotificationCenter(props: NotificationCenterProps) {
               unreadByType={unreadByType}
               invites={invites}
               localItems={localItems}
+              peerItems={peerItems}
               onMarkAllRead={onMarkAllRead}
               onMarkRead={onMarkRead}
               onOpenTarget={onOpenTarget}

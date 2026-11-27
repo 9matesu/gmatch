@@ -13,11 +13,54 @@ export interface GmatchUpdateStatus {
   manual?: boolean
 }
 
+/** Per-provider feed search metrics (from electron/feedMetrics.cjs). */
+export interface FeedProviderMetrics {
+  attempts: number
+  oks: number
+  empties: number
+  timeouts: number
+  errors: number
+  medianMs: number | null
+}
+
+/** Aggregate feed search metrics (from electron/feedMetrics.cjs). */
+export interface FeedMetricsSummary {
+  rounds: number
+  totalLatencyMs: number | null
+  firstResultMs: number | null
+  resultCount: number | null
+  cacheHitRate: number | null
+  fallbacks: number
+  providers: Record<string, FeedProviderMetrics>
+}
+
+/** One picture in the encrypted picture cache (the clicker's cache). */
+export interface CachedPicture {
+  /** The remote url the picture came from. */
+  url: string
+  /** The local (gmcache://) url that serves the bytes from disk. */
+  local: string
+  mime: string
+  bytes: number
+  /** When it was cached (ms). Newest first. */
+  ts: number
+}
+
 /** The single source of truth for the preload bridge surface. */
 export interface GmatchBridge {
   booruFetch?: (req: BooruRequest) => Promise<BooruResponse>
+  /** Read-only feed search metrics (observability). Never a UI surface. */
+  booruTimings?: () => Promise<FeedMetricsSummary>
+  /** mediaq setup suite (one-shot). The app is unchanged offline when mediaq is absent. */
+  mediaqStatus?: () => Promise<{ installed: boolean; running: boolean; base: string; error?: string }>
+  mediaqInstall?: () => Promise<{ ok: boolean; bin?: string; error?: string; cancelled?: boolean }>
+  mediaqCancel?: () => Promise<{ ok: boolean }>
+  mediaqStart?: () => Promise<{ ok: boolean; base?: string; error?: string }>
+  onMediaqProgress?: (cb: (p: { phase: string; message: string; percent?: number }) => void) => () => void
   cacheImage?: (url: string) => Promise<{ local: string | null }>
   cacheStats?: () => Promise<{ files: number; bytes: number }>
+  /** What the device holds, newest first: the clicker's picture cache. */
+  cacheList?: () => Promise<{ items: CachedPicture[] }>
   clearCache?: () => Promise<{ files: number; bytes: number }>
   /** Drops memoized feed lists after tag-intent changes (bytes untouched). */
   clearFeedCache?: () => Promise<{ cleared: number }>
@@ -66,6 +109,9 @@ export interface GmatchBridge {
   winMinimize?: () => void
   winToggleMaximize?: () => void
   winClose?: () => void
+  notifySync?: (payload: { count: number; title?: string; body?: string; hideContent?: boolean }) => void
+  notifyRead?: () => void
+  onNotifyOpened?: (cb: () => void) => () => void
   winReload?: () => void
   appVersion?: () => Promise<string>
   openExternal?: (url: string) => Promise<void>
@@ -80,7 +126,7 @@ export interface GmatchBridge {
   wallpaperSetData?: (
     buf: ArrayBuffer,
     mime: string,
-  ) => Promise<{ ok: boolean; hadPrevious?: boolean; reason?: 'unsupported-platform' | 'no-data' | 'set-failed' | 'error' }>
+  ) => Promise<{ ok: boolean; hadPrevious?: boolean; reason?: 'unsupported-platform' | 'no-data' | 'set-failed' | 'no-powershell' | 'restore-failed' | 'error' }>
   wallpaperRestore?: () => Promise<{ ok: boolean; reason?: string }>
   wallpaperCleanupFiles?: () => Promise<{ ok: boolean }>
   grantCameraOnce?: () => Promise<{ ok: boolean }>
@@ -92,6 +138,9 @@ export interface GmatchBridge {
   domVideoOpen?: (url: string, durationMs?: number) => Promise<{ ok: boolean; reason?: string }>
   blocklistGet?: () => Promise<{ current: BlocklistData; defaults: BlocklistData; isCustom?: boolean }>
   blocklistSet?: (data: BlocklistData | string) => Promise<{ ok: boolean; data?: BlocklistData; error?: string }>
+  /** Ban terms for good. Main merges them into the authoritative list and
+   *  returns it, so the renderer never clobbers a newer list. */
+  blocklistBan?: (terms: string[] | string) => Promise<{ ok: boolean; data?: BlocklistData; added?: string[]; error?: string }>
   blocklistReset?: () => Promise<{ ok: boolean; data?: BlocklistData; error?: string }>
   /** Fire-and-forget renderer log line; main appends it to userData/main.log. */
   logError?: (scope: string, msg: string) => void

@@ -40,19 +40,19 @@ export function AdminSidebar({
   return (
     <aside
       className={cn(
-        "glass-panel border-r border-border-glass flex flex-col h-full overflow-hidden",
+        "glass-panel border-r border-edge flex flex-col h-full overflow-hidden",
         "desktop-sidebar",
         className
       )}
       role="navigation"
       aria-label="Admin navigation"
     >
-      <div className="p-4 border-b border-border-glass flex items-center justify-between">
+      <div className="p-4 border-b border-edge flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-retro-accent" />
           <div className="min-w-0">
             <div className="text-xs font-black tracking-tight text-retro-fg uppercase truncate">gMatch Admin</div>
-            <div className="text-[10px] font-mono text-retro-muted">Moderation Console</div>
+            <div className="text-2xs font-mono text-retro-muted">Moderation Console</div>
           </div>
         </div>
         {onClose && (
@@ -70,7 +70,7 @@ export function AdminSidebar({
       <nav className="flex-1 overflow-y-auto p-3 space-y-3" role="list">
         {sections.map((section, _sectionIndex) => (
           <div key={section} className="space-y-1">
-            <div className="px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-retro-faint">
+            <div className="px-3 py-2 text-2xs font-black uppercase tracking-[0.2em] text-retro-faint">
               {section}
             </div>
             {tabs
@@ -84,7 +84,7 @@ export function AdminSidebar({
                     type="button"
                     onClick={() => onTabChange(tab.id)}
                     className={cn(
-                      "w-full flex items-center justify-between px-3 py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer",
+                      "w-full flex items-center justify-between px-3 py-2.5 text-xs font-bold rounded-lg transition cursor-pointer",
                       active
                         ? "bg-retro-accent/15 text-retro-accent border border-retro-accent/30"
                         : "text-retro-muted hover:text-retro-fg hover:bg-glass-w5 border border-transparent"
@@ -98,9 +98,9 @@ export function AdminSidebar({
                     </div>
                     {tab.badge && (
                       <span className={cn(
-                        "text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold",
+                        "text-2xs px-1.5 py-0.5 rounded-full font-mono font-bold",
                         active ? "bg-retro-selection text-retro-accent" : "bg-glass-w8 text-retro-muted",
-                        tab.id === "reports" && tab.badge && Number(tab.badge) > 0 && "bg-red-500 text-white"
+                        tab.id === "reports" && tab.badge && Number(tab.badge) > 0 && "bg-danger text-retro-fg"
                       )}>
                         {tab.badge}
                       </span>
@@ -112,10 +112,10 @@ export function AdminSidebar({
         ))}
       </nav>
 
-      <div className="p-4 border-t border-border-glass space-y-2">
-        <div className="flex items-center justify-between text-[10px] font-mono text-retro-muted">
+      <div className="p-4 border-t border-edge space-y-2">
+        <div className="flex items-center justify-between text-2xs font-mono text-retro-muted">
           <span>Admin Status:</span>
-          <span className="text-emerald-400 font-bold uppercase tracking-wider">Active</span>
+          <span className="text-success-fg font-bold uppercase tracking-wider">Active</span>
         </div>
         <a
           href="/"

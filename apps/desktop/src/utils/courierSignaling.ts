@@ -10,7 +10,7 @@ import { defaultIceConfig, sanitizeCandidate } from './ice-hygiene'
 import { peerNodeFor } from './peerNodes'
 import { logger } from './logger'
 
-function readTurnEnv(): Record<string, string | undefined> {
+export function readTurnEnv(): Record<string, string | undefined> {
   if (typeof process !== 'undefined' && process.env) return process.env as Record<string, string | undefined>
   if (typeof window !== 'undefined') return (window as unknown as { __ENV?: Record<string, string | undefined> }).__ENV ?? {}
   return {}
@@ -49,6 +49,36 @@ export interface PeerMeshConnection {
 }
 
 const activeMeshPeers = new Map<string, PeerMeshConnection>()
+
+/**
+ * Register a connection established OUTSIDE the courier (tracker discovery).
+ * The swarm frames, the roster and the transport registry all read this same
+ * map, so a tracker-found peer is a first-class peer.
+ */
+export function registerMeshConnection(conn: PeerMeshConnection): void {
+  const existing = activeMeshPeers.get(conn.peerOrbitId)
+  if (existing && existing.pc !== conn.pc) {
+    try {
+      existing.close()
+    } catch {
+      /* already closed */
+    }
+  }
+  activeMeshPeers.set(conn.peerOrbitId, conn)
+}
+
+/** The live connection for a peer, if any (used by the mesh to send). */
+export function getMeshConnection(peerOrbitId: string): PeerMeshConnection | undefined {
+  return activeMeshPeers.get(peerOrbitId)
+}
+
+/** Drop a connection (channel closed, HELLO failed). */
+export function dropMeshConnection(peerOrbitId: string, pc?: RTCPeerConnection): void {
+  const existing = activeMeshPeers.get(peerOrbitId)
+  if (!existing) return
+  if (pc && existing.pc !== pc) return
+  activeMeshPeers.delete(peerOrbitId)
+}
 const pendingSessions = new Map<string, {
   pc: RTCPeerConnection
   channel?: RTCDataChannel
@@ -145,14 +175,44 @@ function dispatchMeshMessage(data: string, fromPeerId: string): void {
   }
 }
 
+/**
+ * Direct DataChannels have no reliable flow control for bursty swarm chunk
+ * traffic, and the browser does not: `channel.send()` on a slow consumer
+ * grows `bufferedAmount` without bound (the peer's queue, our memory).
+ *
+ * When a channel's `bufferedAmount` passes HIGH, that channel is marked
+ * saturated and skipped until its buffer drains below LOW again. Skipping is
+ * SAFE for the swarm protocol, not a lossy hack: chunk reassembly is by
+ * INDEX (reordered/duplicate/missing frames are expected), a missing chunk
+ * leaves the transfer incomplete (a failure, never corrupt bytes), the id
+ * stays wanted, and the next SWARM_HAVE wave re-issues `SWARM_WANT`s that
+ * re-answer only the missing indices. WANT/KEY/CHALLENGE/RECEIPT frames are
+ * equally order-insensitive at their handlers. Recovery never depends on the
+ * saturated channel; the node relay remains the guaranteed fallback path.
+ */
+export const MESH_BACKPRESSURE_HIGH_BYTES = 1 * 1024 * 1024
+export const MESH_BACKPRESSURE_LOW_BYTES = 256 * 1024
+
+const saturatedChannels = new WeakSet<RTCDataChannel>()
+
 export function broadcastMeshFrame(data: string): void {
   for (const conn of activeMeshPeers.values()) {
-    if (conn.channel.readyState === 'open') {
-      try {
-        conn.channel.send(data)
-      } catch (err) {
-        logger.warn('[Mesh] Error sending frame to peer:', conn.peerOrbitId, err)
-      }
+    const channel = conn.channel
+    if (channel.readyState !== 'open') continue
+    const buffered = typeof channel.bufferedAmount === 'number' ? channel.bufferedAmount : 0
+    if (buffered > MESH_BACKPRESSURE_HIGH_BYTES) {
+      // The consumer cannot take more right now: stop feeding it. The
+      // low-water mark below un-saturates on a later wave.
+      saturatedChannels.add(channel)
+      logger.warn('[Mesh] Channel saturated (', buffered, 'B buffered); frame withheld for:', conn.peerOrbitId)
+      continue
+    }
+    if (saturatedChannels.has(channel) && buffered > MESH_BACKPRESSURE_LOW_BYTES) continue
+    saturatedChannels.delete(channel)
+    try {
+      channel.send(data)
+    } catch (err) {
+      logger.warn('[Mesh] Error sending frame to peer:', conn.peerOrbitId, err)
     }
   }
 }
@@ -186,9 +246,10 @@ export async function sendCourierSignal(
   )
 
   try {
-    // Sealed mail is relayed by the courier (Cloudflare by default), so the
-    // signal reaches a peer on ANY world. Only a deployment that disabled the
-    // directory falls back to the peer's node / our node.
+    // Sealed mail is relayed by the node this client is connected to (the hub,
+    // when one is configured), so the
+    // signal reaches a peer on ANY world. With no hub configured the base is
+    // this machine's node.
     const base = (getCentralApiUrl() || opts?.base || getApiBaseUrl()).replace(/\/+$/, '')
     const url = `${base}/api/mail/${token}`
     const res = await fetchImpl(url, {

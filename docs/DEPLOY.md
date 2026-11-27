@@ -1,23 +1,25 @@
 # Deploy notes (security-relevant ops)
 
-## Hosts (2026-10-24) — one Cloudflare project, no hosted data node
+## Hosts (2026-11-07) — no hosted data node, no hosted courier
 
 | Host | State | Action |
 |---|---|---|
-| `https://gmatch.pages.dev` | **live**: release page + blind courier (directory + sealed mail) | deploy with `node site/deploy-pages.mjs` |
+| `https://gmatch.pages.dev` | **live**: static release page + legal pages + `release.json`. No function, no D1, no mailbox, no directory. | deploy with `node site/deploy-pages.mjs` |
 | a self-hosted full node | optional, run by whoever hosts a world | `npm run dist` on that machine, or `docker build` + the image |
 
 The end state is direct peer-to-peer (SPEC §12b): no third-party host stores
-posts, media, comments, likes or profiles. What stays central is a rendezvous
-(directory + sealed mail). The Cloudflare Pages project is that rendezvous and
-nothing else.
+posts, media, comments, likes or profiles — and no third-party host holds a
+mailbox or a directory row either. Every install runs its own node, and that
+node is the rendezvous: the directory, the sealed-mail relay and the swarm
+meeting point. A peer on another node is reached through the address its
+signed beacon carries.
 
 **The release feed is the last host-dependent piece.** `release.json` lives on
-the same Pages origin; the updater also asks the node this install talks to
-when that node serves a manifest. If neither answers, the updater says "no host
+the Pages origin; the updater also asks the node this install talks to when
+that node serves a manifest. If neither answers, the updater says "no host
 answered" rather than pretend the app is current.
 
-## Cloudflare Pages (release page + courier)
+## Cloudflare Pages (static page only)
 
 The project is a **classic Pages project** named `gmatch` (`gmatch.pages.dev`),
 because a Worker project would expose `<name>.<account>.workers.dev`. Deploy is
@@ -30,39 +32,16 @@ node site/deploy-pages.mjs --preview  # preview alias only
 ```
 
 `site/deploy-pages.mjs` stages `index.html`, `release.json`, `img/`, `legal/`
-and `functions/` inside the repo (`.pages-stage`, gitignored, removed after),
-writes a `wrangler.toml` with the D1 binding, and calls `wrangler pages deploy`.
-Staging stays inside the workspace so esbuild can resolve `@noble/*` for the
-Functions bundle.
+inside the repo (`.pages-stage`, gitignored, removed after), writes a
+`wrangler.toml` with no bindings, and calls `wrangler pages deploy`.
 
-The courier (`site/functions/api/[[path]].ts`) keeps **only**:
-
-- `GET /api/health` — mode `courier`, services `mail,directory`;
-- `GET /api/identity` — `sealed_available:false` (no transport key here);
-- `GET /api/servers` — public directory; addresses only to signed callers;
-- `POST /api/servers`, `POST /api/servers/:id/ping`, `DELETE /api/servers/:id`
-  — Ed25519-signed (`X-Orbit-*` headers) and owner-bound;
-- `PUT/GET /api/mail/:token`, `POST /api/mail/:token/ack`, `/api/mail/stats/size`
-  — sealed envelopes, TTL 7 days, drain requires proof of key ownership;
-- everything else — `404` (the blind-courier law).
-
-Storage is D1 (`gmatch-courier`, id `3773d27c-23cc-4fe4-bcc6-8bf17cb70009`).
-Schema: `site/schema.sql`.
-
-```sh
-npx wrangler d1 create gmatch-courier                       # once, then paste the id
-npx wrangler d1 execute gmatch-courier --remote --file=site/schema.sql
-```
-
-No secrets are required: the courier publishes no transport key and verifies
-mail ACKs against the caller's own pubkey. There is **no TURN** — `/api/turn`
-answers 404 on purpose, so clients stay on STUN/direct paths instead of being
-handed credentials to a relay that does not exist. (A TURN service can be added
-later as its own deployment.)
-
-There is **no WebSocket** on the courier: a Pages isolate cannot notify a socket
-held by another isolate without a Durable Object. `MailClient` detects the
-courier origin and polls its boxes every 20 s instead.
+The hosted courier that used to live here (`site/functions/api/[[path]].ts` +
+the `gmatch-courier` D1 database) was **removed in gmatch 2.0**: the D1 was
+emptied and then deleted, and the function is gone. `/api/*` on this origin now
+returns the static page (the Pages fallback), never courier JSON — a client
+that still points here gets HTML and fails loudly instead of talking to a stale
+rendezvous. A shared hub is still possible for people who want one — set
+`gmatch.central.url` (or `VITE_CENTRAL_URL`) to a node they run.
 
 ## Self-hosted node (optional)
 
@@ -73,17 +52,15 @@ snapshot, blob dir. The `Dockerfile` builds it; run it wherever you host.
 - Admin suite: `ADMIN_PIN_HASH` (sha256 hex of the PIN) + `ADMIN_ORBIT_ID` (the
   one orbitId allowed to unlock). Without `ADMIN_ORBIT_ID` the PIN alone grants
   admin (self-host model).
-- A courier can also be run by a node with `SITE_SERVICES=mail` — it then
-  serves the directory and mail and 404s content routes, exactly like the
-  Cloudflare function.
+- A node can also run as a pure relay with `SITE_SERVICES=mail` — it then
+  serves the directory and mail and 404s content routes.
 
 ## API_SEALED_ONLY flip (wave 2 B2)
 
 `API_SEALED_ONLY=1` now rejects plaintext GETs too. Flip ONLY after the
 desktop release that seals GET headers is the minimum supported client —
 old clients break otherwise. Rollback: unset the secret (signed-plaintext
-legacy path stays implemented). This applies to full nodes, not to the
-Cloudflare courier (which never advertises a transport key).
+legacy path stays implemented). This applies to full nodes.
 
 ## Dev sidecar
 
@@ -113,8 +90,10 @@ Dev is **local-only** (`scripts/dev.cjs` + `vite.config.ts`): there is no
 `GMATCH_DEV_API=remote`. Port 5173 is strict because localStorage, IndexedDB
 and the identity are origin-bound.
 
-**A courier is a directory/mail relay, never a data base.** The Cloudflare
-function 404s every stateful route, so no client may persist it as
-`gmatch.api.url` — older builds did, which is why `purgeCourierApiState()`
-(`apps/desktop/src/utils/api.ts`) clears that state on boot. e2e
-`api-network.spec.ts` fails if the dev `/api` ever points back at a courier.
+**A relay node is a directory/mail relay, never a data base.** A node in
+`SITE_SERVICES=mail` mode 404s every stateful route, so no client may persist
+it as `gmatch.api.url` — older builds did, which is why
+`purgeCourierApiState()` (`apps/desktop/src/utils/api.ts`) clears that state on
+boot, and why `central.ts` drops a pointer to the retired hosted courier
+instead of dialing it. e2e `api-network.spec.ts` fails if the dev `/api` ever
+points back at a blind relay.

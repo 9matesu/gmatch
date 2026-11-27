@@ -236,6 +236,10 @@ export function deriveConversationNotifications(
     if (unread <= 0) continue
     const last = newestInbound(thread, selfId)
     const name = resolveName(peerId, last?.senderName)
+    // No real display name anywhere (payload name absent, default resolver):
+    // this is an unidentified peer. Do NOT fabricate a random "User_abc sent you
+    // a message" notification for it — the chat badge still shows the thread.
+    if (!last?.senderName?.trim() && /^User_[0-9a-f]{6,}$/i.test(name)) continue
     // Same helper the chat badge uses, so the "Mentioned you" note and the
     // chat's per-thread mention count can never tell different stories.
     const mentions = countMentions(thread, matcher, dmSeen?.[peerId] ?? 0)
@@ -306,37 +310,105 @@ export function deriveConversationNotifications(
  * Merge sources into one list: newest first, deduped by {@link AppNotification.key}
  * (the newest row for a key wins, so a repeated delivery cannot double-render).
  */
+/** The key prefix shared by every PEER-lane row (reports, interactions). */
+const PEER_KEY_PREFIX = 'local:peer-';
+
 /**
- * Reports about MY content (peer lane).
- *
- * In a mesh there is no central moderator: a report travels as a signed
- * operation to the peers, and the AUTHOR of the content is the one who can
- * act on it. So the report shows up in the author's notification centre —
- * not as "an admin will handle it" (nobody is an admin of a mesh).
+ * The operation id a peer-lane key stands for, or null when the key is not a
+ * peer row. Lets the read handler mark exactly the row that was tapped without
+ * re-deriving the projection.
  */
-export function derivePeerReportNotifications(
-  reports: ReadonlyArray<{ operationId: string; targetType: 'post' | 'comment'; targetId: string; reason: string; reporterId: string; createdAt: number }>,
-  args: { resolveName?: (peerId: string, payloadName?: string) => string } = {},
+export function peerNotificationSubject(key: string): string | null {
+  if (!key.startsWith(PEER_KEY_PREFIX)) return null;
+  const subject = key.slice(PEER_KEY_PREFIX.length);
+  return subject || null;
+}
+
+/** What a peer attention event is about. */
+export type PeerAttentionKind = 'report' | 'follow' | 'like' | 'comment' | 'reply'
+
+/** One peer-lane row, before it becomes an {@link AppNotification}. */
+export interface PeerAttentionEvent {
+  operationId: string
+  kind: PeerAttentionKind
+  /** `user` for a follow (open the actor's profile), else the content. */
+  targetType: 'post' | 'comment' | 'user'
+  /** What a tap should open: a post, a comment, or a profile id. */
+  targetId: string
+  /** The post a comment target belongs to, so the deep link can open it. */
+  postId?: string
+  actorId: string
+  createdAt: number
+  /** A report's reason, or a comment's text. */
+  note?: string
+}
+
+function peerTitle(event: PeerAttentionEvent, name: string): string {
+  switch (event.kind) {
+    case 'report':
+      return `${name} reported your ${event.targetType}`
+    case 'follow':
+      return `${name} started following you`
+    case 'like':
+      return `${name} liked your ${event.targetType === 'comment' ? 'comment' : 'post'}`
+    case 'comment':
+      return `${name} commented on your post`
+    case 'reply':
+      return `${name} replied to your comment`
+    default:
+      return `${name} interacted with your content`
+  }
+}
+
+function peerTarget(event: PeerAttentionEvent): NotificationTarget {
+  if (event.targetType === 'post') return { postId: event.targetId }
+  if (event.targetType === 'comment') {
+    // A comment id alone lands nowhere: the deep link needs the post too.
+    return event.postId
+      ? { postId: event.postId, commentId: event.targetId }
+      : { commentId: event.targetId }
+  }
+  // A follow has no content: the follower's profile is the only honest place.
+  return { userId: event.targetId }
+}
+
+/**
+ * Peer-lane rows about MY content.
+ *
+ * In a mesh there is no central moderator and no central like/comment service:
+ * a report, a follow, a like and a comment all travel as signed operations to
+ * the peers, and the AUTHOR of the content is the one who can act on them, so
+ * they belong in the author's notification centre.
+ *
+ * `readIds` is the durable per-identity read set (`utils/peerNotifications.ts`):
+ * a peer row has no node flag and no chat stamp, so without it the row counted
+ * toward the badge forever and the badge could never clear.
+ */
+export function derivePeerNotifications(
+  events: ReadonlyArray<PeerAttentionEvent>,
+  args: {
+    resolveName?: (peerId: string, payloadName?: string) => string
+    readIds?: ReadonlySet<string> | null
+  } = {},
 ): AppNotification[] {
   const resolveName =
     args.resolveName ??
     ((peerId: string, payloadName?: string) => payloadName?.trim() || generateFallbackName(peerId))
-  return reports.map((report) => {
-    const name = resolveName(report.reporterId)
+  const readIds = args.readIds
+  return events.map((event) => {
+    const name = resolveName(event.actorId)
     return {
-      key: notificationKey('local', `report-${report.operationId}`),
-      id: report.operationId,
+      key: `${PEER_KEY_PREFIX}${event.operationId}`,
+      id: event.operationId,
       source: 'local',
-      type: 'report',
-      title: `${name} reported your ${report.targetType}`,
-      body: report.reason.trim() || null,
-      createdAt: new Date(report.createdAt).toISOString(),
-      read: false,
-      actorId: report.reporterId,
+      type: event.kind,
+      title: peerTitle(event, name),
+      body: event.note?.trim() || null,
+      createdAt: new Date(event.createdAt).toISOString(),
+      read: Boolean(readIds?.has(event.operationId)),
+      actorId: event.actorId,
       actorName: name,
-      target: report.targetType === 'post'
-        ? { postId: report.targetId }
-        : { commentId: report.targetId },
+      target: peerTarget(event),
       marks: [],
     }
   })

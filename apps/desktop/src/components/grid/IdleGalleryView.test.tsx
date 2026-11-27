@@ -18,6 +18,13 @@ vi.mock('../../services/vault', async (importOriginal) => {
   return {
     ...mod,
     useVaultUrls: () => vaultMap,
+    // The gallery reads the PER-MOUNT settled set: a url is only "settled"
+    // once THIS mount's lookup answered. The mock answers immediately, so
+    // every requested url is settled from the first render.
+    useVaultUrlLookups: (urls: Array<string | null | undefined>) => ({
+      urls: vaultMap,
+      settled: new Set((urls ?? []).filter((u): u is string => !!u)),
+    }),
     useVaultUrl: () => null,
     useVaultHttpUrls: () => vaultHttpMap,
   }
@@ -110,13 +117,13 @@ describe('IdleGalleryView', () => {
 
     render(<IdleGalleryView />)
 
-    const videoFilterBtn = screen.getByRole('button', { name: /^Filter: video$/i })
+    const videoFilterBtn = screen.getByRole('tab', { name: /^Videos$/i })
     await userEvent.click(videoFilterBtn)
 
     const videoItems = screen.getAllByRole('button', { name: /^View /i })
     expect(videoItems.length).toBe(1)
 
-    const imageFilterBtn = screen.getByRole('button', { name: /^Filter: image$/i })
+    const imageFilterBtn = screen.getByRole('tab', { name: /^Images$/i })
     await userEvent.click(imageFilterBtn)
 
     const imageItems = screen.getAllByRole('button', { name: /^View /i })
@@ -155,16 +162,16 @@ describe('IdleGalleryView', () => {
     await userEvent.click(selectAllBtn)
 
     // Batch bar shows 18 selected (page 1 has 18 items)
-    expect(screen.getByText(/18 images selected/i)).toBeInTheDocument()
+    expect(screen.getByText(/18 selected/i)).toBeInTheDocument()
 
     // Press Escape to clear
     fireEvent.keyDown(window, { key: 'Escape' })
-    expect(screen.queryByText(/18 images selected/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/18 selected/i)).not.toBeInTheDocument()
 
     // Select single item via checkbox
     const selectCheckbox = screen.getAllByLabelText(/Select image/i)[0]
     await userEvent.click(selectCheckbox)
-    expect(screen.getByText(/1 images selected/i)).toBeInTheDocument()
+    expect(screen.getByText(/^1 selected/i)).toBeInTheDocument()
 
     // Batch delete
     const deleteBtn = screen.getByRole('button', { name: /^Delete$/i })
@@ -191,20 +198,14 @@ describe('IdleGalleryView', () => {
       />
     )
 
-    // Hover / options dropdown on tile
-    const moreTileBtn = screen.getAllByRole('button', { name: /^Options for /i })[0]
-    await userEvent.click(moreTileBtn)
-
-    const repostTileBtn = screen.getByRole('button', { name: /Repost .* to feed/i })
-    await userEvent.click(repostTileBtn)
+    // The tile menu is the shared context menu now: it asks through the
+    // bridge, and the gallery runs the action against its own store.
+    const last = images[images.length - 1]
+    window.dispatchEvent(new CustomEvent('gmatch:gallery-action', { detail: { action: 'repost', keepsakeId: last.id } }))
     expect(onRepost).toHaveBeenCalledTimes(1)
-    expect(onRepost).toHaveBeenCalledWith(
-      expect.objectContaining({ url: images[images.length - 1].url })
-    )
+    expect(onRepost).toHaveBeenCalledWith(expect.objectContaining({ url: last.url }))
 
-    await userEvent.click(moreTileBtn)
-    const storyTileBtn = screen.getByRole('button', { name: /Add .* to story/i })
-    await userEvent.click(storyTileBtn)
+    window.dispatchEvent(new CustomEvent('gmatch:gallery-action', { detail: { action: 'story', keepsakeId: last.id } }))
     expect(onAddToStory).toHaveBeenCalledTimes(1)
 
     // Click on thumbnail to open viewer modal
@@ -380,13 +381,13 @@ describe('IdleGalleryView', () => {
 
     render(<IdleGalleryView />)
     await userEvent.click(screen.getByRole('button', { name: /Select all on page/i }))
-    await userEvent.click(screen.getByRole('button', { name: /Download Selected/i }))
+    await userEvent.click(screen.getByRole('button', { name: /^Download$/i }))
     await waitFor(() => expect(vi.mocked(releaseLocalUrl)).toHaveBeenCalledTimes(2))
 
     // Source refuses: the URL is still released, so nothing is leaked.
     fetchMock.mockImplementation(async () => ({ ok: false }))
     vi.mocked(releaseLocalUrl).mockClear()
-    await userEvent.click(screen.getByRole('button', { name: /Download Selected/i }))
+    await userEvent.click(screen.getByRole('button', { name: /^Download$/i }))
     await waitFor(() => expect(vi.mocked(releaseLocalUrl)).toHaveBeenCalledTimes(2))
     vi.unstubAllGlobals()
   })

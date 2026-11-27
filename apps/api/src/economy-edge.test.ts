@@ -100,7 +100,6 @@ describe('concurrent idempotency races (constraint-conflict recovery)', () => {
     const fakeDb = (err: Error) =>
       new EconomyService({
         prepare: db.prepare.bind(db),
-        batch: db.batch.bind(db),
         atomicBatch: async () => {
           throw err
         },

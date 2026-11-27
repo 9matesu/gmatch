@@ -106,12 +106,6 @@ export function decryptPayload(encryptedPayload: Uint8Array, recipientPrivHex: s
   return cipher.decrypt(ciphertext);
 }
 
-export interface EncryptedContent {
-  ciphertext: Uint8Array;
-  nonce: Uint8Array;
-  authTag?: Uint8Array;
-}
-
 export interface WrappedKey {
   recipientPubHex: string;
   wrappedDekHex: string;
@@ -362,46 +356,3 @@ export function decryptContent(
   return result;
 }
 
-export function encryptMetadata(metadata: { caption?: string; tags?: string[] }, dek: Uint8Array): { encryptedCaption?: string; encryptedTags?: string } {
-  const result: { encryptedCaption?: string; encryptedTags?: string } = {};
-  
-  if (metadata.caption) {
-    const { ciphertext, nonce } = encryptWithDek(new TextEncoder().encode(metadata.caption), dek);
-    const combined = new Uint8Array(nonce.length + ciphertext.length);
-    combined.set(nonce, 0);
-    combined.set(ciphertext, nonce.length);
-    result.encryptedCaption = bytesToHex(combined);
-  }
-  
-  if (metadata.tags && metadata.tags.length > 0) {
-    const { ciphertext, nonce } = encryptWithDek(new TextEncoder().encode(JSON.stringify(metadata.tags)), dek);
-    const combined = new Uint8Array(nonce.length + ciphertext.length);
-    combined.set(nonce, 0);
-    combined.set(ciphertext, nonce.length);
-    result.encryptedTags = bytesToHex(combined);
-  }
-  
-  return result;
-}
-
-export function decryptMetadata(encrypted: { encryptedCaption?: string; encryptedTags?: string }, dek: Uint8Array): { caption?: string; tags?: string[] } {
-  const result: { caption?: string; tags?: string[] } = {};
-  
-  if (encrypted.encryptedCaption) {
-    const combined = hexToBytes(encrypted.encryptedCaption);
-    const nonce = combined.slice(0, 24);
-    const ciphertext = combined.slice(24);
-    const decrypted = decryptWithDek(ciphertext, dek, nonce);
-    result.caption = new TextDecoder().decode(decrypted);
-  }
-  
-  if (encrypted.encryptedTags) {
-    const combined = hexToBytes(encrypted.encryptedTags);
-    const nonce = combined.slice(0, 24);
-    const ciphertext = combined.slice(24);
-    const decrypted = decryptWithDek(ciphertext, dek, nonce);
-    result.tags = JSON.parse(new TextDecoder().decode(decrypted));
-  }
-  
-  return result;
-}

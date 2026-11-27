@@ -37,7 +37,7 @@ const ICONS = {
 export function RoomsPreview({ rows, onOpenRow, onOpenAll }: RoomsPreviewProps) {
   return (
     <div className="h-full min-h-0 flex flex-col rounded-xl overflow-hidden solid-panel">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border-glass shrink-0 bg-glass-w5">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-edge shrink-0 bg-glass-w5">
         <span className="text-xs font-medium text-retro-fg flex items-center gap-1.5">
           <MessageSquare className="w-3.5 h-3.5" />
           Chat
@@ -45,7 +45,7 @@ export function RoomsPreview({ rows, onOpenRow, onOpenAll }: RoomsPreviewProps) 
         <button
           type="button"
           onClick={() => { playPress(720); onOpenAll(); }}
-          className="text-[10px] text-retro-muted hover:text-retro-fg transition-colors cursor-pointer"
+          className="text-2xs text-retro-muted hover:text-retro-fg transition-colors cursor-pointer"
         >
           Open rooms →
         </button>
@@ -65,12 +65,12 @@ export function RoomsPreview({ rows, onOpenRow, onOpenAll }: RoomsPreviewProps) 
               onClick={() => { playPress(760); onOpenRow(r); }}
               className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left hover:bg-glass-w8 transition-colors cursor-pointer"
             >
-              <span className="w-7 h-7 rounded-full bg-surface-raised border border-border-glass text-retro-muted shrink-0 flex items-center justify-center">
+              <span className="w-7 h-7 rounded-full bg-surface-raised border border-edge text-retro-muted shrink-0 flex items-center justify-center">
                 <Icon className="w-3.5 h-3.5" />
               </span>
               <span className="flex-1 min-w-0">
                 <span className="block text-xs font-medium text-retro-body truncate">{r.name}</span>
-                <span className="block text-[10px] text-retro-muted truncate">{r.last || 'No messages yet'}</span>
+                <span className="block text-2xs text-retro-muted truncate">{r.last || 'No messages yet'}</span>
               </span>
               {r.unread && <span className="w-1.5 h-1.5 rounded-full bg-retro-accent shrink-0" aria-label="Unread" />}
             </button>

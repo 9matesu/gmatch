@@ -27,7 +27,7 @@ function useOnline(): boolean {
  * An empty timeline is already explained by the single empty-state card below —
  * a second "empty feed" pill duplicated that message, so it is gone.
  */
-export function FeedStatusPills({ postCount }: { postCount: number }) {
+export function FeedStatusPills() {
   const online = useOnline();
 
   if (online) return null;
@@ -36,7 +36,7 @@ export function FeedStatusPills({ postCount }: { postCount: number }) {
     <div className="px-3 sm:px-6 pt-2">
       <div
         role="status"
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-300 border border-amber-500/30"
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-warning/10 text-warning-fg border border-warning/30"
       >
         <WifiOff className="w-3.5 h-3.5" />
         <span>Offline — showing cached posts, may be stale</span>

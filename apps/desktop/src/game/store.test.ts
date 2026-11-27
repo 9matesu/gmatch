@@ -29,7 +29,6 @@ vi.stubGlobal('localStorage', {
 
 import { defaultSave, serialize, SAVE_KEY } from './save'
 import { setupTag } from './tags'
-import { getUserExcludes } from './tagFilter'
 import { fetchPosts, fetchPostsMulti } from '../services/booru'
 import type { BooruResponse } from '../services/booru'
 import { useGame, HISTORY_CAP, GRID_SIZE, gridSizeForMode, shufflePosts, __resetFeedRetryForTests, lastFeedRetryMs } from './store'
@@ -485,15 +484,16 @@ describe('shufflePosts (never sequential)', () => {
 })
 
 describe('tick', () => {
-  it('pays passive pts/s from owned tags (quartered)', () => {
+  it('pays nothing: points move on clicks alone', () => {
     useGame.setState({
-      points: 0,
+      points: 10,
+      totalEarned: 10,
       tags: [{ name: 'wet', level: 2, base: 10, income: 5, weight: 2 }],
     })
     useGame.getState().tick(1000)
     const s = useGame.getState()
-    expect(s.points).toBeGreaterThanOrEqual(2.5)
-    expect(s.totalEarned).toBeGreaterThanOrEqual(2.5)
+    expect(s.points).toBe(10)
+    expect(s.totalEarned).toBe(10)
   })
 
   it('legacy timed caps still prune, permanent pops persist', () => {
@@ -503,6 +503,33 @@ describe('tick', () => {
     useGame.setState({ caps: [{ capId: 'blue', expiresAt: Number.POSITIVE_INFINITY }] })
     useGame.getState().tick(1000)
     expect(useGame.getState().caps).toHaveLength(1)
+  })
+
+  /**
+   * The clock runs every second. It used to write `lastSeenAt` into the store
+   * on every tick, re-rendering the whole idle UI once a second even when
+   * nothing had changed (nobody even reads `lastSeenAt` — only `save()`
+   * serializes it). A tick with nothing to do must not touch the store.
+   */
+  it('writes nothing when no cap expired (no per-second re-render)', () => {
+    useGame.setState({ caps: [] })
+    let writes = 0
+    const unsub = useGame.subscribe(() => { writes += 1 })
+    useGame.getState().tick(1000)
+    useGame.getState().tick(1000)
+    useGame.getState().tick(1000)
+    unsub()
+    expect(writes).toBe(0)
+  })
+
+  it('still prunes an expired cap, in one write', () => {
+    useGame.setState({ caps: [{ capId: 'blue', expiresAt: Date.now() - 1 }] })
+    let writes = 0
+    const unsub = useGame.subscribe(() => { writes += 1 })
+    useGame.getState().tick(1000)
+    unsub()
+    expect(useGame.getState().caps).toHaveLength(0)
+    expect(writes).toBe(1)
   })
 })
 
@@ -546,27 +573,6 @@ describe('save / load / offline earnings', () => {
     expect(useGame.getState().ageVerified).toBe(true)
   })
 
-  it('offers offline earnings on load and collects them', () => {
-    const past = Date.now() - 60_000
-    mem.set(
-      SAVE_KEY,
-      serialize({
-        ...defaultSave(past),
-        points: 123,
-        ageAccepted: true,
-        tags: [{ name: 'wet', level: 1, base: 10, income: 5, weight: 1 }],
-        lastSeenAt: past,
-      }),
-    )
-    useGame.getState().load()
-    const s = useGame.getState()
-    expect(s.points).toBe(123)
-    expect(s.offlineGain).toBeCloseTo(18.75, 0) // 60s * 1.25 gps * 25% (passive+offline quartered)
-    s.collectOffline()
-    expect(useGame.getState().points).toBeCloseTo(141.75, 0)
-    expect(useGame.getState().collectedOfflineEarnings).toBe(true)
-    expect(useGame.getState().achievements).toContain('offline_slut')
-  })
 
   it('load is idempotent (StrictMode-safe)', () => {
     mem.set(SAVE_KEY, serialize({ ...defaultSave(), points: 42, ageAccepted: true }))
@@ -737,16 +743,16 @@ describe('3x3 grid mode', () => {
     expect(s.current).toBeNull()
   })
 
-  it('tick generates points passively but does not damage squares without player clicking', () => {
+  it('tick neither pays nor damages squares without player clicking', () => {
     useGame.setState({ queue: dozen(), grid: [] })
     useGame.getState().setViewMode('grid')
-    // Braceface (filter cap): permanent 1 auto-click/s.
-    useGame.setState({ caps: [{ capId: 'filter', expiresAt: Number.POSITIVE_INFINITY }] })
+    // The auto-click cap is retired: nothing may act on a foe but the player.
+    useGame.setState({ points: 3 })
     const before = useGame.getState().grid[0].hp
     const ptsBefore = useGame.getState().points
     useGame.getState().tick(1000)
     expect(useGame.getState().grid[0].hp).toBe(before)
-    expect(useGame.getState().points).toBeGreaterThan(ptsBefore)
+    expect(useGame.getState().points).toBe(ptsBefore)
   })
 
   it('KO on single foe queues a non-blocking KoDrop from foe tags', () => {
@@ -767,23 +773,32 @@ describe('3x3 grid mode', () => {
     expect(s.pendingDrops.length).toBeGreaterThanOrEqual(1)
   })
 
-  it('claimDropTag adopts the suggested tag, claimDropAntiTag adds the exclude', () => {
+  it('claimDropTag adopts one tag, claimDropAntiTag bans another, drop survives until empty', async () => {
     useGame.setState({
       tags: [],
       userExcludes: [],
       pendingDrops: [
-        { id: 'd1', foeTitle: 'milf', suggestedTag: 'milf', suggestedAntiTag: 'feet', timestamp: Date.now() },
+        { id: 'd1', foeTitle: 'milf', tags: ['milf', 'feet', 'blonde'], timestamp: Date.now() },
       ],
     })
-    expect(useGame.getState().claimDropTag('d1')).toBe(true)
+    // Adopt one tag: it joins owned, and the drop keeps its other tags so the
+    // player can keep acting on the same foe.
+    expect(useGame.getState().claimDropTag('d1', 'milf')).toBe(true)
     expect(useGame.getState().tags.map((t) => t.name)).toContain('milf')
-    useGame.setState({
-      pendingDrops: [
-        { id: 'd2', foeTitle: 'x', suggestedAntiTag: 'feet', timestamp: Date.now() },
-      ],
-    })
-    expect(useGame.getState().claimDropAntiTag('d2')).toBe(true)
+    expect(useGame.getState().pendingDrops[0].tags).toEqual(['feet', 'blonde'])
+    // Ban another: it becomes an exclude, the drop still has the last tag.
+    expect(await useGame.getState().claimDropAntiTag('d1', 'feet')).toBe(true)
     expect(useGame.getState().userExcludes).toContain('feet')
+    expect(useGame.getState().pendingDrops[0].tags).toEqual(['blonde'])
+    // Claiming the last tag removes the drop entirely.
+    expect(useGame.getState().claimDropTag('d1', 'blonde')).toBe(true)
+    expect(useGame.getState().pendingDrops).toHaveLength(0)
+    // A tag the drop does not carry is refused, and the drop is left alone.
+    useGame.setState({
+      pendingDrops: [{ id: 'd2', foeTitle: 'x', tags: ['x'], timestamp: Date.now() }],
+    })
+    expect(useGame.getState().claimDropTag('d2', 'nope')).toBe(false)
+    expect(useGame.getState().pendingDrops).toHaveLength(1)
   })
 
   it('gridSizeForMode sizes layouts and reorderGrid swaps tiles', () => {
@@ -801,30 +816,8 @@ describe('3x3 grid mode', () => {
   })
 })
 
-describe('setup + user excludes (no hardcoded tags)', () => {
-  it('completeSetup commits 4 picks owned+selected and syncs excludes', () => {
-    const r = useGame
-      .getState()
-      .completeSetup(['bimbo', 'creampie', 'ahegao', 'doggystyle'], ['feet'])
-    expect(r.ok).toBe(true)
-    const s = useGame.getState()
-    expect(s.setupComplete).toBe(true)
-    expect(s.tags.map((t) => t.name)).toEqual(['bimbo', 'creampie', 'ahegao', 'doggystyle'])
-    expect(s.tags.every((t) => t.level === 1 && t.selected === true)).toBe(true)
-    expect(s.userExcludes).toEqual(['feet'])
-    expect(getUserExcludes()).toEqual(['feet'])
-  })
+describe('user excludes', () => {
 
-  it('completeSetup rejects wrong counts, dupes and blocked tags', () => {
-    expect(useGame.getState().completeSetup(['bimbo', 'creampie'], []).ok).toBe(false)
-    expect(
-      useGame.getState().completeSetup(['bimbo', 'bimbo', 'creampie', 'ahegao'], []).ok,
-    ).toBe(false)
-    expect(
-      useGame.getState().completeSetup(['bimbo', 'creampie', 'ahegao', 'loli'], []).ok,
-    ).toBe(false)
-    expect(useGame.getState().setupComplete).toBe(false)
-  })
 
   it('add/removeUserExclude round-trips, dupes refused', () => {
     expect(useGame.getState().addUserExclude(' Feet ')).toBe(true)

@@ -2,6 +2,7 @@
 
 import { orbitFetch, type OrbitIdentityLike } from '../utils/api';
 import { gossipOwnPost, type GossipPostInput } from './gossip';
+import { isPostDeleted } from '../utils/deletedPosts';
 
 export const OUTBOX_KEY = 'gmatch_post_outbox_v1';
 
@@ -85,15 +86,91 @@ export function enqueueOutbox(entry: {
   return created;
 }
 
-export function setOutboxState(objectId: string, state: OutboxState): void {
+/**
+ * Sync the local outbox copy of a post with an edited caption.
+ *
+ * The outbox copy is what the tile renders BEFORE the node echoes the post
+ * back, and a pending re-register would push its `registerBody` to the node.
+ * After the author edits the caption on the node, the local copy still carries
+ * the old text — so the pre-echo window showed the old caption and a
+ * re-register could push it back. Returns false when the object was never
+ * outboxed (a post published elsewhere).
+ */
+export function updateOutboxCaption(objectId: string, caption: string): boolean {
+  const list = readAll();
+  const found = list.find((e) => e.objectId === objectId);
+  if (!found) return false;
+  const body = { ...(found.registerBody || {}) };
+  body.caption = caption;
+  body.post_caption = caption;
+  found.registerBody = body;
+  found.updatedAt = Date.now();
+  writeAll(list);
+  return true;
+}
+
+/**
+ * Remove one object from the outbox and report what it was.
+ *
+ * Deleting a post that only exists locally (a publish that never reached the
+ * node, or an offline compose) must not send a DELETE to the node: there is no
+ * row there, so the request could only 404. This is the one place that knows
+ * whether a post is local-only, so the delete path asks it instead of guessing.
+ *
+ * Returns null when the object was not in the outbox at all.
+ */
+export function removeOutboxEntry(objectId: string): PostOutboxEntry | null {
+  const list = readAll()
+  const found = list.find((e) => e.objectId === objectId)
+  if (!found) return null
+  writeAll(list.filter((e) => e.objectId !== objectId))
+  return found
+}
+
+export function setOutboxState(objectId: string, state: OutboxState, force = false): void {
   const list = readAll();
   const found = list.find((e) => e.objectId === objectId);
   if (!found) return;
   // Monotonic: states only advance (retries never move replicated backwards).
-  if (rank[state] < rank[found.state]) return;
+  // `force` is the one exception: a re-arm deliberately moves a replicated entry
+  // back to pending when the current node does not hold the object.
+  if (!force && rank[state] < rank[found.state]) return;
   found.state = state;
   found.updatedAt = Date.now();
   writeAll(list);
+}
+
+/** Ids already re-armed this session (a re-arm costs one node probe each). */
+const rearmChecked = new Set<string>();
+
+/**
+ * Re-arm replicated entries whose object is NOT on the current node.
+ *
+ * A post replicated to a retired host (the old `fly.dev`) is marked `replicated`
+ * and `flushPostOutbox` skips it forever — so it never reaches THIS node and the
+ * timeline never shows it. Probe the current node once per entry; a 404 means the
+ * row is not here, so move it back to `pending` and let the normal flush register
+ * it locally. Bounded and session-idempotent.
+ */
+export async function rearmMissingReplicated(
+  identity: OrbitIdentityLike,
+  max = 50,
+): Promise<void> {
+  for (const e of listOutbox()) {
+    if (rearmChecked.size >= max) break;
+    if (e.state !== 'replicated' || rearmChecked.has(e.objectId)) continue;
+    if (isPostDeleted(e.objectId)) continue; // tombstoned: never re-register
+    rearmChecked.add(e.objectId);
+    try {
+      const res = await orbitFetch(`/api/objects/${e.objectId}`, {}, identity);
+      // 404 = the row is not on THIS node. Send it back to `local` (not
+      // `pending`): `pending` means "already registered", so the flush would
+      // only re-stamp it replicated without ever registering it here.
+      if (res.status === 404) setOutboxState(e.objectId, 'local', true);
+    } catch {
+      /* node unreachable: leave it replicated, retry on the next boot */
+    }
+  }
 }
 
 function bumpAttempts(objectId: string): void {
@@ -105,7 +182,7 @@ function bumpAttempts(objectId: string): void {
   writeAll(list);
 }
 
-export function removeOutbox(objectId: string): void {
+function removeOutbox(objectId: string): void {
   writeAll(readAll().filter((e) => e.objectId !== objectId));
 }
 
@@ -123,7 +200,10 @@ export function outboxStatesByGroup(): Record<string, OutboxState> {
 
 /** Drop replicated entries past the grace window (server rows authoritative).
  *  Default grace keeps the stub visible until reconciliation refreshes. */
-export function pruneOutbox(graceMs = 5 * 60_000, now = Date.now()): void {
+/** Drop replicated entries past the grace window. The server row is authoritative,
+ *  but the local mirror is what re-registers the post if the node loses it, so
+ *  the window is a day (the entry is a few hundred bytes) instead of 5 min. */
+export function pruneOutbox(graceMs = 24 * 60 * 60_000, now = Date.now()): void {
   writeAll(readAll().filter((e) => !(e.state === 'replicated' && now - e.updatedAt > graceMs)));
 }
 

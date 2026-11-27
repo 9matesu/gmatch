@@ -133,17 +133,10 @@ export function WatchLocalFile({
         aria-label="Choose a local video file"
         onChange={(e) => void pick(e.target.files?.[0] || null)}
       />
-      <div
-        role="button"
-        tabIndex={0}
+      <button
+        type="button"
         aria-label="Drop a local video file here, or activate to browse"
         onClick={() => inputRef.current?.click()}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            inputRef.current?.click()
-          }
-        }}
         onDragOver={(e) => {
           e.preventDefault()
           setDragOver(true)
@@ -155,18 +148,18 @@ export function WatchLocalFile({
           void pick(e.dataTransfer.files?.[0] || null)
         }}
         className={`flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed px-3 py-4 text-center transition-colors ${
-          dragOver ? 'border-retro-fg bg-glass-w10' : 'border-border-glass hover:border-retro-fg/50'
+          dragOver ? 'border-retro-fg bg-glass-w10' : 'border-edge hover:border-retro-fg/50'
         }`}
       >
         <FileVideo className="h-5 w-5 text-retro-muted" />
         <p className="text-xs text-retro-fg">Drop a video file here, or browse</p>
-        <p className={`text-[10px] ${MUTED}`}>MP4, WebM, MOV and other files your browser can play</p>
-      </div>
+        <p className={`text-2xs ${MUTED}`}>MP4, WebM, MOV and other files your browser can play</p>
+      </button>
 
       {meta && file && (
-        <div className="rounded-lg border border-border-glass bg-glass-w5 px-3 py-2 text-xs">
+        <div className="rounded-lg border border-edge bg-glass-w5 px-3 py-2 text-xs">
           <p className="truncate font-semibold text-retro-fg">{meta.name}</p>
-          <p className={`mt-0.5 font-mono text-[10px] ${MUTED}`}>
+          <p className={`mt-0.5 font-mono text-2xs ${MUTED}`}>
             {formatBytes(meta.size)}
             {meta.duration !== null && Number.isFinite(meta.duration) ? ` · ${Math.round(meta.duration)}s` : ''}
             {` · sha256:${meta.hash.slice(0, 12)}…`}

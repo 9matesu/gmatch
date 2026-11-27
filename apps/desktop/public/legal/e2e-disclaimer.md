@@ -1,15 +1,15 @@
 # Encryption & Self-Custody Disclaimer
 
-_Binding text (EN)_: **2026-09-11.2** · updated: 2026-09-09
+_Binding text (EN)_: **2026-11-07.1** · updated: 2026-11-07
 Jurisdiction: Technical explanation tied to Terms §8
 
-## 1. What the official server NEVER sees
+## 1. What a RELAY never sees
 
-DM/post/room content or names; who talks to whom (the courier routes hashes; you map IDs to your box locally); who is online; your images, text or history.
+DM/post/room content or names; who talks to whom (the node routes hashes; you map IDs to your box locally); who is online on other nodes; your images, text or history.
 
 ## 2. What it DOES see
 
-The delivery address, a one-way hash of your public key that ROTATES every session (contacts learn the new address from inside the sealed messages themselves), with minimal metadata (size, time, TTL) and anonymous TURN credential requests. Images you upload leave with pixels only: every metadata container (EXIF/GPS, XMP, text chunks) is stripped on the way in.
+The delivery address, a one-way hash of your public key that ROTATES every session (contacts learn the new address from inside the sealed messages themselves), with minimal metadata (size, time, TTL). It also sees the network connection itself, so it knows your IP address as any peer does. Images you upload leave with pixels only: every metadata container (EXIF/GPS, XMP, text chunks) is stripped on the way in.
 
 ## 3. Keys: what self-custody means
 
@@ -21,7 +21,7 @@ The app FIXES a contact's public key when you first encrypt a conversation. If t
 
 ## 5. Honest limits
 
-- Courier timing metadata can correlate traffic under strong surveillance (no padding/onion by default).
+- Node timing metadata can correlate traffic under strong surveillance (no padding/onion by default).
 
 - A third-party full-node can read everything passing through it ("the host IS the server").
 

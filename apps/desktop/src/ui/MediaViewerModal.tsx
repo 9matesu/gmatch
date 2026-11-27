@@ -49,7 +49,7 @@ export default function MediaViewerModal({ onClose, children, label }: Props) {
         <button
           type="button"
           aria-label="Close viewer"
-          className="absolute right-1.5 top-1.5 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-0 bg-black/60 p-0 text-white/90 hover:bg-black/85"
+          className="absolute right-1.5 top-1.5 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-0 bg-black/60 p-0 text-retro-fg/90 hover:bg-black/85"
           onClick={onClose}
         >
           <X />

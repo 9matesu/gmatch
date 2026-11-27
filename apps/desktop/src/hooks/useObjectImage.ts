@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { orbitFetch } from '../utils/api'
-import { getLocalObject, requestSwarmObject, PEER_ONLINE_EVENT } from '../utils/p2pSwarm'
+import { getLocalObject, registerLocalObject, requestSwarmObject, PEER_ONLINE_EVENT } from '../utils/p2pSwarm'
 import { vaultProbe } from '../services/vault'
 import { resolveVideoMime, sniffFileHead } from '../utils/media'
-import { isMagnetUri } from '../utils/magnet'
+import { normalizeObjectId, isRequestableObjectId, parseObjectRef } from '../utils/objectRef'
+import { isContentHash, resolveContentAddressedMedia } from '../utils/contentAddressedMedia'
 
 /**
  * Video detection for bytes in hand: trusts a concrete blob/stored MIME, but
@@ -60,6 +61,14 @@ function isProtectedObjectUrl(value: string): boolean {
 const CACHE_MAX = 24
 const objectCache = new Map<string, ImageState>()
 const cacheSource = new Map<string, string>()
+/**
+ * A failed resolution is cached for a SHORT time only. A definitive-looking
+ * failure (404 with no seeder, a bad payload) used to sit in the LRU forever,
+ * so a post whose bytes arrived later — or whose node came back — still showed
+ * "No preview" until LRU eviction. After this window the tile retries once.
+ */
+const failedAt = new Map<string, number>()
+const FAILED_TTL_MS = 30_000
 
 // A mounted consumer's entry must never be evicted-and-revoked out from under
 // it: the <img>/<video> keeps pointing at that blob URL and dies the moment it
@@ -72,8 +81,11 @@ const pinned = new Set<string>()
 export function __resetObjectImageCacheForTests(): void {
   objectCache.clear()
   cacheSource.clear()
+  failedAt.clear()
   pinned.clear()
   inflight.clear()
+  objectFetchQueue.length = 0
+  activeObjectFetches = 0
 }
 
 function pinKey(cardId: string, source: string): string {
@@ -83,34 +95,18 @@ function pinKey(cardId: string, source: string): string {
   return `${source}::${normalizeCardId(cardId)}`
 }
 
-export function normalizeCardId(cardId: string): string {
-  if (!cardId) return cardId
-  if (cardId.startsWith('/api/objects/')) return cardId.slice('/api/objects/'.length).split(/[?#]/)[0]
-  return cardId
-}
-
 /**
  * Can this value be used as an object id in a request path?
  *
- * `Objects.id` is always a UUID or a short opaque token (`p2p-obj-…`,
- * `story-preload-1`, …). A `magnet:?…` or `urn:sha256:…` descriptor is what the
- * API *returns* for an object, never something you can ask for — and feeding
- * one back as an id is silent data loss: the literal `?` in `magnet:?xt=…`
- * terminates the path, so the browser requests `/api/objects/magnet:` and the
- * node 404s on the truncated id. That 404 then also fired `orbit-object-404`
- * (which tried to delete the story row) and cached a permanent failure that
- * evicted a real entry from the 24-slot LRU.
- *
- * Rejecting is the honest answer rather than encoding: these are not ids.
+ * The rule lives in `utils/objectRef.ts` (ONE parser for every media
+ * reference in the app). This stays as a re-export because the hook's public
+ * surface is used by several components and tests.
  */
-export function isRequestableObjectId(raw: string | null | undefined): boolean {
-  if (!raw) return false
-  const id = normalizeCardId(raw.trim())
-  if (!id) return false
-  if (isMagnetUri(id)) return false
-  // No path separators or terminators: a single path segment, nothing that can
-  // split the URL. Catches magnets, urns, absolute URLs and file paths at once.
-  return !/[/\\?#\s]/.test(id)
+export { isRequestableObjectId };
+
+/** Strip the `/api/objects/` mount so the bare id remains. */
+export function normalizeCardId(cardId: string): string {
+  return normalizeObjectId(cardId);
 }
 
 function cacheGet(rawCardId: string, source: string): ImageState | null {
@@ -118,6 +114,17 @@ function cacheGet(rawCardId: string, source: string): ImageState | null {
   const hit = objectCache.get(cardId)
   if (!hit) return null
   if (cacheSource.get(cardId) !== source) return null
+  if (hit.failed) {
+    const at = failedAt.get(cardId) ?? 0
+    if (Date.now() - at > FAILED_TTL_MS) {
+      // Expired failure: drop it so the consumer re-resolves (the node may be
+      // back, or a seeder may have arrived).
+      objectCache.delete(cardId)
+      cacheSource.delete(cardId)
+      failedAt.delete(cardId)
+      return null
+    }
+  }
   // refresh LRU position
   objectCache.delete(cardId)
   objectCache.set(cardId, hit)
@@ -127,6 +134,8 @@ function cacheGet(rawCardId: string, source: string): ImageState | null {
 function cacheSet(rawCardId: string, source: string, img: ImageState): void {
   const cardId = normalizeCardId(rawCardId)
   cacheSource.set(cardId, source)
+  if (img.failed) failedAt.set(cardId, Date.now())
+  else failedAt.delete(cardId)
   objectCache.delete(cardId)
   objectCache.set(cardId, { ...img, cardId })
   // Evict oldest (front) entries beyond the cap, revoking their object URLs to
@@ -144,7 +153,19 @@ function cacheSet(rawCardId: string, source: string, img: ImageState): void {
     if (evicted?.url) URL.revokeObjectURL(evicted.url)
     objectCache.delete(victim)
     cacheSource.delete(victim)
+    failedAt.delete(victim)
   }
+}
+
+/** Drop a specific object from the LRU and revoke its blob URL if present. */
+export function evictObjectImage(rawCardId: string): void {
+  const cardId = normalizeCardId(rawCardId)
+  const hit = objectCache.get(cardId)
+  if (!hit) return
+  if (hit.url && hit.url.startsWith('blob:')) URL.revokeObjectURL(hit.url)
+  objectCache.delete(cardId)
+  cacheSource.delete(cardId)
+  failedAt.delete(cardId)
 }
 
 /**
@@ -167,12 +188,54 @@ interface ResolvedObject {
 const FAILED = (cardId: string): ImageState =>
   ({ cardId, url: '', failed: true, isVideo: false, isLink: false, linkUrl: null })
 
+/**
+ * At most N signed object streams in flight at once.
+ *
+ * Chromium opens six connections per host. A grid that mounts dozens of tiles
+ * (a profile with its posts, saved, likes and gallery) used to start a signed
+ * GET for every one of them at the same time, and media keeps the long 120s
+ * budget — so all six sockets sat on media and every other call (feed, lobby,
+ * notifications, DELETE) queued behind them and died on its own 8s timeout.
+ * The UI read that as "nothing loads and nothing deletes". Media is a
+ * background job: give it a small budget and let the rest of the app breathe.
+ */
+const MAX_CONCURRENT_OBJECT_FETCHES = 3
+let activeObjectFetches = 0
+const objectFetchQueue: Array<() => void> = []
+
+function withObjectFetchSlot<T>(run: () => Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const release = () => {
+      activeObjectFetches -= 1
+      const next = objectFetchQueue.shift()
+      if (next) next()
+    }
+    const start = () => {
+      activeObjectFetches += 1
+      run().then(
+        (value) => { release(); resolve(value) },
+        (err) => { release(); reject(err) },
+      )
+    }
+    if (activeObjectFetches < MAX_CONCURRENT_OBJECT_FETCHES) start()
+    else objectFetchQueue.push(start)
+  })
+}
+
 /** Local (P2P/vault/IndexedDB) → signed GET → swarm. Never throws. */
-async function resolveObject(cleanId: string, identity: IdentityLike): Promise<ResolvedObject> {
-  // A descriptor (magnet/urn/absolute URL) is not an id. Fail without touching
-  // the network: no request to 404 on, no orbit-object-404 to delete a live row,
-  // and nothing cached to evict a warm entry on the next story.
-  if (!isRequestableObjectId(cleanId)) {
+async function resolveObject(
+  cleanId: string,
+  identity: IdentityLike,
+  contentHash?: string | null,
+): Promise<ResolvedObject> {
+  // A descriptor (magnet/urn/absolute URL) is not a node id. A magnet still
+  // addresses bytes we may hold: its btih IS the content hash (legacy rows),
+  // so resolve it LOCALLY and never fire a request with the descriptor as a
+  // path (that 404s on the literal "?" and poisons the LRU).
+  const parsed = parseObjectRef(cleanId)
+  const localOnly = !isRequestableObjectId(cleanId)
+  const lookupId = localOnly ? (parsed.kind === 'magnet' ? parsed.id : null) : cleanId
+  if (!lookupId && !isContentHash(contentHash)) {
     return { state: FAILED(cleanId), cache: false, awaitingSeeder: false }
   }
 
@@ -181,12 +244,49 @@ async function resolveObject(cleanId: string, identity: IdentityLike): Promise<R
     return { state, cache: true, awaitingSeeder: false }
   }
 
+  // A row that names its own CONTENT (a peer-replicated post carries the
+  // sha256 of its bytes) is resolved from that content: bytes held locally,
+  // then the swarm with the hash attached, so nothing unverified is ever
+  // rendered. The node's object route is deliberately not consulted — the row
+  // addresses content, and media lives with the peers (SPEC §12b). A row with
+  // no content hash keeps the entire legacy ladder below, unchanged.
+  if (isContentHash(contentHash)) {
+    const expected = contentHash.toLowerCase()
+    const blob = await resolveContentAddressedMedia(lookupId ?? null, expected)
+    if (!blob) return { state: FAILED(cleanId), cache: false, awaitingSeeder: false }
+    // Cache the bytes under BOTH names the row may be asked for: the object id
+    // alias (a remount by url is instant) and the content hash (the durable key
+    // peers address). The resolver proved the hash, so neither registration
+    // claims more than was verified.
+    try {
+      registerLocalObject(cleanId, blob)
+      if (expected !== normalizeCardId(cleanId)) registerLocalObject(expected, blob)
+    } catch {
+      /* cache alias best-effort */
+    }
+    void import('../utils/pendingTransfers')
+      .then(({ removePendingTransfer }) => removePendingTransfer(cleanId))
+      .catch(() => {})
+    return commit({
+      cardId: cleanId,
+      url: URL.createObjectURL(blob),
+      failed: false,
+      isVideo: await isVideoBlob(blob, ''),
+      isLink: false,
+      linkUrl: null,
+    })
+  }
+
+  // No content hash: the legacy ladder needs a requestable id (a descriptor
+  // with no id inside it has nothing to ask anyone for).
+  if (!lookupId) return { state: FAILED(cleanId), cache: false, awaitingSeeder: false }
+
   // P2P first; the network is only touched on a miss.
   // The encrypted vault is local storage too: a row that moved worlds keeps its
   // bytes on disk under the old node URL, so look the object id up there before
   // asking the node (which keeps no media) or a peer (which may not exist).
   try {
-    const vault = await vaultProbe(cleanId)
+    const vault = await vaultProbe(lookupId)
     if (vault.state === 'local' && vault.local) {
       return commit({
         cardId: cleanId,
@@ -203,7 +303,7 @@ async function resolveObject(cleanId: string, identity: IdentityLike): Promise<R
 
   let localBlob: Blob | null = null
   try {
-    localBlob = await getLocalObject(cleanId)
+    localBlob = await getLocalObject(lookupId)
   } catch {
     localBlob = null
   }
@@ -218,6 +318,26 @@ async function resolveObject(cleanId: string, identity: IdentityLike): Promise<R
     })
   }
 
+  // A descriptor has no node path: the local stores were the only honest shot.
+  if (localOnly) {
+    return { state: FAILED(cleanId), cache: false, awaitingSeeder: false }
+  }
+
+  // The signed object stream is the only long-held request in the app: run a
+  // bounded number of them at a time (see MAX_CONCURRENT_OBJECT_FETCHES).
+  return withObjectFetchSlot(() => resolveObjectNetwork(cleanId, identity, commit))
+}
+
+/**
+ * The network half of a resolution: the signed GET, the p2p descriptor / link
+ * handling and the swarm fallback. Everything local already happened in
+ * resolveObject; this is the part that must never monopolise the pool.
+ */
+async function resolveObjectNetwork(
+  cleanId: string,
+  identity: IdentityLike,
+  commit: (state: ImageState) => ResolvedObject,
+): Promise<ResolvedObject> {
   let res: Response | null = null
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
@@ -376,11 +496,15 @@ async function resolveObject(cleanId: string, identity: IdentityLike): Promise<R
 }
 
 /** Dedupe entry point: concurrent callers share one resolution. */
-function resolveObjectOnce(cleanId: string, identity: IdentityLike): Promise<ResolvedObject> {
+function resolveObjectOnce(
+  cleanId: string,
+  identity: IdentityLike,
+  contentHash?: string | null,
+): Promise<ResolvedObject> {
   const key = pinKey(cleanId, identity.orbitId)
   const running = inflight.get(key)
   if (running) return running
-  const p = resolveObject(cleanId, identity).finally(() => inflight.delete(key))
+  const p = resolveObject(cleanId, identity, contentHash).finally(() => inflight.delete(key))
   inflight.set(key, p)
   return p
 }
@@ -418,9 +542,20 @@ function isDirectUrlLike(cardId: string): boolean {
 export function useObjectImage(
   cardId: string | null,
   identity: IdentityLike | null,
-  options?: { enabled?: boolean }
+  options?: {
+    enabled?: boolean
+    /**
+     * The sha256 of this row's bytes, when the caller knows it (a
+     * peer-replicated post carries it in the signed operation manifest). With
+     * a hash the row resolves from its CONTENT — local verified bytes, then
+     * the swarm with the hash attached — and never asks the node for media.
+     * Without one, the legacy ladder is unchanged.
+     */
+    contentHash?: string | null
+  }
 ): ObjectImageResult {
   const enabled = options?.enabled !== false
+  const contentHash = options?.contentHash ?? null
   // If cardId is already a direct URL (http, https, data, blob, or static endpoint)
   const isDirectUrl = Boolean(cardId && isDirectUrlLike(cardId))
 
@@ -489,8 +624,20 @@ export function useObjectImage(
       cacheSource.delete(cleanId)
     }
 
-    // Adopt a cached entry immediately if present
-    if (cacheGet(cleanId, identity.orbitId)) return
+    // Adopt a cached entry immediately if present.
+    //
+    // This used to `return` on a cache hit WITHOUT setting state, so a warm
+    // object only rendered on the FIRST mount (where the useState initialiser
+    // reads the cache). Change the cardId on a mounted consumer — a feed tile
+    // recycled by the window, a story tray advance — and `img` still pointed
+    // at the previous id, the `img.cardId !== normalized` branch below fell
+    // through to EMPTY, and the tile sat on "Loading media..." until an
+    // unrelated retry. Adopting the value is the whole point of the cache.
+    const cached = cacheGet(cleanId, identity.orbitId)
+    if (cached) {
+      setImg(cached)
+      return
+    }
 
     let cancelled = false
 
@@ -498,7 +645,7 @@ export function useObjectImage(
     // await one fetch instead of racing (and orphaning blob URLs). The result
     // is committed to the LRU inside resolveObject, so a cancelled consumer
     // leaves a warm entry behind rather than a leak.
-    void resolveObjectOnce(cleanId, identity).then(({ state, awaitingSeeder }) => {
+    void resolveObjectOnce(cleanId, identity, contentHash).then(({ state, awaitingSeeder }) => {
       if (cancelled) return
       awaitingSeederRef.current = awaitingSeeder
       setImg(state)
@@ -506,7 +653,10 @@ export function useObjectImage(
       if (!cancelled) setImg(FAILED(cleanId))
     })
     return () => { cancelled = true }
-  }, [cardId, identity, enabled, retryNonce])
+    // `identity?.orbitId` (a string), not the identity object: an unstable
+    // object from a caller re-ran this effect on every render, and each run
+    // re-asked the vault over IPC. The id is all the cache key needs.
+  }, [cardId, identity?.orbitId, enabled, retryNonce, contentHash])
 
   // Hold a pin for as long as this consumer is mounted, so the LRU can never
   // revoke the URL we are currently rendering.

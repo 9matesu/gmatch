@@ -229,6 +229,23 @@ export class DmStore {
   hasMessage(peerId: string, id: string): boolean {
     return this.thread(peerId).some((m) => m.id === id)
   }
+
+  /**
+   * Peers with at least one of OUR messages still marked `failed`.
+   *
+   * The replay driver needs the list without walking every thread twice, and it
+   * must stay honest: a message the peer never received is a message this device
+   * still owes. Nothing is inferred from `sent` — only an explicit failure.
+   */
+  threadsWithFailures(): string[] {
+    const all = this.threads()
+    const out: string[] = []
+    for (const [peerId, thread] of Object.entries(all)) {
+      if (!Array.isArray(thread)) continue
+      if (thread.some((m) => m && m.own && m.status === 'failed' && !m.deletedTs)) out.push(peerId)
+    }
+    return out
+  }
 }
 
 /** Clamp outbound text to what one sealed body should carry. */
@@ -473,6 +490,41 @@ export class DmManager {
     this.deps.store.setStatus(peerId, msg.id, msg.status)
     this.deps.onThreadChanged(peerId)
     return msg
+  }
+
+  /**
+   * Re-send every message this device authored that never left it.
+   *
+   * A `failed` row used to be terminal: the player's words stayed on their own
+   * disk forever, with no path back even after the courier returned. This is
+   * the missing half of "persistent": the OUTBOX is the store (nothing new is
+   * persisted), and this replays it.
+   *
+   * Idempotent by construction — the envelope id is derived from the message id
+   * (encodeDmBody), so the peer dedupes a replay instead of showing the message
+   * twice. Bounded so a long backlog cannot flood the courier on every reconnect.
+   */
+  async resendFailed(peerId?: string, limit = 20): Promise<number> {
+    const peers = peerId ? [peerId] : this.deps.store.threadsWithFailures()
+    let sent = 0
+    for (const peer of peers) {
+      const pending = this.deps.store.thread(peer).filter((m) => m.own && m.status === 'failed' && !m.deletedTs)
+      for (const msg of pending.slice(0, limit)) {
+        if (!this.deps.store.peerKeys(peer)) continue
+        try {
+          const env = await this.sendBody(peer, encodeDmBody(msg, this.epochId()))
+          this.deps.store.update(peer, msg.id, (m) => {
+            m.status = 'sent'
+            m.envelopeId = env.id
+          })
+          sent += 1
+        } catch {
+          // Still unreachable: leave the row failed for the next attempt.
+        }
+      }
+    }
+    if (sent > 0) this.deps.onThreadChanged(peerId ?? '')
+    return sent
   }
 
   /** Author-only edit. Reverts locally when the peer cannot be reached, so the

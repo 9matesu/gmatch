@@ -124,13 +124,13 @@ describe('CommandIsland count badges', () => {
 });
 
 describe('CommandIsland styling & layout compliance', () => {
-  it('pill bar has no scrollbar and uses overflow-hidden flex-nowrap', () => {
+  it('pill bar keeps one row and scrolls silently instead of spilling, and the picker lives outside it', () => {
     render(<CommandIsland mainView="feed" setMainView={vi.fn()} />);
     const nav = screen.getByRole('navigation', { name: 'Command Island' });
-    expect(nav.className).toContain('overflow-hidden');
+    expect(nav.className).toContain('overflow-x-auto');
     expect(nav.className).toContain('flex-nowrap');
     expect(nav.className).not.toContain('styled-scrollbar');
-    expect(nav.className).not.toContain('overflow-x-auto');
+    expect(nav.className).not.toContain('flex-1');
   });
 
   it('servers button is uncolored and does not have text-retro-online green', async () => {
@@ -140,5 +140,54 @@ describe('CommandIsland styling & layout compliance', () => {
     expect(serversButton).toBeInTheDocument();
     const icon = serversButton.querySelector('svg');
     expect(icon?.className.baseVal || icon?.getAttribute('class') || '').not.toContain('text-retro-online');
+  });
+});
+
+describe('CommandIsland post button (footer, centered, one picker flow)', () => {
+  it('carries no balance counter: the g$ ledger lives in the Vault, not the chrome', () => {
+    render(<CommandIsland mainView="feed" setMainView={vi.fn()} />);
+    expect(screen.queryByLabelText(/Balance:/)).toBeNull();
+  });
+
+  it('clicking Post toggles the media-picker bubble (one flow, no second modal)', () => {
+    const onPickMedia = vi.fn();
+    render(<CommandIsland mainView="feed" setMainView={vi.fn()} onOpenCreatePost={vi.fn()} onPickMedia={onPickMedia} />);
+
+    // Click toggles the bubble.
+    fireEvent.click(screen.getByLabelText('Create a post'));
+    const dialog = screen.getByRole('dialog', { name: 'Pick post media' });
+    // The bubble must not live inside the dock: the island translates itself by
+    // -50%, which makes it a containing block for fixed children and clipped
+    // the bubble to the pill's height before.
+    expect(dialog.closest('nav')).toBeNull();
+
+    // A second click closes it again.
+    fireEvent.click(screen.getByLabelText('Create a post'));
+    expect(screen.queryByRole('dialog', { name: 'Pick post media' })).toBeNull();
+  });
+
+  it('the bubble is STABLE: leaving the trigger or switching panes keeps it open', () => {
+    render(<CommandIsland mainView="feed" setMainView={vi.fn()} onOpenCreatePost={vi.fn()} onPickMedia={vi.fn()} />);
+    fireEvent.click(screen.getByLabelText('Create a post'));
+    expect(screen.getByRole('dialog', { name: 'Pick post media' })).toBeInTheDocument();
+    // Hovering out (the old close trigger) must NOT dismiss it.
+    fireEvent.mouseLeave(screen.getByLabelText('Create a post').parentElement!);
+    expect(screen.getByRole('dialog', { name: 'Pick post media' })).toBeInTheDocument();
+    // Clicking a pane tab keeps it open — the trap this slice removes.
+    fireEvent.click(screen.getByText('Paste URL'));
+    expect(screen.getByRole('dialog', { name: 'Pick post media' })).toBeInTheDocument();
+  });
+
+  it('closes on an outside pointerdown and on Escape', () => {
+    render(<CommandIsland mainView="feed" setMainView={vi.fn()} onOpenCreatePost={vi.fn()} onPickMedia={vi.fn()} />);
+    fireEvent.click(screen.getByLabelText('Create a post'));
+    expect(screen.getByRole('dialog', { name: 'Pick post media' })).toBeInTheDocument();
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole('dialog', { name: 'Pick post media' })).toBeNull();
+
+    fireEvent.click(screen.getByLabelText('Create a post'));
+    expect(screen.getByRole('dialog', { name: 'Pick post media' })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Pick post media' })).toBeNull();
   });
 });

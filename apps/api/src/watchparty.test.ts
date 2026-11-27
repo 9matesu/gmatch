@@ -4,7 +4,7 @@ import {
   deleteChat, kickWatch, banWatch, muteWatch, transferHost, settingsWatch,
   queueOps, setPartyMedia, __resetParties, partyRoom, MAX_QUEUE, isPartyMediaObject,
   serializeParties, restoreParties, liveMediaObjectIds, HOST_SEAT_GRACE_MS, controlsParty, type Party,
-  mintInvite, revokeInvite, redeemInvite, watchReady,
+  mintInvite, revokeInvite, redeemInvite, watchReady, parseWatchFrame,
 } from './watchparty'
 import { handleIncoming, conns, createWsTicket, type WsConn } from './ws-bus'
 
@@ -24,6 +24,24 @@ function authed(conn: WsConn & { sent: string[] }, userId: string) {
 beforeEach(() => {
   __resetParties()
   conns.clear()
+})
+
+// The frame contract itself is tested where it lives:
+// packages/protocol/src/watch-frame.test.ts. What matters HERE is that the
+// node's handlers consume the narrowed frame: a field of the wrong type is
+// dropped, so a transport frame with a string position is refused.
+describe('the node consumes the narrowed frame', () => {
+  it('a frame with a non-numeric position is refused by the transport handler', () => {
+    const p = makeParty('u0')
+    const frame = parseWatchFrame({ party: p.id, action: 'play', position: '7' })
+    expect(applyWatch('u0', frame!)).toBeNull()
+  })
+
+  it('a frame with a numeric position is applied', () => {
+    const p = makeParty('u0')
+    const frame = parseWatchFrame({ party: p.id, action: 'play', position: 7 })
+    expect(applyWatch('u0', frame!)).not.toBeNull()
+  })
 })
 
 function makeParty(creator = 'u1'): Party {

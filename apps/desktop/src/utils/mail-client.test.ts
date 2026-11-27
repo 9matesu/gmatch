@@ -29,7 +29,7 @@ function okJson(obj: unknown): Response {
   return new Response(JSON.stringify(obj), { status: 200, headers: { 'Content-Type': 'application/json' } })
 }
 
-function client(deps: Partial<Record<'fetchImpl' | 'onMail' | 'now', unknown>> = {}) {
+function client(deps: Partial<Record<'fetchImpl' | 'onMail' | 'now' | 'apiBase' | 'extraBases', unknown>> = {}) {
   const sockets: FakeSocket[] = []
   const c = new MailClient({
     apiBase: 'http://courier.test',
@@ -63,32 +63,43 @@ describe('MailClient (blind courier)', () => {
     expect(sockets[0].sent.join()).not.toContain(bob.publicKeyHex)
   })
 
-  it('polls the Cloudflare courier instead of holding a websocket', async () => {
+  it('a base whose websocket never opens falls back to polling it', async () => {
     vi.useFakeTimers()
     try {
       const fetchImpl = makeFetch(async () => okJson({ envelopes: [] }))
-      const sockets: FakeSocket[] = []
-      const c = new MailClient({
-        apiBase: 'https://gmatch.pages.dev',
-        identity: bob,
-        fetchImpl,
-        onMail: () => {},
-        webSocketFactory: () => {
-          const s = new FakeSocket()
-          sockets.push(s)
-          return s
-        },
-      })
+      const { c, sockets } = client({ apiBase: 'http://no-ws.test', fetchImpl })
       c.start()
-      // No socket: pages.dev has no shared live state across isolates.
-      expect(sockets).toHaveLength(0)
+      expect(sockets).toHaveLength(1)
+      // A proxy that drops the upgrade: the socket dies without ever opening.
+      sockets[0].emitClose()
+      await vi.advanceTimersByTimeAsync(5_000) // backoff -> one more attempt
+      expect(sockets).toHaveLength(2)
+      sockets[1].emitClose()
       await vi.advanceTimersByTimeAsync(0)
-      expect(fetchImpl).toHaveBeenCalledTimes(1)
+      // Two failed attempts: this node offers the HTTP mailbox only.
+      expect(fetchImpl).toHaveBeenCalled()
+      const before = (fetchImpl as unknown as { mock: { calls: unknown[] } }).mock.calls.length
       await vi.advanceTimersByTimeAsync(20_000)
-      expect(fetchImpl).toHaveBeenCalledTimes(2)
+      expect((fetchImpl as unknown as { mock: { calls: unknown[] } }).mock.calls.length).toBeGreaterThan(before)
+      // No third socket: the base is poll-only now.
+      expect(sockets).toHaveLength(2)
       c.stop()
-      await vi.advanceTimersByTimeAsync(60_000)
-      expect(fetchImpl).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a socket that OPENED and then dropped is retried, not downgraded to polling', async () => {
+    vi.useFakeTimers()
+    try {
+      const fetchImpl = makeFetch(async () => okJson({ envelopes: [] }))
+      const { c, sockets } = client({ apiBase: 'http://busy.test', fetchImpl })
+      c.start()
+      sockets[0].emitOpen() // a real node: it talked to us
+      sockets[0].emitClose()
+      await vi.advanceTimersByTimeAsync(5_000)
+      expect(sockets).toHaveLength(2)
+      c.stop()
     } finally {
       vi.useRealTimers()
     }
@@ -131,6 +142,26 @@ describe('MailClient (blind courier)', () => {
     const ackJson = JSON.parse(String(ackCall!.init!.body))
     expect(ackJson.ids).toEqual([env.id])
     expect(ackJson.pubkey).toBe(bob.publicKeyHex)
+  })
+
+  it('a mailbox learned late is drained and watched too', async () => {
+    // The node this client is connected to can be learned AFTER start (a
+    // browser build rides the dev proxy and only then learns the node's real
+    // address). A peer that learned our node from the signed beacon drops
+    // envelopes exactly there.
+    const calls: string[] = []
+    const fetchImpl = makeFetch(async (url) => {
+      calls.push(url)
+      return okJson({ envelopes: [] })
+    })
+    const { c, sockets } = client({ fetchImpl })
+    c.start()
+    expect(sockets).toHaveLength(1)
+    c.addBases(['http://node.test:8790'])
+    // a watch socket for the new box
+    expect(sockets).toHaveLength(2)
+    await c.pull()
+    expect(calls.some((u) => u.startsWith('http://node.test:8790/api/mail/'))).toBe(true)
   })
 
   it('envelopes I cannot open are never acked (no DoS by acking foreign ids)', async () => {
@@ -288,6 +319,64 @@ describe('MailClient (blind courier)', () => {
     expect(ackPayload.ids).toEqual([sessionEnv.id])
     expect(ackPayload.epoch).toBe(curEpoch)
     expect(ackPayload.pubkey).toBe(bob.publicKeyHex)
+  })
+})
+
+describe('MailClient multi-base mailboxes (receiver drains every legitimate box)', () => {
+  // A sender chooses the recipient's mailbox: the peer's own node (learned
+  // from a signed beacon) or the rendezvous when it never learned a node.
+  // A receiver connected to a node must therefore drain BOTH its node's
+  // boxes and the rendezvous — draining only the primary once dropped every
+  // envelope a peer addressed to our node's mailbox.
+
+  function multiFetch(byUrl: (url: string) => Response | 'ack') {
+    const seen: string[] = []
+    const fetchImpl = makeFetch(async (url) => {
+      seen.push(`${new URL(url).origin}${new URL(url).pathname}`)
+      const r = byUrl(String(url))
+      if (r === 'ack') return okJson({ ok: true })
+      return r
+    })
+    return { seen, fetchImpl }
+  }
+
+  it('pull drains the node box AND the hub box, acking on both', async () => {
+    const { seal1to1 } = await import('@orbit/protocol')
+    const nodeEnv = seal1to1('mail to my node box', 'mail', alice, bob)
+    const { seen, fetchImpl } = multiFetch((url) =>
+      url.startsWith('http://node:8790/') && url.endsWith(`/api/mail/${BOB_TOKEN}`)
+        ? okJson({ envelopes: [nodeEnv] })
+        : okJson({ envelopes: [] }),
+    )
+    const { c } = client({ apiBase: 'https://hub.test', extraBases: ['http://node:8790'], fetchImpl })
+    await c.pull()
+    expect(seen.filter((u) => u === `http://node:8790/api/mail/${BOB_TOKEN}`)).toHaveLength(1)
+    expect(seen.filter((u) => u === `https://hub.test/api/mail/${BOB_TOKEN}`)).toHaveLength(1)
+    expect(seen.find((u) => u === `http://node:8790/api/mail/${BOB_TOKEN}/ack`)).toBeTruthy()
+  })
+
+  it('an extra base equal to the primary (normalized) is not pulled twice', async () => {
+    const { seen, fetchImpl } = multiFetch(() => okJson({ envelopes: [] }))
+    const { c } = client({ apiBase: 'http://node:8790', extraBases: ['http://node:8790/'], fetchImpl })
+    await c.pull()
+    expect(seen.filter((u) => u === `http://node:8790/api/mail/${BOB_TOKEN}`)).toHaveLength(1)
+  })
+
+  it('watch opens one socket per distinct mailbox base', async () => {
+    const { c, sockets } = client({ apiBase: 'http://a.test', extraBases: ['http://node:8790'], fetchImpl: makeFetch(async () => okJson({ envelopes: [] })) })
+    c.start()
+    expect(sockets).toHaveLength(2)
+    sockets[0].emitOpen()
+    const watchFrame = JSON.parse(sockets[0].sent[0])
+    expect(watchFrame).toEqual({ type: 'watch', tokens: [BOB_TOKEN] })
+  })
+
+  it('stop() closes every watch socket', async () => {
+    const { c, sockets } = client({ apiBase: 'http://node:8790', extraBases: ['http://other:8790'], fetchImpl: makeFetch(async () => okJson({ envelopes: [] })) })
+    c.start()
+    expect(sockets).toHaveLength(2)
+    c.stop()
+    expect(sockets.every((s) => s.closed)).toBe(true)
   })
 })
 

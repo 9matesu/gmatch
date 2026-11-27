@@ -26,6 +26,26 @@ function readSticky(): boolean {
   }
 }
 
+/**
+ * Absolute formatting is expensive: `toLocaleString` with dateStyle/timeStyle
+ * builds a formatter every call, and a 300-row timeline asks for it on every
+ * render of every row (the CPU profile put PostTimestamp at ~4% of samples,
+ * above every other component). The value only depends on (timestamp, locale),
+ * so it is computed once per distinct timestamp.
+ */
+const absoluteCache = new Map<string, string>()
+
+function absoluteFor(createdAt: string): string {
+  const cached = absoluteCache.get(createdAt)
+  if (cached !== undefined) return cached
+  const parsed = parseApiTimestamp(createdAt)
+  const value = parsed ? parsed.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : ''
+  // Bounded: a feed holds hundreds of rows, not the app's whole history.
+  if (absoluteCache.size > 2000) absoluteCache.clear()
+  absoluteCache.set(createdAt, value)
+  return value
+}
+
 export function PostTimestamp({
   createdAt,
   className = 'text-xs text-retro-muted leading-tight',
@@ -48,7 +68,7 @@ export function PostTimestamp({
   }, []);
 
   const parsed = parseApiTimestamp(createdAt);
-  const full = parsed ? parsed.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '';
+  const full = absoluteFor(createdAt);
   const showAbsolute = absolute || hovered;
   const label = showAbsolute ? full : timeAgo(createdAt);
 
@@ -60,17 +80,22 @@ export function PostTimestamp({
       // Hover previews the exact date; click latches it (touch has no hover).
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      onClick={() => {
-        const next = !absolute;
-        setAbsolute(next);
-        try {
-          localStorage.setItem(KEY, next ? '1' : '0');
-        } catch { /* private mode: the choice just does not persist */ }
-        onToggle?.(next);
-      }}
-      className={`${className} shrink-0 cursor-pointer`}
+      className={`${className} shrink-0`}
     >
-      {label}
+      <button
+        type="button"
+        onClick={() => {
+          const next = !absolute;
+          setAbsolute(next);
+          try {
+            localStorage.setItem(KEY, next ? '1' : '0');
+          } catch { /* private mode: the choice just does not persist */ }
+          onToggle?.(next);
+        }}
+        className="cursor-pointer"
+      >
+        {label}
+      </button>
     </time>
   );
 }

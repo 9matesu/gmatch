@@ -3,6 +3,31 @@
 > Statuses: **accepted** (binds this line), **target** (approved direction, not
 > yet implemented). Rejected alternatives stay recorded so they are not relitigated.
 
+## ADR-2026-11-07-01 — No hosted service of any kind (accepted)
+
+- **Context:** the product had three hosted surfaces — a full node on
+  fly.dev, a blind courier on Cloudflare Pages (directory + sealed mail in D1)
+  and the release page on the same Pages origin. The full node was retired
+  first (2026-10-24); the courier stayed as "the rendezvous".
+- **Decision:** the courier is retired too. `gmatch.pages.dev` becomes a
+  **static release page** (no function, no D1); the `gmatch-courier` database
+  is emptied and deleted; `central.ts` defaults to `none`, so the node a client
+  is connected to is the directory, the mail relay and the swarm rendezvous.
+  A shared hub stays possible and is opt-in (`gmatch.central.url` /
+  `VITE_CENTRAL_URL`). A pointer to the retired origin is dropped, never
+  dialed.
+- **Why:** a hosted rendezvous still means a third party holds a mailbox and a
+  listing for every install — a silent dependency on somebody else's account
+  and uptime, and a privacy claim the app could not fully keep. The node
+  already speaks every protocol the courier spoke (mail, directory, presence,
+  relay), so the hosted copy bought reachability, not function.
+- **Cost, stated honestly:** two peers on NATed machines with no reachable
+  node cannot meet (§10d of SPEC). That was already true for the hosted
+  courier's content, and a shared hub remains one `localStorage` entry away.
+- **Consequence:** the legal corpus is re-issued (`2026-11-07.1`) because the
+  controller of the data changed, and the site copy stops describing a
+  directory the project no longer runs.
+
 ## ADR-1.5.5-01 — SSBC ecosystem: rejected as a dependency (accepted)
 
 - **Evaluated:** `ssb-server`, `ssb-db`/`ssb-db2`, `ssb-keys`, `secret-stack`.
@@ -72,6 +97,12 @@
 
 ## ADR-2026-10-25-01 — No hosted data base: Cloudflare is a meeting point (accepted, supersedes ADR-1.5.5-06)
 
+> **Superseded by ADR-2026-11-07-01.** The "one hosted rendezvous" this ADR kept
+> was removed on 2026-11-07; gmatch 2.1 reinstated a Cloudflare-KV courier in
+> `site/functions/`, and that too was deleted on 2026-11-26 (the courier shape is
+> now a capability a node can run, not an origin the app assumes). The text below
+> records the 2026-10-25 position; read it as history.
+
 - Every install runs its own node (bundled Bun sidecar, host mode by default).
   The only hosted component is the Cloudflare Pages courier
   (`gmatch.pages.dev`): a signed public-node directory and a sealed-mail relay
@@ -88,8 +119,9 @@
   (`pausedReason: 'legacy'`) and never dialed; a `v2` pointer gets one bounded
   `/api/health` probe, and silence pauses it (`pausedReason: 'unreachable'`).
   `gmatch.fly.dev` answered while serving a different world, which is exactly
-  what reachability cannot see. See `apps/desktop/electron/server-mode-core.cjs`
-  and `docs/DESKTOP.md`.
+  what reachability cannot see. That host is decommissioned in gmatch 2.0 —
+  no client code references it. See
+  `apps/desktop/electron/server-mode-core.cjs` and `docs/DESKTOP.md`.
 
 ## ADR-2026-10-28-01 — libp2p slice retired (accepted, supersedes ADR-1.5.5-02/08)
 

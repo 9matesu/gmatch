@@ -1,6 +1,7 @@
-import blocklistData from '../../../shared/blocklist.json'
+import { DEFAULT_BLOCKLIST, tagHitsAnyTerm } from './blocklist';
 
 export * from './social-vectors';
+export * from './blocklist';
 
 export type OrbitId = string;
 
@@ -9,6 +10,13 @@ export type LikeDecision = 'like' | 'reject' | 'pass';
 export const MAX_TAGS = 5;
 export const MAX_TAG_LENGTH = 20;
 
+/**
+ * The blocklist terms this process enforces.
+ *
+ * The desktop sidecar points the API at the player's edited copy
+ * (`BLOCKLIST_PATH`, written only through Settings → Blocklist); the repo
+ * file is the factory default.
+ */
 function resolveInitialBlocklist(): string[] {
   if (typeof process !== 'undefined' && process.env?.BLOCKLIST_PATH) {
     try {
@@ -21,19 +29,21 @@ function resolveInitialBlocklist(): string[] {
       /* fallback */
     }
   }
-  return Array.isArray(blocklistData.blocklist) ? [...blocklistData.blocklist] : []
+  return [...DEFAULT_BLOCKLIST]
 }
 
-export let TAG_BLACKLIST: string[] = resolveInitialBlocklist()
+const ACTIVE_BLOCKLIST: readonly string[] = resolveInitialBlocklist()
 
-export function setTagBlacklist(list: string[]): void {
-  TAG_BLACKLIST = [...list]
-}
-
+/**
+ * Is this tag on the hard line?
+ *
+ * The token-boundary rule (SPEC §8): a term matches when it starts a token,
+ * and may be a PREFIX of that token — so 'lolicon' and 'teenager' are
+ * blocked while 'fifteen' and 'grape' are not. See ./blocklist.ts.
+ */
 export function isBlacklistedTag(tag: string): boolean {
   if (!tag) return false;
-  const clean = tag.trim().toLowerCase().replace(/^#/, '').replace(/[^a-z0-9_-]/g, '');
-  return TAG_BLACKLIST.some(b => clean.includes(b));
+  return tagHitsAnyTerm(tag, ACTIVE_BLOCKLIST);
 }
 
 /**
@@ -51,20 +61,6 @@ export function isDefaultPeerName(name?: string | null): boolean {
   if (!name || !name.trim()) return true;
   const n = name.trim();
   return /^user[-_].*/i.test(n) || n.toLowerCase() === 'user' || n.toLowerCase() === 'unknown user' || n.toLowerCase() === 'anonymous';
-}
-
-export function checkBlacklistedTags(raw: (string | null | undefined)[]): { hasBlacklisted: boolean; blockedTags: string[] } {
-  const blocked: string[] = [];
-  for (const entry of raw) {
-    if (!entry) continue;
-    const parts = entry.split(',').map(p => p.trim().toLowerCase().replace(/^#/, '').replace(/[^a-z0-9_-]/g, '')).filter(Boolean);
-    for (const part of parts) {
-      if (isBlacklistedTag(part) && !blocked.includes(part)) {
-        blocked.push(part);
-      }
-    }
-  }
-  return { hasBlacklisted: blocked.length > 0, blockedTags: blocked };
 }
 
 /**
@@ -182,7 +178,6 @@ export interface User {
   gacha_downloads_received?: number;
   gacha_items_collected?: number;
   score?: number;
-  maximum_gooner?: boolean;
   /** PC Domination: user has opted in to remote control features */
   pc_domination_enabled?: boolean;
   /** PC Domination: JSON settings object for fine-grained consent */
@@ -216,16 +211,6 @@ export interface Relationship {
   tierColor: string;
   tierLabel: string;
   last_match_at?: string;
-}
-
-export interface RelationshipResponse {
-  relationships: Relationship[];
-  stats: {
-    likes_given: number;
-    likes_received: number;
-    matches_total: number;
-    score: number;
-  };
 }
 
 export const TIER_RARITY = [
@@ -293,26 +278,6 @@ export interface Friend {
   encryption_pub_key?: string;
 }
 
-export interface FriendRequest {
-  id: string;
-  sender_id: OrbitId;
-  receiver_id?: OrbitId;
-  status: 'pending' | 'accepted' | 'rejected';
-  created_at: string;
-  sender_name?: string;
-}
-
-export interface UploadResponse {
-  id: string;
-  size: number;
-  type?: string;
-  recipients?: number;
-}
-
-export interface ApiError {
-  error: string;
-}
-
 export interface Announcement {
   id: string;
   message: string;
@@ -322,21 +287,11 @@ export interface Announcement {
   is_active?: number;
 }
 
-export interface Recommendation {
-  id: string;
-  user_id: string;
-  category: 'Feature' | 'UI' | 'Idea' | 'Bug';
-  content: string;
-  status: 'pending' | 'reviewed' | 'resolved';
-  created_at: string;
-  user_name?: string | null;
-}
-
 export interface StoreItem {
   id: string;
   name: string;
   desc: string;
-  category: 'perk' | 'badge' | 'title' | 'pack' | 'hack';
+  category: 'perk' | 'badge' | 'title' | 'hack';
   cost: number;
   icon: string;
   badge?: string;
@@ -359,9 +314,6 @@ export const STORE_ITEMS: StoreItem[] = [
   { id: 'item-hack-mobile', name: 'Screen Lock', desc: 'Locks their screen behind a takeover image for one minute. Only lands while they are online.', category: 'hack', cost: 4500, icon: 'Flame', badge: 'LOCK', consumable: true },
   { id: 'item-hack-deny', name: 'Vision Jam', desc: 'Blurs their feed images for five minutes. Only lands while they are online.', category: 'hack', cost: 800, icon: 'EyeOff', badge: 'JAM', consumable: true },
   { id: 'item-flash-drop', name: 'Flash Drop Broadcast', desc: 'Instantly broadcasts your chosen photo to everyone online for 5 seconds. Liking one counts as a normal like.', category: 'hack', cost: 1000, icon: 'Zap', badge: 'ABILITY', consumable: true },
-  { id: 'item-lootbox-celebrity', name: 'Celebrity Stars Mystery Box', desc: 'Opens a celebrity-tier luxury lootbox containing rare pop-culture, idol, and celebrity cards.', category: 'pack', cost: 350, icon: 'Sparkles', badge: 'CELEB', consumable: true },
-  { id: 'item-pack-rare', name: 'Holo Rare Vault Pack', desc: 'Opens a 3-card pack guaranteed to contain Rare or Epic holographic cards with high trade valuation.', category: 'pack', cost: 250, icon: 'Sparkles', badge: 'HOLO', consumable: true },
-  { id: 'item-pack-cyber', name: 'Cyber Mythic Lootbox', desc: 'Opens a 5-card luxury lootbox with guaranteed Epic and Legendary tier duel cards.', category: 'pack', cost: 500, icon: 'Box', badge: 'MYTHIC', consumable: true },
 ];
 
 /** One-time flash broadcast shown to every online user for ~5 seconds. */
@@ -405,11 +357,6 @@ export interface BabecockRound {
   my_entry?: string | null;
 }
 
-export interface BabecockPlacement {
-  entry_id: string;
-  grid_position: number;
-}
-
 /**
  * Babecock invite: a host pings a specific user to draw their attention to the
  * currently-open round. The round is still globally joinable — the invite is
@@ -436,18 +383,5 @@ export interface BabecockInvite {
 
 export * from './lobby';
 export * from './card-valuation';
-export * from './booru';
 export * from './gossip';
 export * from './watchSource';
-
-/** PC Domination action log entry */
-export interface DominationAction {
-  id: string;
-  dominator_id: string;
-  victim_id: string;
-  action: 'wallpaper' | 'game_bg' | 'popup_video' | 'message' | 'text_overlay' | 'blur' | 'camera';
-  payload?: Record<string, any>;
-  status: 'sent' | 'executed' | 'failed' | 'denied';
-  created_at: string;
-  executed_at?: string;
-}

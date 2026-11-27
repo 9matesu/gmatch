@@ -123,9 +123,8 @@ export const HELP_TOPICS: HelpTopic[] = [
       {
         heading: 'Where cards come from',
         bullets: [
-          'The 5 free starter cards.',
-          'Forge your own from a URL, up to 5 tags. The card shows VALUE TBD until it has been voted on enough to have a score.',
-          'Lootboxes in the Store, and the Community Market where players list and buy each other cards.',
+          'Forge your own from an image, up to 5 tags. The card shows VALUE TBD until it has been voted on enough to have a score.',
+          'The Community Market, where players list and buy each other cards.',
           'Gifts, which permanently transfer a card to you.',
         ],
       },
@@ -144,22 +143,22 @@ export const HELP_TOPICS: HelpTopic[] = [
     id: 'idle',
     title: 'Clicker',
     tabLabel: 'Clicker',
-    blurb: 'Babecock Idle: clicking, heat, tags, gallery and prestige.',
+    blurb: 'Clicker: heat, crits, tags, gallery and prestige.',
     sections: [
       {
         heading: 'The loop',
         body:
-          'Click the image to earn points. Every 25th click is a critical hit worth 10x. Clicking fast builds a Heat combo that multiplies your earnings up to 3x, but it decays if you stop. Points buy tags, and tags generate passive income whether you are clicking or not.',
+          'Click the image to earn points. Every 25th click is a critical hit worth 10x. Clicking fast builds a Heat combo that multiplies your earnings up to 3x, and it decays when you stop. Points buy tags, tags bias which pictures appear, and nothing earns while you are away.',
         bullets: [
           'Heat: keep clicking within 2 seconds to stack it, 10 per stack, +0.25 each, capped at 3x.',
-          'Passive income: your tags and gallery keep earning while the app is closed.',
-          'Offline earnings are capped at 8 hours and paid at 25%.',
+          'No idle income: there is no offline earning and nothing to collect when you come back.',
+          'Crits are the big number: 10x, every 25th click, multiplied by every cap and shard you own.',
         ],
       },
       {
         heading: 'Tags',
         body:
-          'Tags are the upgrade currency. Each one you own adds passive income, and rarer tags are worth more than common ones. There is no cap on how many you can hold, only what they cost.',
+          'Tags are the upgrade currency. What you own decides which pictures the feed shows, and rarer tags cost more because they are rarer. There is no cap on how many you can hold, only what they cost.',
         bullets: [
           'The market offers up to 24 new tags at a time, drawn from what the images you have been beating actually had.',
           'Each tag level costs 1.15x more than the last, up to level 20.',
@@ -169,7 +168,7 @@ export const HELP_TOPICS: HelpTopic[] = [
       {
         heading: 'Gallery',
         body:
-          'Images you beat can be kept in your gallery. Each one earns passive income scaled by its rarity, and the price of the next slot rises 1.1x every time, so hoarding early is worth more than hoarding late.',
+          'Images you beat can be kept in your gallery, and any of them can be brought back to the panel. The price of the next slot rises 1.1x every time, so hoarding early is worth more than hoarding late.',
         callout: 'Your gallery is permanent through prestige. Your points, tags and levels are not.',
       },
       {
@@ -181,10 +180,9 @@ export const HELP_TOPICS: HelpTopic[] = [
         heading: 'GoonCaps',
         body: 'Permanent multipliers you buy once. They are the reason a second playthrough is faster than the first.',
         bullets: [
-          'E-Girl Spit 150 — doubles click power',
-          'Braceface 900 — one automatic click per second',
-          'Pornmeat 5,000 — doubles passive income',
-          'Brain Drain 50,000 — multiplies everything by 10',
+          'E-Girl Spit 150 – doubles click power',
+          'Brain Drain 50,000 – multiplies click power by 10',
+          'Every pop stacks permanently, including a second pop of the same cap.',
         ],
       },
     ],
@@ -325,4 +323,3 @@ export const HELP_TOPICS: HelpTopic[] = [
   },
 ]
 
-export const HELP_TOPIC_IDS = HELP_TOPICS.map((t) => t.id)

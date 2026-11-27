@@ -19,6 +19,7 @@ import {
   ArrowUpRight,
 } from 'lucide-react'
 import { HELP_TOPICS } from '../help/helpContent'
+import { BounceSidebar, type BounceSidebarItem } from './rare/bounce-sidebar'
 import { useCommunityInvite, openCommunityInvite } from '../services/community'
 import feedImg from '../assets/screenshots/feed.png'
 import cardsImg from '../assets/screenshots/cards.png'
@@ -85,14 +86,14 @@ function TopicBody({ topicId }: { topicId: string }) {
       </div>
 
       {shot && (
-        <div className="border border-border-glass rounded-lg overflow-hidden bg-black/40">
+        <div className="border border-edge rounded-lg overflow-hidden bg-black/40">
           <img
             src={shot.src}
             alt={shot.caption}
             className="w-full max-h-56 object-cover object-top block"
             loading="lazy"
           />
-          <div className="px-3 py-1 bg-surface-canvas/90 text-[10px] text-retro-muted font-mono border-t border-border-glass">
+          <div className="px-3 py-1 bg-surface-canvas/90 text-2xs text-retro-muted font-mono border-t border-edge">
             {shot.caption}
           </div>
         </div>
@@ -100,7 +101,7 @@ function TopicBody({ topicId }: { topicId: string }) {
 
       {topic.sections.map((s) => (
         <section key={s.heading} className="space-y-1.5">
-          <h4 className="text-xs font-bold text-retro-fg uppercase tracking-wider">{s.heading}</h4>
+          <h4 className="text-xs font-bold text-retro-fg tracking-wider">{s.heading}</h4>
           {s.body && <p className="text-xs text-retro-muted leading-relaxed">{s.body}</p>}
           {s.bullets && (
             <ul className="text-xs text-retro-muted leading-relaxed list-disc pl-4 space-y-1">
@@ -110,7 +111,7 @@ function TopicBody({ topicId }: { topicId: string }) {
             </ul>
           )}
           {s.callout && (
-            <p className="text-xs text-retro-fg leading-relaxed bg-surface-interactive border border-border-glass rounded-lg p-3">
+            <p className="text-xs text-retro-fg leading-relaxed bg-surface-interactive border border-edge rounded-lg p-3">
               {s.callout}
             </p>
           )}
@@ -140,6 +141,12 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
   const quickstartShot = TOPIC_IMAGES['getting-started']
   const networkShot = TOPIC_IMAGES['network']
 
+  const helpNavItems: BounceSidebarItem[] = TABS.map((t) => t.label)
+  const helpNavActiveIndex = Math.max(
+    0,
+    TABS.findIndex((t) => t.id === tab),
+  )
+
   return (
     <div
       className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 select-none font-sans"
@@ -149,15 +156,15 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
         role="dialog"
         aria-modal="true"
         aria-label="Help"
-        className="bg-surface-raised border border-border-glass rounded-xl max-w-4xl w-full h-[80vh] max-h-[620px] flex flex-col shadow-2xl overflow-hidden text-retro-fg my-auto"
+        className="bg-surface-raised border border-edge rounded-xl max-w-4xl w-full h-[80vh] max-h-[620px] flex flex-col shadow-2xl overflow-hidden text-retro-fg my-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border-glass shrink-0 bg-surface-raised">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-edge shrink-0 bg-surface-raised">
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-bold tracking-wide text-retro-fg uppercase">Help &amp; Guide</h2>
+            <h2 className="text-sm font-bold tracking-wide text-retro-fg ">Help &amp; Guide</h2>
             {currentTabDef && (
-              <span className="text-[10px] text-retro-muted font-mono hidden sm:inline">
+              <span className="text-2xs text-retro-muted font-mono hidden sm:inline">
                 / {currentTabDef.label}
               </span>
             )}
@@ -174,85 +181,24 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
 
         {/* Two-Column Body */}
         <div className="flex-1 min-h-0 flex flex-col sm:flex-row overflow-hidden">
-          {/* Left Navigation Sidebar */}
+          {/* Left Navigation Sidebar — RareUI bounce sidebar: a spring dot
+              arcs to the active topic. Type is the interface; the old icon
+              buttons are gone (Swiss reduction). */}
           <nav
             aria-label="Help topics"
-            className="w-full sm:w-56 shrink-0 border-b sm:border-b-0 sm:border-r border-border-glass bg-surface-canvas/50 p-2 overflow-y-auto styled-scrollbar flex sm:flex-col gap-0.5"
+            className="w-full sm:w-56 shrink-0 border-b sm:border-b-0 sm:border-r border-edge bg-surface-canvas/50 p-3 overflow-y-auto styled-scrollbar"
           >
-            {/* Start Group */}
-            <div className="hidden sm:block px-2 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-retro-muted">
-              Start
-            </div>
-            {TABS.filter((t) => t.group === 'start').map((t) => {
-              const Icon = t.icon
-              const active = tab === t.id
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => setTab(t.id)}
-                  aria-current={active ? 'true' : undefined}
-                  className={`w-full px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-2 cursor-pointer text-left whitespace-nowrap ${
-                    active
-                      ? 'bg-surface-interactive text-retro-fg font-bold border border-border-glass'
-                      : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w5 border border-transparent'
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5 shrink-0" />
-                  <span className="truncate">{t.label}</span>
-                </button>
-              )
-            })}
-
-            {/* Features Group */}
-            <div className="hidden sm:block px-2 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-retro-muted">
-              Features
-            </div>
-            {TABS.filter((t) => t.group === 'features').map((t) => {
-              const Icon = t.icon
-              const active = tab === t.id
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => setTab(t.id)}
-                  aria-current={active ? 'true' : undefined}
-                  className={`w-full px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-2 cursor-pointer text-left whitespace-nowrap ${
-                    active
-                      ? 'bg-surface-interactive text-retro-fg font-bold border border-border-glass'
-                      : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w5 border border-transparent'
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5 shrink-0" />
-                  <span className="truncate">{t.label}</span>
-                </button>
-              )
-            })}
-
-            {/* System Group */}
-            <div className="hidden sm:block px-2 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-retro-muted">
-              Network &amp; Security
-            </div>
-            {TABS.filter((t) => t.group === 'system').map((t) => {
-              const Icon = t.icon
-              const active = tab === t.id
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => setTab(t.id)}
-                  aria-current={active ? 'true' : undefined}
-                  className={`w-full px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-2 cursor-pointer text-left whitespace-nowrap ${
-                    active
-                      ? 'bg-surface-interactive text-retro-fg font-bold border border-border-glass'
-                      : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w5 border border-transparent'
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5 shrink-0" />
-                  <span className="truncate">{t.label}</span>
-                </button>
-              )
-            })}
+            <BounceSidebar
+              items={helpNavItems}
+              value={helpNavActiveIndex}
+              onChange={(i) => {
+                const item = helpNavItems[i]
+                const label = typeof item === 'string' ? item : item?.label
+                const target = TABS.find((t) => t.label === label)
+                if (target) setTab(target.id)
+              }}
+              dotColor="var(--color-retro-accent)"
+            />
           </nav>
 
           {/* Right Content Area */}
@@ -262,12 +208,12 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
             <button
               type="button"
               onClick={() => openCommunityInvite(communityUrl)}
-              className="w-full flex items-center gap-2 rounded-lg border border-border-glass bg-glass-w5 hover:bg-glass-w8 px-3 py-2 text-left transition-colors cursor-pointer"
+              className="w-full flex items-center gap-2 rounded-lg border border-edge bg-glass-w5 hover:bg-glass-w8 px-3 py-2 text-left transition-colors cursor-pointer"
             >
               <Users className="w-4 h-4 shrink-0 text-retro-fg" />
               <span className="flex-1 min-w-0">
                 <span className="block text-xs font-bold text-retro-fg">Community &amp; support</span>
-                <span className="block text-[11px] text-retro-muted truncate">Ask for help or report an issue on the community server</span>
+                <span className="block text-xs text-retro-muted truncate">Ask for help or report an issue on the community server</span>
               </span>
               <ArrowUpRight className="w-4 h-4 shrink-0 text-retro-muted" />
             </button>
@@ -283,41 +229,41 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                 </div>
 
                 {quickstartShot && (
-                  <div className="border border-border-glass rounded-lg overflow-hidden bg-black/40">
+                  <div className="border border-edge rounded-lg overflow-hidden bg-black/40">
                     <img
                       src={quickstartShot.src}
                       alt={quickstartShot.caption}
                       className="w-full max-h-56 object-cover object-top block"
                       loading="lazy"
                     />
-                    <div className="px-3 py-1 bg-surface-canvas/90 text-[10px] text-retro-muted font-mono border-t border-border-glass">
+                    <div className="px-3 py-1 bg-surface-canvas/90 text-2xs text-retro-muted font-mono border-t border-edge">
                       {quickstartShot.caption}
                     </div>
                   </div>
                 )}
 
                 <section className="space-y-2">
-                  <h4 className="text-xs font-bold text-retro-fg uppercase tracking-wider">How it works</h4>
+                  <h4 className="text-xs font-bold text-retro-fg tracking-wider">How it works</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                    <div className="p-3 bg-surface-interactive/60 border border-border-glass rounded-lg space-y-1">
+                    <div className="p-3 bg-surface-interactive/60 border border-edge rounded-lg space-y-1">
                       <span className="font-bold text-retro-fg">1. Keys stay on your device</span>
                       <p className="text-retro-muted leading-relaxed">
                         Your account is a cryptographic keypair generated locally. No email, phone number, or password is sent to any server.
                       </p>
                     </div>
-                    <div className="p-3 bg-surface-interactive/60 border border-border-glass rounded-lg space-y-1">
+                    <div className="p-3 bg-surface-interactive/60 border border-edge rounded-lg space-y-1">
                       <span className="font-bold text-retro-fg">2. Zero central storage</span>
                       <p className="text-retro-muted leading-relaxed">
                         Media is addressed by content hashes. A post you view is fetched from peers in encrypted chunks and cached locally; a full community node keeps its own community's copy.
                       </p>
                     </div>
-                    <div className="p-3 bg-surface-interactive/60 border border-border-glass rounded-lg space-y-1">
+                    <div className="p-3 bg-surface-interactive/60 border border-edge rounded-lg space-y-1">
                       <span className="font-bold text-retro-fg">3. Build your 5-card deck</span>
                       <p className="text-retro-muted leading-relaxed">
                         You get 5 starter cards. Equip them in Deck Builder and press Set as Active to enter Quick Play duels.
                       </p>
                     </div>
-                    <div className="p-3 bg-surface-interactive/60 border border-border-glass rounded-lg space-y-1">
+                    <div className="p-3 bg-surface-interactive/60 border border-edge rounded-lg space-y-1">
                       <span className="font-bold text-retro-fg">4. Rooms and watch parties</span>
                       <p className="text-retro-muted leading-relaxed">
                         Stream videos in sync, chat with online players, and challenge peers directly in the Arena.
@@ -326,8 +272,8 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                   </div>
                 </section>
 
-                <section className="space-y-2 pt-2 border-t border-border-glass">
-                  <h4 className="text-xs font-bold text-retro-fg uppercase tracking-wider">Troubleshooting &amp; Logs</h4>
+                <section className="space-y-2 pt-2 border-t border-edge">
+                  <h4 className="text-xs font-bold text-retro-fg tracking-wider">Troubleshooting &amp; Logs</h4>
                   <p className="text-retro-muted leading-relaxed">
                     If an action fails or a peer appears offline, diagnostic events are logged locally to help identify network and storage issues.
                   </p>
@@ -353,7 +299,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                   </p>
                 </div>
                 <section className="space-y-2">
-                  <h4 className="text-xs font-bold text-retro-fg uppercase tracking-wider">How to send</h4>
+                  <h4 className="text-xs font-bold text-retro-fg tracking-wider">How to send</h4>
                   <ol className="text-xs text-retro-muted space-y-1.5 list-decimal list-inside leading-relaxed">
                     <li><span className="text-retro-fg font-medium">Select recipients</span>: choose a peer from the roster or active chat</li>
                     <li><span className="text-retro-fg font-medium">Drop or browse file</span>: preview images and videos before sending</li>
@@ -362,15 +308,15 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                   </ol>
                 </section>
                 <section className="space-y-2">
-                  <h4 className="text-xs font-bold text-retro-fg uppercase tracking-wider">Transmission Options</h4>
+                  <h4 className="text-xs font-bold text-retro-fg tracking-wider">Transmission Options</h4>
                   <div className="space-y-2">
-                    <div className="bg-surface-interactive/60 p-3 border border-border-glass rounded-lg">
+                    <div className="bg-surface-interactive/60 p-3 border border-edge rounded-lg">
                       <span className="text-retro-fg font-medium">Encrypted Media</span>: Sealed directly to the recipient public encryption key.
                     </div>
-                    <div className="bg-surface-interactive/60 p-3 border border-border-glass rounded-lg">
+                    <div className="bg-surface-interactive/60 p-3 border border-edge rounded-lg">
                       <span className="text-retro-fg font-medium">Remote Wallpaper</span>: Applies the media as background wallpaper for the recipient.
                     </div>
-                    <div className="bg-surface-interactive/60 p-3 border border-border-glass rounded-lg">
+                    <div className="bg-surface-interactive/60 p-3 border border-edge rounded-lg">
                       <span className="text-retro-fg font-medium">Timebomb</span>: Automatically removes the payload after the configured duration expires.
                     </div>
                   </div>
@@ -386,27 +332,27 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                 </div>
 
                 {networkShot && (
-                  <div className="border border-border-glass rounded-lg overflow-hidden bg-black/40">
+                  <div className="border border-edge rounded-lg overflow-hidden bg-black/40">
                     <img
                       src={networkShot.src}
                       alt={networkShot.caption}
                       className="w-full max-h-56 object-cover object-top block"
                       loading="lazy"
                     />
-                    <div className="px-3 py-1 bg-surface-canvas/90 text-[10px] text-retro-muted font-mono border-t border-border-glass">
+                    <div className="px-3 py-1 bg-surface-canvas/90 text-2xs text-retro-muted font-mono border-t border-edge">
                       {networkShot.caption}
                     </div>
                   </div>
                 )}
 
                 <section className="space-y-1.5">
-                  <h4 className="text-xs font-bold text-retro-fg uppercase tracking-wider">Network Directory</h4>
+                  <h4 className="text-xs font-bold text-retro-fg tracking-wider">Network Directory</h4>
                   <p className="text-xs text-retro-muted leading-relaxed">
                     The directory lists active nodes and online peers. Discovered peers are ranked by online presence and activity.
                   </p>
                 </section>
                 <section className="space-y-1.5">
-                  <h4 className="text-xs font-bold text-retro-fg uppercase tracking-wider">Hosting a Node</h4>
+                  <h4 className="text-xs font-bold text-retro-fg tracking-wider">Hosting a Node</h4>
                   <ul className="text-xs text-retro-muted space-y-1.5 list-disc list-inside leading-relaxed">
                     <li><span className="text-retro-fg font-medium">Host a world</span>: Open Settings &gt; Server and switch to Host mode. Your computer hosts a local sidecar.</li>
                     <li><span className="text-retro-fg font-medium">Share with friends</span>: In the Servers tab, copy your node code or LAN address to allow friends to connect.</li>
@@ -423,19 +369,19 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                   </p>
                 </div>
                 <section className="space-y-1.5">
-                  <h4 className="text-xs font-bold text-retro-fg uppercase tracking-wider">Pseudonymous by Design</h4>
+                  <h4 className="text-xs font-bold text-retro-fg tracking-wider">Pseudonymous by Design</h4>
                   <p className="text-xs text-retro-muted leading-relaxed">
                     Your account is derived entirely from cryptographic keys on this machine. There are no passwords, emails, or phone numbers tied to your presence.
                   </p>
                 </section>
                 <section className="space-y-1.5">
-                  <h4 className="text-xs font-bold text-retro-fg uppercase tracking-wider">End-to-End Encryption</h4>
+                  <h4 className="text-xs font-bold text-retro-fg tracking-wider">End-to-End Encryption</h4>
                   <p className="text-xs text-retro-muted leading-relaxed">
                     Direct messages and private transfers are encrypted using X25519 keys. The courier relay operates blindly and cannot read message bodies or user relationships.
                   </p>
                 </section>
                 <section className="space-y-1.5">
-                  <h4 className="text-xs font-bold text-retro-fg uppercase tracking-wider">18+ Content Policy</h4>
+                  <h4 className="text-xs font-bold text-retro-fg tracking-wider">18+ Content Policy</h4>
                   <p className="text-xs text-retro-muted leading-relaxed">
                     This network is restricted to adults 18+. Client-side blocklists strictly prohibit illegal content, child exploitation, and non-consensual material.
                   </p>
@@ -450,7 +396,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                   </p>
                 </div>
                 <section className="space-y-2">
-                  <div className="divide-y divide-border-glass/40 text-xs">
+                  <div className="divide-y divide-edge/40 text-xs">
                     {[
                       ['?', 'Open or close this help guide'],
                       ['Ctrl+H', 'Toggle help modal'],
@@ -463,7 +409,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
                     ].map(([key, desc]) => (
                       <div key={key} className="flex items-center justify-between py-2">
                         <span className="text-retro-muted">{desc}</span>
-                        <kbd className="bg-surface-interactive border border-border-glass px-2 py-0.5 text-xs font-mono text-retro-fg rounded font-bold">
+                        <kbd className="bg-surface-interactive border border-edge px-2 py-0.5 text-xs font-mono text-retro-fg rounded font-bold">
                           {key}
                         </kbd>
                       </div>

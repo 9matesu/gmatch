@@ -30,6 +30,10 @@ export interface NativeVideoPlayerProps {
   alwaysShowControls?: boolean;
   className?: string;
   videoClassName?: string;
+  /** Hug the video's own aspect ratio (no letterbox): the container is exactly
+   *  as tall as the media, so no black bars ever show. Default false — grid
+   *  tiles that size the container themselves keep the h-full behavior. */
+  natural?: boolean;
   style?: React.CSSProperties;
   onExpand?: () => void;
   onDoubleTapLike?: () => void;
@@ -73,6 +77,7 @@ export function NativeVideoPlayer({
   alwaysShowControls = false,
   className = '',
   videoClassName = '',
+  natural = false,
   style,
   onExpand,
   onDoubleTapLike,
@@ -463,8 +468,8 @@ export function NativeVideoPlayer({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       data-media-url={resolvedSrc}
-      className={`relative select-none outline-none group bg-black overflow-hidden flex items-center justify-center ${
-        isFullscreen ? 'w-screen h-screen' : 'w-full h-full'
+      className={`relative select-none outline-none group bg-retro-bg overflow-hidden flex items-center justify-center ${
+        isFullscreen ? 'w-screen h-screen' : natural ? 'w-full' : 'w-full h-full'
       } ${className}`}
       style={style}
     >
@@ -477,7 +482,7 @@ export function NativeVideoPlayer({
         muted={isMuted}
         playsInline={playsInline}
         preload={inView ? preload : 'none'}
-        className={`w-full h-full object-contain pointer-events-auto cursor-pointer ${videoClassName}`}
+        className={`${natural ? 'w-full h-auto' : 'w-full h-full'} object-contain pointer-events-auto cursor-pointer ${videoClassName}`}
         onClick={handleVideoCanvasClick}
         onTimeUpdate={() => {
           if (!isScrubbing && videoRef.current) {
@@ -510,7 +515,7 @@ export function NativeVideoPlayer({
 
       {isBuffering && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-          <div className="p-3.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white shadow-xl animate-spin">
+          <div className="p-3.5 rounded-full bg-black/60 backdrop-blur-md border border-edge text-retro-fg shadow-xl animate-spin">
             <Loader2 className="w-8 h-8 text-retro-accent" />
           </div>
         </div>
@@ -518,11 +523,11 @@ export function NativeVideoPlayer({
 
       {actionPulse && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 animate-orbit-pop">
-          <div className="p-4 rounded-full bg-black/70 backdrop-blur-md text-white border border-white/20 shadow-2xl">
+          <div className="p-4 rounded-full bg-black/70 backdrop-blur-md text-retro-fg border border-edge shadow-2xl">
             {actionPulse === 'play' ? (
-              <Play className="w-10 h-10 fill-white text-white translate-x-0.5" />
+              <Play className="w-10 h-10 fill-white text-retro-fg translate-x-0.5" />
             ) : (
-              <Pause className="w-10 h-10 fill-white text-white" />
+              <Pause className="w-10 h-10 fill-white text-retro-fg" />
             )}
           </div>
         </div>
@@ -541,7 +546,7 @@ export function NativeVideoPlayer({
                 videoRef.current.play().catch(() => {});
               }
             }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-interactive hover:bg-glass-w12 border border-border-glass text-xs font-medium text-retro-fg transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-interactive hover:bg-glass-w12 border border-edge text-xs font-medium text-retro-fg transition-colors cursor-pointer"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Retry</span>
@@ -558,9 +563,9 @@ export function NativeVideoPlayer({
             type="button"
             onClick={togglePlay}
             aria-label="Play video"
-            className="pointer-events-auto w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-black/60 hover:bg-black/85 backdrop-blur-md border border-white/20 text-white flex items-center justify-center shadow-2xl transition-all duration-150 hover:scale-110 active:scale-95 group/btn cursor-pointer"
+            className="pointer-events-auto w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-black/60 hover:bg-black/85 backdrop-blur-md border border-edge text-retro-fg flex items-center justify-center shadow-2xl transition duration-150 hover:scale-110 active:scale-95 group/btn cursor-pointer"
           >
-            <Play className="w-7 h-7 sm:w-8 sm:h-8 fill-white text-white translate-x-0.5 group-hover/btn:text-retro-accent group-hover/btn:fill-retro-accent transition-colors" />
+            <Play className="w-7 h-7 sm:w-8 sm:h-8 fill-white text-retro-fg translate-x-0.5 group-hover/btn:text-retro-accent group-hover/btn:fill-retro-accent transition-colors" />
           </button>
         </div>
       )}
@@ -575,7 +580,7 @@ export function NativeVideoPlayer({
               strip, and a permanent "HD Video" label on every clip was noise. */}
           <div className="flex items-center gap-1.5 pointer-events-auto">
             {playbackRate !== 1 && (
-              <span className="px-1.5 py-0.5 rounded-md bg-retro-accent/20 border border-retro-accent/40 text-[10px] font-bold text-retro-accent">
+              <span className="px-1.5 py-0.5 rounded-md bg-retro-accent/20 border border-retro-accent/40 text-2xs font-bold text-retro-accent">
                 {playbackRate}x
               </span>
             )}
@@ -587,7 +592,7 @@ export function NativeVideoPlayer({
                   onExpand();
                 }}
                 title="Expand to Fullscreen / Lightbox"
-                className="p-1.5 rounded-md bg-black/60 hover:bg-black/80 backdrop-blur-xs border border-white/10 text-zinc-300 hover:text-white transition-colors cursor-pointer"
+                className="p-1.5 rounded-md bg-black/60 hover:bg-black/80 backdrop-blur-xs border border-edge text-retro-body hover:text-retro-fg transition-colors cursor-pointer"
               >
                 <Maximize2 className="w-3.5 h-3.5" />
               </button>
@@ -612,26 +617,26 @@ export function NativeVideoPlayer({
             onMouseLeave={() => setHoverTime(null)}
             className="relative w-full h-4 flex items-center cursor-pointer group/scrub"
           >
-            <div className="w-full h-1 group-hover/scrub:h-2 rounded-full bg-glass-w20 overflow-hidden transition-all duration-150">
+            <div className="w-full h-1 group-hover/scrub:h-2 rounded-full bg-glass-w20 overflow-hidden transition duration-150">
               <div
-                className="h-full bg-glass-w20 rounded-full transition-all duration-150"
+                className="h-full bg-glass-w20 rounded-full transition duration-150"
                 style={{ width: `${bufferedPct}%` }}
               />
             </div>
 
             <div
-              className="absolute left-0 top-1/2 -translate-y-1/2 h-1 group-hover/scrub:h-2 rounded-full bg-gradient-to-r from-retro-accent to-white pointer-events-none transition-all duration-150"
+              className="absolute left-0 top-1/2 -translate-y-1/2 h-1 group-hover/scrub:h-2 rounded-full bg-retro-accent pointer-events-none transition duration-150"
               style={{ width: `${progressPct}%` }}
             />
 
             <div
-              className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-white shadow-lg border border-black/20 pointer-events-none transition-transform duration-150 scale-0 group-hover/scrub:scale-100"
+              className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-retro-accent shadow-lg border border-black/20 pointer-events-none transition-transform duration-150 scale-0 group-hover/scrub:scale-100"
               style={{ left: `${progressPct}%` }}
             />
 
             {hoverTime !== null && (
               <div
-                className="absolute -top-7 -translate-x-1/2 px-2 py-0.5 rounded bg-black/90 border border-white/20 text-[10px] font-mono font-bold text-white shadow-lg pointer-events-none"
+                className="absolute -top-7 -translate-x-1/2 px-2 py-0.5 rounded bg-black/90 border border-edge text-2xs font-mono font-bold text-retro-fg shadow-lg pointer-events-none"
                 style={{ left: `${hoverPosition}%` }}
               >
                 {formatVideoTime(hoverTime)}
@@ -639,13 +644,13 @@ export function NativeVideoPlayer({
             )}
           </div>
 
-          <div className="flex items-center justify-between gap-2 mt-1 text-white">
+          <div className="flex items-center justify-between gap-2 mt-1 text-retro-fg">
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={togglePlay}
                 aria-label={isPlaying ? 'Pause' : 'Play'}
-                className="p-1.5 rounded-md hover:bg-glass-w10 text-white transition-colors cursor-pointer"
+                className="p-1.5 rounded-md hover:bg-glass-w10 text-retro-fg transition-colors cursor-pointer"
               >
                 {isPlaying ? (
                   <Pause className="w-4 h-4 fill-white" />
@@ -659,10 +664,10 @@ export function NativeVideoPlayer({
                   type="button"
                   onClick={toggleMute}
                   aria-label={isMuted ? 'Unmute' : 'Mute'}
-                  className="p-1.5 rounded-md hover:bg-glass-w10 text-white transition-colors cursor-pointer"
+                  className="p-1.5 rounded-md hover:bg-glass-w10 text-retro-fg transition-colors cursor-pointer"
                 >
                   {isMuted || volume === 0 ? (
-                    <VolumeX className="w-4 h-4 text-zinc-400" />
+                    <VolumeX className="w-4 h-4 text-retro-muted" />
                   ) : volume < 0.5 ? (
                     <Volume1 className="w-4 h-4" />
                   ) : (
@@ -681,7 +686,7 @@ export function NativeVideoPlayer({
                 />
               </div>
 
-              <div className="text-[10px] font-mono text-zinc-300 ml-1 select-none">
+              <div className="text-2xs font-mono text-retro-body ml-1 select-none">
                 <span>{formatVideoTime(currentTime)}</span>
                 <span className="opacity-40 mx-1">/</span>
                 <span className="opacity-75">{formatVideoTime(duration)}</span>
@@ -694,7 +699,7 @@ export function NativeVideoPlayer({
                   type="button"
                   onClick={cycleSpeed}
                   title="Playback Speed"
-                  className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold hover:bg-glass-w10 text-zinc-300 hover:text-white transition-colors cursor-pointer"
+                  className="px-1.5 py-0.5 rounded text-2xs font-mono font-bold hover:bg-glass-w10 text-retro-body hover:text-retro-fg transition-colors cursor-pointer"
                 >
                   {playbackRate}x
                 </button>
@@ -706,7 +711,7 @@ export function NativeVideoPlayer({
                   onClick={toggleLoop}
                   title={isLooping ? 'Loop is On' : 'Loop is Off'}
                   className={`p-1.5 rounded-md hover:bg-glass-w10 transition-colors cursor-pointer ${
-                    isLooping ? 'text-retro-accent' : 'text-zinc-400 hover:text-white'
+                    isLooping ? 'text-retro-accent' : 'text-retro-muted hover:text-retro-fg'
                   }`}
                 >
                   <Repeat className="w-3.5 h-3.5" />
@@ -718,7 +723,7 @@ export function NativeVideoPlayer({
                   type="button"
                   onClick={togglePip}
                   title="Picture in Picture"
-                  className="p-1.5 rounded-md hover:bg-glass-w10 text-zinc-400 hover:text-white transition-colors cursor-pointer hidden sm:block"
+                  className="p-1.5 rounded-md hover:bg-glass-w10 text-retro-muted hover:text-retro-fg transition-colors cursor-pointer hidden sm:block"
                 >
                   <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
                     <path d="M19 7h-8v6h8V7zm2-4H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16.01H3V4.99h18v14.02z" />
@@ -735,7 +740,7 @@ export function NativeVideoPlayer({
                   }}
                   title="Expand to Lightbox"
                   aria-label="Expand to Lightbox"
-                  className="p-1.5 rounded-md hover:bg-glass-w10 text-zinc-300 hover:text-white transition-colors cursor-pointer"
+                  className="p-1.5 rounded-md hover:bg-glass-w10 text-retro-body hover:text-retro-fg transition-colors cursor-pointer"
                 >
                   <Maximize2 className="w-4 h-4" />
                 </button>
@@ -746,7 +751,7 @@ export function NativeVideoPlayer({
                   type="button"
                   onClick={toggleFullscreen}
                   aria-label={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-                  className="p-1.5 rounded-md hover:bg-glass-w10 text-zinc-300 hover:text-white transition-colors cursor-pointer"
+                  className="p-1.5 rounded-md hover:bg-glass-w10 text-retro-body hover:text-retro-fg transition-colors cursor-pointer"
                 >
                   {isFullscreen ? (
                     <Minimize className="w-4 h-4" />

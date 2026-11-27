@@ -7,8 +7,21 @@ if (apiArg) contextBridge.exposeInMainWorld('__API_BASE__', apiArg.slice('--api-
 
 contextBridge.exposeInMainWorld('gmatch', {
   booruFetch: (request) => ipcRenderer.invoke('booru:fetch', request),
+  booruTimings: () => ipcRenderer.invoke('booru:timings'),
+  // mediaq setup suite: status, one-shot install (streams progress), start.
+  mediaqStatus: () => ipcRenderer.invoke('mediaq:status'),
+  mediaqInstall: () => ipcRenderer.invoke('mediaq:install'),
+  mediaqCancel: () => ipcRenderer.invoke('mediaq:cancel'),
+  mediaqStart: () => ipcRenderer.invoke('mediaq:start'),
+  onMediaqProgress: (cb) => {
+    const handler = (_e, p) => cb(p)
+    ipcRenderer.on('mediaq:progress', handler)
+    return () => ipcRenderer.removeListener('mediaq:progress', handler)
+  },
   cacheImage: (url) => ipcRenderer.invoke('cache:image', url),
   cacheStats: () => ipcRenderer.invoke('cache:stats'),
+  // What the device holds, newest first (the cache viewer reads this).
+  cacheList: () => ipcRenderer.invoke('cache:list'),
   clearCache: () => ipcRenderer.invoke('cache:clear'),
   clearFeedCache: () => ipcRenderer.invoke('cache:clear-feed'),
   evictImage: (url) => ipcRenderer.invoke('cache:evict', url),
@@ -44,6 +57,16 @@ contextBridge.exposeInMainWorld('gmatch', {
   winMinimize: () => ipcRenderer.send('window:minimize'),
   winToggleMaximize: () => ipcRenderer.send('window:toggle-maximize'),
   winClose: () => ipcRenderer.send('window:close'),
+  /** The merged unread count; the main process owns what the OS shows. */
+  notifySync: (payload) =>
+    ipcRenderer.send('notify:sync', payload),
+  notifyRead: () => ipcRenderer.send('notify:read'),
+  /** Fired when the user clicks the native toast. */
+  onNotifyOpened: (cb) => {
+    const handler = () => cb()
+    ipcRenderer.on('notify:opened', handler)
+    return () => ipcRenderer.removeListener('notify:opened', handler)
+  },
   winReload: () => ipcRenderer.send('window:reload'),
   appVersion: () => ipcRenderer.invoke('app:version'),
   openExternal: (url) => ipcRenderer.invoke('shell:open', url),
@@ -72,6 +95,9 @@ contextBridge.exposeInMainWorld('gmatch', {
   domVideoOpen: (url, durationMs) => ipcRenderer.invoke('dom-video:open', url, durationMs),
   blocklistGet: () => ipcRenderer.invoke('blocklist:get'),
   blocklistSet: (data) => ipcRenderer.invoke('blocklist:set', data),
+  // Ban terms for good: main merges them into the authoritative list and
+  // returns it. The renderer never sends its own (possibly stale) full list.
+  blocklistBan: (terms) => ipcRenderer.invoke('blocklist:ban', terms),
   blocklistReset: () => ipcRenderer.invoke('blocklist:reset'),
   pmvPlaylist: (id) => ipcRenderer.invoke('pmv:playlist', id),
   logError: (scope, msg) => { try { ipcRenderer.send('log:renderer', { scope: String(scope || ''), msg: String(msg || '') }) } catch { /* never log-loop */ } },

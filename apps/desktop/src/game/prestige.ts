@@ -22,11 +22,6 @@ export function tierForXp(xp: number): number {
   return Math.min(TITLES.length, Math.floor(Math.sqrt(Math.max(0, xp) / 100)) + 1)
 }
 
-/** Inverse of tierForXp: XP needed to reach `tier`. */
-export function xpForTier(tier: number): number {
-  return Math.pow(Math.max(1, tier) - 1, 2) * 100
-}
-
 export function titleForTier(tier: number): string {
   return TITLES[Math.min(Math.max(1, tier), TITLES.length) - 1]
 }

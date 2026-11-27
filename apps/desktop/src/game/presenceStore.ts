@@ -58,6 +58,12 @@ interface PresenceState {
 /** Kept in sync with utils/presence.isUserOnline — the canonical 60s rule. */
 const SEEN_FRESH_MS = 60_000
 
+/** Records not re-sighted within this window are dropped on the next ingest
+ *  (plan B1): the roster only needs recent players, and an unbounded Map of
+ *  every id ever seen grew for the life of the process. Matches the 24h
+ *  window the P2P peer map already uses for its ghosts. */
+const RECORD_TTL_MS = 24 * 60 * 60 * 1000
+
 function onlineFromRecord(rec: PresenceRecord, now: number): boolean {
   if (rec.lastSeenMs <= 0) return rec.online
   const delta = now - rec.lastSeenMs
@@ -75,6 +81,7 @@ export const usePresence = create<PresenceState>((set, get) => ({
   ingest: (users, counts) =>
     set((state) => {
       const next = new Map(state.records)
+      const now = Date.now()
       for (const u of users) {
         if (!u?.id) continue
         next.set(u.id, {
@@ -84,10 +91,15 @@ export const usePresence = create<PresenceState>((set, get) => ({
           pfpUrl: u.pfp_url || undefined,
         })
       }
+      for (const [id, rec] of next) {
+        // lastSeenMs <= 0 means "no sighting" — a deliberate offline row the
+        // snapshot wrote on purpose; TTL-prune only genuine stale sightings.
+        if (rec.lastSeenMs > 0 && now - rec.lastSeenMs > RECORD_TTL_MS) next.delete(id)
+      }
       return {
         records: next,
         counts: counts === undefined ? state.counts : counts,
-        countsAt: counts === undefined || counts === null ? 0 : Date.now(),
+        countsAt: counts === undefined || counts === null ? 0 : now,
       }
     }),
 

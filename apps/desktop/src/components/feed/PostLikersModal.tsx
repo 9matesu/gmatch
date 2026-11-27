@@ -98,16 +98,16 @@ export function PostLikersModal({
       aria-label="Post likes"
     >
       <div
-        className="bg-surface-raised w-full max-w-sm rounded-t-3xl sm:rounded-2xl border border-border-glass shadow-2xl overflow-hidden flex flex-col max-h-[80vh] sm:max-h-[500px] animate-orbit-slide-up"
+        className="bg-surface-raised w-full max-w-sm rounded-t-xl sm:rounded-xl border border-edge shadow-2xl overflow-hidden flex flex-col max-h-(--max-h-panel) sm:max-h-[500px] animate-orbit-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-4 border-b border-border-glass flex items-center justify-between">
+        <div className="p-4 border-b border-edge flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Heart className="w-4 h-4 text-rose-500 fill-rose-500" />
+            <Heart className="w-4 h-4 text-danger-fg fill-danger" />
             <h3 className="text-sm font-extrabold text-retro-fg">Likes</h3>
             {!loading && (
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-glass-w12 text-retro-muted border border-border-glass">
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-glass-w12 text-retro-muted border border-edge">
                 {likers.length}
               </span>
             )}
@@ -133,7 +133,7 @@ export function PostLikersModal({
               <span className="text-xs">Loading likes...</span>
             </div>
           ) : error ? (
-            <div className="py-10 text-center text-xs text-rose-400 space-y-2">
+            <div className="py-10 text-center text-xs text-danger-fg space-y-2">
               <p>{error}</p>
               <button
                 type="button"
@@ -149,7 +149,7 @@ export function PostLikersModal({
                     .catch(() => setError('Failed to load likes'))
                     .finally(() => setLoading(false));
                 }}
-                className="px-3 py-1 bg-glass-w12 border border-border-glass rounded text-retro-fg hover:bg-glass-w20 cursor-pointer"
+                className="px-3 py-1 bg-glass-w12 border border-edge rounded text-retro-fg hover:bg-glass-w20 cursor-pointer"
               >
                 Retry
               </button>
@@ -164,13 +164,14 @@ export function PostLikersModal({
               // profilePics is synced from loadUsers on every boot + save.
               const avatar = profilePics[liker.user_id] || liker.pfp_url;
               return (
-                <div
+                <button
                   key={liker.user_id}
+                  type="button"
                   onClick={() => handleUserClick(liker.user_id)}
-                  className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-glass-w12 transition-colors cursor-pointer group"
+                  className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-glass-w12 transition-colors cursor-pointer group text-left"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-full bg-glass-w20 border border-border-glass overflow-hidden shrink-0 flex items-center justify-center">
+                    <div className="w-9 h-9 rounded-full bg-glass-w20 border border-edge overflow-hidden shrink-0 flex items-center justify-center">
                       {avatar ? (
                         <img
                           src={resolveMediaUrl(avatar)}
@@ -187,15 +188,15 @@ export function PostLikersModal({
                       <span className="text-xs font-semibold text-retro-fg truncate group-hover:underline">
                         {liker.display_name}
                       </span>
-                      <span className="text-[10px] text-retro-muted font-mono truncate">
+                      <span className="text-2xs text-retro-muted font-mono truncate">
                         @{liker.user_id.slice(0, 14)}...
                       </span>
                     </div>
                   </div>
-                  <span className="text-[11px] font-medium text-retro-muted group-hover:text-retro-fg shrink-0 transition-colors px-2 py-1 rounded bg-glass-w06">
+                  <span className="text-xs font-medium text-retro-muted group-hover:text-retro-fg shrink-0 transition-colors px-2 py-1 rounded bg-glass-w06">
                     View
                   </span>
-                </div>
+                </button>
               );
             })
           )}

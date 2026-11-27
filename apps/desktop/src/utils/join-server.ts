@@ -10,10 +10,15 @@ export async function joinServer(
   s: DirectoryServer,
   toast: Toast,
   askPassword: (name: string) => Promise<string | null>,
+  identity?: { orbitId: string } | null,
 ): Promise<'relaunching' | 'connected' | 'cancelled' | 'failed'> {
+  // identity MUST reach switchClientWorld: it gates the auth-reachability probe
+  // (GET /api/servers/dashboard). Without it the switch validated only
+  // /api/health and committed, so a node that requires a password looked
+  // joinable without one.
   const out = await switchClientWorld(
     { name: s.name, endpointHint: s.endpoint_hint, passwordRequired: s.password_required === 1 },
-    { toast, askPassword },
+    { toast, askPassword, identity },
   )
   if (out === 'switched') {
     toast(`Connected to ${s.name}.`, 'success')

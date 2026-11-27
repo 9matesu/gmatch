@@ -102,7 +102,9 @@ export class OrbitPeer {
           try {
             const body = await res.json()
             if (body?.error === 'Answer not found') { setTimeout(pollAnswer, 1000); return }
-          } catch {}
+          } catch (err) {
+            logger.warn('[webrtc] POST /api/signal/ice failed', err)
+          }
           this.close(); reject(new Error('Poll answer failed (404)')); return
         }
         clearTimeout(timeout)

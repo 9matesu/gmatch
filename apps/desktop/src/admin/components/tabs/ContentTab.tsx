@@ -13,6 +13,7 @@ import {
 import { cn } from "../../../lib/utils";
 import { formatAbsoluteTime } from "../../../utils/timeAgo";
 import { AdminMediaThumbnail } from "../AdminMediaThumbnail";
+import { SubTabBar } from "../SubTabBar";
 import type {
   AdminPost,
   AdminLobbyImage,
@@ -202,44 +203,24 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-black text-retro-fg uppercase tracking-wider">Content & Games</h1>
+          <h1 className="text-lg font-black text-retro-fg tracking-wider">Content & Games</h1>
           <p className="text-xs text-retro-muted mt-0.5">Manage public feed media, live duels, game sessions, and broadcast notices</p>
         </div>
       </div>
 
-      {/* Subtab Navigation */}
-      <div className="flex flex-wrap gap-1 bg-surface-raised border border-border-glass rounded-xl p-1">
-        {subTabs.map(tab => {
-          const Icon = tab.icon;
-          const active = activeSubTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveSubTab(tab.id)}
-              className={cn(
-                "px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer",
-                active
-                  ? "bg-retro-accent text-retro-accent-text shadow-sm"
-                  : "text-retro-muted hover:text-retro-fg"
-              )}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {tab.label}
-              {tab.id === "matches" && matches.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 bg-purple-500/20 text-purple-300 rounded-full text-[10px]">
-                  {matches.length} live
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      <SubTabBar
+        tabs={subTabs.map((t) => ({
+          ...t,
+          badge: t.id === "matches" && matches.length > 0 ? matches.length : null,
+        }))}
+        active={activeSubTab}
+        onChange={(id) => setActiveSubTab(id as SubTab)}
+      />
 
       {/* Subtab 1: Public Posts & Lobby Board (NO Private Content) */}
       {activeSubTab === "posts_lobby" && (
         <div className="space-y-4">
-          <div className="flex items-center gap-2 border-b border-border-glass pb-3">
+          <div className="flex items-center gap-2 border-b border-edge pb-3">
             <button
               type="button"
               onClick={() => setContentSection("posts")}
@@ -284,13 +265,13 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                 ]}
               />
 
-              <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
+              <div className="rounded-xl border border-edge bg-surface-raised overflow-hidden">
                 {isLoading ? (
                   <AdminLoadingState rows={6} columns={4} />
                 ) : posts.length === 0 ? (
                   <AdminEmptyState title="No posts found" description="No public feed posts match filter" illustration="folder" />
                 ) : (
-                  <div className="divide-y divide-border-subtle">
+                  <div className="divide-y divide-edge-subtle">
                     {posts.map(post => {
                       const isHidden = Boolean(post.hidden_at);
                       return (
@@ -308,10 +289,10 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                             <div className="flex items-center gap-2">
                               <span className="text-xs font-bold text-retro-fg">{post.author_name || "Unknown Author"}</span>
                               {isHidden && <Badge variant="warning" size="sm">Hidden</Badge>}
-                              <span className="text-[10px] text-retro-muted">{formatAbsoluteTime(post.created_at)}</span>
+                              <span className="text-2xs text-retro-muted">{formatAbsoluteTime(post.created_at)}</span>
                             </div>
                             <p className="text-xs text-retro-body mt-1 truncate">{post.post_caption || "No caption"}</p>
-                            <div className="flex items-center gap-2 mt-1 text-[10px] text-retro-muted">
+                            <div className="flex items-center gap-2 mt-1 text-2xs text-retro-muted">
                               <span>{post.like_count || 0} likes</span>
                               <span>·</span>
                               <span>{post.comment_count || 0} comments</span>
@@ -321,14 +302,14 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                             <button
                               type="button"
                               onClick={() => { onAction("togglePostVisibility", post); setTimeout(fetchPosts, 300); }}
-                              className="px-2.5 py-1 text-xs font-semibold rounded border border-border-glass text-retro-muted hover:text-retro-fg cursor-pointer"
+                              className="px-2.5 py-1 text-xs font-semibold rounded border border-edge text-retro-muted hover:text-retro-fg cursor-pointer"
                             >
                               {isHidden ? "Unhide" : "Hide"}
                             </button>
                             <button
                               type="button"
                               onClick={() => { onAction("deletePost", post.id); setTimeout(fetchPosts, 300); }}
-                              className="px-2.5 py-1 text-xs font-semibold rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 cursor-pointer"
+                              className="px-2.5 py-1 text-xs font-semibold rounded border border-danger/30 text-danger-fg hover:bg-danger/10 cursor-pointer"
                             >
                               Delete
                             </button>
@@ -343,11 +324,11 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
           )}
 
           {contentSection === "lobby" && (
-            <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
+            <div className="rounded-xl border border-edge bg-surface-raised overflow-hidden">
               {lobbyImages.length === 0 ? (
                 <AdminEmptyState title="No lobby images" description="Lobby board is clear" illustration="folder" />
               ) : (
-                <div className="divide-y divide-border-subtle">
+                <div className="divide-y divide-edge-subtle">
                   {lobbyImages.map(img => (
                     <div key={img.id} className="p-3 flex items-center justify-between gap-3 hover:bg-glass-w5 transition-colors">
                       <AdminMediaThumbnail
@@ -362,14 +343,14 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-retro-fg">{img.user_name || img.user_id.slice(0, 10)}</span>
-                          <span className="text-[10px] text-retro-muted">{formatAbsoluteTime(img.created_at)}</span>
+                          <span className="text-2xs text-retro-muted">{formatAbsoluteTime(img.created_at)}</span>
                         </div>
-                        <p className="text-[10px] text-retro-muted mt-0.5 font-mono">{img.id}</p>
+                        <p className="text-2xs text-retro-muted mt-0.5 font-mono">{img.id}</p>
                       </div>
                       <button
                         type="button"
                         onClick={() => { onAction("deleteLobbyImage", img.id); setTimeout(fetchLobbyImages, 300); }}
-                        className="px-2.5 py-1 text-xs font-semibold rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 cursor-pointer"
+                        className="px-2.5 py-1 text-xs font-semibold rounded border border-danger/30 text-danger-fg hover:bg-danger/10 cursor-pointer"
                       >
                         Delete
                       </button>
@@ -385,7 +366,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
       {/* Subtab 2: Matches & Duels */}
       {activeSubTab === "matches" && (
         <div className="space-y-4">
-          <div className="flex items-center gap-2 border-b border-border-glass pb-3">
+          <div className="flex items-center gap-2 border-b border-edge pb-3">
             <button
               type="button"
               onClick={() => setMatchSection("live")}
@@ -419,21 +400,21 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
           </div>
 
           {matchSection === "live" && (
-            <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
+            <div className="rounded-xl border border-edge bg-surface-raised overflow-hidden">
               {matches.length === 0 ? (
                 <AdminEmptyState title="No live matches" description="No duels in progress" illustration="chart" />
               ) : (
-                <div className="divide-y divide-border-subtle">
+                <div className="divide-y divide-edge-subtle">
                   {matches.map(m => (
                     <div key={m.id} className="p-4 flex flex-wrap items-center justify-between gap-3 hover:bg-glass-w5 transition-colors">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-retro-fg">{m.user_a_name || m.user_a.slice(0, 8)}</span>
-                          <span className="text-[10px] text-retro-muted">vs</span>
+                          <span className="text-2xs text-retro-muted">vs</span>
                           <span className="text-xs font-bold text-retro-fg">{m.user_b_name || m.user_b.slice(0, 8)}</span>
                           <Badge variant="info" size="sm">LIVE</Badge>
                         </div>
-                        <p className="text-[10px] text-retro-muted mt-1">
+                        <p className="text-2xs text-retro-muted mt-1">
                           Phase: {m.phase || m.status} · Round {m.round_seq || 1} · Created {formatAbsoluteTime(m.created_at, { timeStyle: 'short' })}
                         </p>
                       </div>
@@ -441,7 +422,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                         <button
                           type="button"
                           onClick={() => { onAction("forceEnd", m.id); setTimeout(fetchMatches, 300); }}
-                          className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                          className="px-3 py-1.5 bg-danger/10 hover:bg-danger/20 text-danger-fg border border-danger/30 rounded-lg text-xs font-bold transition-colors cursor-pointer"
                         >
                           Force End
                         </button>
@@ -454,11 +435,11 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
           )}
 
           {matchSection === "archive" && (
-            <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
+            <div className="rounded-xl border border-edge bg-surface-raised overflow-hidden">
               {archivedMatches.length === 0 ? (
                 <AdminEmptyState title="No archived matches" description="Match history is clear" illustration="chart" />
               ) : (
-                <div className="divide-y divide-border-subtle">
+                <div className="divide-y divide-edge-subtle">
                   {archivedMatches.map(m => (
                     <div key={m.id} className="p-3 flex items-center justify-between gap-3 hover:bg-glass-w5 transition-colors">
                       <div className="min-w-0 flex-1">
@@ -466,7 +447,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                           <span className="text-xs font-bold text-retro-fg">{m.user_a_name || m.user_a.slice(0, 8)} vs {m.user_b_name || m.user_b.slice(0, 8)}</span>
                           <StatusBadge status={m.result} mapping={{ winner_a: "success", winner_b: "success", draw: "info", forfeit_a: "warning", forfeit_b: "warning", no_match: "neutral", admin_cancelled: "danger" }} />
                         </div>
-                        <p className="text-[10px] text-retro-muted mt-0.5">
+                        <p className="text-2xs text-retro-muted mt-0.5">
                           Score: {m.score_a} - {m.score_b} · Ended: {formatAbsoluteTime(m.ended_at)}
                         </p>
                       </div>
@@ -478,11 +459,11 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
           )}
 
           {matchSection === "tiers" && (
-            <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
+            <div className="rounded-xl border border-edge bg-surface-raised overflow-hidden">
               {specialMatches.length === 0 ? (
                 <AdminEmptyState title="No tier matches" description="No special tier matches active" illustration="chart" />
               ) : (
-                <div className="divide-y divide-border-subtle">
+                <div className="divide-y divide-edge-subtle">
                   {specialMatches.map(t => (
                     <div key={t.id} className="p-3 flex items-center justify-between gap-3 hover:bg-glass-w5 transition-colors">
                       <div className="min-w-0 flex-1">
@@ -490,14 +471,14 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                           <span className="text-xs font-bold text-retro-fg">{t.user_a_name || t.user_a.slice(0, 8)} vs {t.user_b_name || t.user_b.slice(0, 8)}</span>
                           <Badge variant="warning" size="sm">Tier {t.tier}</Badge>
                         </div>
-                        <p className="text-[10px] text-retro-muted mt-0.5">
+                        <p className="text-2xs text-retro-muted mt-0.5">
                           Tier: {t.tier} · Status: {t.status} {t.last_result ? `· Result: ${t.last_result}` : ""}
                         </p>
                       </div>
                       <button
                         type="button"
                         onClick={() => { onAction("endTier", t.id); setTimeout(fetchMatches, 300); }}
-                        className="px-2.5 py-1 text-xs font-semibold rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 cursor-pointer"
+                        className="px-2.5 py-1 text-xs font-semibold rounded border border-danger/30 text-danger-fg hover:bg-danger/10 cursor-pointer"
                       >
                         End Tier
                       </button>
@@ -515,14 +496,14 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Custom Rooms */}
-            <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
-              <div className="px-4 py-3 border-b border-border-glass flex items-center justify-between">
-                <h2 className="text-xs font-bold uppercase tracking-wider text-retro-fg">Multiplayer Rooms ({rooms.length})</h2>
+            <div className="rounded-xl border border-edge bg-surface-raised overflow-hidden">
+              <div className="px-4 py-3 border-b border-edge flex items-center justify-between">
+                <h2 className="text-xs font-bold tracking-wider text-retro-fg">Multiplayer Rooms ({rooms.length})</h2>
               </div>
               {rooms.length === 0 ? (
                 <AdminEmptyState title="No active rooms" description="Zero custom rooms running" illustration="folder" />
               ) : (
-                <div className="divide-y divide-border-subtle">
+                <div className="divide-y divide-edge-subtle">
                   {rooms.map(r => (
                     <div key={r.id} className="p-3 flex items-center justify-between gap-3 hover:bg-glass-w5 transition-colors">
                       <div className="min-w-0 flex-1">
@@ -530,12 +511,12 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                           <span className="text-xs font-bold text-retro-fg">{r.name}</span>
                           <Badge variant="neutral" size="sm">{r.player_count} players</Badge>
                         </div>
-                        <p className="text-[10px] text-retro-muted mt-0.5">Host: {r.owner_name || "Room"}</p>
+                        <p className="text-2xs text-retro-muted mt-0.5">Host: {r.owner_name || "Room"}</p>
                       </div>
                       <button
                         type="button"
                         onClick={() => { onAction("closeRoom", r.id); setTimeout(fetchRooms, 300); }}
-                        className="px-2 py-1 text-[10px] font-semibold rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 cursor-pointer"
+                        className="px-2 py-1 text-2xs font-semibold rounded border border-danger/30 text-danger-fg hover:bg-danger/10 cursor-pointer"
                       >
                         Close
                       </button>
@@ -546,14 +527,14 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
             </div>
 
             {/* Babecock Sessions */}
-            <div className="rounded-xl border border-border-glass bg-surface-raised overflow-hidden">
-              <div className="px-4 py-3 border-b border-border-glass flex items-center justify-between">
-                <h2 className="text-xs font-bold uppercase tracking-wider text-retro-fg">Babecock Rounds ({babecockRounds.length})</h2>
+            <div className="rounded-xl border border-edge bg-surface-raised overflow-hidden">
+              <div className="px-4 py-3 border-b border-edge flex items-center justify-between">
+                <h2 className="text-xs font-bold tracking-wider text-retro-fg">Babecock Rounds ({babecockRounds.length})</h2>
               </div>
               {babecockRounds.length === 0 ? (
                 <AdminEmptyState title="No active rounds" description="Zero babecock rounds running" illustration="folder" />
               ) : (
-                <div className="divide-y divide-border-subtle">
+                <div className="divide-y divide-edge-subtle">
                   {babecockRounds.map(b => (
                     <div key={b.id} className="p-3 flex items-center justify-between gap-3 hover:bg-glass-w5 transition-colors">
                       <div className="min-w-0 flex-1">
@@ -561,12 +542,12 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                           <span className="text-xs font-bold text-retro-fg">Round {b.id.slice(0, 8)}</span>
                           <Badge variant="info" size="sm">{b.status}</Badge>
                         </div>
-                        <p className="text-[10px] text-retro-muted mt-0.5">{b.entry_count} entries</p>
+                        <p className="text-2xs text-retro-muted mt-0.5">{b.entry_count} entries</p>
                       </div>
                       <button
                         type="button"
                         onClick={() => { onAction("closeBabecock", b.id); setTimeout(fetchRooms, 300); }}
-                        className="px-2 py-1 text-[10px] font-semibold rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 cursor-pointer"
+                        className="px-2 py-1 text-2xs font-semibold rounded border border-danger/30 text-danger-fg hover:bg-danger/10 cursor-pointer"
                       >
                         Close
                       </button>
@@ -583,10 +564,10 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
       {activeSubTab === "announcements" && (
         <div className="space-y-6">
           {/* Announcements Header */}
-          <div className="rounded-xl border border-border-glass bg-surface-raised p-4 space-y-4">
+          <div className="rounded-xl border border-edge bg-surface-raised p-4 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xs font-bold uppercase tracking-wider text-retro-fg">Broadcast Banner Notices</h2>
+                <h2 className="text-xs font-bold tracking-wider text-retro-fg">Broadcast Banner Notices</h2>
                 <p className="text-xs text-retro-muted mt-0.5">Platform-wide alert banners shown at the top of player screens</p>
               </div>
               <button
@@ -602,7 +583,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
             {announcements.length === 0 ? (
               <AdminEmptyState title="No announcements" description="No broadcast notices published" illustration="folder" />
             ) : (
-              <div className="divide-y divide-border-subtle">
+              <div className="divide-y divide-edge-subtle">
                 {announcements.map(ann => (
                   <div key={ann.id} className="p-3 flex items-center justify-between gap-3 hover:bg-glass-w5 transition-colors">
                     <div className="min-w-0 flex-1">
@@ -610,7 +591,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                         <span className="text-xs font-semibold text-retro-fg">{ann.message}</span>
                         {ann.is_active ? <Badge variant="success" size="sm">Active</Badge> : <Badge variant="neutral" size="sm">Inactive</Badge>}
                       </div>
-                      <p className="text-[10px] text-retro-muted mt-0.5">
+                      <p className="text-2xs text-retro-muted mt-0.5">
                         By {ann.created_by_name || "Admin"} · {formatAbsoluteTime(ann.created_at)}
                       </p>
                     </div>
@@ -618,14 +599,14 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                       <button
                         type="button"
                         onClick={() => { onAction("toggleAnnouncement", ann.id, !ann.is_active); setTimeout(fetchAnnouncements, 300); }}
-                        className="px-2 py-1 text-[10px] font-semibold rounded border border-border-glass text-retro-muted hover:text-retro-fg cursor-pointer"
+                        className="px-2 py-1 text-2xs font-semibold rounded border border-edge text-retro-muted hover:text-retro-fg cursor-pointer"
                       >
                         {ann.is_active ? "Deactivate" : "Activate"}
                       </button>
                       <button
                         type="button"
                         onClick={() => { onAction("deleteAnnouncement", ann.id); setTimeout(fetchAnnouncements, 300); }}
-                        className="px-2 py-1 text-[10px] font-semibold rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 cursor-pointer"
+                        className="px-2 py-1 text-2xs font-semibold rounded border border-danger/30 text-danger-fg hover:bg-danger/10 cursor-pointer"
                       >
                         Delete
                       </button>
@@ -637,16 +618,16 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
           </div>
 
           {/* Feedback & Recommendations */}
-          <div className="rounded-xl border border-border-glass bg-surface-raised p-4 space-y-4">
+          <div className="rounded-xl border border-edge bg-surface-raised p-4 space-y-4">
             <div>
-              <h2 className="text-xs font-bold uppercase tracking-wider text-retro-fg">Community Feedback & Suggestions</h2>
+              <h2 className="text-xs font-bold tracking-wider text-retro-fg">Community Feedback & Suggestions</h2>
               <p className="text-xs text-retro-muted mt-0.5">Submissions from player in-app recommendation forms</p>
             </div>
 
             {recommendations.length === 0 ? (
               <AdminEmptyState title="No feedback received" description="Player suggestions will appear here" illustration="folder" />
             ) : (
-              <div className="divide-y divide-border-subtle">
+              <div className="divide-y divide-edge-subtle">
                 {recommendations.map(rec => (
                   <div key={rec.id} className="p-3 flex items-center justify-between gap-3 hover:bg-glass-w5 transition-colors">
                     <div className="min-w-0 flex-1">
@@ -655,7 +636,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                         <Badge variant="info" size="sm">{rec.category}</Badge>
                         <StatusBadge status={rec.status} mapping={{ pending: "pending", reviewed: "info", resolved: "success" }} size="sm" />
                       </div>
-                      <p className="text-[10px] text-retro-muted mt-0.5">
+                      <p className="text-2xs text-retro-muted mt-0.5">
                         From {rec.user_name || rec.user_id.slice(0, 8)} · {formatAbsoluteTime(rec.created_at)}
                       </p>
                     </div>
@@ -664,7 +645,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                         <button
                           type="button"
                           onClick={() => { adminApi.updateRecommendation(identity!, rec.id, "resolved"); setTimeout(fetchAnnouncements, 300); }}
-                          className="px-2 py-1 text-[10px] font-semibold rounded border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 cursor-pointer"
+                          className="px-2 py-1 text-2xs font-semibold rounded border border-success/30 text-success-fg hover:bg-success/10 cursor-pointer"
                         >
                           Resolve
                         </button>
@@ -672,7 +653,7 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
                       <button
                         type="button"
                         onClick={() => { adminApi.deleteRecommendation(identity!, rec.id); setTimeout(fetchAnnouncements, 300); }}
-                        className="px-2 py-1 text-[10px] font-semibold rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 cursor-pointer"
+                        className="px-2 py-1 text-2xs font-semibold rounded border border-danger/30 text-danger-fg hover:bg-danger/10 cursor-pointer"
                       >
                         Delete
                       </button>
@@ -692,19 +673,20 @@ export function ContentTab({ identity, pinVerified, onZoom, onAction }: ContentT
           title="Create System Notice"
         >
           <div className="space-y-4 text-left p-2">
-            <label className="text-[10px] font-bold text-retro-muted uppercase block">Announcement Message</label>
+            <label htmlFor="admin-announcement" className="text-2xs font-bold text-retro-muted uppercase block">Announcement Message</label>
             <textarea
+              id="admin-announcement"
               value={newAnnouncementText}
               onChange={e => setNewAnnouncementText(e.target.value)}
               placeholder="Type notification text..."
               rows={3}
-              className="w-full bg-surface-canvas border border-border-glass rounded-lg px-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent resize-none"
+              className="w-full bg-surface-canvas border border-edge rounded-lg px-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent resize-none"
             />
             <div className="flex justify-end gap-2 pt-2">
               <button
                 type="button"
                 onClick={() => setShowCreateAnnModal(false)}
-                className="px-3 py-1.5 rounded text-xs border border-border-glass text-retro-muted hover:text-retro-fg cursor-pointer"
+                className="px-3 py-1.5 rounded text-xs border border-edge text-retro-muted hover:text-retro-fg cursor-pointer"
               >
                 Cancel
               </button>

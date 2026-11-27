@@ -93,7 +93,7 @@ async function main() {
   delete process.env.GMATCH_HOST_MODE
 
   // ---- and the module still exports the surface main.cjs expects ----
-  assert.deepStrictEqual(Object.keys(sidecar).sort(), ['API_BASE', 'PORT', 'sidecarEvents', 'startApi', 'stopApi'].sort())
+  assert.deepStrictEqual(Object.keys(sidecar).sort(), ['API_BASE', 'PORT', 'isRunning', 'ping', 'sidecarEvents', 'startApi', 'stopApi'].sort())
 
   Module._load = originalLoad
   globalThis.fetch = originalFetch

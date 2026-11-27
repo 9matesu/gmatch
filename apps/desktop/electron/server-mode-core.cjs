@@ -15,9 +15,10 @@ function isMode(v) {
 }
 
 /**
- * A courier is infrastructure, never a world: the Cloudflare deployment keeps
- * a directory and moves sealed mail, but 404s every stateful route. A client
- * pointed at it becomes a local HOST instead of a broken client.
+ * A node that serves only mail/directory is infrastructure, never a world: the
+ * retired Pages origin was one (it stored a directory and moved sealed mail,
+ * but 404s every stateful route). A client pointed at such an address becomes a
+ * local HOST instead of a broken client.
  */
 const COURIER_HOSTS = /(^|\.)gmatch\.pages\.dev$/
 

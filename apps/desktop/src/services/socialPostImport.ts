@@ -1,125 +1,273 @@
 "use client";
 
 import type { OrbitIdentityLike } from '../utils/api'
+import { orbitFetch } from '../utils/api'
+import { getLocalObject, registerLocalObject, sha256HexBlob } from '../utils/p2pSwarm'
+import { isPostDeleted } from '../utils/deletedPosts'
+import { projectPosts } from './socialFeedProjection'
+import { publishSignedPostOperation, shouldEmitSocialOperation } from './socialPublish'
 import type { SocialOperationLog } from './socialOperationLog'
-import { publishSignedPostOperation } from './socialPublish'
 
 /**
- * Import of the user's EXISTING local posts into the operation log
- * (roadmap L4/L5 migration).
+ * Import the player's OWN existing public posts into the signed operation log
+ * (roadmap L4 — "old data remains visible/importable").
  *
- * Without this, the local-first feed starts empty: posts the user made before
- * the operation log existed are never replicable. The import turns the
- * user's own public posts into `post.create` operations, one per post.
+ * A post published before the local-first path existed lives only as a NODE
+ * row plus bytes on this machine (or in the node's blob store). Peers cannot
+ * address it, because addressing happens through a signed `post.create` whose
+ * manifest carries the sha256 of the bytes. This turns each such post into
+ * exactly that operation, and seeds the bytes locally under both the object id
+ * and the content hash first — so once the operation travels, a peer can fetch
+ * the media from this machine rather than from a node.
  *
- * Guardrails, all of them deliberate:
- * - **Own posts only.** Someone else's content is never re-published by us.
- * - **Idempotent by objectId.** A post that already has a `post.create` in the
- *   log is skipped, so running the import twice adds nothing (operation ids
- *   are sequence-bound and would otherwise differ every run).
- * - **Capped.** A bounded number of posts per run; the rest is picked up by
- *   a later run (the importer is incremental, not a one-shot migration).
- * - **Additive only.** It writes operations; it never touches the post, its
- *   bytes, or the vault. Operations are prunable, so this is reversible.
- * - **Opt-in.** Re-publishing old content to peers is a visible decision, so
- *   the caller decides when to run this — never silently at boot.
+ * Rules (each one is a test):
+ * - **Own public feed posts only.** Same gate as a fresh publish
+ *   (`shouldEmitSocialOperation`): stories, avatars, chats and private rows are
+ *   never re-published.
+ * - **Idempotent by object id.** A post already in the log is skipped, so
+ *   running it twice is harmless (and two runs cannot fork an actor chain).
+ * - **Bytes or nothing.** A post whose bytes are neither local nor readable
+ *   from this node is skipped: an operation with no servable media would show
+ *   peers an empty frame.
+ * - **The hash is verified, never assumed.** When the node row declares a
+ *   `content_hash`, the bytes must hash to it; otherwise the bytes are refused
+ *   and the post is skipped as a mismatch. When there is no declared hash, the
+ *   computed one becomes the address (that is what the bytes ARE).
+ * - **Additive only.** Nothing is deleted, rewritten or re-uploaded, and a
+ *   tombstoned post is never resurrected.
+ * - **Opt-in.** Nothing calls this at boot; re-publishing old content to peers
+ *   is the player's explicit decision (Settings → Preferences).
  */
 
-/** The shape the importer needs from a local object row. */
+/** One row as the node describes it (already own-scoped by the query). */
 export interface ImportablePost {
   id: string
-  owner_id?: string | null
-  content_hash?: string | null
-  mime_type?: string | null
-  size_bytes?: number | null
+  contentHash?: string | null
+  mimeType?: string | null
+  sizeBytes?: number | null
   caption?: string | null
-  tags?: string[] | null
-  is_public?: number | boolean | null
+  tags?: string | null
+  isPublic?: boolean
+  isStory?: boolean
+  isAvatar?: boolean
+  isChat?: boolean
 }
 
-export const DEFAULT_IMPORT_LIMIT = 50
-
-const HEX64 = /^[0-9a-f]{64}$/
-
-/** objectIds that already have a post.create in the log. */
-export async function importedObjectIds(log: SocialOperationLog): Promise<Set<string>> {
-  const entries = await log.listAllOperations()
-  const ids = new Set<string>()
-  for (const entry of entries) {
-    const record = entry.record as { type?: string; objectId?: string }
-    if (record?.type === 'post.create' && typeof record.objectId === 'string') ids.add(record.objectId)
-  }
-  return ids
-}
-
-/**
- * Which local posts may be imported: own, public, with a content hash (the
- * operation's content CID) and a known size — and not already imported.
- */
-export function selectImportCandidates(
-  objects: readonly ImportablePost[],
-  options: { selfId: string; alreadyImported?: ReadonlySet<string>; limit?: number },
-): ImportablePost[] {
-  const limit = options.limit ?? DEFAULT_IMPORT_LIMIT
-  const out: ImportablePost[] = []
-  for (const object of objects) {
-    if (out.length >= limit) break
-    if (!object?.id) continue
-    if (object.owner_id && object.owner_id !== options.selfId) continue
-    const isPublic = object.is_public === 1 || object.is_public === true
-    if (!isPublic) continue
-    if (!object.content_hash || !HEX64.test(object.content_hash)) continue
-    if (!object.mime_type) continue
-    if (!object.size_bytes || object.size_bytes < 1) continue
-    if (options.alreadyImported?.has(object.id)) continue
-    out.push(object)
-  }
-  return out
-}
+export type ImportSkipReason =
+  | 'not-public'
+  | 'deleted'
+  | 'already'
+  | 'no-bytes'
+  | 'hash-mismatch'
+  | 'invalid'
 
 export interface ImportSummary {
-  imported: number
-  skipped: number
-  failed: number
-  /** Why a post was refused (the first few), so the UI can say something. */
-  errors: string[]
+  /** operationIds committed to the log by this run. */
+  imported: string[]
+  /** Posts deliberately left alone, with the reason. */
+  skipped: Array<{ id: string; reason: ImportSkipReason }>
+  /** Local seeds written (bytes registered under id + content hash). */
+  bytesSeeded: number
+}
+
+export interface ImportOwnPostsDeps {
+  /** This player's own posts, newest first (the node scopes by author id). */
+  listOwnPosts(limit: number): Promise<ImportablePost[]>
+  /** Bytes already on this machine (vault/IndexedDB swarm store). */
+  readLocal(id: string): Promise<Blob | null>
+  /** Signed read of the node's copy, when the node still holds the bytes. */
+  fetchFromNode(id: string): Promise<Blob | null>
+  /** sha256 of bytes, lowercase hex. */
+  hash(blob: Blob): Promise<string>
+  /** Register verified bytes so this machine can serve them over the swarm. */
+  seed(id: string, blob: Blob): void
+  /** A tombstone outranks an import: never resurrect a deleted post. */
+  isDeleted?(id: string): boolean
+}
+
+export interface ImportOwnPostsOptions {
+  /** Candidates per run; bounded so one click cannot become a stampede. */
+  limit?: number
+  /** Test seam: replace one or more leaf operations. */
+  deps?: Partial<ImportOwnPostsDeps>
+}
+
+export const MAX_IMPORT_PER_RUN = 100
+
+const SHA256_HEX = /^[0-9a-f]{64}$/i
+/** An object id must be a single path segment (never a descriptor/URL). */
+const SAFE_OBJECT_ID = /^[A-Za-z0-9_-]{1,128}$/
+
+function toImportable(row: Record<string, unknown>): ImportablePost {
+  const str = (v: unknown): string | null => (typeof v === 'string' && v.length > 0 ? v : null)
+  const bool = (v: unknown): boolean => v === true || v === 1
+  const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+  return {
+    id: String(row.id ?? ''),
+    contentHash: str(row.content_hash),
+    mimeType: str(row.mime_type),
+    sizeBytes: num(row.size_bytes),
+    caption: str(row.post_caption) ?? str(row.caption),
+    tags: str(row.tags),
+    // The serializer omits the flag for a normal public post.
+    isPublic: row.is_public === undefined ? true : bool(row.is_public),
+    isStory: bool(row.is_story),
+    isAvatar: bool(row.is_avatar),
+    isChat: bool(row.is_chat),
+  }
+}
+
+function defaultDeps(identity: OrbitIdentityLike): ImportOwnPostsDeps {
+  return {
+    async listOwnPosts(limit) {
+      const res = await orbitFetch(
+        `/api/posts?author_id=${encodeURIComponent(identity.orbitId)}&limit=${limit}&sort=latest`,
+        {},
+        identity,
+      )
+      if (!res.ok) return []
+      const data = await res.json().catch(() => null)
+      const rows = Array.isArray(data?.posts) ? data.posts : []
+      return rows
+        .filter((row: unknown): row is Record<string, unknown> => !!row && typeof row === 'object')
+        .map(toImportable)
+    },
+    readLocal: (id) => getLocalObject(id),
+    async fetchFromNode(id) {
+      try {
+        const res = await orbitFetch(`/api/objects/${encodeURIComponent(id)}`, {}, identity)
+        if (!res.ok) return null
+        // A row the node does not hold answers with a `p2p` DESCRIPTOR
+        // (JSON), not bytes. Reading that as media would import the
+        // descriptor text as a picture, so it is refused here.
+        const type = (res.headers.get('content-type') || '').toLowerCase()
+        if (type.includes('application/json')) return null
+        const blob = await res.blob()
+        return blob.size > 0 ? blob : null
+      } catch {
+        return null
+      }
+    },
+    hash: (blob) => sha256HexBlob(blob),
+    seed: (id, blob) => registerLocalObject(id, blob),
+    isDeleted: (id) => isPostDeleted(id),
+  }
 }
 
 /**
- * Import the selected posts as signed operations. A failure on one post never
- * stops the others: the summary says what happened.
+ * Commit one signed `post.create` per importable post. Returns what happened,
+ * never throwing for a single bad row: one unreadable post must not abort the
+ * rest of the player's history.
  */
-export async function importLocalPosts(
+export async function importOwnPosts(
   identity: OrbitIdentityLike,
-  candidates: readonly ImportablePost[],
   log: SocialOperationLog,
-  options: { limit?: number } = {},
+  options: ImportOwnPostsOptions = {},
 ): Promise<ImportSummary> {
-  const summary: ImportSummary = { imported: 0, skipped: 0, failed: 0, errors: [] }
-  const already = await importedObjectIds(log)
-  for (const object of candidates) {
-    if (already.has(object.id)) {
-      summary.skipped += 1
-      continue
-    }
+  const deps: ImportOwnPostsDeps = { ...defaultDeps(identity), ...options.deps }
+  const limit = Math.max(1, Math.min(options.limit ?? MAX_IMPORT_PER_RUN, MAX_IMPORT_PER_RUN))
+  const summary: ImportSummary = { imported: [], skipped: [], bytesSeeded: 0 }
+
+  let candidates: ImportablePost[]
+  try {
+    candidates = await deps.listOwnPosts(limit)
+  } catch {
+    return summary
+  }
+
+  // What the log already carries (including tombstones, so a deleted post is
+  // not re-created by an import either).
+  const known = new Set<string>()
+  try {
+    for (const post of projectPosts(await log.listAllOperations())) known.add(post.id)
+  } catch {
+    /* an unreadable log imports nothing new today; publish will refuse forks */
+  }
+
+  for (const candidate of candidates) {
+    const id = candidate.id
+    const skip = (reason: ImportSkipReason) => summary.skipped.push({ id, reason })
+
+    if (!SAFE_OBJECT_ID.test(id)) { skip('invalid'); continue }
+    if (!shouldEmitSocialOperation({
+      isPublic: candidate.isPublic,
+      isStory: candidate.isStory,
+      isAvatar: candidate.isAvatar,
+      isChat: candidate.isChat,
+      durable: true,
+    })) { skip('not-public'); continue }
+    // A tombstone outranks an import, and a storage hiccup must not abort the
+    // whole run: treat an unreadable tombstone index as "not deleted".
+    let tombstoned = false
     try {
-      await publishSignedPostOperation(identity, {
-        objectId: object.id,
-        contentCid: object.content_hash as string,
-        mimeType: object.mime_type as string,
-        sizeBytes: object.size_bytes as number,
-        caption: object.caption ?? undefined,
-        tags: (object.tags ?? []).join(', '),
-      }, log)
-      already.add(object.id)
-      summary.imported += 1
-    } catch (error) {
-      summary.failed += 1
-      if (summary.errors.length < 5) {
-        summary.errors.push(`${object.id}: ${error instanceof Error ? error.message : String(error)}`)
+      tombstoned = !!deps.isDeleted?.(id)
+    } catch {
+      tombstoned = false
+    }
+    if (tombstoned) { skip('deleted'); continue }
+    if (known.has(id)) { skip('already'); continue }
+
+    let bytes: Blob | null = null
+    try {
+      bytes = await deps.readLocal(id)
+    } catch {
+      bytes = null
+    }
+    if (!bytes) {
+      try {
+        bytes = await deps.fetchFromNode(id)
+      } catch {
+        bytes = null
       }
     }
-    if (options.limit && summary.imported >= options.limit) break
+    if (!bytes || bytes.size === 0) { skip('no-bytes'); continue }
+
+    let hash: string
+    try {
+      hash = (await deps.hash(bytes)).toLowerCase()
+    } catch {
+      skip('invalid')
+      continue
+    }
+    if (!SHA256_HEX.test(hash)) { skip('invalid'); continue }
+
+    const declared = candidate.contentHash
+    // A declared address that the bytes do not match means these are NOT the
+    // bytes the original post described. Refuse them; never re-address them.
+    if (declared && SHA256_HEX.test(declared) && declared.toLowerCase() !== hash) {
+      skip('hash-mismatch')
+      continue
+    }
+
+    // Seed BEFORE publishing: an operation a peer can receive but whose media
+    // nobody serves would show them an empty frame.
+    try {
+      deps.seed(id, bytes)
+      deps.seed(hash, bytes)
+      summary.bytesSeeded += 1
+    } catch {
+      /* seeding is best-effort; the local vault copy still resolves for us */
+    }
+
+    try {
+      const operation = await publishSignedPostOperation(identity, {
+        objectId: id,
+        contentCid: hash,
+        mimeType: candidate.mimeType || bytes.type || 'application/octet-stream',
+        sizeBytes: bytes.size,
+        caption: candidate.caption ?? undefined,
+        tags: candidate.tags ?? undefined,
+      }, log)
+      summary.imported.push(operation.operationId)
+      known.add(id)
+    } catch (error) {
+      // "post already created" is the race against a concurrent run, not a
+      // failure; everything else is reported as invalid so the caller can say
+      // how many rows were left behind.
+      const message = error instanceof Error ? error.message : ''
+      skip(/already created/i.test(message) ? 'already' : 'invalid')
+    }
   }
+
   return summary
 }

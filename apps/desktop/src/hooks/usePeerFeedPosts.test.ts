@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyReactionsToFeedPosts, projectedPostsToFeedPosts } from './usePeerFeedPosts'
+import { applyReactionsToFeedPosts, applySavesToFeedPosts, projectedPostsToFeedPosts } from './usePeerFeedPosts'
 import type { ProjectedPost } from '../services/socialFeedProjection'
 import { reactionKey, type ProjectedReaction } from '../services/socialInteractionProjection'
 
@@ -28,6 +28,9 @@ describe('peer feed rows (L4.2)', () => {
       mime_type: 'image/jpeg',
       caption: 'hi',
       origin: 'peer',
+      // The row keeps the signed manifest's content address: the media ladder
+      // needs it to fetch from the swarm instead of a node (roadmap L4).
+      content_hash: 'c'.repeat(64),
       like_count: 0,
       comment_count: 0,
     })
@@ -62,5 +65,17 @@ describe('peer feed rows (L4.2)', () => {
     const [plain] = applyReactionsToFeedPosts(rows, new Map(), 'me')
     expect(plain.like_count).toBe(0)
     expect(plain.is_liked).toBe(false)
+  })
+
+  it('marks a locally-bookmarked peer post as saved', () => {
+    const rows = projectedPostsToFeedPosts([base], 'me')
+    // A peer post has no node row, so its bookmark is this device's own store.
+    const [saved] = applySavesToFeedPosts(rows, new Set(['post-a']))
+    expect(saved.is_saved).toBe(true)
+
+    // An unrelated id changes nothing, and an empty set is a no-op (same rows).
+    const [untouched] = applySavesToFeedPosts(rows, new Set(['other']))
+    expect(untouched.is_saved).toBe(false)
+    expect(applySavesToFeedPosts(rows, new Set())).toBe(rows)
   })
 })

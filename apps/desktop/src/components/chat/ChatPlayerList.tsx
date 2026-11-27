@@ -219,14 +219,14 @@ export function ChatPlayerList({
   return (
     <div className="h-full min-h-0 flex flex-col select-none overflow-hidden" data-testid="chat-player-list">
       {/* Header */}
-      <div className="p-3 sm:p-4 border-b border-border-glass flex items-center justify-between shrink-0">
+      <div className="p-3 sm:p-4 border-b border-edge flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <Users className="w-4 h-4 text-retro-muted shrink-0" />
           <h2 className="font-semibold text-sm text-retro-fg truncate">
             Players
           </h2>
         </div>
-        <div className="flex items-center gap-1.5 text-[11px] font-mono shrink-0">
+        <div className="flex items-center gap-1.5 text-xs font-mono shrink-0">
           <span className="flex items-center gap-1 text-retro-online font-medium">
             <span className="w-2 h-2 rounded-full bg-retro-online inline-block" />
             {displayOnlineCount}
@@ -239,8 +239,8 @@ export function ChatPlayerList({
       </div>
 
       {/* Quick Search */}
-      <div className="p-2.5 border-b border-border-glass shrink-0">
-        <div className="flex items-center gap-2 bg-surface-raised border border-border-glass rounded-md px-2.5 py-1.5 text-xs text-retro-body">
+      <div className="p-2.5 border-b border-edge shrink-0">
+        <div className="flex items-center gap-2 bg-surface-raised border border-edge rounded-md px-2.5 py-1.5 text-xs text-retro-body">
           <Search className="w-3.5 h-3.5 text-retro-muted shrink-0" />
           <input
             type="text"
@@ -311,12 +311,12 @@ export function ChatPlayerList({
                         {displayName}
                       </span>
                       {isSelf && (
-                        <span className="text-[10px] font-semibold text-retro-accent shrink-0 px-1 py-0.2 rounded bg-glass-w8">
+                        <span className="text-2xs font-semibold text-retro-accent shrink-0 px-1 py-0.2 rounded bg-glass-w8">
                           You
                         </span>
                       )}
                     </div>
-                    <span className="block text-[10px] text-retro-muted truncate">
+                    <span className="block text-2xs text-retro-muted truncate">
                       {player.online ? (
                         <>
                           <span className="text-retro-online font-medium">Active now</span>

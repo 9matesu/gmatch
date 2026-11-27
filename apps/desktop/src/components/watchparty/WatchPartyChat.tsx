@@ -44,16 +44,16 @@ export function WatchPartyChat({ party, profilePics, myId, isHost }: {
   const chat = party?.chat || []
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col border-t border-border-glass">
+    <div className="flex-1 min-h-0 flex flex-col border-t border-edge">
       <p className={`px-3 pt-2 pb-1 uppercase tracking-wider ${MUTED}`}>Chat</p>
       <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto px-3 pb-2 space-y-1.5 styled-scrollbar">
         {chat.map((m, i) => m.sys ? (
-          <p key={`${m.at}-${i}`} className="text-center text-[10px] uppercase tracking-wider text-retro-muted">{m.text}</p>
+          <p key={`${m.at}-${i}`} className="text-center text-2xs uppercase tracking-wider text-retro-muted">{m.text}</p>
         ) : (
           <div key={`${m.at}-${i}`} className="group flex items-start gap-2">
             <Avatar id={m.from || m.id} size={18} imageUrl={profilePics[m.from || m.id] || null} />
             <div className="min-w-0 flex-1">
-              <span className={`text-[10px] font-bold uppercase tracking-wider ${m.from === myId ? 'text-retro-fg' : 'text-retro-muted'}`}>
+              <span className={`text-2xs font-bold uppercase tracking-wider ${m.from === myId ? 'text-retro-fg' : 'text-retro-muted'}`}>
                 {m.name}
               </span>
               <p className="text-xs text-retro-fg break-words">{renderChatText(m.text)}</p>
@@ -71,11 +71,11 @@ export function WatchPartyChat({ party, profilePics, myId, isHost }: {
           </div>
         ))}
         {chat.length === 0 && (
-          <p className="text-[10px] text-retro-muted">No messages yet.</p>
+          <p className="text-2xs text-retro-muted">No messages yet.</p>
         )}
       </div>
       {party && (
-        <div className="p-2 border-t border-border-glass">
+        <div className="p-2 border-t border-edge">
           <textarea
             ref={textareaRef}
             rows={1}

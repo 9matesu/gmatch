@@ -49,8 +49,10 @@ describe('GMatchFeed video player on timeline', () => {
     expect(video).toBeInTheDocument();
     expect(video).toHaveAttribute('src', 'https://example.com/clip.mp4');
 
-    // Controls should be rendered (video autoplays muted)
-    expect(screen.getByLabelText(/pause|play/i)).toBeInTheDocument();
+    // Controls should be rendered. The timeline does NOT autoplay (a feed of
+    // decoders was the biggest GPU cost), so the toggle reads "Play"; the
+    // clip still plays when the player presses it.
+    expect(screen.getByLabelText('Play')).toBeInTheDocument();
     expect(screen.getByLabelText(/unmute|mute/i)).toBeInTheDocument();
     expect(screen.getByTitle(/playback speed/i)).toBeInTheDocument();
     expect(screen.getByTitle(/loop/i)).toBeInTheDocument();

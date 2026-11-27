@@ -64,11 +64,11 @@ export function GamesHub({
       {/* Sleek Arena Mode Pills */}
       {subTab !== 'idle' && (
         <div className="flex items-center justify-between gap-2 px-3 sm:px-4 pt-3 pb-1">
-          <div className="flex items-center gap-1 p-1 rounded-full bg-surface-raised/60 backdrop-blur-md border border-border-glass" role="tablist" aria-label="Arena Modes">
+          <div className="flex items-center gap-1 p-1 rounded-full bg-surface-raised/60 backdrop-blur-md border border-edge" role="tablist" aria-label="Arena Modes">
             {[
               { id: 'duel' as const, label: '1v1 Arena' },
-              { id: 'ranks' as const, label: 'Rankings' },
               { id: 'babecock' as const, label: 'Babecock' },
+              { id: 'ranks' as const, label: 'Rankings' },
             ].map((mode) => (
               <button
                 key={mode.id}
@@ -79,7 +79,7 @@ export function GamesHub({
                   playPress(780);
                   onSubTabChange?.(mode.id);
                 }}
-                className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                className={`px-3 py-1 rounded-full text-xs font-semibold transition cursor-pointer ${
                   subTab === mode.id
                     ? 'bg-retro-accent text-retro-accent-text '
                     : 'text-retro-muted hover:text-retro-fg'
@@ -101,7 +101,14 @@ export function GamesHub({
         )}
 
         {subTab === 'babecock' && (
-          <div role="tabpanel" id="arena-panel-babecock" aria-labelledby="arena-tab-babecock" className="solid-panel rounded-xl p-4 backdrop-blur-md">
+          <div role="tabpanel" id="arena-panel-babecock" aria-label="Babecock" className="solid-panel rounded-xl p-4 backdrop-blur-md space-y-3">
+            <button
+              type="button"
+              onClick={() => onSubTabChange?.('duel')}
+              className="text-2xs text-retro-muted hover:text-retro-fg transition-colors cursor-pointer"
+            >
+              ← Back to Arena
+            </button>
             <BabecockPanel identity={identity} />
           </div>
         )}

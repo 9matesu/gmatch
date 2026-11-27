@@ -84,6 +84,42 @@ describe('presence store: one record per user', () => {
   })
 })
 
+describe('presence store: bounded records (plan B1)', () => {
+  beforeEach(() => {
+    __resetPresenceForTests()
+  })
+
+  it('prunes records unseen for over 24h on the next ingest', () => {
+    ingestSnapshot([
+      u('fresh', { last_seen: fresh() }),
+      u('yesterday', { last_seen: ago(2 * 60 * 60_000) }),
+      u('ghost', { last_seen: ago(25 * 60 * 60_000) }),
+      u('ancient', { last_seen: ago(400 * 60 * 60_000) }),
+    ])
+    // A new sighting arrives; the stale tail must go with the same ingest.
+    ingestSnapshot([u('fresh', { last_seen: fresh() })])
+    const s = usePresence.getState()
+    expect(s.record('fresh')).toBeDefined()
+    expect(s.record('yesterday')).toBeDefined()
+    expect(s.record('ghost')).toBeUndefined()
+    expect(s.record('ancient')).toBeUndefined()
+  })
+
+  it('keeps the map bounded when snapshots carry many one-shot ids', () => {
+    for (let wave = 0; wave < 10; wave++) {
+      const users = []
+      for (let i = 0; i < 50; i++) users.push(u(`wave${wave}-u${i}`, { last_seen: fresh() }))
+      ingestSnapshot(users)
+    }
+    // Every id was fresh, so all 500 survive — but a later sweep of stale
+    // records cannot accumulate forever: re-sighting prunes what it replaces.
+    expect(usePresence.getState().records.size).toBe(500)
+    const stale = Array.from({ length: 50 }, (_, i) => u(`wave0-u${i}`, { last_seen: ago(48 * 60 * 60_000) }))
+    ingestSnapshot(stale)
+    expect(usePresence.getState().records.size).toBe(450)
+  })
+})
+
 describe('presence store: self is always online', () => {
   beforeEach(() => {
     __resetPresenceForTests()

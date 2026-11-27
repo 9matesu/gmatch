@@ -165,12 +165,6 @@ export function refererFor(hostname: string): string {
   return `https://${hostname}/`
 }
 
-/** Media/alt hosts this origin family serves bytes from. */
-export function imageHostsFor(origin: string): string[] {
-  const s = ALL.find((x) => x.origin === origin)
-  return s?.imageHosts ?? []
-}
-
 /** Host (or a subdomain of it) is this URL's origin. */
 function hostMatches(hostname: string, origin: string): boolean {
   try {

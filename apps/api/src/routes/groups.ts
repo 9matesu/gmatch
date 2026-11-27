@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import { orbitAuth } from '../middleware/auth'
 import type { D1Turso } from '../db'
+import { findDisplayName } from '../common/userLookup'
 
 type Bindings = { DB: D1Turso }
 
@@ -137,13 +138,13 @@ groups.post('/:id/messages', async (c) => {
     }
   }
 
-  const sender = await c.env.DB.prepare('SELECT display_name FROM Users WHERE id = ?').bind(userId).first<{ display_name: string | null }>()
+  const senderName = (await findDisplayName(c.env.DB, userId))?.trim() || 'Unknown User'
   let attachmentMime: string | null = null
   if (attachmentId) {
     const obj = await c.env.DB.prepare('SELECT mime_type FROM Objects WHERE id = ?').bind(attachmentId).first<{ mime_type: string | null }>()
     attachmentMime = obj?.mime_type || null
   }
-  const msg = { id, group_id: groupId, sender_id: userId, sender_name: sender?.display_name?.trim() || 'Unknown User', body: body.trim(), reply_to: replyTo, attachment_id: attachmentId, attachment_mime: attachmentMime, created_at: new Date().toISOString() }
+  const msg = { id, group_id: groupId, sender_id: userId, sender_name: senderName, body: body.trim(), reply_to: replyTo, attachment_id: attachmentId, attachment_mime: attachmentMime, created_at: new Date().toISOString() }
 
   // Push to every member's open socket so their group thread refreshes.
   try {

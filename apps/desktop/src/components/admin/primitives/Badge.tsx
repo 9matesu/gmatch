@@ -23,24 +23,24 @@ type BadgeVariant =
   | "offline";
 
 const variantClasses: Record<BadgeVariant, string> = {
-  default: "bg-surface-interactive text-retro-muted border border-border-glass",
-  success: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30",
-  warning: "bg-amber-500/15 text-amber-400 border border-amber-500/30",
-  danger: "bg-red-500/15 text-red-400 border border-red-500/30",
-  info: "bg-cyan-500/15 text-cyan-400 border border-cyan-500/30",
-  primary: "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40",
-  neutral: "bg-glass-w20 text-retro-muted border border-border-glass",
-  active: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30",
-  inactive: "bg-glass-w20 text-retro-muted border border-border-glass",
-  pending: "bg-amber-500/15 text-amber-400 border border-amber-500/30",
-  completed: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30",
-  draft: "bg-glass-w20 text-retro-muted border border-border-glass",
-  released: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30",
-  archived: "bg-amber-500/15 text-amber-400 border border-amber-500/30",
-  banned: "bg-red-500/15 text-red-400 border border-red-500/30",
-  hidden: "bg-amber-500/15 text-amber-400 border border-amber-500/30",
-  online: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30",
-  offline: "bg-glass-w20 text-retro-muted border border-border-glass",
+  default: "bg-surface-interactive text-retro-muted border border-edge",
+  success: "bg-success/15 text-success-fg border border-success/30",
+  warning: "bg-warning/15 text-warning-fg border border-warning/30",
+  danger: "bg-danger/15 text-danger-fg border border-danger/30",
+  info: "bg-info/15 text-info-fg border border-info/30",
+  primary: "bg-info/20 text-info-fg border border-info/40",
+  neutral: "bg-glass-w20 text-retro-muted border border-edge",
+  active: "bg-success/15 text-success-fg border border-success/30",
+  inactive: "bg-glass-w20 text-retro-muted border border-edge",
+  pending: "bg-warning/15 text-warning-fg border border-warning/30",
+  completed: "bg-success/15 text-success-fg border border-success/30",
+  draft: "bg-glass-w20 text-retro-muted border border-edge",
+  released: "bg-success/15 text-success-fg border border-success/30",
+  archived: "bg-warning/15 text-warning-fg border border-warning/30",
+  banned: "bg-danger/15 text-danger-fg border border-danger/30",
+  hidden: "bg-warning/15 text-warning-fg border border-warning/30",
+  online: "bg-success/15 text-success-fg border border-success/30",
+  offline: "bg-glass-w20 text-retro-muted border border-edge",
 };
 
 interface BadgeProps {
@@ -61,34 +61,37 @@ export function Badge({
   onClick,
 }: BadgeProps) {
   const sizeClasses = {
-    sm: "px-1.5 py-0.5 text-[10px]",
-    md: "px-2 py-0.5 text-[10px]",
+    sm: "px-1.5 py-0.5 text-2xs",
+    md: "px-2 py-0.5 text-2xs",
     lg: "px-2.5 py-1 text-xs",
   };
 
   const dotColors: Record<BadgeVariant, string> = {
     default: "bg-retro-muted",
-    success: "bg-emerald-400",
-    warning: "bg-amber-400",
-    danger: "bg-red-400",
-    info: "bg-cyan-400",
-    primary: "bg-cyan-400",
+    success: "bg-success",
+    warning: "bg-warning",
+    danger: "bg-danger",
+    info: "bg-info",
+    primary: "bg-info",
     neutral: "bg-retro-muted",
-    active: "bg-emerald-400",
+    active: "bg-success",
     inactive: "bg-retro-muted",
-    pending: "bg-amber-400",
-    completed: "bg-emerald-400",
+    pending: "bg-warning",
+    completed: "bg-success",
     draft: "bg-retro-muted",
-    released: "bg-emerald-400",
-    archived: "bg-amber-400",
-    banned: "bg-red-400",
-    hidden: "bg-amber-400",
-    online: "bg-emerald-400",
+    released: "bg-success",
+    archived: "bg-warning",
+    banned: "bg-danger",
+    hidden: "bg-warning",
+    online: "bg-success",
     offline: "bg-retro-muted",
   };
 
+  const Tag = onClick ? "button" : "span";
+
   return (
-    <span
+    <Tag
+      type={onClick ? "button" : undefined}
       className={cn(
         "inline-flex items-center gap-1 font-mono font-bold uppercase tracking-wider rounded-full border",
         sizeClasses[size],
@@ -100,7 +103,7 @@ export function Badge({
     >
       {dot && <span className={cn("w-1.5 h-1.5 rounded-full", dotColors[variant])} />}
       {children}
-    </span>
+    </Tag>
   );
 }
 

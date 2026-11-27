@@ -196,7 +196,7 @@ export class DominationMeshManager {
 
   /** Live-approve a pending camera request: keep the return address until the
    *  frame is captured, then completeWithPhoto() closes the loop. */
-  async land(requestId: string): Promise<void> {
+  async land(_requestId: string): Promise<void> {
     // Kept for API compat: approval alone no longer reports success — the
     // execution report does. Nothing to do here but keep the pending entry.
   }

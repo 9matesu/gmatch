@@ -37,7 +37,7 @@ async function testVault() {
     assert.strictEqual(vault.get('https://example.com/pic.jpg'), null)
 
     // Test 2: pin() with mock fetcher
-    const mockFetcher = async (url) => ({
+    const mockFetcher = async (_url) => ({
       buf: Buffer.from('fake image data bytes'),
       mime: 'image/jpeg',
     })

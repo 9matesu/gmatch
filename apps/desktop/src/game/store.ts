@@ -1,13 +1,14 @@
 import { create } from 'zustand'
 import { getSecureItem } from '../utils/secure-storage'
-import { clickGain, clickPower, heatMultiplier, heatStreakAfter, isCrit, passiveGps } from './economy'
+import { clickGain, heatMultiplier, heatStreakAfter, isCrit } from './economy'
 import type { EconomyInput } from './economy'
-import { buyTag as buyTagLevel, deriveTagStats, discoverTags, feedQuery, mergeTags as mergeTagList, normalizeCustomTag, removeTag as removeTagList, setupTag, soloTag as soloTagList, toggleTag as toggleTagLevel, validateCustomTag } from './tags'
+import { buyTag as buyTagLevel, deriveTagStats, discoverTags, feedQuery, mergeTags as mergeTagList, normalizeCustomTag, removeTag as removeTagList, soloTag as soloTagList, toggleTag as toggleTagLevel, validateCustomTag } from './tags'
 import { buildRoundQueries, roundQueryKey, PILLS_PER_ROUND, RECENT_QUERY_DEPTH } from './queryBuilder'
-import { getUserExcludes, isNoise, isQueryBlocked, rankTags, setUserExcludes } from './tagFilter'
+import { getUserExcludes, banTagsInBlocklist, isNoise, isQueryBlocked, rankTags, setUserExcludes } from './tagFilter'
+import { tagHitsAnyTerm } from '@orbit/shared'
 import { learnPurge, setCoRules, setFeedIntent } from './tagCooccur'
 import { KILL_XP, foeMaxHp, killBonusPoints } from './battle'
-import { CAPS, activeCaps, capAutoClicksPerSec, popCap as popCapList } from './caps'
+import { ALL_CAP_IDS, CAPS, activeCaps, popCap as popCapList } from './caps'
 import { imageRarity } from './rarity'
 import { applyBrainmelt, canBrainmelt, tierForXp, titleForTier } from './prestige'
 import { ACHIEVEMENTS, newlyEarned } from './achievements'
@@ -17,7 +18,6 @@ import {
   SAVE_VERSION,
   defaultSave,
   deserialize,
-  offlineEarnings,
   serialize,
 } from './save'
 import type { SaveData } from './save'
@@ -98,7 +98,6 @@ export interface GameState {
   imageReady: boolean
   setImageReady: (ready: boolean) => void
   toasts: Toast[]
-  offlineGain: number
 
   clickImage: () => ClickResult
   clickCell: (index: number) => ClickResult
@@ -107,11 +106,14 @@ export interface GameState {
   reorderGrid: (from: number, to: number) => void
   /** KO novelty pipeline (session-only): generated per drain from foe tags. */
   pendingDrops: KoDrop[]
-  claimDropTag: (id: string) => boolean
-  claimDropAntiTag: (id: string) => boolean
+  claimDropTag: (id: string, tag: string) => boolean
+  /** Ban a tag for good. Resolves true only when the DURABLE write landed
+   *  (the term is now in the user's blocklist.json). */
+  claimDropAntiTag: (id: string, tag: string) => Promise<boolean>
+  /** Ban a tag for good: it lands in the user's blocklist.json (enforced by
+   *  the main process on every query) AND in the runtime exclude list. */
+  banTag: (tag: string) => Promise<boolean>
   dismissDrop: (id: string) => void
-  /** Player-picked starter tags + extra excludes (setup screen, one shot). */
-  setupComplete: boolean
   userExcludes: string[]
   coRules: { a: string; b: string; count: number }[]
   /** Player-owned feed sources (custom URLs / local folders, tried first). */
@@ -120,9 +122,6 @@ export interface GameState {
   addFolderSource: (folderId: string, folderPath: string, label?: string) => { added: boolean; message: string }
   removeCustomSource: (id: string) => void
   toggleCustomSource: (id: string) => void
-  completeSetup: (tags: string[], excludes: string[]) => { ok: boolean; message: string }
-  /** Re-run the setup picks after the first one (Settings → Feed / onboarding edit). */
-  updateSetup: (tags: string[], excludes: string[]) => { ok: boolean; message: string }
   addUserExclude: (raw: string) => boolean
   removeUserExclude: (term: string) => boolean
   buyTag: (name: string) => boolean
@@ -142,6 +141,9 @@ export interface GameState {
   goBack: () => boolean
   /** Grid mode: swap the whole board for a fresh one (session-only history). */
   skipGrid: () => void
+  /** Save a cached picture to the gallery (the cache viewer's action). The
+   *  bytes are captured durably, exactly like a drained foe. */
+  addGalleryImage: (url: string, tags?: string[]) => boolean
   /** "Never show this again": seen + bytes evicted + rarest content tags
    * learned as anti-tags (player intent beats algorithm: feed tags never
    * become excludes). */
@@ -158,7 +160,6 @@ export interface GameState {
   load: () => void
   /** Re-read the save from the slot the active identity owns (plan A1). */
   reload: () => void
-  collectOffline: () => void
   verifyAge: () => void
   dismissToast: (id: number) => void
   clearToasts: () => void
@@ -247,7 +248,6 @@ function statsOf(s: GameState): AchievementStats {
     prestiges: s.prestigeCount,
     shards: s.shards,
     tier: tierForXp(s.xp),
-    collectedOfflineEarnings: s.collectedOfflineEarnings,
     maxHeatStreak: s.maxHeatStreak,
   }
 }
@@ -286,7 +286,6 @@ function freshData() {
     clicks: 0,
     crits: 0,
     tags: [] as OwnedTag[],
-    setupComplete: false,
     userExcludes: [] as string[],
     coRules: [] as { a: string; b: string; count: number }[],
     customSources: [] as CustomSource[],
@@ -337,10 +336,7 @@ function freshData() {
 /** Viewed-image history cap for the back arrow. */
 export const HISTORY_CAP = 50
 
-/** Setup screen: exactly this many starter tags, picked by the player. */
-export const SETUP_TAG_COUNT = 4
-
-/** Cap on player-excluded terms (setup screen + config tab). */
+/** Cap on player-excluded terms (Config tab). */
 export const MAX_USER_EXCLUDES = 100
 
 /**
@@ -360,6 +356,27 @@ export function shufflePosts<T>(posts: readonly T[]): T[] {
 function pushPast(past: BooruPost[], post: BooruPost | null): BooruPost[] {
   if (!post) return past
   return [...past, post].slice(-HISTORY_CAP)
+}
+
+/**
+ * Drop every foe that carries a banned term: the current one, the queued
+ * ones, the grid squares and the back-arrow history.
+ *
+ * The ban is durable (blocklist.json), so a foe that already slipped into the
+ * feed must not stay on screen — and the back arrow must not be a way back
+ * to it.
+ */
+function purgeFoesWithTag(
+  s: { current: BooruPost | null; queue: BooruPost[]; grid: GridCell[]; past: BooruPost[] },
+  term: string,
+): { current: BooruPost | null; queue: BooruPost[]; grid: GridCell[]; past: BooruPost[] } {
+  const hits = (p: BooruPost) => p.tags.some((t) => tagHitsAnyTerm(t, [term]))
+  return {
+    current: s.current && hits(s.current) ? null : s.current,
+    queue: s.queue.filter((p) => !hits(p)),
+    grid: s.grid.filter((c) => !hits(c.post)),
+    past: s.past.filter((p) => !hits(p)),
+  }
 }
 
 /**
@@ -476,22 +493,24 @@ function gallerySpoils(s: GameState, post: BooruPost, clicksOnFoe: number, now: 
     // kept so a failed keep stays retryable; nothing points at a live URL.
     saveState: post.url ? 'downloading' : 'failed',
   }
-  // Novelty drop (non-blocking): one suggested tag + one anti-tag from the foe.
+  // Novelty drop (non-blocking): every actionable tag on the defeated foe, so
+  // the player adopts or bans each one instead of an arbitrary single pair.
   const ownedNames = new Set(s.tags.map((t) => t.name.toLowerCase()))
+  const excludedNames = new Set(s.userExcludes)
   const cleanFoeTags = post.tags
     .map((t) => normalizeCustomTag(String(t)))
     .filter((t) => t.length >= 2 && !isQueryBlocked(t) && !isNoise(t))
-  const candidateTag = cleanFoeTags.find((t) => !ownedNames.has(t))
-  const candidateAntiTag = cleanFoeTags.find(
-    (t) => t !== candidateTag && !s.userExcludes.includes(t),
+  // De-dupe, then keep only tags the player can still act on: not already owned
+  // (adopting is a no-op) and not already excluded (banning is a no-op).
+  const actionableTags = [...new Set(cleanFoeTags)].filter(
+    (t) => !ownedNames.has(t) && !excludedNames.has(t),
   )
   const newDrop: KoDrop | null =
-    candidateTag || candidateAntiTag
+    actionableTags.length > 0
       ? {
           id: `drop:${post.id}:${now}`,
           foeTitle: cleanFoeTags[0] ?? 'foe',
-          suggestedTag: candidateTag,
-          suggestedAntiTag: candidateAntiTag,
+          tags: actionableTags,
           timestamp: now,
         }
       : null
@@ -553,6 +572,17 @@ function koFoe(s: GameState, now: number, clicksOnFoe: number) {
     foeMaxHp: foe,
     foeClicks: 0,
   }
+}
+
+/**
+ * Return the drop list with `tag` removed from drop `id`. The drop itself is
+ * removed once its last tag is claimed. Pure — used by both claim actions so
+ * "acted on this tag" means the same thing for adopt and ban.
+ */
+function withoutDropTag(drops: KoDrop[], id: string, tag: string): KoDrop[] {
+  return drops
+    .map((d) => (d.id === id ? { ...d, tags: d.tags.filter((t) => t !== tag) } : d))
+    .filter((d) => d.tags.length > 0)
 }
 
 export const useGame = create<GameState>((set, get) => ({
@@ -807,29 +837,70 @@ export const useGame = create<GameState>((set, get) => ({
     set({ grid })
   },
 
-  claimDropTag: (id) => {
+  claimDropTag: (id, tag) => {
     const s = get()
     const drop = s.pendingDrops.find((d) => d.id === id)
-    if (!drop?.suggestedTag) return false
-    const name = drop.suggestedTag
-    if (s.tags.some((t) => t.name.toLowerCase() === name)) {
-      set({ pendingDrops: s.pendingDrops.filter((d) => d.id !== id) })
+    if (!drop || !drop.tags.includes(tag)) return false
+    // Remove just the acted-on tag; keep the rest so the player can keep
+    // adopting/banning the other tags of the same foe. The drop disappears
+    // once its last tag is claimed.
+    const pendingDrops = withoutDropTag(s.pendingDrops, id, tag)
+    if (s.tags.some((t) => t.name.toLowerCase() === tag)) {
+      set({ pendingDrops })
       return true
     }
-    const stats = deriveTagStats(name, 1)
-    const tags = [...s.tags, { name, level: 1, selected: true, ...stats }]
-    set({ tags, pendingDrops: s.pendingDrops.filter((d) => d.id !== id) })
+    const stats = deriveTagStats(tag, 1)
+    const tags = [...s.tags, { name: tag, level: 1, selected: true, ...stats }]
+    set({ tags, pendingDrops })
     get().save()
     return true
   },
 
-  claimDropAntiTag: (id) => {
+  /**
+   * Ban a tag FOR GOOD.
+   *
+   * The durable half is the user's blocklist.json: the main process merges the
+   * term into the authoritative list and hands it back, so every later query
+   * carries `-term` and the renderer post-filter drops the post. The runtime
+   * exclude list (capped at 100) is a SECONDARY, best-effort half — it must
+   * never be able to veto the ban, which is what the old code did: a
+   * duplicate or a full list made `addUserExclude` refuse, the ban never
+   * reached the blocklist, and the tag came back.
+   */
+  banTag: async (raw) => {
+    const t = String(raw || '').toLowerCase().trim()
+    if (!t) return false
+    const res = await banTagsInBlocklist([t])
+    if (!res.ok) {
+      // Honest failure: the term is NOT banned, so say so instead of
+      // pretending the ban landed.
+      get().notify(`Could not ban "${t}" — ${res.error || 'the blocklist write failed'}`)
+      return false
+    }
+    // Runtime exclude (best-effort; the durable ban already landed).
+    const s = get()
+    if (!s.userExcludes.includes(t) && s.userExcludes.length < MAX_USER_EXCLUDES) {
+      setUserExcludes([...s.userExcludes, t])
+      set({ userExcludes: getUserExcludes() })
+    }
+    // The foes already on screen must go too — the back arrow included.
+    const purged = purgeFoesWithTag(get(), t)
+    set(purged)
+    if (!get().current && get().queue.length > 0) get().advanceFeed()
+    get().save()
+    return true
+  },
+
+  claimDropAntiTag: async (id, tag) => {
     const s = get()
     const drop = s.pendingDrops.find((d) => d.id === id)
-    if (!drop?.suggestedAntiTag) return false
-    const ok = get().addUserExclude(drop.suggestedAntiTag)
-    set({ pendingDrops: get().pendingDrops.filter((d) => d.id !== id) })
-    return ok
+    if (!drop || !drop.tags.includes(tag)) return false
+    // Only drop the tag from the drop if the DURABLE ban landed; a failed
+    // write stays visible so the player can still dismiss it (and retry).
+    const banned = await get().banTag(tag)
+    if (!banned) return false
+    set({ pendingDrops: withoutDropTag(get().pendingDrops, id, tag) })
+    return true
   },
 
   dismissDrop: (id) => {
@@ -967,6 +1038,10 @@ export const useGame = create<GameState>((set, get) => ({
       achievements: prog.achievements,
       toasts: [...prog.toasts, { id: toastSeq++, msg: `Custom tag added: ${verdict.name}` }],
     })
+    // The Tags tab is now the ONE place a feed starts. Adding the first tag
+    // must pull a round immediately, or the clicker would sit on the offline
+    // card until something else happened to fetch.
+    void get().fetchFeed()
     return { added: true, message: `Added ${verdict.name} — steering the feed.` }
   },
 
@@ -975,7 +1050,7 @@ export const useGame = create<GameState>((set, get) => ({
     if (s.fetching) return
     set({ fetching: true })
     // Player-owned tags only — no hardcoded seeds. Nothing owned: the market
-    // waits for setup picks, custom tags, or drained-foe discovery.
+    // waits for custom tags added in the Tags tab or drained-foe discovery.
     const owned = feedQuery(s.tags)
     if (owned.length === 0) {
       set({ fetching: false })
@@ -1219,14 +1294,23 @@ export const useGame = create<GameState>((set, get) => ({
 
   advanceFeed: () => {
     const s = get()
-    if (s.current) void evictImage(s.current.url)
+    // NO eviction here. Moving on is not rejecting: the picture the player
+    // just saw stays in the encrypted disk cache, so the BACK arrow brings it
+    // back instantly and the cache viewer can still save it. The old code
+    // deleted the bytes right after caching them, which made the cache
+    // permanently empty and turned BACK into a re-download.
     if (s.queue.length > 0) {
       // Skipping is free but pays nothing — the beaten-or-not choice is the player's.
       // The skipped foe stays reachable via the back arrow at full HP.
+      // RANDOM pick (not the queue head): a small pool + sequential walk is what
+      // made the same pictures repeat in order. A random unseen index keeps it fresh.
       const foe = foeMaxHp(s.defeated)
+      const idx = Math.floor(Math.random() * s.queue.length)
+      const next = s.queue[idx]
+      const queue = [...s.queue.slice(0, idx), ...s.queue.slice(idx + 1)]
       set({
-        current: s.queue[0],
-        queue: s.queue.slice(1),
+        current: next,
+        queue,
         past: pushPast(s.past, s.current),
         foeHp: foe,
         foeMaxHp: foe,
@@ -1260,10 +1344,47 @@ export const useGame = create<GameState>((set, get) => ({
     return true
   },
 
+  /**
+   * Save a picture the device already holds (the cache viewer) to the
+   * gallery.
+   *
+   * The bytes are captured durably, exactly like a drained foe: the keep is
+   * only 'persisted' once the bytes are fetched, hashed and read back. The
+   * cache already holds them, so `persistKeepsake` reads them from the
+   * encrypted disk cache instead of the network.
+   */
+  addGalleryImage: (url, tags) => {
+    const s = get()
+    const src = String(url || '').trim()
+    if (!src) return false
+    if (s.gallery.some((g) => g.url === src)) return false
+    const now = Date.now()
+    // The clicker history knows the tags of a picture the player saw; use
+    // them when the caller has none (the cache index carries urls only).
+    const known = s.past.find((p) => p.url === src)
+    const tagList = (tags && tags.length ? tags : known?.tags ?? []).slice(0, 24)
+    const rarityBase = rarityBaseForPost(src)
+    const img: GalleryImage = {
+      id: `cache:${now}:${s.gallery.length}`,
+      url: src,
+      tags: tagList,
+      rarityBase,
+      clicks: 0,
+      rarity: imageRarity(rarityBase, s.gallery.length, 0),
+      boughtAt: now,
+      saveState: 'downloading',
+    }
+    kickKeepsakePersist(img)
+    set({ gallery: [...s.gallery, img] })
+    get().save()
+    return true
+  },
+
   skipGrid: () => {
     const s = get()
     if (!isGridMode(s.viewMode) || s.grid.length === 0) return
-    for (const c of s.grid) void evictImage(c.post.url)
+    // The skipped board stays reachable through the undo stack, so its bytes
+    // stay in the cache (the 500MB LRU is what bounds the cache).
     const gridPast = [...s.gridPast, s.grid].slice(-GRID_HISTORY_CAP)
     // Fresh board: every square refills from the queue head (fetch tops up).
     const target = gridSizeForMode(s.viewMode)
@@ -1343,6 +1464,9 @@ export const useGame = create<GameState>((set, get) => ({
   },
 
   popCap: (capId) => {
+    // Retired ids stay in CAPS so an old save still resolves, but nothing may
+    // BUY one: at cost 0 they were free no-ops in the machine.
+    if (!ALL_CAP_IDS.includes(capId)) return false
     const s = get()
     const def = CAPS[capId]
     if (s.points < def.cost) return false
@@ -1404,26 +1528,24 @@ export const useGame = create<GameState>((set, get) => ({
     return true
   },
 
+  /**
+   * Cap housekeeping only. The idle economy is gone: a tick used to add
+   * passive pts/s (tag levels + gallery) and auto-click income, which made the
+   * game play itself. Points now move on clicks alone, so the only thing left
+   * for the clock to do is expire legacy timed caps.
+   *
+   * It used to ALSO write `lastSeenAt` into the store on every tick — once a
+   * second, re-rendering the whole idle UI for a field nobody reads (only
+   * `save()` serializes it, and it already stamps `lastSeenAt`). A tick with
+   * nothing to expire now returns without touching the store.
+   */
   tick: (dtMs = 1000) => {
+    void dtMs
     const s = get()
-    const now = Date.now()
-    const caps = activeCaps(s.caps, now)
-    const input: EconomyInput = { ...econ(s), caps }
-    const gps = passiveGps(input, now)
-    const auto = capAutoClicksPerSec(caps, now)
-    const gain = (gps + clickPower(input, now) * auto) * (dtMs / 1000)
-
-    // Passive points income remains, but HP damage and KO only happen via active user clicks.
-    set({
-      caps,
-      points: s.points + gain,
-      totalEarned: s.totalEarned + gain,
-      xp: s.xp + gain * 0.01,
-      lastSeenAt: now,
-      ...progress({ ...s, points: s.points + gain }, s.xp),
-    })
+    const live = activeCaps(s.caps, Date.now())
+    if (live.length === s.caps.length) return
+    set({ caps: live })
   },
-
   save: () => {
     const s = get()
     const now = Date.now()
@@ -1448,7 +1570,6 @@ export const useGame = create<GameState>((set, get) => ({
       maxHeatStreak: Math.max(s.maxHeatStreak, s.heatStreak),
       backgroundUrl: s.backgroundUrl,
       viewMode: s.viewMode,
-      setupComplete: s.setupComplete,
       userExcludes: s.userExcludes,
       coRules: s.coRules,
       customSources: s.customSources,
@@ -1480,17 +1601,7 @@ export const useGame = create<GameState>((set, get) => ({
       })),
       now,
     )
-    const gps = passiveGps(
-      {
-        shards: d.shards,
-        achievementsEarned: d.achievements.length,
-        tags,
-        gallery: d.gallery,
-        caps,
-      },
-      now,
-    )
-    const gain = d.ageAccepted ? offlineEarnings(gps, now - d.lastSeenAt) : 0
+
     set({
       loaded: true,
       points: d.points,
@@ -1501,7 +1612,6 @@ export const useGame = create<GameState>((set, get) => ({
       shards: d.shards,
       prestigeCount: d.prestigeCount,
       tags,
-      setupComplete: d.setupComplete,
       userExcludes,
       coRules: d.coRules,
       customSources: d.customSources,
@@ -1519,7 +1629,6 @@ export const useGame = create<GameState>((set, get) => ({
       backgroundUrl: d.backgroundUrl,
       viewMode: d.viewMode,
       lastSeenAt: now,
-      offlineGain: gain >= 1 ? gain : 0,
     })
   },
 
@@ -1528,76 +1637,9 @@ export const useGame = create<GameState>((set, get) => ({
     get().load()
   },
 
-  collectOffline: () => {
-    const s = get()
-    if (s.offlineGain <= 0) return
-    const next: GameState = {
-      ...s,
-      points: s.points + s.offlineGain,
-      totalEarned: s.totalEarned + s.offlineGain,
-      xp: s.xp + s.offlineGain * 0.01,
-      collectedOfflineEarnings: true,
-      offlineGain: 0,
-    }
-    set({
-      points: next.points,
-      totalEarned: next.totalEarned,
-      xp: next.xp,
-      collectedOfflineEarnings: true,
-      offlineGain: 0,
-      ...progress(next, s.xp),
-    })
-  },
-
   verifyAge: () => {
     set({ ageVerified: true })
     get().save()
-  },
-
-  completeSetup: (names, excludes) => {
-    if (get().setupComplete) return { ok: false, message: 'Setup already done.' }
-    return get().updateSetup(names, excludes)
-  },
-
-  updateSetup: (names, excludes) => {
-    const s = get()
-    // Validity gate only (no network): exactly SETUP_TAG_COUNT unique live
-    // probing happens on the setup screen before this is called.
-    const clean: string[] = []
-    for (const raw of names) {
-      const verdict = validateCustomTag(raw)
-      if (!verdict.ok) return { ok: false, message: `“${raw}” is not usable — pick another.` }
-      if (!clean.includes(verdict.name)) clean.push(verdict.name)
-    }
-    if (clean.length !== SETUP_TAG_COUNT) {
-      return { ok: false, message: `Pick exactly ${SETUP_TAG_COUNT} tags.` }
-    }
-    // Re-select starter tags without discarding purchased levels: keep any
-    // already-owned tag's level/stats (flipping feed selection), add fresh
-    // picks at level 1, and retain previously-owned (leveled) tags that are no
-    // longer starters as owned-but-unselected so income is never lost.
-    const prevTags = new Map(s.tags.map((t) => [t.name, t]))
-    const pickedNames = new Set(clean)
-    const picked: OwnedTag[] = clean.map((name) => {
-      const existing = prevTags.get(name)
-      return existing ? { ...existing, selected: true } : setupTag(name)
-    })
-    for (const t of s.tags) {
-      if (!pickedNames.has(t.name) && t.level > 0) picked.push({ ...t, selected: false })
-    }
-    setUserExcludes(excludes.slice(0, MAX_USER_EXCLUDES))
-    const next = { ...s, tags: picked, setupComplete: true, userExcludes: getUserExcludes() }
-    const prog = progress(next, s.xp)
-    set({
-      tags: picked,
-      setupComplete: true,
-      priorityTag: clean[clean.length - 1] ?? null,
-      userExcludes: next.userExcludes,
-      achievements: prog.achievements,
-      toasts: [...prog.toasts, { id: toastSeq++, msg: `Feed tuned: ${clean.join(', ')}` }],
-    })
-    get().save()
-    return { ok: true, message: `Feed tuned — ${clean.length} starters set.` }
   },
 
   addUserExclude: (raw) => {

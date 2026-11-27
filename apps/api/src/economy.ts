@@ -73,6 +73,69 @@ interface RecordedOperation {
   result: string | null
 }
 
+/**
+ * The recorded row for an idempotency key, with the actor.
+ *
+ * `user_id` is what makes a replay safe: the recorded operation belongs to
+ * the actor that created it, so a key handed to another actor must not return
+ * that actor's result.
+ */
+export interface RecordedIdempotentOperation extends RecordedOperation {
+  user_id: string
+}
+
+/**
+ * THE read of a recorded idempotent operation.
+ *
+ * This query was hand-copied at seven call sites outside this module
+ * (cards.ts × 4, routes/users.ts × 3), each with a slightly different column
+ * list. Two of them forgot the `fingerprint` comparison, so one key replayed
+ * with different parameters could be handed another request's result. One
+ * read, one shape, one comparison rule.
+ */
+export async function findRecordedOperation(
+  db: D1Turso,
+  idempotencyKey: string,
+): Promise<RecordedIdempotentOperation | null> {
+  return db
+    .prepare('SELECT id, user_id, kind, fingerprint, payload, result FROM EconomicOperations WHERE idempotency_key = ?')
+    .bind(idempotencyKey)
+    .first<RecordedIdempotentOperation>()
+}
+
+/**
+ * A replay is honoured only when the recorded operation belongs to the same
+ * actor AND the same request.
+ *
+ * `fingerprint` is the request identity (`kind|actor|target|amount`). An
+ * operation recorded before fingerprints existed has none, so it is compared
+ * on the actor alone — the recorded result still carries the target and the
+ * callers check that too.
+ */
+export function assertReplayMatches(
+  existing: RecordedIdempotentOperation,
+  expected: { userId: string; fingerprint?: string | null },
+): void {
+  if (existing.user_id !== expected.userId) throw idempotencyConflict()
+  if (
+    expected.fingerprint &&
+    existing.fingerprint &&
+    existing.fingerprint !== expected.fingerprint
+  ) {
+    throw idempotencyConflict()
+  }
+}
+
+/** The recorded result, parsed. Null when there is no result yet. */
+export function parseRecordedResult<T>(existing: RecordedIdempotentOperation): T | null {
+  if (!existing.result) return null
+  try {
+    return JSON.parse(existing.result) as T
+  } catch {
+    return null
+  }
+}
+
 // Reusable atomic transfer statement builder. Produces the full debit→credit→
 // ledger→operation statement chain for a two-wallet transfer, gated through
 // SQLite's changes() so the entire chain is a no-op when the sender has
@@ -223,10 +286,7 @@ export class EconomyService {
   }
 
   private async findOperation(idempotencyKey: string): Promise<RecordedOperation | null> {
-    return this.db
-      .prepare('SELECT id, kind, fingerprint, payload, result FROM EconomicOperations WHERE idempotency_key = ?')
-      .bind(idempotencyKey)
-      .first<RecordedOperation>()
+    return findRecordedOperation(this.db, idempotencyKey)
   }
 
   // A replay is only honoured when the recorded fingerprint matches the request.

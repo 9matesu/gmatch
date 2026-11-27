@@ -1,6 +1,7 @@
 import type { D1Turso } from './db'
 import type { GameMatch } from '@orbit/shared'
 import { MIN_GAME_CARDS } from '@orbit/shared'
+import { findDisplayName } from './common/userLookup'
 
 /**
  * Server-persisted in-app notifications + match invites.
@@ -429,14 +430,14 @@ export async function acceptMatchInvite(
 
   await db.prepare("UPDATE MatchInvites SET status = 'accepted', updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(inviteId).run()
 
-  const u = await db.prepare('SELECT display_name FROM Users WHERE id = ?').bind(inviteeId).first<{ display_name: string | null }>()
+  const u = await findDisplayName(db, inviteeId)
   const { createNotification } = await import('./notifications')
   const notif = await createNotification(
     db,
     invite.inviter_id,
     'match_invite',
     'Match accepted',
-    `${u?.display_name || 'Someone'} accepted your challenge — the match is starting!`,
+    `${u || 'Someone'} accepted your challenge - the match is starting!`,
     { invite_id: inviteId, match_id: match.id, accepted: true }
   )
   if (notif) {
@@ -460,13 +461,13 @@ export async function declineMatchInvite(
 
   await db.prepare("UPDATE MatchInvites SET status = 'declined', updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(inviteId).run()
 
-  const u = await db.prepare('SELECT display_name FROM Users WHERE id = ?').bind(inviteeId).first<{ display_name: string | null }>()
+  const u = await findDisplayName(db, inviteeId)
   const notif = await createNotification(
     db,
     invite.inviter_id,
     'match_invite',
     'Challenge declined',
-    `${u?.display_name || 'Someone'} declined your challenge`,
+    `${u || 'Someone'} declined your challenge`,
     { invite_id: inviteId, declined: true }
   )
   if (notif) {

@@ -145,7 +145,7 @@ describe('ServersView', () => {
     const activeRow = active.closest('li')!
     expect(within(activeRow).getByText('Current')).toBeInTheDocument()
     expect(activeRow).toHaveAttribute('aria-current', 'true')
-    expect(within(activeRow).getByText('1 / 4')).toBeInTheDocument()
+    expect(within(activeRow).getByText('1 online · 4 members')).toBeInTheDocument()
 
     // clicking the active row must not reconnect...
     fireEvent.click(active)
@@ -475,6 +475,36 @@ describe('ServersView', () => {
     expect(JSON.parse(String(post?.init?.body))).toMatchObject({ name: 'My Realm' })
   })
 
+  it('browser build: creating a listing publishes this machine address and keeps the claim marker', async () => {
+    // No window.gmatch: a browser build. The node answers for itself.
+    const ownId = (identity as unknown as { orbitId: string }).orbitId
+    let created = false
+    mockFetch(async (url, init) => {
+      if (url.includes('/api/servers/node')) {
+        return json({ name: 'My Box', description: '', isAdmin: true, mode: 'host', lanUrls: ['http://192.168.5.2:8790'] })
+      }
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'My Box', users: [], posts_24h: 0, members_total: 1 })
+      if (url.includes('/api/servers') && init?.method === 'POST') {
+        created = true
+        return json({ server: { id: 'bbb', name: 'My Realm', owner_id: ownId, password_required: 0, endpoint_hint: 'http://192.168.5.2:8790' } }, 201)
+      }
+      return json({ servers: created ? [{ id: 'bbb', name: 'My Realm', owner_id: ownId, password_required: 0, endpoint_hint: 'http://192.168.5.2:8790' }] : [] })
+    })
+    const toasts: string[] = []
+    render(<ServersView identity={identity} toast={(m) => toasts.push(m)} />)
+    await openHostForm()
+    fireEvent.change(screen.getByLabelText(/server name/i), { target: { value: 'My Realm' } })
+    fireEvent.click(screen.getByRole('button', { name: /^create$/i }))
+    await waitFor(() => expect(toasts.join(' ')).toMatch(/registered/i), { timeout: 2500 })
+    const post = calls.find((c) => c.init?.method === 'POST')
+    // the address a friend can dial comes from the node, not from a guess
+    expect(JSON.parse(String(post?.init?.body))).toMatchObject({ name: 'My Realm', endpoint_hint: 'http://192.168.5.2:8790' })
+    // the claim marker is what the heartbeat replays every 15min
+    expect(JSON.parse(localStorage.getItem('gmatch.server.register') || '{}')).toMatchObject({
+      name: 'My Realm', endpoint_hint: 'http://192.168.5.2:8790',
+    })
+  })
+
   it('create while connected to central hosts locally: switches + relaunches, claim survives restart', async () => {
     const HOST_KEY = ['gmatch', 'server', 'host'].join('.')
     const serverSet = vi.fn().mockResolvedValue({ ok: true })
@@ -548,6 +578,51 @@ describe('ServersView', () => {
     expect(serverRelaunch).not.toHaveBeenCalled()
     expect(serverSet).not.toHaveBeenCalled()
     delete (window as unknown as { gmatch?: unknown }).gmatch
+  })
+
+  it('a listing named gmatch with a real address stays visible (this machine must be findable)', async () => {
+    stubLocalStorage({ 'gmatch.central.url': 'https://central.test' })
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'gmatch', users: [], posts_24h: 0, members_total: 1 })
+      if (url.includes('/api/servers/node')) {
+        return json({ name: 'gmatch', description: '', isAdmin: true, mode: 'host', lanUrls: ['http://192.168.5.2:8790'] })
+      }
+      // someone else's listing that happens to carry the default node name
+      return json({ servers: [
+        { id: 'aaa', name: 'gmatch', owner_id: 'another-owner', password_required: 0, endpoint_hint: 'http://192.168.5.2:8790', last_seen: '2026-01-01' },
+      ] })
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    // The node on this machine + a directory listing that carries THIS
+    // machine's own LAN address are ONE node: one row (the duplicate the
+    // directory merge used to show is gone), and the row is not hidden by
+    // its name — this machine stays findable.
+    await waitFor(() => expect(screen.getAllByRole('listitem').length).toBe(1))
+    expect(screen.getByText('gmatch')).toBeInTheDocument()
+  })
+
+  it('a claim with a LAN address survives the boot migration; a loopback claim does not', async () => {
+    stubLocalStorage({
+      'gmatch.central.url': 'https://central.test',
+      'gmatch.server.register': JSON.stringify({ name: 'My Realm', endpoint_hint: 'http://192.168.5.2:8790' }),
+    })
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'My Realm', users: [], posts_24h: 0, members_total: 1 })
+      return json({ servers: [] })
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    await waitFor(() => expect(screen.getByText(/my realm/i)).toBeInTheDocument())
+    // a joinable address keeps the claim: otherwise the listing dies on the
+    // next boot and the heartbeat has nothing to replay
+    expect(localStorage.getItem('gmatch.server.register')).toBeTruthy()
+
+    cleanup()
+    stubLocalStorage({
+      'gmatch.central.url': 'https://central.test',
+      'gmatch.server.register': JSON.stringify({ name: 'My Realm', endpoint_hint: '127.0.0.1:8790' }),
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    await waitFor(() => expect(localStorage.getItem('gmatch.server.register')).toBeNull())
   })
 
   it('second create on a hosting install is blocked in favor of rename', async () => {

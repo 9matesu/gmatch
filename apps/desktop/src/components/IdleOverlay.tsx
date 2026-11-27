@@ -6,6 +6,7 @@ import { playChime } from '../utils/sounds'
 import type { OrbitIdentity } from '@orbit/crypto'
 import type { OrbitObject } from '@orbit/shared'
 
+import { logger } from '../utils/logger'
 export function IdleOverlay({ items, identity, onExit }: {
   items: OrbitObject[]
   identity: OrbitIdentity
@@ -31,7 +32,9 @@ export function IdleOverlay({ items, identity, onExit }: {
           const blob = await res.blob()
           const url = URL.createObjectURL(blob)
           urls.set(item.id, url)
-        } catch {}
+        } catch (err) {
+          logger.warn('[IdleOverlay] GET /api/objects/:id failed', err)
+        }
       }
     }
     const workers = Array.from({ length: limit }, () => worker())
@@ -88,17 +91,17 @@ export function IdleOverlay({ items, identity, onExit }: {
   const currentUrl = currentItem ? imageUrls.get(currentItem.id) : null
 
   return (
-    <div className="fixed inset-0 z-[var(--z-modal)] bg-black flex flex-col items-center justify-center overflow-hidden cursor-pointer" onClick={handleInteract}>
+    <div className="fixed inset-0 z-[var(--z-modal)] bg-retro-bg flex flex-col items-center justify-center overflow-hidden cursor-pointer" onClick={handleInteract}>
       {loaded && currentUrl ? (
         <>
           <img
             key={currentItem?.id}
             src={currentUrl}
             alt=""
-            className="max-w-[95vw] max-h-[90vh] object-contain animate-fadeIn"
+            className="max-w-[95vw] max-h-(--max-h-dialog) object-contain animate-fadeIn"
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
           />
-          <div className="absolute bottom-6 text-[10px] text-retro-muted font-sans">
+          <div className="absolute bottom-6 text-2xs text-retro-muted font-sans">
             Click anywhere or press any key to return
           </div>
         </>
@@ -108,7 +111,7 @@ export function IdleOverlay({ items, identity, onExit }: {
           <p className="text-retro-muted text-xs font-sans">
             {imageItems.length === 0 ? 'No images to display' : 'Loading slideshow...'}
           </p>
-          <p className="text-[10px] text-retro-muted font-sans">
+          <p className="text-2xs text-retro-muted font-sans">
             Click anywhere or press any key to return
           </p>
         </div>

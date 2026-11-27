@@ -93,8 +93,6 @@ export function createTransportRegistry(options: TransportRegistryOptions = {}):
   const baseRetry = options.baseRetryMs ?? 1_500
   const maxRetry = options.maxRetryMs ?? 30_000
   const peers = new Map<string, PeerTransportEntry>()
-  /** One-shot retry latches: consumed by shouldRetryDirect. */
-  const retryDue = new Set<string>()
 
   function entry(peerId: string): PeerTransportEntry {
     let found = peers.get(peerId)
@@ -130,7 +128,6 @@ export function createTransportRegistry(options: TransportRegistryOptions = {}):
       e.directAttempts = 0
       e.nextDirectRetryAt = 0
       e.lastFailure = undefined
-      retryDue.delete(peerId)
     },
     markDirectFailed(peerId, reason, hasRelay) {
       if (!peerId) return
@@ -141,7 +138,6 @@ export function createTransportRegistry(options: TransportRegistryOptions = {}):
       const jitter = 0.75 + 0.5 * Math.random()
       const nextAt = hasRelay ? now() + Math.round(growth * jitter) : 0
       e.nextDirectRetryAt = nextAt
-      retryDue.delete(peerId)
       setPhase(peerId, hasRelay ? 'relay' : 'failed', reason)
     },
     isDirectAttemptOverdue(peerId) {
@@ -165,16 +161,13 @@ export function createTransportRegistry(options: TransportRegistryOptions = {}):
       if (now() < e.nextDirectRetryAt) return false
       // Consume: the caller owns re-starting the attempt.
       e.nextDirectRetryAt = 0
-      retryDue.add(peerId)
       return true
     },
     forget(peerId) {
       peers.delete(peerId)
-      retryDue.delete(peerId)
     },
     reset() {
       peers.clear()
-      retryDue.clear()
     },
   }
 }

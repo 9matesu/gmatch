@@ -402,5 +402,3 @@ export async function proxyAndStoreExternal(
     proxiedMime: mimeType,
   }
 }
-
-export const PROXY_INLINE_THRESHOLD = INLINE_THRESHOLD

@@ -18,7 +18,7 @@ import {
   writeOnboardingState,
 } from './onboardingState';
 import { saveUserProfile } from '../utils/profile';
-import { playWin, playPress } from '../utils/sounds';
+import { playPress } from '../utils/sounds';
 import { isDefaultPeerName } from '@orbit/shared';
 
 type Profile = { displayName: string; tags: string[]; pfpUrl?: string };
@@ -63,7 +63,10 @@ export function OnboardingFlow(props: Props) {
     writeOnboardingState(identityId, state);
   }, [identityId, state]);
 
-  if (isOnboardingComplete(state)) return null;
+  // Onboarding done is not the same as signed in: a returning user with no
+  // identity in this browser used to get a blank screen (this gate returned
+  // null and nothing else rendered). Ask for the identity.
+  if (isOnboardingComplete(state) && identity) return null;
 
   const finish = () => {
     const next: OnboardingState = { version: 1, completed: ['profile', 'ready'], current: 'ready' };
@@ -74,7 +77,7 @@ export function OnboardingFlow(props: Props) {
 
   return (
     <div className="fixed inset-0 z-[var(--z-lightbox)] overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-retro-fg">
-      <div className="w-full max-w-2xl bg-retro-bg border border-border-glass rounded-xl p-6 sm:p-8 shadow-2xl space-y-5 animate-orbit-slide-up">
+      <div className="w-full max-w-2xl bg-retro-bg border border-edge rounded-xl p-6 sm:p-8 shadow-2xl space-y-5 animate-orbit-slide-up">
         <ProfileStep
           {...props}
           onDone={finish}
@@ -121,7 +124,6 @@ function ProfileStep(props: Props & { onDone: () => void }) {
         await saveUserProfile(identity, { display_name: effectiveName });
         onProfileUpdated({ displayName: effectiveName, tags: initialProfile.tags, pfpUrl: initialProfile.pfpUrl });
       }
-      playWin();
       onDone();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not complete setup');
@@ -134,7 +136,7 @@ function ProfileStep(props: Props & { onDone: () => void }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-white">Set up your profile</h1>
+          <h1 className="text-2xl font-black tracking-tighter text-retro-fg">Set up your profile</h1>
           <p className="text-xs text-retro-muted">Only your name is required. Everything else you can add later.</p>
         </div>
       </div>
@@ -149,7 +151,7 @@ function ProfileStep(props: Props & { onDone: () => void }) {
               value={secretKey}
               onChange={(e) => setSecretKey(e.target.value)}
               placeholder="Paste your exported secret key"
-              className="w-full bg-retro-panel border border-border-glass rounded-lg px-3 py-2 text-xs font-mono text-retro-fg placeholder:text-retro-muted outline-none focus:border-border-glass transition-colors"
+              className="w-full bg-retro-panel border border-edge rounded-lg px-3 py-2 text-xs font-mono text-retro-fg placeholder:text-retro-muted outline-none focus:border-edge transition-colors"
             />
           </div>
           <div className="space-y-1.5">
@@ -161,7 +163,7 @@ function ProfileStep(props: Props & { onDone: () => void }) {
               onChange={(e) => setName(e.target.value)}
               placeholder="Leave blank to use existing name"
               maxLength={30}
-              className="w-full bg-retro-panel border border-border-glass rounded-lg px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-border-glass transition-colors"
+              className="w-full bg-retro-panel border border-edge rounded-lg px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-edge transition-colors"
             />
           </div>
         </div>
@@ -169,7 +171,7 @@ function ProfileStep(props: Props & { onDone: () => void }) {
         <div className="space-y-1.5">
           <label htmlFor="onboarding-display-name" className="text-xs font-medium text-retro-fg flex items-center justify-between">
             <span>Display Name</span>
-            <span className="text-[10px] text-retro-muted font-normal">Required · public handle</span>
+            <span className="text-2xs text-retro-muted font-normal">Required · public handle</span>
           </label>
           <div className="flex items-center gap-2">
             <input
@@ -179,13 +181,13 @@ function ProfileStep(props: Props & { onDone: () => void }) {
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. AnonGooner"
               maxLength={30}
-              className="flex-1 bg-retro-panel border border-border-glass rounded-lg px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-border-glass transition-colors"
+              className="flex-1 bg-retro-panel border border-edge rounded-lg px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-edge transition-colors"
             />
             <button
               type="button"
               onClick={() => { playPress(500); setName(generateRandomHandle()); }}
               title="Generate random anonymous handle"
-              className="p-2 bg-retro-panel hover:bg-glass-w12 border border-border-glass rounded-lg text-retro-muted hover:text-retro-fg transition-colors cursor-pointer shrink-0"
+              className="p-2 bg-retro-panel hover:bg-glass-w12 border border-edge rounded-lg text-retro-muted hover:text-retro-fg transition-colors cursor-pointer shrink-0"
             >
               <Dices className="w-4 h-4" />
             </button>
@@ -203,20 +205,20 @@ function ProfileStep(props: Props & { onDone: () => void }) {
       </button>
 
       {error && (
-        <div role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400">{error}</div>
+        <div role="alert" className="rounded-lg border border-danger/30 bg-danger/10 p-3 text-xs text-danger-fg">{error}</div>
       )}
 
       <button
         type="button"
         onClick={() => void enter()}
         disabled={busy || (!isImporting && !name.trim()) || (isImporting && !secretKey.trim())}
-        className="w-full py-2.5 px-4 rounded-lg bg-white hover:bg-retro-fg active:scale-[0.99] text-black font-semibold text-xs shadow-sm transition-all disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
+        className="w-full py-2.5 px-4 rounded-lg bg-retro-accent hover:bg-retro-fg active:scale-(--scale-press) text-retro-accent-text font-semibold text-xs shadow-sm transition disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
       >
         {busy ? (
           <span>Joining…</span>
         ) : (
           <>
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <CheckCircle2 className="w-4 h-4 text-success-fg" />
             <span>Enter</span>
             <ArrowRight className="w-4 h-4" />
           </>

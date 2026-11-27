@@ -30,24 +30,24 @@ export function FlashOverlay({
 
   return (
     <div className="fixed inset-0 z-[var(--z-lightbox)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-orbit-fade-in">
-      <div className="relative max-w-md w-full rounded-xl overflow-hidden border-4 border-yellow-400 shadow-[0_0_80px_rgba(250,204,21,0.45)]">
+      <div className="relative max-w-md w-full rounded-xl overflow-hidden border-4 border-warning">
         <div className="absolute top-0 inset-x-0 bg-gradient-to-b from-black/80 to-transparent p-3 z-10 flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
             {flash.pfp_url ? (
-              <img src={resolveMediaUrl(flash.pfp_url)} alt="" className="w-7 h-7 rounded-full border border-border-glass shrink-0" />
+              <img src={resolveMediaUrl(flash.pfp_url)} alt="" className="w-7 h-7 rounded-full border border-edge shrink-0" />
             ) : (
-              <div className="w-7 h-7 rounded-full bg-retro-panel border border-border-glass flex items-center justify-center text-xs shrink-0"><Zap className="w-3.5 h-3.5 fill-current" /></div>
+              <div className="w-7 h-7 rounded-full bg-retro-panel border border-edge flex items-center justify-center text-xs shrink-0"><Zap className="w-3.5 h-3.5 fill-current" /></div>
             )}
             <div className="min-w-0">
-              <div className="text-xs font-black text-yellow-300 uppercase tracking-widest">Flash Drop</div>
-              <div className="text-[10px] text-retro-body font-mono truncate">{flash.owner_name || 'Anonymous'}</div>
+              <div className="text-xs font-black text-warning-fg uppercase tracking-widest">Flash Drop</div>
+              <div className="text-2xs text-retro-body font-mono truncate">{flash.owner_name || 'Anonymous'}</div>
             </div>
           </div>
           <button
             type="button"
             onClick={onDismiss}
             aria-label="Dismiss flash"
-            className="text-retro-body hover:text-white p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer"
+            className="text-retro-body hover:text-retro-fg p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer"
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -59,8 +59,8 @@ export function FlashOverlay({
           identity={identity ?? null}
           mimeType={flash.mime_type}
           alt="Flash"
-          className="w-full max-h-[70vh] object-contain"
-          videoClassName="w-full max-h-[70vh] object-contain"
+          className="w-full max-h-(--max-h-sheet) object-contain"
+          videoClassName="w-full max-h-(--max-h-sheet) object-contain"
           autoPlay
           loop
           muted
@@ -71,12 +71,12 @@ export function FlashOverlay({
             type="button"
             onClick={() => onLike(flash.id)}
             disabled={flash.liked_by_me}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-yellow-400/20 border border-yellow-400/40 text-yellow-300 text-xs font-bold cursor-pointer disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-warning/20 border border-warning/40 text-warning-fg text-xs font-bold cursor-pointer disabled:opacity-50"
           >
             <Heart className={`w-3.5 h-3.5 ${flash.liked_by_me ? 'fill-current' : ''}`} />
             <span>{flash.likes_count}</span>
           </button>
-          <div className="text-[10px] text-retro-muted font-mono">
+          <div className="text-2xs text-retro-muted font-mono">
             {flash.mime_type.startsWith('video') ? 'VIDEO' : 'IMAGE'} · Flash Drop
           </div>
         </div>

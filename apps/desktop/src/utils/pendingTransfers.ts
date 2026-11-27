@@ -8,7 +8,7 @@
  * Bytes are only accepted after hash verification (see p2pSwarm).
  */
 
-export const PENDING_TRANSFERS_KEY = 'gmatch_pending_transfers_v1';
+const PENDING_TRANSFERS_KEY = 'gmatch_pending_transfers_v1';
 const MAX_PENDING_TRANSFERS = 128
 const MAX_TRANSFER_ID_LENGTH = 256
 const MAX_ATTEMPTS = 1000
@@ -66,29 +66,67 @@ export interface ResumeResult {
   stillPending: number;
 }
 
+/** How many transfers are chased at once. */
+const RESUME_CONCURRENCY = 4;
+
 /**
  * Re-issue WANTs for every persisted transfer. `resolve` is injectable for
  * tests; production passes a hash-verifying swarm fetch. A transfer that
  * resolves is removed; a failure keeps it queued for the next reconnect.
+ *
+ * The list is read ONCE, the fetches run at a bounded concurrency, and the
+ * survivors are written ONCE. This used to walk the list strictly serially,
+ * calling `resolve` one at a time — each with a 5 s swarm timeout, so 128
+ * stuck entries could block a peer-online wave for ten minutes — and it
+ * rewrote the WHOLE localStorage key after every single entry, twice on a
+ * failure (once to bump the attempt counter, once to persist). Up to 256 full
+ * rewrites of the same key for one resume.
  */
 export async function resumePendingTransfers(
   resolve: (id: string, hash: string | null) => Promise<unknown>,
 ): Promise<ResumeResult> {
   const list = readAll();
-  let resolved = 0;
-  for (const entry of list) {
-    try {
-      await resolve(entry.id, entry.hash);
-      removePendingTransfer(entry.id);
-      resolved += 1;
-    } catch {
-      const fresh = readAll();
-      const found = fresh.find((e) => e.id === entry.id);
-      if (found) {
-        found.attempts += 1;
-        writeAll(fresh);
+  if (list.length === 0) return { resolved: 0, stillPending: 0 };
+
+  const settled = new Map<string, 'resolved' | 'failed'>();
+  let cursor = 0;
+
+  const worker = async () => {
+    while (cursor < list.length) {
+      const entry = list[cursor++];
+      try {
+        await resolve(entry.id, entry.hash);
+        settled.set(entry.id, 'resolved');
+      } catch {
+        settled.set(entry.id, 'failed');
       }
     }
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(RESUME_CONCURRENCY, list.length) }, worker),
+  );
+
+  // ONE write of the surviving list, with the attempt counters bumped.
+  // The list is RE-READ here: an `enqueuePendingTransfer` that landed while
+  // the fetches were in flight must survive the write (the old per-entry
+  // removePendingTransfer re-read for exactly this reason).
+  const resolvedIds = new Set(
+    list.filter((entry) => settled.get(entry.id) === 'resolved').map((entry) => entry.id),
+  );
+  const failedIds = new Set(
+    list.filter((entry) => settled.get(entry.id) === 'failed').map((entry) => entry.id),
+  );
+  const fresh = readAll().filter((entry) => !resolvedIds.has(entry.id));
+  for (const entry of fresh) {
+    if (failedIds.has(entry.id)) {
+      entry.attempts = Math.min(entry.attempts + 1, MAX_ATTEMPTS);
+    }
   }
-  return { resolved, stillPending: listPendingTransfers().length };
+  writeAll(fresh);
+
+  return {
+    resolved: resolvedIds.size,
+    stillPending: fresh.length,
+  };
 }

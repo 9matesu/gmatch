@@ -26,7 +26,7 @@ describe('GMatchFeed cold-start nudge', () => {
         myProfileTags={['cars']}
       />,
     )
-    expect(screen.getByText(/Empty in here\?/)).toBeInTheDocument()
+    expect(screen.getByText(/No posts yet\./)).toBeInTheDocument()
     expect(screen.getByLabelText('Follow Alice')).toBeInTheDocument()
     fireEvent.click(screen.getByLabelText('Follow Bob'))
     expect(onFollow).toHaveBeenCalledWith('u2')
@@ -36,11 +36,11 @@ describe('GMatchFeed cold-start nudge', () => {
     render(
       <GMatchFeed
         identity={{ orbitId: 'me' } as never}
-        posts={[{ id: 'p1', author_id: 'x', url: 'https://example.com/1.jpg', author_name: 'X', tags: [], created_at: new Date().toISOString(), like_count: 0, comment_count: 0 } as never]}
+        posts={[{ id: 'p1', author_id: 'x', url: 'https://example.com/1.jpg', caption: 'a post exists', author_name: 'X', tags: [], created_at: new Date().toISOString(), like_count: 0, comment_count: 0 } as never]}
         stories={[]}
         users={[]}
       />,
     )
-    expect(screen.queryByText(/Empty in here\?/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/No posts yet\./)).not.toBeInTheDocument()
   })
 })

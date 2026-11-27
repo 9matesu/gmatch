@@ -3,24 +3,32 @@ export type LinkToken = {
   value: string
 }
 
-const URL_PATTERN = /(https?:\/\/[^\s<>"']+|www\.[^\s<>"']+|tg:\/\/[^\s<>"']+)/gi
-const TRAILING_PUNCTUATION = /[.,;:!?)\]}]+$/
-const MEDIA_EXT = /\.(jpe?g|png|gif|webp|avif|mp4|webm|mov|ogg|m4v)(\?.*)?$/i
+/**
+ * Only these schemes may become a clickable anchor.
+ *
+ * The tokenizer used to accept `tg://` verbatim and to turn any `www.` token
+ * into an `http://` link. A URL that reaches an <a href> is a scheme the browser
+ * may act on, not just text: `javascript:` / `vbscript:` / `data:text/html` are
+ * all executable, and a peer-authored post is exactly the untrusted input that
+ * should never be able to hand the player one.
+ *
+ * http + https are the whole allowlist on purpose: it is what a share link
+ * actually is, and anything else degrades to inert text rather than a live sink.
+ */
+const SAFE_SCHEME = /^https?:\/\//i
 
-/** True if a normalized URL points directly at an image/video asset. */
-export function isMediaUrl(url: string): boolean {
-  return MEDIA_EXT.test(url.split('?')[0])
-}
+const URL_PATTERN = /(https?:\/\/[^\s<>"']+|www\.[^\s<>"']+)/gi
+const TRAILING_PUNCTUATION = /[.,;:!?)\]}]+$/
 
 /** Normalize a matched URL token: trim trailing punctuation and ensure a scheme. */
 function normalizeUrl(raw: string): { display: string; href: string } | null {
   const trimmed = raw.replace(TRAILING_PUNCTUATION, '')
   if (!trimmed) return null
-  let href = trimmed
-  if (/^tg:\/\//i.test(href)) {
-    return { display: trimmed, href }
-  }
-  if (!/^https?:\/\//i.test(href)) href = `http://${href}`
+  // `www.example.com` -> `http://www.example.com`; an already-schemed token is
+  // kept only when it is http(s) (the pattern can only match http(s) or www.,
+  // so this is the assertion that keeps the invariant local).
+  const href = SAFE_SCHEME.test(trimmed) ? trimmed : `http://${trimmed}`
+  if (!SAFE_SCHEME.test(href)) return null
   return { display: trimmed, href }
 }
 
@@ -49,7 +57,7 @@ export function tokenizeUrls(text: string): LinkToken[] {
   return tokens.length > 0 ? tokens : [{ type: 'text', value: text }]
 }
 
-/** True if the text contains at least one URL. */
+/** True if the text contains at least one link that may be rendered as an anchor. */
 export function containsUrl(text: string): boolean {
-  return URL_PATTERN.test(text)
+  return tokenizeUrls(text).some((t) => t.type === 'url')
 }

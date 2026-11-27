@@ -4,9 +4,11 @@ import { useState, useEffect } from 'react';
 import { ZoomIn, ZoomOut, RotateCcw, X, ExternalLink } from 'lucide-react';
 import { isMediaVideo, resolveMediaUrl } from '../utils/media';
 import { orbitFetch } from '../utils/api';
+import { localHeldMediaUrl } from '../utils/localMedia';
 import { MediaBadge } from './MediaBadge';
 import { ObjectImage } from './ObjectImage';
 
+import { logger } from '../utils/logger'
 interface IdentityLike {
   orbitId: string;
   publicKeyHex: string;
@@ -157,8 +159,8 @@ export function CardZoomModal({
       >
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="truncate">
-            <h3 className="text-xs font-bold tracking-wide uppercase text-retro-fg truncate">{title}</h3>
-            {subtitle && <p className="text-[10px] text-retro-muted truncate">{subtitle}</p>}
+            <h3 className="text-xs font-bold tracking-wide text-retro-fg truncate">{title}</h3>
+            {subtitle && <p className="text-2xs text-retro-muted truncate">{subtitle}</p>}
           </div>
         </div>
 
@@ -174,7 +176,7 @@ export function CardZoomModal({
             >
               <ZoomOut className="w-3.5 h-3.5" />
             </button>
-            <span className="text-[10px] font-mono px-1 text-retro-muted min-w-[36px] text-center tabular-nums">
+            <span className="text-2xs font-mono px-1 text-retro-muted min-w-[36px] text-center tabular-nums">
               {Math.round(scale * 100)}%
             </span>
             <button
@@ -204,13 +206,23 @@ export function CardZoomModal({
               onClick={() => {
                 void (async () => {
                   try {
+                    const local = await localHeldMediaUrl(imageUrl)
+                    if (local) {
+                      window.open(local, '_blank', 'noopener,noreferrer')
+                      if (local.startsWith('blob:')) {
+                        setTimeout(() => URL.revokeObjectURL(local), 60_000)
+                      }
+                      return
+                    }
                     const res = await orbitFetch(imageUrl as string, {}, identity)
                     if (!res.ok) return
                     const blob = await res.blob()
                     const url = URL.createObjectURL(blob)
                     window.open(url, '_blank', 'noopener,noreferrer')
                     setTimeout(() => URL.revokeObjectURL(url), 60_000)
-                  } catch { }
+                  } catch (err) {
+                    logger.warn('[CardZoomModal] request failed', err)
+                  }
                 })()
               }}
               className="glass-action h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer"
@@ -261,7 +273,7 @@ export function CardZoomModal({
                 contentUrl={imageUrl}
                 identity={identity}
                 className="max-w-[82vw] max-h-[68vh] object-contain rounded-xl shadow-2xl pointer-events-auto"
-                videoClassName="max-w-[82vw] max-h-[68vh] object-contain rounded-xl shadow-2xl pointer-events-auto bg-black"
+                videoClassName="max-w-[82vw] max-h-[68vh] object-contain rounded-xl shadow-2xl pointer-events-auto bg-retro-bg"
                 autoPlay
                 loop
                 controls
@@ -295,13 +307,13 @@ export function CardZoomModal({
 
       {/* Bottom Caption Bar / Instructions */}
       <div
-        className="flex flex-wrap items-center justify-between gap-2 z-10 bg-retro-panel/80 border border-border-glass px-4 py-2 rounded-lg text-retro-muted text-[10px]"
+        className="flex flex-wrap items-center justify-between gap-2 z-10 bg-retro-panel/80 border border-edge px-4 py-2 rounded-lg text-retro-muted text-2xs"
         onClick={e => e.stopPropagation()}
       >
         <span>
           {caption ? <strong className="text-retro-fg">{caption}</strong> : 'Click image to toggle 2x zoom · Drag to pan when zoomed'}
         </span>
-        <span className="font-mono text-[10px] text-retro-muted hidden sm:inline">
+        <span className="font-mono text-2xs text-retro-muted hidden sm:inline">
           [Esc] to close · [+] / [−] to zoom
         </span>
       </div>
