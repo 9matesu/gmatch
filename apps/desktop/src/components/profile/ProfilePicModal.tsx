@@ -159,7 +159,7 @@ export function ProfilePicModal({
       className="fixed inset-0 z-[var(--z-lightbox)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-retro-fg"
     >
       <div
-        className="w-full max-w-md bg-surface-raised border border-edge rounded-lg shadow-xl overflow-hidden flex flex-col max-h-(--max-h-dialog-sm) animate-orbit-pop"
+        className="w-full max-w-lg bg-surface-raised border border-edge rounded-lg shadow-xl flex flex-col animate-orbit-pop"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
