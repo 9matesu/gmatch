@@ -40,7 +40,7 @@ export function NotificationSidebar({
             <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-3 styled-scrollbar">
+        <div className="flex-1 overflow-y-auto styled-scrollbar">
           <NotificationCenter
             defaultOpen
             sidebar
