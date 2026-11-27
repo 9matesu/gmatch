@@ -192,7 +192,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
       {/* Media. Click opens the fullscreen ImageViewer; double-click still likes. */}
       <div
         className="relative bg-retro-bg flex items-center justify-center overflow-hidden min-h-[280px] cursor-pointer"
-        onClick={() => { if (post.id) window.dispatchEvent(new CustomEvent('gmatch-open-image', { detail: { id: post.id, authorName: post.author_name || 'You', url: post.localPreviewUrl || post.url } })); }}
+        onClick={() => { if (post.id) window.dispatchEvent(new CustomEvent('gmatch-open-image', { detail: { id: post.id, authorName: post.author_name || 'You', url: post.localPreviewUrl || post.url, contentHash: post.content_hash } })); }}
         onDoubleClick={handleDoubleTap}
       >
         {post.localPreviewUrl ? (

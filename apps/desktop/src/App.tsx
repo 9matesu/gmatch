@@ -518,7 +518,7 @@ export default function Home() {
   // the whole vault), named from the post's author.
   useEffect(() => {
     const onOpen = (e: Event) => {
-      const d = (e as CustomEvent<{ id?: string; authorName?: string; url?: string }>).detail;
+      const d = (e as CustomEvent<{ id?: string; authorName?: string; url?: string; contentHash?: string | null }>).detail;
       if (!d?.id) return;
       setSpectateViewerItems([{
         id: d.id,
@@ -528,6 +528,10 @@ export default function Home() {
         size_bytes: 0,
         mime_type: '',
         created_at: '',
+        // A peer-replicated post has no node row: the fullscreen viewer must
+        // resolve its bytes by CONTENT (like the grid tile), or the signed
+        // /api/objects fetch 404s and the picture reads "unavailable".
+        content_hash: d.contentHash || null,
       } as OrbitObject]);
       setExpandedItemId(d.id);
     };

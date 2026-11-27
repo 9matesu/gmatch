@@ -357,6 +357,7 @@ export function ImageViewer({
                   <ObjectImage
                     contentUrl={activeItem.content_url}
                     objectId={activeItem.id}
+                    contentHash={(activeItem as { content_hash?: string | null }).content_hash}
                     identity={identity}
                     className="max-w-[88vw] max-h-[68vh] object-contain rounded-xl shadow-2xl select-none"
                     videoClassName="max-w-[88vw] max-h-[68vh] object-contain rounded-xl shadow-2xl bg-retro-bg"
