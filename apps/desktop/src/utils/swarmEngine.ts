@@ -224,6 +224,9 @@ async function serveOfferedObject(
   const totalChunks = Math.ceil(buffer.byteLength / SWARM_CHUNK_PAYLOAD) || 1
   const mimeType = blob.type || 'application/octet-stream'
   for (let i = 0; i < totalChunks; i++) {
+    // Yield between batches so a large object does not flood the transport in
+    // one synchronous tick (a 30 MB clip is ~7,680 chunks).
+    if (i % 64 === 0) await new Promise((r) => setTimeout(r, 0))
     const slice = new Uint8Array(buffer.slice(i * SWARM_CHUNK_PAYLOAD, Math.min((i + 1) * SWARM_CHUNK_PAYLOAD, buffer.byteLength)))
     const { ciphertext, nonce } = encryptSwarmChunk(dek, slice, {
       objectId: id,
@@ -527,6 +530,10 @@ interface PendingFetch {
  */
 export function createSwarmEngine(options: SwarmEngineOptions): SwarmEngine {
   const pendingFetches = new Map<string, PendingFetch>()
+  /** Ids with a serve in flight, so duplicate WANTs cannot each re-encrypt and
+   *  resend the whole object at once (amplification guard). A sequential
+   *  re-serve (e.g. a fresh durable-replication challenge) still works. */
+  const serving = new Set<string>()
 
   function clearBadFrameTimer(req: PendingFetch): void {
     if (req.badFrameTimer) {
@@ -704,35 +711,45 @@ export function createSwarmEngine(options: SwarmEngineOptions): SwarmEngine {
     const blob = await options.readLocal(msg.id)
     if (!blob) return
     if (options.canSend && !options.canSend()) return
-    // swarm-v1: an offered WANT gets an end-to-end encrypted transfer. The
-    // seeder learns nothing it can read: it seals a per-transfer DEK to the
-    // requester's ephemeral public key and ships ciphertext.
-    if (isOfferedWant(msg) && msg.transferId && msg.offerPub) {
+    // Amplification guard: duplicate WANTs for one id must not each re-encrypt
+    // and resend the whole object at once. A sequential re-serve (a fresh
+    // durable-replication challenge) still works once the first serve ends.
+    if (serving.has(msg.id)) return
+    serving.add(msg.id)
+    try {
+      // swarm-v1: an offered WANT gets an end-to-end encrypted transfer. The
+      // seeder learns nothing it can read: it seals a per-transfer DEK to the
+      // requester's ephemeral public key and ships ciphertext.
+      if (isOfferedWant(msg) && msg.transferId && msg.offerPub) {
+        try {
+          await serveOfferedObject(options.send, msg.id, blob, msg.transferId, msg.offerPub, options.senderOrbitId?.() ?? '')
+          // v1 replication evidence: challenge the fetcher to attest durable
+          // custody once it lands the bytes (content-addressed ids only).
+          options.receiptRoles.mintChallengeFor(msg.id)
+        } catch {
+          /* cannot seal to that offer: the fetcher times out, never plaintext */
+        }
+        return
+      }
+      if (!options.legacyPlaintext?.()) return
       try {
-        await serveOfferedObject(options.send, msg.id, blob, msg.transferId, msg.offerPub, options.senderOrbitId?.() ?? '')
-        // v1 replication evidence: challenge the fetcher to attest durable
-        // custody once it lands the bytes (content-addressed ids only).
+        const buffer = await blob.arrayBuffer()
+        if (buffer.byteLength === 0 || buffer.byteLength > SWARM_MAX_OBJECT_BYTES) return
+        const totalChunks = Math.ceil(buffer.byteLength / SWARM_CHUNK_SIZE) || 1
+        const mimeType = blob.type || 'application/octet-stream'
+        for (let i = 0; i < totalChunks; i++) {
+          if (i % 64 === 0) await new Promise((r) => setTimeout(r, 0))
+          const slice = new Uint8Array(buffer.slice(i * SWARM_CHUNK_SIZE, Math.min((i + 1) * SWARM_CHUNK_SIZE, buffer.byteLength)))
+          const frame: SwarmMessage = { type: 'SWARM_CHUNK', id: msg.id, index: i, total: totalChunks, mimeType, dataBase64: bytesToBase64(slice) }
+          if (!isBoundedChunkFrame(frame)) return
+          options.send(frame)
+        }
         options.receiptRoles.mintChallengeFor(msg.id)
       } catch {
-        /* cannot seal to that offer: the fetcher times out, never plaintext */
+        /* read failed */
       }
-      return
-    }
-    if (!options.legacyPlaintext?.()) return
-    try {
-      const buffer = await blob.arrayBuffer()
-      if (buffer.byteLength === 0 || buffer.byteLength > SWARM_MAX_OBJECT_BYTES) return
-      const totalChunks = Math.ceil(buffer.byteLength / SWARM_CHUNK_SIZE) || 1
-      const mimeType = blob.type || 'application/octet-stream'
-      for (let i = 0; i < totalChunks; i++) {
-        const slice = new Uint8Array(buffer.slice(i * SWARM_CHUNK_SIZE, Math.min((i + 1) * SWARM_CHUNK_SIZE, buffer.byteLength)))
-        const frame: SwarmMessage = { type: 'SWARM_CHUNK', id: msg.id, index: i, total: totalChunks, mimeType, dataBase64: bytesToBase64(slice) }
-        if (!isBoundedChunkFrame(frame)) return
-        options.send(frame)
-      }
-      options.receiptRoles.mintChallengeFor(msg.id)
-    } catch {
-      /* read failed */
+    } finally {
+      serving.delete(msg.id)
     }
   }
 

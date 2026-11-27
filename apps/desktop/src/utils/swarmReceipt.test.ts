@@ -74,6 +74,17 @@ describe('swarm durable-replication receipts (L2 wiring)', () => {
     expect(recorded!.receipt.objectCid).toBe(contentId)
   })
 
+  it('serves one object once for concurrent duplicate WANTs', async () => {
+    const { a, frames } = wire()
+    a.registerLocalObject(contentId, new Blob([PAYLOAD], { type: 'text/plain' }))
+    const want = offeredWant(contentId)
+    await Promise.all([a.handleMessage(want), a.handleMessage(want)])
+    await settle()
+    // One serve mints exactly one SWARM_KEY; the duplicate WANT is ignored
+    // while the first serve is in flight (amplification guard).
+    expect(frames.filter((m) => m.type === 'SWARM_KEY').length).toBe(1)
+  })
+
   it('issues no receipt when the session has no signing identity', async () => {
     const { a, b, frames } = wire({ receiptIdentity: null })
     a.registerLocalObject(contentId, new Blob([PAYLOAD]))
