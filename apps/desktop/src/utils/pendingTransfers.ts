@@ -51,7 +51,19 @@ export function listPendingTransfers(): PendingTransfer[] {
 export function enqueuePendingTransfer(id: string, hash: string | null): void {
   if (!id || id.length > MAX_TRANSFER_ID_LENGTH || (hash !== null && !/^[a-f\d]{64}$/i.test(hash))) return;
   const list = readAll();
-  if (list.some((e) => e.id === id)) return;
+  const found = list.find((e) => e.id === id);
+  if (found) {
+    // A transfer first discovered without a hash (a 404 row with no descriptor)
+    // can learn its content address later. Upgrade the hint IN PLACE: without
+    // the hash the resume wave asks with `expectedHash: undefined`, so a peer
+    // keyed only by the content hash can never satisfy it — the transfer stayed
+    // pending forever. Never reset attempts or recency on a dedupe.
+    if (!found.hash && hash) {
+      found.hash = hash;
+      writeAll(list);
+    }
+    return;
+  }
   if (list.length >= MAX_PENDING_TRANSFERS) list.shift();
   list.push({ id, hash: hash || null, attempts: 0, addedAt: Date.now() });
   writeAll(list);

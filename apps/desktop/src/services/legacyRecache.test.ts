@@ -57,6 +57,21 @@ describe('recacheLegacyMedia', () => {
     expect(update).not.toHaveBeenCalled();
   });
 
+  it('does not stamp a keep persisted when the fetch returned no content hash', async () => {
+    const update = vi.fn();
+    const summary = await recacheLegacyMedia({
+      deps: deps({
+        listKeepsakes: () => [keep({ id: 'a' })],
+        persist: async () => ({ status: 'local' }),
+        update,
+      }),
+    });
+    // Persisted without a localRef renders as a blank tile and is never
+    // delivered; leave it retryable instead.
+    expect(summary).toEqual({ scanned: 1, cached: 0, failed: 1 });
+    expect(update).not.toHaveBeenCalled();
+  });
+
   it('does not touch already-persisted keeps', async () => {
     const persist = vi.fn(async () => ({ status: 'local' as const, ref: 'a'.repeat(64) }));
     const summary = await recacheLegacyMedia({

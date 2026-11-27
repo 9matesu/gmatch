@@ -255,7 +255,16 @@ async function resolveObject(
   // no content hash keeps the entire legacy ladder below, unchanged.
   if (isContentHash(contentHash)) {
     const expected = contentHash.toLowerCase()
-    const blob = await resolveContentAddressedMedia(lookupId ?? null, expected)
+    const blob = await resolveContentAddressedMedia(lookupId ?? null, expected, {
+      // A seeder that is offline now can answer after a reboot or a peer comes
+      // online: remember the address so the bounded resume wave re-asks instead
+      // of leaving this row permanently failed after one 5 s timeout.
+      onMiss: (id, hash) => {
+        void import('../utils/pendingTransfers')
+          .then(({ enqueuePendingTransfer }) => enqueuePendingTransfer(id, hash))
+          .catch(() => {})
+      },
+    })
     if (!blob) return { state: FAILED(cleanId), cache: false, awaitingSeeder: false }
     // Cache the bytes under BOTH names the row may be asked for: the object id
     // alias (a remount by url is instant) and the content hash (the durable key

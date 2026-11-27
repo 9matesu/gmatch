@@ -35,6 +35,15 @@ describe('pendingTransfers (Phase 4)', () => {
     expect(listPendingTransfers().some((entry) => entry.id === 'bad-hash')).toBe(false)
   });
 
+  it('upgrades an addressless transfer with a hash learned later', () => {
+    const hash = 'a'.repeat(64)
+    enqueuePendingTransfer('o1', null)
+    enqueuePendingTransfer('o1', hash)
+    expect(listPendingTransfers()).toEqual([
+      { id: 'o1', hash, attempts: 0, addedAt: expect.any(Number) },
+    ])
+  });
+
   it('repairs malformed persisted entries before returning them', () => {
     mem.set('gmatch_pending_transfers_v1', JSON.stringify([
       { id: 'ok', hash: 'f'.repeat(64), attempts: 2, addedAt: 100 },

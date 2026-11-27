@@ -80,7 +80,11 @@ export async function recacheLegacyMedia(opts: RecacheOptions = {}): Promise<Rec
     } catch {
       res = { status: 'failed', reason: 'fetch' };
     }
-    if (res.status === 'local' && res.ref) {
+    // A 'local' result with no content hash is NOT delivered: the gallery
+    // renders a persisted keep from `vault://f/<localRef>` and renders NOTHING
+    // for `saveState: 'persisted'` without a ref. Stamping it would strand the
+    // keep as a permanently blank tile (and skip it on every later re-cache).
+    if (res.status === 'local' && res.ref && /^[a-f\d]{64}$/i.test(res.ref)) {
       deps.update(g.id, { saveState: 'persisted', localRef: res.ref });
       summary.cached += 1;
     } else {

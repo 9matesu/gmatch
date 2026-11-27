@@ -76,22 +76,26 @@ const IMMEDIATE_ATTACH_CAP = 8 * 1024 * 1024
 
 async function attachBytes(file: File, cap: number): Promise<Record<string, unknown> | undefined> {
   if (file.size > cap) return undefined
-  const b64 = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      const result = String(reader.result || '')
-      const comma = result.indexOf(',')
-      resolve(comma >= 0 ? result.slice(comma + 1) : '')
+  try {
+    // arrayBuffer + btoa instead of FileReader: FileReader does not exist in a
+    // plain JS runtime (tests, SSR), so an attachment silently vanished there.
+    // Chunk the latin1 string so a large image never spreads 8M arguments.
+    const bytes = new Uint8Array(await file.arrayBuffer())
+    let latin1 = ''
+    const CHUNK = 0x8000
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      latin1 += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
     }
-    reader.onerror = () => reject(reader.error ?? new Error('read failed'))
-    reader.readAsDataURL(file)
-  }).catch(() => '')
-  if (!b64) return undefined
-  // No hash travels with the bytes on purpose: the node hashes what it STORES.
-  // The client can only hash the file it holds (pre-crop / pre-metadata-strip),
-  // which legitimately differs from the canonical row bytes - sending it would
-  // make every real post look like a mismatch.
-  return { data_base64: b64, data_mime: file.type || 'application/octet-stream' }
+    const b64 = btoa(latin1)
+    if (!b64) return undefined
+    // No hash travels with the bytes on purpose: the node hashes what it STORES.
+    // The client can only hash the file it holds (pre-crop / pre-metadata-strip),
+    // which legitimately differs from the canonical row bytes - sending it would
+    // make every real post look like a mismatch.
+    return { data_base64: b64, data_mime: file.type || 'application/octet-stream' }
+  } catch {
+    return undefined
+  }
 }
 
 export async function forgeMediaLocally(
@@ -217,6 +221,27 @@ export async function forgeMediaLocally(
     // flushPostOutbox (this call, plus boot/reconnect), never blocking publish.
     enqueueOutbox({ objectId, postGroup: options.postGroup ?? null, registerBody: payload, gossipInput })
     void flushPostOutbox(identity).catch(() => { })
+
+    // A durable post with big media CANNOT carry its bytes in the outbox: the
+    // 1 MB cap is deliberate (localStorage's whole origin budget is ~5 MB).
+    // But the node accepts up to 8 MB on the immediate register path, so send
+    // the bytes in ONE extra, fire-and-forget register using the SAME id. It is
+    // idempotent: the node stores the attached bytes BEFORE its existing-row
+    // check, so this works whether the outbox flush created the row first or
+    // not, and a retry never duplicates the post. Without this, a large image
+    // lives only in this device's IndexedDB and becomes unreachable the moment
+    // the author is offline and no peer is seeding ("swarm-only").
+    if (file.size > REGISTER_ATTACH_CAP && file.size <= IMMEDIATE_ATTACH_CAP) {
+      void attachBytes(file, IMMEDIATE_ATTACH_CAP)
+        .then((attached) => attached
+          ? orbitFetch('/api/objects/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...payload, ...attached }),
+          }, identity)
+          : undefined)
+        .catch(() => { /* offline: the outbox still retries the metadata */ })
+    }
 
     // Experimental v1 protocol bookkeeping (roadmap L1/L4): public durable
     // feed posts also commit a SIGNED post.create operation to the durable

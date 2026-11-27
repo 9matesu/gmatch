@@ -103,6 +103,17 @@ describe('postOutbox store (Phase 3b)', () => {
     expect(listOutbox()[0].state).toBe('local');
   });
 
+  it('rearmMissingReplicated re-registers a node row that holds no bytes (p2p descriptor)', async () => {
+    enqueueOutbox({ objectId: 'rearm-descriptor', postGroup: null, registerBody: regBody('rearm-descriptor'), gossipInput: null });
+    setOutboxState('rearm-descriptor', 'replicated');
+    (orbitFetch as unknown as { mockResolvedValue: (v: unknown) => void }).mockResolvedValue({
+      status: 200, ok: true, headers: { get: () => 'application/json' },
+      json: async () => ({ type: 'p2p' }),
+    });
+    await rearmMissingReplicated(identity);
+    expect(listOutbox()[0].state).toBe('local');
+  });
+
   it('rearmMissingReplicated leaves a replicated entry alone when the node holds it', async () => {
     enqueueOutbox({ objectId: 'rearm-2', postGroup: null, registerBody: regBody('rearm-2'), gossipInput: null });
     setOutboxState('rearm-2', 'replicated');

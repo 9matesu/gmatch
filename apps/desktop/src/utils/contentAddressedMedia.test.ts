@@ -108,6 +108,21 @@ describe('resolveContentAddressedMedia', () => {
     expect(d.requestSwarm).toHaveBeenCalledTimes(2)
   })
 
+  it('reports a terminal miss so the caller can queue a durable resume', async () => {
+    const hash = await sha256HexBlob(BYTES)
+    const onMiss = vi.fn()
+    // First miss: nothing can prove the bytes -> the hint carries the alias and
+    // the hash. A later hit must NOT clear or re-add it (the caller owns that).
+    expect(await resolveContentAddressedMedia('object-1', hash, { deps: deps(), onMiss })).toBeNull()
+    expect(onMiss).toHaveBeenCalledTimes(1)
+    expect(onMiss).toHaveBeenCalledWith('object-1', hash)
+
+    onMiss.mockClear()
+    const d = deps({ requestSwarm: vi.fn(async () => BYTES) })
+    expect(await resolveContentAddressedMedia('object-1', hash, { deps: d, onMiss })).toBe(BYTES)
+    expect(onMiss).not.toHaveBeenCalled()
+  })
+
   it('normalizes the digest to lowercase before every lookup', async () => {
     const hash = await sha256HexBlob(BYTES)
     const d = deps({ requestSwarm: vi.fn(async () => BYTES) })

@@ -163,10 +163,26 @@ export async function rearmMissingReplicated(
     rearmChecked.add(e.objectId);
     try {
       const res = await orbitFetch(`/api/objects/${e.objectId}`, {}, identity);
-      // 404 = the row is not on THIS node. Send it back to `local` (not
-      // `pending`): `pending` means "already registered", so the flush would
-      // only re-stamp it replicated without ever registering it here.
-      if (res.status === 404) setOutboxState(e.objectId, 'local', true);
+      // A row can exist on the node and still deliver no picture: the node
+      // answers 200 with a `p2p` descriptor when it holds no bytes. That row is
+      // just as undelivered as a 404, and the outbox copy may still carry the
+      // attached bytes (`data_base64`) the first register failed to store.
+      // Treat both as "this node has nothing for me" and send the entry back to
+      // `local` (not `pending`): `pending` means "already registered", so the
+      // flush would only re-stamp it replicated without ever registering here.
+      let missing = res.status === 404
+      if (res.ok && !missing) {
+        try {
+          const ct = typeof res.headers?.get === 'function' ? (res.headers.get('content-type') || '') : ''
+          if (!ct || /json/i.test(ct)) {
+            const data = await res.json().catch(() => null)
+            if (data && typeof data === 'object' && (data as { type?: unknown }).type === 'p2p') missing = true
+          }
+        } catch {
+          /* a body we cannot read is not proof of missing bytes */
+        }
+      }
+      if (missing) setOutboxState(e.objectId, 'local', true);
     } catch {
       /* node unreachable: leave it replicated, retry on the next boot */
     }

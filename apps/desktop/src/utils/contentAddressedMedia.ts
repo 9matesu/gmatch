@@ -27,7 +27,9 @@ import { getLocalObject, requestSwarmObject, sha256HexBlob } from './p2pSwarm'
  * `useObjectImage` exactly as it was.
  *
  * Nothing here claims more than it proved: bytes that do not hash to the
- * expected value are never returned, from disk or from a peer.
+ * expected value are never returned, from disk or from a peer. A terminal miss
+ * is reported through `onMiss` so the caller can queue a durable retry — a
+ * seeder that is offline now may answer on the next boot or peer-online wave.
  */
 
 export interface ContentAddressedDeps {
@@ -44,6 +46,11 @@ export interface ContentAddressedOptions {
   timeoutMs?: number
   /** Test seam: replace one or more leaf operations. */
   deps?: Partial<ContentAddressedDeps>
+  /** Fired ONLY on a terminal miss (no local bytes, no verifiable peer).
+   *  The caller can persist a pending transfer so a later boot / peer-online
+   *  wave re-asks. A content-addressed row used to fail silently here: without
+   *  a durable hint it was never queued and therefore never resumed. */
+  onMiss?: (id: string, hash: string) => void
 }
 
 /** One bound for a tile's peer fetch, same as the legacy 404 fallback. */
@@ -112,5 +119,12 @@ export async function resolveContentAddressedMedia(
 
   const byHash = await fromSwarm(expected)
   if (byHash) return byHash
-  return alias ? fromSwarm(alias) : null
+  const byAlias = alias ? await fromSwarm(alias) : null
+  if (byAlias) return byAlias
+  // No honest source answered. Report the address so the durable retry list
+  // can take it; the resolver itself must stay free of storage side effects.
+  try {
+    options.onMiss?.(alias ?? expected, expected)
+  } catch { /* a diagnostic callback must never fail a render */ }
+  return null
 }

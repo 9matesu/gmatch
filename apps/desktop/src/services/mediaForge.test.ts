@@ -32,6 +32,31 @@ describe('mediaForge durable publish (Phase 3)', () => {
   })
 })
 
+describe('mediaForge large durable media', () => {
+  it('puts a >1MB durable image on the node without putting bytes in the outbox', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const identity = { orbitId: 'u1', publicKeyHex: 'a'.repeat(64), privateKeyHex: 'b'.repeat(64) }
+    // Just past the 1 MB durable outbox cap; still inside the 8 MB node cap.
+    const file = new File([new Uint8Array(1_100_000).fill(65)], 'big.jpg', { type: 'image/jpeg' })
+    const forged = await forgeMediaLocally(file, identity as any, { isPublic: true, durable: true })
+
+    const outbox = listOutbox()[0]
+    expect(outbox.registerBody.data_base64).toBeUndefined()
+    await vi.waitFor(() => {
+      const withBytes = fetchMock.mock.calls.find(([, init]) => {
+        try { return Boolean(JSON.parse(init.body as string).data_base64) } catch { return false }
+      })
+      expect(withBytes).toBeDefined()
+      expect(JSON.parse(withBytes![1].body as string).id).toBe(forged.id)
+    })
+  })
+})
+
 describe('mediaForge (local-first seeding)', () => {
   it('computes SHA-256 hex digest of a blob using Web Crypto', async () => {
     const text = 'hello world zero media'
