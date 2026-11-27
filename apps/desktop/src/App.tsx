@@ -2610,13 +2610,9 @@ export default function Home() {
             }
             if (currentSettings.autoOpenImages && typeof document !== 'undefined' && document.hidden) {
               // Only auto-open when the user is away at arrival so it never
-              // hijacks active navigation; the toast still fires either way.
+              // hijacks active navigation.
               setExpandedItemId(newest.id);
             }
-            const currentUsers = usersRef.current;
-            const sender = currentUsers.find(u => u.id === newest.owner_id);
-            const senderName = sender?.display_name?.trim();
-            if (senderName) toast(`${senderName} sent you an image`, 'info');
           }
         }
       }
@@ -3027,10 +3023,6 @@ export default function Home() {
 
               setItems(prev => [newItem, ...prev])
               try { playChime() } catch { }
-              const currentUsers = usersRef.current;
-              const wrtcSender = currentUsers.find(u => u.id === offer.sender_id);
-              const wrtcName = wrtcSender?.display_name?.trim();
-              if (wrtcName) toast(`${wrtcName} sent you an image (P2P)`, 'info')
               peer.close()
             }
           }
