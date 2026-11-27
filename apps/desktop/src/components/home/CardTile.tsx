@@ -4,7 +4,8 @@ import { useState, useRef } from 'react'
 import { isMediaVideo } from '../../utils/media'
 import { MediaBadge } from '../MediaBadge'
 import { getApiBaseUrl } from '../../utils/api'
-import { ObjectImage } from '../ObjectImage'
+import { HoloCard } from 'react-holo-card-effect/dist/index.js'
+import { useObjectImage } from '../../hooks/useObjectImage'
 import { computeCardRarity, RARITY_TIERS, formatGc, parseTags } from '@orbit/shared'
 import type { User } from '@orbit/shared'
 import { useNow } from '../../hooks/useNow'
@@ -70,6 +71,7 @@ export function CardTile({
   const localNow = useNow(now === undefined ? 30_000 : 0)
   const currentNow = now ?? localNow
   const isVid = Boolean(item.mime_type?.startsWith('video/')) || isMediaVideo(item.content_url)
+  const cardImg = useObjectImage(item.id, identity || null)
 
   const isReceived = Boolean(item.is_received || (identity && item.owner_id !== identity.orbitId))
   const likes = Number(item.likes_count ?? item.like_count ?? 0)
@@ -217,23 +219,7 @@ export function CardTile({
 
         {/* Card Image */}
         <div className="relative w-full aspect-[3/4.2] bg-surface-canvas overflow-hidden">
-          <ObjectImage
-            contentUrl={item.content_url}
-            objectId={item.id}
-            identity={identity || null}
-            mimeType={item.mime_type}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            videoClassName="pointer-events-none w-full h-full object-cover"
-            muted
-            playsInline
-            preload="none"
-            onError={handleMediaError}
-          />
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 opacity-20 mix-blend-color-dodge animate-holo"
-            style={{ background: 'linear-gradient(115deg, transparent 0%, #54a29e 25%, transparent 47%, transparent 53%, #a79d66 75%, transparent 100%)' }}
-          />
+          <HoloCard url={cardImg.url || ''} height={210} width={150} showSparkles={false} />
           {isVid && <MediaBadge className="absolute bottom-1.5 right-1.5 z-10" />}
         </div>
 

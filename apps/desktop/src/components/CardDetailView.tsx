@@ -6,7 +6,8 @@ import { orbitFetch } from '../utils/api';
 import { userFacingError } from '../utils/userError';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { computeCashoutPayout, clampCashoutRateBps, DEFAULT_CASHOUT_RATE_BPS, formatGc } from '@orbit/shared';
-import { ObjectImage } from './ObjectImage';
+import { HoloCard } from 'react-holo-card-effect/dist/index.js';
+import { useObjectImage } from '../hooks/useObjectImage';
 
 interface CardRecord {
   id: string;
@@ -57,6 +58,9 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
   const [listingPrice, setListingPrice] = useState<number | null>(null);
   const [buying, setBuying] = useState(false);
   const inflightRef = useRef(false);
+  // Resolve the card's bytes to a blob URL (signed fetch) — the HoloCard's
+  // CSS background cannot do the authenticated /api/objects request.
+  const cardImg = useObjectImage(card?.mediaObjectId ?? null, identity);
 
   const refreshCardData = useCallback(async (initial: boolean) => {
     if (!cardId || !identity) return;
@@ -229,30 +233,16 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
         </div>
 
         {/* Content */}
-        <div className="p-5 overflow-y-auto">
-          <div className="grid md:grid-cols-2 gap-5 items-start">
-          {/* Left: the card only, with outline + holographic foil. */}
+        <div className="p-5 space-y-4 overflow-y-auto">
+          {/* The card as a tall card, Pokemon-style holo (react-holo-card-effect). */}
           <div className="flex justify-center">
-            <div className="glass-card max-w-sm w-full overflow-hidden rounded-lg relative">
-              <ObjectImage
-                objectId={card.mediaObjectId}
-                contentUrl={card.contentUrl}
-                mimeType={card.mimeType}
-                identity={identity}
-                alt={card.name || 'Card'}
-                className="w-full aspect-[3/3.4] object-cover"
-                videoClassName="w-full aspect-[3/3.4] object-cover"
-              />
-              <div
-                aria-hidden
-                className="pointer-events-none absolute inset-0 opacity-30 mix-blend-color-dodge animate-holo"
-                style={{ background: 'linear-gradient(115deg, transparent 0%, #54a29e 25%, transparent 47%, transparent 53%, #a79d66 75%, transparent 100%)' }}
-              />
-            </div>
+            <HoloCard
+              url={cardImg.url || ''}
+              height={340}
+              width={300}
+              showSparkles={false}
+            />
           </div>
-
-          {/* Right: all the info. */}
-          <div className="space-y-4 min-w-0">
 
           {/* Compact stat row */}
           <div className="flex items-center gap-2 flex-wrap text-xs">
@@ -417,8 +407,6 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
               )}
             </div>
           )}
-          </div>
-          </div>
         </div>
       </div>
     </div>
