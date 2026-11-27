@@ -3,7 +3,12 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CreatePostModal } from './CreatePostModal';
+import { orbitFetch } from '../../utils/api';
 
+vi.mock('../../utils/api', async (importActual) => ({
+  ...(await importActual<Record<string, unknown>>()),
+  orbitFetch: vi.fn(),
+}));
 vi.mock('../../utils/sounds', () => ({ playPress: vi.fn(), playWin: vi.fn(), playMsgReceive: vi.fn() }));
 vi.mock('../../hooks/useCropper', () => ({ useCropper: () => ({ crop: vi.fn(), cropper: null }) }));
 vi.mock('../CropModal', () => ({ isCropableImage: () => false }));
@@ -21,8 +26,7 @@ const identity = { orbitId: 'me-1' } as never;
 /** B7: URL entry now flows through the shared media picker. */
 async function pickUrl(url: string, toast = vi.fn()) {
   render(<CreatePostModal identity={identity} onClose={() => {}} toast={toast} />);
-  await userEvent.click(screen.getByRole('button', { name: /pick media/i }));
-  await userEvent.click(await screen.findByRole('button', { name: /from your media, this device, or a link/i }));
+  await userEvent.click(screen.getByRole('button', { name: /browse keepsakes/i }));
   await userEvent.click(await screen.findByRole('button', { name: 'Paste URL' }));
   await userEvent.type(await screen.findByPlaceholderText('https://…'), url);
   await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
@@ -32,6 +36,8 @@ async function pickUrl(url: string, toast = vi.fn()) {
 
 beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn());
+  vi.mocked(orbitFetch).mockReset();
+  vi.mocked(orbitFetch).mockResolvedValue({ ok: true, json: async () => ({ id: 'srv-text' }) } as Response);
   // jsdom has no createObjectURL; the file path mints a preview URL.
   (URL as unknown as { createObjectURL: unknown }).createObjectURL = vi.fn(() => 'blob:preview');
   (URL as unknown as { revokeObjectURL: unknown }).revokeObjectURL = vi.fn();
@@ -89,8 +95,7 @@ describe('CreatePostModal URL uploads', () => {
   it('rejects unusable URL input in the picker with an inline reason', async () => {
     const toast = vi.fn();
     render(<CreatePostModal identity={identity} onClose={() => {}} toast={toast} />);
-    await userEvent.click(screen.getByRole('button', { name: /pick media/i }));
-    await userEvent.click(await screen.findByRole('button', { name: /from your media, this device, or a link/i }));
+    await userEvent.click(screen.getByRole('button', { name: /browse keepsakes/i }));
     await userEvent.click(await screen.findByRole('button', { name: 'Paste URL' }));
     await userEvent.type(await screen.findByPlaceholderText('https://…'), 'not a url');
     await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
@@ -128,12 +133,43 @@ describe('CreatePostModal URL uploads', () => {
     );
   });
 
-  it('renders story mode with Create Story title and Share Story button', () => {
+  it('renders story mode as a media-only suite with no caption composer', () => {
     render(<CreatePostModal mode="story" identity={identity} onClose={() => {}} toast={vi.fn()} />);
     expect(screen.getByText(/Create Story/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Share Story/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /upload \/ files/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /camera/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /pick media/i })).toBeInTheDocument();
+    // Camera + upload + keepsakes are the story suite; no text path exists.
+    expect(screen.getByRole('button', { name: /^camera$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^upload$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /browse keepsakes/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^url$/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /write a text post/i })).toBeNull();
+    expect(screen.queryByRole('textbox')).toBeNull();
+  });
+
+  it('disables Share in story mode with no media and shows no caption textbox', () => {
+    // Stories are media-only and reachable: with nothing attached the Share
+    // button is disabled, and there is no caption textbox to type into at all
+    // (the old test injected an initialCaption the UI never renders).
+    render(<CreatePostModal mode="story" identity={identity} onClose={() => {}} toast={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /Share Story/i })).toBeDisabled();
+    expect(screen.queryByRole('textbox')).toBeNull();
+  });
+
+  it('Write a text post opens text mode with no media requirement and publishes', async () => {
+    const onPostCreated = vi.fn();
+    render(
+      <CreatePostModal identity={identity} onClose={() => {}} onPostCreated={onPostCreated} toast={vi.fn()} />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: /write a text post/i }));
+    // The media box is gone in text mode: words alone are enough.
+    expect(screen.queryByRole('button', { name: /browse keepsakes/i })).toBeNull();
+    await userEvent.type(screen.getByPlaceholderText(/what is happening/i), 'just a thought');
+    await userEvent.click(screen.getByRole('button', { name: /^share$/i }));
+    await waitFor(() =>
+      expect(onPostCreated).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'srv-text', caption: 'just a thought' }),
+      ),
+    );
+    expect(orbitFetch).toHaveBeenCalledWith('/api/objects', expect.anything(), identity);
   });
 });

@@ -52,6 +52,8 @@ describe('serialize / deserialize round-trip', () => {
     expect(back!.points).toBe(7)
     expect(back!.tags).toEqual([])
     expect(back!.defeated).toBe(0)
+    expect(back!.freePicksUsed).toBe(0) // backward-compatible load default
+    expect(back!.idleCarryMs).toBe(0)
   })
 
   it('migrates legacy gp saves 1:1 to points (plan D4)', () => {
@@ -80,5 +82,27 @@ describe('serialize / deserialize round-trip', () => {
     expect(v2?.version).toBe(SAVE_VERSION)
     expect(v2?.points).toBe(777)
     expect(v2?.totalEarned).toBe(888)
+  })
+
+  it('floors the lifetime shard/keepsake counters on a save that predates them', () => {
+    const legacy = deserialize(JSON.stringify({
+      version: 2,
+      shards: 40,
+      idleShardsEarned: 6,
+      gallery: [{ id: 'g1', url: 'u', tags: [], rarityBase: 2, clicks: 0, rarity: 'Common' }],
+    }))
+    expect(legacy?.totalShardsEarned).toBe(40)
+    expect(legacy?.totalGallerySaved).toBe(1)
+  })
+
+  it('keeps an existing lifetime counter verbatim, so a spent balance never relocks a badge', () => {
+    const back = deserialize(JSON.stringify({
+      version: SAVE_VERSION,
+      shards: 0,
+      totalShardsEarned: 100,
+      totalGallerySaved: 100,
+    }))
+    expect(back?.totalShardsEarned).toBe(100)
+    expect(back?.totalGallerySaved).toBe(100)
   })
 })

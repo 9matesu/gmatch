@@ -78,6 +78,8 @@ contextBridge.exposeInMainWorld('gmatch', {
   appVersion: () => ipcRenderer.invoke('app:version'),
   openExternal: (url) => ipcRenderer.invoke('shell:open', url),
   serverSet: (payload) => ipcRenderer.invoke('server:set', payload),
+  // Switch the local world (host mode); takes effect on the next relaunch.
+  serverSetWorld: (worldId) => ipcRenderer.invoke('server:set-world', worldId),
   serverRelaunch: () => ipcRenderer.invoke('server:relaunch'),
   // Settings diagnostics: respawn the bundled node without closing the window.
   restartSidecar: () => ipcRenderer.invoke('server:restart-sidecar'),

@@ -5,6 +5,7 @@ import { ArrowsClockwise, CheckCircle } from '@phosphor-icons/react';
 import { useGame } from '../../game/store';
 import { persistKeepsake } from '../../services/keepsake';
 import { recacheLegacyMedia, type RecacheSummary } from '../../services/legacyRecache';
+import { isPermanentlySaved } from '../../utils/mediaVault';
 
 /**
  * Settings > Preferences: the OPT-IN legacy re-cache.
@@ -16,11 +17,20 @@ import { recacheLegacyMedia, type RecacheSummary } from '../../services/legacyRe
  */
 
 function describe(summary: RecacheSummary): string {
+  // "0 cached" used to read as "no keepsakes were saved", when in fact a
+  // manually viewed keep is already permanent in the vault. Say that instead.
+  const saved = summary.permanent
+    ? `${summary.permanent} already saved permanently in the vault`
+    : null;
   if (summary.scanned === 0) {
-    return 'Nothing to re-cache — every keepsake already has local bytes.';
+    return saved
+      ? `${saved}. Nothing to re-cache.`
+      : 'Nothing to re-cache — every keepsake already has local bytes.';
   }
-  const cached = `${summary.cached} cached`;
-  return summary.failed > 0 ? `${cached} · ${summary.failed} could not be fetched` : cached;
+  const parts = [`${summary.cached} cached permanently`];
+  if (saved) parts.push(saved);
+  if (summary.failed > 0) parts.push(`${summary.failed} could not be fetched`);
+  return parts.join(' · ');
 }
 
 export function RecacheMediaSection({
@@ -43,6 +53,7 @@ export function RecacheMediaSection({
             useGame.setState((s) => ({
               gallery: s.gallery.map((g) => (g.id === id ? { ...g, ...patch } : g)),
             })),
+          isPermanent: isPermanentlySaved,
         },
       });
       setSummary(result);

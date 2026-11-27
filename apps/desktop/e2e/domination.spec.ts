@@ -86,44 +86,6 @@ function sendSection(page: Page) {
   return page.getByRole('region', { name: 'Send' })
 }
 
-/**
- * Give a peer wallet g$, the way an admin would.
- *
- * There is no client-reachable way to earn g$ cheaply: the only flows that
- * credit a wallet are card-tier match payouts and moderation rewards, both far
- * too heavy for a smoke test. `seedApp`'s `points` are the CLIENT idle game and
- * never reach the server wallet, so a domination send is 402 without this.
- *
- * The e2e sidecar pins its own ADMIN_PIN in playwright.config.ts, so this
- * does not depend on the dev default or on any local .env file. The grant is
- * host-is-admin, expires after 12h, and is confined to the throwaway database
- * that GMATCH_API_FRESH wipes before every run.
- */
-export const E2E_ADMIN_PIN = 'e2e-admin-pin'
-
-async function fundWallet(page: Page, targetId: string, amount = 5000) {
-  const result = await page.evaluate(
-    async ([id, gcoins, pin]: [string, number, string]) => {
-      const mod = await import('/src/utils/api.ts')
-      const ident = JSON.parse(localStorage.getItem('orbit_identity') || 'null')
-      const verify = await mod.orbitFetch(
-        '/api/admin/verify-pin',
-        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin }) },
-        ident,
-      )
-      if (!verify.ok) return { step: 'verify-pin', status: verify.status, body: await verify.text() }
-      const adj = await mod.orbitFetch(
-        `/api/admin/users/${id}/adjust`,
-        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ add_gcoins: gcoins }) },
-        ident,
-      )
-      return { step: 'adjust', status: adj.status, body: await adj.text() }
-    },
-    [targetId, amount, E2E_ADMIN_PIN] as [string, number, string],
-  )
-  expect(result.status, `fundWallet failed at ${result.step}: ${result.status} ${result.body}`).toBeLessThan(300)
-}
-
 test('a consented domination effect is delivered to the target', async ({ page, browser }) => {
   const victim = await newPeer(browser, VICTIM)
   try {
@@ -131,20 +93,17 @@ test('a consented domination effect is delivered to the target', async ({ page, 
     await nameSelf(victim.page, VICTIM)
     await optIn(victim.page)
 
-    // The attacker needs wallet g$: the cheapest effect is 250 and the only
-    // client-reachable earnings are card-tier payouts, so fund it as an admin.
-    const attacker = await seedApp(page, { points: 5000 })
+    // Domination is free: a send never touches the wallet, so the attacker
+    // needs no g$ — just a signed-in identity.
+    await seedApp(page, { points: 5000 })
     await boot(page)
     await nameSelf(page, ATTACKER)
     await openDomination(page)
 
     // Pick the victim from the live target list. Without consent + pc_domination
-    // enabled, the server returns 403 and nothing is charged.
+    // enabled, the server returns 403 and nothing happens.
     const target = page.getByRole('button', { name: new RegExp(VICTIM) }).first()
     await expect(target).toBeVisible({ timeout: 45_000 })
-    // Fund the SENDER. The wallet is per-identity, and it is the attacker who
-    // pays — crediting the victim here makes every send 402.
-    await fundWallet(page, attacker.orbitId)
     await target.click()
 
     const effect = sendSection(page).getByRole('button', { name: /Message/ }).first()
@@ -158,14 +117,15 @@ test('a consented domination effect is delivered to the target', async ({ page, 
     // it is short. Push the duration to max so the assertion is not racing a
     // timer.
     await dialog.getByLabel('Duration').fill('60')
-    // This case asserts the paid server-backed action. The online peer has
-    // keys, so consent correctly selects the free sealed-mesh path. Hide only
-    // the sender's roster keys after target selection to exercise the paid
-    // server route; the victim remains online and still receives the effect.
+    // This case exercises the server-backed delivery path (domination is free,
+    // so no wallet is involved either way). The online peer has keys, so consent
+    // would correctly select the sealed-mesh path; hide only the sender's roster
+    // keys after target selection to force the server route. The victim remains
+    // online and still receives the effect.
     //
     // The mesh's `peerAddressable` reads the courier TOFU store
     // (`orbit_mail_peerkeys_v1`), not `orbit_users`, so both must be cleared:
-    // clearing only the roster left the paid path at the mercy of whether the
+    // clearing only the roster left the server path at the mercy of whether the
     // directory had already taught the sender the victim's keys.
     await page.evaluate((id: string) => {
       const raw = localStorage.getItem('orbit_users')
@@ -222,13 +182,10 @@ test('a consented domination effect is delivered to the target', async ({ page, 
     // dialog closing is not evidence of anything, and the overlay expires.
     await expect(victim.page.getByText('hello from the e2e suite')).toBeVisible({ timeout: 45_000 })
 
-    // The send must be ACCEPTED and CHARGED, not silently refused. 402/403 here
-    // is the feature quietly doing nothing.
-    //
-    // The cache is invalidated first: orbitFetch serves GETs from a 3s
-    // in-memory cache, and this read happens right after the charge lands, so a
-    // cached pre-send balance would read as "not charged" while the wallet was
-    // in fact debited. The assertion is unchanged — the sender is 500 down.
+    // Domination is FREE: a send never touches the wallet, so the balance is
+    // unchanged. The cache is invalidated first because orbitFetch serves GETs
+    // from a 3s in-memory cache, and a stale pre-send read must not be mistaken
+    // for the post-send value.
     const bal = await page.evaluate(async () => {
       const mod = await import('/src/utils/api.ts')
       const ident = JSON.parse(localStorage.getItem('orbit_identity') || 'null')
@@ -236,10 +193,13 @@ test('a consented domination effect is delivered to the target', async ({ page, 
       const r = await mod.orbitFetch('/api/economy/balance', {}, ident)
       return (await r.json()) as { balance: number }
     })
-    expect(bal.balance, 'the message effect was not charged to the sender').toBeLessThan(5000)
+    // A freshly seeded attacker has a server wallet of 0 (the 5000 in the
+    // seed is the CLIENT idle currency, not g$), and a free send must not
+    // move it.
+    expect(bal.balance, 'a free domination send must not move the wallet').toBe(0)
 
-    // The send must be ACCEPTED, not silently refused — a 403/402 is the
-    // feature quietly doing nothing.
+    // The send must be ACCEPTED, not silently refused — a 403 here is the
+    // feature quietly doing nothing (domination is free, so 402 never applies).
     await expect(dialog).not.toBeVisible({ timeout: 30_000 })
     await expect(page.getByText(/Not enough g\$|Could not send|has not allowed/i)).toHaveCount(0, { timeout: 20_000 })
 

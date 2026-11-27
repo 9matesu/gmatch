@@ -3,7 +3,7 @@
 /**
  * The ONE brand lockup. Every surface that shows the name (title bar, boot
  * splash's static twin, onboarding, age gate) renders this component — the
- * mark is the shipped icon.svg, the wordmark is live text, and mark size, gap,
+ * mark is the shipped icon.png, the wordmark is live text, and mark size, gap,
  * clear-space and the minimum size all come from `LOGO` in ui/tokens.ts.
  *
  * No baked raster wordmark, no second face, no new colour: the name wears the

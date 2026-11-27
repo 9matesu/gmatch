@@ -142,3 +142,35 @@ describe('GMatchStories loading state', () => {
   })
 });
 
+describe('GMatchStories media-only suite', () => {
+  it('opens the composer from the labelled add-story ring', () => {
+    const onAddStory = vi.fn()
+    render(
+      <ToastProvider>
+        <GMatchStories stories={[]} currentUserId="me" profilePics={{}} onAddStory={onAddStory} />
+      </ToastProvider>,
+    )
+    fireEvent.click(screen.getByLabelText('Add a story'))
+    expect(onAddStory).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows a segmented progress bar and next/prev zones in the sequence viewer', () => {
+    renderStories([story({ id: 's1' }), story({ id: 's2' })])
+    fireEvent.click(screen.getAllByAltText('Story Gal')[0])
+    expect(screen.getByTestId('seg-track-0')).toBeTruthy()
+    expect(screen.getByTestId('seg-track-1')).toBeTruthy()
+    expect(screen.getByLabelText('Next story')).toBeTruthy()
+    expect(screen.getByLabelText('Previous story')).toBeTruthy()
+  })
+
+  it('advances the active segment when the Next story zone is clicked', () => {
+    renderStories([story({ id: 's1' }), story({ id: 's2' })])
+    fireEvent.click(screen.getAllByAltText('Story Gal')[0])
+    // First story is active: its segment has not completed yet.
+    expect(screen.getByTestId('seg-fill-0').style.width).toBe('0%')
+    fireEvent.click(screen.getByLabelText('Next story'))
+    // Advancing marks the first segment complete (100%) and moves to the next.
+    expect(screen.getByTestId('seg-fill-0').style.width).toBe('100%')
+  })
+});
+

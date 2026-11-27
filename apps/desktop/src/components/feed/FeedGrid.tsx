@@ -146,7 +146,10 @@ export function FeedGrid({ posts, identity, onOpen, likedPosts, likeCounts, onTo
           })}
         </div>
       ))}
-      {rows.length === 0 && <p className="py-8 text-center text-xs text-retro-faint">Nothing to lay out yet.</p>}
+      {/* No label while pictures are still being measured: that strip appeared
+          and vanished on every load, reading as a flaky "nothing here" flash.
+          Only a grid with no posts at all says so. */}
+      {rows.length === 0 && posts.length === 0 && <p className="py-8 text-center text-xs text-retro-faint">Nothing to lay out yet.</p>}
     </div>
   )
 }

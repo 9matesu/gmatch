@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  FREE_TAG_PICKS,
   MAX_MARKET_OFFERS,
   MAX_TAG_LEVEL,
   buyTag,
@@ -9,6 +10,7 @@ import {
   feedQuery,
   isTagSelected,
   mergeTags,
+  newTagCost,
   normalizeCustomTag,
   removeTag,
   setupTag,
@@ -33,6 +35,16 @@ describe('tagCost (SPEC §3)', () => {
 
   it('grows exponentially', () => {
     expect(tagCost(50, 10)).toBe(Math.ceil(50 * Math.pow(1.15, 10)))
+  })
+
+  it('global inflation raises the same level price', () => {
+    expect(tagCost(100, 2, 1.5)).toBe(Math.ceil(100 * Math.pow(1.15, 2) * 1.5))
+    expect(newTagCost(deriveTagStats('wet', 1), 2)).toBeGreaterThan(newTagCost(deriveTagStats('wet', 1), 1))
+  })
+
+  it('buyTag charges the inflated price', () => {
+    expect(buyTag(tag('wet', 0, 100), 199, 2)).toBeNull()
+    expect(buyTag(tag('wet', 0, 100), 400, 2)!.points).toBe(200)
   })
 })
 
@@ -71,6 +83,12 @@ describe('setup picks (user spec: no hardcoded default tags)', () => {
     const mod = (await import('./tags')) as Record<string, unknown>
     expect('STARTER_TAGS' in mod).toBe(false)
     expect('starterOffers' in mod).toBe(false)
+  })
+})
+
+describe('free tag picks (user spec)', () => {
+  it('exactly 5 picks are free', () => {
+    expect(FREE_TAG_PICKS).toBe(5)
   })
 })
 

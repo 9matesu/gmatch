@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildRoundQueries, roundQueryKey, PILLS_PER_ROUND, RECENT_QUERY_DEPTH } from './queryBuilder'
+import { buildRoundQueries, roundQueryKey, PILLS_PER_ROUND, RECENT_QUERY_DEPTH, RECENT_TAG_WINDOW } from './queryBuilder'
 
 /** Deterministic RNG: always returns the same value. */
 const zeroRand = () => 0
@@ -65,8 +65,28 @@ describe('buildRoundQueries (single-pill smart rotation)', () => {
     expect(r1).not.toEqual(r2)
   })
 
+  it('rotates out recently-used individual tags', () => {
+    const pills = ['american_guy', 'blonde', 'outdoor', 'milf']
+    const picks = buildRoundQueries({
+      pills, count: 2, rand: zeroRand,
+      recentTags: ['american_guy', 'blonde'],
+    })
+    expect(picks).not.toContain('american_guy')
+    expect(picks).not.toContain('blonde')
+    expect(picks).toHaveLength(2)
+  })
+
+  it('falls back to recent tags when the cold pool is too small', () => {
+    const picks = buildRoundQueries({
+      pills: ['american_guy', 'blonde'], count: 2,
+      recentTags: ['american_guy', 'blonde'],
+    })
+    expect([...picks].sort()).toEqual(['american_guy', 'blonde'])
+  })
+
   it('exposes sane round tuning constants', () => {
     expect(PILLS_PER_ROUND).toBeGreaterThanOrEqual(1)
     expect(RECENT_QUERY_DEPTH).toBeGreaterThanOrEqual(4)
+    expect(RECENT_TAG_WINDOW).toBeGreaterThanOrEqual(4)
   })
 })

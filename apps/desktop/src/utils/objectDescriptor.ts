@@ -36,23 +36,48 @@ const DESCRIPTOR_MAX_BYTES = 4096
 
 const DESCRIPTOR_URL_RE = /^(https?:\/\/|gmcache:\/\/|vault:\/\/|\/api\/objects\/)\S+$/i
 
+/** A content ref (legacy 40-hex btih or 64-hex sha256), never a node path. */
+const CONTENT_REF_RE =
+  /^(?:urn:sha256:([0-9a-f]{40}|[0-9a-f]{64})|magnet:\?xt=urn:btih:([0-9a-f]{40}|[0-9a-f]{64})(?:&[^\s]*)?)$/i
+
+/** Strict UTF-8, short, single-token text — real binary media never matches. */
+function shortText(data: unknown): string | null {
+  if (typeof ArrayBuffer === 'undefined' || !(data instanceof ArrayBuffer)) return null
+  if (data.byteLength === 0 || data.byteLength > DESCRIPTOR_MAX_BYTES) return null
+  try {
+    const text = new TextDecoder('utf-8', { fatal: true }).decode(new Uint8Array(data)).trim()
+    return text && !/\s/.test(text) ? text : null
+  } catch {
+    return null
+  }
+}
+
 /**
  * The provider URL a legacy row stored in place of media bytes, else null.
  * Decoding is strict UTF-8 and the whole payload must look like one URL, so
  * real media (binary) can never be mistaken for a descriptor.
  */
 export function descriptorUrlFromBytes(data: unknown): string | null {
-  if (typeof ArrayBuffer === 'undefined' || !(data instanceof ArrayBuffer)) return null
-  if (data.byteLength === 0 || data.byteLength > DESCRIPTOR_MAX_BYTES) return null
-  let text: string
-  try {
-    text = new TextDecoder('utf-8', { fatal: true }).decode(new Uint8Array(data))
-  } catch {
-    return null
-  }
-  const trimmed = text.trim()
-  if (!trimmed || /\s/.test(trimmed)) return null
-  return DESCRIPTOR_URL_RE.test(trimmed) ? trimmed : null
+  const text = shortText(data)
+  return text && DESCRIPTOR_URL_RE.test(text) ? text : null
+}
+
+/**
+ * The content address inside a `urn:sha256:` / `magnet:?xt=urn:btih:` row.
+ * It is an ID for the LOCAL vault/swarm, never a URL to fetch. Both the old
+ * 40-hex prefix and the current full 64-hex sha256 are accepted.
+ */
+export function contentRefFromText(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const text = value.trim()
+  if (!text || text.length > DESCRIPTOR_MAX_BYTES || /\s/.test(text)) return null
+  const m = CONTENT_REF_RE.exec(text)
+  return m ? (m[1] || m[2]).toLowerCase() : null
+}
+
+/** The content ref a legacy row stored in place of bytes, else null. */
+export function contentRefFromBytes(data: unknown): string | null {
+  return contentRefFromText(shortText(data))
 }
 
 export interface DescriptorRecovery<T> {

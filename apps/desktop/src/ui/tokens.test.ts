@@ -51,7 +51,7 @@ describe('common UI tokens', () => {
   })
 
   it('owns the brand lockup (mark + wordmark, clear-space, min size) in one token', () => {
-    expect(tokens.LOGO.markSrc).toBe('/icon.svg')
+    expect(tokens.LOGO.markSrc).toBe('/icon.png')
     expect(tokens.LOGO.lockup).toContain('gap-(--logo-gap)')
     expect(tokens.LOGO.lockup).toContain('min-w-(--logo-min-width)')
     expect(tokens.LOGO.clearSpace).toBe('p-(--logo-clear-space)')
@@ -66,7 +66,7 @@ describe('common UI tokens', () => {
     // The pre-bundle splash cannot import React: it mirrors the token NAMES,
     // not a second wordmark design.
     expect(bootHtml).toContain('class="brand-lockup"')
-    expect(bootHtml).toContain('class="brand-mark" src="/icon.svg"')
+    expect(bootHtml).toContain('class="brand-mark" src="/icon.png"')
     expect(bootHtml).toContain('var(--logo-gap,')
     expect(bootHtml).toContain('var(--logo-mark-size-hero,')
     expect(bootHtml).toContain('var(--logo-clear-space,')

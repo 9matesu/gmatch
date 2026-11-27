@@ -308,6 +308,9 @@ try {
           // the sidecar whose storage key is this install's. Derived from the
           // same key it passes to the child (apiSidecar.instanceIdFor).
           instance_id: process.env.GMATCH_INSTANCE_ID || null,
+          // The active world this node serves. The switch overlay waits for the
+          // NEW world's id before remounting, so a switch never lands early.
+          world_id: process.env.GMATCH_WORLD_ID || 'official',
           error: dbInitError,
           timestamp: new Date().toISOString(),
           mode: siteServices ? 'courier' : 'legacy',

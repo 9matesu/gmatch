@@ -32,6 +32,18 @@ const EXT_MIME = {
   webp: 'image/webp', mp4: 'video/mp4', webm: 'video/webm', img: 'application/octet-stream',
 }
 
+/** Extension for the disk key, from the bytes' declared mime (not the url). */
+function extForMime(mime, url) {
+  const m = /^(image|video)\/([\w.+-]+)/i.exec(String(mime || ''))
+  if (m) {
+    const sub = m[2].toLowerCase()
+    if (sub === 'jpeg') return 'jpg'
+    if (['jpg', 'png', 'gif', 'webp', 'mp4', 'webm'].includes(sub)) return sub
+  }
+  const ext = cacheFileName(url).split('.').pop()
+  return ext || 'img'
+}
+
 let UA = 'Mozilla/5.0'
 /**
  * url -> { key, mime, bytes, ts }
@@ -102,7 +114,7 @@ function saveIndex() {
   if (!indexPath) return
   try {
     const rows = Object.entries(meta)
-      .map(([url, m]) => ({ url, key: m.key, mime: m.mime, bytes: m.bytes, ts: m.ts || 0 }))
+      .map(([url, m]) => ({ url, key: m.key, hash: m.hash || '', mime: m.mime, bytes: m.bytes, ts: m.ts || 0 }))
       .sort((a, b) => (b.ts || 0) - (a.ts || 0))
       .slice(0, INDEX_MAX_ENTRIES)
     fs.writeFileSync(indexPath, JSON.stringify(rows), 'utf8')
@@ -131,6 +143,11 @@ function loadIndex() {
       if (!url || !key || !mem.has(key)) continue
       meta[url] = {
         key,
+        // Old indexes predate content keys; the hash is recoverable from a
+        // sha256-prefixed key, and stays empty for a legacy url-hash file.
+        hash: typeof r.hash === 'string' && r.hash
+          ? r.hash
+          : (/^[0-9a-f]{64}/i.test(key) ? key.slice(0, 64) : ''),
         mime: typeof r.mime === 'string' ? r.mime : 'application/octet-stream',
         bytes: Number(r.bytes) || 0,
         ts: Number(r.ts) || 0,
@@ -166,24 +183,30 @@ function stats() {
  */
 function list() {
   let pruned = false
-  const rows = []
+  const byContent = new Map()
   for (const [url, m] of Object.entries(meta)) {
     if (!mem.has(m.key)) {
       delete meta[url]
       pruned = true
       continue
     }
-    rows.push({
+    const row = {
       url,
       local: `${SCHEME}://f/${m.key}`,
+      hash: m.hash || (/^[0-9a-f]{64}/i.test(m.key) ? m.key.slice(0, 64) : ''),
       mime: m.mime,
       bytes: m.bytes,
       ts: m.ts || 0,
-    })
+    }
+    // One picture, one tile: mirrors serving identical bytes share a content
+    // hash AND a single .enc file. Keep the newest sighting so a viewer that
+    // clicks a row still lands on a url that resolves from disk.
+    const id = row.hash || row.local
+    const prev = byContent.get(id)
+    if (!prev || row.ts > prev.ts) byContent.set(id, row)
   }
   if (pruned) saveIndex()
-  rows.sort((a, b) => b.ts - a.ts)
-  return rows
+  return [...byContent.values()].sort((a, b) => b.ts - a.ts)
 }
 
 function getReferer(url) {
@@ -347,11 +370,20 @@ async function cacheImage(url) {
     if (!fetched) return null
 
     const { buf, mime } = fetched
-    const key = cacheFileName(url)
-    if (!mem.put(key, buf)) return null // over budget: no local copy, remote URL stands
-    meta[url] = { key, mime: mime || EXT_MIME[key.split('.').pop()] || 'application/octet-stream', bytes: buf.length, ts: Date.now() }
+    // Content-addressed: two urls serving the same bytes share ONE encrypted
+    // file. A repeat only refreshes recency, so a re-view costs no rewrite.
+    // Files are keyed by content hash only; the MIME is metadata on the row.
+    const stored = mem.putContent(buf)
+    if (!stored) return null // over budget: no local copy, remote URL stands
+    meta[url] = {
+      key: stored.key,
+      hash: stored.hash,
+      mime: mime || 'application/octet-stream',
+      bytes: buf.length,
+      ts: Date.now(),
+    }
     saveIndex()
-    return `${SCHEME}://f/${key}`
+    return `${SCHEME}://f/${stored.key}`
   } catch {
     return null
   }
@@ -463,10 +495,11 @@ function thumbCacheSet(key, buf) {
 }
 
 /** Downscale picture bytes to a small JPEG. Returns null when not possible. */
-function makeThumb(buf, ext) {
-  // Videos and unknown blobs have no thumbnail: the caller falls through to the
+function makeThumb(buf, mime) {
+  // Content keys carry no extension now: the MIME from the url index is the
+  // signal. Videos and unknown blobs have no thumbnail and fall through to the
   // original bytes, so a <video> poster still works.
-  if (!/^(jpe?g|png|webp|gif|img)$/i.test(ext || '')) return null
+  if (!/^image\//i.test(String(mime || ''))) return null
   let image = null
   try {
     const { nativeImage } = require('electron')
@@ -512,10 +545,9 @@ async function serveImage(request) {
     if (!buf) return new Response('miss', { status: 404 })
     const mime = Object.values(meta).find((m) => m.key === key)?.mime || EXT_MIME[key.split('.').pop()] || 'application/octet-stream'
     if (wantsThumb) {
-      const ext = key.split('.').pop()
       let thumb = thumbCacheGet(key)
       if (!thumb) {
-        thumb = makeThumb(buf, ext)
+        thumb = makeThumb(buf, mime)
         if (thumb) thumbCacheSet(key, thumb)
       }
       if (thumb) {
@@ -569,7 +601,7 @@ async function serveImage(request) {
 /** Test seam: plant a url -> file entry (no network, no bytes). */
 function setMeta(url, entry) {
   if (!url || !entry?.key) return false
-  meta[url] = { key: entry.key, mime: entry.mime || 'application/octet-stream', bytes: Number(entry.bytes) || 0, ts: Number(entry.ts) || Date.now() }
+  meta[url] = { key: entry.key, hash: entry.hash || '', mime: entry.mime || 'application/octet-stream', bytes: Number(entry.bytes) || 0, ts: Number(entry.ts) || Date.now() }
   return true
 }
 
@@ -596,5 +628,5 @@ module.exports = {
   serveImage,
   capFor,
   // Test seam (pure-ish helpers; heavy IO stays in cacheImage/serveImage).
-  _test: { fnv1a, cacheFileName, normalizeQuery, destroyDiskCaches, capFor, setMeta, putBytes, saveIndex },
+  _test: { fnv1a, cacheFileName, normalizeQuery, destroyDiskCaches, capFor, setMeta, putBytes, saveIndex, extForMime },
 }

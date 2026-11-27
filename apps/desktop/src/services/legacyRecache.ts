@@ -28,12 +28,20 @@ export interface RecacheSummary {
   cached: number;
   /** Keeps that could not be fetched/persisted (left untouched). */
   failed: number;
+  /**
+   * Keeps that ALREADY held permanent vault bytes and were deliberately not
+   * re-fetched. Present only when nonzero so older callers keep their shape.
+   * A vault is not a cache: "0 cached" never means "no keepsakes saved".
+   */
+  permanent?: number;
 }
 
 export interface RecacheDeps {
   listKeepsakes(): GalleryImage[];
   persist(url: string, kind?: 'image' | 'video'): Promise<KeepsakePersistResult>;
   update(id: string, patch: Partial<Pick<GalleryImage, 'saveState' | 'localRef'>>): void;
+  /** True when a keep already has verified permanent bytes. */
+  isPermanent?(keep: GalleryImage): boolean;
 }
 
 export interface RecacheOptions {
@@ -58,6 +66,7 @@ export async function recacheLegacyMedia(opts: RecacheOptions = {}): Promise<Rec
     listKeepsakes: () => [],
     persist: async () => ({ status: 'failed', reason: 'no-deps' }),
     update: () => {},
+    isPermanent: (g) => g.saveState === 'persisted' && !!g.localRef,
     ...opts.deps,
   };
   const limit = Math.max(1, Math.min(opts.limit ?? MAX_RECACHE_PER_RUN, MAX_RECACHE_PER_RUN));
@@ -69,6 +78,9 @@ export async function recacheLegacyMedia(opts: RecacheOptions = {}): Promise<Rec
   } catch {
     return summary;
   }
+
+  const permanent = keeps.filter((g) => deps.isPermanent!(g)).length;
+  if (permanent > 0) summary.permanent = permanent;
 
   // Sequential on purpose: a bounded, gentle drain rather than a parallel burst
   // that would hammer the provider (and Cloudflare) at once.

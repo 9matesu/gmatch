@@ -25,15 +25,16 @@ describe('ClickerCacheView', () => {
     useGame.setState({ gallery: [] })
   })
 
-  it('says so when the cache is empty', async () => {
+  it('says the temporary cache is empty without implying keepsakes are missing', async () => {
     render(<ClickerCacheView />)
-    await waitFor(() => expect(screen.getByText(/Nothing cached yet/i)).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(/Nothing in the temporary picture cache/i)).toBeTruthy())
+    expect(screen.getByText(/keepsakes you saved are in the Gallery/i)).toBeTruthy()
   })
 
   it('lists the cached pictures', async () => {
     mockedList.mockResolvedValue([pic('https://x/a.jpg'), pic('https://x/b.jpg')])
     render(<ClickerCacheView />)
-    await waitFor(() => expect(screen.getByText(/Picture cache \(2\)/)).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(/Temporary picture cache/)).toBeTruthy())
     expect(screen.getByLabelText('Save to gallery: https://x/a.jpg')).toBeTruthy()
     expect(screen.getByLabelText('Save to gallery: https://x/b.jpg')).toBeTruthy()
   })

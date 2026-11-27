@@ -16,10 +16,10 @@ import {
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { FeedPost, PostComment } from './GMatchFeed';
 import { displayMedia, readPostContent } from './postModel';
-import { Linkify } from '../Linkify';
+import { PostBody } from './PostBody';
 import { ObjectImage } from '../ObjectImage';
 import { isVideoPost, resolveMediaUrl } from '../../utils/media';
-import { timeAgo } from '../../utils/timeAgo';
+import { formatCount, formatRelativeDate } from '../../utils/formatDate';
 import { formatLikedBy } from '../../utils/likedBy';
 import { custodyStatus } from '../../utils/durableCustody';
 import { useDurableCustody } from '../../hooks/useDurableCustody';
@@ -172,7 +172,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
               <span className={classes(TYPE.sub, WEIGHT.semibold, COLOR.fg, 'hover:underline')}>{post.author_name}</span>
             </div>
             <span className={classes(TYPE.caption, COLOR.muted, WEIGHT.medium, 'block')}>
-              {post.location ? `${post.location} · ` : ''}{timeAgo(post.created_at)}
+              {post.location ? `${post.location} · ` : ''}{formatRelativeDate(post.created_at)}
             </span>
           </div>
         </button>
@@ -299,16 +299,11 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
 
       {/* The written body. Text is content on every post; on a text-only post
           it is the whole card, set at reading size instead of caption size. */}
-      {content.text ? (
-        <p className={classes(
-          'whitespace-pre-wrap break-words leading-relaxed',
-          PADDING_X[4], PADDING_Y[3],
-          mediaItems.length ? TYPE.body : TYPE.base,
-          COLOR.fg,
-        )}>
-          <Linkify text={content.text} />
-        </p>
-      ) : null}
+      <PostBody
+        text={content.text}
+        typeClassName={mediaItems.length ? TYPE.body : TYPE.base}
+        className={classes(PADDING_X[4], PADDING_Y[3])}
+      />
 
       {/* Action Bar — same icons and order as the standard card. */}
       <div className={classes(PADDING_X[4], PADDING_Y[3])}>
@@ -383,7 +378,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
         )}
         aria-label="View who liked this post"
       >
-        {likedByLabel || `${likeCount.toLocaleString()} ${likeCount === 1 ? 'like' : 'likes'}`}
+        {likedByLabel || `${formatCount(likeCount)} ${likeCount === 1 ? 'like' : 'likes'}`}
       </button>
 
       {/* Peer-confirmed durability: a peer's signed receipt proved it stored

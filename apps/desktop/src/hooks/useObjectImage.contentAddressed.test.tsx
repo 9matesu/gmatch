@@ -18,6 +18,9 @@ vi.mock('../utils/p2pSwarm', async (importOriginal) => {
     getLocalObject: vi.fn(async () => null),
     registerLocalObject: vi.fn(),
     requestSwarmObject: vi.fn(),
+    // jsdom's Blob has no arrayBuffer(); the resolver only needs a digest that
+    // matches the addresses the fixtures use.
+    sha256HexBlob: vi.fn(async () => 'a'.repeat(64)),
   }
 })
 vi.mock('../services/vault', () => ({ vaultProbe: vi.fn(async () => ({ state: 'miss' })) }))
@@ -33,6 +36,7 @@ async function modules() {
   const api = await import('../utils/api')
   const hook = await import('./useObjectImage')
   return {
+    getLocalObject: vi.mocked(swarm.getLocalObject),
     requestSwarmObject: vi.mocked(swarm.requestSwarmObject),
     registerLocalObject: vi.mocked(swarm.registerLocalObject),
     orbitFetch: vi.mocked(api.orbitFetch),
@@ -48,6 +52,7 @@ describe('useObjectImage content-addressed rows (L4)', () => {
     m.reset()
     ;(URL as unknown as { createObjectURL: unknown }).createObjectURL = vi.fn(() => 'blob:peer-picture')
     ;(URL as unknown as { revokeObjectURL: unknown }).revokeObjectURL = vi.fn()
+    m.getLocalObject.mockResolvedValue(null)
     m.requestSwarmObject.mockResolvedValue(new Blob(['png'], { type: 'image/png' }))
   })
 
@@ -67,6 +72,22 @@ describe('useObjectImage content-addressed rows (L4)', () => {
     // The verified bytes are cached under the object alias AND the content key.
     expect(m.registerLocalObject).toHaveBeenCalledWith('post-object-1', expect.any(Blob))
     expect(m.registerLocalObject).toHaveBeenCalledWith(CONTENT_HASH, expect.any(Blob))
+    expect(h.result.current.failed).toBe(false)
+    h.unmount()
+  })
+
+  it('resolves a legacy 40-hex ref from local bytes (the prefix branch callers used to gate out)', async () => {
+    const bytes = new Blob(['legacy-prefix-bytes'], { type: 'image/png' })
+    const prefix = CONTENT_HASH.slice(0, 40)
+    const m = await modules()
+    m.getLocalObject.mockImplementation(async (id: string) => (id === prefix ? bytes : null))
+
+    const h = renderHook(() => m.useObjectImage('legacy-ref-object', identity, { contentHash: prefix }))
+    await waitFor(() => expect(h.result.current.url).toBe('blob:peer-picture'))
+
+    expect(m.getLocalObject).toHaveBeenCalledWith(prefix)
+    expect(m.requestSwarmObject).not.toHaveBeenCalled()
+    expect(m.orbitFetch).not.toHaveBeenCalled()
     expect(h.result.current.failed).toBe(false)
     h.unmount()
   })

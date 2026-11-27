@@ -25,7 +25,12 @@ import { isMediaVideo, isTwitterUrl, isVideoPageUrl, isVideoPost, resolveTwitter
 import { forgeMediaLocally } from '../../services/mediaForge';
 import { devFetchable } from '../../services/imageCache';
 import { Button, Input, Textarea } from '../../ui/kit';
-import { COLOR, FIELD } from '../../ui/tokens';
+import { classes, COLOR, FIELD, RADIUS } from '../../ui/tokens';
+
+/** One opaque plate for every media surface on the composer. The glass roles
+ *  let the page show through a dialog; a media box must not (a half-loaded
+ *  picture behind it reads as part of the attachment). */
+const OPAQUE_PLATE = classes('border', COLOR.edge, RADIUS.panel, COLOR.canvasSurface);
 
 interface PostMediaItem {
   id: string;
@@ -64,7 +69,10 @@ export function CreatePostModal({
   initialCaption?: string;
   mode?: 'post' | 'story';
 }) {
-  const [activeTab, setActiveTab] = useState<'upload' | 'camera' | 'pick'>('upload');
+  const [mediaSource, setMediaSource] = useState<'idle' | 'camera'>('idle');
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  /** Text posts are a first-class mode, not an empty media box with words. */
+  const [textMode, setTextMode] = useState(false);
   const [mediaList, setMediaList] = useState<PostMediaItem[]>(() => initialMedia || []);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [caption, setCaption] = useState(initialCaption || '');
@@ -119,7 +127,7 @@ export function CreatePostModal({
   };
 
   useEffect(() => {
-    if (activeTab === 'camera') {
+    if (mediaSource === 'camera') {
       void startCamera();
     } else {
       stopCamera();
@@ -127,7 +135,7 @@ export function CreatePostModal({
     return () => {
       stopCamera();
     };
-  }, [activeTab]);
+  }, [mediaSource]);
 
   const capturePhoto = () => {
     if (!videoRef.current) return;
@@ -367,6 +375,13 @@ function addLinkToCaption(raw: string): void {
       failPublish('Please sign in to share posts');
       return;
     }
+    // Stories are media-only. A caption is not a story: refuse the attempt
+    // with the real reason inline instead of publishing a text row the tray
+    // would never show (the server marks it is_story and hides it).
+    if (mode === 'story' && mediaList.length === 0) {
+      failPublish('Stories need a photo or video. Add media before sharing.', 'warning');
+      return;
+    }
     if (mediaList.length === 0 && !caption.trim()) {
       failPublish('Write something, or add a photo', 'warning');
       return;
@@ -503,10 +518,10 @@ function addLinkToCaption(raw: string): void {
             // Zero-media P2P path: seed locally into swarm and register metadata
             // with central server. Never sends raw binary bytes (which 422).
             const forged = await forgeMediaLocally(uploadFile, identity, {
-              caption: i === 0 ? caption.trim() : undefined,
-              postCaption: i === 0 ? caption.trim() : undefined,
-              location: i === 0 ? location.trim() : undefined,
-              tags: i === 0 ? tags.trim() : undefined,
+              caption: mode === 'story' || i !== 0 ? undefined : caption.trim(),
+              postCaption: mode === 'story' || i !== 0 ? undefined : caption.trim(),
+              location: mode === 'story' || i !== 0 ? undefined : location.trim(),
+              tags: mode === 'story' || i !== 0 ? undefined : tags.trim(),
               isPublic: mode !== 'story',
               isStory: mode === 'story',
               postGroup,
@@ -529,7 +544,7 @@ function addLinkToCaption(raw: string): void {
             formData.append('url', item.previewUrl);
             formData.append('is_public', mode === 'story' ? '0' : '1');
             if (mode === 'story') {
-              formData.append('is_story', '1');
+              formData.append('is_story', 'true');
             }
             formData.append('post_group', postGroup);
             const fallbackMime = urlFallbackMime(item as any);
@@ -537,7 +552,7 @@ function addLinkToCaption(raw: string): void {
             if (fallbackMime) {
               formData.append('mime_type', fallbackMime);
             }
-            if (i === 0) {
+            if (i === 0 && mode !== 'story') {
               formData.append('post_caption', caption.trim());
               formData.append('location', location.trim());
               formData.append('tags', tags.trim());
@@ -607,6 +622,7 @@ function addLinkToCaption(raw: string): void {
   const captionField = (
               <div>
                 <Textarea
+                  id="text-post-body"
                   value={caption}
                   onChange={(e) => setCaption(e.target.value)}
                   placeholder={mediaList.length === 0 ? 'What is happening?!' : 'Write a caption...'}
@@ -619,6 +635,41 @@ function addLinkToCaption(raw: string): void {
               </div>
   )
 
+  const addFromPicker = () => void openMediaPicker().then((sel) => { if (sel) void takePickerSelection(sel); });
+
+  /** One URL row, shared by the empty box and the "add more" row. */
+  const urlInputRow = (
+    <div className="flex w-full gap-2">
+      <div className="relative flex-1 min-w-0">
+        <Link2 className="w-3.5 h-3.5 text-retro-muted absolute left-3 top-1/2 -translate-y-1/2" />
+        <Input
+          type="url"
+          inputMode="url"
+          value={linkUrl}
+          onChange={(e) => setLinkUrl(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            void takeUrl(linkUrl.trim());
+            setLinkUrl('');
+          }}
+          placeholder="Paste an image or video URL…"
+          aria-label="Media URL"
+          className="pl-9"
+        />
+      </div>
+      <Button
+        variant="primary"
+        size="md"
+        disabled={!linkUrl.trim()}
+        onClick={() => { void takeUrl(linkUrl.trim()); setLinkUrl(''); }}
+        className="shrink-0"
+      >
+        Attach
+      </Button>
+    </div>
+  );
+
   const currentMedia = mediaList[activeMediaIndex] || mediaList[0];
 
   return (
@@ -626,7 +677,7 @@ function addLinkToCaption(raw: string): void {
       className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 pb-[calc(0.75rem+var(--island-clearance))] sm:p-4 sm:pb-[calc(1rem+var(--island-clearance))] font-sans select-none animate-orbit-fade-in"
     >
       <div
-        className="w-full max-w-2xl bg-retro-panel border border-edge rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[calc(100dvh-var(--island-clearance)-2rem)] text-retro-fg animate-orbit-pop"
+        className={`w-full max-w-2xl ${COLOR.canvasSurface} border border-edge rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[calc(100dvh-var(--island-clearance)-2rem)] text-retro-fg animate-orbit-pop`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -670,135 +721,128 @@ function addLinkToCaption(raw: string): void {
           </div>
         )}
 
-        {/* Mode Selector Tabs */}
-        <div className="flex items-center border-b border-edge px-3 pt-2 pb-2 gap-1.5 text-xs">
-          <Button
-            variant={activeTab === 'upload' ? 'secondary' : 'ghost'}
-            size="md"
-            onClick={() => { playPress(750); setActiveTab('upload'); }}
-          >
-            <UploadCloud className="w-4 h-4" />
-            <span>Upload / Files</span>
-          </Button>
-
-          <Button
-            variant={activeTab === 'camera' ? 'secondary' : 'ghost'}
-            size="md"
-            onClick={() => { playPress(750); setActiveTab('camera'); }}
-          >
-            <Camera className="w-4 h-4" />
-            <span>Camera</span>
-          </Button>
-
-          <Button
-            variant={activeTab === 'pick' ? 'secondary' : 'ghost'}
-            size="md"
-            onClick={() => { playPress(750); setActiveTab('pick'); }}
-          >
-            <FolderOpen className="w-4 h-4" />
-            <span>Pick media</span>
-          </Button>
-        </div>
+        {/* Text posts are explicit. Stories never offer this: they are
+            media-only, so the button does not exist there at all. */}
+        {mode !== 'story' && (
+          <div className="flex items-center justify-between border-b border-edge px-4 py-2">
+            <Button
+              variant={textMode ? 'secondary' : 'link'}
+              size="sm"
+              onClick={() => { playPress(750); setTextMode((v) => !v); setMediaSource('idle'); }}
+            >
+              {textMode ? 'Add media instead' : 'Write a text post'}
+            </Button>
+            {textMode && <span className="text-2xs text-retro-muted">No media needed — just words.</span>}
+          </div>
+        )}
 
         {/* Body Content */}
         <div className="flex-1 overflow-y-auto p-4 styled-scrollbar">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-            <div className="space-y-3 md:order-2">{captionField}</div>
+          {/* One hidden file input for the whole composer: both the empty box
+              and the "Add more" row trigger it via fileInputRef. */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/*,video/*"
+            onChange={(e) => handleFilesSelected(e.target.files)}
+            className="hidden"
+          />
+          {textMode ? (
+            <div className="space-y-3">
+              <div className={`${OPAQUE_PLATE} p-4`}>
+                <label className="text-xs font-bold text-retro-body" htmlFor="text-post-body">Your post</label>
+                <div className="mt-2">{captionField}</div>
+              </div>
+              <Button variant="secondary" size="md" onClick={() => setTextMode(false)}>
+                <FolderOpen className="w-4 h-4" />
+                <span>Add media</span>
+              </Button>
+            </div>
+          ) : (
+          <div className={classes('grid grid-cols-1 gap-4 items-start', mode !== 'story' && 'md:grid-cols-2')}>
+            {mode !== 'story' && <div className="space-y-3 md:order-2">{captionField}</div>}
             <div className="space-y-3 md:order-1">
 
-          {/* Active Tab Modalities */}
-          {activeTab === 'upload' && (
-            <div className="space-y-2">
-              {/* Share a LINK instead of a file: the bytes never leave the
-                  origin, and the row carries the anchor in its written body. */}
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1 min-w-0">
-                  <Link2 className="w-3.5 h-3.5 text-retro-muted absolute left-3 top-1/2 -translate-y-1/2" />
-                  <Input
-                    type="url"
-                    inputMode="url"
-                    value={linkUrl}
-                    onChange={(e) => setLinkUrl(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key !== 'Enter') return;
-                      e.preventDefault();
-                      addLinkToCaption(linkUrl.trim());
-                      setLinkUrl('');
-                    }}
-                    placeholder="Paste a link to share…"
-                    aria-label="Link to share"
-                    className="pl-9"
-                  />
-                </div>
-                <Button
-                  variant="primary"
-                  size="md"
-                  disabled={!linkUrl.trim()}
-                  onClick={() => { addLinkToCaption(linkUrl.trim()); setLinkUrl(''); }}
-                  className="shrink-0"
-                >
-                  Add
-                </Button>
-              </div>
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-edge hover:border-retro-accent rounded-xl bg-surface-interactive hover:bg-glass-w10 p-5 flex flex-col items-center justify-center gap-2 cursor-pointer transition text-center group"
-              >
-                <UploadCloud className="w-8 h-8 text-retro-muted group-hover:text-retro-accent group-hover:scale-110 transition-transform" />
-                <p className="text-xs font-bold text-retro-body">Drag &amp; drop photos or click to browse</p>
-                <span className="text-2xs text-retro-muted">Images and video, up to {MAX_MEDIA}. {mediaList.length}/{MAX_MEDIA} added</span>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  accept="image/*,video/*"
-                  onChange={(e) => handleFilesSelected(e.target.files)}
-                  className="hidden"
-                />
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'camera' && (
-            <div className="border border-edge rounded-xl overflow-hidden bg-retro-bg p-2 flex flex-col items-center gap-3">
+          {mediaSource === 'camera' && (
+            <div className={`${OPAQUE_PLATE} p-2 flex flex-col items-center gap-3`}>
               {cameraError ? (
                 <div className="p-6 text-center text-xs text-retro-error font-bold">
                   {cameraError}
                 </div>
               ) : (
-                <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-surface-canvas flex items-center justify-center">
+                <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-surface-canvas flex items-center justify-center">
                   <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
                 </div>
               )}
-              <Button variant="primary" size="md" onClick={capturePhoto} className="px-5">
-                <Camera className="w-4 h-4" />
-                <span>Snap Picture</span>
-              </Button>
+              <div className="flex flex-wrap justify-center gap-2 pb-1">
+                <Button variant="primary" size="md" onClick={capturePhoto}>
+                  <Camera className="w-4 h-4" />
+                  <span>Snap Picture</span>
+                </Button>
+                <Button variant="secondary" size="md" onClick={() => setMediaSource('idle')}>Done</Button>
+              </div>
             </div>
           )}
 
-          {activeTab === 'pick' && (
-            <div className="space-y-2">
-              <Button
-                variant="secondary"
-                size="md"
-                onClick={() => void openMediaPicker().then((sel) => { if (sel) void takePickerSelection(sel); })}
-                className="w-full h-auto flex-col border-2 border-dashed p-5 text-center"
-              >
-                <FolderOpen className="w-7 h-7 text-retro-muted transition-colors" />
-                <p className="text-xs font-bold text-retro-body">From your media, this device, or a link</p>
-                <span className="text-2xs text-retro-muted">Previewed before it attaches. {mediaList.length}/{MAX_MEDIA} added</span>
+          {mediaList.length === 0 && mediaSource !== 'camera' && (
+            <div className={`${OPAQUE_PLATE} border-2 border-dashed p-5 flex flex-col items-center gap-3 text-center`}>
+              <UploadCloud className="w-8 h-8 text-retro-muted" />
+              <div>
+                <p className="text-xs font-bold text-retro-body">Drop photos or video here</p>
+                <span className="text-2xs text-retro-muted">Images and video, up to {MAX_MEDIA}. {mediaList.length}/{MAX_MEDIA} added</span>
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Button variant="secondary" size="md" onClick={() => fileInputRef.current?.click()}>
+                  <UploadCloud className="w-4 h-4" />
+                  <span>Upload</span>
+                </Button>
+                <Button variant="secondary" size="md" onClick={addFromPicker}>
+                  <FolderOpen className="w-4 h-4" />
+                  <span>Browse keepsakes</span>
+                </Button>
+                <Button variant="secondary" size="md" onClick={() => { playPress(750); setMediaSource('camera'); }}>
+                  <Camera className="w-4 h-4" />
+                  <span>Camera</span>
+                </Button>
+                {mode !== 'story' && (
+                  <Button variant="secondary" size="md" onClick={() => { playPress(750); setShowUrlInput((v) => !v); }}>
+                    <Link2 className="w-4 h-4" />
+                    <span>URL</span>
+                  </Button>
+                )}
+              </div>
+              {showUrlInput && urlInputRow}
+            </div>
+          )}
+
+          {mediaList.length > 0 && mediaSource !== 'camera' && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}>
+                <UploadCloud className="w-3.5 h-3.5" /><span>Add more</span>
+              </Button>
+              <Button variant="secondary" size="sm" onClick={addFromPicker}>
+                <FolderOpen className="w-3.5 h-3.5" /><span>Browse keepsakes</span>
+              </Button>
+              {mode !== 'story' && (
+                <Button variant="secondary" size="sm" onClick={() => { playPress(750); setShowUrlInput((v) => !v); }}>
+                  <Link2 className="w-3.5 h-3.5" /><span>URL</span>
+                </Button>
+              )}
+              <Button variant="secondary" size="sm" onClick={() => { playPress(750); setMediaSource('camera'); }}>
+                <Camera className="w-3.5 h-3.5" /><span>Camera</span>
               </Button>
             </div>
           )}
+          {mediaList.length > 0 && showUrlInput && mediaSource !== 'camera' && urlInputRow}
 
           {/* Carousel & Multi-Media Viewer */}
           {mediaList.length > 0 && currentMedia && (
             <div className="space-y-3">
-              <div className="relative w-full rounded-xl overflow-hidden bg-retro-bg flex items-center justify-center border border-edge group">
+              <div className={`relative w-full rounded-xl overflow-hidden ${COLOR.canvasSurface} flex items-center justify-center border border-edge group`}>
                 {currentMedia.isVideoPage ? (
                   <div className="w-full aspect-video flex flex-col items-center justify-center gap-2 p-4 text-center">
-                    <span className="w-10 h-10 rounded-full bg-glass-w12 border border-edge flex items-center justify-center text-retro-fg text-xs font-black">▶</span>
+                    <span className={`w-10 h-10 rounded-full ${COLOR.canvasSurface} border border-edge flex items-center justify-center text-retro-fg text-xs font-black`}>▶</span>
                     <span className="text-xs font-semibold text-retro-fg">Video link attached</span>
                     <span className="text-2xs text-retro-muted break-all max-w-full">
                       {(currentMedia.originalUrl || currentMedia.previewUrl).slice(0, 80)}
@@ -878,7 +922,7 @@ function addLinkToCaption(raw: string): void {
 
               {/* Thumbnails & Reorder Bar */}
               {mediaList.length > 1 && (
-                <div className="flex items-center gap-2 overflow-x-auto p-1.5 styled-scrollbar bg-retro-bg border border-edge rounded-lg">
+                <div className={`flex items-center gap-2 overflow-x-auto p-1.5 styled-scrollbar ${COLOR.canvasSurface} border border-edge rounded-lg`}>
                   {mediaList.map((m, idx) => (
                     <div
                       key={m.id}
@@ -926,7 +970,8 @@ function addLinkToCaption(raw: string): void {
 
 
 
-              {/* Location & Tags inputs */}
+              {/* Location & Tags are post metadata; a story carries no text. */}
+              {mode !== 'story' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div className={FIELD.shell}>
                   <MapPin className="w-4 h-4 text-retro-muted shrink-0" />
@@ -950,10 +995,12 @@ function addLinkToCaption(raw: string): void {
                   />
                 </div>
               </div>
+              )}
             </div>
           )}
             </div>
           </div>
+          )}
         </div>
       </div>
       {cropper}

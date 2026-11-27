@@ -57,10 +57,31 @@ export interface ContentAddressedOptions {
 export const PEER_MEDIA_TIMEOUT_MS = 5000
 
 const SHA256_HEX = /^[0-9a-f]{64}$/i
+const LEGACY_HEX = /^[0-9a-f]{40}$/i
 
-/** A value usable as a content address (sha256 hex). */
+/** A value usable as a content address (full sha256 hex). */
 export function isContentHash(value: string | null | undefined): value is string {
   return typeof value === 'string' && SHA256_HEX.test(value)
+}
+
+/**
+ * The old "fake btih" address: sha256(bytes).slice(0, 40). It is a real local
+ * content address (the vault and IndexedDB index both accept it), but it is
+ * NOT a full digest — a peer's swarm answer can only be trusted against 64
+ * hex, so legacy rows are resolved from durable local stores only.
+ */
+export function isLegacyContentHash(value: string | null | undefined): value is string {
+  return typeof value === 'string' && LEGACY_HEX.test(value)
+}
+
+/**
+ * The gate every caller should use: a full sha256 OR the legacy 40-hex
+ * prefix. Both are real local content addresses (`resolveContentAddressedMedia`
+ * verifies a prefix against the first 40 hex of the digest); callers that
+ * gated only on `isContentHash` made the legacy branch unreachable.
+ */
+export function isContentAddress(value: string | null | undefined): value is string {
+  return isContentHash(value) || isLegacyContentHash(value)
 }
 
 const defaultDeps: ContentAddressedDeps = {
@@ -69,7 +90,12 @@ const defaultDeps: ContentAddressedDeps = {
   hash: (blob) => sha256HexBlob(blob),
 }
 
-async function verified(deps: ContentAddressedDeps, id: string | null, expected: string): Promise<Blob | null> {
+async function verified(
+  deps: ContentAddressedDeps,
+  id: string | null,
+  expected: string,
+  partial: boolean,
+): Promise<Blob | null> {
   if (!id) return null
   let blob: Blob | null = null
   try {
@@ -79,7 +105,8 @@ async function verified(deps: ContentAddressedDeps, id: string | null, expected:
   }
   if (!blob) return null
   try {
-    return (await deps.hash(blob)) === expected ? blob : null
+    const actual = await deps.hash(blob)
+    return (partial ? actual.startsWith(expected) : actual === expected) ? blob : null
   } catch {
     return null
   }
@@ -97,14 +124,25 @@ export async function resolveContentAddressedMedia(
   contentHash: string,
   options: ContentAddressedOptions = {},
 ): Promise<Blob | null> {
-  if (!isContentHash(contentHash)) return null
+  const partial = isLegacyContentHash(contentHash)
+  if (!isContentHash(contentHash) && !partial) return null
   const expected = contentHash.toLowerCase()
   const deps: ContentAddressedDeps = { ...defaultDeps, ...options.deps }
   const timeoutMs = options.timeoutMs ?? PEER_MEDIA_TIMEOUT_MS
   const alias = objectId && objectId !== expected ? objectId : null
 
-  const local = (await verified(deps, alias, expected)) ?? (await verified(deps, expected, expected))
+  const local =
+    (await verified(deps, alias, expected, partial)) ??
+    (await verified(deps, expected, expected, partial))
   if (local) return local
+  // A 40-hex btih is a PREFIX, not a full digest. The swarm verifier only
+  // accepts 64 hex, so asking it with the prefix would either reject the
+  // request or accept bytes nobody proved. The vault/IndexedDB copy is the
+  // honest answer for legacy rows; stop here rather than fabricate one.
+  if (partial) {
+    try { options.onMiss?.(alias ?? expected, expected) } catch { /* diagnostic */ }
+    return null
+  }
 
   const fromSwarm = async (id: string): Promise<Blob | null> => {
     try {

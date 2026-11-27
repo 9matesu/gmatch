@@ -154,4 +154,117 @@ describe('GMatchProfile', () => {
     await userEvent.click(screen.getByRole('button', { name: /saved/i }));
     expect(screen.getByText('No saved posts')).toBeInTheDocument();
   });
+
+  it('renders text posts as chronological cards, never as media grid cells', () => {
+    const older = {
+      id: 'text-old', author_id: 'user_123', author_name: 'Alice Wonder', caption: 'Older words',
+      url: '', created_at: '2026-10-24T12:00:00.000Z', like_count: 0, comment_count: 0,
+    } as any;
+    const newer = {
+      id: 'text-new', author_id: 'user_123', author_name: 'Alice Wonder', caption: 'Newer words',
+      url: '', created_at: '2026-10-26T12:00:00.000Z', like_count: 0, comment_count: 0,
+    } as any;
+    const { container } = render(
+      <GMatchProfile
+        identity={fakeIdentity}
+        myUser={fakeUser}
+        posts={[older, newer]}
+        cards={[]}
+      />
+    );
+    const cards = screen.getAllByTestId('profile-text-post');
+    expect(cards).toHaveLength(2);
+    expect(cards[0].getAttribute('data-post-id')).toBe('text-new');
+    expect(cards[1].getAttribute('data-post-id')).toBe('text-old');
+    expect(container.querySelector('[data-post-id="text-old"] img')).toBeNull();
+    expect(screen.queryByText(/No preview|Loading media/i)).toBeNull();
+    expect(container.querySelector('.grid-cols-3')).toBeNull();
+  });
+
+  it('keeps media posts in the media grid', () => {
+    const media = {
+      id: 'media-1', author_id: 'user_123', author_name: 'Alice Wonder', caption: 'a picture',
+      url: '/api/objects/media-1', created_at: '2026-10-26T12:00:00.000Z', like_count: 0, comment_count: 0,
+    } as any;
+    const { container } = render(
+      <GMatchProfile identity={fakeIdentity} myUser={fakeUser} posts={[media]} cards={[]} />,
+    );
+    expect(screen.queryByTestId('profile-text-post')).toBeNull();
+    expect(container.querySelector('[data-post-id="media-1"]')).toBeTruthy();
+  });
+
+  it('renders an already-saved text card with a filled bookmark on first paint', async () => {
+    const savedText = {
+      id: 'text-saved', author_id: 'user_123', author_name: 'Alice Wonder', caption: 'Kept words',
+      url: '', created_at: '2026-10-26T12:00:00.000Z', like_count: 3, is_saved: true,
+    } as any;
+    render(
+      <GMatchProfile identity={fakeIdentity} myUser={fakeUser} posts={[savedText]} cards={[]} />,
+    );
+    const save = screen.getByRole('button', { name: 'Remove from saved' });
+    expect(save).toHaveAttribute('aria-pressed', 'true');
+    expect(save.innerHTML).toContain('fill-retro-fg');
+    // Seeded from the row, not from a click: the first click UNSAVES it.
+    await userEvent.click(save);
+    expect(screen.getByRole('button', { name: 'Save post' })).toBeInTheDocument();
+  });
+
+  it('interleaves text cards and media grid rows in one chronological list', () => {
+    const text = (id: string, stamp: string) => ({
+      id, author_id: 'user_123', author_name: 'Alice Wonder', caption: id,
+      url: '', created_at: stamp, like_count: 0, comment_count: 0,
+    }) as any;
+    const media = {
+      id: 'media-mid', author_id: 'user_123', author_name: 'Alice Wonder', caption: 'middle picture',
+      url: '/api/objects/media-mid', created_at: '2026-10-26T12:00:00.000Z',
+      like_count: 0, comment_count: 0,
+    } as any;
+    const { container } = render(
+      <GMatchProfile
+        identity={fakeIdentity}
+        myUser={fakeUser}
+        posts={[media, text('text-old', '2026-10-25T12:00:00.000Z'), text('text-new', '2026-10-27T12:00:00.000Z')]}
+        cards={[]}
+      />,
+    );
+    const ids = Array.from(container.querySelectorAll('[data-post-id]')).map((el) => el.getAttribute('data-post-id'));
+    expect(ids).toEqual(['text-new', 'media-mid', 'text-old']);
+    expect(container.querySelectorAll('.grid-cols-3')).toHaveLength(1);
+  });
+
+  it('sorts zone-less SQLite stamps as UTC, like the ISO rows', () => {
+    const text = (id: string, stamp: string) => ({
+      id, author_id: 'user_123', author_name: 'Alice Wonder', caption: id,
+      url: '', created_at: stamp, like_count: 0, comment_count: 0,
+    }) as any;
+    const { container } = render(
+      <GMatchProfile
+        identity={fakeIdentity}
+        myUser={fakeUser}
+        posts={[text('iso-older', '2026-10-26T11:00:00.000Z'), text('sqlite-newer', '2026-10-26 12:00:00')]}
+        cards={[]}
+      />,
+    );
+    const ids = Array.from(container.querySelectorAll('[data-post-id]')).map((el) => el.getAttribute('data-post-id'));
+    expect(ids).toEqual(['sqlite-newer', 'iso-older']);
+  });
+
+  it('opens a Comment expansion from a Saved tab text card', async () => {
+    const savedText = {
+      id: 'saved-comment', author_id: 'user_123', author_name: 'Alice Wonder', caption: 'Saved words',
+      url: '', created_at: '2026-10-26T12:00:00.000Z', like_count: 0, is_saved: true,
+    } as any;
+    const { container } = render(
+      <GMatchProfile
+        identity={fakeIdentity}
+        myUser={fakeUser}
+        posts={[]}
+        cards={[]}
+        savedPosts={[savedText]}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: /saved/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Comment' }));
+    expect(container.querySelector('[data-expanded-post="saved-comment"]')).toBeInTheDocument();
+  });
 });

@@ -1,5 +1,7 @@
 "use client";
 
+import { getActiveWorldId, namespaceStorageKey } from '../utils/serverWorlds';
+
 /**
  * Durable local operation log (roadmap L1, slice 1).
  *
@@ -105,7 +107,7 @@ function logChannelInstance(): BroadcastChannel | null {
   if (logChannel) return logChannel
   if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') return null
   try {
-    logChannel = new BroadcastChannel(LOG_CHANNEL_NAME)
+    logChannel = new BroadcastChannel(namespaceStorageKey(LOG_CHANNEL_NAME, getActiveWorldId()))
     logChannel.onmessage = () => {
       externalRevision += 1
       if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
@@ -427,7 +429,7 @@ const STORE = 'operations'
 function openLogDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (typeof indexedDB === 'undefined') return reject(new Error('IndexedDB unavailable'))
-    const request = indexedDB.open(DB_NAME, DB_VERSION)
+    const request = indexedDB.open(namespaceStorageKey(DB_NAME, getActiveWorldId()), DB_VERSION)
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains(STORE)) {
         request.result.createObjectStore(STORE, { keyPath: 'operationId' })

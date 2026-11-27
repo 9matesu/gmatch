@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { FeedbackState } from '../ui/kit'
 import { isMediaVideo, resolveMediaUrl } from '../utils/media'
 import { resolveObjectRefId } from '../utils/objectRef'
-import { isContentHash } from '../utils/contentAddressedMedia'
+import { isContentAddress } from '../utils/contentAddressedMedia'
 import { useObjectImage, evictObjectImage } from '../hooks/useObjectImage'
 import { NativeVideoPlayer } from './media/NativeVideoPlayer'
 import { useVaultLookup, useVaultHttpUrls, vaultOptIn } from '../services/vault'
@@ -184,7 +184,7 @@ export function ObjectImage({
   // the hook can never resolve it, so the tile must say "No preview" instead
   // of spinning on "Loading media..." forever. The post stays visible. A row
   // that names its content is still addressable by that hash.
-  const unresolvable = signed && !effObjectId && !isContentHash(contentHash)
+  const unresolvable = signed && !effObjectId && !isContentAddress(contentHash)
 
   // Defer the authenticated fetch for signed images until the element is near
   // the viewport. Direct URLs rely on the browser's native `loading="lazy"`.

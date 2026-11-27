@@ -10,7 +10,7 @@
 import { useEffect, useState } from 'react'
 import { getApiBaseUrl } from '../utils/api'
 
-export const COMMUNITY_FALLBACK_URL = 'https://discord.gg/Xkqb6U4Na'
+export const COMMUNITY_FALLBACK_URL = 'https://discord.gg/BBCmAQs6x'
 
 const HTTP_URL_RE = /^https?:\/\/[^\s]+$/i
 let cached: string | null = null

@@ -6,7 +6,7 @@ import { getLocalObject, registerLocalObject, requestSwarmObject, PEER_ONLINE_EV
 import { vaultProbe } from '../services/vault'
 import { resolveVideoMime, sniffFileHead } from '../utils/media'
 import { normalizeObjectId, isRequestableObjectId, parseObjectRef } from '../utils/objectRef'
-import { isContentHash, resolveContentAddressedMedia } from '../utils/contentAddressedMedia'
+import { isContentAddress, resolveContentAddressedMedia } from '../utils/contentAddressedMedia'
 import { countMetric, timeMetric } from '../utils/metrics'
 
 /**
@@ -279,7 +279,7 @@ async function resolveObjectInner(
   const parsed = parseObjectRef(cleanId)
   const localOnly = !isRequestableObjectId(cleanId)
   const lookupId = localOnly ? (parsed.kind === 'magnet' ? parsed.id : null) : cleanId
-  if (!lookupId && !isContentHash(contentHash)) {
+  if (!lookupId && !isContentAddress(contentHash)) {
     return { state: FAILED(cleanId), cache: false, awaitingSeeder: false }
   }
 
@@ -300,7 +300,7 @@ async function resolveObjectInner(
   // rendered. The node's object route is deliberately not consulted — the row
   // addresses content, and media lives with the peers (SPEC §12b). A row with
   // no content hash keeps the entire legacy ladder below, unchanged.
-  if (isContentHash(contentHash)) {
+  if (isContentAddress(contentHash)) {
     const expected = contentHash.toLowerCase()
     const blob = await resolveContentAddressedMedia(lookupId ?? null, expected, {
       // A seeder that is offline now can answer after a reboot or a peer comes

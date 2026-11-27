@@ -31,6 +31,7 @@ import {
   toImhentaiPagePosts,
   toImhentaiPost,
 } from './imhentai'
+import { resolveXStatusMedia, xStatusApiUrl } from '../utils/xVideoUrl'
 import {
   BABESOURCE_ROOT,
   babesourceSearchUrl,
@@ -81,6 +82,8 @@ export interface BooruResponse {
   emptyFresh?: boolean
   /** True when posts came from the 10-minute feed cache, not the network. */
   cached?: boolean
+  /** Explicit reason a direct media query (e.g. an X status link) failed. */
+  reason?: string
 }
 
 // The preload bridge surface (window.gmatch) — including update types — is
@@ -1645,6 +1648,33 @@ export async function fetchPosts(req: BooruRequest): Promise<BooruResponse> {
 async function fetchPostsUncached(req: BooruRequest): Promise<BooruResponse> {
   const offline: BooruResponse = { posts: [], source: null, ok: false, offline: true }
   if (!req.tags.trim() || isQueryBlocked(req.tags)) return offline
+  // A status link is a DIRECT media request, not a tag search: asking the
+  // booru mirrors for the whole URL found nothing and the /video/1 suffix
+  // 404'd at the resolver. Resolve it once here (read-only, no upload), then
+  // still run the normal explicit/blocklist gate before returning a post.
+  if (xStatusApiUrl(req.tags.trim())) {
+    const resolved = await resolveXStatusMedia(req.tags.trim())
+    if (!resolved.ok) {
+      // Keep the precise reason ('no-media', 'http-429', …) instead of
+      // collapsing every failure into one empty/offline verdict: the clicker
+      // can then say WHY this link has no picture. 'no-media' is answered,
+      // not offline.
+      return {
+        posts: [], source: null, ok: false,
+        offline: resolved.reason === 'offline' || resolved.reason.startsWith('http-'),
+        reason: resolved.reason,
+      }
+    }
+    const post: BooruPost = {
+      id: `x-${resolved.id}`,
+      url: resolved.url,
+      tags: resolved.tags,
+      rating: 'e',
+      kind: resolved.kind,
+    }
+    const clean = sanitize([post])
+    return clean.length > 0 ? { posts: clean, source: 'x-status', ok: true } : offline
+  }
   // Stage timing so the per-split cost of a round is measurable rather than
   // guessed. Read it with readQueryTimings()/timingSummary().
   const round = startRound(req.tags)

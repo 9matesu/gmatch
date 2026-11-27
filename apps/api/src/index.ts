@@ -126,6 +126,7 @@ import { posts } from './routes/posts'
 import { gossip } from './routes/gossip'
 import { moderation } from './routes/moderation'
 import { economy } from './routes/economy'
+import { shardRedeem } from './routes/shard-redeem'
 import { cards } from './routes/cards'
 import { decks } from './routes/decks'
 import { slideshows } from './routes/slideshows'
@@ -174,6 +175,7 @@ app.route('/api/posts', posts)
 app.route('/api/gossip', gossip)
 app.route('/api/moderation', moderation)
 app.route('/api/economy', economy)
+app.route('/api/shard-redeem', shardRedeem)
 app.route('/api/cards', cards)
 app.route('/api/decks', decks)
 app.route('/api/slideshows', slideshows)

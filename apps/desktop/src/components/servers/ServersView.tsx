@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
-import { Lock, Globe, ShieldCheck, RefreshCw, Pencil, Check, X, Search, Share2, ArrowLeft, ChevronRight, Plus, Trash2, Loader2, Copy } from 'lucide-react'
+import { Lock, Globe, ShieldCheck, RefreshCw, Pencil, Check, X, Search, Share2, ArrowLeft, ChevronRight, Plus, Trash2, Copy } from 'lucide-react'
 import { generateIdentity } from '@orbit/crypto'
 import { getCentralApiUrl, setCentralApiUrl } from '../../utils/central'
 import { rememberKnownNodeHint } from '../../utils/peerNodes'
@@ -29,7 +29,6 @@ import { AddWorldDialog } from './AddWorldDialog'
 import { GroupsDialog } from './GroupsDialog'
 import { WorldRow, WorldMenuItem, BROWSER_COLUMNS, formatRelativeTime } from './WorldRow'
 import type { WorldRowState } from './WorldRow'
-import { worldGlyph, worldTileStyle } from './worldIdentity'
 import { claimPendingHost } from '../../hooks/usePendingServerHost'
 import { SERVER_MARKER_KEY } from '../../firstRun/onboardingState'
 import { playPress } from '../../utils/sounds'
@@ -40,7 +39,7 @@ import type { User } from '@orbit/shared'
 import {
   classes, CHROME, COLOR, DIALOG_WIDTH, FEEDBACK, GAP, ICON, LAYOUT, MONO,
   MOTION, PADDING, PADDING_SM, PADDING_X, PADDING_Y, PRESENCE, RADIUS, RECIPE,
-  SHADOW, STATUS, TRACKING, TRANSITION, TYPE, WEIGHT,
+  STATUS, TRACKING, TRANSITION, TYPE, WEIGHT,
 } from '../../ui/tokens'
 
 /** SURFACE + TYPOGRAPHY chrome shared by this view's panels, banners and
@@ -168,12 +167,16 @@ export function ServersView({
   profilePics = {},
   onServerJoined,
   p2pPeers = [],
+  onWorldSwitch,
 }: {
   identity: Parameters<typeof orbitFetch>[2] | null
   toast: Toast
   onSelectUser?: (user: User) => void
   profilePics?: Record<string, string>
   onServerJoined?: (server: DirectoryServer) => void
+  /** Fired when a switch commits, so the shell can show the world-switch
+   *  loading screen and remount once the new node answers health. */
+  onWorldSwitch?: (target: { name: string; url: string; worldId?: string }) => void
   /** Live P2P roster (signed presence beacons). Peers on OTHER nodes never
    *  appear in this node's dashboard, so without this the hub shows "nobody
    *  online" while the swarm is actually alive. */
@@ -816,6 +819,14 @@ export function ServersView({
     }
   }
 
+  // A committed client switch is a world change: raise the shell's loading
+  // screen so the app remounts into the new world's data once its node answers.
+  const announceSwitch = (s: DirectoryServer) => {
+    const raw = (s.endpoint_hint || '').trim()
+    const url = normalizeServerUrl(raw) || normalizeServerUrl(`http://${raw}`) || raw
+    if (url) onWorldSwitch?.({ name: s.name, url })
+  }
+
   // Switch = join another node, or hop back to this machine's own host node.
   const switchTo = async (s: DirectoryServer) => {
     if (connectingId) return
@@ -823,7 +834,10 @@ export function ServersView({
     try {
       if (!mine(s)) {
         const out = await joinServer(s, toast, askPassword, identity)
-        if (out === 'connected') onServerJoined?.(s)
+        if (out === 'connected') {
+          onServerJoined?.(s)
+          announceSwitch(s)
+        }
         if (out !== 'relaunching') setConnectingId(null)
         return
       }
@@ -992,6 +1006,9 @@ export function ServersView({
           setCentral(target)
           toast(`Connected to ${s.name}.`, 'success')
           onServerJoined?.(s)
+          // A committed switch is a world change: the shell raises the loading
+          // screen and remounts once this world's node answers health.
+          onWorldSwitch?.({ name: s.name, url: target })
           void refresh()
         }
         setConnectingId(null)
@@ -1022,8 +1039,9 @@ export function ServersView({
         return
       }
       const out = await joinServer(s, toast, askPassword, identity)
-      if (out === 'connected' && onServerJoined) {
-        onServerJoined(s)
+      if (out === 'connected') {
+        onServerJoined?.(s)
+        announceSwitch(s)
       }
       if (out !== 'relaunching') {
         setConnectingId(null)
@@ -1059,6 +1077,7 @@ export function ServersView({
     const res = await joinServer(serverObj, toast, askPassword, identity)
     if (res === 'connected') {
       onServerJoined?.(serverObj)
+      announceSwitch(serverObj)
     }
     return true
   }
@@ -1395,6 +1414,11 @@ export function ServersView({
             </h1>
             {activeTab === 'hub' && (
               <p className={classes(TYPE.caption, COLOR.muted, 'truncate')}>Members, invites and settings</p>
+            )}
+            {activeTab === 'browse' && (
+              <p className={classes(TYPE.caption, COLOR.muted, 'truncate')}>
+                Each server is its own world — separate posts, members and media.
+              </p>
             )}
           </div>
 
@@ -1901,43 +1925,6 @@ export function ServersView({
         ) : (
           /* BROWSE SERVERS VIEW */
           <section className="relative flex flex-col min-h-0 h-full overflow-hidden" aria-label="Server directory">
-            {/* Entering a world is a transition, not a silent row swap: the
-                list dims, the target world's tile carries its own colour and
-                the wait is named. Weight where the action happens. */}
-            {connectingId && (() => {
-              const target = serverRows.find((s) => s.id === connectingId)
-              const worldName = target?.name || 'world'
-              const key = target ? serverKey(target) : worldName
-              return (
-                <div
-                  role="status"
-                  aria-live="polite"
-                  data-testid="world-connecting"
-                  className={classes(
-                    'absolute inset-0 z-20 flex flex-col items-center justify-center backdrop-blur-sm',
-                    COLOR.canvasVeil, GAP[3],
-                  )}
-                >
-                  <span
-                    className={classes(
-                      'flex size-16 items-center justify-center border shadow-xl',
-                      RADIUS.panel, TYPE.display, WEIGHT.bold, COLOR.fgSoft,
-                      SHADOW.large, MOTION.keyframe.pop,
-                    )}
-                    style={worldTileStyle(key)}
-                  >
-                    {worldGlyph(worldName)}
-                  </span>
-                  <p className={classes(TYPE.sub, WEIGHT.bold, COLOR.fg)}>
-                    Entering <span className={COLOR.accent}>{worldName}</span>…
-                  </p>
-                  <div className={classes('flex items-center', GAP[2], TYPE.caption, MONO, COLOR.muted)}>
-                    <Loader2 className={classes(ICON.sm, 'animate-spin')} />
-                    Connecting to this world's node
-                  </div>
-                </div>
-              )
-            })()}
             {!identity && (
               <div className={classes(
                 COLOR.interactiveSoft, 'border-b shrink-0', COLOR.edgeSubtle,

@@ -33,7 +33,7 @@ import type { OrbitIdentity } from '@orbit/crypto';
 import type { User } from '@orbit/shared';
 import type { ChatMessage } from '../../hooks/useP2P';
 import { orbitFetch } from '../../utils/api';
-import { formatAbsoluteTime } from '../../utils/timeAgo';
+import { formatDate, formatTime } from '../../utils/formatDate';
 import { ObjectImage } from '../ObjectImage';
 import { DropZone, readClipboard } from '../DropZone';
 import { ChatPlayerList } from './ChatPlayerList';
@@ -1048,7 +1048,7 @@ export function GMatchDMs({
                           </span>
                         ) : (
                           <span className="text-2xs text-retro-muted shrink-0 tabular-nums">
-                            {thread.last_created_at ? formatAbsoluteTime(thread.last_created_at, { hour: '2-digit', minute: '2-digit' }) : ''}
+                            {thread.last_created_at ? formatTime(thread.last_created_at) : ''}
                           </span>
                         )}
                       </div>
@@ -1205,7 +1205,7 @@ export function GMatchDMs({
                            onClick={() => jumpToMessage(hit.messageId)}
                            className="w-full text-left"
                          >
-                           <span className="block text-2xs text-retro-muted">{new Date(hit.ts).toLocaleString()}</span>
+                           <span className="block text-2xs text-retro-muted">{formatDate(hit.ts, true)}</span>
                            <span className="block text-xs text-retro-body truncate">{hit.text}</span>
                          </Button>
                        ))
@@ -1463,7 +1463,7 @@ export function GMatchDMs({
                                       another one — it read as if it had landed. */}
                                   {isLast && (
                                     <time className="text-2xs text-retro-muted select-none" dateTime={new Date(msg.timestamp).toISOString()}>
-                                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                      {formatTime(msg.timestamp)}
                                     </time>
                                   )}
                                   {isOwn && msg.courierStatus === 'failed' && (

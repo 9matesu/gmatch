@@ -19,14 +19,11 @@ export const LOBBY_REVEAL_SECONDS = 4;
 export const LOBBY_DECIDE_SECONDS = 45;
 export const LOBBY_ROUND_RESULT_SECONDS = 3;
 
-// Lifecycle cadences: everything is transient by design. All pictures/cards are
-// wiped every few hours, lobby chat is capped at 12 hours (server + client agree,
-// "clears every 12 hours"), and stories last half a day.
-// Lifecycle cadences: everything ephemeral shifts on a 7-hour dynamic cycle.
-// Stories and active lobby images last 7 hours, while cards/portfolios persist eternally.
-// Lobby chat is capped at 12 hours.
+// Lifecycle cadences: lobby images and pictures shift on a 7-hour cycle, while
+// stories last a full day (24h). Cards/portfolios persist eternally. Lobby chat
+// is capped at 12 hours.
 export const PICTURE_WIPE_SECONDS = 7 * 60 * 60;
-export const STORY_TTL_SECONDS = 7 * 60 * 60;
+export const STORY_TTL_SECONDS = 24 * 60 * 60;
 export const PICTURE_TTL_SECONDS = 7 * 60 * 60;
 
 // Special match ladder: a mutual like climbs a level, the third (final) mutual

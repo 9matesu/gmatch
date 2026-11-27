@@ -1,4 +1,5 @@
 import type { FeedPost } from '../../components/feed/GMatchFeed'
+import { getActiveWorldId, namespaceStorageKey } from '../../utils/serverWorlds'
 
 /**
  * Durable snapshot of the last timeline this device read.
@@ -35,7 +36,9 @@ export interface FeedSnapshot {
 }
 
 function scopedKey(orbitId: string): string {
-  return `${KEY}:${orbitId}`
+  // Per world AND per identity: a snapshot read on one server must not show up
+  // as another server's timeline. The default world keeps the global key.
+  return namespaceStorageKey(`${KEY}:${orbitId}`, getActiveWorldId())
 }
 
 function read(orbitId: string): FeedSnapshot | null {

@@ -18,6 +18,8 @@ export interface RoundQueryOptions {
   forceInclude?: string | null
   /** Recent round keys (see roundQueryKey) to avoid repeating. */
   recentKeys?: string[]
+  /** Individual recently-used tags: a theme is rotated out, not just a whole round key. */
+  recentTags?: string[]
   /** Injectable RNG (default Math.random) for deterministic tests. */
   rand?: () => number
   /** Re-roll attempts when the draw collides with recentKeys. */
@@ -28,6 +30,8 @@ export interface RoundQueryOptions {
 export const PILLS_PER_ROUND = 2
 /** Round keys remembered to refuse immediate repeats. */
 export const RECENT_QUERY_DEPTH = 8
+/** Individual tags remembered so one theme cannot dominate consecutive rounds. */
+export const RECENT_TAG_WINDOW = 6
 
 /** Canonical key for a round's picks (order-independent). */
 export function roundQueryKey(picks: string[]): string {
@@ -60,10 +64,12 @@ export function buildRoundQueries(opts: RoundQueryOptions): string[] {
   const forceEligible = forced && pills.includes(forced) ? forced : null
 
   const draw = (): string[] => {
+    // Cold tags first (round-robin), hot tags only when the pool is too small.
+    const recentTags = new Set(opts.recentTags ?? [])
     const rest = shuffled(
-      pills.filter((p) => p !== forceEligible),
+      pills.filter((p) => p !== forceEligible && !recentTags.has(p)),
       rand,
-    )
+    ).concat(shuffled(pills.filter((p) => p !== forceEligible && recentTags.has(p)), rand))
     const out = forceEligible ? [forceEligible] : []
     for (const p of rest) {
       if (out.length >= n) break

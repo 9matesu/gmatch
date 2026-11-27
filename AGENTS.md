@@ -18,6 +18,18 @@ large changes; `docs/DESKTOP.md` covers the exe's runtime internals.
 > (`apps/desktop/electron/blocklistRule.cjs`) pinned against it by a parity
 > test (`apps/desktop/src/game/blocklistParity.test.ts`).
 
+## Model routing (mandatory)
+
+Every dispatched worker, reviewer or doc task runs on a **mixture of free
+models** — never one shared model, which throttles and stalls a whole wave.
+Pick the best model **per job** (CODING vs UI/vision vs REVIEW vs DOCS) and
+spread parallel agents across providers (`kilo`, `crowllm`, `tokenharbor`,
+`anymodel`, `9router`). The full matrix, alternates and stall/recovery rules
+live in `docs/MODEL-ROUTING.md`; pass `--model <id>` to
+`orca orchestration worker-start` and `model` to every subagent call. `HY4` is
+exhausted — never use it. When a model rate-limits or shows no heartbeat for
+~5 min, wait 3–5 min and resume that task on the next alternate.
+
 ## Layout (npm workspaces — there is no root `src/`)
 
 - `apps/desktop/src/` — renderer (Vite + React 19 + Tailwind 4). Import via `@/` → `apps/desktop/src`.

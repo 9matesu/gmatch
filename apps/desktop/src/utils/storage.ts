@@ -1,5 +1,7 @@
 "use client";
 
+import { getActiveWorldId, namespaceStorageKey } from './serverWorlds';
+
 export interface StoredObject {
   id: string
   name: string
@@ -87,7 +89,7 @@ export const MAX_HOLDERS_PER_OBJECT = 8
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (typeof window === 'undefined') return reject(new Error('IndexedDB not available in SSR'))
-    const req = indexedDB.open(DB_NAME, DB_VERSION)
+    const req = indexedDB.open(namespaceStorageKey(DB_NAME, getActiveWorldId()), DB_VERSION)
     req.onupgradeneeded = () => {
       const db = req.result
       if (!db.objectStoreNames.contains(STORE_OBJECTS)) {

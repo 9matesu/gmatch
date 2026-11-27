@@ -109,7 +109,7 @@ export interface GmatchBridge {
   secureGet?: (key: string) => Promise<string | null>
   secureSet?: (key: string, value: string) => Promise<void>
   secureDelete?: (key: string) => Promise<void>
-  serverState?: () => Promise<{ packaged: boolean; mode: 'host' | 'client'; url: string; lanUrls: string[]; nodeOwnerId?: string | null; pausedUrl?: string; pausedReason?: 'legacy' | 'unreachable' }>
+  serverState?: () => Promise<{ packaged: boolean; mode: 'host' | 'client'; url: string; worldId?: string; lanUrls: string[]; nodeOwnerId?: string | null; pausedUrl?: string; pausedReason?: 'legacy' | 'unreachable' }>
   /** Bind this install's first identity as owner; sticky across account switches. */
   claimAdminOwner?: (orbitId: string) => Promise<{ ok: boolean; orbitId?: string; error?: string } | null>
   winMinimize?: () => void
@@ -122,6 +122,8 @@ export interface GmatchBridge {
   appVersion?: () => Promise<string>
   openExternal?: (url: string) => Promise<void>
   serverSet?: (payload: { mode: 'host' | 'client'; url?: string }) => Promise<{ ok: boolean; error?: string }>
+  /** Persist the active world id (per-world client namespace). Best effort. */
+  serverSetWorld?: (worldId: string) => Promise<{ ok: boolean; error?: string }>
   serverRelaunch?: () => Promise<void>
   /** Manual sidecar restart: stop the old child, free :8790, respawn and health-probe. */
   restartSidecar?: () => Promise<{ ok: boolean; error?: string }>

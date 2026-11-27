@@ -131,7 +131,10 @@ export function MediaContextMenu({ ctx, onDismiss, toast, onRepostImage, onSetWa
     },
   });
 
-  if (onRepostImage) {
+  // A keepsake already gets exactly one repost from GALLERY_ACTIONS below
+  // (routed through the gallery bridge). Adding the inline one too showed
+  // "Repost to feed" twice in the same menu.
+  if (onRepostImage && !keepsakeId) {
     actions.push({
       id: 'repost-inline',
       label: 'Repost to feed',

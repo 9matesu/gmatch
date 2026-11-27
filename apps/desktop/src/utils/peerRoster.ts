@@ -1,5 +1,6 @@
 import type { User } from '@orbit/shared'
 import { areUsersStructurallyEqual } from './compare'
+import { getActiveWorldId, namespaceStorageKey } from './serverWorlds'
 
 /**
  * The peer roster — ONE owner for "who is online".
@@ -34,6 +35,12 @@ export const PEER_GHOST_MS = 24 * 60 * 60 * 1000
 
 /** Where the known-peer list is persisted between sessions. */
 export const KNOWN_PEERS_KEY = 'orbit_p2p_known_peers'
+
+/** The persisted key for the ACTIVE world (default world keeps the global key):
+ *  a roster learned on one server must not haunt another. */
+export function knownPeersStorageKey(): string {
+  return namespaceStorageKey(KNOWN_PEERS_KEY, getActiveWorldId())
+}
 
 /** How many peers are persisted. Online first, then the rest. */
 export const MAX_KNOWN_PEERS = 30
@@ -160,7 +167,7 @@ export class PeerRoster {
   private readonly listeners = new Set<(peers: User[]) => void>()
   private snapshot: User[] = []
 
-  constructor(private readonly persistKey: string | null = KNOWN_PEERS_KEY) {}
+  constructor(private readonly persistKey: string | null = knownPeersStorageKey()) {}
 
   /** Subscribe to roster changes. Fires immediately with the current list. */
   subscribe(cb: (peers: User[]) => void): () => void {

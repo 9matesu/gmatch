@@ -104,7 +104,7 @@ export function WatchRoomHeader({ party, identity, profilePics: _profilePics }: 
                 <div className="text-xs font-medium text-retro-fg">Private room</div>
                 <div className="text-xs text-retro-muted">Hidden from the open rooms list. Joining needs a host invite.</div>
               </div>
-              <Switch checked={party.isPrivate} onChange={() => setPartySettings(party.id, { isPrivate: !party.isPrivate })} />
+              <Switch label="Private room" checked={party.isPrivate} onChange={() => setPartySettings(party.id, { isPrivate: !party.isPrivate })} />
             </div>
             {party.isPrivate && (
               <div className="flex items-center justify-between gap-4">
@@ -123,21 +123,21 @@ export function WatchRoomHeader({ party, identity, profilePics: _profilePics }: 
                 <div className="text-xs font-medium text-retro-fg">Lock video changes</div>
                 <div className="text-xs text-retro-muted">Only the host can load or queue videos.</div>
               </div>
-              <Switch checked={party.lockVideo} onChange={() => setPartySettings(party.id, { lockVideo: !party.lockVideo })} />
+              <Switch label="Lock video changes" checked={party.lockVideo} onChange={() => setPartySettings(party.id, { lockVideo: !party.lockVideo })} />
             </div>
             <div className="flex items-center justify-between gap-4">
               <div>
                 <div className="text-xs font-medium text-retro-fg">Shared control</div>
                 <div className="text-xs text-retro-muted">Members can play, pause, seek and manage the queue.</div>
               </div>
-              <Switch checked={party.sharedControl} onChange={() => setPartySettings(party.id, { sharedControl: !party.sharedControl })} />
+              <Switch label="Shared control" checked={party.sharedControl} onChange={() => setPartySettings(party.id, { sharedControl: !party.sharedControl })} />
             </div>
             <div className="flex items-center justify-between gap-4">
               <div>
                 <div className="text-xs font-medium text-retro-fg">Approve suggestions</div>
                 <div className="text-xs text-retro-muted">Member additions wait for host approval.</div>
               </div>
-              <Switch checked={party.requireApproval} onChange={() => setPartySettings(party.id, { requireApproval: !party.requireApproval })} />
+              <Switch label="Approve suggestions" checked={party.requireApproval} onChange={() => setPartySettings(party.id, { requireApproval: !party.requireApproval })} />
             </div>
             <ul className="border-t border-edge pt-2 space-y-1 max-h-52 overflow-y-auto styled-scrollbar">
               <li className="text-2xs uppercase tracking-wider text-retro-muted">Members</li>

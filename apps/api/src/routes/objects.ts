@@ -295,7 +295,7 @@ objects.post('/', orbitAuth, async (c) => {
     const caption = (formData.get('caption') as string | null)?.trim() || null
     const clientContentHash = (formData.get('content_hash') as string | null)?.trim().toLowerCase() || null
 
-    const isStory = formData.get('is_story') === 'true' ? 1 : 0
+    const isStory = (formData.get('is_story') === 'true' || formData.get('is_story') === '1') ? 1 : 0
     const isWallpaper = formData.get('is_wallpaper') === 'true' ? 1 : 0
     const isChat = (formData.get('is_chat') === 'true' || formData.get('is_chat') === '1') ? 1 : 0
     const isAvatar = (formData.get('is_avatar') === 'true' || formData.get('is_avatar') === '1') ? 1 : 0

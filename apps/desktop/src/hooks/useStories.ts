@@ -7,10 +7,25 @@ import { logger } from '../utils/logger'
 const CACHE_KEY = 'orbit_cached_stories'
 const CACHE_CAP = 200
 
+/**
+ * The node stamps stories with a 24h `expires_at`. The boot mirror is
+ * stale-first, so an expired row must not outlive its TTL just because this
+ * device cached it — drop it before it reaches the tray (the node does the
+ * same filter on its own read).
+ */
+export function liveStories(list: OrbitObject[]): OrbitObject[] {
+  const now = Date.now()
+  return list.filter((s) => {
+    if (!s.expires_at) return true
+    const t = new Date(s.expires_at).getTime()
+    return Number.isNaN(t) || t > now
+  })
+}
+
 function readCache(): OrbitObject[] {
   try {
     const saved = localStorage.getItem(CACHE_KEY)
-    return saved ? (JSON.parse(saved) as OrbitObject[]) : []
+    return saved ? liveStories(JSON.parse(saved) as OrbitObject[]) : []
   } catch {
     return []
   }
@@ -45,7 +60,7 @@ export function useStories(identity: OrbitIdentity | null) {
         // A slow earlier reply must never overwrite a newer one, and a reply for
         // another identity must never land in this session's tray.
         if (requestId !== requestRef.current || requestIdentity !== identity.orbitId) return
-        const list = Array.isArray(data) ? data : []
+        const list = liveStories(Array.isArray(data) ? data : [])
         setStories(list)
         try {
           // Cap matches the server's own 200-row ceiling (routes/objects.ts).

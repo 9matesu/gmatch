@@ -183,6 +183,11 @@ async function main() {
   ]
   assert.deepStrictEqual(Object.keys(sidecar).sort(), expected.sort())
 
+  // ---- the install keeps the legacy install id (host mode is one world) ----
+  // An upgrade must still recognize a sidecar an older build left running on
+  // :8790 (else it refuses adoption and spawns a second Bun into EADDRINUSE).
+  assert.strictEqual(sidecar.instanceIdFor(STORAGE_KEY), INSTANCE_ID, 'the legacy install id is unchanged')
+
   Module._load = originalLoad
   globalThis.fetch = originalFetch
   process.resourcesPath = originalResourcesPath

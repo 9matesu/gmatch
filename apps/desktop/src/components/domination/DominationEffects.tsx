@@ -9,7 +9,6 @@ import { cn } from '../../lib/utils';
 import { Button } from '../../ui/kit';
 import { CHROME, COLOR, MOTION, RECIPE, TYPE, WEIGHT } from '../../ui/tokens';
 import { logger } from '../../utils/logger';
-import { useGame } from '../../game/store';
 import { validateDomPayload } from '../../utils/dominationMesh';
 
 interface DominationEvent {
@@ -32,8 +31,6 @@ interface DominationEvent {
     meshId?: string;
     /** Sealed sender display name (mesh path). */
     senderName?: string;
-    /** g$ the victim just earned from the consent cut (server-paid). */
-    victimReward?: number;
   };
   timestamp: string;
 }
@@ -428,18 +425,13 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
           }, identity).catch(() => { });
         }
       }
-
-      if (typeof payload?.victimReward === 'number' && payload.victimReward > 0) {
-        useGame.getState().notify(`Effect from a player. You earned +${payload.victimReward} g$ for putting up with it`);
-      }
     };
 
     window.addEventListener('orbit-domination', handleDomination as EventListener);
     // Mesh inbound (Fase 5/6): sealed dom_request bodies arrive via the
     // courier hook as 'gmatch:domination-mesh-effect'. Reuse the server path
     // 1:1 — same consent gates, same panic pause, same rendering. Only the
-    // id source differs: the mesh request id rides as payload.meshId (no
-    // server actionId, no ledger, no victim payout).
+    // id source differs: the mesh request id rides as payload.meshId.
     const handleMeshEffect = (e: Event) => {
       const d = (e as CustomEvent<{
         action?: string;

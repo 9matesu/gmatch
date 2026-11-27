@@ -6,6 +6,7 @@
 // WITHOUT relaunch) → invalidate caches → notify subscribers. Host-mode
 // transitions still restart (sidecar) and never route through here.
 import { normalizeServerUrl } from './serverUrl'
+import { DEFAULT_WORLD_ID, setActiveWorldId, worldIdForAddress } from './serverWorlds'
 import { isCourierApiUrl, invalidateCache, notifyApiBaseChanged } from './api'
 import { rememberJoin, peekPendingJoin, clearPendingJoin } from './server-join'
 import { SERVER_MARKER_KEY } from '../firstRun/onboardingState'
@@ -17,9 +18,20 @@ export type SwitchResult = 'switched' | 'stale' | 'cancelled' | 'failed'
 // Last-writer-wins across concurrent attempts: only the newest call notifies.
 let commitSeq = 0
 
-export function _resetSwitchSeqForTests(): void { commitSeq = 0 }
+export function _resetSwitchSeqForTests(): void { commitSeq = 0; lastCommittedPrev = null }
 
 const SERVER_COOKIE = 'gmatch_server_url'
+
+/** What a committed client switch replaced, kept so the overlay can undo it. */
+interface PrevWorldSelection {
+  marker: string | null
+  override: string | null
+  cookie: string | null
+  mode: 'host' | 'client'
+  url: string
+}
+
+let lastCommittedPrev: PrevWorldSelection | null = null
 
 function readServerCookie(): string | null {
   try {
@@ -127,6 +139,8 @@ export async function switchClientWorld(
 
   // 4. Atomic commit: snapshot previous persistence so a failed serverSet
   // restores it instead of leaving a half-written selection.
+  let prevState: { mode?: string; url?: string } | null = null
+  try { prevState = (await window.gmatch?.serverState?.()) ?? null } catch { /* no bridge */ }
   const prev = {
     marker: null as string | null,
     override: null as string | null,
@@ -169,7 +183,57 @@ export async function switchClientWorld(
   }
   if (stale()) return 'stale'
 
+  // Persist this world's identity once the node is committed, so per-world
+  // client storage (the directory mirror today; more later) resolves the same
+  // world on every device. Best effort: a world id that fails to write costs
+  // only the namespace, never the switch — the destination is already active.
+  try { await window.gmatch?.serverSetWorld?.(worldIdForAddress(url)) } catch { /* namespace only */ }
+
+  // Remember what this commit replaced: a switch the NEW node never confirms
+  // (the overlay times out) is rolled back to it by the caller.
+  lastCommittedPrev = {
+    marker: prev.marker,
+    override: prev.override,
+    cookie: prev.cookie,
+    mode: prevState?.mode === 'client' ? 'client' : prevState?.mode === 'host' ? 'host' : (prev.override ? 'client' : 'host'),
+    url: prevState?.url || prev.override || '',
+  }
+
   invalidateCache()
   notifyApiBaseChanged(url)
   return 'switched'
+}
+
+/**
+ * Undo the most recent committed client switch (its overlay poll failed). Every
+ * pointer switchClientWorld wrote is restored and the main process re-pointed.
+ * A HOST move never routes through switchClientWorld, so there is nothing to
+ * roll back for host — that is deliberate. Returns false when there was none.
+ */
+export async function rollbackLastClientSwitch(): Promise<boolean> {
+  const prev = lastCommittedPrev
+  lastCommittedPrev = null
+  if (!prev) return false
+  try {
+    if (prev.marker === null) localStorage.removeItem(SERVER_MARKER_KEY)
+    else localStorage.setItem(SERVER_MARKER_KEY, prev.marker)
+    if (prev.override === null) localStorage.removeItem('gmatch.api.url')
+    else localStorage.setItem('gmatch.api.url', prev.override)
+  } catch { /* private mode */ }
+  writeServerCookie(prev.cookie)
+  try {
+    await window.gmatch?.serverSet?.({ mode: prev.mode, url: prev.mode === 'client' ? prev.url : '' })
+  } catch { /* best effort: the pointers above are the reactive path */ }
+  // Restore the world id the failed switch overwrote, so the next boot names
+  // the SAME namespace it left. Hosting is always the default world.
+  if (prev.mode === 'client' && prev.url) {
+    const prevWorld = worldIdForAddress(prev.url)
+    try { await window.gmatch?.serverSetWorld?.(prevWorld) } catch { /* namespace only */ }
+    setActiveWorldId(prevWorld)
+  } else {
+    setActiveWorldId(DEFAULT_WORLD_ID)
+  }
+  invalidateCache()
+  notifyApiBaseChanged(prev.override || '')
+  return true
 }

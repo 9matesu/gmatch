@@ -17,8 +17,17 @@
  * Pure apart from localStorage — unit-tested in `scopedSeen.test.ts`.
  */
 
+import { getActiveWorldId, namespaceStorageKey } from './serverWorlds'
+
+/** The world a key belongs to: chat seen state is per world, and the default
+ *  world keeps the global key so an upgrade never loses its stamps. */
+function worldBase(base: string): string {
+  return namespaceStorageKey(base, getActiveWorldId())
+}
+
 export function scopedStorageKey(base: string, scope?: string | null): string {
-  return scope ? `${base}:${scope}` : base
+  const b = worldBase(base)
+  return scope ? `${b}:${scope}` : b
 }
 
 function readRaw(key: string): string | null {
@@ -60,7 +69,8 @@ export function readScopedJson<T>(base: string, scope: string | null | undefined
     }
   }
   if (!scope) return fallback
-  const legacy = readRaw(base)
+  const legacyKey = worldBase(base)
+  const legacy = readRaw(legacyKey)
   if (legacy === null) return fallback
   let parsed: T
   try {
@@ -69,7 +79,7 @@ export function readScopedJson<T>(base: string, scope: string | null | undefined
     return fallback
   }
   writeRaw(key, legacy)
-  removeRaw(base)
+  removeRaw(legacyKey)
   return parsed
 }
 

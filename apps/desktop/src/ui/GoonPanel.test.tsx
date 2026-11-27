@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import GoonPanel from './GoonPanel'
 import { useGame } from '../game/store'
 import type { BooruPost, GridCell } from '../game/types'
@@ -15,6 +15,24 @@ vi.mock('./CachedImg', () => ({
 }))
 
 vi.mock('../utils/sound', () => ({ playHit: vi.fn() }))
+vi.mock('../utils/sounds', () => ({ playHit: vi.fn(), playPress: vi.fn() }))
+
+const mocks = vi.hoisted(() => ({
+  redeemShards: vi.fn(),
+  getCurrentIdentity: vi.fn(),
+  cachedImageFor: vi.fn<(url: string) => string | undefined>(() => undefined),
+}))
+vi.mock('../services/shardRedeem', () => ({ redeemShards: mocks.redeemShards }))
+vi.mock('../hooks/useIdentity', () => ({ getCurrentIdentity: mocks.getCurrentIdentity }))
+vi.mock('../services/imageCache', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('../services/imageCache')>()
+  return {
+    ...mod,
+    cachedImageFor: mocks.cachedImageFor,
+    prefetchImages: vi.fn(),
+    resolveImage: vi.fn(async () => undefined),
+  }
+})
 
 beforeEach(() => {
   // useReducedMotion reads matchMedia; jsdom ships none.
@@ -238,5 +256,264 @@ describe('GoonPanel click feedback', () => {
         .map((n) => Number((n as HTMLElement).style.opacity))
     expect(washIn(fresh)).toHaveLength(0)
     expect(Math.max(0, ...washIn(hurt))).toBeGreaterThan(0.5)
+  })
+})
+
+/** A real press on the stage (scores on pointerdown, per SPEC §7). */
+function press(el: Element) {
+  act(() => {
+    el.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+  })
+}
+
+describe('GoonPanel gacha hit sequence', () => {
+  beforeEach(() => {
+    mocks.redeemShards.mockReset()
+    mocks.getCurrentIdentity.mockReset()
+    mocks.cachedImageFor.mockReset()
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockImplementation(() => ({
+        matches: false,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      })),
+    )
+    useGame.setState({
+      viewMode: '1x1',
+      current: post('gacha-foe'),
+      foeHp: 100,
+      foeMaxHp: 100,
+      grid: [],
+      clicks: 0,
+      crits: 0,
+      points: 0,
+      shards: 0,
+      gallery: [],
+      tags: [],
+      userExcludes: [],
+      pendingDrops: [],
+      heatStreak: 0,
+      lastClickAt: 0,
+      feedOffline: false,
+      fetching: false,
+      queue: [],
+      defeated: 0,
+    } as never)
+  })
+
+  it('flashes the picture white with a hit-proportional peak and restarts per hit', () => {
+    const { container } = render(<GoonPanel />)
+    const img = container.querySelector('img[alt="goon feed"]')!
+    fireEvent.load(img)
+    const stage = container.querySelector('button[aria-label="Attack the current foe"]')!
+
+    press(stage)
+    expect(useGame.getState().clicks).toBe(1)
+    const first = container.querySelector('[data-testid="goon-white-flash"]') as HTMLElement
+    expect(first).toBeTruthy()
+    const peak = Number(first.style.getPropertyValue('--gg-flash-peak'))
+    expect(peak).toBeGreaterThan(0)
+    expect(peak).toBeLessThanOrEqual(0.85)
+    const firstName = first.className
+
+    press(stage)
+    const second = container.querySelector('[data-testid="goon-white-flash"]') as HTMLElement
+    expect(second).toBeTruthy()
+    expect(second.className).not.toBe(firstName)
+    // The white flash never remounts the art it plays over.
+    expect(container.querySelector('img[alt="goon feed"]')).toBe(img)
+  })
+
+  it('shakes the media element itself, not an empty overlay', () => {
+    const { container } = render(<GoonPanel />)
+    const img = container.querySelector('img[alt="goon feed"]')!
+    fireEvent.load(img)
+    const stage = container.querySelector('button[aria-label="Attack the current foe"]')!
+
+    press(stage)
+    expect(img.className).toMatch(/animate-\[gg-shake-[ab]/)
+    const firstName = img.className
+    press(stage)
+    expect(img.className).not.toBe(firstName)
+    expect(container.querySelector('img[alt="goon feed"]')).toBe(img)
+  })
+
+  it('reveals the KO shard GAIN and only the fresh drop, not a stale one', () => {
+    useGame.setState({
+      foeHp: 1,
+      foeMaxHp: 100,
+      // Lifetime total is NOT what this KO earned: only the +1 delta is shown.
+      shards: 1000,
+      defeated: 4,
+      pendingDrops: [{ id: 'drop:stale', foeTitle: 'stale', tags: ['old_a', 'old_b', 'old_c'], timestamp: 1 }],
+      current: { ...post('gacha-foe'), tags: ['blonde'] },
+    } as never)
+    const { container } = render(<GoonPanel />)
+    fireEvent.load(container.querySelector('img[alt="goon feed"]')!)
+    const stage = container.querySelector('button[aria-label="Attack the current foe"]')!
+
+    press(stage)
+    expect(container.querySelector('[data-testid="gacha-dissolve"]')).toBeTruthy()
+    const reveal = screen.getByTestId('gacha-reveal')
+    expect(reveal.textContent).toMatch(/Common|Copper|Silver|Gold|Diamond/)
+    expect(reveal.textContent).toContain('1 shard')
+    expect(reveal.textContent).not.toContain('1000 shards')
+    expect(reveal.textContent).toContain('1 tag')
+    expect(reveal.textContent).not.toContain('3 tags')
+  })
+
+  it('shows no drop count when the KO produced no new drop', () => {
+    useGame.setState({
+      foeHp: 1,
+      foeMaxHp: 100,
+      pendingDrops: [{ id: 'drop:stale', foeTitle: 'stale', tags: ['old_a'], timestamp: 1 }],
+      current: { ...post('gacha-foe'), tags: [] },
+    } as never)
+    const { container } = render(<GoonPanel />)
+    fireEvent.load(container.querySelector('img[alt="goon feed"]')!)
+    press(container.querySelector('button[aria-label="Attack the current foe"]')!)
+    expect(screen.getByTestId('gacha-reveal').textContent).not.toMatch(/tag/)
+  })
+
+  it('dissolves from the cached bytes with no referrer', () => {
+    mocks.cachedImageFor.mockImplementation((url) => url.includes('dissolve-foe') ? 'gmcache://dissolved' : undefined)
+    useGame.setState({ foeHp: 1, foeMaxHp: 100, current: post('dissolve-foe') } as never)
+    const { container } = render(<GoonPanel />)
+    fireEvent.load(container.querySelector('img[alt="goon feed"]')!)
+    press(container.querySelector('button[aria-label="Attack the current foe"]')!)
+    const dissolve = container.querySelector('[data-testid="gacha-dissolve"]')!
+    expect(dissolve.getAttribute('src')).toBe('gmcache://dissolved')
+    expect(dissolve.getAttribute('referrerpolicy')).toBe('no-referrer')
+  })
+
+  it('uses the gold rarity token on a Gold chip', () => {
+    useGame.setState({ current: post('gold-foe'), foeHp: 100, foeMaxHp: 100, gallery: [], foeClicks: 0 } as never)
+    render(<GoonPanel />)
+    const chip = screen.getByTestId('foe-rarity')
+    expect(chip.textContent).toBe('Gold')
+    expect(chip.className).toContain('text-rarity-gold')
+  })
+
+  it('banks the KO click in the displayed rarity at a tier boundary', () => {
+    // 'foe-1' has base 478: 478+1021 = 1499 (Silver), +1 = 1500 (Gold).
+    useGame.setState({ current: post('foe-1'), foeHp: 100, foeMaxHp: 100, gallery: [], foeClicks: 1021 } as never)
+    render(<GoonPanel />)
+    expect(screen.getByTestId('foe-rarity').textContent).toBe('Gold')
+  })
+
+  it('gives every grid square its own boss name, rarity chip and aligned HP bar', () => {
+    const named = (id: string): BooruPost => ({ ...post(id), tags: ['blonde_girl'] })
+    useGame.setState({
+      viewMode: '1x2',
+      gallery: [],
+      grid: [
+        { post: named('b1'), hp: 100, maxHp: 100, clicks: 0 },
+        { post: named('b2'), hp: 25, maxHp: 100, clicks: 0 },
+      ] as never,
+    } as never)
+    render(<GoonPanel />)
+    const first = screen.getByRole('button', { name: /Foe 1:/ })
+    const second = screen.getByRole('button', { name: /Foe 2:/ })
+    expect(first.querySelector('[data-testid="foe-name"]')!.textContent).toBe('blonde girl')
+    expect(first.querySelector('[data-testid="foe-rarity"]')!.textContent).toMatch(
+      /Common|Copper|Silver|Gold|Diamond/,
+    )
+    const fill = (b: HTMLElement) =>
+      (b.querySelector('[data-testid="foe-hp-fill"]') as HTMLElement).style.width
+    expect(fill(first)).toBe('100%')
+    expect(fill(second)).toBe('25%')
+  })
+
+  it('shows a compact HUD read from real points, shards and heat', () => {
+    useGame.setState({ points: 999, shards: 7, heatStreak: 12, lastClickAt: Date.now() } as never)
+    render(<GoonPanel />)
+    const hud = screen.getByTestId('clicker-hud')
+    expect(hud.textContent).toContain('999')
+    expect(hud.textContent).toContain('7 shards')
+    expect(hud.textContent).toContain('x1.25')
+  })
+
+  it('offers real cap purchases in one compact row', () => {
+    useGame.setState({ points: 200, caps: [], capsUsed: [] } as never)
+    render(<GoonPanel />)
+    const buy = screen.getByRole('button', { name: /Buy E-Girl Spit/ })
+    fireEvent.click(buy)
+    expect(useGame.getState().points).toBe(50)
+    expect(useGame.getState().caps).toHaveLength(1)
+  })
+
+  it('skips all hit animation under prefers-reduced-motion but still scores', () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockImplementation(() => ({
+        matches: true,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      })),
+    )
+    useGame.setState({ foeHp: 1, foeMaxHp: 100 } as never)
+    const before = useGame.getState().defeated
+    const { container } = render(<GoonPanel />)
+    fireEvent.load(container.querySelector('img[alt="goon feed"]')!)
+    const stage = container.querySelector('button[aria-label="Attack the current foe"]')!
+    press(stage)
+    expect(container.querySelector('[data-testid="goon-white-flash"]')).toBeNull()
+    expect(container.querySelector('[data-testid="gacha-dissolve"]')).toBeNull()
+    expect(useGame.getState().defeated).toBe(before + 1)
+  })
+
+  it('scores a grid square once on click (mouse or keyboard), never on a drag', () => {
+    // Exactly fill a 1x2 board so the grid top-up effect leaves it alone.
+    useGame.setState({ viewMode: '1x2', grid: [cell('g1', 100, 100), cell('g2', 100, 100)], clicks: 0 } as never)
+    render(<GoonPanel />)
+    const tile = screen.getByRole('button', { name: /Foe 1:/ })
+    tile.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
+    expect(useGame.getState().clicks).toBe(1)
+    tile.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 }))
+    expect(useGame.getState().clicks).toBe(2)
+  })
+
+  it('does not score the press that starts a tile drag', () => {
+    useGame.setState({ viewMode: '1x2', grid: [cell('g1', 100, 100), cell('g2', 100, 100)], clicks: 0 } as never)
+    render(<GoonPanel />)
+    const tile = screen.getByRole('button', { name: /Foe 1:/ })
+    const dataTransfer = { setData: vi.fn(), getData: vi.fn(() => '0'), effectAllowed: '', dropEffect: '' }
+    // Real browser order: pointerdown -> pointermove -> dragstart -> dragend.
+    // A drag produces no click, so a click-only tile cannot score it.
+    press(tile)
+    fireEvent.pointerMove(tile)
+    fireEvent.dragStart(tile, { dataTransfer })
+    fireEvent.dragEnd(tile, { dataTransfer })
+    expect(useGame.getState().clicks).toBe(0)
+    fireEvent.click(tile)
+    expect(useGame.getState().clicks).toBe(1)
+  })
+
+  it('spends only the shards the node took and reports the real g$ grant', async () => {
+    useGame.setState({ shards: 2000 } as never)
+    mocks.getCurrentIdentity.mockReturnValue({ orbitId: 'me' } as never)
+    mocks.redeemShards.mockResolvedValueOnce({
+      ok: true, grantedG: 7, shardsSpent: 1000, balance: 7, remaining24h: 4, nextRedeemAt: 'later',
+    })
+    render(<GoonPanel />)
+    await act(async () => { fireEvent.click(screen.getByTestId('redeem-shards')) })
+    expect(mocks.redeemShards).toHaveBeenCalledWith({ orbitId: 'me' }, 1000)
+    expect(useGame.getState().shards).toBe(1000)
+    expect(useGame.getState().toasts.at(-1)?.msg).toContain('+7 g$ credited')
+  })
+
+  it('never spends shards on a cooldown and shows the real reason', async () => {
+    useGame.setState({ shards: 1000 } as never)
+    mocks.getCurrentIdentity.mockReturnValue({ orbitId: 'me' } as never)
+    mocks.redeemShards.mockResolvedValueOnce({
+      ok: false, grantedG: 0, shardsSpent: 0, balance: 0, remaining24h: 0,
+      nextRedeemAt: 'later', error: 'Shard redemption is cooling down', retryAfterMs: 5000,
+    })
+    render(<GoonPanel />)
+    await act(async () => { fireEvent.click(screen.getByTestId('redeem-shards')) })
+    expect(useGame.getState().shards).toBe(1000)
+    expect(useGame.getState().toasts.at(-1)?.msg).toContain('cooling down')
+    expect(useGame.getState().toasts.at(-1)?.msg).toContain('Retry in 5s')
   })
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { switchClientWorld, _resetSwitchSeqForTests } from './server-switch'
+import { switchClientWorld, rollbackLastClientSwitch, _resetSwitchSeqForTests } from './server-switch'
 import { SERVER_MARKER_KEY } from '../firstRun/onboardingState'
 
 const TARGET = { name: 'Budega', endpointHint: '192.168.0.42:8790' }
@@ -92,6 +92,26 @@ describe('switchClientWorld', () => {
     expect(out).toBe('failed')
     expect(cookie.value).toContain(encodeURIComponent(oldUrl))
     expect(cookie.value).not.toContain(encodeURIComponent(URL))
+  })
+
+  it('rolls a committed client switch back to the previous world', async () => {
+    storage.set('gmatch.api.url', 'http://old:8790')
+    storage.set(SERVER_MARKER_KEY, 'http://old:8790')
+    const serverSet = vi.fn(async (_payload: { mode: string; url: string }) => ({ ok: true }))
+    vi.stubGlobal('window', {
+      gmatch: { serverSet, serverState: async () => ({ mode: 'host', url: 'http://127.0.0.1:8790' }) },
+      dispatchEvent: vi.fn(),
+    })
+    expect(await switchClientWorld(TARGET, { toast: vi.fn(), fetchImpl: okFetch() })).toBe('switched')
+    expect(storage.get('gmatch.api.url')).toBe(URL)
+
+    expect(await rollbackLastClientSwitch()).toBe(true)
+    expect(storage.get('gmatch.api.url')).toBe('http://old:8790')
+    expect(storage.get(SERVER_MARKER_KEY)).toBe('http://old:8790')
+    // The main process is re-pointed at the world we left (host → no url).
+    expect(serverSet.mock.calls[serverSet.mock.calls.length - 1][0]).toEqual({ mode: 'host', url: '' })
+    // Nothing left to undo.
+    expect(await rollbackLastClientSwitch()).toBe(false)
   })
 
   it('concurrent attempts: only the newest notifies', async () => {

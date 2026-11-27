@@ -25,6 +25,15 @@ const PORT = Number(process.env.GMATCH_API_PORT || 8790)
 const HOST_URL = `http://127.0.0.1:${PORT}`
 /** Persisted client pointers are bare http(s)://host[:port] (no path). */
 const CLIENT_URL_RE = /^https?:\/\/[\w.-]+(:\d+)?$/
+/** The install's own default world; its data lives at the userData root. */
+const DEFAULT_WORLD_ID = 'official'
+
+/** A named (non-default) world id is an opaque token the RENDERER namespaces
+ *  its caches with — hosting is always the legacy userData root, so the id
+ *  never becomes a filesystem path. Any non-empty string is accepted. */
+function isWorldId(value) {
+  return typeof value === 'string' && value.trim().length > 0
+}
 
 const {
   normalizeServerUrl,
@@ -50,14 +59,18 @@ function readRawConfig() {
   }
 }
 
-/** @returns {{mode:'host'|'client', url:string, pausedUrl?:string, pausedReason?:'legacy'|'unreachable'}} */
+/** @returns {{mode:'host'|'client', url:string, worldId?:string, pausedUrl?:string, pausedReason?:'legacy'|'unreachable'}} */
 function readServerMode() {
   // Env override first (QA / power users).
   const envUrl = normalizeServerUrl(process.env.GMATCH_SERVER_URL)
   if (envUrl) return { mode: 'client', url: envUrl }
 
   const raw = readRawConfig()
-  const localHost = { mode: 'host', url: HOST_URL }
+  const worldId = raw && isWorldId(raw.worldId) ? raw.worldId : DEFAULT_WORLD_ID
+  // Only a NON-default world is named in the result: the default install keeps
+  // the exact legacy shape, so nothing downstream has to change for it.
+  const world = worldId === DEFAULT_WORLD_ID ? {} : { worldId }
+  const localHost = { mode: 'host', url: HOST_URL, ...world }
   if (!raw || raw.mode !== 'client') return localHost
   if (!CLIENT_URL_RE.test(raw.url || '')) return localHost
 
@@ -71,16 +84,42 @@ function readServerMode() {
   if (raw.paused === true || isLegacyClientConfig(raw)) {
     return { ...localHost, pausedUrl: url, pausedReason: pauseReasonOf(raw) }
   }
-  return { mode: 'client', url }
+  return { mode: 'client', url, ...world }
 }
 
-function writeServerMode(mode, url) {
+function writeServerMode(mode, url, worldId = DEFAULT_WORLD_ID) {
   if (mode !== 'host' && mode !== 'client') throw new Error('mode must be host|client')
   if (mode === 'client' && !CLIENT_URL_RE.test(url || '')) {
     throw new Error('url must be http(s)://host[:port]')
   }
+  const id = isWorldId(worldId) ? worldId : DEFAULT_WORLD_ID
   fs.mkdirSync(path.dirname(configPath()), { recursive: true })
-  fs.writeFileSync(configPath(), JSON.stringify({ mode, url: url || '', v: CONFIG_VERSION }))
+  // The default world omits the field entirely, so an ordinary install's
+  // config file stays byte-for-byte what it always was.
+  const world = id === DEFAULT_WORLD_ID ? {} : { worldId: id }
+  fs.writeFileSync(configPath(), JSON.stringify({ mode, url: url || '', v: CONFIG_VERSION, ...world }))
+}
+
+/** The active world id alone (host or client), defaulting to the local world. */
+function readWorldId() {
+  const raw = readRawConfig()
+  return raw && isWorldId(raw.worldId) ? raw.worldId : DEFAULT_WORLD_ID
+}
+
+/**
+ * Record the active world id for a COMMITTED CLIENT world. Hosting is one world
+ * (the legacy userData root), so a world id only ever describes a client
+ * destination the renderer namespaces its caches with: refuse when the stored
+ * mode is not `client`, so a stale call can never tag the host world.
+ */
+function writeWorldId(worldId) {
+  if (!isWorldId(worldId)) throw new Error('worldId must be a non-empty string')
+  const raw = readRawConfig()
+  if (!raw || raw.mode !== 'client') throw new Error('only a client world carries a world id')
+  const url = raw.url || ''
+  const world = worldId === DEFAULT_WORLD_ID ? {} : { worldId }
+  fs.mkdirSync(path.dirname(configPath()), { recursive: true })
+  fs.writeFileSync(configPath(), JSON.stringify({ mode: 'client', url, v: CONFIG_VERSION, ...world }))
 }
 
 /**
@@ -149,7 +188,9 @@ async function revalidateServerMode({ fetchImpl } = {}) {
   ])
   if (!unchanged()) return raced()
   if (answered) {
-    writeServerMode('client', url)
+    // Preserve the world id: rejoining the same node is the same world, so its
+    // per-world client namespace must survive the restart.
+    writeServerMode('client', url, raw.worldId)
     return null
   }
   pauseServerMode(url, 'unreachable')
@@ -177,10 +218,13 @@ function lanUrls() {
 module.exports = {
   readServerMode,
   writeServerMode,
+  readWorldId,
+  writeWorldId,
   pauseServerMode,
   revalidateServerMode,
   probeServer,
   lanUrls,
   isDecommissionedUrl,
+  DEFAULT_WORLD_ID,
   PORT,
 }

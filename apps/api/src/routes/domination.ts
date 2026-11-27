@@ -2,7 +2,6 @@ import { Hono } from 'hono'
 import { D1Turso } from '../db'
 import { orbitAuth } from '../middleware/auth'
 import { logAdminAction } from '../admin-audit'
-import { EconomyService } from '../economy'
 
 import { isDefaultPeerName } from '@orbit/shared'
 
@@ -73,27 +72,6 @@ domination.put('/settings', async (c) => {
   return c.json({ success: true })
 })
 
-/**
- * Domination economy: every action costs g$ from the authoritative ledger
- * (plan D4 — one wallet), and the victim is paid a consent cut. Costs scale
- * with intrusiveness; camera is the priciest and pays the victim most.
- */
-export const DOMINATION_PRICES: Record<string, { cost: number; victimCut: number }> = {
-  wallpaper: { cost: 250, victimCut: 0.4 },
-  game_bg: { cost: 250, victimCut: 0.4 },
-  text_overlay: { cost: 400, victimCut: 0.4 },
-  message: { cost: 500, victimCut: 0.4 },
-  blur: { cost: 800, victimCut: 0.5 },
-  popup_video: { cost: 1200, victimCut: 0.5 },
-  camera: { cost: 2500, victimCut: 0.6 },
-}
-
-/** GET /api/domination/prices - Public cost table (UI shows prices pre-purchase). */
-domination.get('/prices', async (c) => {
-  const prices: Record<string, number> = {}
-  for (const [action, p] of Object.entries(DOMINATION_PRICES)) prices[action] = p.cost
-  return c.json({ prices })
-})
 /** POST /api/domination/trigger - Trigger a domination action on a target user */
 domination.post('/trigger', async (c) => {
   const dominatorId = c.get('orbitId')
@@ -126,14 +104,13 @@ domination.post('/trigger', async (c) => {
   if (!victim) return c.json({ error: 'Target user not found' }, 404)
   if (!victim.pc_domination_enabled) return c.json({ error: 'Target has not enabled PC Domination' }, 403)
 
-  // Fire-and-forget over WS means an offline victim silently eats the fee —
-  // refuse before charging anything instead.
+  // Fire-and-forget over WS: an offline victim would never see the effect.
   const lastSeenMs = victim.last_seen ? Date.parse(victim.last_seen) : 0
   if (Date.now() - lastSeenMs > 10 * 60_000) {
-    return c.json({ error: 'They are offline right now. Nothing was charged' }, 409)
+    return c.json({ error: 'They are offline right now' }, 409)
   }
 
-  // Per-action cooldown so a funded account cannot spam one player's screen.
+  // Per-action cooldown so nobody can spam one player's screen.
   const recent = await db.prepare(`
     SELECT COUNT(*) as n FROM DominationActions
     WHERE dominator_id = ? AND victim_id = ? AND action = ? AND created_at > ?
@@ -166,28 +143,8 @@ domination.post('/trigger', async (c) => {
     if (payload) payload.isPublic = false
   }
 
-  const pricing = DOMINATION_PRICES[action]
-  if (!pricing) return c.json({ error: `No price for action ${action}` }, 400)
-
   const actionId = crypto.randomUUID()
   const nowIso = new Date().toISOString()
-
-  // Pay first: a dominator with an empty wallet cannot dominate anyone.
-  // Idempotency key = actionId, so a retried trigger never double-charges.
-  const economy = new EconomyService(db)
-  try {
-    await economy.debit(dominatorId, pricing.cost, {
-      idempotencyKey: `dom-${actionId}`,
-      kind: 'purchase',
-      reference: `domination:${action}`,
-    })
-  } catch (err: any) {
-    const msg = String(err?.message || '').toLowerCase()
-    if (msg.includes('insufficient') || msg.includes('balance')) {
-      return c.json({ error: `Not enough g$ — ${action} costs ${pricing.cost} g$`, cost: pricing.cost }, 402)
-    }
-    throw err
-  }
 
   try {
     await db.prepare(`
@@ -195,29 +152,8 @@ domination.post('/trigger', async (c) => {
       VALUES (?, ?, ?, ?, ?, 'sent', ?)
     `).bind(actionId, dominatorId, targetId, action, payload ? JSON.stringify(payload) : null, nowIso).run()
   } catch (err) {
-    // Never keep the money when the action was not recorded.
-    await economy.credit(dominatorId, pricing.cost, {
-      idempotencyKey: `dom-refund-${actionId}`,
-      kind: 'refund',
-      reference: `domination-refund:${action}`,
-    }).catch(() => { /* ledger alert below */ })
-    console.error('[domination] insert failed, refunded', err)
-    return c.json({ error: 'Could not record the action. Your g$ were refunded' }, 500)
-  }
-
-  // Consent cut FIRST: the victim earns a share of the fee for hosting the
-  // chaos, and the WS event carries the amount so the UI can celebrate it.
-  const victimReward = Math.round(pricing.cost * pricing.victimCut)
-  let paidVictim = false
-  try {
-    await economy.credit(targetId, victimReward, {
-      idempotencyKey: `dom-pay-${actionId}`,
-      kind: 'reward',
-      reference: `domination-victim:${action}`,
-    })
-    paidVictim = true
-  } catch (err) {
-    console.warn('[domination] victim payout failed:', err)
+    console.error('[domination] insert failed', err)
+    return c.json({ error: 'Could not record the action' }, 500)
   }
 
   const { broadcastToUser } = await import('../ws-bus')
@@ -225,13 +161,13 @@ domination.post('/trigger', async (c) => {
     type: 'domination',
     action,
     from: dominatorId,
-    payload: { ...payload, actionId, intensity, victimReward: paidVictim ? victimReward : 0 },
+    payload: { ...payload, actionId, intensity },
     timestamp: nowIso
   })
 
   await logAdminAction(db, dominatorId, `domination_${action}`, { id: targetId, type: 'domination_target' }, JSON.stringify(payload))
 
-  return c.json({ success: true, actionId, cost: pricing.cost, victimReward: paidVictim ? victimReward : 0 })
+  return c.json({ success: true, actionId })
 })
 
 /** GET /api/domination/targets - Get list of users with domination enabled and their consent flags */

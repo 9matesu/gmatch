@@ -4,7 +4,7 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import { Heart, Flag, X, CornerDownRight } from 'lucide-react';
 import { playMsgReceive } from '../../utils/sounds';
 import { resolveMediaUrl } from '../../utils/media';
-import { timeAgo } from '../../utils/timeAgo';
+import { formatRelativeDate } from '../../utils/formatDate';
 import { Linkify } from '../Linkify';
 import type { FeedPost, PostComment } from './GMatchFeed';
 
@@ -118,7 +118,7 @@ export function PostComments({
             ) : (
               <span className="text-xs font-bold text-retro-fg">{c.author_name}</span>
             )}
-            <span className="text-2xs text-retro-muted">{timeAgo(c.created_at)}</span>
+            <span className="text-2xs text-retro-muted">{formatRelativeDate(c.created_at)}</span>
             {c.pending && <span className="text-2xs text-retro-muted italic">sending…</span>}
           </div>
           <p className="text-xs text-retro-body mt-0.5 leading-relaxed">

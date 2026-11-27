@@ -48,10 +48,10 @@ describe('community invite', () => {
   it('only opens http(s) links', () => {
     const open = vi.fn()
     vi.stubGlobal('window', { open })
-    openCommunityInvite('https://discord.gg/Xkqb6U4Na')
+    openCommunityInvite('https://discord.gg/BBCmAQs6x')
     openCommunityInvite('javascript:alert(1)')
     expect(open).toHaveBeenCalledTimes(1)
-    expect(open).toHaveBeenCalledWith('https://discord.gg/Xkqb6U4Na', '_blank', 'noopener,noreferrer')
+    expect(open).toHaveBeenCalledWith('https://discord.gg/BBCmAQs6x', '_blank', 'noopener,noreferrer')
     vi.unstubAllGlobals()
   })
 })

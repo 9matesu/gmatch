@@ -39,6 +39,7 @@ export function ProfileView({
   onOpenNetwork,
   shareGroups,
   onEditPost,
+  onRepostPost,
 }: {
   identity: OrbitIdentity | null;
   myUser: User | undefined;
@@ -76,6 +77,8 @@ export function ProfileView({
   shareGroups: { id: string; name: string; member_count: number }[];
   /** Edit the caption of an own post. The caller owns the request + the toast. */
   onEditPost?: (post: FeedPost) => void;
+  /** Repost from a profile text card (gated: no handler, no repost row). */
+  onRepostPost?: (post: FeedPost) => void;
 }) {
   return (
     <div className="p-4 sm:p-6 w-full max-w-3xl mx-auto">
@@ -142,6 +145,7 @@ export function ProfileView({
         profileTags={myProfile.tags}
         toast={toast}
         onEditPost={onEditPost}
+        onRepostPost={onRepostPost}
       />
     </div>
   );

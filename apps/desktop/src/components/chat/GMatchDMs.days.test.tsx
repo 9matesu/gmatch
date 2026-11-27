@@ -124,6 +124,15 @@ describe('chat day separators', () => {
     expect(screen.getByText('body b')).toBeDefined()
   })
 
+  it('an old day separator is English, not the device locale', () => {
+    const old = new Date(2026, 4, 20, 12, 0, 0).getTime()
+    render(<GMatchDMs {...baseProps({ pmMessages: [msg('a', old)] })} />)
+    const sep = screen.getByTestId('chat-day-separator')
+    expect(sep.textContent).toContain('May 20, 2026')
+    expect(sep.textContent).not.toMatch(/de Mai|20 de/)
+    expect(sep.getAttribute('aria-label')).toBe('Messages from May 20, 2026')
+  })
+
   it('a future-dated message (clock skew) does not say "-1 days ago"', () => {
     const now = new Date()
     render(<GMatchDMs {...baseProps({ pmMessages: [msg('a', now.getTime() + 60_000)] })} />)

@@ -18,9 +18,24 @@ export interface SaveData {
   clickCount: number
   critCount: number
   shards: number
+  /**
+   * Lifetime shards ever EARNED (KO + idle + Brainmelt). `shards` is a current
+   * balance a redemption spends, so "never relocks" reads this instead.
+   */
+  totalShardsEarned: number
+  /** Lifetime idle shards banked — bounds the passive trickle across relaunches. */
+  idleShardsEarned: number
+  /** Sub-shard clock residue, persisted so a relaunch does not restart it. */
+  idleCarryMs: number
+  /** Lifetime free custom-tag picks — deleting a tag never refunds a pick. */
+  freePicksUsed: number
+  /** Global tag purchases — each one nudges every future tag price up. */
+  purchases: number
   prestigeCount: number
   tags: OwnedTag[]
   gallery: GalleryImage[]
+  /** Lifetime keepsakes ever added to the gallery (never drops on delete). */
+  totalGallerySaved: number
   caps: ActiveCap[]
   capsUsed: CapId[]
   achievements: string[]
@@ -51,9 +66,15 @@ export function defaultSave(now = Date.now()): SaveData {
     clickCount: 0,
     critCount: 0,
     shards: 0,
+    totalShardsEarned: 0,
+    idleShardsEarned: 0,
+    idleCarryMs: 0,
+    freePicksUsed: 0,
+    purchases: 0,
     prestigeCount: 0,
     tags: [],
     gallery: [],
+    totalGallerySaved: 0,
     caps: [],
     capsUsed: [],
     achievements: [],
@@ -97,6 +118,22 @@ export function deserialize(raw: string | null | undefined): SaveData | null {
   const num = (v: unknown, fallback: number): number =>
     typeof v === 'number' && Number.isFinite(v) ? v : fallback
   const arr = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : [])
+  // Lifetime counters are new; a save that predates them carries no value, so
+  // floor at the best evidence it has (the current balance/size) to keep an
+  // earned badge from relocking on upgrade. A save that ALREADY carries them is
+  // authoritative — the store keeps them >= the balance/size, and trusting a
+  // present value keeps a round trip exact.
+  const shards = num(d.shards, 0)
+  const idleShardsEarned = num(d.idleShardsEarned, 0)
+  const gallery = arr<GalleryImage>(d.gallery).map(migrateGalleryImage)
+  const totalShardsEarned =
+    typeof d.totalShardsEarned === 'number' && Number.isFinite(d.totalShardsEarned)
+      ? d.totalShardsEarned
+      : Math.max(shards, idleShardsEarned)
+  const totalGallerySaved =
+    typeof d.totalGallerySaved === 'number' && Number.isFinite(d.totalGallerySaved)
+      ? d.totalGallerySaved
+      : gallery.length
   return {
     version: SAVE_VERSION,
     // Legacy saves carry gp/gc/totalEarnedGP/totalEarnedGc — same value, renamed.
@@ -105,10 +142,16 @@ export function deserialize(raw: string | null | undefined): SaveData | null {
     xp: num(d.xp, 0),
     clickCount: num(d.clickCount, 0),
     critCount: num(d.critCount, 0),
-    shards: num(d.shards, 0),
+    shards,
+    totalShardsEarned,
+    idleShardsEarned,
+    idleCarryMs: num(d.idleCarryMs, 0),
+    freePicksUsed: num(d.freePicksUsed, 0),
+    purchases: num(d.purchases, 0),
     prestigeCount: num(d.prestigeCount, 0),
     tags: arr<OwnedTag>(d.tags),
-    gallery: arr<GalleryImage>(d.gallery).map(migrateGalleryImage),
+    gallery,
+    totalGallerySaved,
     caps: arr<ActiveCap>(d.caps),
     capsUsed: arr<CapId>(d.capsUsed),
     achievements: arr<string>(d.achievements),
@@ -171,8 +214,3 @@ function sanitizeCustomSources(v: unknown): CustomSource[] {
   }
   return out
 }
-
-/**
- * Offline earnings = elapsed * pts/s * 25%, capped at 8h (SPEC §11).
- * elapsedMs is clamped to [0, capMs].
- */

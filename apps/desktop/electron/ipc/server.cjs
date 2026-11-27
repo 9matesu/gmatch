@@ -20,6 +20,9 @@ function readOwner(app) {
 module.exports = function registerServerHandlers({ ipcMain, app, serverMode, apiSidecar, secureKV }) {
   ipcMain.handle('server:state', () => ({
     packaged: app.isPackaged,
+    // The active world id (default install = "official"). The renderer uses it
+    // to namespace per-world client storage and to know which world is live.
+    worldId: serverMode.readWorldId(),
     // Public identifier only — never a credential. The console PIN stays in
     // the main process / node as a scrypt hash.
     nodeOwnerId: readOwner(app),
@@ -43,7 +46,8 @@ module.exports = function registerServerHandlers({ ipcMain, app, serverMode, api
     }
   })
   // Persist host/client choice + hand the renderer the fresh state. Switching
-  // takes effect on next launch (relaunch button in Settings does that).
+  // takes effect on next launch (relaunch button in Settings does that). The
+  // client world id is written separately by `server:set-world` (switchClientWorld).
   ipcMain.handle('server:set', (_event, payload) => {
     const mode = payload?.mode === 'client' ? 'client' : 'host'
     try {
@@ -52,6 +56,16 @@ module.exports = function registerServerHandlers({ ipcMain, app, serverMode, api
       return { ok: false, error: err.message }
     }
     return { ok: true }
+  })
+  // Record the active CLIENT world id (written by switchClientWorld right after
+  // it commits a node). Hosting is one world, so writeWorldId refuses otherwise.
+  ipcMain.handle('server:set-world', (_event, worldId) => {
+    try {
+      serverMode.writeWorldId(String(worldId || ''))
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: err?.message || String(err) }
+    }
   })
   ipcMain.handle('server:probe', async (_event, url) => {
     try {

@@ -360,8 +360,10 @@ export type FieldTone = keyof Pick<typeof FIELD, 'base' | 'bare'>
  * cannot drift apart. Call sites render `<Brand>`; they never rebuild the lockup.
  */
 export const LOGO = {
-  /** The one brand mark asset: same bytes as the favicon and PWA icons. */
-  markSrc: '/icon.svg',
+  /** The one brand mark asset: the shipped 512px icon.png, same bytes as the
+   *  favicon, the PWA icons and the pre-bundle splash (font-independent raster,
+   *  so no SVG text can reflow between the splash and the mounted lockup). */
+  markSrc: '/icon.png',
   /** Mark + wordmark on one axis, with the one gap and a floor width. */
   lockup: classes('inline-flex items-center', 'gap-(--logo-gap)', 'min-w-(--logo-min-width)'),
   /** Clear-space belongs to the lockup, not to the layout around it. */

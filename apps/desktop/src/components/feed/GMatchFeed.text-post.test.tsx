@@ -80,6 +80,21 @@ describe('GMatchFeed text posts', () => {
     expect(screen.getByText('Just words, no picture at all.')).toBeTruthy();
   });
 
+  it('formats the body once — paragraphs and live links, no inline+expanded duplicate', () => {
+    const { container } = render(
+      <GMatchFeed
+        identity={identity}
+        posts={[textPost({ caption: 'First line.\n\nSecond line https://example.com' })]}
+        stories={[]}
+        users={[]}
+      />,
+    );
+    expect(screen.getByRole('link', { name: 'https://example.com' })).toBeTruthy();
+    expect(container.querySelectorAll('p').length).toBe(2);
+    fireEvent.click(screen.getByRole('button', { name: 'Comment' }));
+    expect(screen.getAllByText('First line.')).toHaveLength(1);
+  });
+
   it('keeps the media panel and the reversible no-preview hide for image posts', () => {
     const image = textPost({
       id: 'image-1',

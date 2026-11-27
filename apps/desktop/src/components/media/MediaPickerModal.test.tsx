@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { MediaPickerModal, useMediaPicker } from './MediaPickerModal';
+import { MediaPickerModal, MediaPickerPanel, useMediaPicker } from './MediaPickerModal';
 
 const png = new File(['x'], 'pic.png', { type: 'image/png' });
 const pdf = new File(['x'], 'doc.pdf', { type: 'application/pdf' });
@@ -62,6 +62,44 @@ describe('MediaPickerModal', () => {
     fireEvent.change(input, { target: { files: [pdf] } });
     expect(screen.getByRole('alert').textContent).toMatch(/isn't accepted/i);
     expect(screen.queryByText('Use this media')).toBeNull();
+  });
+});
+
+describe('MediaPickerPanel opaque fixed-size balloon', () => {
+  it('uses an opaque surface and one fixed height in modal mode', () => {
+    const { container } = render(
+      <MediaPickerModal options={{ sources: ['url'] }} onPick={vi.fn()} onClose={vi.fn()} />,
+    );
+    const balloon = container.querySelector('[aria-label="Pick media"][class*="bg-surface-canvas"]') as HTMLElement;
+    expect(balloon.className).toContain('bg-surface-canvas');
+    expect(balloon.className).toContain('h-[560px]');
+  });
+
+  it('keeps the fixed balloon height and a scrolling body across pane switches', () => {
+    render(
+      <MediaPickerPanel
+        options={{ sources: ['browse', 'upload', 'url'] }}
+        onPick={vi.fn()}
+        onClose={vi.fn()}
+        compact
+      />,
+    );
+    const balloon = screen.getByLabelText('Pick media');
+    // Real invariant: a fixed height class on the balloon and a flex-1 body
+    // that owns the scroll — not an unchanging className string (the body
+    // content differs per pane, so the full string legitimately changes).
+    const expectFixedBalloon = () => {
+      expect(balloon.className).toContain('h-[420px]');
+      const body = balloon.querySelector('.overflow-y-auto') as HTMLElement;
+      expect(body).toBeTruthy();
+      expect(body.className).toContain('flex-1');
+      expect(body.className).toContain('overflow-y-auto');
+    };
+    expectFixedBalloon();
+    fireEvent.click(screen.getByText('Upload'));
+    expectFixedBalloon();
+    fireEvent.click(screen.getByText('Paste URL'));
+    expectFixedBalloon();
   });
 });
 

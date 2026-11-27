@@ -279,6 +279,28 @@ describe('ServersView', () => {
     delete (window as unknown as { gmatch?: unknown }).gmatch
   })
 
+  it('raises the world-switch loading screen once a client switch commits', async () => {
+    const onWorldSwitch = vi.fn()
+    ;(window as unknown as { gmatch?: unknown }).gmatch = {
+      serverSet: vi.fn().mockResolvedValue({ ok: true }),
+      serverRelaunch: vi.fn(),
+      serverState: vi.fn().mockResolvedValue({ packaged: true, mode: 'host', url: 'http://127.0.0.1:8790', lanUrls: [] }),
+    }
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers')) return json({ servers: [
+        { id: 'ccc', name: 'Open World', description: '', owner_id: 'owner2', password_required: 0, endpoint_hint: 'https://world.test:8790', last_seen: 'x' },
+      ] })
+      return json({})
+    })
+    render(<ServersView identity={identity} toast={() => {}} onWorldSwitch={onWorldSwitch} />)
+    // Nothing before a commit — the screen is a switch, never a hover teaser.
+    expect(onWorldSwitch).not.toHaveBeenCalled()
+    fireEvent.click(await screen.findByRole('button', { name: /connect to open world/i }))
+    await waitFor(() => expect(onWorldSwitch).toHaveBeenCalledWith({ name: 'Open World', url: 'https://world.test:8790' }))
+    delete (window as unknown as { gmatch?: unknown }).gmatch
+  })
+
   it('a client world keeps the host\'s directory row instead of calling it This computer', async () => {
     stubLocalStorage({
       'gmatch.central.url': 'https://central.test',

@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { Hono } from 'hono'
 import domination from './domination'
-import { economy } from './economy'
-import { EconomyService } from '../economy'
+import { purgeDeadDominationUsers, DEAD_DOMINATION_HANDLES } from '../../scripts/purge-dead-domination-users'
 import { createMockEnv, type TestIdentity, createTestIdentity, signRequestHeaders } from '../test-utils'
 
 describe('domination routes', () => {
@@ -107,11 +106,6 @@ describe('domination routes', () => {
     await env.DB.prepare("UPDATE Users SET pc_domination_enabled = 1, pc_domination_settings = ?, last_seen = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?")
       .bind(JSON.stringify({ allowDesktopBackgroundChange: true, allowBlurEverything: true }), userB.orbitId).run()
 
-    // trigger now costs g$ — fund the dominator first
-    await new EconomyService(env.DB).credit(userA.orbitId, 10_000, {
-      idempotencyKey: 'fund-dom-success', kind: 'reward', reference: 'test-fund',
-    })
-
     const res = await app.request('/api/domination/trigger', {
       method: 'POST',
       headers: auth(userA, 'POST', '/api/domination/trigger', JSON.stringify({
@@ -182,11 +176,22 @@ describe('domination routes', () => {
     expect(ids).not.toContain(placeholder.orbitId)
   })
 })
-describe('domination economy (cost + victim payout)', () => {
+describe('domination is fully free (zero wallet writes)', () => {
   let app: Hono
   let env: { DB: any }
   let userA: TestIdentity
   let userB: TestIdentity
+
+  // Each action's payload must satisfy its consent + wire schema.
+  const ACTIONS: Record<string, unknown> = {
+    wallpaper: { url: 'https://example.com/a.jpg' },
+    game_bg: { url: 'https://example.com/b.jpg' },
+    popup_video: { url: 'https://example.com/c.mp4' },
+    message: { text: 'hi' },
+    text_overlay: { text: 'hi', position: 'top' },
+    blur: { intensity: 8 },
+    camera: { quality: 0.8 },
+  }
 
   beforeEach(async () => {
     env = await createMockEnv()
@@ -197,65 +202,55 @@ describe('domination economy (cost + victim payout)', () => {
     app = new Hono()
     app.use('*', async (c2, next) => { c2.env = env as any; await next() })
     app.route('/api/domination', domination)
-    app.route('/api/economy', economy)
   })
 
   function auth(identity: TestIdentity, method: string, path: string, body = '') {
     return signRequestHeaders(identity, method, path, body)
   }
 
-  async function fund(identity: TestIdentity, amount: number) {
-    await new EconomyService(env.DB).credit(identity.orbitId, amount, {
-      idempotencyKey: `fund-${identity.orbitId}-${Math.random().toString(36).slice(2, 10)}`,
-      kind: 'reward',
-      reference: 'test-fund',
-    })
+  async function walletWrites() {
+    const [wallets, ledger, ops] = await Promise.all([
+      env.DB.prepare('SELECT COUNT(*) n FROM Wallets').first<{ n: number }>(),
+      env.DB.prepare('SELECT COUNT(*) n FROM LedgerTransactions').first<{ n: number }>(),
+      env.DB.prepare('SELECT COUNT(*) n FROM EconomicOperations').first<{ n: number }>(),
+    ])
+    return { wallets: Number(wallets?.n ?? 0), ledger: Number(ledger?.n ?? 0), ops: Number(ops?.n ?? 0) }
   }
 
-  async function balance(identity: TestIdentity): Promise<number> {
-    const res = await app.request('/api/economy/balance', { headers: auth(identity, 'GET', '/api/economy/balance') })
-    const j = await res.json() as any
-    return Number(j.balance)
-  }
-
-  it('trigger debits the dominator and pays the victim a consent cut', async () => {
+  it('sends every action with zero wallet, ledger or economy-operation writes', async () => {
+    const consents = {
+      allowDesktopBackgroundChange: true,
+      allowGameBackgroundChange: true,
+      allowPopupVideo: true,
+      allowPopupMessage: true,
+      allowTextOverlay: true,
+      allowBlurEverything: true,
+      allowRemoteCamera: true,
+    }
     await env.DB.prepare("UPDATE Users SET pc_domination_enabled = 1, pc_domination_settings = ?, last_seen = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?")
-      .bind(JSON.stringify({ allowPopupMessage: true }), userB.orbitId).run()
-    await fund(userA, 10_000)
-    const before = await balance(userA)
-    const body = JSON.stringify({ targetId: userB.orbitId, action: 'message', payload: { text: 'hi' } })
-    const res = await app.request('/api/domination/trigger', {
-      method: 'POST', headers: auth(userA, 'POST', '/api/domination/trigger', body), body,
-    })
-    expect(res.status).toBe(200)
-    const j = await res.json() as any
-    expect(j.cost).toBe(500)
-    expect(j.victimReward).toBe(200)
-    expect(await balance(userA)).toBe(before - j.cost)
-    expect(await balance(userB)).toBe(j.victimReward)
+      .bind(JSON.stringify(consents), userB.orbitId).run()
+    expect(await walletWrites()).toEqual({ wallets: 0, ledger: 0, ops: 0 })
+
+    for (const [action, payload] of Object.entries(ACTIONS)) {
+      const body = JSON.stringify({ targetId: userB.orbitId, action, payload })
+      const res = await app.request('/api/domination/trigger', {
+        method: 'POST', headers: auth(userA, 'POST', '/api/domination/trigger', body), body,
+      })
+      expect(res.status, action).toBe(200)
+      const json = await res.json() as any
+      expect(json).toMatchObject({ success: true, actionId: expect.any(String) })
+      expect(json).not.toHaveProperty('cost')
+      expect(json).not.toHaveProperty('victimReward')
+    }
+
+    expect(await walletWrites()).toEqual({ wallets: 0, ledger: 0, ops: 0 })
+    const recorded = await env.DB.prepare('SELECT COUNT(*) n FROM DominationActions').first<{ n: number }>()
+    expect(Number(recorded?.n)).toBe(Object.keys(ACTIONS).length)
   })
 
-  it('trigger fails with 402 when the dominator cannot pay', async () => {
-    await env.DB.prepare("UPDATE Users SET pc_domination_enabled = 1, pc_domination_settings = ?, last_seen = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?")
-      .bind(JSON.stringify({ allowPopupMessage: true }), userB.orbitId).run()
-    const body = JSON.stringify({ targetId: userB.orbitId, action: 'message', payload: { text: 'hi' } })
-    const res = await app.request('/api/domination/trigger', {
-      method: 'POST', headers: auth(userA, 'POST', '/api/domination/trigger', body), body,
-    })
-    expect(res.status).toBe(402)
-    const j = await res.json() as any
-    expect(j.error).toMatch(/not enough/i)
-    expect(j.cost).toBe(500)
-    // victim must NOT be paid when the charge failed
-    expect(await balance(userB)).toBe(0)
-  })
-
-  it('GET /api/domination/prices returns the action cost table', async () => {
+  it('no longer serves a prices table', async () => {
     const res = await app.request('/api/domination/prices', { headers: auth(userA, 'GET', '/api/domination/prices') })
-    expect(res.status).toBe(200)
-    const j = await res.json() as any
-    expect(j.prices.message).toBe(500)
-    expect(j.prices.camera).toBeGreaterThan(j.prices.message)
+    expect(res.status).toBe(404)
   })
 
   it('GET /api/domination/targets exposes an online flag per target', async () => {
@@ -271,7 +266,6 @@ describe('domination economy (cost + victim payout)', () => {
   it('POST /api/domination/ack/:id marks the action delivered for its victim only', async () => {
     await env.DB.prepare('UPDATE Users SET pc_domination_enabled = 1, pc_domination_settings = ?, last_seen = ? WHERE id = ?')
       .bind(JSON.stringify({ allowPopupMessage: true }), new Date().toISOString(), userB.orbitId).run()
-    await new EconomyService(env.DB).credit(userA.orbitId, 10000, { idempotencyKey: 'dom-fund', kind: 'reward', reference: 'test' })
     const body = JSON.stringify({ targetId: userB.orbitId, action: 'message', payload: { text: 'yo' } })
     const trig = await app.request('/api/domination/trigger', {
       method: 'POST', headers: auth(userA, 'POST', '/api/domination/trigger', body), body,
@@ -297,5 +291,74 @@ describe('domination economy (cost + victim payout)', () => {
     const out = await app.request('/api/domination/outgoing', { headers: auth(userA, 'GET', '/api/domination/outgoing') })
     const oj = await out.json() as any
     expect(oj.actions.find((a: any) => a.id === actionId).status).toBe('executed')
+  })
+})
+
+describe('dead domination users purge', () => {
+  it('removes both named handles and their domination rows, then no-ops', async () => {
+    const env = await createMockEnv()
+    const pairs: Array<{ id: string; displayName: string }> = []
+    for (const handle of DEAD_DOMINATION_HANDLES) {
+      const u = createTestIdentity()
+      pairs.push({ id: u.orbitId, displayName: handle })
+      await env.DB.prepare("INSERT INTO Users (id, public_key, display_name, pc_domination_enabled, last_seen) VALUES (?, ?, ?, 1, strftime('%Y-%m-%dT%H:%M:%fZ','now'))")
+        .bind(u.orbitId, u.publicKeyHex, handle).run()
+      await env.DB.prepare('INSERT INTO DominationActions (id, dominator_id, victim_id, action, status, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+        .bind(`dom-${handle}`, u.orbitId, u.orbitId, 'message', 'sent', new Date().toISOString()).run()
+    }
+    const real = createTestIdentity()
+    await env.DB.prepare('INSERT INTO Users (id, public_key, display_name) VALUES (?, ?, ?)')
+      .bind(real.orbitId, real.publicKeyHex, 'RealPlayer').run()
+
+    const first = await purgeDeadDominationUsers(env.DB, pairs)
+    expect(first.deleted.sort()).toEqual(pairs.map((p) => p.id).sort())
+    const survivors = await env.DB.prepare('SELECT id FROM Users').all<{ id: string }>()
+    expect(survivors.results.map((r) => r.id)).toEqual([real.orbitId])
+    const actions = await env.DB.prepare('SELECT id FROM DominationActions').all<{ id: string }>()
+    expect(actions.results).toEqual([])
+
+    const second = await purgeDeadDominationUsers(env.DB, pairs)
+    expect(second.deleted).toEqual([])
+    expect(second.missing.sort()).toEqual(pairs.map((p) => p.id).sort())
+    expect((await env.DB.prepare('SELECT id FROM Users').all<{ id: string }>()).results.map((r) => r.id)).toEqual([real.orbitId])
+  })
+
+  it('never deletes a real account whose name only collides by case/trailing space', async () => {
+    const env = await createMockEnv()
+    const pairs: Array<{ id: string; displayName: string }> = []
+    for (const handle of DEAD_DOMINATION_HANDLES) {
+      const u = createTestIdentity()
+      pairs.push({ id: u.orbitId, displayName: handle })
+      await env.DB.prepare("INSERT INTO Users (id, public_key, display_name, pc_domination_enabled, last_seen) VALUES (?, ?, ?, 1, strftime('%Y-%m-%dT%H:%M:%fZ','now'))")
+        .bind(u.orbitId, u.publicKeyHex, handle).run()
+    }
+    // A REAL player whose name differs only by UPPERCASE + a trailing space:
+    // LOWER(TRIM(display_name)) collides with the first dead handle, but the
+    // explicit id pair for the dead user must not match this row.
+    const real = createTestIdentity()
+    const realName = `${DEAD_DOMINATION_HANDLES[0].toUpperCase()} `
+    await env.DB.prepare('INSERT INTO Users (id, public_key, display_name) VALUES (?, ?, ?)')
+      .bind(real.orbitId, real.publicKeyHex, realName).run()
+    await env.DB.prepare('INSERT INTO Wallets (user_id, balance) VALUES (?, 1234)').bind(real.orbitId).run()
+    await env.DB.prepare('INSERT INTO Objects (id, owner_id, size_bytes, mime_type) VALUES (?, ?, ?, ?)')
+      .bind(`obj-${real.orbitId}`, real.orbitId, 100, 'image/jpeg').run()
+
+    const first = await purgeDeadDominationUsers(env.DB, pairs)
+    expect(first.deleted.sort()).toEqual(pairs.map((p) => p.id).sort())
+
+    // The real user and its wallet + object rows survive untouched.
+    const survivor = await env.DB.prepare('SELECT id FROM Users WHERE id = ?').bind(real.orbitId).first<{ id: string }>()
+    expect(survivor?.id).toBe(real.orbitId)
+    const wallet = await env.DB.prepare('SELECT balance FROM Wallets WHERE user_id = ?').bind(real.orbitId).first<{ balance: number }>()
+    expect(wallet?.balance).toBe(1234)
+    const object = await env.DB.prepare('SELECT id FROM Objects WHERE id = ?').bind(`obj-${real.orbitId}`).first<{ id: string }>()
+    expect(object?.id).toBe(`obj-${real.orbitId}`)
+
+    // A second purge changes nothing.
+    const second = await purgeDeadDominationUsers(env.DB, pairs)
+    expect(second.deleted).toEqual([])
+    const stillThere = await env.DB.prepare('SELECT id FROM Users WHERE id = ?').bind(real.orbitId).first<{ id: string }>()
+    expect(stillThere?.id).toBe(real.orbitId)
+    expect(await env.DB.prepare('SELECT COUNT(*) n FROM Objects').first<{ n: number }>()).toMatchObject({ n: 1 })
   })
 })

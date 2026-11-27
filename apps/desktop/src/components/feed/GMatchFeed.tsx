@@ -36,6 +36,7 @@ import type { OrbitObject as StoryItem } from '@orbit/shared';
 import { generateFallbackName } from '@orbit/shared';
 import { countHidden, isRenderable } from './isRenderable';
 import { displayMedia, hasMedia, readPostContent } from './postModel';
+import { PostBody } from './PostBody';
 import { FeedGrid } from './FeedGrid';
 import { GMatchStories } from '../GMatchStories';
 import { PostComments } from './PostComments';
@@ -50,7 +51,7 @@ import { vaultPin, vaultBridge } from '../../services/vault';
 import { PEER_ONLINE_EVENT } from '../../utils/p2pSwarm';
 import {
   classes, COLOR, DIALOG_WIDTH, GAP, ICON, LAYOUT, PADDING_X, RADIUS,
-  SHADOW, STATUS, TRANSITION, TYPE, WEIGHT,
+  SHADOW, TRANSITION, TYPE, WEIGHT,
 } from '../../ui/tokens';
 
 /** Sibling item MIME types for render-time video detection (see isVideoPost). */
@@ -96,6 +97,7 @@ import { FeedStatusPills } from './FeedStatusPills';
 import { Linkify } from '../Linkify';
 import { copyText } from '../../utils/clipboard';
 import { isPostDeleted } from '../../utils/deletedPosts';
+import { formatCount } from '../../utils/formatDate';
 
 export interface PostComment {
   id: string;
@@ -1124,38 +1126,17 @@ function GMatchFeedImpl({
         </div>
       )}
 
-      {/* ONE quiet sync label (replaces the per-post chips): reflects real
-          background publish work — active uploads / posts saved locally only.
-          Non-blocking, no layout shift beyond this single row. */}
-      {syncCounts.pending > 0 || syncCounts.local > 0 ? (
-        <FeedbackState
-          layout="strip"
-          align="start"
-          state={syncCounts.pending > 0 ? 'loading' : 'empty'}
-          className="select-none border-b"
-          icon={
-            syncCounts.pending > 0
-              ? undefined
-              : <span className={classes('w-1.5 h-1.5 shrink-0', RADIUS.pill, STATUS.warningDot)} aria-hidden="true" />
-          }
-          title={
-            syncCounts.pending > 0
-              ? `Syncing ${syncCounts.pending} post${syncCounts.pending === 1 ? '' : 's'} to the network…`
-              : `${syncCounts.local} post${syncCounts.local === 1 ? '' : 's'} saved on this device — they upload when the network is back.`
-          }
-        />
-      ) : null}
-
-
-      {/* Discreet grey loading label when stories/content are loading */}
-      {storiesLoading && (
-        <FeedbackState
-          layout="strip"
-          state="loading"
-          className="select-none border-b"
-          title="Loading content..."
-        />
-      )}
+      {/* Background work is announced, never painted. A strip here used to
+          appear and vanish with every fetch, shifting the whole timeline under
+          the reader. The per-post sync badge still discloses local-only posts
+          visually; this live region adds no row and no label flash. */}
+      <div className="sr-only" aria-live="polite">
+        {syncCounts.pending > 0
+          ? `Syncing ${syncCounts.pending} post${syncCounts.pending === 1 ? '' : 's'} to the network.`
+          : syncCounts.local > 0
+            ? `${syncCounts.local} post${syncCounts.local === 1 ? '' : 's'} saved on this device — they upload when the network is back.`
+            : ''}
+      </div>
 
       {/* Stories Tray Carousel — below the header */}
       <div className={classes('bg-transparent border-b py-3', PADDING_X[1], COLOR.edge)}>
@@ -1261,7 +1242,7 @@ function GMatchFeedImpl({
                           <h3 className="text-xl font-black tracking-tight">{post.caption}</h3>
                           {post.players_playing && (
                             <p className="text-xs text-retro-body font-mono">
-                              <Zap className="inline w-3 h-3" /> {post.players_playing.toLocaleString()} online
+                              <Zap className="inline w-3 h-3" /> {formatCount(post.players_playing)} online
                             </p>
                           )}
                           <button
@@ -1512,9 +1493,7 @@ function GMatchFeedImpl({
                         </div>
                       )}
                       {renderAuthorLine(post)}
-                      <p className="pt-2 pb-1 text-sm sm:text-base leading-relaxed text-retro-fg whitespace-pre-wrap break-words">
-                        <Linkify text={content.text} />
-                      </p>
+                      <PostBody text={content.text} className="pt-2 pb-1" />
                     </div>
                   </div>
                 ) : (
@@ -1628,7 +1607,7 @@ function GMatchFeedImpl({
                       className="text-left text-xs text-retro-muted hover:text-retro-fg hover:underline cursor-pointer w-fit transition-colors"
                       aria-label="View who liked this post"
                     >
-                      {likedByLabel || `${currentLikes.toLocaleString()} ${currentLikes === 1 ? 'like' : 'likes'}`}
+                      {likedByLabel || `${formatCount(currentLikes)} ${currentLikes === 1 ? 'like' : 'likes'}`}
                     </button>
                   )}
 
@@ -1790,17 +1769,12 @@ function GMatchFeedImpl({
             <div ref={sentinelRef2} className="h-px w-full" aria-hidden="true" />
           )}
           {displayPosts.length > 0 && hasMore !== false && (
+            // The box is always the same height: a label swapping in here used
+            // to move the page under the reader on every background page fetch.
             <div ref={sentinelRef} className="py-6 flex flex-col items-center justify-center gap-2">
-              {(internalLoadingMore || isLoadingMore) ? (
-                <FeedbackState
-                  layout="strip"
-                  state="loading"
-                  title="Loading more moments…"
-                  className={classes(RADIUS.pill, COLOR.edge, SHADOW.xs)}
-                />
-              ) : (
-                <div className="h-6 w-full" />
-              )}
+              <div className="h-6 w-full" aria-live="polite">
+                {(internalLoadingMore || isLoadingMore) && <span className="sr-only">Loading more posts</span>}
+              </div>
             </div>
           )}
         </div>

@@ -12,9 +12,50 @@ export function isCrit(clickNumber: number): boolean {
   return clickNumber > 0 && clickNumber % CRIT_EVERY === 0
 }
 
-/** Each Corruption shard = +10% global multiplier (SPEC §9). */
+/**
+ * Global price inflation: every tag purchase nudges ALL future tag prices.
+ * This is the anti-runaway lever — buying more can never make the market
+ * cheaper, no matter how many pts a run has banked.
+ */
+export const INFLATION_PER_PURCHASE = 0.02
+export function inflationMultiplier(purchases: number): number {
+  return 1 + INFLATION_PER_PURCHASE * (Number.isFinite(purchases) ? Math.max(0, purchases) : 0)
+}
+
+/** SPEC §9: each shard is +10%, linear — progression is tuned by inflation/costs. */
 export function shardMultiplier(shards: number): number {
-  return 1 + SHARD_MULT * shards
+  const n = Number.isFinite(shards) ? Math.max(0, shards) : 0
+  return 1 + SHARD_MULT * n
+}
+
+/**
+ * Idle shards: slow, bounded and earned only while the game is open. The
+ * session/lifetime cap keeps even a week-long open window far below the
+ * 1000-shards-per-g$ redemption rate; the server caps it again on redeem.
+ */
+export const IDLE_SHARD_INTERVAL_MS = 5 * 60_000
+export const IDLE_SHARD_LIFETIME_CAP = 100
+export function idleShardAccrual(
+  dtMs: number,
+  carryMs: number,
+  banked: number,
+): { shards: number; carryMs: number } {
+  const dt = Number.isFinite(dtMs) ? Math.max(0, dtMs) : 0
+  const carry = Number.isFinite(carryMs) ? Math.max(0, carryMs) : 0
+  const room = Math.max(0, IDLE_SHARD_LIFETIME_CAP - (Number.isFinite(banked) ? Math.max(0, banked) : 0))
+  const raw = carry + dt
+  const shards = Math.min(room, Math.floor(raw / IDLE_SHARD_INTERVAL_MS))
+  return { shards, carryMs: Math.min(raw - shards * IDLE_SHARD_INTERVAL_MS, IDLE_SHARD_INTERVAL_MS - 1) }
+}
+
+/** A drained foe pays a shard burst every N wins — faster than idle, but slow. */
+export const KO_SHARDS_EVERY = 5
+export function koShards(defeatedAfter: number, defeatedBefore = Math.max(0, defeatedAfter - 1)): number {
+  return Math.max(
+    0,
+    Math.floor(Math.max(0, defeatedAfter) / KO_SHARDS_EVERY) -
+      Math.floor(Math.max(0, defeatedBefore) / KO_SHARDS_EVERY),
+  )
 }
 
 export interface EconomyInput {

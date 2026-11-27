@@ -73,7 +73,7 @@ Patterns: a trailing `*` covers every route below it.
 | `/api/cards/market` | economy | card market |
 | `/api/decks` | economy | deck building |
 | `/api/decks/*` | economy | deck cards, validate |
-| `/api/domination/*` | economy | prices, trigger, settings, targets, history, ack |
+| `/api/domination/*` | social | trigger, settings, targets, history, ack |
 | `/api/economy/*` | economy | cashout rate |
 | `/api/servers` | host | the directory of the node you are on (per node now) |
 | `/api/servers/*` | host | host-mode dashboard, node registration |

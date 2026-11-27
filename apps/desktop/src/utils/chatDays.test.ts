@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { dayKey, daySeparatorLabel, groupMessagesByDay } from './chatDays'
+import { formatDate } from './formatDate'
 import type { ChatMessage } from '../hooks/useP2P'
 
 /**
@@ -50,10 +51,10 @@ describe('daySeparatorLabel', () => {
     expect(daySeparatorLabel(at(2026, 3, 5, 12), now)).toBe('5 days ago')
   })
 
-  it('falls back to a real date once "N days ago" stops being useful', () => {
-    const old = daySeparatorLabel(at(2026, 1, 5, 12), now)
-    expect(old).not.toMatch(/ago$/)
-    expect(old).toMatch(/2026/)
+  it('falls back to the shared English date once "N days ago" stops being useful', () => {
+    const stamp = at(2026, 2, 5, 12)
+    expect(daySeparatorLabel(stamp, now)).toBe(formatDate(stamp))
+    expect(daySeparatorLabel(stamp, now)).toBe('Feb 5, 2026')
   })
 
   it('a later-timestamped message is still Today, never "in the future"', () => {

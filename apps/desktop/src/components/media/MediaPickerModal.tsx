@@ -272,7 +272,7 @@ export function MediaPickerPanel({
       // width and height on every pane, so switching tabs never resizes it or
       // moves the controls under the pointer. The body is the only part that
       // scrolls.
-      className={`bg-surface-raised border border-edge rounded-xl w-full max-w-lg flex flex-col shadow-2xl overflow-hidden text-retro-fg ${
+      className={`${COLOR.canvasSurface} border border-edge rounded-xl w-full max-w-lg flex flex-col shadow-2xl overflow-hidden text-retro-fg ${
         compact
           ? 'h-[420px] max-h-(--max-h-sheet) text-xs'
           : 'h-[560px] max-h-(--max-h-panel)'
@@ -401,7 +401,7 @@ export function MediaPickerPanel({
                 takeFile(e.dataTransfer.files?.[0], 'upload');
               }}
               className={`border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer text-center transition ${
-                dragOver ? 'border-retro-accent bg-glass-w10' : 'border-edge hover:border-retro-accent bg-surface-interactive'
+                dragOver ? 'border-retro-accent bg-glass-w10' : `border-edge hover:border-retro-accent ${COLOR.canvasSurface}`
               }`}
             >
               <UploadCloud className="w-7 h-7 text-retro-muted" />
@@ -453,7 +453,7 @@ export function MediaPickerPanel({
 
           {pending && (
             <div className="space-y-2 pt-1">
-              <div className="flex justify-center border border-edge rounded-xl bg-glass-w5 p-2">
+              <div className={`flex justify-center border border-edge rounded-xl ${COLOR.canvasSurface} p-2`}>
                 <Preview url={pending.kind === 'file' ? pending.previewUrl : pending.url} isVideo={pending.kind === 'file' ? fileAccepted(pending.file, ['video']) && !fileAccepted(pending.file, ['image']) : /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(pending.url)} />
               </div>
               <div className="flex justify-end gap-2">

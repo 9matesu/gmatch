@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
-import { timeAgo, parseApiTimestamp } from '../../utils/timeAgo'
+import { parseApiTimestamp } from '../../utils/timeAgo'
+import { formatDate, formatRelativeDate } from '../../utils/formatDate'
 
 /**
  * A post timestamp: relative by default, absolute on hover or click.
  *
- * Reuses utils/timeAgo rather than owning date logic — that module already
- * handles SQLite's zone-less timestamps, which `new Date()` silently reads as
- * local time and renders wrong by the viewer's UTC offset.
+ * Both forms come from utils/formatDate (en-US), which reuses timeAgo's parsing
+ * for SQLite's zone-less timestamps — `new Date()` would read those as local
+ * time and render wrong by the viewer's UTC offset.
  *
  * The absolute value is ALWAYS in the DOM (the `title` and the accessible
  * name), so this is not a hover-only affordance: keyboard and screen-reader
@@ -26,25 +27,11 @@ function readSticky(): boolean {
   }
 }
 
-/**
- * Absolute formatting is expensive: `toLocaleString` with dateStyle/timeStyle
- * builds a formatter every call, and a 300-row timeline asks for it on every
- * render of every row (the CPU profile put PostTimestamp at ~4% of samples,
- * above every other component). The value only depends on (timestamp, locale),
- * so it is computed once per distinct timestamp.
- */
-const absoluteCache = new Map<string, string>()
-
-function absoluteFor(createdAt: string): string {
-  const cached = absoluteCache.get(createdAt)
-  if (cached !== undefined) return cached
-  const parsed = parseApiTimestamp(createdAt)
-  const value = parsed ? parsed.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : ''
-  // Bounded: a feed holds hundreds of rows, not the app's whole history.
-  if (absoluteCache.size > 2000) absoluteCache.clear()
-  absoluteCache.set(createdAt, value)
-  return value
-}
+// The absolute form is pinned to en-US by the shared formatter: a Brazilian
+// machine used to render "26 de Out. 2026" here, while the rest of the app is
+// English. The formatter instances are module-level, so a long timeline does
+// not build one per row.
+const absoluteFor = (createdAt: string) => formatDate(createdAt, true)
 
 export function PostTimestamp({
   createdAt,
@@ -70,7 +57,7 @@ export function PostTimestamp({
   const parsed = parseApiTimestamp(createdAt);
   const full = absoluteFor(createdAt);
   const showAbsolute = absolute || hovered;
-  const label = showAbsolute ? full : timeAgo(createdAt);
+  const label = showAbsolute ? full : formatRelativeDate(createdAt);
 
   return (
     <time

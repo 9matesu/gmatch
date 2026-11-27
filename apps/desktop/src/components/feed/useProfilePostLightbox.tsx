@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { createLikeGovernor, type LikeGovernor } from '../../utils/likeReconcile';
 import { playPress, playMsgReceive } from '../../utils/sounds';
@@ -14,8 +14,18 @@ import type { FeedPost, PostComment } from './GMatchFeed';
 
 type ToastFn = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 
+/** Fill only unknown ids: a local toggle must never be overwritten by a later
+ *  parent refresh carrying the pre-click row. */
+function seedMissing<T>(prev: Record<string, T>, from: Record<string, T>): Record<string, T> {
+  const missing = Object.entries(from).filter(([id]) => prev[id] === undefined);
+  return missing.length ? { ...prev, ...Object.fromEntries(missing) } : prev;
+}
+
 export interface ProfileLightboxDeps {
   identity: OrbitIdentity | null;
+  /** Posts already on the surface: text cards render before any click, so
+   *  their like/save/count state has to be seeded from these rows. */
+  seedPosts?: FeedPost[];
   profilePics?: Record<string, string>;
   users?: Array<{ id: string; display_name?: string }>;
   followingIds?: string[];
@@ -34,6 +44,8 @@ export interface ProfileLightboxDeps {
   onReportPost?: (post: FeedPost) => void;
   /** Edit the caption of an own post. The caller owns the request + the toast. */
   onEditPost?: (post: FeedPost) => void;
+  /** Repost from a profile surface. Gate: no handler, no repost row. */
+  onRepostPost?: (post: FeedPost) => void;
   /** Stacking override for lightboxes nested inside higher-z overlays
    *  (e.g. UserProfileModal at z-system). Defaults to z-modal. */
   zIndexClass?: string;
@@ -51,6 +63,7 @@ export interface ProfileLightboxDeps {
 export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
   const {
     identity,
+    seedPosts,
     profilePics = {},
     users = [],
     followingIds = [],
@@ -68,6 +81,7 @@ export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
     onDeletePost,
     onReportPost,
     onEditPost,
+    onRepostPost,
     zIndexClass,
   } = deps;
 
@@ -98,6 +112,24 @@ export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
       setCount: (id, n) => setCounts((c) => ({ ...c, [id]: n })),
     });
   }
+
+  // A text card is already on screen when the profile mounts — there is no
+  // click to seed its state. Seed from the rows the surface was given; openPost
+  // keeps its own fallback for surfaces that do not pass seedPosts.
+  useEffect(() => {
+    if (!seedPosts?.length) return;
+    const likes: Record<string, boolean> = {};
+    const saves: Record<string, boolean> = {};
+    const counts: Record<string, number> = {};
+    for (const post of seedPosts) {
+      likes[post.id] = !!post.is_liked;
+      saves[post.id] = !!post.is_saved;
+      counts[post.id] = post.like_count ?? 0;
+    }
+    setLiked((prev) => seedMissing(prev, likes));
+    setSaved((prev) => seedMissing(prev, saves));
+    setCounts((prev) => seedMissing(prev, counts));
+  }, [seedPosts]);
 
   const openPost = useCallback(
     (post: FeedPost) => {
@@ -375,5 +407,19 @@ export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
     </>
   );
 
-  return { activePost, openPost, closePost, expandedNode, modals };
+  // The profile's chronological text cards use these SAME handlers as the
+  // expanded post — no second like/save/share implementation on this surface.
+  const openShare = useCallback((post: FeedPost) => setSharingPost(post), []);
+  const openRepost = useCallback((post: FeedPost) => {
+    setOptionsPost(null);
+    onRepostPost?.(post);
+  }, [onRepostPost]);
+
+  return {
+    activePost, openPost, closePost, expandedNode, modals,
+    toggleLike, toggleSave, openShare, openRepost,
+    likedOf: (id: string) => !!liked[id],
+    savedOf: (id: string) => !!saved[id],
+    likeCountOf: (id: string, fallback = 0) => counts[id] ?? fallback,
+  };
 }

@@ -44,13 +44,23 @@ const TARGET = {
   },
 };
 
-function mockServer() {
+const ALL_CONSENTS = {
+  allowDesktopBackgroundChange: true,
+  allowDesktopWallpaperOS: true,
+  allowGameBackgroundChange: true,
+  allowPopupVideo: true,
+  allowPopupMessage: true,
+  allowTextOverlay: true,
+  allowBlurEverything: true,
+  allowRemoteCamera: true,
+  allowPublicCamera: true,
+  allowHacks: true,
+};
+
+function mockServer(target = TARGET) {
   (orbitFetch as ReturnType<typeof vi.fn>).mockImplementation(async (url: string) => {
     if (String(url).includes('/api/domination/targets')) {
-      return { ok: true, json: async () => ({ targets: [TARGET] }) };
-    }
-    if (String(url).includes('/api/domination/prices')) {
-      return { ok: true, json: async () => ({ prices: { message: 500 } }) };
+      return { ok: true, json: async () => ({ targets: [target] }) };
     }
     if (String(url).includes('/api/domination/settings')) {
       return { ok: true, json: async () => ({ enabled: false }) };
@@ -59,7 +69,7 @@ function mockServer() {
       return { ok: true, json: async () => ({ actions: [] }) };
     }
     if (String(url).includes('/api/domination/trigger')) {
-      return { ok: true, json: async () => ({ cost: 500, victimReward: 250 }) };
+      return { ok: true, json: async () => ({ success: true, actionId: 'dom-1' }) };
     }
     return { ok: false, status: 404, json: async () => ({}) };
   });
@@ -135,22 +145,23 @@ describe('PCDominationTab mesh-first send (Fase 5/6 slice 4)', () => {
     expect(meshSend).not.toHaveBeenCalled();
   });
 
-  it('mesh-known target keeps the action and g$ price text without a mesh badge', async () => {
-    render(<PCDominationTab {...baseProps} mesh={{ peerKnown: () => true, send: vi.fn() }} />);
-    await screen.findByRole('button', { name: /bob/i });
-    expect(screen.queryByText(/free via mesh/i)).toBeNull();
-    const cards = screen.getAllByRole('button', { name: /message/i });
-    const card = cards.find((c) => (c.textContent || '').startsWith('Message'));
-    expect(card).toBeTruthy();
-    expect(card).toHaveTextContent('500 g$');
+  it('renders no currency price anywhere, on either lane', async () => {
+    for (const peerKnown of [true, false]) {
+      render(<PCDominationTab {...baseProps} mesh={{ peerKnown: () => peerKnown, send: vi.fn() }} />);
+      await screen.findByRole('button', { name: /bob/i });
+      expect(screen.queryByText(/g\$|free via mesh|price/i)).toBeNull();
+    }
   });
 
-  it('shows the g$ price on the action card for a server-triggered send', async () => {
+  it('every consented card is directly actionable; missing consent is the only block', async () => {
+    mockServer({ ...TARGET, consents: ALL_CONSENTS });
     render(<PCDominationTab {...baseProps} mesh={{ peerKnown: () => false, send: vi.fn() }} />);
     await screen.findByRole('button', { name: /bob/i });
-    const cards = screen.getAllByRole('button', { name: /message/i });
-    const card = cards.find((c) => (c.textContent || '').startsWith('Message'));
-    expect(card).toBeTruthy();
-    expect(card).toHaveTextContent('500 g$');
+    const effectButtons = screen.getAllByRole('button').filter((b) =>
+      ['Wallpaper', 'Game background', 'Video popup', 'Message', 'Banner text', 'Blur', 'Photo request']
+        .some((label) => (b.textContent || '').startsWith(label)),
+    );
+    expect(effectButtons).toHaveLength(7);
+    expect(effectButtons.some((b) => (b as HTMLButtonElement).disabled)).toBe(false);
   });
 });

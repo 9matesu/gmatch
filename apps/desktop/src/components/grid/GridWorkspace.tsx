@@ -125,7 +125,7 @@ export default function GridWorkspace({
   }, [ageVerified])
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-transparent p-3 sm:p-4 pb-[var(--island-clearance)]">
+    <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-transparent p-2 sm:p-3 pb-[var(--island-clearance)]">
       <section aria-label="Clicker workspace" className="relative flex min-h-0 flex-1 items-stretch gap-0 overflow-hidden">
         {/* Game Stage — expands, centers, left side */}
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden pr-1">
@@ -220,7 +220,7 @@ export default function GridWorkspace({
         {!collapsed && (
           <aside
             style={{ width: right.width }}
-            className="flex min-h-0 shrink-0 flex-col gap-2.5 overflow-y-auto pl-1 pr-1.5 pb-1 styled-scrollbar"
+            className="flex min-h-0 shrink-0 flex-col gap-2 overflow-y-auto pl-1 pr-1.5 pb-1 styled-scrollbar"
           >
             <StatsPanel />
             <ShopPanel />

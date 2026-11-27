@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#09090b" />
     <title>gMatch</title>
-    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/icon.png" type="image/png" />
     <!--
       The brand face is registered here, before the bundle, so the static boot
       shell paints in Switzer at the click (no FOUT, no system-font flash). The
@@ -62,7 +62,8 @@
       }
       /* Static twin of ui/Brand.tsx: before the bundle exists we cannot import
          the component, so the splash mirrors the LOGO token NAMES (with the
-         same values as fallback) and the SAME /icon.svg mark. No baked wordmark. */
+         same values as fallback) and the SAME shipped /icon.png mark. No baked
+         wordmark. */
       #boot .brand-lockup {
         display: inline-flex;
         align-items: center;
@@ -77,9 +78,9 @@
         height: var(--logo-mark-size-hero, 3.5rem);
         min-width: var(--logo-mark-min-size, 1rem);
         object-fit: contain;
-        /* icon.svg is a black squircle with a white "gM". invert keeps BOTH
-           halves (white squircle, black gM); brightness(0) collapsed it into
-           the plain white square the visual review found. */
+        /* icon.png is the shipped 512px app icon (black squircle, white "gM").
+           invert keeps BOTH halves (white squircle, black gM) on the dark
+           splash; brightness(0) collapsed it into a plain white square. */
         filter: invert(1);
       }
       html.boot-light #boot .brand-mark {
@@ -139,7 +140,7 @@
     <div id="boot">
       <div class="boot-stage">
         <div class="brand-lockup">
-          <img class="brand-mark" src="/icon.svg" alt="" aria-hidden="true" />
+          <img class="brand-mark" src="/icon.png" alt="" aria-hidden="true" />
           <span class="brand-word">gMatch</span>
         </div>
         <p id="boot-status" class="boot-status" role="status" aria-live="polite">Starting the node…</p>

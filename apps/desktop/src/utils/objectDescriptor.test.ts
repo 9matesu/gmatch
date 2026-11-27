@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  contentRefFromBytes,
+  contentRefFromText,
   descriptorUrlFromBytes,
   mediaFlag,
   recoverDescriptorRow,
@@ -45,6 +47,25 @@ describe('descriptorUrlFromBytes', () => {
     expect(descriptorUrlFromBytes(bytes('https://a/' + 'x'.repeat(5000)))).toBeNull()
     expect(descriptorUrlFromBytes(undefined)).toBeNull()
     expect(descriptorUrlFromBytes('https://cdn.example/a.jpg')).toBeNull()
+  })
+})
+
+describe('contentRefFromText / contentRefFromBytes', () => {
+  it('extracts both legacy 40-hex and current 64-hex content refs', () => {
+    const forty = 'a'.repeat(40)
+    const sixtyfour = 'b'.repeat(64)
+    expect(contentRefFromText(`urn:sha256:${sixtyfour}`)).toBe(sixtyfour)
+    expect(contentRefFromText(`magnet:?xt=urn:btih:${forty}`)).toBe(forty)
+    expect(contentRefFromText(`MAGNET:?xt=urn:btih:${sixtyfour}&dn=x`)).toBe(sixtyfour)
+    expect(contentRefFromBytes(bytes(`urn:sha256:${forty}`))).toBe(forty)
+  })
+
+  it('never treats a URL, real media or a malformed ref as a content address', () => {
+    expect(contentRefFromText('https://cdn.example/a.jpg')).toBeNull()
+    expect(contentRefFromText('urn:sha256:abc')).toBeNull()
+    expect(contentRefFromText('/api/objects/' + 'a'.repeat(64))).toBeNull()
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).buffer
+    expect(contentRefFromBytes(png)).toBeNull()
   })
 })
 

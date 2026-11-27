@@ -131,6 +131,10 @@ async function startApi() {
     ? path.join(process.resourcesPath, 'api', 'bun.exe')
     : null
 
+  // Host mode is ONE world: this install's own, at the legacy userData root
+  // (so an upgrade finds its existing DB). A CLIENT world's id lives in the
+  // server-mode config for the RENDERER to namespace; a hosted node always
+  // serves the default world's data root.
   const instanceId = instanceIdFor(storageKey)
   currentInstanceId = instanceId
   const hostOwned = app.isPackaged && Boolean(process.env.GMATCH_HOST_MODE)

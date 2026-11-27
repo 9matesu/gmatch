@@ -83,6 +83,9 @@ import { NativeHeaderBar } from "./components/home/NativeHeaderBar";
 import { NotificationSidebar } from "./components/notifications/NotificationSidebar";
 import { RoomsPreview } from "./components/chat/RoomsPreview";
 import { ServersView } from "./components/servers/ServersView";
+import { WorldSwitchOverlay, type WorldSwitchTarget } from "./components/servers/WorldSwitchOverlay";
+import { rollbackLastClientSwitch } from "./utils/server-switch";
+import { useActiveWorld } from "./hooks/useActiveWorld";
 import { PCDominationView } from "./components/views/PCDominationView";
 import { DominationEffects } from "./components/domination/DominationEffects";
 import type { ActiveHackDebuff } from "@orbit/shared";
@@ -163,6 +166,10 @@ function normalizeFeedPost(p: FeedPost): FeedPost {
 }
 
 export default function Home() {
+  // One read of the active world, so every per-world store namespace is seeded
+  // before any child effect reads it. Identity stays global.
+  useActiveWorld();
+
   useEffect(() => {
     runMigrations();
   }, []);
@@ -388,6 +395,9 @@ export default function Home() {
   const [canonicalCards, setCanonicalCards] = useState<CanonicalCard[]>([]);
   const [sendCardTarget, setSendCardTarget] = useState<{ id: string; name: string } | null>(null);
   const [itemsLoading, setItemsLoading] = useState(true);
+  // A committed world switch raises this: the loading screen stays up until the
+  // new node answers health, then the app remounts into the new dataset.
+  const [worldSwitch, setWorldSwitch] = useState<WorldSwitchTarget | null>(null);
   const [mainView, setMainView] = useState<MainViewType>(() => {
     if (typeof window === 'undefined') return 'servers'
     // Direct URL > last-visited persisted view > feed (see routing).
@@ -3928,6 +3938,7 @@ export default function Home() {
                       onPersistLike={persistLike}
                       onPersistSave={persistSave}
                       onPersistComment={persistComment}
+                      onRepostPost={onRepostPost}
                       onSelectUser={(uId) => {
                         const target = findUserById(users, uId);
                         if (target) setSelectedProfileUser(target);
@@ -3983,9 +3994,23 @@ export default function Home() {
                           }}
                           profilePics={profilePics}
                           onServerJoined={() => { loadUsersRef.current?.(); }}
+                          onWorldSwitch={(t) => setWorldSwitch(t)}
                         />
                       ) : (
                         <div className="p-6 text-xs text-retro-muted">Sign in to browse servers.</div>
+                      )}
+                      {worldSwitch && (
+                        <WorldSwitchOverlay
+                          target={worldSwitch}
+                          onSettled={() => { setWorldSwitch(null); window.location.reload(); }}
+                          onFail={async (reason) => {
+                            setWorldSwitch(null);
+                            // The committed switch's node never came up: put every
+                            // pointer back on the world we left (host is never here).
+                            try { await rollbackLastClientSwitch(); } catch { /* already back */ }
+                            toast(reason, 'error');
+                          }}
+                        />
                       )}
                     </div>
                   )}

@@ -7,6 +7,7 @@ import { ObjectImage } from '../ObjectImage'
 import { isVideoPost, resolveMediaUrl } from '../../utils/media'
 import type { OrbitIdentity } from '@orbit/crypto'
 import { CHROME, classes, COLOR, ICON, MONO, PADDING, STATUS, TYPE, WEIGHT } from '../../ui/tokens'
+import { formatCount } from '../../utils/formatDate'
 
 export interface FeedTileProps {
   post: FeedPost
@@ -133,7 +134,7 @@ export const FeedTile = memo(function FeedTile({ post, identity, liked, likes, o
           }}
           className={classes('pointer-events-auto shrink-0 cursor-pointer', MONO)}
         >
-          {likes > 0 ? likes.toLocaleString() : ''}
+          {likes > 0 ? formatCount(likes) : ''}
         </button>
         {onSaveToVault && media && (
           <button

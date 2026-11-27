@@ -34,10 +34,9 @@ describe('PCDominationTab constants', () => {
 })
 
 /**
- * Every server lane action (the API debits the authoritative ledger, pays the
- * consent cut and broadcasts before the receiver renders it) has a matching
- * client contract: a consent key, a validated payload and a stable wire id.
- * The mesh lane is free and carries the same id as its idempotency key.
+ * Every action (server trigger or sealed mesh send) has a matching client
+ * contract: a consent key, a validated payload and a stable wire id that
+ * doubles as its idempotency key. Neither lane charges g$.
  */
 describe('domination action contract (all seven effects)', () => {
   const cases: Record<string, unknown> = {

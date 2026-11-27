@@ -8,7 +8,8 @@ reshape the feed you are shown, buy images into your
 **Gallery**, pop **GoonCaps**, climb the **Pornification** ladder, and
 **Brainmelt** (prestige). Idle pts are a local-only currency (the save file);
 the server g$ ledger (`EconomyService`) backs duels, hacks and trades — two
-separate economies, no bridge between them.
+separate economies — there is no general bridge between them, with exactly one
+authorized crossing: the one-way, capped shard → g$ redemption (SPEC §2).
 
 ## 0. Architecture (merge plan D1–D9)
 
@@ -123,18 +124,26 @@ separate economies, no bridge between them.
 
 ## 2. Currencies
 
-- **pts** — the idle game's currency, LOCAL ONLY (2026-09-11 simplification):
-  earned by clicks alone (no passive, no offline), spent in the Tag Market / Image Shop /
-  GoonCap Vending Machine. Lives in the localStorage save; never synced to the
-  server. The old `idle-credit`/`idle-debit` ledger bridge (plan D4) was
+- **pts** — the idle game's currency, LOCAL ONLY: earned by clicks and spent in
+  the Tag Market / Image Shop / GoonCap Vending Machine. Lives in the
+  localStorage save; never synced to the server. The old
+  `idle-credit`/`idle-debit` ledger bridge (plan D4) was
   removed with `economy-idle.ts`, `walletBridge` and `walletSync`.
   Legacy saves migrate `gp`/`gc`/`totalEarnedGP`/`totalEarnedGc` →
   `points`/`totalEarned` (same value, renamed).
 - **g$** — the server ledger currency (`EconomyService` is authoritative):
-  duel stakes, hacks, trades, store purchases. Idle no longer feeds it; you
-  earn g$ through the shell's social/game loops only.
+  duel stakes, hacks, trades, store purchases, and the shard redemption below.
 - **XP** — drives Pornification tier (never resets within a run).
-- **Corruption shards** — prestige currency, persists through Brainmelt.
+- **Corruption shards** — prestige currency, persists through Brainmelt. Awarded
+  by Brainmelt, and (Batch 2) slowly by idle time while the app is open and by a
+  larger burst when a clicker foe/grid round is drained. Besides the +10%/shard
+  global multiplier (§9), shards are the **single authorized bridge** out of the
+  idle economy: a deliberate **one-way** redemption of **1000 shards → 1 g$**,
+  capped server-side at **1 redemption per 6h** and **5 g$ per rolling 24h**,
+  idempotent per redemption key, credited only by the authoritative ledger (the
+  client never credits itself). Shards are client-local, so the node cannot
+  verify their provenance — the rate and the cap are the only guard, and that
+  limitation is intentional and accepted.
 
 ## 3. Tags (the "appliances" market)
 
@@ -359,6 +368,20 @@ product path.
 - The Goon Panel scores on **press** (`pointerdown`), not release, so a click
   feels instant; the click event that follows is ignored (`detail > 0`) so one
   press scores once, and keyboard activation (`detail 0`) still scores.
+- **Batch 2 clicker/UI (2026-11-27).** The clicker plays as **gacha**: pressing
+  the art white-flashes proportional to damage, shakes the image, floats the
+  number, and a KO dissolves the picture into a short reward reveal that names
+  only the rarity, shards and drops ACTUALLY gained. Every 3×3 square carries its
+  own slim HP bar with name and rarity chip and drains independently; the HUD
+  collapses to two compact rows (pts/shards/combo, then buy/caps) and respects
+  `prefers-reduced-motion`. The 3×3 squares score on **click** (a real drag
+  suppresses click) so reordering a board never damages a foe — the 1×1 stage
+  alone keeps press-scoring. The composer adds an explicit **Write a text post**
+  mode (a text-only post needs no media), and stories are a **media-only
+  Instagram-style suite** (camera/upload/browse, ring progress, next/prev) with a
+  **24h** TTL; a caption-only story is refused inline. Every chat and post
+  timestamp is formatted **en-US** (`Oct 26, 2026`) by one shared formatter,
+  never the machine locale.
 - **KO novelty drops show every tag on the defeated foe (2026-11-23).** The
   drop tray under the Goon Panel lists ALL actionable tags of the image — valid,
   not already owned, not already excluded — instead of one arbitrary suggested
@@ -784,17 +807,40 @@ First Click, 100 Clicks, First Tag, Tag Collector (10 tags), Gallery of Sins
 First Brainmelt, 10 Shards, Goon Master (tier 10), Heat Demon (80-click
 heat streak). Each +5% click power. Persist across prestige.
 
-## 10b. Domination economy & spy payoff (connected loops)
+## 10a. Badges — the cosmetic shelf (2026-11-27)
 
-- Every PC-Domination action costs g$ from the authoritative ledger (one
-  wallet, plan D4): wallpaper/game_bg 250, text_overlay 400, message 500,
-  blur 800, popup_video 1200, camera 2500. Debit happens BEFORE the action
-  is recorded/broadcast — broke dominators get 402 and nothing fires.
-- The victim is paid a consent cut (40-60% of the fee, scaled by
-  intrusiveness): being dominated earns you g$. Idempotency keys are the
-  actionId, so retries never double-charge or double-pay.
-- `GET /api/domination/prices` exposes the table; the UI shows the price on
-  every action card and the payout in the success toast.
+A second, purely cosmetic milestone layer, separate from the 12
+power-granting achievements. `apps/desktop/src/game/badges.ts` is a catalog of
+18 badges across clicking / collection / prestige / shard-economy / combat,
+with names and thresholds deliberately distinct from the achievements.
+
+- **Derived, never stored.** `playerStatsFromGame` (in
+  `game/playerStats.ts`) is a pure projection of the game store; there is no
+  second stats file. (An earlier attempt kept a `gmatch.playerStats.v1` copy
+  that nothing updated, so every number stayed zero; it is gone.)
+- **Lifetime only, so a badge never relocks.** Every metric read is one
+  Brainmelt keeps (clicks, crits, capsUsed, purchases, prestigeCount,
+  idleShardsEarned, defeated, maxHeatStreak) and never goes DOWN: the
+  spendable `shards` balance and the deletable `gallery.length` are not read
+  directly, so two dedicated counters — `totalShardsEarned` and
+  `totalGallerySaved` — back the shard and keepsake badges, and a redemption
+  or a deletion cannot take a badge back. Run-scoped metrics (totalEarned,
+  XP/tier, tags — all reset by Brainmelt) are deliberately excluded. Session
+  time and picture-cache views are NOT tracked anywhere, so no badge depends
+  on them instead of faking a counter.
+- **UI.** `components/profile/BadgeShelf.tsx` renders a compact, expandable
+  shelf on the owner's own profile (`isSelf` only). Stats arrive through the
+  `usePlayerStats` hook (`useShallow`), not a prop chain, and every style is a
+  shared token (`CHROME`, `RARITY`); no emoji, no raw colour. Local only — no
+  network, no telemetry.
+
+## 10b. Domination (free) & spy payoff (connected loops)
+
+- **PC-Domination is FREE (Batch 2, 2026-11-27).** No action debits g$, no
+  victim payout exists, there is no 402/broke path and no price table — the
+  former `/api/domination/prices` route and its 250–2500 g$ costs are removed.
+  Consent flags still gate every action, idempotency keys are still the
+  actionId, and every action still reports the REAL execution ack.
 - **The high-impact OS wallpaper tier works on Windows and Linux** (2026-11-27).
   It is still gated on the separate `allowDesktopWallpaperOS` consent (off by
   default, and useless without `allowDesktopBackgroundChange`), and it reports
@@ -1384,6 +1430,45 @@ Consequences that are already implemented:
   to be served by the node (or by the user), and until then the updater says
   "no host answered" honestly rather than pretend the app is up to date.
 
+### 12c. Worlds = per-server local caches (2026-11-27)
+
+A **world** is a server. Each one is its own ecosystem — its own node data,
+posts, ids and chat — and the app treats a switch between them as entering a
+different world, not as a filter. The isolation is split in two on purpose:
+
+- **The node half is per world (host mode is ONE world).** A hosted node always
+  serves the install's own `official` world at the legacy `userData` root and
+  keeps the legacy `sha256(storageKey)` instance id, so an upgrade still adopts
+  a sidecar an older build left running (no `EADDRINUSE`, no data loss). A
+  **client** switch (joining a friend's node) commits a world id derived from
+  the server address (`worldIdForAddress` → `w_<fnv-1a-8hex>`); that id is the
+  only thing the renderer namespaces its caches with, and it never becomes a
+  filesystem path. `GET /api/health` echoes the node's `world_id` and
+  `server:state` returns `worldId`.
+- **Only cached SOCIAL data is namespaced per world.** `useActiveWorld` reads
+  the id once at boot (seeded synchronously from the API base, confirmed by
+  `server:state`) and pushes it into `utils/serverWorlds.ts`; every social cache
+  keys off it via `namespaceStorageKey` / `worldDbName`: the feed snapshot
+  (`gmatch.feed.snapshot.v1::<world>`), the operation log's IndexedDB name
+  (`gmatch-operation-log::<world>`) **and** its `BroadcastChannel`, the swarm
+  `orbit-gallery` DB, the known-peers roster and the chat seen stamps. World A's
+  timeline, post history and unread state can never appear in world B.
+- **Identity and durable local data stay GLOBAL, deliberately.** You are the
+  same person visiting each world: the Ed25519 identity, display name / tags /
+  pfp, the idle game save + gallery keepsake index, and the on-disk media vault
+  + encrypted imgcache are shared. A picture is bytes addressed by content, not
+  a world's row, so it is never re-downloaded per world. (The `shortcut:` in
+  `utils/serverWorlds.ts` records this boundary.)
+
+The switch itself shows `WorldSwitchOverlay` while the NEW node is polled: each
+`/api/health` attempt is bounded by a 4s `AbortController` (a hung-but-listening
+node cannot stall the loop), and it settles only on a real `db_ready` answer.
+A timeout returns to the world list with the real reason, and a failed CLIENT
+switch is rolled back — every pointer (`server-mode` config, `gmatch.api.url`,
+the dev-proxy cookie) and the persisted world id are restored to the world that
+was left, so the next launch does not dial the dead node. There is one overlay,
+not a second in-view veil.
+
 ## 13. Servers (directory, federation, admin) — v1.1+
 ADR-002 (`docs/ADR-002-servers.md`) é canônico; resumo de operação:
 
@@ -1678,7 +1763,7 @@ background. Each is a one-owner fix, not a second system.
 - **Community invite is one shared lookup.** `services/community.ts` reads the
   node's public `GET /api/discord-invite` (`SystemMeta.discord_invite_url`,
   set from the admin panel) and falls back to the constant
-  `https://discord.gg/Xkqb6U4Na` when a fresh local node has none or the node is
+  `https://discord.gg/BBCmAQs6x` when a fresh local node has none or the node is
   unreachable. The same hook feeds the header item
   (`CommandIsland`), Settings → Preferences (`CommunitySection`) and the top of
   the Help modal. Non-`http(s)` values are rejected, never opened.

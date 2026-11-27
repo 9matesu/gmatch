@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { sha256HexBlob } from './p2pSwarm'
 import {
   PEER_MEDIA_TIMEOUT_MS,
+  isContentAddress,
   isContentHash,
+  isLegacyContentHash,
   resolveContentAddressedMedia,
   type ContentAddressedDeps,
 } from './contentAddressedMedia'
@@ -38,6 +40,16 @@ describe('isContentHash', () => {
     expect(isContentHash('a'.repeat(40))).toBe(false)
     expect(isContentHash('z'.repeat(64))).toBe(false)
     expect(isContentHash(null)).toBe(false)
+  })
+})
+
+describe('isContentAddress', () => {
+  it('accepts a full digest and the legacy 40-hex prefix, nothing else', () => {
+    expect(isContentAddress('a'.repeat(64))).toBe(true)
+    expect(isContentAddress('a'.repeat(40))).toBe(true)
+    expect(isContentAddress('a'.repeat(64).toUpperCase())).toBe(true)
+    expect(isContentAddress('not-a-hash')).toBe(false)
+    expect(isContentAddress(null)).toBe(false)
   })
 })
 
@@ -135,6 +147,31 @@ describe('resolveContentAddressedMedia', () => {
     const d = deps()
     expect(await resolveContentAddressedMedia('object-1', 'not-a-hash', { deps: d })).toBeNull()
     expect(d.readLocal).not.toHaveBeenCalled()
+    expect(d.requestSwarm).not.toHaveBeenCalled()
+  })
+})
+
+describe('legacy 40-hex content refs (magnet btih)', () => {
+  const hash = 'a'.repeat(64)
+  const legacy = 'a'.repeat(40)
+
+  it('recognises the 40-hex prefix without weakening the full-hash guard', () => {
+    expect(isLegacyContentHash(legacy)).toBe(true)
+    expect(isContentHash(legacy)).toBe(false)
+    expect(isLegacyContentHash(hash)).toBe(false)
+  })
+
+  it('resolves the vault/IndexedDB copy that hashes to the prefix, with no swarm ask', async () => {
+    const full = await sha256HexBlob(BYTES)
+    const prefix = full.slice(0, 40)
+    const d = deps({ readLocal: vi.fn(async (id: string) => (id === prefix ? BYTES : null)) })
+    expect(await resolveContentAddressedMedia(null, prefix, { deps: d })).toBe(BYTES)
+    expect(d.requestSwarm).not.toHaveBeenCalled()
+  })
+
+  it('refuses local bytes that do not match the prefix', async () => {
+    const d = deps({ readLocal: vi.fn(async () => new Blob(['someone else'])) })
+    expect(await resolveContentAddressedMedia('object-1', legacy, { deps: d })).toBeNull()
     expect(d.requestSwarm).not.toHaveBeenCalled()
   })
 })

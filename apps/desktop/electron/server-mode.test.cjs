@@ -98,6 +98,24 @@ async function main() {
   assert.deepStrictEqual(read(), { mode: 'client', url: 'http://friend:8790', v: 2 })
   assert.deepStrictEqual(serverMode.readServerMode(), { mode: 'client', url: 'http://friend:8790' })
 
+  // ---- the client world id survives a revalidation (same node = same world) ----
+  // Each server is a distinct world; its per-world client namespace must be the
+  // same on every device and must not be reset to the default on reboot.
+  write({ mode: 'client', url: 'http://friend:8790', v: 2, worldId: 'w_abcd1234' })
+  assert.strictEqual(await serverMode.revalidateServerMode({ fetchImpl: okFetch }), null)
+  assert.strictEqual(read().worldId, 'w_abcd1234', 'rejoining the same node keeps its world id')
+  assert.strictEqual(serverMode.readWorldId(), 'w_abcd1234')
+  assert.deepStrictEqual(serverMode.readServerMode(), { mode: 'client', url: 'http://friend:8790', worldId: 'w_abcd1234' })
+  // A world id only describes a committed CLIENT world; an empty one is refused.
+  assert.throws(() => serverMode.writeWorldId(''), /non-empty/)
+  assert.strictEqual(read().worldId, 'w_abcd1234')
+  // Leaving for the local world resets it: hosting is one world (the legacy root).
+  serverMode.writeServerMode('host', '')
+  assert.strictEqual(read().worldId, undefined)
+  assert.strictEqual(serverMode.readWorldId(), 'official')
+  // ...and a world id can never be written for a host install.
+  assert.throws(() => serverMode.writeWorldId('w_x'), /client world/)
+
   // ---- writing a new choice clears any pause ----
   serverMode.writeServerMode('client', 'http://friend:8790')
   assert.deepStrictEqual(read(), { mode: 'client', url: 'http://friend:8790', v: 2 })

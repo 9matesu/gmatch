@@ -1,17 +1,22 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
 import { useGame } from '../game/store'
-import { gridSizeForMode, isGridMode } from '../game/store'
+import { gridSizeForMode, isGridMode, rarityBaseForPost } from '../game/store'
 import { HEAT_WINDOW_MS, heatMultiplier } from '../game/economy'
-import { ALL_CAP_IDS } from '../game/caps'
-import type { CapId, ViewMode } from '../game/types'
+import { imageRarity } from '../game/rarity'
+import { ALL_CAP_IDS, CAPS } from '../game/caps'
+import type { CapId, Rarity, ViewMode } from '../game/types'
 import { playPress } from '../utils/sounds'
 import { cachedImageFor, prefetchImages, resolveImage } from '../services/imageCache'
 import { isVideoUrl } from '../services/postFilter'
 import { redgifsPlayable } from '../services/redgifs'
+import { redeemShards } from '../services/shardRedeem'
+import { getCurrentIdentity } from '../hooks/useIdentity'
 import { formatNum } from './format'
 import {
   BTN,
   BTN_SMALL,
+  CHROME,
+  COLOR,
   FLOAT_GC,
   FLOAT_GC_CRIT,
   GOON_IMAGE,
@@ -22,6 +27,7 @@ import {
   MUTED,
   PANEL,
   PLATE,
+  RARITY,
   STAGE_FRAME,
 } from './styles'
 import { DamageTint } from './DamageTint'
@@ -39,6 +45,8 @@ import {
   Skull,
   ArrowClockwise,
   Lightning,
+  Coins,
+  Sparkle,
 } from '@phosphor-icons/react'
 import { playHit } from '../utils/sounds'
 
@@ -49,6 +57,29 @@ interface Float {
   text: string
   crit: boolean
   cell: number | null
+}
+
+/** One KO's gacha payoff. Deltas are measured across the drain, not lifetime totals. */
+interface KoFx {
+  key: number
+  cell: number | null
+  url?: string
+  preview?: string
+  rarity: Rarity
+  gained: number
+  drops: number
+  shards: number
+}
+
+/** Rarity chip colour is one named token per tier, never a per-call colour. */
+function rarityClass(rarity: Rarity): string {
+  return RARITY[rarity.toLowerCase() as keyof typeof RARITY]
+}
+
+/** The foe's own first tag is its name — real feed data, not a invented title. */
+function foeName(tags: string[]): string {
+  const tag = tags.find(Boolean)
+  return tag ? tag.replace(/_/g, ' ') : 'FOE'
 }
 
 const CAP_ORDER: readonly CapId[] = ALL_CAP_IDS
@@ -74,6 +105,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
   const fetching = useGame((s) => s.fetching)
   const foeHp = useGame((s) => s.foeHp)
   const foeMaxHp = useGame((s) => s.foeMaxHp)
+  const foeClicks = useGame((s) => s.foeClicks)
   const defeated = useGame((s) => s.defeated)
   const viewMode = useGame((s) => s.viewMode)
   const grid = useGame((s) => s.grid)
@@ -99,6 +131,10 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
   const queue = useGame((s) => s.queue)
   const past = useGame((s) => s.past)
   const setImageReady = useGame((s) => s.setImageReady)
+  const points = useGame((s) => s.points)
+  const shards = useGame((s) => s.shards)
+  const gallery = useGame((s) => s.gallery)
+  const popCap = useGame((s) => s.popCap)
 
   const [floats, setFloats] = useState<Float[]>([])
   const [critFlash, setCritFlash] = useState(false)
@@ -141,12 +177,18 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
   useEffect(() => { setBanPick([]); setBanPickerOpen(false) }, [current?.id])
   const [dragFrom, setDragFrom] = useState<number | null>(null)
   const [dragOver, setDragOver] = useState<number | null>(null)
-  // Shake + hit-flash are retriggered by REMOUNTING a child span, not the tile
-  // that holds the media. See the note on GoonPanel's `key` props: bumping the
-  // tile's key used to unmount the <img>/<video> on every click.
+  // A drag started on a tile: suppress the press/click that belongs to it so
+  // reordering never scores a hit. Cleared when the drag ends.
+  // Shake + white flash restart by ALTERNATING the animation name on the media
+  // element itself. Nothing is remounted: a key bump used to unmount the
+  // <img>/<video> on every click (blank frame / video restart).
   const [shakeKey, setShakeKey] = useState(0)
   const [shakeCell, setShakeCell] = useState<number | null>(null)
   const [critCell, setCritCell] = useState<number | null>(null)
+  const [flashPeak, setFlashPeak] = useState(0.5)
+  const [koFx, setKoFx] = useState<KoFx | null>(null)
+  const [redeeming, setRedeeming] = useState(false)
+  const koTimer = useRef<number | null>(null)
   const floatId = useRef(0)
   const stageRef = useRef<HTMLElement | null>(null)
   const reduceMotion = useReducedMotion()
@@ -261,7 +303,11 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
   // DOM spans + orphan timers on unmount. Cap live floats at 20 and clear
   // every timer on unmount — the stage can't be the thing that leaks.
   const floatTimers = useRef<number[]>([])
-  useEffect(() => () => { for (const t of floatTimers.current) window.clearTimeout(t); floatTimers.current = [] }, [])
+  useEffect(() => () => {
+    for (const t of floatTimers.current) window.clearTimeout(t)
+    floatTimers.current = []
+    if (koTimer.current !== null) window.clearTimeout(koTimer.current)
+  }, [])
   const spawnFloat = (x: number, y: number, gain: number, crit: boolean, cell: number | null, heatMult = 1) => {
     const id = ++floatId.current
     const heatTag = heatMult > 1 ? ` x${heatMult}` : ''
@@ -274,33 +320,101 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
   }
 
   /**
-   * Retrigger the click feedback. The shake and hit-flash alternate between two
-   * identically-named keyframe pairs (`gg-shake-a`/`-b`), because changing
-   * `animation-name` restarts a CSS animation in place. Nothing is remounted,
-   * so the tile's <img>/<video> keeps its DOM node ÔÇö which is what stops a
-   * click from restarting a video or blanking an already-decoded image.
+   * Retrigger the hit feedback. Shake and white flash alternate between two
+   * identically-named keyframe pairs (a/b), because changing `animation-name`
+   * restarts a CSS animation IN PLACE. The media element keeps its DOM node —
+   * a remount would blank an image or restart a video on every click.
    */
-  const triggerShake = (cell: number | null, crit = false) => {
+  const triggerHit = (cell: number | null, crit: boolean, gain: number, maxHp: number) => {
     setCritCell(crit ? cell : null)
     if (reduceMotion) return
+    // Hit-proportional: a 1 HP tap barely flashes, a crit on a fresh boss
+    // nearly whites out. Always composited opacity, capped short.
+    const ratio = maxHp > 0 ? gain / maxHp : 0
+    setFlashPeak(Math.min(0.85, 0.18 + ratio * 1.1 + (crit ? 0.12 : 0)))
     setShakeCell(cell)
     setShakeKey((k) => k + 1)
   }
 
+  /** Read the KO's real reward from the store across the drain, never fabricate. */
+  const spawnKo = (
+    cell: number | null,
+    url: string | undefined,
+    preview: string | undefined,
+    gained: number,
+    before: ReturnType<typeof useGame.getState>,
+  ) => {
+    if (reduceMotion) return
+    const after = useGame.getState()
+    const kept = after.gallery[after.gallery.length - 1]
+    // A drop is fresh only if the head actually changed — otherwise it is a
+    // stale drop from an earlier KO and must not be counted twice.
+    const freshDrop = after.pendingDrops[0] !== before.pendingDrops[0] ? after.pendingDrops[0] : null
+    setKoFx({
+      key: ++floatId.current,
+      cell,
+      // Dissolve from the cached copy when we have one — never re-download
+      // the very picture the player just drained.
+      url: url ? cachedImageFor(url) ?? url : undefined,
+      preview,
+      rarity: kept?.rarity ?? 'Common',
+      gained,
+      drops: freshDrop?.tags.length ?? 0,
+      shards: after.shards - before.shards,
+    })
+    if (koTimer.current !== null) window.clearTimeout(koTimer.current)
+    koTimer.current = window.setTimeout(() => setKoFx(null), 950)
+  }
+
+  /** Spend only the shards the NODE says it took, and report what it credited. */
+  const redeem = async () => {
+    const identity = getCurrentIdentity()
+    if (!identity) {
+      useGame.getState().notify('Redemption needs a signed-in wallet — nothing was spent.')
+      return
+    }
+    setRedeeming(true)
+    try {
+      const result = await redeemShards(identity, 1000)
+      if (result.ok) {
+        useGame.getState().spendShards(result.shardsSpent)
+        useGame.getState().notify(
+          `Redeemed ${result.shardsSpent} shards — +${formatNum(result.grantedG)} g$ credited.`,
+        )
+      } else {
+        const wait = result.retryAfterMs ? ` Retry in ${Math.ceil(result.retryAfterMs / 1000)}s.` : ''
+        useGame.getState().notify(`Redemption failed — ${result.error ?? 'node refused'}.${wait}`)
+      }
+    } finally {
+      setRedeeming(false)
+    }
+  }
+
   const handleClick = (e: MouseEvent<HTMLElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
-    const { gain, crit, heat } = clickImage()
+    const before = useGame.getState()
+    const { gain, crit, heat, killed } = clickImage()
     playHit(crit)
     spawnFloat(e.clientX - rect.left, e.clientY - rect.top, gain, crit, null, heat)
-    triggerShake(null, crit)
+    triggerHit(null, crit, gain, before.foeMaxHp)
+    if (killed) {
+      // Points delta includes the real KO bonus; shard/drop deltas come from
+      // comparing the store across this drain.
+      spawnKo(null, before.current?.url, before.current?.preview, useGame.getState().points - before.points, before)
+    }
   }
 
   const handleCellClick = (index: number, e: MouseEvent<HTMLButtonElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
-    const { gain, crit, heat } = clickCell(index)
+    const before = useGame.getState()
+    const cellBefore = before.grid[index]
+    const { gain, crit, heat, killed } = clickCell(index)
     playHit(crit)
     if (gain > 0) spawnFloat(e.clientX - rect.left, e.clientY - rect.top, gain, crit, index, heat)
-    triggerShake(index, crit)
+    triggerHit(index, crit, gain, cellBefore?.maxHp ?? 0)
+    if (killed) {
+      spawnKo(index, cellBefore?.post.url, cellBefore?.post.preview, useGame.getState().points - before.points, before)
+    }
   }
 
   /** Middle-click anywhere on the stage advances to the next foe — no reward. */
@@ -430,30 +544,63 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
     </div>
   )
 
-  // KO popup: a brief screen pop the moment a foe is drained — mobile-game
-  // feedback, honoring prefers-reduced-motion.
-  const [koPop, setKoPop] = useState(false)
-  const prevDefeated = useRef(defeated)
-  useEffect(() => {
-    if (defeated <= prevDefeated.current) {
-      prevDefeated.current = defeated
-      return
-    }
-    prevDefeated.current = defeated
-    if (reduceMotion) return
-    setKoPop(true)
-    const t = window.setTimeout(() => setKoPop(false), 900)
-    return () => window.clearTimeout(t)
-  }, [defeated, reduceMotion])
+  // One hit sequence, three composited layers: the MEDIA shakes (its own
+  // animation-name alternates), a white flash peaks with the damage dealt, and
+  // on a KO the drained foe dissolves while a short reward card reveals.
+  const shakeCls = (cell: number | null) =>
+    !reduceMotion && shakeKey > 0 && shakeCell === cell
+      ? shakeKey % 2
+        ? 'animate-[gg-shake-b_0.18s_ease-out]'
+        : 'animate-[gg-shake-a_0.18s_ease-out]'
+      : ''
 
-  const koPopEl = koPop && (
-    <div className="pointer-events-none absolute inset-0 z-[11] flex items-center justify-center">
-      <div className="animate-orbit-pop flex items-center gap-2 rounded-2xl border border-edge bg-black/85 px-8 py-3 font-mono text-3xl font-black tracking-widest text-retro-fg">
-        <Skull className="h-7 w-7 text-danger-fg" weight="fill" />
-        KO
+  const flashEl = (cell: number | null) =>
+    !reduceMotion && shakeKey > 0 && shakeCell === cell ? (
+      <span
+        data-testid="goon-white-flash"
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-0 z-[5] bg-current ${COLOR.onMedia} ${shakeKey % 2 ? 'animate-[gg-white-flash-b_0.16s_ease-out_forwards]' : 'animate-[gg-white-flash-a_0.16s_ease-out_forwards]'}`}
+        style={{ '--gg-flash-peak': flashPeak } as React.CSSProperties}
+      />
+    ) : null
+
+  const gachaEl = (cell: number | null) =>
+    koFx && koFx.cell === cell ? (
+      <div
+        key={koFx.key}
+        className="pointer-events-none absolute inset-0 z-[9] flex items-center justify-center"
+      >
+        {!reduceMotion && (koFx.url || koFx.preview) && (
+          <img
+            data-testid="gacha-dissolve"
+            src={koFx.url ?? koFx.preview}
+            alt=""
+            aria-hidden="true"
+            referrerPolicy="no-referrer"
+            className={`${GOON_IMAGE} absolute inset-0 animate-[gg-gacha-ko_0.42s_ease-out_forwards]`}
+          />
+        )}
+        <div
+          data-testid="gacha-reveal"
+          className={`${CHROME.overlayPanel} flex items-center gap-2 px-3 py-1.5 ${reduceMotion ? '' : 'animate-[gg-gacha-reveal_0.26s_ease-out_both]'}`}
+        >
+          <span className={`${MONO} text-2xs font-black uppercase tracking-wider ${rarityClass(koFx.rarity)}`}>
+            {koFx.rarity} FOE
+          </span>
+          <span className={`${MONO} text-xs font-bold ${COLOR.fg}`}>+{formatNum(koFx.gained)} pts</span>
+          {koFx.drops > 0 && (
+            <span className={`${MONO} text-2xs ${COLOR.muted}`}>
+              {koFx.drops} tag{koFx.drops === 1 ? '' : 's'} to claim
+            </span>
+          )}
+          {koFx.shards > 0 && (
+            <span className={`${MONO} text-2xs ${COLOR.muted}`}>
+              {koFx.shards} shard{koFx.shards === 1 ? '' : 's'}
+            </span>
+          )}
+        </div>
       </div>
-    </div>
-  )
+    ) : null
 
   return (
     <section
@@ -501,18 +648,61 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           </div>
         )}
       </div>
+      {/* One compact telemetry row: real points, shards and live heat combo. */}
+      <div
+        data-testid="clicker-hud"
+        className="flex flex-none flex-wrap items-center gap-1.5 px-1"
+        aria-label="Clicker stats"
+      >
+        <span
+          className={`${MONO} inline-flex items-center gap-1 rounded-md border border-edge bg-glass-w8 px-2 py-0.5 text-2xs font-bold ${COLOR.fg}`}
+          title="Idle points — earned by clicking"
+        >
+          <Coins size={12} weight="fill" className="text-warning-fg" />
+          {formatNum(points)} pts
+        </span>
+        <span
+          className={`${MONO} inline-flex items-center gap-1 rounded-md border border-edge bg-glass-w8 px-2 py-0.5 text-2xs font-bold ${COLOR.fg}`}
+          title="Corruption shards — each adds 10% click power"
+        >
+          <Sparkle size={12} weight="fill" className="text-chrome-lav" />
+          {shards} shards
+        </span>
+        <button
+          type="button"
+          data-testid="redeem-shards"
+          aria-label="Redeem 1000 shards"
+          title="One-way: redeem 1000 shards for g$ on the node, at its rate"
+          disabled={shards < 1000 || redeeming}
+          onClick={() => void redeem()}
+          className={`${MONO} inline-flex cursor-pointer items-center rounded-md border border-retro-accent/50 bg-retro-accent/15 px-2 py-0.5 text-2xs font-bold text-retro-fg transition-colors hover:bg-retro-accent/25 disabled:cursor-not-allowed disabled:opacity-40`}
+        >
+          {redeeming ? 'Redeeming…' : 'Redeem 1000 shards'}
+        </button>
+        {heatLive && (
+          <span
+            className={`${MONO} inline-flex items-center gap-1 rounded-md border border-warning/40 bg-warning/15 px-2 py-0.5 text-2xs font-black text-warning-fg`}
+            title={`Heat combo: ${heatStreak} rapid clicks. x${heat} click power`}
+          >
+            <Fire size={12} weight="fill" className="text-warning-fg" />
+            x{heat}
+          </span>
+        )}
+      </div>
       {isGrid ? (
         <div
           className={`${STAGE_FRAME} relative min-h-0 flex-1 grid auto-rows-fr ${gridCols} gap-2 p-2`}
           aria-label={`${viewMode} goon grid`}
         >
           {critFlashEl}
-          {koPopEl}
           {grid.map((cell, i) => {
             const motion =
               (cell.post.kind === 'video' || isVideoUrl(cell.post.url)) &&
               !/\.gif(?:[?#]|$)/i.test(cell.post.url)
             const pct = Math.max(0, (cell.hp / cell.maxHp) * 100)
+            const name = foeName(cell.post.tags)
+            // Real feed data: same rarity the store will bank on the KO.
+            const rarity = imageRarity(rarityBaseForPost(cell.post.id), gallery.length, cell.clicks + 1)
             return (
               <button
                 // Stable across clicks: only the foe's identity and the cell
@@ -548,15 +738,18 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                   setDragOver(null)
                 }}
                 className={`relative min-h-0 cursor-grab overflow-hidden rounded-lg border bg-retro-bg p-0 text-left font-[inherit] text-[color:inherit] active:cursor-grabbing ${dragOver === i ? 'border-retro-accent ring-2 ring-retro-accent/60' : 'border-edge'
-                  } ${dragFrom === i ? 'opacity-50' : ''}`}
+                  } ${dragFrom === i ? 'opacity-50' : ''} ${reduceMotion ? '' : 'animate-[gg-gacha-slide-in_0.26s_ease-out_both]'}`}
+                // A real drag suppresses click, so scoring the grid on click
+                // cannot damage a foe the player only grabbed to reorder.
+                // Keyboard activation arrives as click with detail 0.
                 onClick={(e) => handleCellClick(i, e)}
                 onAuxClick={handleAuxClick}
                 onContextMenu={(e) => { e.preventDefault(); purgePost(cell.post) }}
-                aria-label={`Foe ${i + 1}: ${Math.ceil(cell.hp)} of ${cell.maxHp} HP. Activate to attack, drag to reorder, right-click to purge`}
+                aria-label={`Foe ${i + 1}: ${name}, ${rarity}, ${Math.ceil(cell.hp)} of ${cell.maxHp} HP. Activate to attack, drag to reorder, right-click to purge`}
               >
                 {motion ? (
                   <video
-                    className={GOON_IMAGE}
+                    className={`${GOON_IMAGE} ${shakeCls(i)}`}
                     src={redgifsPlayable(cell.post.url)}
                     poster={cell.post.preview ? redgifsPlayable(cell.post.preview) : undefined}
                     autoPlay
@@ -569,7 +762,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                   />
                 ) : (
                   <CachedImg
-                    className={GOON_IMAGE}
+                    className={`${GOON_IMAGE} ${shakeCls(i)}`}
                     src={cell.post.url}
                     fallbackSrc={cell.post.preview}
                     alt="goon grid square"
@@ -578,25 +771,28 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                     draggable={false}
                   />
                 )}
-                {/* Click feedback. The a/b alternation restarts each animation
-                    per hit without changing the tile's key, so the <img>/<video>
-                    above keep their DOM nodes. */}
-                {shakeCell === i && (
-                  <span
-                    aria-hidden="true"
-                    data-testid="goon-shake"
-                    className={`pointer-events-none absolute inset-0 z-[4] ${shakeKey % 2 ? 'animate-[gg-shake-b_0.18s_ease-out]' : 'animate-[gg-shake-a_0.18s_ease-out]'}`}
-                  />
-                )}
+                {/* Each square is its own boss: name + rarity read on art,
+                    then a slim HP bar that stays legible without a big plate. */}
+                <span className="pointer-events-none absolute inset-x-1 top-1 z-[3] flex items-center gap-1">
+                  <span data-testid="foe-name" className={`${CHROME.mediaChip} max-w-[65%] truncate font-bold`}>
+                    {name}
+                  </span>
+                  <span data-testid="foe-rarity" className={`${CHROME.cardChip} border ${rarityClass(rarity)}`}>
+                    {rarity}
+                  </span>
+                </span>
+                {flashEl(i)}
                 <DamageTint
                   dmg={1 - pct / 100}
                   flashKey={shakeCell === i ? shakeKey : 0}
                   crit={critCell === i}
                   reducedMotion={reduceMotion}
                 />
+                {gachaEl(i)}
                 <span className="pointer-events-none absolute inset-x-0 bottom-0 z-[2]">
-                  <span className={`${HP_BAR} h-[2px] rounded-none`}>
+                  <span className={`${HP_BAR} h-1 rounded-none`}>
                     <span
+                      data-testid="foe-hp-fill"
                       className={`${HP_FILL} ${pct <= 30 ? HP_FILL_LOW : ''}`}
                       style={{ width: `${pct}%` }}
                     />
@@ -687,16 +883,20 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
             />
           )}
           {critFlashEl}
-          {koPopEl}
-          {/* Shake on its own keyed-free overlay, and the progressive damage
-              wash. Both sit above the media and below the controls. */}
-          {shakeCell === null && shakeKey > 0 && (
-            <span
-              aria-hidden="true"
-              data-testid="goon-shake"
-              className={`pointer-events-none absolute inset-0 z-[4] ${shakeKey % 2 ? 'animate-[gg-shake-b_0.18s_ease-out]' : 'animate-[gg-shake-a_0.18s_ease-out]'}`}
-            />
+          {inBattle && !showOffline && current && (
+            <span className="pointer-events-none absolute inset-x-3 top-3 z-[5] flex items-center gap-1">
+              <span data-testid="foe-name" className={`${CHROME.mediaChip} max-w-[50%] truncate font-bold`}>
+                {foeName(current.tags)}
+              </span>
+              <span
+                data-testid="foe-rarity"
+                className={`${CHROME.cardChip} border ${rarityClass(imageRarity(rarityBaseForPost(current.id), gallery.length, foeClicks + 1))}`}
+              >
+                {imageRarity(rarityBaseForPost(current.id), gallery.length, foeClicks + 1)}
+              </span>
+            </span>
           )}
+          {flashEl(null)}
           {inBattle && (
             <DamageTint
               dmg={1 - hpPct / 100}
@@ -705,6 +905,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               reducedMotion={reduceMotion}
             />
           )}
+          {gachaEl(null)}
           {inBattle && (
             <span className="pointer-events-none absolute inset-x-0 bottom-0 z-[5]">
               <span className={`${HP_BAR} h-[2px] rounded-none`}>
@@ -720,7 +921,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               decorative effect — the object-contain image is the whole stage. */}
           {isMotion && current ? (
             <video
-              className={`${GOON_IMAGE} relative z-[3] ${reduceMotion ? '' : 'pointer-events-none'}`}
+              className={`${GOON_IMAGE} relative z-[3] ${shakeCls(null)} ${reduceMotion ? '' : 'pointer-events-none'}`}
               src={redgifsPlayable(current.url)}
               poster={current.preview ? redgifsPlayable(current.preview) : undefined}
               autoPlay
@@ -734,7 +935,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
           ) : !showOffline && shownUrl ? (
             <img
               ref={onStageRef}
-              className={`${GOON_IMAGE} relative z-[1]`}
+              className={`${GOON_IMAGE} relative z-[1] ${shakeCls(null)}`}
               src={shownUrl}
               alt="goon feed"
               referrerPolicy="no-referrer"
@@ -961,16 +1162,6 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
         ) : (
           <span className={`${MUTED} text-xs`}>No live foe. Take your time.</span>
         )}
-        {heatLive && (
-          <span
-            className={`${MONO} inline-flex min-w-0 shrink items-center gap-1.5 whitespace-nowrap rounded-lg border border-warning/40 bg-warning/15 px-2.5 py-1 text-xs font-black text-warning-fg${reduceMotion ? '' : ' animate-pulse'}`}
-            title={`Heat combo: ${heatStreak} rapid clicks. X${heat} click power`}
-            aria-label={`Heat combo x${heat}`}
-          >
-            <Fire size={14} weight="fill" className="text-warning-fg" />
-            x{heat}
-          </span>
-        )}
         {feedOffline && (
           <button
             type="button"
@@ -984,12 +1175,38 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
             {fetching ? 'Retrying…' : 'Retry'}
           </button>
         )}
+      </div>
+      {/* One compact buy/caps row — real cap prices from the store, no sprawl. */}
+      <div
+        data-testid="clicker-buy-row"
+        className="flex flex-none flex-wrap items-center gap-1.5 px-1 pb-0.5"
+        aria-label="Buy caps and overclocks"
+      >
+        {ALL_CAP_IDS.map((id, idx) => {
+          const def = CAPS[id]
+          const afford = points >= def.cost
+          return (
+            <button
+              key={id}
+              type="button"
+              aria-label={`Buy ${def.name}`}
+              title={`${def.name} — x${def.clickMult} click, permanent. Costs ${formatNum(def.cost)} pts. Press ${idx + 1}`}
+              disabled={!afford}
+              onClick={() => { playPress(800); popCap(id) }}
+              className={`${MONO} inline-flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-0.5 text-2xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${afford ? 'border-retro-accent/50 bg-retro-accent/15 text-retro-fg hover:bg-retro-accent/25' : 'border-edge bg-glass-w5 text-retro-muted'}`}
+            >
+              <span className={`${COLOR.faint} font-black`}>{idx + 1}</span>
+              {def.name}
+              <span className={afford ? 'text-warning-fg' : COLOR.faint}>{formatNum(def.cost)}</span>
+            </button>
+          )
+        })}
         <span
-          className={`${MONO} inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-edge bg-glass-w8 px-2.5 py-1 text-xs font-bold text-retro-body shadow-sm`}
+          className={`${MONO} inline-flex items-center gap-1 rounded-md border border-edge bg-glass-w8 px-2 py-0.5 text-2xs font-bold ${COLOR.body}`}
           title="Lifetime KOs. Each foe hits harder"
         >
-          <Skull size={13} weight="bold" className="text-danger-fg" />
-          {formatNum(defeated)}
+          <Skull size={12} weight="bold" className="text-danger-fg" />
+          {formatNum(defeated)} KOs
         </span>
       </div>
 

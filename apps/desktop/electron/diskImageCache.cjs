@@ -3,6 +3,7 @@
 // Files stored at userData/imgcache/<key>.enc.
 const fs = require('fs')
 const path = require('path')
+const crypto = require('crypto')
 const aead = require('./aeadFile.cjs')
 
 const MAX_DEFAULT = 500 * 1024 * 1024 // 500 MB disk ceiling
@@ -76,9 +77,37 @@ function put(key, buf) {
   }
 }
 
+/** sha256 of the plaintext bytes — one identity for a picture under any url. */
+function contentHash(buf) {
+  return crypto.createHash('sha256').update(buf).digest('hex')
+}
+
+/**
+ * Store bytes under their CONTENT hash ALONE. The MIME/extension lives in the
+ * url index (`imageCache.cjs` meta), not in the file name: two mirrors serving
+ * the same bytes as jpeg and png must share one encrypted .enc, or the LRU
+ * counts the picture twice. A repeat only touches recency — no rewrite.
+ */
+function putContent(buf) {
+  if (!dbPath || !encKey || !buf) return null
+  const hash = contentHash(buf)
+  const key = hash
+  const safeKey = safe(key)
+  const hit = index.get(safeKey)
+  if (hit) {
+    hit.ts = Date.now()
+    return { key, hash, reused: true }
+  }
+  return put(key, buf) ? { key, hash, reused: false } : null
+}
+
+function safe(key) {
+  return key.replace(/[^a-zA-Z0-9_-]/g, '_')
+}
+
 function get(key) {
   if (!dbPath || !encKey) return null
-  const safeKey = key.replace(/[^a-zA-Z0-9_-]/g, '_')
+  const safeKey = safe(key)
   const meta = index.get(safeKey)
   if (!meta) return null
   try {
@@ -96,12 +125,12 @@ function get(key) {
  *  against files the LRU already dropped. */
 function has(key) {
   if (!dbPath) return false
-  return index.has(key.replace(/[^a-zA-Z0-9_-]/g, '_'))
+  return index.has(safe(key))
 }
 
 function del(key) {
   if (!dbPath) return false
-  const safeKey = key.replace(/[^a-zA-Z0-9_-]/g, '_')
+  const safeKey = safe(key)
   const meta = index.get(safeKey)
   if (!meta) return false
   try { fs.unlinkSync(path.join(dbPath, `${safeKey}.enc`)) } catch {}
@@ -127,4 +156,4 @@ function totalBytes() { return total }
 function size() { return index.size }
 function getMaxBytes() { return maxBytes }
 
-module.exports = { init, put, get, has, del, clear, setMaxBytes, totalBytes, size, getMaxBytes }
+module.exports = { init, put, get, has, del, clear, setMaxBytes, totalBytes, size, getMaxBytes, contentHash, putContent }

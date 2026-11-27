@@ -16,12 +16,8 @@ interface ActionModalProps {
   onClose: () => void;
   onSubmit: (payload: any) => Promise<void>;
   loading?: boolean;
-  /** Context for the honest confirm line: who + how much. */
+  /** Who the effect is going to. */
   targetName?: string;
-  price?: number;
-  /** A mesh-known target is free on every lane; the confirm line agrees with
-   *  the card instead of quoting a server price nobody will be charged. */
-  freeViaMesh?: boolean;
 }
 
 export function ActionModal({
@@ -32,8 +28,6 @@ export function ActionModal({
   onSubmit,
   loading = false,
   targetName,
-  price,
-  freeViaMesh = false,
 }: ActionModalProps) {
   const [url, setUrl] = useState('');
   const [inlineName, setInlineName] = useState<string | null>(null);
@@ -156,7 +150,7 @@ export function ActionModal({
       onClose={onClose}
       maxWidth={DIALOG_WIDTH.lg}
     >
-      {/* One form, one caption, one cost line. Every error sits by its field. */}
+      {/* One form, one caption. Every error sits by its field. */}
       <form onSubmit={handleSubmit} className="space-y-4">
         {targetName && <Caption>to {targetName}</Caption>}
         {formError && (
@@ -305,15 +299,9 @@ export function ActionModal({
           </label>
         )}
 
-        {/* One cost line, one primary action. The cost is never guessed. */}
+        {/* One primary action; domination has no currency cost. */}
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-edge-subtle pt-3">
-          <span className={cn(TYPE.body, COLOR.muted, 'text-pretty')}>
-            {freeViaMesh
-              ? 'Nothing is charged.'
-              : price != null
-                ? <><span className={MONO}>{price} g$</span> charged only if the send is accepted.</>
-                : 'Charged only if the send is accepted.'}
-          </span>
+          <span className={cn(TYPE.body, COLOR.muted, 'text-pretty')}>Nothing is charged.</span>
           <div className="flex gap-2">
             <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
             <Button type="submit" variant="primary" size="sm" loading={loading} loadingLabel="Sending…">

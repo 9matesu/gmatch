@@ -44,8 +44,9 @@ export function ClickerCacheView({
 
   const load = useCallback(async () => {
     setLoading(true)
-    const rows = await listCachedPictures()
-    setItems(rows)
+    // The main process dedupes by content hash (and by local file for legacy
+    // rows) before crossing IPC; a second pass here would only hide real rows.
+    setItems(await listCachedPictures())
     setLoading(false)
   }, [])
 
@@ -69,7 +70,7 @@ export function ClickerCacheView({
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-xs font-semibold text-retro-fg">
           <HardDrive className="h-4 w-4" />
-          Picture cache ({items.length})
+          Temporary picture cache ({items.length})
           {total > 0 && <span className="font-normal text-retro-muted">· {fmtBytes(total)}</span>}
         </div>
         <button
@@ -87,11 +88,15 @@ export function ClickerCacheView({
         <p className="text-xs text-retro-muted">Reading cache…</p>
       ) : items.length === 0 ? (
         <p className="text-xs text-retro-muted">
-          Nothing cached yet. Play a few rounds — the pictures you see are kept here.
+          Nothing in the temporary picture cache. Play a few rounds — the pictures you see are
+          kept here. Keepsakes you saved are in the Gallery, where they are permanent.
         </p>
       ) : (
         <>
-          <p className="text-2xs text-retro-muted">Click a picture to save it to your gallery.</p>
+          <p className="text-2xs text-retro-muted">
+            This cache is temporary and may be cleared. Gallery keepsakes are saved permanently.
+            Click a picture to save it to your gallery.
+          </p>
           <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6">
             {items.slice(0, windowSize).map((p) => (
               <button

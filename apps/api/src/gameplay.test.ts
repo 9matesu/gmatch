@@ -5,7 +5,7 @@ import { EconomyService } from './economy'
 import crypto from 'crypto'
 
 // Release-1.0 gate: the connected loops the plan promises, over HTTP.
-// Only the legs NOT covered by existing suites (domination victim payout,
+// Only the legs NOT covered by existing suites (free domination send,
 // marketplace cancel listing, share-link PM round trip).
 function auth(identity: any, method: string, url: string, body?: string) {
   return signRequestHeaders(identity, method, url, body)
@@ -32,8 +32,10 @@ describe('release loops (P4 gaps)', () => {
     })
   })
 
-  it('domination action debits attacker AND pays the victim a consent cut', async () => {
+  it('domination action sends free with no debit or payout', async () => {
     const body = JSON.stringify({ targetId: victim.orbitId, action: 'blur', payload: { intensity: 10, duration: 5000 } })
+    const econ = new EconomyService(env.DB)
+    const before = await env.DB.prepare('SELECT COUNT(*) n FROM LedgerTransactions').first<{ n: number }>()
     const res = await app.request('/api/domination/trigger', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...auth(attacker, 'POST', '/api/domination/trigger', body) },
@@ -42,16 +44,16 @@ describe('release loops (P4 gaps)', () => {
     expect(res.status).toBe(200)
     const json: any = await res.json()
     expect(json.success).toBe(true)
+    expect(json.cost).toBeUndefined()
+    expect(json.victimReward).toBeUndefined()
 
-    const econ = new EconomyService(env.DB)
-    const attackerBal = await econ.getBalance(attacker.orbitId)
-    const victimBal = await econ.getBalance(victim.orbitId)
-    expect(attackerBal).toBeLessThan(10_000) // fee taken
-    expect(victimBal).toBeGreaterThan(0)     // payout received
-    expect(victimBal).toBeLessThanOrEqual(10_000 - attackerBal) // cut <= fee
+    expect(await econ.getBalance(attacker.orbitId)).toBe(10_000)
+    expect(await econ.getBalance(victim.orbitId)).toBe(0)
+    const after = await env.DB.prepare('SELECT COUNT(*) n FROM LedgerTransactions').first<{ n: number }>()
+    expect(Number(after?.n)).toBe(Number(before?.n))
   })
 
-  it('broke attacker gets 4xx and nothing is recorded', async () => {
+  it('a broke attacker can still send and the action is recorded', async () => {
     const body = JSON.stringify({ targetId: victim.orbitId, action: 'blur', payload: { intensity: 10, duration: 5000 } })
     const url = '/api/domination/trigger'
     // drain wallet
@@ -66,9 +68,12 @@ describe('release loops (P4 gaps)', () => {
       headers: { 'Content-Type': 'application/json', ...auth(attacker, 'POST', url, body) },
       body,
     }, env)
-    expect(res.status).toBe(402)
-    const victimBal = await new EconomyService(env.DB).getBalance(victim.orbitId)
-    expect(victimBal).toBe(10_000) // only the transfer landed; no domination payout double
+    expect(res.status).toBe(200)
+    const econ = new EconomyService(env.DB)
+    expect(await econ.getBalance(attacker.orbitId)).toBe(0)
+    expect(await econ.getBalance(victim.orbitId)).toBe(10_000) // only the transfer landed
+    const recorded = await env.DB.prepare('SELECT COUNT(*) n FROM DominationActions').first<{ n: number }>()
+    expect(Number(recorded?.n)).toBe(1)
   })
 
   it('marketplace: cancel listing returns the card to none', async () => {

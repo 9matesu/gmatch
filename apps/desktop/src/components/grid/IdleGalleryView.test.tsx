@@ -5,6 +5,12 @@ import userEvent from '@testing-library/user-event'
 import IdleGalleryView, { resolveGalleryTileUrl } from './IdleGalleryView'
 import { useGame } from '../../game/store'
 import type { GalleryImage } from '../../game/types'
+import { ensurePermanentMedia } from '../../utils/mediaVault'
+
+vi.mock('../../utils/mediaVault', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('../../utils/mediaVault')>()
+  return { ...mod, ensurePermanentMedia: vi.fn(async () => ({ state: 'permanent' as const, ref: 'a'.repeat(64), via: 'vault' as const, reused: false })) }
+})
 
 vi.mock('../../utils/p2pSwarm', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../../utils/p2pSwarm')>()
@@ -34,7 +40,12 @@ vi.mock('../../services/vault', async (importOriginal) => {
 // component claims/releases a minted URL (the semantics live in keepsake.test).
 vi.mock('../../services/keepsake', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../../services/keepsake')>()
-  return { ...mod, releaseLocalUrl: vi.fn(), retainLocalUrl: vi.fn() }
+  return {
+    ...mod,
+    releaseLocalUrl: vi.fn(),
+    retainLocalUrl: vi.fn(),
+    persistKeepsake: vi.fn(async () => ({ status: 'failed' as const, reason: 'no-bridge' })),
+  }
 })
 
 function makeGalleryImages(count: number): GalleryImage[] {
@@ -51,14 +62,49 @@ function makeGalleryImages(count: number): GalleryImage[] {
 }
 
 describe('IdleGalleryView', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.restoreAllMocks()
     vaultMap = {}
     vaultHttpMap = {}
+    const { persistKeepsake } = await import('../../services/keepsake')
+    vi.mocked(persistKeepsake).mockImplementation(async () => ({ status: 'failed', reason: 'no-bridge' }))
     useGame.setState({
       gallery: [],
       backgroundUrl: null,
     })
+  })
+
+  // FIRST on purpose: the gallery's boot repair runs once per module/session,
+  // so this is the only test where the repair can overlap a manual view.
+  it('persists one viewed keep exactly once when boot repair is still running', async () => {
+    const hash = 'a'.repeat(64)
+    let finish: (r: { status: 'local'; ref: string; bytes: number }) => void = () => {}
+    const gate = new Promise<{ status: 'local'; ref: string; bytes: number }>((res) => { finish = res })
+    const { persistKeepsake } = await import('../../services/keepsake')
+    vi.mocked(persistKeepsake).mockImplementation(() => gate)
+    const img: GalleryImage = {
+      id: 'k-once', url: 'https://example.com/clip.mp4', tags: ['t'], rarityBase: 1,
+      clicks: 0, rarity: 'Common', boughtAt: 1, kind: 'video', saveState: 'failed',
+    }
+    useGame.setState({ gallery: [img] })
+    const g = window as unknown as { gmatch?: unknown }
+    const prevBridge = g.gmatch
+    g.gmatch = { vaultPin: async () => null }
+    vi.mocked(ensurePermanentMedia).mockClear()
+    try {
+      render(<IdleGalleryView />)
+      await userEvent.click(screen.getAllByRole('button', { name: /^View /i })[0])
+      // Only boot repair may have started the download while it was in flight.
+      expect(vi.mocked(persistKeepsake)).toHaveBeenCalledTimes(1)
+      expect(ensurePermanentMedia).not.toHaveBeenCalled()
+      await act(async () => { finish({ status: 'local', ref: hash, bytes: 10 }) })
+      await waitFor(() => expect(useGame.getState().gallery[0].saveState).toBe('persisted'))
+      // The viewer does not re-persist the keep once the repair lands.
+      expect(vi.mocked(persistKeepsake)).toHaveBeenCalledTimes(1)
+      expect(ensurePermanentMedia).not.toHaveBeenCalled()
+    } finally {
+      g.gmatch = prevBridge
+    }
   })
 
   it('renders empty state when gallery has no items', () => {
@@ -353,11 +399,11 @@ describe('IdleGalleryView', () => {
 
     try {
       render(<IdleGalleryView />)
-      expect(screen.getByText(/Caching…$/)).toBeInTheDocument()
+      expect(screen.getByText(/Saving permanently…$/)).toBeInTheDocument()
 
       // Mid-stream progress from the main process drives the badge.
       await act(async () => { emit?.({ url: img.url, bytes: 512, total: 1024 }) })
-      expect(screen.getByText(/Caching… 50%/)).toBeInTheDocument()
+      expect(screen.getByText(/Saving permanently… 50%/)).toBeInTheDocument()
     } finally {
       g.gmatch = prevBridge
     }
@@ -620,13 +666,47 @@ describe('IdleGalleryView', () => {
 
       // While the probe is in flight the viewer must not claim the bytes are
       // gone: it owes the attempt first.
-      expect(screen.getByText(/Caching the bytes/i)).toBeInTheDocument()
+      expect(screen.getByText(/Checking the permanent copy/i)).toBeInTheDocument()
       expect(screen.queryByText(/Media unavailable locally/i)).toBeNull()
 
       await act(async () => { release({ state: 'absent' }) })
       await waitFor(() => {
         expect(screen.getByText(/Media unavailable locally/i)).toBeInTheDocument()
       })
+    } finally {
+      g.gmatch = prevBridge
+    }
+  })
+
+  it('labels a vault-held keepsake as permanent, never as a cached tile', () => {
+    const img: GalleryImage = {
+      id: 'k-permanent', url: 'https://example.com/p.jpg', tags: ['t'], rarityBase: 1,
+      clicks: 0, rarity: 'Common', boughtAt: 1, kind: 'image',
+      saveState: 'persisted', localRef: 'a'.repeat(64),
+    }
+    useGame.setState({ gallery: [img] })
+    render(<IdleGalleryView />)
+    expect(screen.getByTitle(/Saved permanently in the local vault/i)).toBeTruthy()
+    expect(screen.queryByText(/Not cached/i)).toBeNull()
+  })
+
+  it('a manual view writes the permanent vault once and reports the real outcome', async () => {
+    const img: GalleryImage = {
+      id: 'k-manual', url: 'https://example.com/clip.mp4', tags: ['t'], rarityBase: 1,
+      clicks: 0, rarity: 'Common', boughtAt: 1, kind: 'video', saveState: 'failed',
+    }
+    useGame.setState({ gallery: [img] })
+    const g = window as unknown as { gmatch?: unknown }
+    const prevBridge = g.gmatch
+    g.gmatch = { vaultPin: async () => null }
+    vi.mocked(ensurePermanentMedia).mockClear()
+    try {
+      render(<IdleGalleryView />)
+      await userEvent.click(screen.getAllByRole('button', { name: /^View /i })[0])
+      await waitFor(() => expect(screen.getByText(/Saved permanently to this device/i)).toBeTruthy())
+      expect(ensurePermanentMedia).toHaveBeenCalledTimes(1)
+      expect(ensurePermanentMedia).toHaveBeenCalledWith(img.url, 'video')
+      expect(useGame.getState().gallery[0].saveState).toBe('persisted')
     } finally {
       g.gmatch = prevBridge
     }

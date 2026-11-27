@@ -29,6 +29,7 @@ import {
   ExternalLink,
 } from 'lucide-react'
 import { MUTED } from '../../ui/styles'
+import { ensurePermanentMedia, isPermanentlySaved } from '../../utils/mediaVault'
 
 const RARITY_ORDER: Record<string, number> = {
   Common: 1,
@@ -297,7 +298,7 @@ function KeepsakeErrorState({
   const unreadable = state === 'error'
   const title =
     state === 'pending'
-      ? 'Caching the bytes…'
+      ? 'Checking the permanent copy…'
       : unreadable
         ? 'Local media could not be read'
         : 'Media unavailable locally'
@@ -367,7 +368,11 @@ export default function IdleGalleryView({
   const [showSlideshow, setShowSlideshow] = useState(false)
   const [slideshowItems, setSlideshowItems] = useState<ResolvedItem[]>([])
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [vaultNotice, setVaultNotice] = useState<string | null>(null)
   const pinProgress = useVaultPinProgress()
+  // One view per keep: a manual open is the one-time trigger for the vault
+  // write, and the notice reports what actually happened.
+  const vaultAttempted = useRef<Set<string>>(new Set())
 
   // Boot repair: sweep every keep that is not yet verified into the vault once
   // per session, so the offline data IS there when the network is not.
@@ -688,29 +693,38 @@ export default function IdleGalleryView({
         : { status: 'loading' }
   const viewerLocalUrl = viewerResolved.status === 'local' ? viewerResolved.url : null
 
-  // Legacy recovery: only after the fresh lookup CONFIRMED no local bytes does
-  // a viewer without verified bytes attempt the authorized persist pipeline
-  // once. Failure keeps the record (and any existing localRef); nothing is
-  // silently discarded or re-imported while bytes might still be local.
-  const recoveryTried = useRef<Set<string>>(new Set())
+  // A manual view is the one-time trigger for a permanent vault write. The
+  // helper checks the vault FIRST, so viewing an already-saved keep (or a
+  // legacy 40-hex row whose bytes are on disk) never re-downloads anything.
+  // Only the Electron bridge has a permanent vault; browser dev keeps its
+  // IndexedDB copy through the existing persist pipeline.
   useEffect(() => {
-    if (!viewerItem || viewerResolved.status !== 'missing') return
-    if (viewerLocal?.kind !== 'missing' || !viewerLocal.legacy) return
-    if (recoveryTried.current.has(viewerItem.id)) return
-    recoveryTried.current.add(viewerItem.id)
+    if (!viewerItem || isPermanentlySaved(viewerItem)) return
+    const bridge = typeof window !== 'undefined'
+      ? (window as unknown as { gmatch?: { vaultPin?: unknown; vaultPinStream?: unknown } }).gmatch
+      : undefined
+    if (!bridge || (typeof bridge.vaultPin !== 'function' && typeof bridge.vaultPinStream !== 'function')) return
+    // Boot repair already owns this keep's persist (retryingKeepsakes is set
+    // synchronously before its download). A second owner would fetch the same
+    // MP4 again; when the repair finishes the store updates `viewerItem` and
+    // this effect re-runs against the persisted record.
+    if (retryingKeepsakes.has(viewerItem.id)) return
+    if (vaultAttempted.current.has(viewerItem.id)) return
     const target = viewerItem
-    void (async () => {
-      const { persistKeepsake } = await import('../../services/keepsake')
-      const res = await persistKeepsake(target.url, {}, target.kind)
-      useGame.setState((s) => ({
-        gallery: s.gallery.map((g) =>
-          g.id === target.id
-            ? { ...g, saveState: res.status === 'local' ? 'persisted' : 'failed', localRef: res.ref ?? g.localRef }
-            : g,
-        ),
-      }))
-    })()
-  }, [viewerItem, viewerResolved, viewerLocal])
+    vaultAttempted.current.add(target.id)
+    void ensurePermanentMedia(target.url, target.kind).then((res) => {
+      if (res.state === 'permanent') {
+        useGame.setState((s) => ({
+          gallery: s.gallery.map((g) =>
+            g.id === target.id ? { ...g, saveState: 'persisted' as const, localRef: res.ref } : g,
+          ),
+        }))
+        setVaultNotice('Saved permanently to this device.')
+      } else {
+        setVaultNotice(`Could not save permanently: ${res.reason}. You can retry from this keepsake.`)
+      }
+    })
+  }, [viewerItem])
 
   // Forwarding (repost/story/forge) prefers verified local bytes; the remote
   // URL survives only as import provenance for the controlled forge pipeline
@@ -894,6 +908,12 @@ export default function IdleGalleryView({
         </div>
       )}
 
+      {vaultNotice && (
+        <div className="px-4 pt-1 text-xs text-retro-muted" role="status">
+          {vaultNotice}
+        </div>
+      )}
+
       {/* Tag pills */}
       {tagCounts.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 px-4 pt-3 pb-1">
@@ -1071,9 +1091,17 @@ export default function IdleGalleryView({
 
                   {/* Phase 5: local-cache status — never imply a keep is saved
                       when its bytes are not locally stored. */}
+                  {isPermanentlySaved(img) && (
+                    <span
+                      title="Saved permanently in the local vault, not the temporary picture cache."
+                      className="pointer-events-none absolute bottom-1.5 right-1.5 z-20 rounded-md bg-black/70 px-1.5 py-0.5 text-2xs font-mono text-retro-fg/80 backdrop-blur-md"
+                    >
+                      Permanent
+                    </span>
+                  )}
                   {img.saveState === 'downloading' && (
                     <span className="pointer-events-none absolute bottom-1.5 left-1.5 z-20 rounded-md bg-black/70 px-1.5 py-0.5 text-2xs font-mono text-retro-fg/80 backdrop-blur-md">
-                      Caching…{pinProgress[img.url] != null ? ` ${pinProgress[img.url]}%` : ''}
+                      Saving permanently…{pinProgress[img.url] != null ? ` ${pinProgress[img.url]}%` : ''}
                     </span>
                   )}
                   {img.saveState === 'failed' && (
@@ -1083,10 +1111,10 @@ export default function IdleGalleryView({
                         e.stopPropagation()
                         await retryKeepsake(img)
                       }}
-                      title="Could not cache this keep locally. The source link is kept for a retry."
+                      title="Could not save this keep to the permanent vault. The source link is kept for a retry."
                       className="absolute bottom-1.5 left-1.5 z-20 rounded-md border border-danger/40 bg-black/75 px-1.5 py-0.5 text-2xs font-mono text-danger-fg backdrop-blur-md cursor-pointer hover:bg-black/90"
                     >
-                      Not cached · Retry
+                      Not saved · Retry
                     </button>
                   )}
                   {missingLocal && img.saveState !== 'failed' && (

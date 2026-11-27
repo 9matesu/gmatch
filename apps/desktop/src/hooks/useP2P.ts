@@ -4,7 +4,7 @@ import { User, OrbitObject, generateFallbackName } from '@orbit/shared';
 import { parseBareSwarmAnnounce, parseSwarmEnvelope, type SwarmAnnounce, type SwarmMessage } from '@orbit/protocol';
 import { saveObject, getObject } from '../utils/storage';
 import { getApiBaseUrl, getApiWebSocketUrl, isCourierHost, orbitFetch, subscribeApiBase } from '../utils/api';
-import { PeerRoster } from '../utils/peerRoster';
+import { PeerRoster, knownPeersStorageKey } from '../utils/peerRoster';
 import { areUsersStructurallyEqual } from '../utils/compare';
 import { logger } from '../utils/logger';
 import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, hydrateDurableReplications, announcePeerOnline, PEER_ONLINE_EVENT, announceHeldObjects, setSwarmReceiptIdentity, setSwarmOperationHandler, setSwarmOperationAckHandler, sendSwarmFrame } from '../utils/p2pSwarm';
@@ -470,7 +470,7 @@ export function useP2P(identity: OrbitIdentity | null) {
     // know is NOT overwritten — a world switch must not replace a live
     // online peer with its stale persisted copy.
     try {
-      const savedPeers = localStorage.getItem('orbit_p2p_known_peers');
+      const savedPeers = localStorage.getItem(knownPeersStorageKey());
       if (savedPeers) roster.hydrate(JSON.parse(savedPeers));
     } catch {}
 

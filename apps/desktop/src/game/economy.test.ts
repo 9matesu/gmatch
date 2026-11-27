@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { BASE_CLICK, CRIT_EVERY, clickGain, clickPower, isCrit, shardMultiplier, type EconomyInput, heatMultiplier, heatStreakAfter, HEAT_WINDOW_MS } from './economy'
+import {
+  BASE_CLICK, CRIT_EVERY, IDLE_SHARD_INTERVAL_MS, INFLATION_PER_PURCHASE,
+  clickGain, clickPower, idleShardAccrual, inflationMultiplier, isCrit,
+  koShards, shardMultiplier, type EconomyInput, heatMultiplier, heatStreakAfter, HEAT_WINDOW_MS,
+} from './economy'
 import type { ActiveCap } from './types'
 
 const NOW = 1_000_000
@@ -57,6 +61,46 @@ describe('click power', () => {
   })
 })
 
+
+describe('inflation + diminishing growth (harder to farm)', () => {
+  it('every purchase raises every future tag price', () => {
+    expect(inflationMultiplier(0)).toBe(1)
+    expect(inflationMultiplier(10)).toBeCloseTo(1 + 10 * INFLATION_PER_PURCHASE)
+    expect(inflationMultiplier(10)).toBeGreaterThan(inflationMultiplier(9))
+  })
+
+  it('shards are +10% each, linear (SPEC §9)', () => {
+    expect(shardMultiplier(0)).toBe(1)
+    expect(shardMultiplier(3)).toBeCloseTo(1.3)
+    expect(shardMultiplier(10)).toBeCloseTo(2)
+    expect(shardMultiplier(20)).toBeCloseTo(3)
+    expect(shardMultiplier(20) - shardMultiplier(10)).toBeCloseTo(shardMultiplier(10) - shardMultiplier(0))
+  })
+})
+
+describe('idle shards + KO bursts', () => {
+  it('only whole intervals bank a shard; sub-shard carry never writes', () => {
+    const first = idleShardAccrual(1000, 0, 0)
+    expect(first.shards).toBe(0)
+    expect(first.carryMs).toBe(1000)
+    const second = idleShardAccrual(IDLE_SHARD_INTERVAL_MS - 1000, first.carryMs, 0)
+    expect(second.shards).toBe(1)
+    expect(second.carryMs).toBe(0)
+  })
+
+  it('is bounded by the lifetime cap and ignores bad input', () => {
+    expect(idleShardAccrual(IDLE_SHARD_INTERVAL_MS * 1000, 0, 100).shards).toBe(0)
+    expect(idleShardAccrual(NaN, -50, -10).shards).toBe(0)
+  })
+
+  it('a win pays a shard burst every 5 KOs', () => {
+    expect(koShards(1)).toBe(0)
+    expect(koShards(5)).toBe(1)
+    expect(koShards(5, 5)).toBe(0)
+    expect(koShards(10, 5)).toBe(1)
+    expect(koShards(0)).toBe(0)
+  })
+})
 
 describe('heat combo', () => {
   it('stacks +0.25 per 10-click streak, capped at x3', () => {

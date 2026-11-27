@@ -7,6 +7,8 @@ import type { OrbitIdentity } from '@orbit/crypto'
 import type { OrbitObject } from '@orbit/shared'
 
 import { logger } from '../utils/logger'
+import { Sparkle } from '@phosphor-icons/react'
+import { COLOR, FEEDBACK, MOTION, TYPE } from '../ui/styles'
 export function IdleOverlay({ items, identity, onExit }: {
   items: OrbitObject[]
   identity: OrbitIdentity
@@ -91,31 +93,36 @@ export function IdleOverlay({ items, identity, onExit }: {
   const currentUrl = currentItem ? imageUrls.get(currentItem.id) : null
 
   return (
-    <div className="fixed inset-0 z-[var(--z-modal)] bg-retro-bg flex flex-col items-center justify-center overflow-hidden cursor-pointer" onClick={handleInteract}>
+    <button
+      type="button"
+      aria-label="Exit slideshow"
+      className={`fixed inset-0 z-[var(--z-modal)] flex cursor-pointer flex-col items-center justify-center overflow-hidden ${COLOR.canvas}`}
+      onClick={handleInteract}
+    >
       {loaded && currentUrl ? (
         <>
           <img
             key={currentItem?.id}
             src={currentUrl}
             alt=""
-            className="max-w-[95vw] max-h-(--max-h-dialog) object-contain animate-fadeIn"
+            className={`max-w-[95vw] max-h-(--max-h-dialog) object-contain ${MOTION.keyframe.fadeIn}`}
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
           />
-          <div className="absolute bottom-6 text-2xs text-retro-muted font-sans">
-            Click anywhere or press any key to return
-          </div>
+          <span className={`absolute bottom-6 ${TYPE.caption} ${COLOR.muted}`}>
+            Tap anywhere or press any key to return
+          </span>
         </>
       ) : (
-        <div className="text-center space-y-4">
-          <div className="text-6xl animate-pulse">◇</div>
-          <p className="text-retro-muted text-xs font-sans">
-            {imageItems.length === 0 ? 'No images to display' : 'Loading slideshow...'}
-          </p>
-          <p className="text-2xs text-retro-muted font-sans">
-            Click anywhere or press any key to return
-          </p>
-        </div>
+        <span className={FEEDBACK.center}>
+          <Sparkle size={40} weight="fill" className={`animate-pulse ${COLOR.accent}`} />
+          <span className={`${TYPE.body} ${COLOR.muted}`}>
+            {imageItems.length === 0 ? 'No keepsakes saved yet' : 'Loading your keepsakes…'}
+          </span>
+          <span className={`${TYPE.caption} ${COLOR.muted}`}>
+            Tap anywhere or press any key to return
+          </span>
+        </span>
       )}
-    </div>
+    </button>
   )
 }

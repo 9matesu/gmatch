@@ -28,6 +28,7 @@ vi.stubGlobal('localStorage', {
 })
 
 import { defaultSave, serialize, SAVE_KEY } from './save'
+import { IDLE_SHARD_INTERVAL_MS } from './economy'
 import { setupTag } from './tags'
 import { fetchPosts, fetchPostsMulti } from '../services/booru'
 import type { BooruResponse } from '../services/booru'
@@ -531,6 +532,24 @@ describe('tick', () => {
     expect(useGame.getState().caps).toHaveLength(0)
     expect(writes).toBe(1)
   })
+
+  it('clamps a frozen 8h window to a single shard', () => {
+    useGame.setState({ idleShardsEarned: 0, shards: 0 })
+    useGame.getState().tick(8 * 60 * 60 * 1000)
+    expect(useGame.getState().shards).toBe(1)
+    expect(useGame.getState().idleShardsEarned).toBe(1)
+  })
+
+  it('persists the sub-shard carry across a save/load round-trip', () => {
+    useGame.setState({ idleShardsEarned: 0, shards: 0 })
+    useGame.getState().tick(1000)
+    expect(useGame.getState().shards).toBe(0)
+    useGame.getState().save()
+    useGame.getState().resetGame()
+    useGame.getState().load()
+    useGame.getState().tick(IDLE_SHARD_INTERVAL_MS - 1000)
+    expect(useGame.getState().shards).toBe(1)
+  })
 })
 
 describe('brainmelt', () => {
@@ -657,6 +676,109 @@ describe('shufflePosts (never sequential)', () => {
     const same = posts.map((p) => p.id).join(',')
     const varied = Array.from({ length: 20 }, () => shufflePosts(posts).map((p) => p.id).join(','))
     expect(varied.some((v) => v !== same)).toBe(true)
+  })
+})
+
+describe('harder economy + shard accrual', () => {
+  const mocked = vi.mocked(fetchPosts)
+  const post = { id: 'c1', url: 'https://x/c1.jpg', tags: ['bimbo'], rating: 'e' }
+
+  it('the first five custom tags are free, then a tag costs inflated pts', async () => {
+    mocked.mockClear()
+    mocked.mockResolvedValue({ posts: [post], source: 'tbib', ok: true })
+    useGame.setState({ points: 10_000, tags: [], purchases: 0, freePicksUsed: 0 })
+    for (let i = 0; i < 5; i++) {
+      const r = await useGame.getState().addCustomTag(`free_tag_${i}`)
+      expect(r.added, r.message).toBe(true)
+    }
+    expect(useGame.getState().points).toBe(10_000)
+    expect(useGame.getState().tags).toHaveLength(5)
+    const sixth = await useGame.getState().addCustomTag('paid_tag')
+    expect(sixth.added).toBe(true)
+    expect(useGame.getState().points).toBeLessThan(10_000)
+    expect(useGame.getState().purchases).toBe(1)
+    expect(useGame.getState().freePicksUsed).toBe(5)
+  })
+
+  it('a deleted tag never refunds a free pick (delete + readd cannot inflate forever)', async () => {
+    mocked.mockClear()
+    mocked.mockResolvedValue({ posts: [post], source: 'tbib', ok: true })
+    useGame.setState({ points: 10_000, tags: [], purchases: 0, freePicksUsed: 0 })
+    for (let i = 0; i < 5; i++) {
+      expect((await useGame.getState().addCustomTag(`recycle_${i}`)).added).toBe(true)
+    }
+    expect(useGame.getState().freePicksUsed).toBe(5)
+    expect(useGame.getState().deleteTag('recycle_0')).toBe(true)
+    expect(useGame.getState().tags.some((t) => t.name === 'recycle_0')).toBe(false)
+    const before = useGame.getState().points
+    const readd = await useGame.getState().addCustomTag('recycle_0')
+    expect(readd.added).toBe(true)
+    expect(useGame.getState().points).toBeLessThan(before)
+    expect(useGame.getState().purchases).toBe(1)
+    expect(useGame.getState().freePicksUsed).toBe(5)
+  })
+
+  it('refuses a paid tag when broke', async () => {
+    mocked.mockClear()
+    mocked.mockResolvedValue({ posts: [post], source: 'tbib', ok: true })
+    useGame.setState({
+      points: 0, purchases: 10, freePicksUsed: 5,
+      tags: Array.from({ length: 5 }, (_, i) => setupTag(`owned_${i}`)),
+    })
+    const r = await useGame.getState().addCustomTag('too_pricey')
+    expect(r.added).toBe(false)
+    expect(r.message).toContain('pts')
+  })
+
+  it('buying a tag raises global inflation for the next buy', () => {
+    useGame.setState({ points: 100_000, purchases: 0, tags: [{ name: 'wet', level: 0, base: 1000, income: 1, weight: 1 }] })
+    expect(useGame.getState().buyTag('wet')).toBe(true)
+    const afterFirst = useGame.getState().points
+    expect(useGame.getState().buyTag('wet')).toBe(true)
+    const spentSecond = afterFirst - useGame.getState().points
+    expect(spentSecond).toBeGreaterThan(1000)
+  })
+
+  it('a drained foe pays a shard burst', () => {
+    useGame.setState({
+      current: { id: 'k1', url: 'https://x/k1.jpg', tags: [] }, imageReady: true,
+      foeHp: 1, foeMaxHp: 1, foeClicks: 0, defeated: 4, shards: 0,
+    })
+    expect(useGame.getState().clickImage().killed).toBe(true)
+    expect(useGame.getState().shards).toBe(1)
+  })
+
+  it('idle shards accrue only at whole-interval boundaries and stay bounded', () => {
+    useGame.getState().resetGame()
+    useGame.setState({ idleShardsEarned: 0, shards: 0 })
+    for (let i = 0; i < 10; i++) useGame.getState().tick(1000)
+    expect(useGame.getState().shards).toBe(0)
+    useGame.getState().tick(5 * 60 * 1000 - 10_000)
+    expect(useGame.getState().shards).toBe(1)
+    useGame.setState({ idleShardsEarned: 100 })
+    useGame.getState().tick(5 * 60 * 1000)
+    expect(useGame.getState().shards).toBe(1)
+  })
+
+  it('spends shards only after a confirmed redemption, never below zero', () => {
+    useGame.setState({ shards: 1000 })
+    expect(useGame.getState().spendShards(1001)).toBe(false)
+    expect(useGame.getState().shards).toBe(1000)
+    // A replayed redemption reports shardsSpent 0: a no-op, never a double charge.
+    expect(useGame.getState().spendShards(0)).toBe(true)
+    expect(useGame.getState().shards).toBe(1000)
+    expect(useGame.getState().spendShards(1000)).toBe(true)
+    expect(useGame.getState().shards).toBe(0)
+  })
+
+  it('persists purchases, banked idle shards and lifetime free picks in the save', () => {
+    useGame.setState({ purchases: 7, idleShardsEarned: 3, freePicksUsed: 4 })
+    useGame.getState().save()
+    useGame.setState({ purchases: 0, idleShardsEarned: 0, freePicksUsed: 0, loaded: false })
+    useGame.getState().load()
+    expect(useGame.getState().purchases).toBe(7)
+    expect(useGame.getState().idleShardsEarned).toBe(3)
+    expect(useGame.getState().freePicksUsed).toBe(4)
   })
 })
 

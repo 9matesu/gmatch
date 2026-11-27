@@ -1,4 +1,5 @@
 import type { ChatMessage } from '../hooks/useP2P'
+import { formatDate } from './formatDate'
 
 /**
  * Day separators for a chat stream.
@@ -54,11 +55,9 @@ export function daySeparatorLabel(timestamp: number, now: number = Date.now()): 
   if (days <= 0) return 'Today' // also covers clock skew from other clients
   if (days === 1) return 'Yesterday'
   if (days < 7) return `${days} days ago`
-  return new Date(timestamp).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
+  // The one English date formatter for the app — toLocaleDateString here read
+  // the device locale and leaked "26 de Out." into an otherwise English chat.
+  return formatDate(timestamp)
 }
 
 export type ChatRow =

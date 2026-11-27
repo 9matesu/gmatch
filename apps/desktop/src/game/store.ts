@@ -1,9 +1,9 @@
 import { create } from 'zustand'
 import { getSecureItem } from '../utils/secure-storage'
-import { clickGain, heatMultiplier, heatStreakAfter, isCrit } from './economy'
+import { clickGain, heatMultiplier, heatStreakAfter, IDLE_SHARD_INTERVAL_MS, idleShardAccrual, inflationMultiplier, isCrit, koShards } from './economy'
 import type { EconomyInput } from './economy'
-import { buyTag as buyTagLevel, deriveTagStats, discoverTags, feedQuery, mergeTags as mergeTagList, normalizeCustomTag, removeTag as removeTagList, soloTag as soloTagList, toggleTag as toggleTagLevel, validateCustomTag } from './tags'
-import { buildRoundQueries, roundQueryKey, PILLS_PER_ROUND, RECENT_QUERY_DEPTH } from './queryBuilder'
+import { buyTag as buyTagLevel, deriveTagStats, discoverTags, feedQuery, FREE_TAG_PICKS, mergeTags as mergeTagList, newTagCost, normalizeCustomTag, removeTag as removeTagList, soloTag as soloTagList, toggleTag as toggleTagLevel, validateCustomTag } from './tags'
+import { buildRoundQueries, roundQueryKey, PILLS_PER_ROUND, RECENT_QUERY_DEPTH, RECENT_TAG_WINDOW } from './queryBuilder'
 import { getUserExcludes, banTagsInBlocklist, isNoise, isQueryBlocked, rankTags, setUserExcludes } from './tagFilter'
 import { tagHitsAnyTerm } from '@orbit/shared'
 import { learnPurge, setCoRules, setFeedIntent } from './tagCooccur'
@@ -50,9 +50,25 @@ export interface GameState {
   crits: number
   tags: OwnedTag[]
   gallery: GalleryImage[]
+  /**
+   * Lifetime keepsakes ever added to the gallery. `gallery.length` can shrink
+   * (a keep can be deleted), so a badge that never relocks reads this instead.
+   */
+  totalGallerySaved: number
   caps: ActiveCap[]
   capsUsed: CapId[]
   shards: number
+  /**
+   * Lifetime shards ever EARNED (KO + idle + Brainmelt). `shards` is a current
+   * balance a redemption spends, so a badge that never relocks reads this.
+   */
+  totalShardsEarned: number
+  /** Lifetime idle shards banked (bounds the passive trickle across launches). */
+  idleShardsEarned: number
+  /** Lifetime free custom-tag picks — a delete never refunds one. */
+  freePicksUsed: number
+  /** Global tag purchases; every one raises every future tag price. */
+  purchases: number
   prestigeCount: number
   achievements: string[]
   collectedOfflineEarnings: boolean
@@ -87,6 +103,8 @@ export interface GameState {
   /** Recent round query keys (order-independent pill sets): consecutive
    * rounds never repeat the same queries (session-only, not saved). */
   recentQueryKeys: string[]
+  /** Individual recently-fed tags: one theme cannot dominate consecutive rounds. */
+  recentTags: string[]
   feedOffline: boolean
   /** True when sources answer but everything was already seen (pool
    *  exhausted) — distinct from network-offline for UI copy. */
@@ -154,6 +172,8 @@ export interface GameState {
   /** Permanently delete a keepsake from the gallery (never blocks play). */
   removeGalleryImage: (id: string) => boolean
   popCap: (capId: CapId) => boolean
+  /** Deduct shards ONLY after a confirmed redemption; never credits g$ locally. */
+  spendShards: (amount: number) => boolean
   brainmelt: () => boolean
   tick: (dtMs?: number) => void
   save: () => void
@@ -290,9 +310,14 @@ function freshData() {
     coRules: [] as { a: string; b: string; count: number }[],
     customSources: [] as CustomSource[],
     gallery: [] as GalleryImage[],
+    totalGallerySaved: 0,
     caps: [] as ActiveCap[],
     capsUsed: [] as CapId[],
     shards: 0,
+    totalShardsEarned: 0,
+    idleShardsEarned: 0,
+    freePicksUsed: 0,
+    purchases: 0,
     prestigeCount: 0,
     achievements: [] as string[],
     collectedOfflineEarnings: false,
@@ -317,6 +342,7 @@ function freshData() {
     feedCursor: 0,
     priorityTag: null,
     recentQueryKeys: [] as string[],
+    recentTags: [] as string[],
     feedOffline: false,
     feedEmptyFresh: false,
     fetching: false,
@@ -324,9 +350,11 @@ function freshData() {
     allowReal: typeof localStorage !== 'undefined' ? localStorage.getItem('gmatch.feed.allowReal') !== '0' : true,
     allowHentai: typeof localStorage !== 'undefined' ? localStorage.getItem('gmatch.feed.allowHentai') !== '0' : true,
     toasts: [] as Toast[],
-    offlineGain: 0,
   }
 }
+
+/** Idle carry lives outside the store: a sub-shard fraction must never re-render. */
+let idleCarryMs = 0
 
 /**
  * Drain a foe into the gallery. Shared by manual clicks and auto-click ticks.
@@ -524,6 +552,8 @@ function gallerySpoils(s: GameState, post: BooruPost, clicksOnFoe: number, now: 
   return {
     defeated,
     bonus,
+    // Winning is faster than idling, but still slow: one shard per N drained foes.
+    shardGain: koShards(defeated, s.defeated),
     img,
     gallery: [...s.gallery, img],
     // Auto-generated market: the drained foe's tags become buyable offers.
@@ -665,6 +695,9 @@ export const useGame = create<GameState>((set, get) => ({
       clicks: clickNumber,
       crits: s.crits + (crit ? 1 : 0),
       xp: s.xp + clickXp + KILL_XP,
+      shards: s.shards + ko.shardGain,
+      totalShardsEarned: s.totalShardsEarned + ko.shardGain,
+      totalGallerySaved: s.totalGallerySaved + 1,
       tags: ko.tags,
       past: ko.past,
       gallery: ko.gallery,
@@ -683,6 +716,9 @@ export const useGame = create<GameState>((set, get) => ({
       clicks: next.clicks,
       crits: next.crits,
       xp: next.xp,
+      shards: next.shards,
+      totalShardsEarned: next.totalShardsEarned,
+      totalGallerySaved: next.totalGallerySaved,
       tags: next.tags,
       past: next.past,
       gallery: next.gallery,
@@ -763,6 +799,9 @@ export const useGame = create<GameState>((set, get) => ({
       clicks: clickNumber,
       crits: s.crits + (crit ? 1 : 0),
       xp: s.xp + clickXp + KILL_XP,
+      shards: s.shards + spoil.shardGain,
+      totalShardsEarned: s.totalShardsEarned + spoil.shardGain,
+      totalGallerySaved: s.totalGallerySaved + 1,
       tags: spoil.tags,
       past: spoil.past,
       gallery: spoil.gallery,
@@ -778,6 +817,9 @@ export const useGame = create<GameState>((set, get) => ({
       clicks: next.clicks,
       crits: next.crits,
       xp: next.xp,
+      shards: next.shards,
+      totalShardsEarned: next.totalShardsEarned,
+      totalGallerySaved: next.totalGallerySaved,
       tags: next.tags,
       past: next.past,
       gallery: next.gallery,
@@ -911,12 +953,14 @@ export const useGame = create<GameState>((set, get) => ({
     const s = get()
     const idx = s.tags.findIndex((t) => t.name === name)
     if (idx === -1) return false
-    const res = buyTagLevel(s.tags[idx], s.points)
+    const inflation = inflationMultiplier(s.purchases)
+    const res = buyTagLevel(s.tags[idx], s.points, inflation)
     if (!res) return false
     const tags = [...s.tags]
     tags[idx] = res.tag
-    const next = { ...s, tags, points: res.points }
-    set({ tags, points: res.points, ...progress(next, s.xp) })
+    const purchases = s.purchases + 1
+    const next = { ...s, tags, points: res.points, purchases }
+    set({ tags, points: res.points, purchases, ...progress(next, s.xp) })
     return true
   },
 
@@ -1020,23 +1064,40 @@ export const useGame = create<GameState>((set, get) => ({
     try {
       // Silent validation: proving the tag serves must not mark its pool
       // seen (that would hide those pictures from the very feed being built).
-      probe = await fetchPosts({ tags: verdict.name, limit: 20, page: 0, probe: true, silent: true })
+      probe = await fetchPosts({ tags: verdict.name, limit: 5, page: 0, probe: true, silent: true })
     } finally {
       set({ fetching: false })
     }
     if (!probe.ok || probe.posts.length === 0) {
       return { added: false, message: `No live results for ${verdict.name} — check the spelling.` }
     }
-    // Probing proved the feed serves it: own level 1 free, steering the feed.
-    const owned: OwnedTag = { name: verdict.name, level: 1, selected: true, ...deriveTagStats(verdict.name, 1) }
+    // Probing proved the feed serves it. The first FREE_TAG_PICKS are free,
+    // counted LIFETIME: deleting a tag must not refund a pick (or inflation
+    // never rises). After that a new tag costs its level-1 price × inflation.
     const snap = get()
-    const next = { ...snap, tags: [...snap.tags, owned] }
-    const prog = progress(next, s.xp)
+    const stats = deriveTagStats(verdict.name, 1)
+    const ownedCount = snap.tags.filter((t) => t.level > 0).length
+    const cost = newTagCost(stats, inflationMultiplier(snap.purchases))
+    const free = Math.max(0, FREE_TAG_PICKS - snap.freePicksUsed)
+    if (free === 0 && snap.points < cost) {
+      return { added: false, message: `Needs ${cost} pts — after ${FREE_TAG_PICKS} free picks new tags cost points.` }
+    }
+    const owned: OwnedTag = { name: verdict.name, level: 1, selected: true, ...stats }
+    const purchases = snap.purchases + (free === 0 ? 1 : 0)
+    const freePicksUsed = snap.freePicksUsed + (free > 0 ? 1 : 0)
+    const points = free === 0 ? snap.points - cost : snap.points
+    const next = { ...snap, tags: [...snap.tags, owned], points, purchases, freePicksUsed }
+    const prog = progress(next, snap.xp)
     set({
       tags: next.tags,
+      points,
+      purchases,
+      freePicksUsed,
       priorityTag: verdict.name,
       achievements: prog.achievements,
-      toasts: [...prog.toasts, { id: toastSeq++, msg: `Custom tag added: ${verdict.name}` }],
+      toasts: [...prog.toasts, { id: toastSeq++, msg: free > 0
+        ? `Custom tag added: ${verdict.name} (free pick ${ownedCount + 1}/${FREE_TAG_PICKS})`
+        : `Custom tag bought: ${verdict.name} (${cost} pts)` }],
     })
     // The Tags tab is now the ONE place a feed starts. Adding the first tag
     // must pull a round immediately, or the clicker would sit on the offline
@@ -1063,7 +1124,7 @@ export const useGame = create<GameState>((set, get) => ({
     }
     // Silent: market discovery must not mark the pool seen — those pictures
     // still belong to future feed rounds.
-    const res = await fetchPosts({ tags: q[0], limit: 60, silent: true })
+    const res = await fetchPosts({ tags: q[0], limit: 30, silent: true })
     const prev = new Map(s.tags.map((t) => [t.name, t]))
     let offers: OwnedTag[]
     if (res.ok && res.posts.length > 0) {
@@ -1171,12 +1232,17 @@ export const useGame = create<GameState>((set, get) => ({
           count: Math.min(PILLS_PER_ROUND, owned.length),
           forceInclude: force,
           recentKeys: s.recentQueryKeys,
+          recentTags: s.recentTags,
         })
         setFeedIntent(picks)
-        set({ recentQueryKeys: [...s.recentQueryKeys, roundQueryKey(picks)].slice(-RECENT_QUERY_DEPTH) })
+        set({
+          recentQueryKeys: [...s.recentQueryKeys, roundQueryKey(picks)].slice(-RECENT_QUERY_DEPTH),
+          recentTags: [...s.recentTags, ...picks].slice(-RECENT_TAG_WINDOW),
+        })
         const priority = force
-        // ponytail: in grid mode pull a larger batch (30) so queue stays ahead of the 3x3 grid
-        const batchLimit = isGridMode(get().viewMode) ? 30 : 15
+        // Dev fallback pays per post: fetch a small round and let the main
+        // process' parsed-post memo serve repeats instead of re-parsing them.
+        const batchLimit = isGridMode(get().viewMode) ? 18 : 10
         const res = await fetchPostsMulti({ tags: picks, limit: batchLimit, priority, allowReal: s.allowReal, allowHentai: s.allowHentai, fresh: true })
         // Dev-only round trace: which query won which source (wrong-tag
         // reports become a one-line answer). Stripped from prod builds and
@@ -1375,7 +1441,7 @@ export const useGame = create<GameState>((set, get) => ({
       saveState: 'downloading',
     }
     kickKeepsakePersist(img)
-    set({ gallery: [...s.gallery, img] })
+    set({ gallery: [...s.gallery, img], totalGallerySaved: s.totalGallerySaved + 1 })
     get().save()
     return true
   },
@@ -1504,6 +1570,17 @@ export const useGame = create<GameState>((set, get) => ({
     return true
   },
 
+  spendShards: (amount) => {
+    // Caller passes the node's shardsSpent verbatim; a replay reports 0, which
+    // is a successful no-op rather than a second deduction.
+    if (amount === 0) return true
+    const s = get()
+    if (!Number.isSafeInteger(amount) || amount < 0 || s.shards < amount) return false
+    set({ shards: s.shards - amount })
+    get().save()
+    return true
+  },
+
   brainmelt: () => {
     const s = get()
     if (!canBrainmelt(tierForXp(s.xp))) return false
@@ -1530,6 +1607,7 @@ export const useGame = create<GameState>((set, get) => ({
       heatStreak: 0,
       lastClickAt: 0,
       shards: out.shards,
+      totalShardsEarned: s.totalShardsEarned + out.shardsGained,
       prestigeCount: out.prestigeCount,
     }
     next.toasts = pushToast(next, `BRAINMELT — +${out.shardsGained} corruption shards`)
@@ -1542,6 +1620,7 @@ export const useGame = create<GameState>((set, get) => ({
       heatStreak: 0,
       lastClickAt: 0,
       shards: out.shards,
+      totalShardsEarned: next.totalShardsEarned,
       prestigeCount: out.prestigeCount,
       ...progress(next, s.xp),
     })
@@ -1549,22 +1628,30 @@ export const useGame = create<GameState>((set, get) => ({
   },
 
   /**
-   * Cap housekeeping only. The idle economy is gone: a tick used to add
-   * passive pts/s (tag levels + gallery) and auto-click income, which made the
-   * game play itself. Points now move on clicks alone, so the only thing left
-   * for the clock to do is expire legacy timed caps.
-   *
-   * It used to ALSO write `lastSeenAt` into the store on every tick — once a
-   * second, re-rendering the whole idle UI for a field nobody reads (only
-   * `save()` serializes it, and it already stamps `lastSeenAt`). A tick with
-   * nothing to expire now returns without touching the store.
+   * Cap housekeeping + the passive shard trickle. Points still move on clicks
+   * alone; the clock only banks WHOLE idle shards (carry lives outside the
+   * store) and expires legacy timed caps. A tick with neither returns without
+   * touching the store — no once-a-second re-render.
    */
   tick: (dtMs = 1000) => {
-    void dtMs
     const s = get()
+    // A frozen/long-hidden window must not bank an 8-hour backlog in one
+    // tick: the clock pays at most one interval's worth per call.
+    const dt = Math.min(Math.max(0, dtMs ?? 1000), IDLE_SHARD_INTERVAL_MS)
+    const accrual = idleShardAccrual(dt, idleCarryMs, s.idleShardsEarned)
+    idleCarryMs = accrual.carryMs
     const live = activeCaps(s.caps, Date.now())
-    if (live.length === s.caps.length) return
-    set({ caps: live })
+    const capChanged = live.length !== s.caps.length
+    if (accrual.shards === 0) {
+      if (capChanged) set({ caps: live })
+      return
+    }
+    set({
+      ...(capChanged ? { caps: live } : {}),
+      shards: s.shards + accrual.shards,
+      totalShardsEarned: s.totalShardsEarned + accrual.shards,
+      idleShardsEarned: s.idleShardsEarned + accrual.shards,
+    })
   },
   save: () => {
     const s = get()
@@ -1578,9 +1665,15 @@ export const useGame = create<GameState>((set, get) => ({
       clickCount: s.clicks,
       critCount: s.crits,
       shards: s.shards,
+      totalShardsEarned: s.totalShardsEarned,
+      idleShardsEarned: s.idleShardsEarned,
+      idleCarryMs,
+      freePicksUsed: s.freePicksUsed,
+      purchases: s.purchases,
       prestigeCount: s.prestigeCount,
       tags: s.tags,
       gallery: s.gallery,
+      totalGallerySaved: s.totalGallerySaved,
       caps: activeCaps(s.caps, now),
       capsUsed: s.capsUsed,
       achievements: s.achievements,
@@ -1607,6 +1700,7 @@ export const useGame = create<GameState>((set, get) => ({
     activeSlot = saveKey() // pin: this run now owns exactly this slot
     const d = deserialize(readStorage()) ?? defaultSave()
     const now = Date.now()
+    idleCarryMs = d.idleCarryMs
     // No fallback offers: the player's own picks (or nothing) drive the feed.
     const tags = d.tags
     const userExcludes = d.userExcludes
@@ -1630,6 +1724,10 @@ export const useGame = create<GameState>((set, get) => ({
       clicks: d.clickCount,
       crits: d.critCount,
       shards: d.shards,
+      totalShardsEarned: d.totalShardsEarned,
+      idleShardsEarned: d.idleShardsEarned,
+      purchases: d.purchases,
+      freePicksUsed: d.freePicksUsed,
       prestigeCount: d.prestigeCount,
       tags,
       userExcludes,
@@ -1638,6 +1736,7 @@ export const useGame = create<GameState>((set, get) => ({
       allowReal: d.allowReal !== false,
       allowHentai: d.allowHentai !== false,
       gallery: d.gallery,
+      totalGallerySaved: d.totalGallerySaved,
       caps,
       capsUsed: d.capsUsed,
       past: [],
@@ -1752,6 +1851,7 @@ export const useGame = create<GameState>((set, get) => ({
   clearToasts: () => set({ toasts: [] }),
 
   resetGame: () => {
+    idleCarryMs = 0
     setUserExcludes([])
     clearSeenMemory()
     set({ ...freshData() })

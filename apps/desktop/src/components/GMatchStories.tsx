@@ -183,7 +183,7 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
   };
 
   // Mark story as seen.
-  // The seen set grows without bound (a 7h TTL per story, so ids accumulate
+  // The seen set grows without bound (a 24h TTL per story, so ids accumulate
   // forever) and used to be JSON.stringify'd into localStorage on EVERY story
   // view. Cap it and debounce the write: the ids only drive ring styling, so
   // losing the oldest few is harmless.
@@ -370,6 +370,8 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
       >
         {/* Current User Story / Add Story Circle */}
         <div
+          role="button"
+          aria-label="Add a story"
           className="flex flex-col items-center gap-1 shrink-0 group cursor-pointer"
           onClick={onAddStory}
         >
@@ -524,6 +526,8 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
             {/* Navigation Click Tap Zones (Left 35% = Prev, Right 65% = Next) */}
             <div className="absolute inset-0 z-10 flex">
               <div
+                role="button"
+                aria-label="Previous story"
                 className="w-1/3 h-full cursor-pointer"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -532,6 +536,8 @@ export function GMatchStories({ stories = [], loading = false, currentUserId, id
                 }}
               />
               <div
+                role="button"
+                aria-label="Next story"
                 className="w-2/3 h-full cursor-pointer"
                 onClick={(e) => {
                   e.stopPropagation();

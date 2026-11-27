@@ -34,6 +34,8 @@ export const MAX_TAG_LEVEL = 20
 export const TAG_COST_GROWTH = 1.15
 /** Unowned market offers shown at once — owned tags are always kept. */
 export const MAX_MARKET_OFFERS = 24
+/** Free validated + live-probed picks before new tags cost pts. */
+export const FREE_TAG_PICKS = 5
 
 export interface TagStats {
   base: number
@@ -63,9 +65,14 @@ export function setupTag(name: string): OwnedTag {
   return { name, level: 1, selected: true, ...deriveTagStats(name, 1) }
 }
 
-/** cost = base * 1.15^owned (SPEC §3). */
-export function tagCost(base: number, owned: number): number {
-  return Math.ceil(base * Math.pow(TAG_COST_GROWTH, owned))
+/** cost = base * 1.15^owned * global inflation. */
+export function tagCost(base: number, owned: number, inflation = 1): number {
+  return Math.ceil(base * Math.pow(TAG_COST_GROWTH, owned) * inflation)
+}
+
+/** A NEW tag after the free picks costs its level-1 price times inflation. */
+export function newTagCost(stats: TagStats, inflation = 1): number {
+  return tagCost(stats.base, 1, inflation)
 }
 
 export function canBuyTag(tag: OwnedTag): boolean {
@@ -73,9 +80,9 @@ export function canBuyTag(tag: OwnedTag): boolean {
 }
 
 /** Buy one level of a tag; returns a new tag or null if maxed/unaffordable. Buying selects it for the feed. */
-export function buyTag(tag: OwnedTag, points: number): { tag: OwnedTag; points: number } | null {
+export function buyTag(tag: OwnedTag, points: number, inflation = 1): { tag: OwnedTag; points: number } | null {
   if (!canBuyTag(tag)) return null
-  const cost = tagCost(tag.base, tag.level)
+  const cost = tagCost(tag.base, tag.level, inflation)
   if (points < cost) return null
   return { tag: { ...tag, level: tag.level + 1, selected: true }, points: points - cost }
 }

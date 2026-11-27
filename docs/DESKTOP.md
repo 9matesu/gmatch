@@ -24,6 +24,11 @@ Two topologies, chosen once per launch in Settings → Server
   no hosted rendezvous: the node a client is connected to is the directory and
   the sealed-mail relay for its clients, so a packaged build with no stored mode
   starts its own node instead of dialing a host that cannot hold a world.
+- **Worlds are per-server local caches (SPEC §12c).** Host mode is the single
+  `official` world at the legacy `userData` root; a client switch records a
+  `worldId` (`w_<hash>` of the node address) so the renderer namespaces cached
+  SOCIAL data per world (feed snapshot, operation log, roster, chat seen) while
+  identity, the idle save and the content-addressed media vault stay global.
 - **A stored client pointer is resolved, never assumed.** Two shapes, two rules,
   because provenance and reachability answer different questions. A pointer
   written by an **older app** carries no `v` stamp and is **not dialed at all**:
@@ -191,7 +196,7 @@ Help → Troubleshooting → Open log folder):
 |---|---|---|
 | `main.log` (+`.1`) | main + renderer errors | rotates at ~1MB, one generation |
 | `window-bounds.json` | last size/position | rejected if off-screen |
-| `server-mode.json` | host/client + friend URL | env `gmatch_SERVER_URL` overrides |
+| `server-mode.json` | host/client + friend URL (+ optional `worldId` for a client world) | env `gmatch_SERVER_URL` overrides |
 | `blocklist.json` | user blocklist | overrides packaged default |
 | `admin-pin.txt` | host-mode admin PIN | 8 hex, minted per install |
 | `storage.key` | 64-hex blob/PM encryption key | losing it = losing the local world |

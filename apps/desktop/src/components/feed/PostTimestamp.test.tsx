@@ -96,6 +96,13 @@ describe('PostTimestamp', () => {
     expect(stamp()).toHaveAttribute('dateTime')
   })
 
+  it('pins the absolute form to en-US, never the device locale', () => {
+    render(<PostTimestamp createdAt="2026-10-26T12:00:00.000Z" />)
+    const el = stamp()
+    expect(el.getAttribute('title')).toMatch(/^Oct 26, 2026/)
+    expect(el.getAttribute('title')).not.toMatch(/de Out/)
+  })
+
   it('is already absolute once the post is older than five weeks', () => {
     vi.setSystemTime(new Date('2026-11-15T00:00:00Z'))
     render(<PostTimestamp createdAt={ISO} />)

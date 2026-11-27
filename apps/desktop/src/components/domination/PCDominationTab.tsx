@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { formatCount } from '../../ui/format';
 import {
   Monitor,
   Shield,
@@ -67,7 +66,7 @@ interface Props {
   activeHack: ActiveHackSession | null;
   setActiveHack: React.Dispatch<React.SetStateAction<ActiveHackSession | null>>;
   onOpenFlash: () => void;
-  /** Mesh-first transport (Fase 5/6): sealed courier send, free, no server.
+  /** Mesh-first transport (Fase 5/6): sealed courier send, no server.
    *  Absent (legacy/no courier) => every send uses the server trigger route. */
   mesh?: {
     peerKnown: (orbitId: string) => boolean;
@@ -221,7 +220,6 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
   const [selectedTarget, setSelectedTarget] = useState<DominationTarget | null>(null);
   const [search, setSearch] = useState('');
   const [sending, setSending] = useState<string | null>(null);
-  const [prices, setPrices] = useState<Record<string, number>>({});
   const [history, setHistory] = useState<any[]>([]);
   const [outgoing, setOutgoing] = useState<any[]>([]);
   // Mesh outbox (Fase 5/6): sealed sends never touch the server, so their
@@ -259,10 +257,9 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
     if (!identity) return;
     setTargetsState('loading');
     try {
-      const [targetsRes, settingsRes, pricesRes] = await Promise.all([
+      const [targetsRes, settingsRes] = await Promise.all([
         orbitFetch('/api/domination/targets', {}, identity),
         orbitFetch('/api/domination/settings', {}, identity),
-        orbitFetch('/api/domination/prices', {}, identity),
       ]);
       if (!targetsRes.ok) throw new Error(`targets ${targetsRes.status}`);
       const data = await targetsRes.json();
@@ -276,10 +273,6 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
         if (!prev) return list[0] || null;
         return list.find((t) => t.id === prev.id) || list[0] || null;
       });
-      if (pricesRes.ok) {
-        const d = await pricesRes.json().catch(() => null);
-        if (d?.prices) setPrices(d.prices);
-      }
       if (settingsRes.ok) {
         const serverConfig = await settingsRes.json().catch(() => null);
         if (typeof serverConfig?.enabled === 'boolean' && serverConfig.enabled !== settings.pcDominationEnabled) {
@@ -380,8 +373,8 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
     const consentKey = ACTION_LABELS[action]?.consent;
     const consented = consentKey ? Boolean(selectedTarget.consents?.[consentKey]) : false;
     // Mesh-first (Fase 5/6): peer mesh-addressable + consented => sealed
-    // courier send, free, no server in the path. Anything else (unknown
-    // keys, mesh throw) falls through to the server trigger route below.
+    // courier send, no server in the path. Anything else (unknown keys,
+    // mesh throw) falls through to the server trigger route below.
     if (mesh && mesh.peerKnown(selectedTarget.id) && consented) {
       try {
         const r = await mesh.send(selectedTarget.id, action, payload, ownDisplayName() || undefined);
@@ -419,19 +412,13 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
         }),
       }, identity);
       if (res.ok) {
-        const data = await res.json().catch(() => ({}) as any);
-        const cost = typeof data?.cost === 'number' ? data.cost : prices[action];
-        const payout = typeof data?.victimReward === 'number' ? data.victimReward : 0;
-        const money = typeof cost === 'number' ? ` · -${cost} g$${payout > 0 ? `, they earned +${payout}` : ''}` : '';
-        toastFn(`${label} sent to ${selectedTarget.displayName}${money}. Landed status shows in Outbox.`, 'success');
+        toastFn(`${label} sent to ${selectedTarget.displayName}. Landed status shows in Outbox.`, 'success');
         void loadHistory();
       } else {
         const err = await res.json().catch(() => ({ error: '' }));
         const msg = String(err?.error || '');
-        if (res.status === 402) {
-          toastFn(msg || `Not enough g$ for ${label}.`, 'error');
-        } else if (res.status === 409) {
-          toastFn(`${selectedTarget.displayName} just went offline. Nothing was charged. Pick someone online.`, 'warning');
+        if (res.status === 409) {
+          toastFn(`${selectedTarget.displayName} just went offline. Pick someone online.`, 'warning');
           void loadTargets();
         } else if (res.status === 403) {
           toastFn(msg || `${selectedTarget.displayName} has that effect turned off.`, 'warning');
@@ -442,9 +429,9 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
         }
       }
     } catch {
-      // We do NOT know if the server processed it. Blind retry could double
-      // charge — point the user at the authoritative Outbox instead.
-      toastFn('Connection dropped before the server answered. Check Outbox before sending again. You may already have been charged.', 'warning');
+      // We do NOT know if the server processed it — point the user at the
+      // authoritative Outbox instead of blindly retrying.
+      toastFn('Connection dropped before the server answered. Check Outbox before sending again.', 'warning');
       void loadHistory();
     } finally {
       setSending(null);
@@ -472,10 +459,6 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
 
   const consentCountOf = (t: DominationTarget) =>
     ACTION_ORDER.filter((a) => Boolean(t.consents?.[ACTION_LABELS[a].consent])).length;
-
-  // One stated fact for every card: a mesh-known target costs nothing. Cards
-  // carry only their own exception, never a second copy of this line.
-  const allFree = Boolean(selectedTarget && mesh && mesh.peerKnown(selectedTarget.id));
 
   // Server outbox + local mesh outbox, newest first. Mesh entries never come
   // from the server history fetch, so they merge here at render.
@@ -640,7 +623,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
             </div>
           </Card>
 
-          {/* Effects: every card is the same shape — label, icon, price. */}
+          {/* Effects: every card is the same shape — label, icon, what it does. */}
           <div className="space-y-3 lg:col-span-3">
             {!selectedTarget ? (
               <FeedbackState
@@ -651,15 +634,14 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
               />
             ) : (
               <>
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg glass-panel px-4 py-2.5">
+                <div className="rounded-lg glass-panel px-4 py-2.5">
                   <Title>
                     Effects for <span className="font-semibold">{selectedTarget.displayName}</span>
                   </Title>
-                  <span className={cn(MONO, TYPE.body, COLOR.muted)}>{formatCount(points)} g$</span>
                 </div>
                 {selectedTarget.enabled && !selectedTarget.online && (
                   <Caption className="text-warning-fg/80 text-pretty">
-                    They are offline. Sends will be refused and nothing will be charged.
+                    They are offline. Sends will be refused until they return.
                   </Caption>
                 )}
                 {(() => {
@@ -670,8 +652,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                   ).length
                   const allAllowed = allowedCount === ACTION_ORDER.length
                   const noneAllowed = allowedCount === 0
-                  // The cost is stated on every card; don't repeat it here.
-                  if (allAllowed || allFree) return null
+                  if (allAllowed) return null
                   return (
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-retro-muted">
                       {noneAllowed && <span>No consent yet — ask in the Consent tab.</span>}
@@ -681,12 +662,9 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                 })()}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {ACTION_ORDER.map((action) => {
-                    const { label, icon: Icon, consent } = ACTION_LABELS[action];
+                    const { label, icon: Icon, consent, description } = ACTION_LABELS[action];
                     const allowed = Boolean(selectedTarget.consents?.[consent]);
                     const sendable = allowed && Boolean(selectedTarget.enabled) && selectedTarget.online !== false;
-                    const priceText = prices[action] != null
-                      ? `${prices[action]} g$`
-                      : 'Price unavailable';
                     const exceptionText = sending === action ? 'sending…' : !allowed ? 'no consent' : null;
                     return (
                       <button
@@ -696,7 +674,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                         disabled={!sendable || sending === action}
                         title={
                           !selectedTarget.enabled ? 'They have Domination switched off'
-                            : !selectedTarget.online ? 'They are offline. Nothing would be charged'
+                            : !selectedTarget.online ? 'They are offline right now'
                               : !allowed ? `They have "${label}" turned off in their consent`
                                 : undefined
                         }
@@ -716,7 +694,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                           <Icon className="size-4 shrink-0 text-retro-muted" aria-hidden="true" />
                         </span>
                         <span className="mt-auto flex w-full items-center justify-between gap-2">
-                          <span className={cn(MONO, TYPE.caption, COLOR.muted)}>{priceText}</span>
+                          <span className={cn(TYPE.caption, COLOR.muted, 'text-pretty')}>{description}</span>
                           {exceptionText && (
                             <span className={cn('font-mono text-2xs', allowed ? STATUS.success : STATUS.danger)}>
                               {exceptionText}
@@ -866,7 +844,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                         : st === 'landed' ? 'Reached their screen (consented); execution still pending'
                           : st === 'executed' || st === 'completed' ? 'Confirmed executed on their device'
                             : st === 'failed' ? 'Their client tried and the effect failed (OS refused, media unreachable, or capture declined)'
-                              : st === 'expired' ? 'Their client never confirmed it rendered (app closed or camera blocked). Their consent cut stayed paid.'
+                              : st === 'expired' ? 'Their client never confirmed it rendered (app closed or camera blocked).'
                                 : st
                     }
                   >
@@ -886,7 +864,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
           </div>
           {historyPane === 'outgoing' && historyState === 'ready' && outgoingAll.length > 0 && (
             <p className="px-1 text-xs text-retro-muted text-pretty">
-              <span className="font-mono">awaiting</span> = charged and relayed; it flips to{' '}
+              <span className="font-mono">awaiting</span> = relayed; it flips to{' '}
               <span className="font-mono text-success-fg/80">landed</span> once their client confirms, or to{' '}
               <span className="font-mono text-warning-fg/80">fizzled</span> after 30 min if it never rendered.
               Camera requests stay <span className="font-mono">awaiting</span> until they approve the photo.
@@ -920,8 +898,6 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
           action={actionModal.action}
           actionTitle={actionModal.title}
           targetName={selectedTarget?.displayName}
-          price={prices[actionModal.action]}
-          freeViaMesh={allFree}
           isOpen={Boolean(actionModal)}
           onClose={() => setActionModal(null)}
           onSubmit={handleModalSubmit}

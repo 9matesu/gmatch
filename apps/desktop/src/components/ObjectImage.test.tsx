@@ -48,6 +48,14 @@ describe('ObjectImage placeholder (T-W3)', () => {
     expect(screen.queryByText('No preview')).toBeNull()
   })
 
+  it('keeps a 40-hex legacy content address resolvable (not hidden as unavailable)', () => {
+    const hash = 'a'.repeat(40)
+    const { container } = render(
+      <ObjectImage contentUrl={`urn:sha256:${hash}`} contentHash={hash} identity={identity} hideUnavailable />,
+    )
+    expect(container.firstChild).not.toBeNull()
+  })
+
   it('shows "No preview" only once the signed fetch has failed', () => {
     hookState.failed = true
     render(<ObjectImage contentUrl="/api/objects/abc" identity={identity} />)

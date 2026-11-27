@@ -80,7 +80,23 @@ describe('recacheLegacyMedia', () => {
         persist,
       }),
     });
-    expect(summary).toEqual({ scanned: 0, cached: 0, failed: 0 });
+    expect(summary).toEqual({ scanned: 0, cached: 0, failed: 0, permanent: 1 });
     expect(persist).not.toHaveBeenCalled();
+  });
+
+  it('counts vault-held keepsakes as permanently saved, never as "0 cached"', async () => {
+    const persist = vi.fn(async () => ({ status: 'local' as const, ref: 'a'.repeat(64) }));
+    const summary = await recacheLegacyMedia({
+      deps: deps({
+        listKeepsakes: () => [
+          keep({ id: 'saved', saveState: 'persisted', localRef: 'a'.repeat(64) }),
+          keep({ id: 'legacy' }),
+        ],
+        persist,
+      }),
+    });
+    expect(summary.permanent).toBe(1);
+    expect(summary.cached).toBe(1);
+    expect(persist).toHaveBeenCalledTimes(1);
   });
 });
