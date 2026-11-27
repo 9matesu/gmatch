@@ -203,16 +203,19 @@ const MAX_CONCURRENT_OBJECT_FETCHES = 3
 let activeObjectFetches = 0
 const objectFetchQueue: Array<() => void> = []
 
-function withObjectFetchSlot<T>(run: () => Promise<T>): Promise<T> {
+function withObjectFetchSlot<T>(run: (release: () => void) => Promise<T>): Promise<T> {
   return new Promise<T>((resolve, reject) => {
+    let released = false
     const release = () => {
+      if (released) return
+      released = true
       activeObjectFetches -= 1
       const next = objectFetchQueue.shift()
       if (next) next()
     }
     const start = () => {
       activeObjectFetches += 1
-      run().then(
+      run(release).then(
         (value) => { release(); resolve(value) },
         (err) => { release(); reject(err) },
       )
@@ -325,7 +328,7 @@ async function resolveObject(
 
   // The signed object stream is the only long-held request in the app: run a
   // bounded number of them at a time (see MAX_CONCURRENT_OBJECT_FETCHES).
-  return withObjectFetchSlot(() => resolveObjectNetwork(cleanId, identity, commit))
+  return withObjectFetchSlot((release) => resolveObjectNetwork(cleanId, identity, commit, release))
 }
 
 /**
@@ -337,6 +340,7 @@ async function resolveObjectNetwork(
   cleanId: string,
   identity: IdentityLike,
   commit: (state: ImageState) => ResolvedObject,
+  release: () => void,
 ): Promise<ResolvedObject> {
   let res: Response | null = null
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -358,6 +362,9 @@ async function resolveObjectNetwork(
       // peer that knows this object id, so ask the swarm before declaring the
       // tile dead (this is the difference between "their image never loads"
       // and a working DM attachment).
+      // The signed HTTP stream is done; free the pool slot BEFORE the swarm ask
+      // (WebRTC/relay, not the node's socket pool) so live rows are not starved.
+      release()
       let swarmBlob: Blob | null = null
       try {
         swarmBlob = await requestSwarmObject(cleanId, 5000)
@@ -398,6 +405,8 @@ async function resolveObjectNetwork(
 
   if (contentType.includes('json')) {
     const data = await res.json().catch(() => null)
+    // Body read: free the slot before any swarm fallback.
+    release()
     if (data && data.type === 'p2p') {
       // Zero-media register-only row: bytes live on the swarm, not the server.
       // Resolve order: local store (also keyed by content_hash) -> swarm peers.
@@ -487,6 +496,7 @@ async function resolveObjectNetwork(
   }
 
   const blob = await res.blob()
+  release()
   return commit({
     cardId: cleanId,
     url: URL.createObjectURL(blob),
