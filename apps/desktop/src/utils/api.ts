@@ -217,6 +217,28 @@ export function purgeCourierApiState(): boolean {
   return purged
 }
 
+/**
+ * Host mode ALWAYS uses this machine's node. The dev proxy reads the
+ * `gmatch_server_url` cookie to choose its `/api` target, so clearing only the
+ * localStorage override left a stale client pointer in that cookie: the page
+ * kept loading the old world's feed/users while the shell believed it was
+ * hosting. Expires a non-loopback pointer (a client launch keeps its cookie;
+ * the shell only calls this when it knows it is the host).
+ */
+export function clearNonLoopbackServerCookie(): boolean {
+  try {
+    if (typeof document === 'undefined') return false
+    if (!document.cookie.includes(`${SERVER_COOKIE}=`)) return false
+    const raw = readCookie(SERVER_COOKIE)
+    if (!raw || isCourierApiUrl(raw)) return false
+    const withScheme = /^https?:\/\//i.test(raw) ? raw : `http://${raw}`
+    if (isLoopbackApiUrl(withScheme)) return false
+    document.cookie = `${SERVER_COOKIE}=; path=/; max-age=0`
+    return true
+  } catch { /* cookies disabled */ }
+  return false
+}
+
 function readCookie(name: string): string | null {
   try {
     const hit = document.cookie.split(';').map((c) => c.trim()).find((c) => c.startsWith(`${name}=`))

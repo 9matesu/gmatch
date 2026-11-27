@@ -11,6 +11,18 @@ export type { DirectoryServer }
  */
 export const DIRECTORY_CACHE_KEY = '***'
 
+/**
+ * The mirror belongs to ONE world. A node's `/api/servers` lists the directory
+ * IT knows; merging that into a global cache made rows from the previous node
+ * survive a switch forever (the new node never lists them, so nothing ever
+ * replaced them). Keying on the committed API base gives each world its own
+ * mirror; the unscoped key stays for legacy readers and tests.
+ */
+export function directoryCacheKey(base?: string | null): string {
+  const origin = (base || '').trim().replace(/\/+$/, '')
+  return origin ? `${DIRECTORY_CACHE_KEY}:${origin}` : DIRECTORY_CACHE_KEY
+}
+
 export function mergeDirectory(
   cached: DirectoryServer[],
   fresh: DirectoryServer[],
@@ -67,9 +79,9 @@ export function dedupeServers(list: DirectoryServer[]): DirectoryServer[] {
   return [...byKey.values()]
 }
 
-export function readDirectoryCache(): DirectoryServer[] {
+export function readDirectoryCache(base?: string | null): DirectoryServer[] {
   try {
-    const raw = localStorage.getItem(DIRECTORY_CACHE_KEY)
+    const raw = localStorage.getItem(directoryCacheKey(base))
     const parsed = raw ? JSON.parse(raw) : []
     return Array.isArray(parsed) ? parsed : []
   } catch {
@@ -77,6 +89,6 @@ export function readDirectoryCache(): DirectoryServer[] {
   }
 }
 
-export function writeDirectoryCache(list: DirectoryServer[]): void {
-  try { localStorage.setItem(DIRECTORY_CACHE_KEY, JSON.stringify(list)) } catch { /* quota */ }
+export function writeDirectoryCache(list: DirectoryServer[], base?: string | null): void {
+  try { localStorage.setItem(directoryCacheKey(base), JSON.stringify(list)) } catch { /* quota */ }
 }

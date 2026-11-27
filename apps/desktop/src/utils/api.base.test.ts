@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { clearUnreachableApiBase, isCourierApiUrl, LOCAL_NODE_BASE, purgeCourierApiState, resolveLiveApiBase } from './api'
+import { clearNonLoopbackServerCookie, clearUnreachableApiBase, isCourierApiUrl, LOCAL_NODE_BASE, purgeCourierApiState, resolveLiveApiBase } from './api'
 
 // jsdom in this repo does not expose localStorage; stub it like useCourierDms.test.tsx.
 const storage: Record<string, string> = {}
@@ -23,6 +23,7 @@ describe('api base without a hosted fallback', () => {
   })
 
   afterEach(() => {
+    document.cookie = 'gmatch_server_url=; path=/; max-age=0'
     vi.unstubAllGlobals()
   })
 
@@ -45,6 +46,16 @@ describe('api base without a hosted fallback', () => {
     expect(purgeCourierApiState()).toBe(true)
     expect(localStorage.getItem('gmatch.api.url')).toBeNull()
     expect(localStorage.getItem('gmatch.onboarding.serverUrl')).toBeNull()
+  })
+
+  it('expires a stale non-loopback proxy cookie in host mode, keeps a loopback one', () => {
+    document.cookie = `gmatch_server_url=${encodeURIComponent('https://friend-world.test:8790')}; path=/`
+    expect(clearNonLoopbackServerCookie()).toBe(true)
+    expect(document.cookie).not.toContain('gmatch_server_url=')
+
+    document.cookie = `gmatch_server_url=${encodeURIComponent('http://127.0.0.1:8790')}; path=/`
+    expect(clearNonLoopbackServerCookie()).toBe(false)
+    expect(document.cookie).toContain('gmatch_server_url=')
   })
 
   it('drops a stored node that does not answer instead of trusting the hostname', async () => {

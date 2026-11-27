@@ -80,6 +80,20 @@ describe('switchClientWorld', () => {
     expect(toast).toHaveBeenCalledWith('nope', 'error')
   })
 
+  it('restores the proxy cookie when the committed switch is refused', async () => {
+    const oldUrl = 'http://old:8790'
+    storage.set('gmatch.api.url', oldUrl)
+    cookie.value = `gmatch_server_url=${encodeURIComponent(oldUrl)}; path=/; max-age=31536000`
+    vi.stubGlobal('window', {
+      gmatch: { serverSet: vi.fn(async () => ({ ok: false, error: 'nope' })) },
+      dispatchEvent: vi.fn(),
+    })
+    const out = await switchClientWorld(TARGET, { toast: vi.fn(), fetchImpl: okFetch() })
+    expect(out).toBe('failed')
+    expect(cookie.value).toContain(encodeURIComponent(oldUrl))
+    expect(cookie.value).not.toContain(encodeURIComponent(URL))
+  })
+
   it('concurrent attempts: only the newest notifies', async () => {
     const dispatched: string[] = []
     vi.stubGlobal('window', {

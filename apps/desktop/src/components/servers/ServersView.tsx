@@ -284,20 +284,20 @@ export function ServersView({
     // Anonymous browser: public directory only — never touch node routes
     // (no ID yet, nothing to sign with).
     if (!identity) {
-      if (!central) { setServers(readDirectoryCache()); setDirError(false); return }
+      if (!central) { setServers(readDirectoryCache(getApiBaseUrl())); setDirError(false); return }
       try {
         const res = await orbitFetch(`${central}/api/servers?_ts=${Date.now()}`, { method: 'GET' }, null)
         if (res.ok) {
           const data = (await res.json()) as { servers: DirectoryServer[] }
-          const merged = mergeDirectory(readDirectoryCache(), Array.isArray(data.servers) ? data.servers : [])
-          writeDirectoryCache(merged)
+          const merged = mergeDirectory(readDirectoryCache(getApiBaseUrl()), Array.isArray(data.servers) ? data.servers : [])
+          writeDirectoryCache(merged, getApiBaseUrl())
           setServers(merged)
           setDirError(false)
         } else {
           setDirError(true)
         }
       } catch {
-        setServers(readDirectoryCache())
+        setServers(readDirectoryCache(getApiBaseUrl()))
         setDirError(true)
       }
       return
@@ -365,7 +365,7 @@ export function ServersView({
     // knows (its own registration plus everything gossiped into it). A
     // configured hub is an EXTRA source, never the only one — there is no
     // built-in hub left to depend on.
-    let merged = readDirectoryCache()
+    let merged = readDirectoryCache(getApiBaseUrl())
     let dirFailed = false
     try {
       // cache-bust: orbitFetch dedups/caches GETs; the list must be fresh
@@ -396,7 +396,7 @@ export function ServersView({
     // (and drop sealed envelopes into) — the discovery path for peers that
     // live on another machine.
     for (const s of merged) rememberKnownNodeHint(s.endpoint_hint)
-    writeDirectoryCache(merged)
+    writeDirectoryCache(merged, getApiBaseUrl())
     setServers(merged)
     setDirError(dirFailed)
   }, [identity, central])
@@ -408,10 +408,10 @@ export function ServersView({
       // The legacy built-in row ("gmatch", no address of its own) is not a
       // destination. A REAL listing keeps its address — even on port 8790,
       // which is the port every default node runs on.
-      const cached = readDirectoryCache().filter(
+      const cached = readDirectoryCache(getApiBaseUrl()).filter(
         (s) => s.id !== 'central-node' && !(s.name.trim().toLowerCase() === 'gmatch' && !s.endpoint_hint?.trim())
       )
-      writeDirectoryCache(cached)
+      writeDirectoryCache(cached, getApiBaseUrl())
       if (localStorage.getItem(DIRECTORY_ID_KEY) === 'central-node') localStorage.removeItem(DIRECTORY_ID_KEY)
       const regRaw = localStorage.getItem(REG_KEY)
       if (regRaw) {
@@ -515,13 +515,28 @@ export function ServersView({
   const isOwnNode = (s: DirectoryServer) => s.id.startsWith('self:')
 
   /**
+   * Is the node we are talking to OURS? A packaged client on a friend's node
+   * must not render that node as "This computer" or swallow its directory row
+   * as if the two addresses were the same machine. The bridge knows the mode;
+   * a browser build has no bridge and rides this machine's dev node.
+   */
+  const weHostThisNode = useMemo(() => {
+    if (serverMode) return serverMode === 'host'
+    if (hostState) return hostState.mode === 'host'
+    // Browser/dev has no bridge: the Vite proxy node is this machine, so the
+    // legacy surface keeps its own-row. A PACKAGED client (`mode: 'client'`)
+    // is the case that must never claim the friend's node as "This computer".
+    return true
+  }, [serverMode, hostState])
+
+  /**
    * A node that hosts a world IS a server, whoever runs it — including the one
    * on this machine. It appears once, in its normal position in the list, keyed
    * by its address so it collapses with its own directory record instead of
    * being repeated as a separate current-world card.
    */
   const ownServer: DirectoryServer | null = useMemo(() => {
-    if (!identity || !nodeUrl) return null
+    if (!identity || !nodeUrl || !weHostThisNode) return null
     const dashUsers = Array.isArray(dash?.users) ? dash.users : []
     return {
       id: `self:${nodeUrl.replace(/^https?:\/\//i, '').replace(/\/+$/, '').toLowerCase()}`,
@@ -535,7 +550,7 @@ export function ServersView({
       user_count: typeof dash?.members_total === 'number' ? dash.members_total : dashUsers.length,
       last_seen: new Date().toISOString(),
     }
-  }, [identity, nodeUrl, serverName, node, dash, serverDescription])
+  }, [identity, nodeUrl, serverName, node, dash, serverDescription, weHostThisNode])
 
   const visibleServers = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -570,11 +585,12 @@ export function ServersView({
     // The connected base only counts as "this machine" when we are hosting it;
     // a client connected to a friend's node must not swallow that friend's row.
     const selfHosts = new Set(['localhost', '127.0.0.1', '::1', '[::1]'])
-    const lanUrls = [...(hostState?.lanUrls ?? []), ...(node?.lanUrls ?? [])]
+    const lanUrls = weHostThisNode ? [...(hostState?.lanUrls ?? []), ...(node?.lanUrls ?? [])] : []
     // Host mode with no measured LAN list: the bridge's own URL is still this
     // machine. Never the committed base — a client joined to a friend's node
-    // must not swallow that friend's row.
-    if (!lanUrls.length && hostState?.mode === 'host' && hostState.url) lanUrls.push(hostState.url)
+    // must not swallow that friend's row. The friend's node reports ITS LAN
+    // URLs on /node, so those must not enter the self-host set in client mode.
+    if (weHostThisNode && !lanUrls.length && hostState?.mode === 'host' && hostState.url) lanUrls.push(hostState.url)
     for (const u of lanUrls) {
       if (!u) continue
       try { selfHosts.add(new URL(u).hostname.toLowerCase()) } catch { /* not a URL */ }
@@ -600,7 +616,7 @@ export function ServersView({
       if (ac !== bc) return ac - bc
       return (b.online_count ?? -1) - (a.online_count ?? -1) || a.name.localeCompare(b.name)
     })
-  }, [ownServer, visibleServers, query, apiBaseTick, hostState, node, nodeUrl])
+  }, [ownServer, visibleServers, query, apiBaseTick, hostState, node, nodeUrl, weHostThisNode])
 
   const currentServerTitle = useMemo(() => {
     const apiBase = getEffectiveServerUrl()
@@ -937,16 +953,19 @@ export function ServersView({
       ) {
         const rawTarget = s.endpoint_hint || central
         const target = normalizeServerUrl(rawTarget) || normalizeServerUrl('http://' + rawTarget) || rawTarget
-        setCentralApiUrl(target)
-        setCentral(target)
-        try {
-          localStorage.setItem(SERVER_MARKER_KEY, target)
-          localStorage.setItem('gmatch.api.url', target)
-          if (typeof document !== 'undefined') {
-            document.cookie = `gmatch_server_url=${encodeURIComponent(target)}; path=/; max-age=31536000`
-          }
-        } catch { /* private mode */ }
         if (!window.gmatch?.serverSet) {
+          // Browser dev has no in-app commit: a full reload applies the base,
+          // so the persistence must be written BEFORE it (the only path that
+          // may write before a probe).
+          setCentralApiUrl(target)
+          setCentral(target)
+          try {
+            localStorage.setItem(SERVER_MARKER_KEY, target)
+            localStorage.setItem('gmatch.api.url', target)
+            if (typeof document !== 'undefined') {
+              document.cookie = `gmatch_server_url=${encodeURIComponent(target)}; path=/; max-age=31536000`
+            }
+          } catch { /* private mode */ }
           toast(`Connected to ${s.name}.`, 'success')
           onServerJoined?.(s)
           if (!onServerJoined && typeof window !== 'undefined' && import.meta.env.MODE !== 'test') {
@@ -956,14 +975,18 @@ export function ServersView({
           }
           return
         }
-        // Packaged bridge path: probe-then-commit in-app. serverSet persists
-        // the selection for future restarts, but nothing relaunches — the
-        // base-change event re-dials transports and refreshes server state.
+        // Packaged bridge path: probe-then-commit in-app. Writing the marker,
+        // override or cookie HERE would snapshot the new world as "previous"
+        // inside switchClientWorld — a refused serverSet then restored the new
+        // pointer instead of the old one, so the next launch dialed a world
+        // that had never accepted us. switchClientWorld is the only writer.
         const out = await switchClientWorld(
           { name: s.name, endpointHint: target, passwordRequired: s.password_required === 1 },
           { toast, identity: identity as unknown as { orbitId: string } | null, askPassword },
         )
         if (out === 'switched') {
+          setCentralApiUrl(target)
+          setCentral(target)
           toast(`Connected to ${s.name}.`, 'success')
           onServerJoined?.(s)
           void refresh()
@@ -1029,7 +1052,7 @@ export function ServersView({
     const host = coord.port ? `${coord.host}:${coord.port}` : coord.host
     // Persist before the relaunch kills the process.
     const serverObj = { id: `mask:${host}`, name: coord.name, owner_id: '', password_required: 0, endpoint_hint: host }
-    writeDirectoryCache(mergeDirectory(readDirectoryCache(), [serverObj]))
+    writeDirectoryCache(mergeDirectory(readDirectoryCache(getApiBaseUrl()), [serverObj]), getApiBaseUrl())
     const res = await joinServer(serverObj, toast, askPassword, identity)
     if (res === 'connected') {
       onServerJoined?.(serverObj)
@@ -1063,8 +1086,8 @@ export function ServersView({
 
   const forgetLocalServer = (s: DirectoryServer) => {
     try {
-      const cached = readDirectoryCache().filter((item) => item.id !== s.id)
-      writeDirectoryCache(cached)
+      const cached = readDirectoryCache(getApiBaseUrl()).filter((item) => item.id !== s.id)
+      writeDirectoryCache(cached, getApiBaseUrl())
       setServers((prev) => prev.filter((item) => item.id !== s.id))
       if (localStorage.getItem(DIRECTORY_ID_KEY) === s.id) localStorage.removeItem(DIRECTORY_ID_KEY)
       const raw = localStorage.getItem(REG_KEY)

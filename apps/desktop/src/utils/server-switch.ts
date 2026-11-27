@@ -7,7 +7,7 @@
 // transitions still restart (sidecar) and never route through here.
 import { normalizeServerUrl } from './serverUrl'
 import { isCourierApiUrl, invalidateCache, notifyApiBaseChanged } from './api'
-import { rememberJoin } from './server-join'
+import { rememberJoin, peekPendingJoin, clearPendingJoin } from './server-join'
 import { SERVER_MARKER_KEY } from '../firstRun/onboardingState'
 
 type Toast = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void
@@ -18,6 +18,28 @@ export type SwitchResult = 'switched' | 'stale' | 'cancelled' | 'failed'
 let commitSeq = 0
 
 export function _resetSwitchSeqForTests(): void { commitSeq = 0 }
+
+const SERVER_COOKIE = 'gmatch_server_url'
+
+function readServerCookie(): string | null {
+  try {
+    const raw = typeof document !== 'undefined' ? document.cookie : ''
+    for (const part of raw.split(';')) {
+      const [name, ...rest] = part.trim().split('=')
+      if (name === SERVER_COOKIE) return decodeURIComponent(rest.join('='))
+    }
+  } catch { /* private mode */ }
+  return null
+}
+
+function writeServerCookie(value: string | null): void {
+  try {
+    if (typeof document === 'undefined') return
+    document.cookie = value === null
+      ? `${SERVER_COOKIE}=; path=/; max-age=0`
+      : `${SERVER_COOKIE}=${encodeURIComponent(value)}; path=/; max-age=31536000`
+  } catch { /* private mode */ }
+}
 
 function withTimeout(ms: number): { signal: AbortSignal; done: () => void } {
   const controller = new AbortController()
@@ -105,15 +127,18 @@ export async function switchClientWorld(
 
   // 4. Atomic commit: snapshot previous persistence so a failed serverSet
   // restores it instead of leaving a half-written selection.
-  const prev = { marker: null as string | null, override: null as string | null }
+  const prev = {
+    marker: null as string | null,
+    override: null as string | null,
+    cookie: readServerCookie(),
+    join: password !== undefined ? peekPendingJoin() : null,
+  }
   try {
     prev.marker = localStorage.getItem(SERVER_MARKER_KEY)
     prev.override = localStorage.getItem('gmatch.api.url')
     localStorage.setItem(SERVER_MARKER_KEY, url)
     localStorage.setItem('gmatch.api.url', url)
-    if (typeof document !== 'undefined') {
-      document.cookie = `gmatch_server_url=${encodeURIComponent(url)}; path=/; max-age=31536000`
-    }
+    writeServerCookie(url)
   } catch { /* private mode: reactive base still switches */ }
   if (password !== undefined) rememberJoin({ url, password })
 
@@ -129,6 +154,15 @@ export async function switchClientWorld(
       if (prev.override === null) localStorage.removeItem('gmatch.api.url')
       else localStorage.setItem('gmatch.api.url', prev.override)
     } catch { /* private mode */ }
+    // The dev proxy reads this cookie, and a reboot of a packaged client reads
+    // the server mode the main process persisted. Roll back EVERY pointer we
+    // wrote: leaving the new URL in the cookie dialed a world whose serverSet
+    // had just refused us, so the next launch came up pointing at nowhere.
+    writeServerCookie(prev.cookie)
+    if (password !== undefined) {
+      if (prev.join) rememberJoin(prev.join)
+      else clearPendingJoin()
+    }
     if (stale()) return 'stale'
     toast(err instanceof Error ? err.message : 'Could not switch worlds', 'error')
     return 'failed'

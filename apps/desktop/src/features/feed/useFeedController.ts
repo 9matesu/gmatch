@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { OrbitIdentity } from '@orbit/crypto'
 import type { FeedPost } from '../../components/feed/GMatchFeed'
 import type { OrbitObject, User } from '@orbit/shared'
-import { orbitFetch } from '../../utils/api'
+import { orbitFetch, subscribeApiBase } from '../../utils/api'
 import { usePeerFeedPosts } from '../../hooks/usePeerFeedPosts'
 import { localFeedPosts } from '../../utils/localFeed'
 import { rememberPushed, type PushedEntry } from '../../utils/feedMerge'
@@ -265,9 +265,21 @@ export function useFeedController(input: FeedControllerInput): FeedController {
     setServerPosts([])
     setOptimisticPosts([])
     setPinnedPosts([])
+    setRepostedPosts([])
     setMyProfilePosts([])
+    setRestoredFromCache(false)
     setStatus('idle')
   }, [])
+
+  /**
+   * A committed world switch changes the node that OWNS the timeline. Every
+   * row held here came from the previous node (or a push it relayed), so it
+   * must be dropped the moment the base changes — otherwise a world with no
+   * posts keeps showing the old world's feed, and any in-flight snapshot from
+   * the old node could still land afterwards. `invalidateCache()` only clears
+   * HTTP responses; THIS is the state that is rendered.
+   */
+  useEffect(() => subscribeApiBase(() => reset()), [reset])
 
   return {
     posts, serverPosts, myProfilePosts, peerPosts: peerFeedPosts, status, restoredFromCache, hasMore, loadingMore,

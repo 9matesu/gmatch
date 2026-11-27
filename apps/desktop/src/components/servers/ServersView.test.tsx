@@ -252,6 +252,58 @@ describe('ServersView', () => {
     delete (window as unknown as { gmatch?: unknown }).gmatch
   })
 
+  it('a client world keeps the host\'s directory row instead of calling it This computer', async () => {
+    stubLocalStorage({
+      'gmatch.central.url': 'https://central.test',
+      'gmatch.api.url': 'https://friend.test:8790',
+    })
+    ;(window as unknown as { gmatch?: unknown }).gmatch = {
+      serverSet: vi.fn(), serverRelaunch: vi.fn(),
+      serverState: vi.fn().mockResolvedValue({ packaged: true, mode: 'client', url: 'https://friend.test:8790', lanUrls: [] }),
+    }
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: '', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers/node')) return json({ name: '', description: '', lanUrls: ['http://192.168.0.9:8790'] })
+      if (url.includes('/api/servers')) return json({ servers: [
+        { id: 'friend', name: 'Friend World', description: '', owner_id: 'someone', password_required: 0, endpoint_hint: 'https://friend.test:8790', last_seen: 'x' },
+      ] })
+      return json({})
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    // The connected node is the friend's, not ours: its own row stays the
+    // current row and is never replaced by a synthetic "This computer" tile.
+    expect(await screen.findByLabelText('Friend World, current server')).toBeInTheDocument()
+    expect(screen.queryByText('This computer')).not.toBeInTheDocument()
+    delete (window as unknown as { gmatch?: unknown }).gmatch
+  })
+
+  it('a refused central-row switch keeps the old world in storage', async () => {
+    stubLocalStorage({
+      'gmatch.central.url': 'https://central.test',
+      'gmatch.api.url': 'http://127.0.0.1:8790',
+    })
+    ;(window as unknown as { gmatch?: unknown }).gmatch = {
+      serverSet: vi.fn().mockResolvedValue({ ok: false, error: 'refused' }),
+      serverRelaunch: vi.fn(),
+      serverState: vi.fn().mockResolvedValue({ packaged: true, mode: 'host', url: 'http://127.0.0.1:8790', lanUrls: [] }),
+    }
+    mockFetch(async (url) => {
+      if (url.endsWith('/api/health')) return json({ ok: true })
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers')) return json({ servers: [
+        { id: 'hub', name: 'Central Hub', description: '', owner_id: 'owner1', password_required: 0, endpoint_hint: 'https://central.test', last_seen: 'x' },
+      ] })
+      return json({})
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    fireEvent.click(await screen.findByRole('button', { name: /connect to central hub/i }))
+    await waitFor(() => expect((window as unknown as { gmatch: { serverSet: ReturnType<typeof vi.fn> } }).gmatch.serverSet)
+      .toHaveBeenCalled())
+    await waitFor(() => expect(localStorage.getItem('gmatch.api.url')).toBe('http://127.0.0.1:8790'))
+    expect(localStorage.getItem('gmatch.onboarding.serverUrl')).toBe('http://127.0.0.1:8790')
+    delete (window as unknown as { gmatch?: unknown }).gmatch
+  })
+
   it('password-protected server prompts from the row and stores the join handoff', async () => {
     const KEY = ['gmatch', 'server', 'join'].join('.')
     stubLocalStorage({ 'gmatch.central.url': 'https://central.test' })

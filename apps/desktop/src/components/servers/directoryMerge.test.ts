@@ -1,5 +1,17 @@
-import { describe, it, expect } from 'vitest'
-import { mergeDirectory, dedupeServers, serverKey, type DirectoryServer } from './directoryMerge'
+// @vitest-environment jsdom
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { mergeDirectory, dedupeServers, serverKey, readDirectoryCache, writeDirectoryCache, type DirectoryServer } from './directoryMerge'
+
+const store = new Map<string, string>()
+beforeEach(() => {
+  store.clear()
+  vi.stubGlobal('localStorage', {
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => void store.set(k, String(v)),
+    removeItem: (k: string) => void store.delete(k),
+  } as Storage)
+})
+afterEach(() => vi.unstubAllGlobals())
 
 const s = (id: string, seen: string, hint?: string): DirectoryServer =>
   ({ id, name: id, owner_id: 'o', password_required: 0, last_seen: seen, ...(hint ? { endpoint_hint: hint } : {}) })
@@ -19,6 +31,17 @@ describe('mergeDirectory (D2)', () => {
     const merged = mergeDirectory([], many)
     expect(merged.length).toBe(200)
     expect((merged[0]?.last_seen || '') >= (merged[199]?.last_seen || '')).toBe(true)
+  })
+})
+
+describe('directory cache (one mirror per world)', () => {
+  it('does not replay the previous node\'s directory after a switch', () => {
+    writeDirectoryCache([s('old-world', '2026-01-01', 'old.test:8790')], 'http://old-node:8790')
+    expect(readDirectoryCache('http://new-node:8790')).toEqual([])
+    expect(readDirectoryCache('http://old-node:8790').map((x) => x.id)).toEqual(['old-world'])
+    writeDirectoryCache([s('new-world', '2026-01-02', 'new.test:8790')], 'http://new-node:8790')
+    expect(readDirectoryCache('http://old-node:8790').map((x) => x.id)).toEqual(['old-world'])
+    expect(readDirectoryCache('http://new-node:8790').map((x) => x.id)).toEqual(['new-world'])
   })
 })
 

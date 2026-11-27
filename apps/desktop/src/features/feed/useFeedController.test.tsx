@@ -138,4 +138,35 @@ describe('useFeedController projection stability', () => {
     expect(row.id).toBe('b')
     expect(row.mediaUrls).toEqual(['https://cdn.test/b-1.jpg', 'https://cdn.test/b-2.jpg'])
   })
+
+  it('drops the previous world\'s timeline when a server switch commits', () => {
+    const { result } = renderHook(() => useFeedController({
+      identity: null,
+      users: USERS,
+      profilePics: PROFILE_PICS,
+      myProfile: MY_PROFILE,
+      items: ITEMS,
+      deletedPostIds: DELETED,
+      archivedPostIds: ARCHIVED,
+      feedSort: 'latest',
+      normalizePost: normalizeFeedPost,
+    }))
+
+    act(() => {
+      result.current.setServerPosts([post('old-world')])
+      result.current.setMyProfilePosts([post('old-self')])
+    })
+    expect(result.current.posts.map((p) => p.id)).toEqual(['old-world', 'old-self'])
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent('gmatch-api-base-changed', {
+        detail: { base: 'http://friend-node:8790' },
+      }))
+    })
+
+    expect(result.current.posts).toEqual([])
+    expect(result.current.serverPosts).toEqual([])
+    expect(result.current.myProfilePosts).toEqual([])
+    expect(result.current.status).toBe('idle')
+  })
 })

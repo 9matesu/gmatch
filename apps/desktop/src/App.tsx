@@ -9,7 +9,7 @@ import { useSettings } from "./hooks/useSettings";
 import { useIdle } from "./hooks/useIdle";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from "react";
-import { getApiBaseUrl, orbitFetch, invalidateCache, subscribeApiBase } from "./utils/api";
+import { getApiBaseUrl, orbitFetch, invalidateCache, subscribeApiBase, clearNonLoopbackServerCookie } from "./utils/api";
 import { loadSeen, saveSeen } from "./utils/scopedSeen";
 import { useAppChat } from "./hooks/useAppChat";
 import type { NotificationTarget } from "./utils/notifications";
@@ -197,6 +197,10 @@ export default function Home() {
               purged = true
             }
           }
+          // The dev proxy reads this cookie for /api. Dropping only the
+          // localStorage override left a host-mode page dialing the old
+          // client world through the cookie with no visible pointer anywhere.
+          if (clearNonLoopbackServerCookie()) purged = true
         }
         // A retired directory host (the old fly.dev API) is never a valid base.
         for (const key of ['gmatch.central.url']) {
@@ -1382,6 +1386,12 @@ export default function Home() {
     pushPost: rememberPushedPost, reset: resetFeed,
   } = feed
 
+  // The feed loader changes with identity/sort, but the world-switch listener
+  // below is installed once. Read the current loader through a ref so a switch
+  // re-reads the NEW node instead of capturing the first one forever.
+  const loadServerFeedRef = useRef(loadServerFeed)
+  useEffect(() => { loadServerFeedRef.current = loadServerFeed }, [loadServerFeed])
+
   // Which rows the node actually serves. A delete that cannot reach the node
   // must not claim success for one of these: it used to vanish from the list
   // and come straight back on the next refresh ("can't delete anything").
@@ -1405,6 +1415,7 @@ export default function Home() {
    * this is its own query (`?saved=1`), independent of what the feed happens to
    * be showing.
    */
+  const loadSavedPostsRef = useRef<() => Promise<void>>(async () => {})
   const [serverSavedPosts, setServerSavedPosts] = useState<FeedPost[]>([])
   const loadSavedPosts = useCallback(async () => {
     if (!identity) { setServerSavedPosts([]); return }
@@ -1415,6 +1426,7 @@ export default function Home() {
       if (Array.isArray(data?.posts)) setServerSavedPosts(data.posts as FeedPost[])
     } catch { /* node unreachable: the tab keeps what it had */ }
   }, [identity])
+  useEffect(() => { loadSavedPostsRef.current = loadSavedPosts }, [loadSavedPosts])
 
   /**
    * The profile "Saved" tab: node saves PLUS the local bookmarks of
@@ -2521,12 +2533,20 @@ export default function Home() {
   useEffect(() => { loadUsersRef.current = loadUsers; }, [loadUsers]);
 
   // Seamless world switch: the commit already invalidated caches and
-  // re-dialed transports. Re-pull server-owned roster state for the new
-  // world; local-first stores (identity, gallery, IndexedDB) are untouched.
-  // loadUsers carries its own stale-response guard.
+  // re-dialed transports. Re-pull EVERY server-owned collection for the new
+  // world and drop the old world's rows first — invalidating the HTTP cache
+  // alone left the previous node's timeline, saved list and announcements on
+  // screen until (or forever after) a new snapshot arrived. The feed
+  // controller clears its own rows in its subscription (registered before
+  // this one); local-first stores (identity, gallery, IndexedDB) are untouched.
+  // loadUsers/loadSavedPosts carry their own stale-response guards.
   useEffect(() => subscribeApiBase(() => {
     invalidateCache();
+    setServerSavedPosts([]);
+    setAnnouncements([]);
     loadUsersRef.current?.();
+    void loadServerFeedRef.current?.();
+    void loadSavedPostsRef.current?.();
   }), []);
 
   // A follow event just landed (live WS broadcast from users.ts). My follower
