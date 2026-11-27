@@ -2912,10 +2912,20 @@ export default function Home() {
   // be one entry in the mount effect above, whose dependency array omitted it —
   // so switching Latest/Trending kept reading the previous snapshot until an
   // unrelated visibilitychange happened to refresh it.
+  // Boot retry: the first read can race the sidecar coming up (offline/error),
+  // and the next trigger was a WS connect or a focus. Retry a few times so the
+  // feed lands as soon as the node answers, without waiting for the user.
+  const feedBootRetry = useRef(0)
   useEffect(() => {
     if (!identity) return
+    if (feedStatus === 'ready') { feedBootRetry.current = 0; return }
+    if ((feedStatus === 'offline' || feedStatus === 'error') && feedPosts.length === 0 && feedBootRetry.current < 6) {
+      feedBootRetry.current += 1
+      const t = setTimeout(() => void loadServerFeed(), 1500)
+      return () => clearTimeout(t)
+    }
     void loadServerFeed()
-  }, [identity, feedSort, loadServerFeed]);
+  }, [identity, feedSort, loadServerFeed, feedStatus, feedPosts.length]);
 
   useEffect(() => {
     if (!identity) return
