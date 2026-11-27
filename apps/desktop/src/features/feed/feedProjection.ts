@@ -199,10 +199,23 @@ export function projectFeed(input: FeedProjectionInput): FeedPost[] {
     ...optimisticVisible, ...localPendingVisible, ...pinnedVisible, ...peerVisible,
     ...serverVisible, ...repostedPosts, ...localPublicPosts, ...myProfileVisible,
   ]
+  // Live name/avatar: a row authored by ME always shows the CURRENT profile,
+  // whatever source it came from (the server snapshot froze the old name). One
+  // pass, so every source is covered and an already-correct row is unchanged.
   const seen = new Set<string>()
-  return merged.filter((p) => {
-    if (seen.has(p.id)) return false
+  const out: FeedPost[] = []
+  for (const p of merged) {
+    if (seen.has(p.id)) continue
     seen.add(p.id)
-    return true
-  })
+    if (selfId && p.author_id === selfId) {
+      out.push({
+        ...p,
+        author_name: myProfile.displayName || 'You',
+        author_avatar: profilePics[selfId] || p.author_avatar,
+      })
+    } else {
+      out.push(p)
+    }
+  }
+  return out
 }

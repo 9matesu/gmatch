@@ -62,6 +62,14 @@ describe('projectFeed', () => {
     expect(rows.map((r) => r.id)).toEqual(['a'])
   })
 
+  it('shows the current profile name on my own server rows (live rename)', () => {
+    const rows = projectFeed({
+      ...base,
+      serverPosts: [post('mine', { author_id: 'self', author_name: 'Old Name' })],
+    })
+    expect(rows[0].author_name).toBe('Me')
+  })
+
   it('lets a fresh publish outrank the server snapshot until the node indexes it', () => {
     const rows = projectFeed({
       ...base,
