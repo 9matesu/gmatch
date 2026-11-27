@@ -26,7 +26,8 @@ export function AgeGateModal() {
 
   const handleRejectAge = () => {
     playPress(400);
-    window.location.href = 'https://www.google.com';
+    if (window.gmatch?.winClose) window.gmatch.winClose();
+    else window.close();
   };
 
   if (isVerified) return null;
@@ -61,7 +62,6 @@ export function AgeGateModal() {
         <div className="w-full space-y-2 pt-1">
           <button
             type="button"
-            autoFocus
             onClick={handleConfirmAge}
             className="w-full py-2.5 px-4 rounded-lg bg-retro-accent hover:bg-retro-fg active:scale-(--scale-press) text-retro-accent-text font-semibold text-xs shadow-sm transition cursor-pointer flex items-center justify-center gap-2"
           >
