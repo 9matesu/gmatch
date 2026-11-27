@@ -71,7 +71,15 @@ export const useMediaqInstall = create<MediaqInstallState>((set) => ({
         if (res.cancelled) {
           set({ status: 'cancelled', message: 'cancelled' })
         } else if (res.ok) {
-          set({ status: 'done', percent: 100, message: 'mediaq is ready' })
+          // The resolve lands AFTER the final progress event: do not overwrite
+          // "installed, server not running" with a blanket ready message.
+          set({
+            status: 'done',
+            percent: 100,
+            message: res.running === false
+              ? `mediaq installed, but the server did not start${res.error ? ': ' + res.error : ''}`
+              : 'mediaq is ready',
+          })
         } else {
           set({ status: 'error', message: res.error || 'install failed' })
         }

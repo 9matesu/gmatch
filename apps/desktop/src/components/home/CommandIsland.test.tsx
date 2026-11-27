@@ -2,6 +2,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { CommandIsland } from './CommandIsland'
+import { isNodeOwner } from '../../admin/nodeOwner'
 
 // The sidebar/footer chrome was replaced by the island; these tests pin that
 // every view keeps an entry point (regression: pc_domination + rooms went
@@ -17,6 +18,22 @@ const openMore = () => {
 }
 
 describe('CommandIsland navigation coverage', () => {
+  it('Admin button is hidden for a non-owner identity and shown for the node owner', () => {
+    const owner = 'owner-orbit-id'
+    const other = 'other-orbit-id'
+    const { unmount } = render(
+      <CommandIsland mainView="feed" setMainView={vi.fn()} showAdmin={isNodeOwner(other, owner)} onOpenAdmin={vi.fn()} />,
+    )
+    openMore()
+    expect(screen.queryByRole('button', { name: 'Admin' })).not.toBeInTheDocument()
+    unmount()
+    render(
+      <CommandIsland mainView="feed" setMainView={vi.fn()} showAdmin={isNodeOwner(owner, owner)} onOpenAdmin={vi.fn()} />,
+    )
+    openMore()
+    expect(screen.getByRole('button', { name: 'Admin' })).toBeInTheDocument()
+  })
+
   it('Profile button appears directly on the pill and navigates to profile', async () => {
     const setMainView = vi.fn()
     const onOpenProfile = vi.fn()

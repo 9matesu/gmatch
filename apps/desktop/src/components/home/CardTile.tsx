@@ -1,16 +1,16 @@
 "use client";
 
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { isMediaVideo } from '../../utils/media'
 import { MediaBadge } from '../MediaBadge'
-import { CardArtwork } from '../cards/CardArtwork'
-import { computeCardRarity, RARITY_TIERS, formatGc, parseTags } from '@orbit/shared'
+import { GameCard } from '../cards/GameCard'
+import { computeCardRarity, RARITY_TIERS, parseTags } from '@orbit/shared'
 import type { User } from '@orbit/shared'
 import { useNow } from '../../hooks/useNow'
-import { Check, Clock, Eye, Gift, Heart, Maximize2 } from 'lucide-react'
+import { Check, Clock, Gift, Heart, Maximize2, Eye } from 'lucide-react'
 import {
-  classes, COLOR, GAP, ICON, MONO, MOTION, PADDING, PADDING_X,
-  RADIUS, SHADOW, TRACKING, TYPE, WEIGHT,
+  classes, COLOR, GAP, ICON, MONO, MOTION, PADDING_X,
+  RADIUS, SHADOW, TYPE, WEIGHT,
 } from '../../ui/tokens'
 import { ContextMenu, type ContextMenuItem } from '../ui/ContextMenu'
 
@@ -101,14 +101,9 @@ export function CardTile({
     ? RARITY_TIERS[item.rarity as keyof typeof RARITY_TIERS]
     : computeCardRarity(cardValue)
 
-  const accent = item.accent_color || rarity.accentColor
   const itemTags = (Array.isArray(item.tags) ? item.tags : parseTags(item.tags)).slice(0, 3)
 
   const frameType = item.frame || 'chrome'
-  const cardRef = useRef<HTMLDivElement>(null)
-  const [tilt, setTilt] = useState({ rotateX: 0, rotateY: 0 })
-  const [mousePos, setMousePos] = useState({ x: 50, y: 50 })
-  const [isHovered, setIsHovered] = useState(false)
   const [menuAt, setMenuAt] = useState<{ x: number; y: number } | null>(null)
 
   // Cards have a context too: right-click opens the same shared menu at the
@@ -121,37 +116,54 @@ export function CardTile({
   }
   if (onSelect) cardItems.push({ label: 'Select card', icon: <Check className="w-3.5 h-3.5" />, onSelect: () => onSelect(item.id) })
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!cardRef.current) return
-    const rect = cardRef.current.getBoundingClientRect()
-    const x = (e.clientX - rect.left) / rect.width
-    const y = (e.clientY - rect.top) / rect.height
-    setTilt({
-      rotateX: (0.5 - y) * 12,
-      rotateY: (x - 0.5) * 12,
-    })
-    setMousePos({ x: x * 100, y: y * 100 })
-  }
+  const footerExtra = (
+    <>
+      <div className={classes('flex items-center justify-between', GAP[2], TYPE.caption, MONO, COLOR.muted)}>
+        {ownerLabel && (
+          <span className="truncate">
+            by{' '}
+            {onOpenOwnerProfile ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onOpenOwnerProfile(item.owner_id)
+                }}
+                className={classes('inline', WEIGHT.medium, 'cursor-pointer hover:underline', COLOR.hoverFg, MOTION.transition.micro)}
+                title={`View ${ownerLabel}`}
+              >
+                {ownerLabel}
+              </button>
+            ) : (
+              <span className={classes(WEIGHT.medium, COLOR.fg)}>{ownerLabel}</span>
+            )}
+          </span>
+        )}
+        <span className={classes('shrink-0 flex items-center', GAP[1], WEIGHT.bold, COLOR.fg)}>
+          <Heart className={classes(ICON.sm, 'fill-danger text-danger-fg')} />
+          <span>{likes}</span>
+        </span>
+      </div>
+
+      {itemTags.length > 0 && (
+        <div className={classes('flex flex-wrap overflow-hidden pt-0.5', GAP[1])}>
+          {itemTags.map((tag) => (
+            <span
+              key={tag}
+              className={classes(TYPE.caption, MONO, WEIGHT.medium, PADDING_X[1.5], 'py-0.5', RADIUS.chip, 'bg-retro-panel border', COLOR.edge, COLOR.muted, 'truncate max-w-[90px]')}
+              style={{ color: rarity.accentColor }}
+            >
+              #{tag}
+            </span>
+          ))}
+        </div>
+      )}
+    </>
+  )
 
   return (
     <div
-      ref={cardRef}
-      data-rarity={rarity.rarity}
-      data-frame={frameType}
-      style={{
-        '--mouse-x': `${mousePos.x}%`,
-        '--mouse-y': `${mousePos.y}%`,
-        transform: isHovered
-          ? `perspective(1000px) rotateX(${tilt.rotateX.toFixed(2)}deg) rotateY(${tilt.rotateY.toFixed(2)}deg) scale3d(1.02, 1.02, 1.02)`
-          : undefined,
-      } as React.CSSProperties}
-      className={classes(
-        'holo-card group relative select-none cursor-pointer',
-        MOTION.transition.transform, 'active:scale-(--scale-press-sm)',
-        RADIUS.panel, 'border', COLOR.edge, COLOR.canvas, 'overflow-hidden', SHADOW.xs, COLOR.hoverEdgeStrong,
-        selected && classes('ring-2 ring-retro-accent', SHADOW.modal, 'z-[var(--z-dropdown)]'),
-      )}
-      onMouseMove={handleMouseMove}
+      className="relative"
       onContextMenu={(e) => {
         if (cardItems.length === 0) return
         e.preventDefault()
@@ -162,35 +174,27 @@ export function CardTile({
         if (onSelect) onSelect(item.id)
         onClick?.()
       }}
-      onDoubleClick={() => {
-        if (onDoubleClick) onDoubleClick()
-      }}
-      onMouseEnter={() => {
-        setIsHovered(true)
-        if (onSelect && dragActive && selected === false) onSelect(item.id)
-      }}
-      onMouseLeave={() => {
-        setIsHovered(false)
-        setTilt({ rotateX: 0, rotateY: 0 })
-      }}
+      onDoubleClick={() => { if (onDoubleClick) onDoubleClick() }}
+      onMouseEnter={() => { if (onSelect && dragActive && selected === false) onSelect(item.id) }}
     >
-      <div className="holo-sheen" />
-      <div className={classes('holo-card-inner flex flex-col h-full', RADIUS.chip, 'overflow-hidden')} style={{ boxShadow: `inset 0 0 0 1.5px ${accent}66` }}>
-        {/* Top Badges */}
-        <div className={classes('absolute top-2 left-2 flex flex-wrap items-center', GAP[1], 'z-[var(--z-dropdown)]')}>
-          <span className={classes(TYPE.caption, WEIGHT.semibold, 'uppercase', TRACKING.wider, PADDING_X[2], 'py-0.5', RADIUS.chip, 'border backdrop-blur-xs', rarity.badgeClass)}>
-            {rarity.label}
-          </span>
+      <GameCard
+        objectId={item.id}
+        identity={identity}
+        width={150}
+        height={210}
+        isVideo={isVid}
+        name={cardTitle}
+        rarity={rarity}
+        value={hasValuation ? cardValue : undefined}
+        accentColor={item.accent_color}
+        frame={frameType}
+        selected={selected}
+        footerExtra={footerExtra}
+      >
+        {/* Frame finish + received ribbon (bottom-left, clear of the value chip). */}
+        <div className={classes('absolute bottom-2 left-2 flex flex-wrap items-center', GAP[1], 'z-20')}>
           {frameType !== 'chrome' && (
-            <span className={classes(TYPE.caption, WEIGHT.medium, 'uppercase', TRACKING.wider, PADDING_X[1.5], 'py-0.5', RADIUS.chip, 'border', MONO, 'backdrop-blur-xs',
-              frameType === 'holo'
-                ? 'bg-chrome-lav/90 text-chrome-lav border-chrome-lav/60'
-                : frameType === 'carbon'
-                ? 'bg-retro-bg/90 text-retro-fg border-edge'
-                : frameType === 'neon'
-                ? 'bg-info/90 text-info-fg border-info/80'
-                : 'bg-black/80 text-retro-fg border-edge'
-            )}>
+            <span className={classes(TYPE.caption, WEIGHT.medium, 'uppercase', RADIUS.chip, PADDING_X[1.5], 'py-0.5', COLOR.scrim, COLOR.onMedia, 'border', COLOR.edge, 'backdrop-blur-xs')}>
               {frameType}
             </span>
           )}
@@ -202,100 +206,36 @@ export function CardTile({
           )}
         </div>
 
-        {/* Top-Right Badges: Expiry Timer & Select Checkbox */}
-        <div className={classes('absolute top-2 right-2 flex items-center', GAP[1], 'z-[var(--z-dropdown)]')}>
+        {/* Expiry timer + selection checkbox (bottom-right). */}
+        <div className={classes('absolute bottom-2 right-2 flex items-center', GAP[1], 'z-20')}>
           {minsLeft !== null && minsLeft > 0 && (
             <span className={classes(TYPE.caption, MONO, WEIGHT.medium, PADDING_X[1.5], 'py-0.5', RADIUS.chip, COLOR.scrim, 'text-warning-fg border border-warning/30 backdrop-blur-xs flex items-center', GAP[1])}>
               <Clock className={ICON.sm} />
               <span>{minsLeft > 60 ? `${Math.floor(minsLeft / 60)}h` : `${minsLeft}m`}</span>
             </span>
           )}
-          {/* Selection Checkbox */}
-          <button
-            type="button"
-            aria-label={selected ? `Deselect ${cardTitle}` : `Select ${cardTitle}`}
-            aria-pressed={selected}
-            onClick={(e) => {
-              e.stopPropagation()
-              onSelect?.(item.id)
-            }}
-            className={classes('size-5 flex items-center justify-center', RADIUS.chip, 'border cursor-pointer', MOTION.transition.micro,
-              selected
-                ? classes(COLOR.interactive, COLOR.edge, COLOR.fg, SHADOW.large)
-                : classes(COLOR.scrim, COLOR.edge, 'opacity-0 group-hover:opacity-100 text-transparent hover:border-edge'),
-            )}
-          >
-            <Check className={classes(ICON.sm, 'stroke-[3]')} />
-          </button>
-        </div>
-
-        {/* Card Image */}
-        <div className="relative w-full aspect-[3/4.2] bg-surface-canvas overflow-hidden">
-          <CardArtwork
-            objectId={item.id}
-            identity={identity}
-            width={150}
-            height={210}
-            isVideo={isVid}
-          />
-          {isVid && <MediaBadge className="absolute bottom-1.5 right-1.5 z-[var(--z-dropdown)]" />}
-        </div>
-
-        {/* Card Info Footer */}
-        <div className={classes(PADDING[2.5], COLOR.canvas, 'border-t', COLOR.edge, 'flex flex-col', GAP[1])}>
-          <div className={classes('flex items-center justify-between', GAP[1.5])}>
-            <div className={classes('min-w-0 flex-1', TYPE.body, WEIGHT.semibold, COLOR.fg, 'truncate')} title={cardTitle}>
-              {cardTitle}
-            </div>
-            {hasValuation && (
-              <div className={classes('shrink-0', TYPE.caption, MONO, WEIGHT.bold, 'tabular-nums', TRACKING.tight)} style={{ color: accent }}>
-                {formatGc(cardValue)}
-              </div>
-            )}
-          </div>
-
-          <div className={classes('flex items-center justify-between', GAP[2], TYPE.caption, MONO, COLOR.muted)}>
-            {ownerLabel && (
-              <span className="truncate">
-                by{' '}
-                {onOpenOwnerProfile ? (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onOpenOwnerProfile(item.owner_id)
-                    }}
-                    className={classes('inline', WEIGHT.medium, 'cursor-pointer hover:underline', COLOR.hoverFg, MOTION.transition.micro)}
-                    title={`View ${ownerLabel}`}
-                  >
-                    {ownerLabel}
-                  </button>
-                ) : (
-                  <span className={classes(WEIGHT.medium, COLOR.fg)}>{ownerLabel}</span>
-                )}
-              </span>
-            )}
-            <span className={classes('shrink-0 flex items-center', GAP[1], WEIGHT.bold, COLOR.fg)}>
-              <Heart className={classes(ICON.sm, 'fill-danger text-danger-fg')} />
-              <span>{likes}</span>
-            </span>
-          </div>
-
-          {itemTags.length > 0 && (
-            <div className={classes('flex flex-wrap overflow-hidden pt-0.5', GAP[1])}>
-              {itemTags.map((tag) => (
-                <span
-                  key={tag}
-                  className={classes(TYPE.caption, MONO, WEIGHT.medium, PADDING_X[1.5], 'py-0.5', RADIUS.chip, 'bg-retro-panel border', COLOR.edge, COLOR.muted, 'truncate max-w-[90px]')}
-                  style={{ color: accent }}
-                >
-                  #{tag}
-                </span>
-              ))}
-            </div>
+          {onSelect && (
+            <button
+              type="button"
+              aria-label={selected ? `Deselect ${cardTitle}` : `Select ${cardTitle}`}
+              aria-pressed={selected}
+              onClick={(e) => {
+                e.stopPropagation()
+                onSelect?.(item.id)
+              }}
+              className={classes('size-5 flex items-center justify-center', RADIUS.chip, 'border cursor-pointer', MOTION.transition.micro,
+                selected
+                  ? classes(COLOR.interactive, COLOR.edge, COLOR.fg, SHADOW.large)
+                  : classes(COLOR.scrim, COLOR.edge, 'opacity-0 group-hover:opacity-100 text-transparent hover:border-edge'),
+              )}
+            >
+              <Check className={classes(ICON.sm, 'stroke-[3]')} />
+            </button>
           )}
         </div>
-      </div>
+
+        {isVid && <MediaBadge className="absolute bottom-1.5 right-1.5 z-[var(--z-dropdown)]" />}
+      </GameCard>
       {menuAt && (
         <ContextMenu
           x={menuAt.x}
@@ -308,4 +248,3 @@ export function CardTile({
     </div>
   )
 }
-

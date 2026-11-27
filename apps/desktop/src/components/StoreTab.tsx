@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { STORE_ITEMS, type StoreItem, type User, formatGc, computeCashoutPayout, clampCashoutRateBps, DEFAULT_CASHOUT_RATE_BPS, RARITY_TIERS } from '@orbit/shared';
+import { STORE_ITEMS, type StoreItem, type User, formatGc, computeCashoutPayout, clampCashoutRateBps, DEFAULT_CASHOUT_RATE_BPS, RARITY_TIERS, computeCardRarity } from '@orbit/shared';
 import { orbitFetch, invalidateCache } from '../utils/api';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { ActiveHackSession } from './home/CommandIsland';
@@ -10,7 +10,7 @@ import { formatCount } from '../ui/format';
 import { Button, PageHeader } from '../ui/kit';
 import {
   classes, CHROME, COLOR, FEEDBACK, GAP, ICON, MONO, MOTION, PADDING, PADDING_X,
-  PADDING_Y, RADIUS, RECIPE, STATUS, TRACKING, TYPE, WEIGHT,
+  PADDING_Y, RADIUS, RARITY, RECIPE, STATUS, TRACKING, TYPE, WEIGHT,
 } from '../ui/tokens';
 import type { CanonicalCard } from '../utils/cardCollection';
 import { TargetSelectorModal } from './hacks/TargetSelectorModal';
@@ -25,7 +25,7 @@ import {
   ShieldAlert,
   ArrowRight,
 } from 'lucide-react'
-import { CardArtwork } from './cards/CardArtwork';
+import { GameCard } from './cards/GameCard';
 
 /**
  * A row in the "your portfolio" table. `ownerName` is joined server-side with
@@ -496,14 +496,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
       <>
       {/* Most valuable cards */}
       <section className={CHROME.statTile}>
-        <div className={classes('flex items-center justify-between', GAP[2], 'mb-3')}>
-          <h3 className={CHROME.sectionLabel}>Most valuable cards</h3>
-          {onOpenCardCollection && (
-            <Button type="button" variant="secondary" onClick={onOpenCardCollection} className="whitespace-nowrap">
-              View collection
-            </Button>
-          )}
-        </div>
+        <h3 className={classes(CHROME.sectionLabel, 'mb-3')}>Most valuable cards</h3>
         {portfolio.length === 0 ? (
           <p className={FEEDBACK.description}>No cards yet.</p>
         ) : (
@@ -560,78 +553,103 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
         })()}
       </section>
 
-      {/* Community Market — Steam-style buy/sell between players */}
+      {/* Community Market — the shop floor: cards listed by other players,
+          each with one asking price, one buy action and a collection route. */}
       <section className={CHROME.statTile}>
-        <div className={classes('flex items-center justify-between', GAP[2], 'mb-3')}>
+        <div className={classes('flex items-center justify-between', GAP[2], 'mb-1')}>
           <h3 className={CHROME.sectionLabel}>Community Market</h3>
-          <span className={classes(TYPE.caption, COLOR.muted)}>{marketListings.length} open listing{marketListings.length === 1 ? '' : 's'}</span>
+          <div className={classes('flex items-center', GAP[2])}>
+            <span className={classes(TYPE.caption, COLOR.muted)}>{marketListings.length} for sale</span>
+            {onOpenCardCollection && (
+              <Button type="button" variant="secondary" size="sm" onClick={onOpenCardCollection} className="whitespace-nowrap">
+                View collection
+              </Button>
+            )}
+          </div>
         </div>
+        <p className={classes(FEEDBACK.descriptionTight, 'mb-3')}>Cards on sale — buying one adds it to your collection.</p>
         {marketListings.length === 0 ? (
           <p className={FEEDBACK.description}>Nothing listed.</p>
         ) : (
-          <div className={classes('grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4', GAP[3])}>
-            {marketListings.map((l) => (
-              <div key={l.listingId} className={classes(RECIPE.card, COLOR.interactiveSoft, 'overflow-hidden flex flex-col')}>
-                <button
-                  type="button"
-                  onClick={() => setMarketCardId(l.cardId)}
-                  className="block w-full text-left cursor-pointer"
-                  aria-label={`View card ${l.card?.name || l.cardId.slice(0, 8)}`}
-                >
-                  <div className={classes('aspect-square bg-retro-bg flex items-center justify-center overflow-hidden', RADIUS.control)}>
-                    <CardArtwork
+          <div className={classes('grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5', GAP[2])}>
+            {marketListings.map((l) => {
+              const tier = computeCardRarity(l.card?.value ?? 0);
+              return (
+                <div key={l.listingId} className={classes(RECIPE.card, COLOR.interactiveSoft, COLOR.hoverEdgeStrong, 'overflow-hidden flex flex-col', MOTION.transition.quick)}>
+                  <button
+                    type="button"
+                    onClick={() => setMarketCardId(l.cardId)}
+                    className="block w-full text-left cursor-pointer"
+                    aria-label={`View card ${l.card?.name || l.cardId.slice(0, 8)}`}
+                  >
+                    <GameCard
                       objectId={l.card?.mediaObjectId ?? null}
                       src={l.card?.contentUrl}
                       identity={identity ?? null}
                       width={190}
                       height={190}
                       isVideo={Boolean(l.card?.mimeType?.startsWith('video/'))}
+                      name={l.card?.name}
+                      rarity={tier}
+                      value={l.card?.value ?? 0}
+                      accentColor={l.card?.accentColor}
+                      frame={l.card?.frame}
+                      showNameplate={false}
+                      interactive={false}
+                      className="rounded-none border-0"
                     />
+                  </button>
+                  {/* Compact product info: name, tier and intrinsic card value. */}
+                  <div className={classes(PADDING[2], 'flex flex-col', GAP[0.5], 'min-w-0')}>
+                    <div className={classes(TYPE.body, WEIGHT.semibold, COLOR.fg, 'truncate')} title={l.card?.name || undefined}>
+                      {l.card?.name || 'Unnamed Card'}
+                    </div>
+                    <div className={classes('flex items-center justify-between', GAP[1.5], TYPE.caption, COLOR.muted, 'min-w-0')}>
+                      <span className={classes('uppercase', TRACKING.wider, WEIGHT.bold, RARITY[tier.rarity] || COLOR.muted, 'truncate')}>{tier.label}</span>
+                      <span className={classes(MONO, 'shrink-0')}>{formatGc(l.card?.value || 0)} value</span>
+                    </div>
                   </div>
-                  <div className={classes(PADDING[2], 'pb-0')}>
-                    <div className={classes(TYPE.body, WEIGHT.bold, COLOR.fg, 'truncate')}>{l.card?.name || 'Unnamed Card'}</div>
-                    <div className={classes(TYPE.caption, 'capitalize', COLOR.muted)}>{l.card?.rarity}</div>
+                  {/* Credit the seller. The name is joined server-side: the
+                      local `users` roster is capped at 100 rows and filtered
+                      to 24h freshness, so it cannot name a stranger. This row is
+                      a SIBLING of the view-card button on purpose: a button
+                      nested in a button is invalid HTML (React warns on
+                      hydration), so the profile link lives outside it. */}
+                  <div className={classes(PADDING_X[2], PADDING_Y[1], 'flex items-center', GAP[1], TYPE.caption, COLOR.muted, 'min-w-0', 'border-t', COLOR.edgeSubtle)}>
+                    <span className="shrink-0">by</span>
+                    {l.sellerId === identity?.orbitId ? (
+                      <span className={classes('truncate', WEIGHT.medium, COLOR.body)}>you</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => onOpenOwner?.(l.sellerId)}
+                        className={classes('min-w-0 truncate text-left', WEIGHT.medium, COLOR.body, COLOR.hoverAccent, 'hover:underline cursor-pointer', MOTION.transition.micro)}
+                        aria-label={`Open profile of ${l.sellerName || 'seller'}`}
+                      >
+                        {l.sellerName || `User_${l.sellerId.slice(0, 6)}`}
+                      </button>
+                    )}
                   </div>
-                </button>
-                {/* Credit the seller. The name is joined server-side: the
-                    local `users` roster is capped at 100 rows and filtered
-                    to 24h freshness, so it cannot name a stranger. This row is
-                    a SIBLING of the view-card button on purpose: a button
-                    nested in a button is invalid HTML (React warns on
-                    hydration), so the profile link lives outside it. */}
-                <div className={classes(PADDING_X[2], 'pt-0.5 flex items-center', GAP[1], TYPE.caption, COLOR.muted, 'min-w-0')}>
-                  <span className="shrink-0">by</span>
-                  {l.sellerId === identity?.orbitId ? (
-                    <span className={classes('truncate', WEIGHT.medium, COLOR.body)}>you</span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => onOpenOwner?.(l.sellerId)}
-                      className={classes('min-w-0 truncate text-left', WEIGHT.medium, COLOR.body, COLOR.hoverAccent, 'hover:underline cursor-pointer', MOTION.transition.micro)}
-                      aria-label={`Open profile of ${l.sellerName || 'seller'}`}
-                    >
-                      {l.sellerName || `User_${l.sellerId.slice(0, 6)}`}
-                    </button>
-                  )}
+                  {/* The asking price is the loudest number on a product tile. */}
+                  <div className={classes('mt-auto flex items-center justify-between', GAP[1.5], PADDING_X[2], PADDING_Y[2], 'border-t', COLOR.edgeSubtle)}>
+                    <span className={classes(TYPE.sub, MONO, WEIGHT.bold, STATUS.info, 'tabular-nums')}>{formatGc(l.price)}</span>
+                    {l.sellerId === identity?.orbitId ? (
+                      <span className={classes(PADDING_X[2], PADDING_Y[1], RADIUS.chip, COLOR.interactive, COLOR.muted, TYPE.caption, WEIGHT.bold)} title="This is your own listing. Cancel it from your card page instead">Yours</span>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="info"
+                        size="sm"
+                        disabled={buyingCardId !== null}
+                        onClick={() => void buyListing(l)}
+                      >
+                        {buyingCardId === l.cardId ? '…' : 'Buy'}
+                      </Button>
+                    )}
+                  </div>
                 </div>
-                <div className={classes('flex items-center justify-between', GAP[1.5], PADDING_X[2], 'pb-2')}>
-                  <span className={classes(TYPE.body, MONO, WEIGHT.bold, STATUS.info, 'tabular-nums')}>{formatGc(l.price)} g$</span>
-                  {l.sellerId === identity?.orbitId ? (
-                    <span className={classes(PADDING_X[2], PADDING_Y[1], RADIUS.chip, COLOR.interactive, COLOR.muted, TYPE.caption, WEIGHT.bold)} title="This is your own listing. Cancel it from your card page instead">Yours</span>
-                  ) : (
-                    <Button
-                      type="button"
-                      variant="info"
-                      size="sm"
-                      disabled={buyingCardId !== null}
-                      onClick={() => void buyListing(l)}
-                    >
-                      {buyingCardId === l.cardId ? '…' : 'Buy'}
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>

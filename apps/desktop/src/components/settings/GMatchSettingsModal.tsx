@@ -25,6 +25,36 @@ function VaultUsage() {
   }, []);
   return <span className="text-xs text-retro-muted">{label}</span>;
 }
+
+/** One read of the install's recorded owner, shared by the admin affordance and
+ *  the owner-only network settings. No PIN value ever crosses into the renderer. */
+function useNodeOwner(identity: OrbitIdentity | null) {
+  const [ownerId, setOwnerId] = useState<string | null>(null);
+  useEffect(() => {
+    let dead = false;
+    void window.gmatch?.serverState?.()
+      .then((s) => { if (!dead) setOwnerId(s?.nodeOwnerId ?? null); })
+      .catch(() => { /* browser dev: no install owner to report */ });
+    return () => { dead = true; };
+  }, []);
+  return isNodeOwner(identity?.orbitId, ownerId);
+}
+
+export function NodeAdminStatus({ identity }: { identity: OrbitIdentity | null }) {
+  const owner = useNodeOwner(identity);
+  return (
+    <div data-testid="node-admin-status" className="p-4 bg-glass-w5 border border-edge rounded-lg flex items-center justify-between gap-3">
+      <div>
+        <h4 className="text-xs font-semibold text-retro-fg">Node admin</h4>
+        <p className="text-xs text-retro-muted">
+          {owner ? 'You own this node. Admin asks for its passcode.' : 'Admin console is unavailable to this account.'}
+        </p>
+      </div>
+      <ShieldCheck className={`w-4 h-4 shrink-0 ${owner ? 'text-retro-fg' : 'text-retro-muted'}`} />
+    </div>
+  );
+}
+
 import { useGame, MAX_USER_EXCLUDES } from '../../game/store';
 import { DeleteAccountSection } from './DeleteAccountSection';
 import { PasskeyManager } from '../PasskeyManager';
@@ -37,10 +67,11 @@ import { MediaqSection } from './MediaqSection';
 import { BlocklistSection } from './BlocklistSection';
 import { DiagnosticsSection } from './DiagnosticsSection';
 import { CacheViewer } from './CacheViewer';
+import { isNodeOwner } from '../../admin/nodeOwner';
 import {
   Settings,
-  User,
   Shield,
+  ShieldCheck,
   ShieldAlert,
   X,
   Check,
@@ -52,20 +83,28 @@ import {
   ChevronDown,
   ChevronUp,
   Upload,
-  Rss,
   FileText,
+  Volume2,
+  Camera,
+  Network,
+  SlidersHorizontal,
 } from 'lucide-react';
 
 export type SettingsTabId =
+  | 'general'
+  | 'security'
+  | 'audio'
+  | 'camera'
+  | 'network'
   | 'preferences'
-  | 'account'
-  | 'feed'
   | 'blocklist';
 
 /** What opens Settings: a real tab, or Preferences with the wallpaper section expanded. */
 export type SettingsOpenTarget = SettingsTabId | 'wallpaper';
 
-const TAB_IDS: readonly SettingsTabId[] = ['preferences', 'account', 'feed', 'blocklist']
+const TAB_IDS: readonly SettingsTabId[] = [
+  'general', 'security', 'audio', 'camera', 'network', 'preferences', 'blocklist',
+]
 const resolveTab = (t: SettingsOpenTarget): SettingsTabId =>
   t !== 'wallpaper' && TAB_IDS.includes(t) ? t : 'preferences';
 
@@ -82,107 +121,118 @@ interface GMatchSettingsModalProps {
   initialTab?: SettingsOpenTarget;
 }
 
+/** Small shared shells: one caption, one stack of rows, no decorative chrome. */
+function Panel({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="p-4 bg-glass-w5 border border-edge rounded-lg space-y-4">
+      <h4 className="text-xs font-medium text-retro-fg">{title}</h4>
+      {children}
+    </section>
+  );
+}
 
-function FeedSettingsTab({
-  toast,
-  onNavigateTab,
+function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <div className="min-w-0">
+        <div className="text-xs font-medium text-retro-fg">{label}</div>
+        {hint && <div className="text-xs text-retro-muted">{hint}</div>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Segmented<T extends string>({
+  label, value, options, onChange,
 }: {
-  toast?: (msg: string, type?: string) => void
-  onNavigateTab?: (tab: SettingsTabId) => void
+  label: string
+  value: T
+  options: readonly { value: T; label: string }[]
+  onChange: (value: T) => void
 }) {
+  return (
+    <div className="flex bg-glass-w5 border border-edge rounded-lg p-0.5 text-xs font-semibold" role="group" aria-label={label}>
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          aria-pressed={value === option.value}
+          onClick={() => { playPress(760); onChange(option.value); }}
+          className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
+            value === option.value ? 'bg-retro-accent text-retro-accent-text' : 'text-retro-muted hover:text-retro-fg'
+          }`}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function FeedSettingsTab({ toast }: { toast?: (msg: string, type?: string) => void }) {
   const userExcludes = useGame((s) => s.userExcludes);
   const addUserExclude = useGame((s) => s.addUserExclude);
   const removeUserExclude = useGame((s) => s.removeUserExclude);
   const [draft, setDraft] = useState('');
 
   const add = () => {
-    const parts = draft
-      .split(/[\s,]+/)
-      .map((t) => t.toLowerCase().trim())
-      .filter(Boolean);
+    const parts = draft.split(/[\s,]+/).map((t) => t.toLowerCase().trim()).filter(Boolean);
     if (parts.length === 0) return;
     let added = 0;
-    for (const p of parts) {
-      if (addUserExclude(p)) added += 1;
-    }
+    for (const p of parts) if (addUserExclude(p)) added += 1;
     toast?.(
-      added > 0
-        ? `Excluded ${added} term${added === 1 ? '' : 's'}.`
-        : 'Nothing added (duplicate, empty, or list full).',
+      added > 0 ? `Excluded ${added} term${added === 1 ? '' : 's'}.` : 'Nothing added (duplicate, empty, or list full).',
       added > 0 ? 'success' : 'info',
     );
     setDraft('');
   };
 
   return (
-    <div className="space-y-6 animate-orbit-fade-in">
-      <div className="p-4 bg-glass-w5 border border-edge rounded-lg field-stack">
-        <h4 className="text-xs font-medium text-retro-fg">Excluded tags</h4>
-        <p className="text-xs text-retro-muted">
-          Active excluded tags ({userExcludes.length}/{MAX_USER_EXCLUDES}).
-        </p>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={draft}
-            placeholder="Add excluded tag"
-            aria-label="Add an excluded tag"
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                add();
-              }
-            }}
-            className="flex-1 bg-surface-raised border border-edge rounded-lg px-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent placeholder:text-retro-muted/60"
-          />
-          <button
-            type="button"
-            disabled={!draft.trim()}
-            onClick={add}
-            className="px-4 py-2 bg-retro-accent hover:bg-retro-accent-hover disabled:opacity-40 text-retro-accent-text rounded-lg text-xs font-semibold cursor-pointer shrink-0 active:scale-(--scale-press) transition-colors"
-          >
-            Add
-          </button>
-        </div>
-        {userExcludes.length === 0 ? (
-          <p className="text-xs text-retro-muted">No custom excludes configured.</p>
-        ) : (
-          <div className="flex flex-wrap gap-1.5">
-            {userExcludes.map((x) => (
-              <span
-                key={x}
-                className="inline-flex items-center gap-1.5 rounded-full border border-edge bg-glass-w5 px-2.5 py-1 text-xs font-mono text-retro-fg"
+    <Panel title="Excluded tags">
+      <p className="text-xs text-retro-muted">
+        Active excluded tags ({userExcludes.length}/{MAX_USER_EXCLUDES}).
+      </p>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={draft}
+          placeholder="Add excluded tag"
+          aria-label="Add an excluded tag"
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
+          className="flex-1 bg-surface-raised border border-edge rounded-lg px-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent placeholder:text-retro-muted/60"
+        />
+        <button
+          type="button"
+          disabled={!draft.trim()}
+          onClick={add}
+          className="px-4 py-2 bg-retro-accent hover:bg-retro-accent-hover disabled:opacity-40 text-retro-accent-text rounded-lg text-xs font-semibold cursor-pointer shrink-0 active:scale-(--scale-press) transition-colors"
+        >
+          Add
+        </button>
+      </div>
+      {userExcludes.length === 0 ? (
+        <p className="text-xs text-retro-muted">No custom excludes configured.</p>
+      ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {userExcludes.map((x) => (
+            <span key={x} className="inline-flex items-center gap-1.5 rounded-full border border-edge bg-glass-w5 px-2.5 py-1 text-xs font-mono text-retro-fg">
+              {x}
+              <button
+                type="button"
+                aria-label={`Remove exclude ${x}`}
+                title={`Stop excluding ${x}`}
+                onClick={() => removeUserExclude(x)}
+                className="text-retro-muted hover:text-retro-error cursor-pointer"
               >
-                {x}
-                <button
-                  type="button"
-                  aria-label={`Remove exclude ${x}`}
-                  title={`Stop excluding ${x}`}
-                  onClick={() => removeUserExclude(x)}
-                  className="text-retro-muted hover:text-retro-error cursor-pointer"
-                >
-                  x
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="p-4 bg-glass-w5 border border-edge rounded-lg space-y-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <h4 className="text-xs font-medium text-retro-fg">Content blocklist</h4>
-        {onNavigateTab && (
-          <button
-            type="button"
-            onClick={() => onNavigateTab('blocklist')}
-            className="px-3.5 py-2 bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text rounded-lg text-xs font-semibold cursor-pointer shrink-0 active:scale-(--scale-press) transition-colors"
-          >
-            Configure
-          </button>
-        )}
-      </div>
-    </div>
+                x
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </Panel>
   );
 }
 
@@ -209,6 +259,7 @@ export function GMatchSettingsModal({
   const [wallpaperExpanded, setWallpaperExpanded] = useState(() => initialTab === 'wallpaper');
   const [copiedId, setCopiedId] = useState(false);
   const [customWallpaperInput, setCustomWallpaperInput] = useState(settings.wallpaperUrl || '');
+  const isNodeAdmin = useNodeOwner(identity);
   // Community key: draft while typing, commit on blur so one keystroke does
   // not restart the mesh. Invalid keys are refused (and the draft resets).
   const [meshKeyDraft, setMeshKeyDraft] = useState(settings.meshCommunityKey);
@@ -328,10 +379,13 @@ export function GMatchSettingsModal({
   }, [onClose]);
 
   const navItems: { id: SettingsTabId; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-    { id: 'preferences', label: 'Preferences', icon: Settings },
-    { id: 'account', label: 'Account & Security', icon: User },
-    { id: 'feed', label: 'Feed & Tags', icon: Rss },
-    { id: 'blocklist', label: 'Blocklist (JSON)', icon: ShieldAlert },
+    { id: 'general', label: 'General', icon: Settings },
+    { id: 'security', label: 'Security', icon: Shield },
+    { id: 'audio', label: 'Audio', icon: Volume2 },
+    { id: 'camera', label: 'Camera', icon: Camera },
+    { id: 'network', label: 'Network', icon: Network },
+    { id: 'preferences', label: 'Preferences', icon: SlidersHorizontal },
+    { id: 'blocklist', label: 'Blocklist', icon: ShieldAlert },
   ];
 
   return (
@@ -348,7 +402,6 @@ export function GMatchSettingsModal({
       >
         {/* Left Navigation Sidebar */}
         <div className="w-full md:w-56 border-b md:border-b-0 md:border-r border-edge bg-glass-w5 flex flex-col shrink-0">
-          {/* Header */}
           <div className="p-4 border-b border-edge flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-glass-w10 flex items-center justify-center text-retro-muted">
@@ -361,7 +414,6 @@ export function GMatchSettingsModal({
                 </div>
               </div>
             </div>
-
             <button
               type="button"
               onClick={onClose}
@@ -372,7 +424,6 @@ export function GMatchSettingsModal({
             </button>
           </div>
 
-          {/* Navigation Links */}
           <div className="p-2 space-y-0.5 overflow-x-auto md:overflow-y-auto flex md:flex-col gap-1 md:gap-0 styled-scrollbar-none">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -381,10 +432,7 @@ export function GMatchSettingsModal({
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => {
-                    playPress(850);
-                    setActiveTab(item.id);
-                  }}
+                  onClick={() => { playPress(850); setActiveTab(item.id); }}
                   className={`w-full py-2 px-3 rounded-lg text-xs font-medium transition-colors flex items-center justify-between cursor-pointer whitespace-nowrap ${isActive
                       ? 'bg-glass-w10 text-retro-fg'
                       : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w5'
@@ -400,7 +448,6 @@ export function GMatchSettingsModal({
             })}
           </div>
 
-          {/* User Profile Mini Footer */}
           <div className="hidden md:flex mt-auto p-3 border-t border-edge items-center justify-between">
             <div className="flex items-center gap-2 min-w-0">
               <div className="w-7 h-7 rounded-full bg-glass-w10 flex items-center justify-center font-medium text-xs text-retro-muted">
@@ -417,7 +464,6 @@ export function GMatchSettingsModal({
 
         {/* Right Main Content Pane */}
         <div className="flex-1 flex flex-col h-full overflow-hidden bg-transparent">
-          {/* Top Bar */}
           <div className="hidden md:flex items-center justify-between px-5 py-3.5 border-b border-edge bg-glass-w5">
             <h3 className="text-lg font-black tracking-tight text-retro-fg">
               {navItems.find((n) => n.id === activeTab)?.label}
@@ -432,36 +478,19 @@ export function GMatchSettingsModal({
             </button>
           </div>
 
-          {/* Scrollable Settings Panel Body */}
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 styled-scrollbar">
-            {/* ──────── 1. PREFERENCES ──────── */}
-            {activeTab === 'preferences' && (
-              <div className="space-y-6 animate-orbit-fade-in">
-                {/* Display & Layout */}
-                <div className="p-4 bg-glass-w5 border border-edge rounded-lg space-y-4">
-                  <h4 className="text-xs font-medium text-retro-fg">Display &amp; layout</h4>
-
-                  {/* Theme: one switch, the whole light theme is a token block. */}
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs text-retro-muted">Theme</span>
-                    <div className="flex items-center gap-1 p-0.5 rounded-lg bg-glass-w5 border border-edge" role="group" aria-label="Theme">
-                      {(['dark', 'light'] as const).map((mode) => (
-                        <button
-                          key={mode}
-                          type="button"
-                          aria-pressed={settings.theme === mode}
-                          onClick={() => { playPress(760); updateSettings('theme', mode); }}
-                          className={`px-2.5 py-1 rounded-md text-2xs font-semibold capitalize transition-colors cursor-pointer ${
-                            settings.theme === mode ? 'bg-retro-accent text-retro-accent-text' : 'text-retro-muted hover:text-retro-fg'
-                          }`}
-                        >
-                          {mode}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Panel opacity */}
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 styled-scrollbar">
+            {/* ──────── GENERAL ──────── */}
+            {activeTab === 'general' && (
+              <div className="space-y-4 animate-orbit-fade-in">
+                <Panel title="Display & layout">
+                  <Row label="Theme">
+                    <Segmented
+                      label="Theme"
+                      value={settings.theme}
+                      options={[{ value: 'dark', label: 'Dark' }, { value: 'light', label: 'Light' }]}
+                      onChange={(value) => updateSettings('theme', value)}
+                    />
+                  </Row>
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
                       <label htmlFor="panel-opacity" className="text-xs text-retro-muted">Panel opacity</label>
@@ -477,242 +506,197 @@ export function GMatchSettingsModal({
                       onChange={(e) => updateSettings('panelOpacity', Number(e.target.value) / 100)}
                       className="w-full accent-retro-accent cursor-pointer"
                     />
-                    <p className="text-2xs text-retro-body">Panel and card transparency. Text keeps its backing.</p>
                   </div>
-
-                  {/* Glass blur */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label htmlFor="glass-blur" className="text-xs text-retro-muted">Glass blur</label>
-                      <span className="text-xs font-mono text-retro-fg tabular-nums">{Math.round((settings.glassBlur ?? 0.7) * 100)}%</span>
-                    </div>
-                    <input
-                      id="glass-blur"
-                      type="range"
-                      min={0}
-                      max={100}
-                      step={10}
-                      value={Math.round((settings.glassBlur ?? 0.7) * 100)}
-                      onChange={(e) => updateSettings('glassBlur', Number(e.target.value) / 100)}
-                      className="w-full accent-retro-accent cursor-pointer"
+                  <Row label="Feed Columns">
+                    <Segmented
+                      label="Feed columns"
+                      value={settings.feedCols}
+                      options={(['1', '2', '3', '4', '5'] as const).map((v) => ({ value: v, label: v }))}
+                      onChange={(value) => updateSettings('feedCols', value)}
                     />
-                    <p className="text-2xs text-retro-body">Backdrop blur strength. 0% disables it.</p>
-                  </div>
-
-                  {/* Animated chrome (perf gate) */}
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <div className="text-xs font-medium text-retro-fg">Animated chrome</div>
-                      <div className="text-xs text-retro-body">Shine on accent buttons and headings. Off is faster.</div>
-                    </div>
-                    <Switch label="Animated chrome" checked={settings.animatedChrome} onChange={() => updateSettings('animatedChrome', !settings.animatedChrome)} />
-                  </div>
-
-                  {/* Watch Party */}
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <div className="text-xs font-medium text-retro-fg">Watch Party tab</div>
-                      <div className="text-xs text-retro-body">Show the synced video party tabs on the feed edges.</div>
-                    </div>
-                    <Switch label="Watch Party tab" checked={settings.watchPartyEnabled} onChange={() => updateSettings('watchPartyEnabled', !settings.watchPartyEnabled)} />
-                  </div>
-
-                  {/* Feed Columns */}
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <div className="text-xs font-medium text-retro-fg">Feed Columns</div>
-                      <div className="text-xs text-retro-muted">Columns for the main media feed</div>
-                    </div>
-                    <div className="flex bg-glass-w5 border border-edge rounded-lg p-0.5 text-xs font-semibold">
-                      {(['1', '2', '3', '4', '5'] as const).map((col) => (
-                        <button
-                          key={col}
-                          type="button"
-                          onClick={() => {
-                            playPress(800);
-                            updateSettings('feedCols', col);
-                          }}
-                          className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${settings.feedCols === col
-                              ? 'bg-retro-accent text-retro-accent-text font-bold'
-                              : 'text-retro-muted hover:text-retro-fg'
-                            }`}
-                        >
-                          {col}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Gallery Columns */}
-                  <div className="flex items-center justify-between gap-4 pt-2 border-t border-edge">
-                    <div>
-                      <div className="text-xs font-medium text-retro-fg">Gallery Columns</div>
-                      <div className="text-xs text-retro-muted">Columns displayed in card collection grid</div>
-                    </div>
-                    <div className="flex bg-glass-w5 border border-edge rounded-lg p-0.5 text-xs font-semibold">
-                      {(['2', '3'] as const).map((col) => (
-                        <button
-                          key={col}
-                          type="button"
-                          onClick={() => {
-                            playPress(800);
-                            updateSettings('galleryCols', col);
-                          }}
-                          className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${settings.galleryCols === col
-                              ? 'bg-retro-accent text-retro-accent-text font-bold'
-                              : 'text-retro-muted hover:text-retro-fg'
-                            }`}
-                        >
-                          {col}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Display Toggles */}
-                  <div className="field-stack pt-2 border-t border-edge divide-y divide-edge">
-                    {([
-                      {
-                        label: 'Auto-Refresh Heartbeat Sync',
-                        desc: 'Automatically synchronize active online peers and matches every 30s',
-                        key: 'autoRefresh' as const,
-                      },
-                      {
-                        label: 'Hide Duplicate Cards',
-                        desc: 'Filter redundant images in the public gallery deck',
-                        key: 'hideDuplicates' as const,
-                      },
-                    ]).map((item) => {
-                      const isOn = Boolean(settings[item.key]);
-                      return (
-                        <div key={item.key} className="pt-3 first:pt-0 flex items-center justify-between gap-4">
-                          <div>
-                            <div className="text-xs font-medium text-retro-fg">{item.label}</div>
-                            <div className="text-xs text-retro-body">{item.desc}</div>
-                          </div>
-
-                          <Switch
-                            label={item.label}
-                            checked={isOn}
-                            onChange={() => {
-                              playPress(isOn ? 600 : 900);
-                              updateSettings(item.key, !isOn as any);
-                            }}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Match Pacing & Audio */}
-                <div className="p-4 bg-glass-w5 border border-edge rounded-lg space-y-4">
-                  <h4 className="text-xs font-medium text-retro-fg">Match pacing &amp; audio</h4>
-
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <div className="text-xs font-medium text-retro-fg">Duel Reveal Pacing</div>
-                      <div className="text-xs text-retro-body">Animation suspense speed when revealing cards</div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-1">
-                      {(['instant', 'fast', 'dramatic'] as const).map((pacing) => (
-                        <button
-                          key={pacing}
-                          type="button"
-                          onClick={() => {
-                            playPress(800);
-                            updateSettings('duelPacing', pacing);
-                          }}
-                          className={`px-2.5 py-1 rounded-lg border text-xs font-semibold capitalize transition-colors cursor-pointer text-center ${settings.duelPacing === pacing
-                              ? 'bg-retro-accent text-retro-accent-text border-transparent font-bold'
-                              : 'bg-glass-w5 text-retro-muted border-edge hover:text-retro-fg hover:bg-glass-w10'
-                            }`}
-                        >
-                          {pacing}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-4 pt-2 border-t border-edge">
-                    <div>
-                      <div className="text-xs font-medium text-retro-fg">Chat Notification Sound</div>
-                      <div className="text-xs text-retro-body">Audio cue when a new direct message arrives</div>
-                    </div>
-
-                    <Switch
-                      label="Chat Notification Sound"
-                      checked={settings.chatNotificationSfx}
-                      onChange={() => {
-                        playPress(settings.chatNotificationSfx ? 600 : 900);
-                        updateSettings('chatNotificationSfx', !settings.chatNotificationSfx);
-                        if (!settings.chatNotificationSfx) playMsgReceive();
-                      }}
+                  </Row>
+                  <Row label="Gallery Columns">
+                    <Segmented
+                      label="Gallery columns"
+                      value={settings.galleryCols}
+                      options={[{ value: '2', label: '2' }, { value: '3', label: '3' }]}
+                      onChange={(value) => updateSettings('galleryCols', value)}
                     />
+                  </Row>
+                </Panel>
+                <UpdateSection toast={toast} />
+              </div>
+            )}
+
+            {/* ──────── SECURITY ──────── */}
+            {activeTab === 'security' && (
+              <div className="space-y-4 animate-orbit-fade-in">
+                <Panel title="Identity">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs text-retro-muted flex items-center gap-1.5">
+                      <Shield className="w-3.5 h-3.5" /> End-to-end keyed
+                    </span>
+                    <div className="p-3 bg-surface-raised border border-edge rounded-lg flex items-center justify-between gap-3 w-full">
+                      <span className="font-mono text-xs text-retro-fg break-all select-all">
+                        {identity?.orbitId || 'Anonymous Session'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleCopyId}
+                        className="px-3 py-1.5 bg-glass-w8 hover:bg-glass-w12 border border-edge text-retro-fg rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer shrink-0 transition-colors active:scale-(--scale-press)"
+                      >
+                        {copiedId ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedId ? 'Copied' : 'Copy'}</span>
+                      </button>
+                    </div>
                   </div>
+                </Panel>
+                <NodeAdminStatus identity={identity} />
+                <button
+                  type="button"
+                  onClick={() => { playPress(700); setShowLegalCenter(true); }}
+                  className="w-full text-left p-3 bg-glass-w5 border border-edge rounded-lg flex items-center justify-between text-xs font-medium text-retro-fg hover:bg-glass-w10 transition-colors cursor-pointer active:scale-(--scale-press)"
+                >
+                  <span>Legal Terms</span>
+                  <FileText className="w-3.5 h-3.5" />
+                </button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => onOpenIdentityModal?.('export')}
+                    className="p-4 bg-glass-w5 border border-edge hover:bg-glass-w10 hover:border-retro-accent rounded-lg text-left space-y-2 transition cursor-pointer group active:scale-(--scale-press)"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-glass-w10 border border-edge text-retro-fg flex items-center justify-center">
+                      <Download className="w-4 h-4" />
+                    </div>
+                    <div className="text-xs font-semibold text-retro-fg">Export Identity Backup</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onOpenIdentityModal?.('login')}
+                    className="p-4 bg-glass-w5 border border-edge hover:bg-glass-w10 hover:border-retro-accent rounded-lg text-left space-y-2 transition cursor-pointer group active:scale-(--scale-press)"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-glass-w10 border border-edge text-retro-fg flex items-center justify-center">
+                      <LogIn className="w-4 h-4" />
+                    </div>
+                    <div className="text-xs font-semibold text-retro-fg">Switch Account / Login</div>
+                  </button>
                 </div>
+                <div className="p-4 bg-glass-w5 border border-edge rounded-lg flex items-center justify-between gap-3">
+                  <h4 className="text-xs font-semibold text-retro-fg">Active session</h4>
+                  <button
+                    type="button"
+                    onClick={() => onOpenIdentityModal?.('logout')}
+                    className="px-3.5 py-2 bg-retro-error/15 border border-retro-error/40 text-retro-error hover:bg-retro-error/25 rounded-lg text-xs font-semibold cursor-pointer transition-colors flex items-center justify-center gap-1.5 active:scale-(--scale-press) shrink-0"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Log Out</span>
+                  </button>
+                </div>
+                {identity && <PasskeyManager identity={identity} />}
+                <DeleteAccountSection
+                  identity={identity}
+                  displayName={(() => {
+                    try { return localStorage.getItem('orbit_display_name') || ''; } catch { return ''; }
+                  })()}
+                  toast={(msg, type) => toast?.(msg, type)}
+                  onDeleted={() => onAccountDeleted?.()}
+                />
+              </div>
+            )}
 
-                {/* Media & Notifications
-                    These four toggles used to live ONLY inside the "Maximum
-                    Gooner Hardcore" modal, which was unreachable (its App
-                    state was a constant `false`). Three of them are live
-                    settings the app reads; the only way to change them was a
-                    modal nobody could open. They live here now. */}
-                <div className="p-4 bg-glass-w5 border border-edge rounded-lg field-stack">
-                  <h4 className="text-xs font-medium text-retro-fg">Media & notifications</h4>
+            {/* ──────── AUDIO ──────── */}
+            {activeTab === 'audio' && (
+              <Panel title="Sound">
+                <Row label="Sound effects" hint="Clicks, purchases and unlocks">
+                  <Switch
+                    label="Sound effects"
+                    checked={settings.soundEffects}
+                    onChange={() => { playPress(settings.soundEffects ? 600 : 900); updateSettings('soundEffects', !settings.soundEffects); }}
+                  />
+                </Row>
+                <Row label="Chat Notification Sound" hint="Audio cue for a new direct message">
+                  <Switch
+                    label="Chat Notification Sound"
+                    checked={settings.chatNotificationSfx}
+                    onChange={() => {
+                      playPress(settings.chatNotificationSfx ? 600 : 900);
+                      updateSettings('chatNotificationSfx', !settings.chatNotificationSfx);
+                      if (!settings.chatNotificationSfx) playMsgReceive();
+                    }}
+                  />
+                </Row>
+              </Panel>
+            )}
 
-                  <div className="field-stack divide-y divide-edge">
-                    {([
-                      {
-                        label: 'Hide notification content',
-                        desc: 'The toast says how many, never what (lock screens show toasts)',
-                        key: 'hideNotificationContent' as const,
-                      },
-                      {
-                        label: 'Sound effects',
-                        desc: 'Clicks, purchases and unlocks play a sound',
-                        key: 'soundEffects' as const,
-                      },
-                      {
-                        label: 'Auto-open images',
-                        desc: 'Open the lightbox when a peer sends media',
-                        key: 'autoOpenImages' as const,
-                      },
-                      {
-                        label: 'Idle mode',
-                        desc: 'Pause the feed when the window has been inactive',
-                        key: 'idleEnabled' as const,
-                      },
-                      {
-                        label: 'Allow remote wallpaper',
-                        desc: 'Let a peer set this device’s background',
-                        key: 'allowRemoteWallpaper' as const,
-                      },
-                    ]).map((item) => {
-                      const isOn = Boolean(settings[item.key]);
-                      return (
-                        <div key={item.key} className="pt-3 first:pt-0 flex items-center justify-between gap-4">
-                          <div>
-                            <div className="text-xs font-medium text-retro-fg">{item.label}</div>
-                            <div className="text-xs text-retro-body">{item.desc}</div>
-                          </div>
+            {/* ──────── CAMERA ──────── */}
+            {activeTab === 'camera' && (
+              <Panel title="Camera permission">
+                <Row label="Camera requests" hint="Gates any remote camera effect on this device">
+                  <Segmented
+                    label="Camera requests"
+                    value={settings.cameraPermissionMode}
+                    options={[
+                      { value: 'prompt', label: 'Prompt' },
+                      { value: 'auto', label: 'Auto' },
+                      { value: 'deny', label: 'Deny' },
+                    ]}
+                    onChange={(value) => updateSettings('cameraPermissionMode', value)}
+                  />
+                </Row>
+              </Panel>
+            )}
 
-                          <Switch
-                            label={item.label}
-                            checked={isOn}
-                            onChange={() => {
-                              playPress(isOn ? 600 : 900);
-                              updateSettings(item.key, !isOn);
-                            }}
+            {/* ──────── NETWORK ──────── */}
+            {activeTab === 'network' && (
+              <div className="space-y-4 animate-orbit-fade-in">
+                {isNodeAdmin && (
+                  <Panel title="Mesh discovery">
+                    <Row label="Mesh discovery" hint="Announce this install on public trackers">
+                      <Switch
+                        label="Mesh discovery"
+                        checked={settings.meshEnabled}
+                        onChange={() => updateSettings('meshEnabled', !settings.meshEnabled)}
+                      />
+                    </Row>
+                    {settings.meshEnabled && (
+                      <>
+                        <label className="block">
+                          <span className="block text-xs text-retro-muted mb-1">Community key</span>
+                          <input
+                            type="text"
+                            value={meshKeyDraft}
+                            onChange={(e) => setMeshKeyDraft(e.target.value)}
+                            onBlur={commitMeshKey}
+                            placeholder="gmatch-open-mesh-v1"
+                            className="w-full bg-retro-bg border border-edge rounded-md px-2 py-1.5 text-xs font-mono text-retro-fg outline-none"
                           />
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                        </label>
+                        <label className="flex items-center justify-between gap-2 cursor-pointer">
+                          <span className="text-xs text-retro-muted">Hide which files I hold (salted)</span>
+                          <input
+                            type="checkbox"
+                            checked={settings.meshObfuscateHave}
+                            onChange={(e) => updateSettings('meshObfuscateHave', e.target.checked)}
+                            className="accent-retro-accent cursor-pointer"
+                          />
+                        </label>
+                      </>
+                    )}
+                  </Panel>
+                )}
+                <TurnSection toast={toast} />
+                <MediaqSection onClose={onClose} toast={toast} />
+                <DiagnosticsSection identity={identity} />
+                <CommunitySection toast={toast} />
+              </div>
+            )}
 
-                {/* Wallpaper & Background Section */}
-                <div className="p-4 bg-glass-w5 border border-edge rounded-lg field-stack">
+            {/* ──────── PREFERENCES ──────── */}
+            {activeTab === 'preferences' && (
+              <div className="space-y-4 animate-orbit-fade-in">
+                {/* Wallpaper */}
+                <Panel title="Wallpaper background">
                   <button
                     type="button"
                     onClick={() => setWallpaperExpanded(!wallpaperExpanded)}
@@ -720,39 +704,28 @@ export function GMatchSettingsModal({
                     aria-expanded={wallpaperExpanded}
                     className="w-full flex items-center justify-between cursor-pointer text-left"
                   >
-                    <span>
-                      <span className="block text-xs font-medium text-retro-fg">Wallpaper background</span>
-                      <span className="block text-xs text-retro-muted">Customize application background image or media</span>
-                    </span>
+                    <span className="text-xs text-retro-muted">Custom image or video</span>
                     <span className="min-w-[28px] min-h-[28px] flex items-center justify-center p-1 text-retro-muted">
                       {wallpaperExpanded ? <ChevronUp className="w-4 h-4" aria-hidden="true" /> : <ChevronDown className="w-4 h-4" aria-hidden="true" />}
                     </span>
                   </button>
-
                   {wallpaperExpanded && (
                     <div className="space-y-4 pt-3 border-t border-edge animate-orbit-fade-in">
-                      {/* Upload or URL */}
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="text-xs text-retro-muted">Custom Image or Media</span>
                           {settings.wallpaperUrl && (
-                            <button
-                              type="button"
-                              onClick={clearWallpaper}
-                              className="text-xs text-retro-error hover:underline cursor-pointer"
-                            >
+                            <button type="button" onClick={clearWallpaper} className="text-xs text-retro-error hover:underline cursor-pointer">
                               Reset to Default
                             </button>
                           )}
                         </div>
-
                         <label className="border border-dashed border-edge hover:border-retro-accent rounded-lg bg-glass-w5 p-3 flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors text-center">
                           <Upload className="w-5 h-5 text-retro-muted" />
                           <span className="text-xs font-semibold text-retro-body">Browse file to upload</span>
-                          <span className="text-2xs text-retro-muted">JPG, PNG, WebP, GIF, MP4 (downscaled to 1920px)</span>
+                          <span className="text-2xs text-retro-muted">Images or video, downscaled to 1920px</span>
                           <input type="file" accept="image/*,video/*" onChange={handleWallpaperFile} className="hidden" />
                         </label>
-
                         <div className="flex gap-2 pt-1">
                           <input
                             type="text"
@@ -770,47 +743,25 @@ export function GMatchSettingsModal({
                           </button>
                         </div>
                       </div>
-
-                      {/* Fit mode */}
-                      <div className="flex items-center justify-between gap-4 pt-1">
-                        <div className="text-xs text-retro-muted">Image Fit</div>
-                        <div className="flex gap-1">
-                          {([
-                            { id: 'cover', label: 'Fill' },
-                            { id: 'contain', label: 'Fit' },
-                            { id: 'repeat', label: 'Repeat' },
-                          ] as const).map((mode) => (
-                            <button
-                              key={mode.id}
-                              type="button"
-                              onClick={() => { playPress(700); updateSettings('wallpaperFit', mode.id); }}
-                              className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${settings.wallpaperFit === mode.id
-                                  ? 'bg-retro-accent text-retro-accent-text border-transparent font-bold'
-                                  : 'bg-glass-w5 text-retro-muted border-edge hover:text-retro-fg hover:bg-glass-w10'
-                                }`}
-                            >
-                              {mode.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Slideshow */}
-                      <div className="flex items-center justify-between pt-2 border-t border-edge">
-                        <div>
-                          <div className="text-xs font-medium text-retro-fg">Card Slideshow</div>
-                          <div className="text-xs text-retro-body">Cycle collected cards as background</div>
-                        </div>
+                      <Row label="Image Fit">
+                        <Segmented
+                          label="Image Fit"
+                          value={settings.wallpaperFit}
+                          options={[
+                            { value: 'cover', label: 'Fill' },
+                            { value: 'contain', label: 'Fit' },
+                            { value: 'repeat', label: 'Repeat' },
+                          ]}
+                          onChange={(value) => updateSettings('wallpaperFit', value)}
+                        />
+                      </Row>
+                      <Row label="Card Slideshow" hint="Cycle collected cards as background">
                         <Switch
                           label="Card Slideshow"
                           checked={settings.wallpaperSlideshow}
-                          onChange={() => {
-                            playPress(750);
-                            updateSettings('wallpaperSlideshow', !settings.wallpaperSlideshow);
-                          }}
+                          onChange={() => { playPress(750); updateSettings('wallpaperSlideshow', !settings.wallpaperSlideshow); }}
                         />
-                      </div>
-
+                      </Row>
                       {settings.wallpaperSlideshow && (
                         <div className="flex items-center gap-2 pt-1">
                           <span className="text-xs text-retro-muted">Interval:</span>
@@ -832,18 +783,12 @@ export function GMatchSettingsModal({
                       )}
                     </div>
                   )}
-                </div>
+                </Panel>
 
-                {/* Local media vault (opt-in): gallery keeps + card bytes on disk */}
-                <div className="p-4 bg-glass-w5 border border-edge rounded-lg field-stack">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <h4 className="text-xs font-medium text-retro-fg">Local media vault</h4>
-                      <p className="text-xs text-retro-body">
-                        Keeps gallery images and cards on this computer (3 GB cap, oldest unkept goes first).
-                        Off = memory only.
-                      </p>
-                    </div>
+                <FeedSettingsTab toast={toast} />
+
+                <Panel title="Local media vault">
+                  <Row label="Local media vault" hint="Keeps gallery images and cards on this device (3 GB cap)">
                     <Switch
                       label="Local media vault"
                       checked={settings.localVault}
@@ -855,7 +800,7 @@ export function GMatchSettingsModal({
                         updateSettings('localVault', next);
                       }}
                     />
-                  </div>
+                  </Row>
                   {settings.localVault && (
                     <div className="flex items-center justify-between gap-4 pt-1 border-t border-edge">
                       <VaultUsage />
@@ -868,215 +813,18 @@ export function GMatchSettingsModal({
                       </button>
                     </div>
                   )}
-                  {!vaultBridge() && (
-                    <p className="text-2xs text-retro-muted">Desktop app only. The browser build always streams.</p>
-                  )}
+                  {!vaultBridge() && <p className="text-xs text-retro-muted">Desktop app only. The browser build always streams.</p>}
                   <CacheViewer toast={toast} />
-                </div>
+                </Panel>
+
+                <ImportPostsSection identity={identity} toast={toast} />
+                <RecacheMediaSection toast={toast} />
               </div>
             )}
 
-            {/* Mesh: who this install announces itself to. */}
-            {activeTab === 'preferences' && (
-              <div className="p-4 bg-glass-w5 border border-edge rounded-lg field-stack">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-xs font-medium text-retro-fg">Mesh discovery</div>
-                    <div className="text-2xs text-retro-muted leading-relaxed">
-                      Announce this install on public trackers so peers on other machines can find you.
-                      Only a rotating daily id and an offer leave the machine — no name, no catalog.
-                      Your IP is visible to the tracker and to the peers you connect to.
-                    </div>
-                  </div>
-                  <Switch
-                    label="Mesh discovery"
-                    checked={settings.meshEnabled}
-                    onChange={() => updateSettings('meshEnabled', !settings.meshEnabled)}
-                  />
-                </div>
-
-                {settings.meshEnabled && (
-                  <>
-                    <label className="block">
-                      <span className="block text-2xs text-retro-muted mb-1">Community key</span>
-                      <input
-                        type="text"
-                        value={meshKeyDraft}
-                        onChange={(e) => setMeshKeyDraft(e.target.value)}
-                        onBlur={commitMeshKey}
-                        placeholder="gmatch-open-mesh-v1"
-                        className="w-full bg-retro-bg border border-edge rounded-md px-2 py-1.5 text-xs font-mono text-retro-fg outline-none"
-                      />
-                      <span className="block text-2xs text-retro-muted mt-1">
-                        Default = open mesh (stops casual enumeration, not someone reading the code).
-                        An invite key closes the mesh to that group.
-                      </span>
-                    </label>
-                    <label className="flex items-center justify-between gap-2 cursor-pointer">
-                      <span className="text-2xs text-retro-muted">Hide which files I hold (salted)</span>
-                      <input
-                        type="checkbox"
-                        checked={settings.meshObfuscateHave}
-                        onChange={(e) => updateSettings('meshObfuscateHave', e.target.checked)}
-                      />
-                    </label>
-                  </>
-                )}
-              </div>
-            )}
-
-            {/* Updates (desktop builds only — hides without the bridge). */}
-            {activeTab === 'preferences' && <UpdateSection toast={toast} />}
-
-            {/* Community invite: node setting with a constant fallback. */}
-            {activeTab === 'preferences' && <CommunitySection toast={toast} />}
-
-            {/* Opt-in migration: share posts published before local-first. */}
-            {activeTab === 'preferences' && <ImportPostsSection identity={identity} toast={toast} />}
-
-            {/* Opt-in legacy measure: fetch keepsakes that predate local bytes. */}
-            {activeTab === 'preferences' && <RecacheMediaSection toast={toast} />}
-
-            {/* Cross-NAT: add a TURN relay at runtime (CGNAT pairs, USA-Brazil). */}
-            {activeTab === 'preferences' && <TurnSection toast={toast} />}
-
-            {/* Optional content provider: one-click install; the clicker works
-                on local sources the whole time, with or without it. */}
-            {activeTab === 'preferences' && <MediaqSection onClose={onClose} toast={toast} />}
-
-            {/* Real diagnostics + repairs: health probe, roster re-pull, cache
-                clear, sidecar restart, and a DEV console dump. */}
-            {activeTab === 'preferences' && <DiagnosticsSection identity={identity} />}
-
-            {/* ──────── 2. ACCOUNT & SECURITY ──────── */}
-            {activeTab === 'account' && (
-              <div className="space-y-6 animate-orbit-fade-in">
-                {/* Orbit ID Display */}
-                <div className="p-4 bg-glass-w5 border border-edge rounded-lg field-stack">
-                  <div className="flex items-center justify-between">
-                    <span className="text-2xs font-medium uppercase tracking-wider text-retro-muted">
-                      Cryptographic Identity Key
-                    </span>
-                    <span className="text-xs text-retro-muted font-medium flex items-center gap-1.5">
-                      <Shield className="w-3.5 h-3.5 text-retro-fg" /> End-to-End Keyed
-                    </span>
-                  </div>
-
-                  <div className="p-3 bg-surface-raised border border-edge rounded-lg flex items-center justify-between gap-3">
-                    <span className="font-mono text-xs text-retro-fg break-all select-all">
-                      {identity?.orbitId || 'Anonymous Session'}
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={handleCopyId}
-                      className="px-3 py-1.5 bg-glass-w8 hover:bg-glass-w12 border border-edge text-retro-fg rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer shrink-0 transition-colors active:scale-(--scale-press)"
-                    >
-                      {copiedId ? <Check className="w-3.5 h-3.5 text-retro-fg" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copiedId ? 'Copied' : 'Copy'}</span>
-                    </button>
-                  </div>
-
-                  <p className="text-xs text-retro-muted leading-relaxed">
-                    Your Orbit ID is your private cryptographic key pair. Keys are stored locally on your device.
-                  </p>
-                </div>
-
-                {/* Legal Terms */}
-                <div className="p-4 bg-glass-w5 border border-edge rounded-lg field-stack">
-                  <button
-                    type="button"
-                    onClick={() => { playPress(700); setShowLegalCenter(true); }}
-                    className="w-full text-left p-3 bg-retro-panel/10 border border-edge rounded-lg text-xs font-medium text-retro-fg hover:bg-retro-panel/20 transition-colors cursor-pointer active:scale-(--scale-press)"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span>Legal Terms</span>
-                      <FileText className="w-3.5 h-3.5" />
-                    </div>
-                    <p className="text-2xs text-retro-muted mt-1">
-                      Terms of Use, Privacy, and related policies. Read-only — no acceptance required here.
-                    </p>
-                  </button>
-                </div>
-
-                {/* Account Management Actions */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => onOpenIdentityModal?.('export')}
-                    className="p-4 bg-glass-w5 border border-edge hover:bg-glass-w10 hover:border-retro-accent rounded-lg text-left space-y-2 transition cursor-pointer group active:scale-(--scale-press)"
-                  >
-                    <div className="w-8 h-8 rounded-lg bg-glass-w10 border border-edge text-retro-fg flex items-center justify-center">
-                      <Download className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="text-xs font-semibold text-retro-fg">Export Identity Backup</div>
-                      <p className="text-xs text-retro-muted mt-0.5">Save your private keys to log in on other devices</p>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => onOpenIdentityModal?.('login')}
-                    className="p-4 bg-glass-w5 border border-edge hover:bg-glass-w10 hover:border-retro-accent rounded-lg text-left space-y-2 transition cursor-pointer group active:scale-(--scale-press)"
-                  >
-                    <div className="w-8 h-8 rounded-lg bg-glass-w10 border border-edge text-retro-fg flex items-center justify-center">
-                      <LogIn className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="text-xs font-semibold text-retro-fg">Switch Account / Login</div>
-                      <p className="text-xs text-retro-muted mt-0.5">Import an existing secret key or switch profiles</p>
-                    </div>
-                  </button>
-                </div>
-
-                {/* Active Session & Log Out */}
-                <div className="p-4 bg-glass-w5 border border-edge rounded-lg field-stack">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                      <h4 className="text-xs font-semibold text-retro-fg">Active session</h4>
-                      <p className="text-xs text-retro-muted">
-                        Signing out clears your private keys and session from this device. Export a backup first if you want to log back in later.
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => onOpenIdentityModal?.('logout')}
-                      className="px-3.5 py-2 bg-retro-error/15 border border-retro-error/40 text-retro-error hover:bg-retro-error/25 rounded-lg text-xs font-semibold cursor-pointer transition-colors flex items-center justify-center gap-1.5 active:scale-(--scale-press) shrink-0"
-                    >
-                      <LogOut className="w-3.5 h-3.5" />
-                      <span>Log Out</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Vault security — the passkey binds this device's key to a
-                    hardware authenticator. The component existed but was
-                    unreachable (its App.tsx branch was a constant `false`),
-                    so the feature was dead code with a live server route. */}
-                {identity && (
-                  <PasskeyManager identity={identity} />
-                )}
-
-                <DeleteAccountSection
-                  identity={identity}
-                  displayName={(() => {
-                    try { return localStorage.getItem('orbit_display_name') || ''; } catch { return ''; }
-                  })()}
-                  toast={(msg, type) => toast?.(msg, type)}
-                  onDeleted={() => onAccountDeleted?.()}
-                />
-              </div>
-            )}
-
-            {/* ──────── 3. FEED & TAGS ──────── */}
-            {activeTab === 'feed' && <FeedSettingsTab toast={toast} onNavigateTab={setActiveTab} />}
-
-            {/* ──────── 4. BLOCKLIST (JSON) ──────── */}
+            {/* ──────── BLOCKLIST ──────── */}
             {activeTab === 'blocklist' && <BlocklistSection toast={toast} />}
 
-            {/* Legal Terms Modal (read-only) */}
             <LegalCenter
               isOpen={showLegalCenter}
               onClose={() => setShowLegalCenter(false)}

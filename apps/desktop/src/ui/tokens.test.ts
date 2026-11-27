@@ -72,6 +72,21 @@ describe('common UI tokens', () => {
     expect(bootHtml).toContain('var(--logo-clear-space,')
   })
 
+  it('keeps the hero wordmark and live status on the one token scale', () => {
+    expect(tokens.TYPE.brand).toBe('text-brand')
+    expect(tokens.LOGO.wordmarkHero).toContain(tokens.TYPE.brand)
+    for (const name of ['text-brand', 'text-status', 'weight-brand', 'boot-status-width']) {
+      expect(css, name).toMatch(new RegExp(`^\\s*--${name}:`, 'm'))
+    }
+    // The pre-bundle splash reads the same names, with matching fallbacks, and
+    // inverts the shipped mark instead of flattening it to a white square.
+    for (const name of ['text-brand,', 'text-status,', 'weight-brand,', 'boot-status-width,']) {
+      expect(bootHtml, name).toContain(`var(--${name}`)
+    }
+    expect(bootHtml).toContain('filter: invert(1)')
+    expect(bootHtml).toContain('class="boot-stage"')
+  })
+
   it('routes every shell transition and orbit keyframe through one motion preset', () => {
     for (const name of [
       'motion-duration-micro', 'motion-duration-fade', 'motion-duration-enter',

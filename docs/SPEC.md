@@ -302,8 +302,8 @@ product path.
   binary) and runs `uv tool install --python 3.12 mediaq` — uv pulls a managed
   CPython, so Python is never bundled and nothing is installed system-wide.
   `electron/mediaqSidecar.cjs` runs it on 127.0.0.1:8765 and stops it on quit;
-  IPC `mediaq:status` / `mediaq:install` / `mediaq:cancel` / `mediaq:start`
-  (+ `mediaq:progress`) drive the suite. The modal shows a real progress bar
+  IPC `mediaq:status` / `mediaq:install` / `mediaq:cancel` / `mediaq:start` /
+  `mediaq:stop` / `mediaq:restart` (+ `mediaq:progress`) drive the suite. The modal shows a real progress bar
   (percent during the uv download, indeterminate during the install) with Cancel
   and "Send to background"; backgrounded, the install keeps running and its
   progress shows as a card in the notification centre (`NotificationCenter`).
@@ -312,7 +312,11 @@ product path.
   one-click install (`components/settings/MediaqSection.tsx`): it drives the
   shared install store with `showModal=false`, so the bar, Cancel and "Send to
   background" work inline and the install keeps running after Settings closes.
-  The clicker's provider is optional and category-aware (`real` + `hentai` from
+  Once installed, the same section starts, stops and restarts the local server;
+  every control reports the real IPC outcome — an installed-but-unlaunched server
+  is never shown as ready, and a server that is still answering after a stop is
+  never claimed as stopped (a server adopted from another process is not ours to
+  kill). The clicker's provider is optional and category-aware (`real` + `hentai` from
   one `ContentProvider`); when mediaq is absent its transport failure just cools
   that one provider and the round falls back to local mirrors. Once the sidecar
   answers, the install/start path clears mediaq's failure cooldown
@@ -817,15 +821,23 @@ heat streak). Each +5% click power. Persist across prestige.
   (`srflx`/`prflx`) candidates are exchanged, so peers on different NATs
   hole-punch into a direct DataChannel. A peer necessarily learns the
   address it connects to; Cloudflare learns nothing but an anonymous query.
+- **A baked public TURN works out of the box.** `defaultTurn()` supplies
+  `turn:openrelay.metered.ca:80` with shared `openrelayproject` credentials as a
+  CANDIDATE alongside Cloudflare STUN, so cross-NAT pairs connect in packaged
+  builds with no injected env. It does NOT force `iceTransportPolicy: 'relay'`:
+  direct/srflx paths still win, a relay outage cannot take P2P down, and the
+  literal-LAN-IP sanitization is unchanged. Third-party and rate-limited — a
+  best-effort fallback, not a guarantee.
 - Literal-IP `host` candidates NEVER leave the machine (mDNS `.local` hosts
   only) — the LAN stays private. Unknown shapes fail closed. The signal
   server re-validates every posted candidate (defense in depth against a
   malicious peer) and 400s raw-IP `host` ones.
-- TURN env (`NEXT_PUBLIC_TURN_URL/USERNAME/CREDENTIAL`) flips the config to
-  `iceTransportPolicy: 'relay'` — fully relayed connections, zero IP
-  exposure, for users who choose that posture.
-- Symmetric-NAT pairs (which STUN cannot traverse) fall back to the sealed
-  WS-relay swarm; the UI reports the real path.
+- TURN from Settings (`gmatch.turn.v1`) or env (`NEXT_PUBLIC_TURN_URL/
+  USERNAME/CREDENTIAL`, with `VITE_TURN_*` aliases) WINS over the baked default
+  and flips the config to `iceTransportPolicy: 'relay'` — fully relayed
+  connections, zero IP exposure, for users who choose that posture.
+- Symmetric-NAT pairs (which STUN cannot traverse) fall back to the baked TURN
+  relay or the sealed WS-relay swarm; the UI reports the real path.
 - Wave 2 (masks): peers address each other ONLY through delivery tokens
   rendered as `gmatch://node/...` codes (`utils/nodeMask.ts`); tokens
   rotate per boot (`utils/handleRotation.ts`, epoch travels sealed inside
@@ -1503,7 +1515,7 @@ then disabled with the reason instead of failing as a 404 toast, and the
 lobby/queue/group composer is replaced by a notice. Courier DMs and sealed rooms
 are exempt — they never touch the node.
 
-**Last conversation** is restored on boot (`gmatch_last_dm_peer_v1`);
+**Last conversation** is restored when chat opens, per identity (`gmatch_last_dm_peer_v1`);
 **search** covers local DMs and rooms only, via a bounded lazy index (5000
 messages / 50 results) that reports `truncated` honestly.
 

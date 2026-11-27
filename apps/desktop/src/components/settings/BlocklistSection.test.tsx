@@ -28,12 +28,14 @@ describe('BlocklistSection', () => {
     vi.unstubAllGlobals()
   })
 
-  it('renders the blocklist configuration header and mode toggle', () => {
+  it('renders the compact blocklist header and mode toggle', () => {
     render(<BlocklistSection />)
-    expect(screen.getByText(/Content Blocklist \(blocklist\.json\)/i)).toBeInTheDocument()
+    expect(screen.getByText('Content Blocklist')).toBeInTheDocument()
+    expect(screen.getByText('Changes save automatically')).toBeInTheDocument()
     expect(screen.getByText('Visual Lists')).toBeInTheDocument()
     expect(screen.getByText('Raw JSON')).toBeInTheDocument()
-    expect(screen.getByText('Hard Blocklist (blocklist)')).toBeInTheDocument()
+    expect(screen.getByText('Blocklist', { exact: true })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Save Changes/i })).not.toBeInTheDocument()
   })
 
   it('allows switching to raw JSON mode and back to visual mode', () => {
@@ -46,32 +48,20 @@ describe('BlocklistSection', () => {
 
     const visualBtn = screen.getByText('Visual Lists')
     fireEvent.click(visualBtn)
-    expect(screen.getByText('Hard Blocklist (blocklist)')).toBeInTheDocument()
+    expect(screen.getByText('Blocklist', { exact: true })).toBeInTheDocument()
   })
 
-  it('allows adding a new tag in visual mode and saving', async () => {
+  it('autosaves a new tag in visual mode — no Save button needed', async () => {
     const toast = vi.fn()
     render(<BlocklistSection toast={toast} />)
 
-    // Add a custom tag 'custom_prohibited_term'
     const input = screen.getByPlaceholderText(/Add tag\(s\) to blocklist\.\.\./i)
     fireEvent.change(input, { target: { value: 'custom_prohibited_term' } })
-    const addBtn = screen.getByRole('button', { name: /Add/i })
-    fireEvent.click(addBtn)
+    fireEvent.click(screen.getByRole('button', { name: /Add/i }))
 
     expect(screen.getByText('custom_prohibited_term')).toBeInTheDocument()
-
-    // Save changes
-    const saveBtn = screen.getByRole('button', { name: /Save Changes/i })
-    fireEvent.click(saveBtn)
-
-    await waitFor(() => {
-      expect(isTagBlocked('custom_prohibited_term')).toBe(true)
-      expect(toast).toHaveBeenCalledWith(
-        expect.stringContaining('saved and applied'),
-        'success',
-      )
-    })
+    await waitFor(() => expect(isTagBlocked('custom_prohibited_term')).toBe(true))
+    expect(toast).toHaveBeenCalledWith(expect.stringContaining('Added 1 tag'), 'success')
   })
 
   it('opening the panel does NOT write the list back', async () => {
@@ -95,40 +85,33 @@ describe('BlocklistSection', () => {
     }
   })
 
-  it('allows removing a tag in visual mode and saving', async () => {
-    const toast = vi.fn()
-    render(<BlocklistSection toast={toast} />)
+  it('autosaves a tag removal in visual mode', async () => {
+    render(<BlocklistSection />)
 
-    // Verify 'shota' is currently in blocklist
     expect(isTagBlocked('shota')).toBe(true)
-    const removeBtn = screen.getByRole('button', { name: /Remove shota/i })
-    fireEvent.click(removeBtn)
+    fireEvent.click(screen.getByRole('button', { name: /Remove shota/i }))
 
     expect(screen.queryByText('shota')).not.toBeInTheDocument()
-
-    // Save changes
-    const saveBtn = screen.getByRole('button', { name: /Save Changes/i })
-    fireEvent.click(saveBtn)
-
-    await waitFor(() => {
-      // shota should no longer be blocked because it was removed from the blocklist!
-      expect(isTagBlocked('shota')).toBe(false)
-    })
+    await waitFor(() => expect(isTagBlocked('shota')).toBe(false))
   })
 
-  it('detects invalid JSON syntax in raw JSON mode and blocks saving', async () => {
-    const toast = vi.fn()
-    render(<BlocklistSection toast={toast} />)
+  it('reports invalid JSON and writes nothing', async () => {
+    const blocklistSet = vi.fn(async () => ({ ok: true }))
+    ;(window as unknown as { gmatch: unknown }).gmatch = { blocklistSet }
+    try {
+      render(<BlocklistSection />)
 
-    fireEvent.click(screen.getByText('Raw JSON'))
-    const textarea = screen.getByRole('textbox')
+      fireEvent.click(screen.getByText('Raw JSON'))
+      fireEvent.change(screen.getByRole('textbox'), {
+        target: { value: '{ "blocklist": [ invalid json }' },
+      })
 
-    // Corrupt JSON
-    fireEvent.change(textarea, { target: { value: '{ "blocklist": [ invalid json }' } })
-
-    expect(screen.getByText(/not valid JSON/i)).toBeInTheDocument()
-    const saveBtn = screen.getByRole('button', { name: /Save Changes/i })
-    expect(saveBtn).toBeDisabled()
+      expect(screen.getByText(/not valid JSON/i)).toBeInTheDocument()
+      await waitFor(() => expect(blocklistSet).not.toHaveBeenCalled())
+      expect(screen.queryByRole('button', { name: /Save Changes/i })).not.toBeInTheDocument()
+    } finally {
+      delete (window as unknown as { gmatch?: unknown }).gmatch
+    }
   })
 
   it('allows resetting blocklist to factory defaults', async () => {

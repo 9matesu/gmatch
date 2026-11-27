@@ -13,10 +13,22 @@ vi.mock('../../hooks/watchPartyStore', () => ({
 import { createParty, expandPlaylist, loadPartyVideo, loadPartyVideos } from '../../hooks/watchPartyStore'
 import { WatchPartyUrlModal } from './WatchPartyUrlModal'
 
+// jsdom in this repo has no localStorage; stub it the way other persistence tests do.
+const storage: Record<string, string> = {}
+globalThis.localStorage = {
+  getItem: (key: string) => storage[key] ?? null,
+  setItem: (key: string, value: string) => { storage[key] = String(value) },
+  removeItem: (key: string) => { delete storage[key] },
+  clear: () => { for (const k of Object.keys(storage)) delete storage[k] },
+  key: () => null,
+  length: 0,
+} as Storage
+
 const identity = { orbitId: 'me', publicKeyHex: 'p', privateKeyHex: 'k' } as never
 let fetchMock: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
+  window.localStorage.clear()
   fetchMock = vi.fn(async () => new Response(JSON.stringify({ parties: [] }), { status: 200 }))
   vi.stubGlobal('fetch', fetchMock)
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
@@ -110,6 +122,33 @@ describe('WatchPartyUrlModal', () => {
 
     await waitFor(() => expect(createParty).toHaveBeenCalledWith(identity, 'https://video1', 'Awesome Playlist'))
     await waitFor(() => expect(loadPartyVideos).toHaveBeenCalledWith(identity, 'p9', ['https://video2', 'https://video3'], true))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+  })
+
+  it('saves a launched URL locally and offers it as a quick-launch chip with a thumbnail', async () => {
+    const first = render(<WatchPartyUrlModal identity={identity} onClose={() => {}} />)
+    fireEvent.change(screen.getByLabelText('Video URL'), { target: { value: 'https://example.com/v' } })
+    fireEvent.click(screen.getByRole('button', { name: 'START PARTY' }))
+    await waitFor(() => expect(createParty).toHaveBeenCalledWith(identity, 'https://example.com/v', ''))
+
+    // Stored on this device, not on the node: a chip survives a modal re-open.
+    expect(window.localStorage.getItem('gmatch_watch_urls_v1')).toContain('https://example.com/v')
+    first.unmount()
+    render(<WatchPartyUrlModal identity={identity} onClose={() => {}} />)
+
+    const chip = screen.getByRole('button', { name: 'Quick launch https://example.com/v' })
+    expect(chip.querySelector('img')?.getAttribute('src')).toBe('https://example.com/v')
+  })
+
+  it('relaunches a saved link in one click through the real create path', async () => {
+    window.localStorage.setItem('gmatch_watch_urls_v1', JSON.stringify([
+      { url: 'https://saved.example/v', at: Date.now() },
+    ]))
+    const onClose = vi.fn()
+    render(<WatchPartyUrlModal identity={identity} onClose={onClose} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Quick launch https://saved.example/v' }))
+    await waitFor(() => expect(createParty).toHaveBeenCalledWith(identity, 'https://saved.example/v', ''))
     await waitFor(() => expect(onClose).toHaveBeenCalled())
   })
 })

@@ -32,6 +32,13 @@ test('installPlan picks the next step from what is present', () => {
   expect_install({ platform: 'freebsd', arch: 'x64' }, { hasUv: true, hasMediaq: true }, 'unsupported')
 })
 
+test('the full download suite is uv first, then mediaq (no step skipped)', () => {
+  const base = { platform: 'win32', arch: 'x64' }
+  assert.equal(installPlan({ ...base, hasUv: false, hasMediaq: false }).step, 'install-uv')
+  assert.equal(installPlan({ ...base, hasUv: true, hasMediaq: false }).step, 'install-mediaq')
+  assert.equal(installPlan({ ...base, hasUv: true, hasMediaq: true }).step, 'ready')
+})
+
 function expect_install(base, state, step) {
   const plan = installPlan({ ...base, ...state })
   assert.equal(plan.step, step)

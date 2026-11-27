@@ -7,7 +7,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 const net = require('node:net')
 const { createHash } = require('node:crypto')
-const { adminPin } = require('./admin-pin.cjs')
+const { adminPinHash } = require('./admin-pin.cjs')
 const { createApiLease } = require('./apiSidecarLease.cjs')
 
 const PORT = Number(process.env.GMATCH_API_PORT || 8790)
@@ -184,32 +184,23 @@ async function startApi() {
     console.log(`[api] spawning ${bunPath} in ${apiDir} (packaged=${electronApp.isPackaged})`)
   } catch { /* logging only */ }
 
-  // ADMIN_PIN, and why it is or is not injected.
-  //
-  // In a PACKAGED install there is no repo, so a self-hoster has nowhere to
-  // configure one: the generated per-install 8-hex PIN is minted, persisted to
-  // userData/admin-pin.txt, and shown in Settings -> Server. That is the whole
-  // point of it.
-  //
-  // Unpackaged (running from the repo) we deliberately do NOT inject it. A real
-  // process env var beats a `.env` file in Bun, so injecting here SHADOWED
-  // apps/api/.env.local — the developer set ADMIN_PIN in .env.local, the
-  // sidecar overrode it with a random 8-hex, and their passcode silently did
-  // not work with nothing in the UI to explain why. In dev, .env.local is the
-  // single source of truth and the launcher stops fighting it.
-  const injected = app.isPackaged ? adminPin(app.getPath('userData')) : null
-  if (!injected) {
-    console.log(
-      '[api] no ADMIN_PIN injected — the node reads ADMIN_PIN/ADMIN_PIN_HASH ' +
-        'from apps/api/.env.local or the ambient environment',
-    )
+  // ADMIN_PIN_HASH only: the install's scrypt hash (never the plaintext PIN)
+  // is injected so both packaged and unpackaged launches use the same node
+  // credential. An explicit env ADMIN_PIN_HASH still wins, for dev/QA.
+  const userData = app.getPath('userData')
+  const injectedHash = adminPinHash(userData)
+  if (!process.env.ADMIN_PIN_HASH) {
+    console.log('[api] using this install\'s scrypt admin hash (plaintext never persisted)')
   }
   const entry = fs.existsSync(path.join(apiDir, 'serve.js')) ? 'serve.js' : 'src/serve.ts'
   proc = spawn(bunPath, ['run', entry], {
     cwd: apiDir,
     env: {
       ...process.env,
-      ...(injected ? { ADMIN_PIN: injected } : {}),
+      ADMIN_PIN_HASH: injectedHash,
+      // Live owner binding: the first identity on this install writes this
+      // file, and verify-pin reads it without a sidecar restart.
+      ADMIN_OWNER_FILE: path.join(userData, 'admin-owner.json'),
       PORT: String(PORT),
       // The node echoes this in /api/health so a later launch can prove the
       // process on :8790 is THIS install's node before adopting it.

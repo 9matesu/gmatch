@@ -398,7 +398,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
             },
             ...prev,
           ]);
-          toastFn(`${label} sent to ${selectedTarget.displayName} — free via mesh. Receipt shows in Outbox.`, 'success');
+          toastFn(`${label} sent to ${selectedTarget.displayName}. Receipt shows in Outbox.`, 'success');
           setSending(null);
           return;
         }
@@ -670,7 +670,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                   ).length
                   const allAllowed = allowedCount === ACTION_ORDER.length
                   const noneAllowed = allowedCount === 0
-                  // Free is stated ON every card; do not say it twice here.
+                  // The cost is stated on every card; don't repeat it here.
                   if (allAllowed || allFree) return null
                   return (
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-retro-muted">
@@ -684,11 +684,9 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                     const { label, icon: Icon, consent } = ACTION_LABELS[action];
                     const allowed = Boolean(selectedTarget.consents?.[consent]);
                     const sendable = allowed && Boolean(selectedTarget.enabled) && selectedTarget.online !== false;
-                    const priceText = allFree
-                      ? 'Free via mesh'
-                      : prices[action] != null
-                        ? `${prices[action]} g$`
-                        : 'Price unavailable';
+                    const priceText = prices[action] != null
+                      ? `${prices[action]} g$`
+                      : 'Price unavailable';
                     const exceptionText = sending === action ? 'sending…' : !allowed ? 'no consent' : null;
                     return (
                       <button
@@ -718,7 +716,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                           <Icon className="size-4 shrink-0 text-retro-muted" aria-hidden="true" />
                         </span>
                         <span className="mt-auto flex w-full items-center justify-between gap-2">
-                          <span className={cn(MONO, TYPE.caption, allFree ? STATUS.success : COLOR.muted)}>{priceText}</span>
+                          <span className={cn(MONO, TYPE.caption, COLOR.muted)}>{priceText}</span>
                           {exceptionText && (
                             <span className={cn('font-mono text-2xs', allowed ? STATUS.success : STATUS.danger)}>
                               {exceptionText}

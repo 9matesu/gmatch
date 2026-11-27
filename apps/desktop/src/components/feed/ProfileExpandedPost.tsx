@@ -25,13 +25,13 @@ import { custodyStatus } from '../../utils/durableCustody';
 import { useDurableCustody } from '../../hooks/useDurableCustody';
 import { PostComments } from './PostComments';
 import {
-  classes, COLOR, GAP, ICON, MOTION, PADDING, PADDING_X, PADDING_X_SM, PADDING_Y,
+  classes, COLOR, GAP, ICON, MOTION, PADDING, PADDING_X, PADDING_Y,
   RADIUS, STATUS, TRACKING, TRANSITION, TYPE, WEIGHT,
 } from '../../ui/tokens';
 
-/** Every expanded-post chrome shape, composed from ui/tokens. The media model,
- *  the right-click menu and the durability label contract are untouched. */
-const ARTICLE = classes('mt-2 overflow-hidden animate-orbit-slide-up', RADIUS.panel, 'border', COLOR.edge, COLOR.panelGlass, COLOR.fg);
+/** The expanded post is CONTENT on the caller's single card, never a second
+ *  card stacked inside it. Edges/padding stay token-composed and quiet. */
+const ARTICLE = classes('overflow-hidden animate-orbit-slide-up', COLOR.fg);
 const ACTION_ICON = classes(
   'p-1.5 cursor-pointer active:scale-(--scale-press)',
   MOTION.transition.transform, RADIUS.chip, COLOR.hoverW10,
@@ -150,8 +150,8 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
       }}
       className={ARTICLE}
     >
-      {/* Header: author + collapse */}
-      <div className={classes(PADDING[3], 'border-b flex items-center justify-between', COLOR.edge)}>
+      {/* Header: author + collapse. No separator — one surface, not a nested card. */}
+      <div className={classes(PADDING[4], 'flex items-center justify-between')}>
         <button
           type="button"
           onClick={handleAuthorClick}
@@ -302,9 +302,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
       {content.text ? (
         <p className={classes(
           'whitespace-pre-wrap break-words leading-relaxed',
-          mediaItems.length
-            ? classes(PADDING_X[3], PADDING_Y[3])
-            : classes(PADDING_X[3], PADDING_X_SM[4], PADDING_Y[3]),
+          PADDING_X[4], PADDING_Y[3],
           mediaItems.length ? TYPE.body : TYPE.base,
           COLOR.fg,
         )}>
@@ -312,8 +310,8 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
         </p>
       ) : null}
 
-      {/* Action Bar — same icons, order, colors and padding as the standard card. */}
-      <div className={classes(PADDING_X[3], PADDING_X_SM[4], 'pt-2.5', PADDING_Y[3])}>
+      {/* Action Bar — same icons and order as the standard card. */}
+      <div className={classes(PADDING_X[4], PADDING_Y[3])}>
         <div className="flex items-center justify-between">
           <div className={classes('flex items-center', GAP[1])}>
             <button
@@ -380,7 +378,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
         onClick={() => onOpenLikers?.(post.id)}
         className={classes(
           'text-left hover:underline cursor-pointer w-fit',
-          PADDING_X[3], PADDING_Y[2], TYPE.body, WEIGHT.semibold,
+          PADDING_X[4], PADDING_Y[2], TYPE.body, WEIGHT.semibold,
           COLOR.fg, TRACKING.tight, TRANSITION.micro,
         )}
         aria-label="View who liked this post"
@@ -393,7 +391,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
       {mediaItems.length > 0 && custody.label && (
         <div
           className={classes(
-            'flex items-center', GAP[1], PADDING_X[3], PADDING_Y[2],
+            'flex items-center', GAP[1], PADDING_X[4], PADDING_Y[2],
             TYPE.caption, WEIGHT.medium, COLOR.muted,
           )}
           aria-label="Media replication"
@@ -408,8 +406,6 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
         post={post}
         comments={comments}
         commentsLoading={commentsLoading}
-        authorAvatar={resolvedAuthorAvatar}
-        onAuthorClick={handleAuthorClick}
         onAddComment={onAddComment}
         onToggleCommentLike={onToggleCommentLike}
         onReportComment={onReportComment}

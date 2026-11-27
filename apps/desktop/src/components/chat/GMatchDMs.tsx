@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback, Fragment } from 'react';
 import { playPress } from '../../utils/sounds';
-import { EmojiReaction } from '../ui/EmojiReaction';
 import { ContextMenu, type ContextMenuItem } from '../ui/ContextMenu';
 import { resolveMediaUrl } from '../../utils/media';
 import { GroupMembersPopover, type GroupMember } from './GroupMembersPopover';
@@ -45,7 +44,7 @@ import { groupMessagesByDay } from '../../utils/chatDays';
 import { searchThread } from '../../utils/dmSearch';
 import { UNKNOWN_NAME } from '../../utils/displayName';
 import { Button, Checkbox, FeedbackState, Input, Textarea } from '../../ui/kit';
-import { BUTTON_FEEDBACK, classes, COLOR, FEEDBACK, FIELD, ICON, STATUS } from '../../ui/tokens';
+import { BUTTON_FEEDBACK, CHAT, classes, COLOR, FEEDBACK, FIELD, ICON, STATUS } from '../../ui/tokens';
 
 import { logger } from '../../utils/logger'
 export interface PeerInfo {
@@ -271,9 +270,8 @@ export function GMatchDMs({
   const [listMode, setListMode] = useState(
     () => typeof window !== 'undefined' && window.innerWidth < 768,
   );
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [playersCollapsed, setPlayersCollapsed] = useState(false);
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
-  const [actionFor, setActionFor] = useState<string | null>(null);
   const [showNewGroup, setShowNewGroup] = useState(false);
   const [showNewRoom, setShowNewRoom] = useState(false);
   const [newRoomName, setNewRoomName] = useState('');
@@ -443,7 +441,6 @@ export function GMatchDMs({
     const { copyImageToClipboard } = await import('../../utils/media');
     const ok = await copyImageToClipboard(url).catch(() => false);
     setCopyingImage(null);
-    setActionFor(null);
     showPasteNotice(ok ? 'Image copied to clipboard.' : 'Could not copy that image.');
   };
 
@@ -460,7 +457,6 @@ export function GMatchDMs({
   };
 
   const handleDeleteForEveryone = async (msg: ChatMessage) => {
-    setActionFor(null);
     const peerId = activePmPeer?.orbitId;
     if (!peerId || !onDeleteForEveryone) return;
     const ok = await onDeleteForEveryone(peerId, msg.id);
@@ -664,7 +660,6 @@ export function GMatchDMs({
 
   const copyMessage = (text: string) => {
     if (navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
-    setActionFor(null);
   };
   useEffect(() => {
     const stream = messageStreamRef.current;
@@ -690,7 +685,7 @@ export function GMatchDMs({
   const openRoom = (roomId: string) => {
     playPress(800);
     setListMode(false);
-    setSidebarOpen(false);
+    setPlayersCollapsed(false);
     setShowMembers(false);
     setReplyingTo(null);
     onSelectGroup?.(null);
@@ -701,7 +696,7 @@ export function GMatchDMs({
   const openGroup = (g: GroupInfo) => {
     playPress(800);
     setListMode(false);
-    setSidebarOpen(false);
+    setPlayersCollapsed(false);
     setShowMembers(false);
     onSelectRoom?.(null);
     onSelectGroup?.(g.id);
@@ -738,7 +733,7 @@ export function GMatchDMs({
       setNewGroupMembers(new Set());
       onSelectGroup?.(id);
       setListMode(false);
-      setSidebarOpen(false);
+      setPlayersCollapsed(false);
       onLoadGroupMessages?.(id);
     }
   };
@@ -853,7 +848,7 @@ export function GMatchDMs({
         <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar">
           <button
             type="button"
-            onClick={() => { playPress(800); setListMode(false); setSidebarOpen(false); onSelectGroup?.(null); onSelectRoom?.(null); onSelectPeer({ orbitId: 'global_lobby', name: 'Lobby Lounge (Everyone)' }); }}
+            onClick={() => { playPress(800); setListMode(false); setPlayersCollapsed(false); onSelectGroup?.(null); onSelectRoom?.(null); onSelectPeer({ orbitId: 'global_lobby', name: 'Lobby Lounge (Everyone)' }); }}
             className={classes(BUTTON_FEEDBACK, 'w-full p-3 flex items-center gap-3 border-b text-left', COLOR.edge, COLOR.hoverW5, openTarget === 'lobby' && COLOR.glassW8)}
           >
             <div className="relative w-10 h-10 rounded-full bg-surface-raised border border-edge text-retro-muted shrink-0 overflow-hidden flex items-center justify-center">
@@ -870,7 +865,7 @@ export function GMatchDMs({
 
           <button
             type="button"
-            onClick={() => { playPress(800); setListMode(false); setSidebarOpen(false); onSelectGroup?.(null); onSelectRoom?.(null); onSelectPeer({ orbitId: 'card_queue', name: 'Card Game Queue' }); }}
+            onClick={() => { playPress(800); setListMode(false); setPlayersCollapsed(false); onSelectGroup?.(null); onSelectRoom?.(null); onSelectPeer({ orbitId: 'card_queue', name: 'Card Game Queue' }); }}
             className={classes(BUTTON_FEEDBACK, 'w-full p-3 flex items-center gap-3 border-b text-left', COLOR.edge, COLOR.hoverW5, openTarget === 'queue' && COLOR.glassW8)}
           >
             <div className="relative w-10 h-10 rounded-full bg-surface-raised border border-edge text-retro-muted shrink-0 overflow-hidden flex items-center justify-center">
@@ -974,7 +969,7 @@ export function GMatchDMs({
                     <button
                       key={p.orbitId}
                       type="button"
-                      onClick={() => { playPress(800); setListMode(false); setSidebarOpen(false); onSelectGroup?.(null); onSelectRoom?.(null); onSelectPeer(p); setSearchQuery(''); }}
+                      onClick={() => { playPress(800); setListMode(false); setPlayersCollapsed(false); onSelectGroup?.(null); onSelectRoom?.(null); onSelectPeer(p); setSearchQuery(''); }}
                       className={classes(BUTTON_FEEDBACK, 'w-full p-2.5 flex items-center gap-3 text-left', COLOR.hoverW5)}
                     >
                       <div className="w-9 h-9 rounded-full bg-surface-raised border border-edge text-retro-muted font-medium text-xs flex items-center justify-center overflow-hidden shrink-0">
@@ -1027,7 +1022,7 @@ export function GMatchDMs({
                 <div key={peerId} onContextMenu={handleThreadContextMenu}>
                   <button
                     type="button"
-                    onClick={() => { playPress(800); setListMode(false); setSidebarOpen(false); onSelectGroup?.(null); onSelectRoom?.(null); onSelectPeer({ orbitId: peerId, name, pfp }); setDeleteThreadPeerId(null); }}
+                    onClick={() => { playPress(800); setListMode(false); setPlayersCollapsed(false); onSelectGroup?.(null); onSelectRoom?.(null); onSelectPeer({ orbitId: peerId, name, pfp }); setDeleteThreadPeerId(null); }}
                     className={classes(BUTTON_FEEDBACK, 'w-full p-3 flex items-center gap-3 border-b text-left', COLOR.edge, COLOR.hoverW5, isSelected && COLOR.glassW8)}
                   >
                     <div className="relative w-10 h-10 rounded-full bg-surface-raised border border-edge text-retro-muted shrink-0 overflow-hidden flex items-center justify-center font-medium text-xs">
@@ -1181,26 +1176,6 @@ export function GMatchDMs({
                     <X className="w-4 h-4" />
                   </Button>
                 )}
-                <Button
-                  variant={sidebarOpen ? 'secondary' : 'ghost'}
-                  size="sm"
-                  onClick={() => {
-                    playPress(700);
-                    if (typeof window !== 'undefined' && window.innerWidth < 768) {
-                      setListMode(true);
-                      onSelectGroup?.(null);
-                      onBackToThreads?.();
-                    } else {
-                      setSidebarOpen((v) => !v);
-                    }
-                  }}
-                  title={sidebarOpen ? "Hide groups and players" : "Show groups and players"}
-                  aria-label={sidebarOpen ? "Hide groups and players" : "Show groups and players"}
-                  aria-expanded={sidebarOpen}
-                  className={classes('p-1.5', sidebarOpen && COLOR.accent)}
-                >
-                  <Users className="w-4 h-4" />
-                </Button>
               </div>
              </div>
 
@@ -1347,9 +1322,12 @@ export function GMatchDMs({
                         {block.map((msg) => {
                           const replyTarget = findMessage(msg.replyToId);
                           const isLast = msg.id === block[block.length - 1].id;
-                          const showActions = actionFor === msg.id && !msg.deletedAt;
-                          // RIGHT-CLICK CONTEXT — the same handlers the action
-                          // row uses, gated the same way. No second logic path.
+                          // ONE compact action menu for every message, opened by
+                          // click OR right-click at the cursor. It is the only
+                          // action surface: the old inline button row and the
+                          // separate EmojiReaction trigger (whose pointer/hold
+                          // logic double-fired) are gone. Same handlers, same
+                          // gating, one path.
                           const ctxItems: ContextMenuItem[] = [];
                           if (msg.text && !msg.deletedAt) ctxItems.push({
                             label: 'Copy text', icon: <Copy className="w-3.5 h-3.5" />,
@@ -1359,8 +1337,19 @@ export function GMatchDMs({
                             label: 'Reply', icon: <Reply className="w-3.5 h-3.5" />,
                             onSelect: () => setReplyingTo(msg),
                           });
+                          if (openTarget === 'peer' && !msg.deletedAt) {
+                            ['🔥', '💦', '😈', '❤️'].forEach((emoji) => {
+                              const mine = !!identity && (msg.reactions?.[emoji] || []).includes(identity.orbitId);
+                              ctxItems.push({
+                                label: mine ? `Remove ${emoji}` : `React ${emoji}`,
+                                icon: <span className="w-3.5 text-center leading-none">{emoji}</span>,
+                                onSelect: () => onReactMessage?.(activePmPeer?.orbitId || '', msg.id, emoji, !mine),
+                              });
+                            });
+                          }
                           if (msg.attachmentUrl && !msg.attachmentMime?.startsWith('video/')) ctxItems.push({
                             label: 'Copy image', icon: <Copy className="w-3.5 h-3.5" />,
+                            disabled: copyingImage === msg.id,
                             onSelect: () => void copyAttachmentImage(msg),
                           });
                           if (msg.attachmentUrl && onOpenImage) ctxItems.push({
@@ -1383,34 +1372,43 @@ export function GMatchDMs({
                             label: 'Report message', icon: <Flag className="w-3.5 h-3.5" />, danger: true,
                             onSelect: () => onReportMessage(msg.id),
                           });
+                          if (!isOwn && onReportUser) ctxItems.push({
+                            label: 'Report user', icon: <Flag className="w-3.5 h-3.5" />, danger: true,
+                            onSelect: () => onReportUser(msg.senderId),
+                          });
+                          const openMenu = (x: number, y: number) => {
+                            if (ctxItems.length === 0) return;
+                            setMessageMenu({ x, y, items: ctxItems });
+                          };
                           return (
                             <div key={msg.id} data-message-row={msg.id} className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-full`}>
                               {replyTarget && (
-                                <div className="text-2xs text-retro-muted px-2.5 py-1 mb-0.5 bg-glass-w5 rounded-md border-l-2 border-retro-accent/50 truncate max-w-full w-fit">
-                                  <CornerUpLeft className="w-3 h-3 inline mr-1" />
+                                <div className="text-2xs text-retro-muted px-2.5 py-1 mb-0.5 bg-glass-w5 rounded-md border border-edge truncate max-w-full w-fit">
+                                  <CornerUpLeft className="w-3 h-3 inline mr-1 text-retro-accent" />
                                   {replyTarget.senderId === identity?.orbitId ? 'You' : displayNameFor(replyTarget.senderId)}: {replyTarget.text}
                                 </div>
                               )}
                               <div
                                 id={`chat-msg-${msg.id}`}
                                 data-message-id={msg.id}
-                                onClick={() => setActionFor(showActions ? null : msg.id)}
+                                onClick={(e) => openMenu(e.clientX, e.clientY)}
                                 onContextMenu={(e) => {
                                   if (ctxItems.length === 0) return
                                   e.preventDefault()
                                   e.stopPropagation()
-                                  setActionFor(null)
-                                  setMessageMenu({ x: e.clientX, y: e.clientY, items: ctxItems })
+                                  openMenu(e.clientX, e.clientY)
                                 }}
-                                className={`w-fit max-w-full px-3.5 py-2.5 rounded-2xl text-field sm:text-sm leading-relaxed select-text cursor-pointer break-words whitespace-pre-wrap motion-safe:animate-orbit-fade-in hover: ${block.length > 1 ? 'mt-0.5' : ''} ${
-                                  highlightedMessage === msg.id ? 'ring-2 ring-retro-accent/70' : ''
-                                } ${
+                                className={classes(
+                                  CHAT.bubbleShape,
+                                  'w-fit max-w-full px-3.5 py-2.5 text-field sm:text-sm leading-relaxed',
+                                  block.length > 1 ? 'mt-0.5' : '',
+                                  highlightedMessage === msg.id ? 'ring-2 ring-retro-accent/70' : '',
                                   msg.deletedAt
-                                    ? 'bg-glass-w5 border border-dashed border-edge text-retro-muted italic rounded-br-sm'
+                                    ? CHAT.fillDeleted
                                     : isOwn
-                                      ? 'bg-retro-accent/25 border border-retro-accent/30 text-retro-fg rounded-br-sm backdrop-blur-sm'
-                                      : 'bg-glass-w10 border border-edge text-retro-body rounded-bl-sm backdrop-blur-sm'
-                                }`}
+                                      ? CHAT.fillOwn
+                                      : CHAT.fillOther,
+                                )}
                               >
                                 {msg.deletedAt ? (
                                   <span>Message deleted</span>
@@ -1486,14 +1484,6 @@ export function GMatchDMs({
                                   )}
                                 </div>
                               )}
-                              {showActions && (
-                                <div className={`mt-1 ${isOwn ? 'flex justify-end' : 'flex justify-start'}`}>
-                                  <EmojiReaction
-                                    size="sm"
-                                    onReact={(name) => onReactMessage?.(activePmPeer?.orbitId || '', msg.id, name, !isOwn)}
-                                  />
-                                </div>
-                              )}
                               {openTarget === 'peer' && msg.reactions && Object.keys(msg.reactions).length > 0 && (
                                 <div className={`mt-1 flex flex-wrap gap-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
                                   {Object.entries(msg.reactions).map(([emoji, actors]) => {
@@ -1514,87 +1504,6 @@ export function GMatchDMs({
                                   })}
                                 </div>
                               )}
-                              {showActions && (() => {
-                                // Room messages live in the sealed local store:
-                                // edit/delete/report endpoints don't exist for
-                                // them; only Copy applies.
-                                if (openTarget === 'room') {
-                                  return (
-                                    <div className={`flex flex-wrap items-center gap-1 mt-1 ${isOwn ? 'justify-end' : ''}`}>
-                                      <Button variant="secondary" size="sm" onClick={() => copyMessage(msg.text)} className="text-2xs"><Copy className="w-3 h-3" /> Copy</Button>
-                                      {!msg.attachmentMime?.startsWith('video/') && msg.attachmentUrl && (
-                                        <Button variant="secondary" size="sm" onClick={() => void copyAttachmentImage(msg)} disabled={copyingImage === msg.id} className="text-2xs"><ImagePlus className="w-3 h-3" /> {copyingImage === msg.id ? 'Copying…' : 'Copy image'}</Button>
-                                      )}
-                                    </div>
-                                  );
-                                }
-                                // Ownership, not a client-side age guess: the
-                                // courier has no server policy to enforce, and
-                                // the old 15/10-minute windows silently removed
-                                // Edit/Delete from messages the player owned.
-                                const canEdit = isOwn;
-                                const canDeleteEveryone = isOwn;
-                                return (
-                                <div className={`flex flex-wrap items-center gap-1 mt-1 ${isOwn ? 'justify-end' : ''}`}>
-                                  {openTarget === 'peer' && (
-                                    <div className="flex items-center gap-0.5 mr-1">
-                                      {['🔥', '💦', '😈', '❤️'].map((emoji) => {
-                                        const mine = !!identity && (msg.reactions?.[emoji] || []).includes(identity.orbitId);
-                                        return (
-                                          <Button
-                                            key={emoji}
-                                            variant={mine ? 'secondary' : 'ghost'}
-                                            size="sm"
-                                            title={mine ? `Remove ${emoji}` : `React with ${emoji}`}
-                                            aria-label={mine ? `Remove reaction ${emoji}` : `React with ${emoji}`}
-                                            aria-pressed={mine}
-                                            onClick={() => { onReactMessage?.(activePmPeer?.orbitId || '', msg.id, emoji, !mine); setActionFor(null); }}
-                                          className="w-6 h-6 p-0 text-xs"
-                                            >
-                                          {emoji}
-</Button>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
-                                  <Button variant="secondary" size="sm" onClick={() => { setReplyingTo(msg); setActionFor(null); }} className="text-2xs"><Reply className="w-3 h-3" /> Reply</Button>
-                                  <Button variant="secondary" size="sm" onClick={() => copyMessage(msg.text)} className="text-2xs"><Copy className="w-3 h-3" /> Copy</Button>
-                                  {!msg.attachmentMime?.startsWith('video/') && msg.attachmentUrl && (
-                                    <Button variant="secondary" size="sm" onClick={() => void copyAttachmentImage(msg)} disabled={copyingImage === msg.id} className="text-2xs"><ImagePlus className="w-3 h-3" /> {copyingImage === msg.id ? 'Copying…' : 'Copy image'}</Button>
-                                  )}
-                                  {canEdit && (
-                                    <Button
-                                      variant="secondary"
-                                      size="sm"
-                                      onClick={() => { setEditingMessage({ id: msg.id, text: msg.text }); setActionFor(null); }}
-                                    className="text-2xs"
-><Edit2 className="w-3 h-3" /> Edit</Button>
-                                  )}
-                                  {canDeleteEveryone && (
-                                    <Button
-                                      variant="danger"
-                                      size="sm"
-                                      onClick={() => handleDeleteForEveryone(msg)}
-                                    className="text-2xs"
-><Trash className="w-3 h-3" /> Delete for Everyone</Button>
-                                  )}
-                                  {isOwn && (
-                                    <Button
-                                      variant="danger"
-                                      size="sm"
-                                      onClick={() => { onDeleteMessage?.(msg.id, activePmPeer?.orbitId || ''); setActionFor(null); }}
-                                    className="text-2xs"
-><Trash2 className="w-3 h-3" /> Delete for Me</Button>
-                                  )}
-                                  {!isOwn && onReportMessage && (
-                                    <Button variant="danger" size="sm" onClick={() => { onReportMessage(msg.id); setActionFor(null); }} className="text-2xs"><Flag className="w-3 h-3" /> Report</Button>
-                                  )}
-                                  {!isOwn && onReportUser && (
-                                    <Button variant="danger" size="sm" onClick={() => { onReportUser(msg.senderId); setActionFor(null); }} className="text-2xs">Report user</Button>
-                                  )}
-                                </div>
-                                );
-                              })()}
                             </div>
                           );
                         })}
@@ -1756,18 +1665,25 @@ export function GMatchDMs({
 
       {/* 3. Right Column: Expanded Player List.
           Desktop-only: on a phone it would be a second 240px column beside the
-          conversation, so the toggle in the header (which already exists) owns
-          the phone case and this column appears from md up. */}
-      <div className="hidden md:flex w-60 lg:w-64 border-l border-edge flex-col bg-glass-w5 shrink-0 min-h-0 select-none">
+          conversation, so it appears from md up. The Players header label owns
+          the collapse — there is no separate icon button beside the search. */}
+      <div
+        className={classes(
+          'hidden md:flex border-l border-edge flex-col bg-glass-w5 shrink-0 min-h-0 select-none',
+          playersCollapsed ? 'w-12' : 'w-60 lg:w-64',
+        )}
+      >
         <ChatPlayerList
           identity={identity}
           users={users}
           profilePics={profilePics}
+          collapsed={playersCollapsed}
+          onToggleCollapse={() => setPlayersCollapsed((v) => !v)}
           onOpenProfile={onOpenProfile}
           onMessagePlayer={(p) => {
             playPress(800);
             setListMode(false);
-            setSidebarOpen(false);
+            setPlayersCollapsed(false);
             onSelectGroup?.(null);
             onSelectRoom?.(null);
             onSelectPeer?.({ orbitId: p.orbitId, name: p.name, pfp: p.pfp });

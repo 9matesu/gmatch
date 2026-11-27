@@ -1,25 +1,43 @@
 'use strict'
 // mediaq setup suite IPC: status, one-shot install (streams progress), cancel,
-// start. The installer owns the network/uv work; this only bridges it to the
-// renderer and owns the AbortController that `mediaq:cancel` triggers.
+// start, stop, restart. The installer owns the network/uv work; this bridges it
+// to the renderer, owns the AbortController, and reports what really happened
+// (an installed-but-not-started server is never reported as a clean success).
 module.exports = function registerMediaqHandlers({ ipcMain, installer, sidecar, getUserData, mainLog, onReady }) {
   let current = null // AbortController for the in-flight install, if any
 
+  const log = (line) => { if (mainLog) mainLog('[mediaq] ' + line) }
+  const errText = (err) => String((err && err.message) || err || '')
+
+  // One owner for "the local server is usable by the clicker". Every start path
+  // (install, start, restart) goes through it so a cooldown is never left stale.
+  async function startServer(mediaqBin) {
+    await sidecar.startMediaq({ mediaqBin, onLog: log })
+    if (onReady) onReady()
+    return { ok: true, base: sidecar.BASE, running: true }
+  }
+
   ipcMain.handle('mediaq:status', async () => {
-    const userData = getUserData()
     let st = { installed: false, hasUv: false, bin: null }
+    let error = null
     try {
-      st = await installer.mediaqStatus({ userData })
-    } catch {
-      /* fall through with the empty status */
+      st = await installer.mediaqStatus({ userData: getUserData() })
+    } catch (err) {
+      error = errText(err)
     }
     let running = false
     try {
       running = await sidecar.isHealthy()
     } catch {
-      /* ignore */
+      /* an unreachable local server is simply not running */
     }
-    return { installed: Boolean(st.installed), running: Boolean(running), base: sidecar.BASE }
+    return {
+      installed: Boolean(st.installed),
+      hasUv: Boolean(st.hasUv),
+      running: Boolean(running),
+      base: sidecar.BASE,
+      ...(error ? { error } : {}),
+    }
   })
 
   ipcMain.handle('mediaq:install', async (event) => {
@@ -43,25 +61,29 @@ module.exports = function registerMediaqHandlers({ ipcMain, installer, sidecar, 
     const signal = controller.signal
     try {
       const { bin } = await installer.installMediaqSuite({ userData: getUserData(), onProgress: send, signal })
-      // Start it immediately so the provider (localhost:8765) answers.
-      let started = false
+      // Start it immediately so the provider (localhost:8765) answers. A server
+      // that fails to start is reported as such — install succeeded, launch did not.
+      let running = false
+      let startError = null
       try {
-        await sidecar.startMediaq({ mediaqBin: bin, onLog: (l) => mainLog && mainLog('[mediaq] ' + l) })
-        started = true
+        await startServer(bin)
+        running = true
       } catch (err) {
-        send({ phase: 'warn', message: 'installed, but the server did not start: ' + String((err && err.message) || err) })
+        startError = errText(err)
+        send({ phase: 'warn', message: 'installed, but the server did not start: ' + startError })
       }
-      // Forget any failure cooldown so the clicker uses the new source on its
-      // next fetch instead of waiting out the old one.
-      if (started && onReady) onReady()
-      send({ phase: 'done', percent: 100, message: 'mediaq is ready' })
-      return { ok: true, bin }
+      send({
+        phase: 'done',
+        percent: 100,
+        message: running ? 'mediaq is ready' : 'mediaq installed (server not running)',
+      })
+      return { ok: true, bin, running, ...(startError ? { error: startError } : {}) }
     } catch (err) {
       if (signal.aborted) {
         send({ phase: 'cancelled', message: 'cancelled' })
         return { ok: false, cancelled: true }
       }
-      const message = String((err && err.message) || err)
+      const message = errText(err)
       send({ phase: 'error', message })
       return { ok: false, error: message }
     } finally {
@@ -84,11 +106,39 @@ module.exports = function registerMediaqHandlers({ ipcMain, installer, sidecar, 
     try {
       const st = await installer.mediaqStatus({ userData: getUserData() })
       if (!st.bin) return { ok: false, error: 'not-installed' }
-      await sidecar.startMediaq({ mediaqBin: st.bin, onLog: (l) => mainLog && mainLog('[mediaq] ' + l) })
-      if (onReady) onReady()
-      return { ok: true, base: sidecar.BASE }
+      return await startServer(st.bin)
     } catch (err) {
-      return { ok: false, error: String((err && err.message) || err) }
+      return { ok: false, error: errText(err) }
+    }
+  })
+
+  ipcMain.handle('mediaq:stop', async () => {
+    try {
+      const stopped = await sidecar.stopMediaq()
+      // A server started by another process cannot be killed by us; verify the
+      // port instead of claiming a stop that did not happen.
+      let running = false
+      for (let i = 0; i < 6; i += 1) {
+        running = await sidecar.isHealthy()
+        if (!running) break
+        await new Promise((r) => setTimeout(r, 200))
+      }
+      if (running) return { ok: false, running: true, error: 'still-running' }
+      return { ok: true, running: false, stopped: Boolean(stopped && stopped.stopped) }
+    } catch (err) {
+      return { ok: false, error: errText(err) }
+    }
+  })
+
+  ipcMain.handle('mediaq:restart', async () => {
+    try {
+      const st = await installer.mediaqStatus({ userData: getUserData() })
+      if (!st.bin) return { ok: false, error: 'not-installed' }
+      // Best-effort stop: a server we do not own stays up and start re-adopts it.
+      await sidecar.stopMediaq()
+      return await startServer(st.bin)
+    } catch (err) {
+      return { ok: false, error: errText(err) }
     }
   })
 }

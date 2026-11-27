@@ -1,12 +1,12 @@
 import { memo } from 'react'
-import { Layers } from 'lucide-react'
+import { FolderPlus, Layers } from 'lucide-react'
 import type { FeedPost } from './GMatchFeed'
 import { ratioOf } from './tileMetrics'
 import { displayMedia, readPostContent } from './postModel'
 import { ObjectImage } from '../ObjectImage'
 import { isVideoPost, resolveMediaUrl } from '../../utils/media'
 import type { OrbitIdentity } from '@orbit/crypto'
-import { CHROME, classes, COLOR, MONO, PADDING, TYPE, WEIGHT } from '../../ui/tokens'
+import { CHROME, classes, COLOR, ICON, MONO, PADDING, STATUS, TYPE, WEIGHT } from '../../ui/tokens'
 
 export interface FeedTileProps {
   post: FeedPost
@@ -20,6 +20,10 @@ export interface FeedTileProps {
   onMediaLoad?: (w: number, h: number) => void
   /** Grid only: the media could not be resolved (reversible hide). */
   onMediaUnavailable?: () => void
+  /** Save the tile's media bytes to the local Vault (desktop only). */
+  onSaveToVault?: (post: FeedPost) => void
+  /** Bytes already pinned in the Vault. */
+  vaultSaved?: boolean
 }
 
 /**
@@ -37,7 +41,7 @@ export interface FeedTileProps {
  * steps. The `hideUnavailable` contract (a row with no bytes is hidden
  * reversibly) is untouched.
  */
-export const FeedTile = memo(function FeedTile({ post, identity, liked, likes, onOpen, onToggleLike, onMediaLoad, onMediaUnavailable }: FeedTileProps) {
+export const FeedTile = memo(function FeedTile({ post, identity, liked, likes, onOpen, onToggleLike, onMediaLoad, onMediaUnavailable, onSaveToVault, vaultSaved }: FeedTileProps) {
   // One model for both kinds of post: words, plus bytes only when they exist.
   const content = readPostContent(post)
   const media = displayMedia(post, content)
@@ -131,6 +135,20 @@ export const FeedTile = memo(function FeedTile({ post, identity, liked, likes, o
         >
           {likes > 0 ? likes.toLocaleString() : ''}
         </button>
+        {onSaveToVault && media && (
+          <button
+            type="button"
+            aria-label="Save to Vault"
+            title="Save the media to your Vault (offline copy)"
+            onClick={(e) => {
+              e.stopPropagation()
+              onSaveToVault(post)
+            }}
+            className={classes('pointer-events-auto shrink-0 cursor-pointer', MONO, vaultSaved && STATUS.success)}
+          >
+            <FolderPlus className={ICON.sm} />
+          </button>
+        )}
       </span>
     </div>
   )

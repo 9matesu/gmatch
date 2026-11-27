@@ -1,8 +1,8 @@
 import { memo } from 'react'
 
 /**
- * Thin horizontal track switch: w-9 line (h-1) + floating h-3 w-3 knob.
- * role="switch", aria-checked, onClick.
+ * Pill switch: one rounded track + one round knob.
+ * role="switch", aria-checked, onClick. Colour and elevation come from tokens.
  */
 export const Switch = memo(function Switch({
   checked,
@@ -23,16 +23,16 @@ export const Switch = memo(function Switch({
       aria-checked={checked}
       aria-label={label}
       onClick={onChange}
-      className="relative flex h-6 w-9 shrink-0 cursor-pointer items-center border-0 p-0 focus-visible:outline-2 focus-visible:outline-offset-2 rounded-full"
+      className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-0 p-0 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-retro-accent"
     >
       <span
         aria-hidden="true"
-        className={`absolute inset-x-0 h-1 rounded-full transition-colors ${checked ? 'bg-retro-accent/50' : 'bg-surface-interactive'
+        className={`absolute inset-0 rounded-full transition-colors ${checked ? 'bg-retro-accent' : 'bg-surface-interactive'
           }`}
       />
       <span
         aria-hidden="true"
-        className={`absolute left-0 h-3 w-3 rounded-full shadow transition-transform ${checked ? 'translate-x-6 bg-retro-accent' : 'translate-x-0 bg-retro-muted'
+        className={`absolute left-0.5 h-4 w-4 rounded-full shadow-sm transition-transform ${checked ? 'translate-x-4 bg-retro-accent-text' : 'translate-x-0 bg-retro-muted'
           }`}
       />
     </button>

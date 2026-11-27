@@ -4,6 +4,7 @@
 // (localStorage passthrough).
 import { initSecureStorage } from './utils/secure-storage'
 import { logger } from './utils/logger'
+import { setBootStatus } from './bootStatus'
 import './globals.css'
 
 // Nothing may vanish silently in a public release: renderer crashes ride the
@@ -11,6 +12,9 @@ import './globals.css'
 window.addEventListener('error', (e) => logger.error('window', e.error || e.message))
 window.addEventListener('unhandledrejection', (e) => logger.error('rejection', e.reason))
 
+// Boot phase 2 of 3 (node → identity → feed): the static shell already said
+// "Starting the node…"; secure storage is what resolves the identity.
+setBootStatus('Loading your identity…')
 initSecureStorage()
   .catch(() => { /* falls back to localStorage mode */ })
   .finally(() => {

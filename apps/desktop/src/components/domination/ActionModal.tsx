@@ -309,7 +309,7 @@ export function ActionModal({
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-edge-subtle pt-3">
           <span className={cn(TYPE.body, COLOR.muted, 'text-pretty')}>
             {freeViaMesh
-              ? 'Free via mesh — nothing is charged.'
+              ? 'Nothing is charged.'
               : price != null
                 ? <><span className={MONO}>{price} g$</span> charged only if the send is accepted.</>
                 : 'Charged only if the send is accepted.'}

@@ -26,6 +26,7 @@ import { ImageViewer } from "./components/ImageViewer";
 import { IdleOverlay } from "./components/IdleOverlay";
 import { useP2P, retryPeerTransport } from "./hooks/useP2P";
 import { useFeedController } from './features/feed/useFeedController';
+import { markBootReady } from './bootStatus';
 import type { ChatMessage } from "./hooks/useP2P";
 import { mergeMyCards, filterToActiveDeck, galleryItemVisible, type CanonicalCard } from "./utils/cardCollection";
 import { outboxStatesByGroup } from "./services/postOutbox";
@@ -98,6 +99,7 @@ import { CreateCardModal } from "./components/CreateCardModal";
 import { CardDetailView } from "./components/CardDetailView";
 import GridWorkspace from "./components/grid/GridWorkspace";
 const AdminApp = lazy(() => import("./admin/AdminApp"));
+import { isNodeOwner } from "./admin/nodeOwner";
 import { StoreView } from "./components/views/StoreView";
 import { logger } from './utils/logger';
 import { useNotifications } from './hooks/useNotifications';
@@ -1079,6 +1081,23 @@ export default function Home() {
       }).catch(() => { /* offline: entry stays hidden; nothing breaks */ });
     return () => { dead = true; };
   }, [identity]);
+
+  // The Admin door belongs to THIS install's first identity. Main writes the
+  // owner once (sticky across account switches) and the node's verify-pin
+  // reads the same file, so the UI gate and the server gate cannot disagree.
+  const [nodeOwnerId, setNodeOwnerId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!identity) { setNodeOwnerId(null); return; }
+    let dead = false;
+    void (async () => {
+      try {
+        await window.gmatch?.claimAdminOwner?.(identity.orbitId);
+        const st = await window.gmatch?.serverState?.();
+        if (!dead) setNodeOwnerId(st?.nodeOwnerId ?? null);
+      } catch { /* no bridge (browser dev): fail closed, no Admin door */ }
+    })();
+    return () => { dead = true; };
+  }, [identity?.orbitId]);
 
   // First login: open the Help modal exactly once per identity — the tour's
   // replacement as first-run guidance. Returning users are never interrupted.
@@ -3020,6 +3039,23 @@ export default function Home() {
     void loadServerFeed()
   }, [identity, feedSort, loadServerFeed, feedStatus, feedPosts.length]);
 
+  // ONE boot screen. The static `#boot` cover (index.html) stays up until the
+  // app has something real to show, then lifts — exactly once. This is what
+  // removes the old duplicate: the cover used to be torn down two frames after
+  // mount regardless, so the feed's own "Loading the feed…" (or an empty,
+  // not-yet-loaded timeline) flashed as a SECOND, different loading screen.
+  // Now the brand splash carries the live status (node → identity → feed) and
+  // hands straight over to a feed that is ready, offline or genuinely empty.
+  // A first run / signed-out identity has no feed to await, so it lifts as soon
+  // as the identity is known (the age gate / onboarding is the app itself).
+  useEffect(() => {
+    if (!isLoaded) return
+    if (!identity) { markBootReady(); return }
+    if (feedStatus === 'ready' || feedStatus === 'offline' || feedStatus === 'error') {
+      markBootReady()
+    }
+  }, [isLoaded, identity, feedStatus]);
+
   useEffect(() => {
     if (!identity) return
     void loadFollowing()
@@ -4595,7 +4631,7 @@ export default function Home() {
             <CommandIsland
               mainView={mainView}
               setMainView={handleSetMainView}
-              showAdmin={shellServerMode === 'host' || myProfile.isAdmin}
+              showAdmin={isNodeOwner(identity?.orbitId, nodeOwnerId) && (shellServerMode === 'host' || myProfile.isAdmin)}
               wsConnected={isWsConnected}
               unreadMessagesCount={chatUnreadCount}
               gamesOnlineCount={gamesOnlineCount}

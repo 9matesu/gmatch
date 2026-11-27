@@ -1,16 +1,22 @@
 "use client";
 
-import { useEffect, useState } from 'react';
-import { AlertCircle, CheckCircle2, Download, Play, Sparkles } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { AlertCircle, CheckCircle2, Download, Play, RotateCcw, Sparkles, Square } from 'lucide-react';
 import { useMediaqInstall } from '../../services/mediaqInstall';
-import { classes, COLOR, GAP, ICON, MONO, MOTION, STATUS, TYPE } from '../../ui/tokens';
+import {
+  buttonClass, classes, COLOR, GAP, ICON, MONO, MOTION, PADDING,
+  STATUS, TRACKING, TYPE, WEIGHT,
+} from '../../ui/tokens';
 
 interface MediaqStatus {
   installed: boolean;
   running: boolean;
   base: string;
+  hasUv?: boolean;
   error?: string;
 }
+
+type ServerAction = 'start' | 'stop' | 'restart';
 
 /**
  * Settings > Preferences: the optional media suite.
@@ -18,10 +24,10 @@ interface MediaqStatus {
  * One click downloads uv, installs mediaq (with a managed Python 3.12) and
  * starts it locally. Progress comes from the SAME store the first-run modal and
  * the notification centre use, so closing Settings during an install ("Send to
- * background") never cancels it and the bar keeps moving. Once it is up, the
- * clicker's mediaq ContentProvider answers automatically for both the real and
- * hentai tiers — no configuration, no restart. With no bridge (browser dev) the
- * section says so and the clicker keeps working on its local sources.
+ * background") never cancels it. Once installed, Start / Stop / Restart drive
+ * the local server and every outcome is reported from the real IPC result — an
+ * installed-but-not-running server is never shown as ready. With no bridge
+ * (browser dev) the section says so and the clicker keeps its local sources.
  */
 export function MediaqSection({
   onClose,
@@ -32,100 +38,119 @@ export function MediaqSection({
 }) {
   const mediaq = useMediaqInstall();
   const [status, setStatus] = useState<MediaqStatus | null>(null);
-  const [starting, setStarting] = useState(false);
+  const [busy, setBusy] = useState<ServerAction | null>(null);
+
+  const probeStatus = useCallback(async () => {
+    const g = window.gmatch;
+    if (!g?.mediaqStatus) return;
+    try {
+      setStatus(await g.mediaqStatus());
+    } catch {
+      /* offline probe: leave the last-known status alone */
+    }
+  }, []);
 
   useEffect(() => {
-    let live = true;
-    const probe = () => {
-      const g = window.gmatch;
-      if (!g?.mediaqStatus) return;
-      void g.mediaqStatus().then(
-        (st) => { if (live) setStatus(st); },
-        () => { /* offline probe: leave the last-known status alone */ },
-      );
-    };
-    probe();
-    // A finished install starts the sidecar in the main process; refresh the
-    // "running" line when that happens (status is stable while installing).
-    if (mediaq.status === 'done' || mediaq.status === 'cancelled') probe();
-    return () => { live = false; };
-  }, [mediaq.status]);
+    // Re-read when the shared install state settles: the main process starts the
+    // server at the end of an install, so "running" can change without a click.
+    void probeStatus();
+  }, [mediaq.status, probeStatus]);
 
   const bridged = Boolean(window.gmatch?.mediaqInstall);
   const installing = mediaq.status === 'installing';
   const installed = Boolean(status?.installed) || mediaq.status === 'done';
+  const running = Boolean(status?.running);
 
-  const start = () => {
+  const install = () => {
     toast?.('Installing the media suite — progress stays visible in Notifications.', 'info');
     // Inline install: no modal pops over Settings, but the shared store still
     // drives the notification centre and the first-run setup modal.
     mediaq.start(false);
   };
 
-  const startServer = async () => {
-    if (starting) return;
-    setStarting(true);
+  const runAction = async (action: ServerAction) => {
+    if (busy) return;
+    setBusy(action);
+    const g = window.gmatch;
     try {
-      const res = await window.gmatch?.mediaqStart?.();
-      if (res?.ok) {
-        setStatus((s) => (s ? { ...s, running: true } : s));
-        toast?.('Media suite is running — the clicker will use it on the next fetch.', 'success');
+      if (action === 'start') {
+        const res = await g?.mediaqStart?.();
+        if (res?.ok) toast?.('Media suite is running — the clicker will use it on the next fetch.', 'success');
+        else toast?.(res?.error ? `Could not start the media suite: ${res.error}` : 'Could not start the media suite', 'error');
+      } else if (action === 'stop') {
+        const res = await g?.mediaqStop?.();
+        if (res?.ok) toast?.('Media suite stopped. Local sources are still available.', 'success');
+        else if (res?.error === 'still-running') toast?.('Still running — this server was started outside the app.', 'warning');
+        else toast?.(res?.error ? `Could not stop the media suite: ${res.error}` : 'Could not stop the media suite', 'error');
       } else {
-        toast?.(res?.error ? `Could not start the media suite: ${res.error}` : 'Could not start the media suite', 'error');
+        const res = await g?.mediaqRestart?.();
+        if (res?.ok) toast?.('Media suite restarted.', 'success');
+        else toast?.(res?.error ? `Could not restart the media suite: ${res.error}` : 'Could not restart the media suite', 'error');
       }
     } catch {
-      toast?.('Could not start the media suite', 'error');
+      toast?.(`Could not ${action} the media suite`, 'error');
     } finally {
-      setStarting(false);
+      setBusy(null);
+      await probeStatus();
     }
   };
 
+  const actionButton = (action: ServerAction, label: string, busyLabel: string, Icon: typeof Play) => (
+    <button
+      type="button"
+      onClick={() => void runAction(action)}
+      disabled={busy !== null}
+      aria-busy={busy === action}
+      className={buttonClass(action === 'start' ? 'primary' : 'secondary', 'sm')}
+    >
+      <Icon className={ICON.sm} />
+      {busy === action ? busyLabel : label}
+    </button>
+  );
+
   return (
-    <div className="p-4 bg-glass-w5 border border-edge rounded-lg space-y-3">
+    <div className={`${PADDING[4]} bg-glass-w5 border border-edge rounded-lg space-y-3`}>
       <div className="flex items-center justify-between gap-3">
-        <span className="text-2xs font-medium uppercase tracking-wider text-retro-muted">
+        <span className={classes(TYPE.caption, WEIGHT.medium, TRACKING.wider, COLOR.muted, 'uppercase')}>
           Media suite <span className="normal-case tracking-normal">(optional)</span>
         </span>
         <Sparkles className={classes(ICON.md, installed ? STATUS.success : COLOR.muted)} />
       </div>
 
-      <p className="text-xs text-retro-body">
+      <p className={`${TYPE.body} text-retro-body`}>
         Adds real and hentai picture sources to the clicker. It installs once on
         this device (a small Python manager plus mediaq) and runs locally. The
         app works fully offline without it.
       </p>
 
       {!bridged && (
-        <p className="text-2xs text-retro-muted">
+        <p className={`${TYPE.caption} ${COLOR.muted}`}>
           Desktop app only. The browser build keeps its local sources and ignores this section.
         </p>
       )}
 
       {bridged && installed && !installing && (
-        <p className={classes('flex items-center', GAP[1.5], TYPE.caption, STATUS.success)}>
-          <CheckCircle2 className={ICON.sm} />
-          {status?.running
+        <p className={classes('flex items-center', GAP[1.5], TYPE.caption, running ? STATUS.success : STATUS.warning)}>
+          {running ? <CheckCircle2 className={ICON.sm} /> : <AlertCircle className={ICON.sm} />}
+          {running
             ? 'Installed and running — used automatically by the clicker.'
-            : 'Installed. Start the local server to use it in the clicker.'}
+            : status?.error
+              ? `Installed. Status check failed: ${status.error}`
+              : 'Installed. Start the local server to use it in the clicker.'}
         </p>
       )}
 
-      {bridged && installed && !installing && !status?.running && (
-        <button
-          type="button"
-          onClick={() => void startServer()}
-          disabled={starting}
-          aria-busy={starting}
-          className="inline-flex items-center gap-1.5 rounded-md border border-edge bg-glass-w8 px-2.5 py-1.5 text-xs font-medium text-retro-fg hover:bg-glass-w12 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-        >
-          <Play className={ICON.sm} />
-          {starting ? 'Starting…' : 'Start media suite'}
-        </button>
+      {bridged && installed && !installing && (
+        <div className={classes('flex flex-wrap items-center', GAP[2])}>
+          {!running && actionButton('start', 'Start media suite', 'Starting…', Play)}
+          {running && actionButton('stop', 'Stop media suite', 'Stopping…', Square)}
+          {running && actionButton('restart', 'Restart media suite', 'Restarting…', RotateCcw)}
+        </div>
       )}
 
       {installing && (
         <div className="space-y-1.5" role="status" aria-live="polite">
-          <div className="h-2 w-full overflow-hidden rounded-full bg-glass-w8">
+          <div className={`h-2 w-full overflow-hidden rounded-full ${COLOR.glassW8}`}>
             {mediaq.percent !== null ? (
               <div
                 className={classes('h-full rounded-full bg-retro-accent', MOTION.transition.width)}
@@ -135,22 +160,22 @@ export function MediaqSection({
               <div className="h-full w-1/3 animate-pulse rounded-full bg-retro-accent" />
             )}
           </div>
-          <div className="flex justify-between text-2xs text-retro-muted">
+          <div className={`flex justify-between ${TYPE.caption} ${COLOR.muted}`}>
             <span className="truncate">{mediaq.message || 'Installing…'}</span>
             {mediaq.percent !== null && <span className={MONO}>{mediaq.percent}%</span>}
           </div>
-          <div className="flex flex-wrap gap-2 pt-1">
+          <div className={classes('flex flex-wrap', GAP[2], 'pt-1')}>
             <button
               type="button"
               onClick={() => { onClose?.(); }}
-              className="inline-flex items-center rounded-md border border-edge bg-glass-w8 px-2.5 py-1.5 text-xs font-medium text-retro-fg hover:bg-glass-w12 cursor-pointer"
+              className={buttonClass('secondary', 'sm')}
             >
               Send to background
             </button>
             <button
               type="button"
               onClick={() => mediaq.cancel()}
-              className="inline-flex items-center rounded-md border border-retro-error/40 bg-retro-error/15 px-2.5 py-1.5 text-xs font-medium text-retro-error hover:bg-retro-error/25 cursor-pointer"
+              className={buttonClass('danger', 'sm')}
             >
               Cancel
             </button>
@@ -162,14 +187,13 @@ export function MediaqSection({
         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
           <button
             type="button"
-            onClick={start}
-            disabled={!bridged}
-            className="inline-flex items-center gap-1.5 rounded-md border border-retro-accent bg-retro-accent px-2.5 py-1.5 text-xs font-semibold text-retro-accent-text hover:bg-retro-accent-hover disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            onClick={install}
+            className={buttonClass('primary', 'sm')}
           >
             <Download className={ICON.sm} />
             {mediaq.status === 'error' || mediaq.status === 'cancelled' ? 'Retry install' : 'Install media suite'}
           </button>
-          <span className="text-2xs text-retro-muted">First run downloads ~100 MB and never leaves this device.</span>
+          <span className={`${TYPE.caption} ${COLOR.muted}`}>First run downloads ~100 MB and never leaves this device.</span>
         </div>
       )}
 

@@ -178,7 +178,7 @@ type CourierSignalPayload =
 
 ### NAT Traversal & ICE Hygiene
 
-- Peer connections configure STUN and TURN relays provided by the environment (`defaultIceConfig(readTurnEnv())`).
+- Peer connections configure STUN plus a baked public TURN candidate (`defaultTurn()`), or the TURN relay configured in Settings/environment (`defaultIceConfig(readTurnEnv())`, which wins over the baked default).
 - Private LAN IP candidates are stripped/sanitized before dispatch over the courier (`sanitizeCandidate`) to prevent internal network leakage.
 - **One STUN endpoint, not a list (2026-11-23).** `STUN_SERVERS` is a single
   Cloudflare server. Chromium logs a `socket_manager.cc` error for every STUN
@@ -188,7 +188,9 @@ type CourierSignalPayload =
   `ERR_NAME_NOT_RESOLVED` — the network, not the app. One provider keeps that to
   a single line; the WS-relay swarm remains the documented fallback when no
   direct channel forms, so a redundant STUN costs a little direct-path reach, not
-  connectivity. TURN (relay-forced posture) still appends to the list.
+  connectivity. TURN still appends to the list: explicitly configured TURN
+  (Settings/env) forces the relay-forced posture, the baked public default only
+  adds a candidate.
 
 ### Transport selection is explicit and bounded (2026-10-22)
 

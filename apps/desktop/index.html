@@ -7,10 +7,26 @@
     <title>gMatch</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <!--
+      The brand face is registered here, before the bundle, so the static boot
+      shell paints in Switzer at the click (no FOUT, no system-font flash). The
+      same file is referenced by globals.css @font-face for the app; the browser
+      downloads it once. License: public/legal/ITF-FFL.txt.
+    -->
+    <link rel="preload" href="/fonts/switzer-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <style>
+      @font-face {
+        font-family: "Switzer";
+        font-style: normal;
+        font-weight: 100 900;
+        font-display: swap;
+        src: url("/fonts/switzer-latin.woff2") format("woff2");
+      }
+    </style>
+    <!--
       The first paint is a static shell, not a blank page: it is inline CSS in
       the HTML document, so it renders before the bundle is even requested (the
       user sees something at the click, not at hydration). The app removes #boot
-      once it has mounted. No JS is required to draw it.
+      once the feed is ready. No JS is required to draw it.
     -->
     <style>
       #boot {
@@ -18,13 +34,31 @@
         inset: 0;
         z-index: 2147483647;
         display: flex;
-        flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 14px;
-        background: #09090b;
-        color: #fafafa;
-        font-family: "Geist", -apple-system, "Segoe UI", Roboto, sans-serif;
+        padding: var(--space-6, 24px);
+        background: var(--color-surface-canvas, #09090b);
+        color: var(--color-retro-fg, #fafafa);
+        font-family: "Switzer", -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+      /* One authored entrance for the whole lockup, not one per element. The
+         durations/easing are the app's motion tokens; the inline keyframe is
+         here because this shell paints before globals.css is even requested. */
+      @keyframes boot-rise {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      #boot .boot-stage {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--space-6, 24px);
+        text-align: center;
+        animation: boot-rise var(--motion-duration-enter, 300ms)
+          var(--motion-ease-enter, cubic-bezier(0.16, 1, 0.3, 1)) both;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #boot .boot-stage { animation: none; }
       }
       /* Static twin of ui/Brand.tsx: before the bundle exists we cannot import
          the component, so the splash mirrors the LOGO token NAMES (with the
@@ -39,42 +73,38 @@
       #boot .brand-mark {
         display: block;
         flex-shrink: 0;
-        width: var(--logo-mark-size-hero, 3rem);
-        height: var(--logo-mark-size-hero, 3rem);
+        width: var(--logo-mark-size-hero, 3.5rem);
+        height: var(--logo-mark-size-hero, 3.5rem);
         min-width: var(--logo-mark-min-size, 1rem);
         object-fit: contain;
-        filter: grayscale(1) brightness(0) invert(1);
+        /* icon.svg is a black squircle with a white "gM". invert keeps BOTH
+           halves (white squircle, black gM); brightness(0) collapsed it into
+           the plain white square the visual review found. */
+        filter: invert(1);
       }
       html.boot-light #boot .brand-mark {
-        filter: grayscale(1) brightness(0);
+        filter: none;
       }
       #boot .brand-word {
-        font-size: var(--text-lg, 1.125rem);
-        font-weight: var(--weight-heading, 900);
+        font-size: var(--text-brand, 2rem);
+        font-weight: var(--weight-brand, 900);
         letter-spacing: -0.025em;
       }
-      #boot .bar {
-        width: 132px;
-        height: 3px;
-        border-radius: 2px;
-        background: rgba(255, 255, 255, 0.14);
-        overflow: hidden;
-      }
-      #boot .bar::after {
-        content: "";
-        display: block;
-        width: 40%;
-        height: 100%;
-        border-radius: 2px;
-        background: #fafafa;
-        animation: boot-slide 1.1s ease-in-out infinite;
-      }
-      @keyframes boot-slide {
-        0% { transform: translateX(-100%); }
-        100% { transform: translateX(350%); }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        #boot .bar::after { animation: none; width: 100%; }
+      /* The live status line: one short label that names what boot is actually
+         waiting on (node, identity, feed). One hairline above it gives the
+         label a composed anchor instead of floating in an empty field. No
+         progress bar and no timer — the bundle updates this text; nothing is
+         faked or delayed. */
+      #boot .boot-status {
+        margin: 0;
+        min-width: var(--boot-status-width, 14rem);
+        padding-top: var(--space-4, 16px);
+        border-top: 1px solid var(--color-edge, #27272a);
+        font-family: "Switzer", -apple-system, "Segoe UI", Roboto, sans-serif;
+        font-size: var(--text-status, 0.9375rem);
+        font-weight: 500;
+        letter-spacing: 0.01em;
+        color: var(--color-retro-body, #d4d4d8);
       }
       /* Light theme: the shell must not flash white-on-white either way. The
          theme is known before the bundle loads (it lives in localStorage). */
@@ -82,8 +112,8 @@
         background: #f2f2f4;
         color: #18181b;
       }
-      html.boot-light #boot .bar {
-        background: rgba(9, 9, 11, 0.12);
+      html.boot-light #boot .boot-status {
+        color: var(--color-retro-muted, #71717a);
       }
     </style>
     <script>
@@ -94,17 +124,26 @@
         var theme = raw ? (JSON.parse(raw).theme || 'dark') : 'dark';
         if (theme === 'light') document.documentElement.className = 'boot-light';
       } catch (e) { /* private mode: dark is the safe default */ }
+      // Failsafe only: if the bundle never signals readiness (a crash, a module
+      // that failed to load), lift the cover rather than trapping the user on a
+      // splash forever. The normal path removes #boot the moment the feed lands,
+      // so this never fires in a healthy boot — it is not a delay.
+      setTimeout(function () {
+        var b = document.getElementById('boot');
+        if (b) b.remove();
+      }, 12000);
     </script>
   </head>
   <body class="min-h-screen bg-retro-bg text-retro-fg font-sans flex flex-col selection:bg-retro-accent/20 selection:text-retro-fg">
     <div id="root"></div>
-    <div id="boot" role="status" aria-live="polite">
-      <div class="brand-lockup">
-        <img class="brand-mark" src="/icon.svg" alt="" aria-hidden="true" />
-        <span class="brand-word">gMatch</span>
+    <div id="boot">
+      <div class="boot-stage">
+        <div class="brand-lockup">
+          <img class="brand-mark" src="/icon.svg" alt="" aria-hidden="true" />
+          <span class="brand-word">gMatch</span>
+        </div>
+        <p id="boot-status" class="boot-status" role="status" aria-live="polite">Starting the node…</p>
       </div>
-      <div class="bar" aria-hidden="true"></div>
-      <span class="sr-only">Starting gMatch</span>
     </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

@@ -619,26 +619,31 @@ export function useAppChat(ctx: AppChatContext) {
     return () => document.removeEventListener('visibilitychange', commit)
   }, [courierActive, identity, pmPeerId, pmLastInboundTs, mainView, chatOpen, courierMarkRead, stampDmSeen])
 
-  // Reopen the last conversation on boot. The chat used to drop back to the
-  // empty thread list every launch, which reads as "my history is gone" even
-  // though the local threads were intact.
+  // Remember where the player was, per identity, for the next chat open.
   useEffect(() => {
     try {
       if (pmPeer && pmPeer.id !== 'global_lobby' && pmPeer.id !== 'card_queue') {
         // Identity-scoped: the other account on this install must not reopen
-        // this conversation on its next boot.
+        // this conversation on its next chat open.
         writeScopedJson(LAST_DM_PEER_KEY, identity?.orbitId ?? null, pmPeer)
       }
       // Closing a conversation deliberately does NOT clear the mirror: the
-      // point is to reopen where the player was, and boot runs this before the
-      // restore effect (clearing here would erase the pointer first).
+      // point is to reopen where the player was.
     } catch { /* private mode: remembering is a nicety */ }
   }, [pmPeer, identity?.orbitId])
 
-  const restoredPeerRef = useRef(false)
+  // Reopen the last conversation when chat OPENS, not just on boot: a player
+  // who went back to the thread list and came back used to land on the lobby
+  // (or whichever thread happened to hold the newest message). The signature
+  // fires once per (identity, chat-open) edge, so an explicit "back to threads"
+  // while chat is still visible is not undone on the next render.
+  const chatOpenSignatureRef = useRef('')
+  const chatSurfaceOpen = mainView === 'rooms' || mainView === 'messages'
   useEffect(() => {
-    if (restoredPeerRef.current || !identity || pmPeer) return
-    restoredPeerRef.current = true
+    const signature = `${identity?.orbitId ?? ''}|${chatSurfaceOpen ? '1' : '0'}`
+    if (chatOpenSignatureRef.current === signature) return
+    chatOpenSignatureRef.current = signature
+    if (!chatSurfaceOpen || !identity || pmPeer) return
     const stored = readScopedJson<{ id?: string; name?: string; pfp?: string } | null>(
       LAST_DM_PEER_KEY,
       identity.orbitId,
@@ -649,7 +654,7 @@ export function useAppChat(ctx: AppChatContext) {
     if (!peer) return
     setPmPeer(peer)
     void loadPmMessages(peer.id)
-  }, [identity, pmPeer, loadPmMessages])
+  }, [chatSurfaceOpen, identity, pmPeer, loadPmMessages])
 
   const sendPm = useCallback(async (peerId: string, text: string, replyToId?: string, attachment?: { id: string; url: string }): Promise<boolean> => {
     if (!identity) return false
@@ -975,6 +980,13 @@ export function useAppChat(ctx: AppChatContext) {
       } else {
         await orbitFetch(`/api/pm/threads/${peerId}`, { method: 'DELETE' }, identity)
       }
+      // The mirror would otherwise restore this deleted thread on the next chat
+      // open. Clear it only when it points at the thread being deleted, so
+      // deleting a different thread cannot lose the player's current place.
+      try {
+        const stored = readScopedJson<{ id?: string } | null>(LAST_DM_PEER_KEY, identity.orbitId, null)
+        if (stored?.id === peerId) writeScopedJson(LAST_DM_PEER_KEY, identity.orbitId, null)
+      } catch { /* private mode: nothing to clear */ }
       setPmPeer(null)
       setPmMessagesByPeer(prev => {
         const next = { ...prev }

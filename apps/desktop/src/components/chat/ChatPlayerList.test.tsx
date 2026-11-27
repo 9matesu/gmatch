@@ -87,4 +87,31 @@ describe('ChatPlayerList', () => {
     fireEvent.click(screen.getByText('Alice'))
     expect(onOpenProfile).toHaveBeenCalledWith('u1', expect.objectContaining({ id: 'u1', display_name: 'Alice' }))
   })
+
+  it('collapses via the Players label and hides the list body', () => {
+    const onToggleCollapse = vi.fn()
+    const { rerender } = render(
+      <ChatPlayerList
+        identity={{ orbitId: 'me', publicKeyHex: 'pk', privateKeyHex: 'sk', encryptionPubHex: 'ep', encryptionPrivHex: 'es' }}
+        users={mockUsers}
+        onToggleCollapse={onToggleCollapse}
+      />,
+    )
+    // Expanded: the search field and rows are present.
+    expect(screen.getByPlaceholderText('Search players...')).toBeDefined()
+    fireEvent.click(screen.getByLabelText('Collapse players'))
+    expect(onToggleCollapse).toHaveBeenCalledTimes(1)
+
+    // Collapsed: the body is gone, the icon toggle remains to expand.
+    rerender(
+      <ChatPlayerList
+        identity={{ orbitId: 'me', publicKeyHex: 'pk', privateKeyHex: 'sk', encryptionPubHex: 'ep', encryptionPrivHex: 'es' }}
+        users={mockUsers}
+        collapsed
+        onToggleCollapse={onToggleCollapse}
+      />,
+    )
+    expect(screen.queryByPlaceholderText('Search players...')).toBeNull()
+    expect(screen.getByLabelText('Expand players')).toBeDefined()
+  })
 })

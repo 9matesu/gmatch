@@ -1,17 +1,47 @@
 'use strict'
 // Server-mode bridge for the Settings UI (packaged topology control): read/write
 // the host/client pointer, probe a candidate node, relaunch into the new mode.
+const fs = require('node:fs')
+const path = require('node:path')
+
+function ownerFile(app) {
+  return path.join(app.getPath('userData'), 'admin-owner.json')
+}
+
+function readOwner(app) {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(ownerFile(app), 'utf8'))
+    return typeof parsed?.orbitId === 'string' ? parsed.orbitId : null
+  } catch {
+    return null
+  }
+}
+
 module.exports = function registerServerHandlers({ ipcMain, app, serverMode, apiSidecar, secureKV }) {
   ipcMain.handle('server:state', () => ({
     packaged: app.isPackaged,
-    // Hosts own their node: the PIN is shown in Settings so the developer
-    // (and any self-hoster) can unlock the bundled admin console. See
-    // electron/admin-pin.cjs header for the trust argument.
-    adminPin: require('../admin-pin.cjs').adminPin(app.getPath('userData')),
+    // Public identifier only — never a credential. The console PIN stays in
+    // the main process / node as a scrypt hash.
+    nodeOwnerId: readOwner(app),
     ...(app.isPackaged
       ? { ...serverMode.readServerMode(), lanUrls: serverMode.lanUrls() }
       : { mode: 'host', url: apiSidecar.API_BASE, lanUrls: serverMode.lanUrls() }),
   }))
+  // Bind this install's first identity as the node owner. Sticky: a later
+  // account switch cannot claim the console for a different identity.
+  ipcMain.handle('server:claim-admin-owner', (_event, orbitId) => {
+    const id = String(orbitId || '').trim()
+    if (!id || id.length > 128 || !/^[A-Za-z0-9_-]+$/.test(id)) return { ok: false }
+    const existing = readOwner(app)
+    if (existing) return { ok: true, orbitId: existing }
+    try {
+      fs.mkdirSync(path.dirname(ownerFile(app)), { recursive: true })
+      fs.writeFileSync(ownerFile(app), JSON.stringify({ orbitId: id }))
+      return { ok: true, orbitId: id }
+    } catch (err) {
+      return { ok: false, error: err.message }
+    }
+  })
   // Persist host/client choice + hand the renderer the fresh state. Switching
   // takes effect on next launch (relaunch button in Settings does that).
   ipcMain.handle('server:set', (_event, payload) => {

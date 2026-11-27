@@ -24,6 +24,8 @@ import { ProfileEditorModal } from './ProfileEditorModal';
 import { ProfilePicModal } from './ProfilePicModal';
 import { useProfilePostLightbox } from '../feed/useProfilePostLightbox';
 import { ObjectImage } from '../ObjectImage';
+import { GameCard } from '../cards/GameCard';
+import { computeCardRarity } from '@orbit/shared';
 import { isVideoPost } from '../../utils/media';
 import { saveUserProfile } from '../../utils/profile';
 import { openCardDetail } from '../../utils/openCard';
@@ -641,32 +643,36 @@ export function GMatchProfile({
         )}
 
         {profileTab === 'cards' && (
-          <div className={CELL_GRID}>
-            {cards.slice(0, 12).map((card) => (
-              <div
-                key={card.id}
-                onClick={() => openCardDetail(card)}
-                className={GRID_CELL}
-              >
-                <ObjectImage
-                  contentUrl={card.content_url || (card as any).data || (card as any).url || `/api/objects/${card.id}`}
-                  objectId={card.id}
-                  identity={identity}
-                  mimeType={card.mime_type}
-                  alt=""
-                  className={CELL_IMG}
-                  videoClassName={CELL_IMG}
-                  muted
-                  autoPlay={false}
-                  playsInline
-                />
-                {videoCardIds.has(card.id) && (
-                  <div className={VIDEO_CHIP}>
-                    <Play className={classes(ICON.sm, COLOR.onMediaFill)} />
-                  </div>
-                )}
-              </div>
-            ))}
+          <div className={classes('grid grid-cols-2 sm:grid-cols-3', GAP[2])}>
+            {cards.slice(0, 12).map((card) => {
+              const value = Number((card as { value?: number }).value ?? (card as { gacha_downloads_count?: number }).gacha_downloads_count ?? 0)
+              const isVid = videoCardIds.has(card.id)
+              return (
+                <div
+                  key={card.id}
+                  onClick={() => openCardDetail(card)}
+                >
+                  <GameCard
+                    objectId={card.id}
+                    src={card.content_url || (card as any).data || (card as any).url || undefined}
+                    identity={identity}
+                    width={150}
+                    height={210}
+                    isVideo={isVid}
+                    name={(card as { caption?: string }).caption || (card as { display_name?: string }).display_name}
+                    rarity={computeCardRarity(value)}
+                    value={value || undefined}
+                    interactive={false}
+                  >
+                    {isVid && (
+                      <div className={VIDEO_CHIP}>
+                        <Play className={classes(ICON.sm, COLOR.onMediaFill)} />
+                      </div>
+                    )}
+                  </GameCard>
+                </div>
+              )
+            })}
             {cards.length === 0 && (
               <div className={EMPTY_CELL}>
                 No cards yet

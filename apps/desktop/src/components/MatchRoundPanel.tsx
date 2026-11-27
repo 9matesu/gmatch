@@ -17,7 +17,7 @@ import { ZoomModal, useZoomModal } from './CardZoomModalHost'
 import { computeCardRarity, formatGc, matchEconomy } from '@orbit/shared'
 import { isMediaVideo } from '../utils/media'
 import { CardBack } from './CardBack'
-import { CardArtwork } from './cards/CardArtwork'
+import { GameCard } from './cards/GameCard'
 import { ObjectImage } from './ObjectImage'
 import { Avatar } from './Avatar'
 import { ValuationSummary } from './game/ValuationSummary'
@@ -369,34 +369,26 @@ export function MatchRoundPanel({
             {match.my_card ? (
               <div className={classes('py-2', 'space-y-3', MOTION.keyframe.fadeIn)}>
                 <div className={classes('grid grid-cols-2', GAP[3], 'items-center')}>
-                  {/* Player's locked-in card — the same HoloCard surface as the tile. */}
+                  {/* Player's locked-in card — the same GameCard surface as the tile. */}
                   {(() => {
                     const c = myCards.find(card => card.id === match.my_card)
                     const val = Math.max(0, (c as any)?.value ?? c?.gacha_downloads_count ?? 0)
-                    const rarity = computeCardRarity(val)
                     const name = c?.caption || 'Your Card'
                     return (
                       <div className={classes('space-y-1 text-center')}>
-                        <div className={classes('relative w-full aspect-[3/4.2] mx-auto select-none overflow-hidden', RADIUS.panel)} data-rarity={rarity.rarity}>
-                          <CardArtwork
-                            objectId={myPlayedCardId}
-                            src={myPlayedUrl}
-                            identity={identity}
-                            width={220}
-                            height={308}
-                            isVideo={Boolean(isMediaVideo(myPlayedUrl ?? '') || myPlayed?.mime_type?.startsWith('video/'))}
-                          >
-                            <div className={classes('absolute top-2 left-2 z-20 flex items-center', GAP[1])}>
-                              <span className={classes(CHROME.cardChip, rarity.badgeClass)}>{rarity.label}</span>
-                              <span className={CHROME.cardChip}>{formatGc(val)}</span>
-                            </div>
-                            <span className={classes('absolute bottom-2 right-2 z-20', CHROME.cardChip, COLOR.accentBg, COLOR.onAccent)}>Locked in</span>
-                            <div className={classes('absolute inset-x-0 bottom-0 z-10', CHROME.cardFooter, COLOR.canvasVeil)}>
-                              <div className={CHROME.cardFooterTitle}>{name}</div>
-                              <div className={CHROME.cardFooterMeta}>by You</div>
-                            </div>
-                          </CardArtwork>
-                        </div>
+                        <GameCard
+                          objectId={myPlayedCardId}
+                          src={myPlayedUrl}
+                          identity={identity}
+                          width={220}
+                          height={308}
+                          isVideo={Boolean(isMediaVideo(myPlayedUrl ?? '') || myPlayed?.mime_type?.startsWith('video/'))}
+                          name={name}
+                          value={val}
+                          footerExtra={<div className={CHROME.cardFooterMeta}>by You</div>}
+                        >
+                          <span className={classes('absolute bottom-2 right-2 z-20', CHROME.cardChip, COLOR.accentBg, COLOR.onAccent)}>Locked in</span>
+                        </GameCard>
                         <div className={classes(TYPE.caption, WEIGHT.medium, COLOR.muted)}>You</div>
                       </div>
                     )
@@ -554,7 +546,6 @@ export function MatchRoundPanel({
             {(() => {
               const myCardObj = myCards.find(c => c.id === (match.my_card || myPlayedCardId))
               const myVal = Math.max(0, (myCardObj as any)?.value ?? myCardObj?.gacha_downloads_count ?? 0)
-              const myRarity = computeCardRarity(myVal)
               const myTitle = myCardObj?.caption || 'Your Card'
 
               return (
@@ -564,11 +555,10 @@ export function MatchRoundPanel({
                     tabIndex={myPlayedImg.url && !myPlayedImg.isLink ? 0 : undefined}
                     aria-label={myPlayedImg.url && !myPlayedImg.isLink ? `Zoom ${myTitle}` : undefined}
                     className={classes(
-                      'relative w-full aspect-[3/4.2] mx-auto select-none overflow-hidden', RADIUS.panel, SHADOW.sheet,
+                      'mx-auto select-none', RADIUS.panel, SHADOW.sheet,
                       isRoundResult && match.matched ? 'ring-2 ring-success' : '',
                       myPlayedImg.url ? 'cursor-pointer' : '',
                     )}
-                    data-rarity={myRarity.rarity}
                     onClick={() => {
                       if (myPlayedImg.url) {
                         zoom.showZoom(myPlayedImg.url, {
@@ -589,18 +579,17 @@ export function MatchRoundPanel({
                       }
                     }}
                   >
-                    <CardArtwork
+                    <GameCard
                       objectId={myPlayedCardId}
                       src={myPlayedUrl}
                       identity={identity}
                       width={220}
                       height={308}
                       isVideo={Boolean(isMediaVideo(myPlayedUrl ?? '') || myPlayed?.mime_type?.startsWith('video/'))}
+                      name={myTitle}
+                      value={myVal}
+                      footerExtra={<div className={CHROME.cardFooterMeta}>by You</div>}
                     >
-                      <div className={classes('absolute top-2 left-2 z-20 flex items-center', GAP[1])}>
-                        <span className={classes(CHROME.cardChip, myRarity.badgeClass)}>{myRarity.label}</span>
-                        <span className={CHROME.cardChip}>{formatGc(myVal)}</span>
-                      </div>
                       {myPlayedImg.url && (
                         <span className={classes('absolute top-2 right-2 z-20', CHROME.mediaChip, 'flex items-center', GAP[1])}>
                           <ZoomIn className={ICON.sm} /> Zoom
@@ -629,11 +618,7 @@ export function MatchRoundPanel({
                           {match.my_decision === 'like' ? <><Check className={ICON.sm} /> Liked</> : <><X className={ICON.sm} /> Rejected</>}
                         </span>
                       )}
-                      <div className={classes('absolute inset-x-0 bottom-0 z-10', CHROME.cardFooter, COLOR.canvasVeil)}>
-                        <div className={CHROME.cardFooterTitle}>{myTitle}</div>
-                        <div className={CHROME.cardFooterMeta}>by You</div>
-                      </div>
-                    </CardArtwork>
+                    </GameCard>
                   </div>
                   <div className={classes(TYPE.caption, WEIGHT.medium, COLOR.muted)}>You</div>
                 </div>
@@ -653,11 +638,10 @@ export function MatchRoundPanel({
                     tabIndex={zoomUrl && !opponentImg.isLink ? 0 : undefined}
                     aria-label={zoomUrl && !opponentImg.isLink ? `Zoom ${oppTitle}` : undefined}
                     className={classes(
-                      'relative w-full aspect-[3/4.2] mx-auto select-none overflow-hidden', RADIUS.panel, SHADOW.sheet,
+                      'mx-auto select-none', RADIUS.panel, SHADOW.sheet,
                       isRoundResult && match.matched ? 'ring-2 ring-success' : '',
                       zoomUrl ? 'cursor-pointer' : '',
                     )}
-                    data-rarity={oppRarity.rarity}
                     onClick={() => {
                       if (zoomUrl) {
                         zoom.showZoom(zoomUrl, {
@@ -678,20 +662,18 @@ export function MatchRoundPanel({
                       }
                     }}
                   >
-                    <CardArtwork
+                    <GameCard
                       objectId={oppCardId}
                       src={oppUrl}
                       identity={identity}
                       width={220}
                       height={308}
                       isVideo={opponentImg.isVideo}
+                      name={oppTitle}
+                      rarity={oppRarity}
+                      value={oppKnownValue ?? undefined}
+                      footerExtra={<div className={CHROME.cardFooterMeta}>by {opponentName}</div>}
                     >
-                      {(oppUrl || oppCardId) && (
-                        <div className={classes('absolute top-2 left-2 z-20 flex items-center', GAP[1])}>
-                          <span className={classes(CHROME.cardChip, oppRarity.badgeClass)}>{oppRarity.label}</span>
-                          {oppKnownValue !== null && <span className={CHROME.cardChip}>{formatGc(oppKnownValue)}</span>}
-                        </div>
-                      )}
                       {zoomUrl && (
                         <span className={classes('absolute top-2 right-2 z-20', CHROME.mediaChip, 'flex items-center', GAP[1])}>
                           <ZoomIn className={ICON.sm} /> Zoom
@@ -727,11 +709,7 @@ export function MatchRoundPanel({
                           {match.opponent_decision === 'like' ? <><Check className={ICON.sm} /> Liked</> : <><X className={ICON.sm} /> Rejected</>}
                         </span>
                       )}
-                      <div className={classes('absolute inset-x-0 bottom-0 z-10', CHROME.cardFooter, COLOR.canvasVeil)}>
-                        <div className={CHROME.cardFooterTitle}>{oppTitle}</div>
-                        <div className={CHROME.cardFooterMeta}>by {opponentName}</div>
-                      </div>
-                    </CardArtwork>
+                    </GameCard>
                   </div>
                   <div className={classes(TYPE.caption, WEIGHT.medium, COLOR.muted)}>{opponentName}</div>
                 </div>

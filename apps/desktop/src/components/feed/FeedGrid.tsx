@@ -21,6 +21,10 @@ interface FeedGridProps {
   onMediaReady?: (id: string) => void
   /** A tile's bytes could not be resolved: mark it dead (reversible hide). */
   onMediaDead?: (id: string) => void
+  /** Save a tile's media bytes to the Vault (desktop only). */
+  onSaveToVault?: (post: FeedPost) => void
+  /** Ids whose bytes are already in the Vault. */
+  vaultSaved?: Set<string>
 }
 
 /**
@@ -33,7 +37,7 @@ interface FeedGridProps {
  * from the model: `FeedPost` carries no width/height and adding it would be a
  * data-format change.
  */
-export function FeedGrid({ posts, identity, onOpen, likedPosts, likeCounts, onToggleLike, onMediaReady, onMediaDead }: FeedGridProps) {
+export function FeedGrid({ posts, identity, onOpen, likedPosts, likeCounts, onToggleLike, onMediaReady, onMediaDead, onSaveToVault, vaultSaved }: FeedGridProps) {
   const ref = useRef<HTMLDivElement | null>(null)
   const [width, setWidth] = useState(0)
   const [, bump] = useState(0)
@@ -135,6 +139,8 @@ export function FeedGrid({ posts, identity, onOpen, likedPosts, likeCounts, onTo
                   onMediaReady?.(post.id)
                 }}
                 onMediaUnavailable={() => onMediaDead?.(post.id)}
+                onSaveToVault={onSaveToVault}
+                vaultSaved={vaultSaved?.has(post.url)}
               />
             )
           })}

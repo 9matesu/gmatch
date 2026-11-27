@@ -27,7 +27,7 @@ import { Button, Checkbox, Input, Modal } from '../../ui/kit'
 import { ContextMenu } from '../ui/ContextMenu'
 import { AddWorldDialog } from './AddWorldDialog'
 import { GroupsDialog } from './GroupsDialog'
-import { WorldRow, WorldMenuItem, formatDomain, formatRelativeTime } from './WorldRow'
+import { WorldRow, WorldMenuItem, BROWSER_COLUMNS, formatRelativeTime } from './WorldRow'
 import type { WorldRowState } from './WorldRow'
 import { worldGlyph, worldTileStyle } from './worldIdentity'
 import { claimPendingHost } from '../../hooks/usePendingServerHost'
@@ -99,9 +99,6 @@ const DIRECTORY_ID_KEY = 'gmatch.server.directoryId'
 // heartbeat replays this registration while in host mode; its presence also
 // blocks a second Create (one server per install — use Rename instead).
 const REG_KEY = 'gmatch.server.register'
-// One-shot marker: the host-mode admin has seen their minted passcode. The
-// PIN itself comes from serverState().adminPin (electron/admin-pin.cjs).
-const PIN_SEEN_KEY = 'gmatch.server.pinSeen'
 
 /** The host's local display name, best-effort (private mode returns ''). */
 function localDisplayName(): string {
@@ -208,9 +205,8 @@ export function ServersView({
   const [hubTags, setHubTags] = useState('')
   const [renaming, setRenaming] = useState(false)
   const [serverMode, setServerMode] = useState<'host' | 'client' | null>(null)
-  type ServerBridgeState = { packaged: boolean; mode: 'host' | 'client'; url: string; lanUrls: string[]; adminPin?: string; pausedUrl?: string; pausedReason?: 'legacy' | 'unreachable' }
+  type ServerBridgeState = { packaged: boolean; mode: 'host' | 'client'; url: string; lanUrls: string[]; nodeOwnerId?: string | null; pausedUrl?: string; pausedReason?: 'legacy' | 'unreachable' }
   const [hostState, setHostState] = useState<ServerBridgeState | null>(null)
-  const [pinToDismiss, setPinToDismiss] = useState('')
   const [activeTab, setActiveTab] = useState<'browse' | 'hub'>('browse')
   const [deleteTarget, setDeleteTarget] = useState<DirectoryServer | null>(null)
   const [deletePasscode, setDeletePasscode] = useState('')
@@ -456,9 +452,6 @@ export function ServersView({
       .then((s) => {
         setServerMode(s?.mode ?? null)
         setHostState(s ?? null)
-        let seen = false
-        try { seen = Boolean(localStorage.getItem(PIN_SEEN_KEY)) } catch { /* private mode */ }
-        if (!seen && s?.mode === 'host' && s?.adminPin) setPinToDismiss(s.adminPin)
       })
       .catch(() => setServerMode(null))
   }, [])
@@ -651,17 +644,13 @@ export function ServersView({
   }
 
   /** Secondary line: what a row is, plus what the directory actually told us.
-   *  Never an address, a transport, or a diagnostic. */
+   *  Never an address — that owns its own column — a transport, or a diagnostic. */
   const metaFor = (s: DirectoryServer, isCurrentServer: boolean): string => {
     const bits: string[] = []
     const desc = (s.description || '').trim()
     if (isOwnNode(s)) bits.push(serverMode === 'host' ? 'hosted on this computer' : 'this computer')
     else if (s.is_private && !desc) bits.push('private, join by code')
     if (desc) bits.push(desc.length > 72 ? `${desc.slice(0, 71)}…` : desc)
-    else if (!isOwnNode(s)) {
-      const domain = formatDomain(s.endpoint_hint)
-      if (domain) bits.push(domain)
-    }
     if (!isCurrentServer && !isOwnNode(s) && s.last_seen) {
       bits.push(`listed ${formatRelativeTime(s.last_seen)}`)
     }
@@ -1396,33 +1385,6 @@ export function ServersView({
       'h-full min-h-0 flex-1 overflow-hidden flex flex-col items-center',
       MOTION.keyframe.fadeIn, PADDING[2],
     )}>
-      {/* First-login admin passcode */}
-      {serverMode === 'host' && node?.isAdmin && pinToDismiss && (
-        <div role="alert" data-testid="admin-pin-banner" className={classes(
-          CHROME.tile, STATUS.warningEdge, SHADOW.large,
-          'mb-2 w-full max-w-[720px] shrink-0 space-y-2', PADDING[3],
-        )}>
-          <p className={classes(TYPE.body, WEIGHT.bold, COLOR.fg)}>You are the admin of this server</p>
-          <p className={classes(TYPE.body, COLOR.muted)}>
-            Your admin passcode (unlocks the console. Store it somewhere safe):{' '}
-            <button
-              type="button"
-              className={classes(MONO, STATUS.warning, 'cursor-pointer')}
-              onClick={() => { void navigator.clipboard.writeText(pinToDismiss); toast('Passcode copied', 'success'); }}
-            >
-              {pinToDismiss}
-            </button>
-          </p>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => { try { localStorage.setItem(PIN_SEEN_KEY, '1'); } catch { /* session-only */ } setPinToDismiss(''); }}
-          >
-            Got it
-          </Button>
-        </div>
-      )}
-
       {/* One narrow column on the page background: no card wrapping the list. */}
       <div className="flex flex-col h-full min-h-0 flex-1 w-full max-w-[720px] overflow-hidden">
         {/* One page header: one title, one primary action, a quiet search. */}
@@ -2039,9 +2001,28 @@ export function ServersView({
               )}
 
               {serverRows.length > 0 && (
-                <ul className="dense-list divide-y divide-edge-subtle" aria-label="Servers" onKeyDown={onRowListKeyDown}>
-                  {serverRows.map((s) => renderRow(s))}
-                </ul>
+                <>
+                  {/* Technical column strip: the same slots every row uses.
+                      Ping is named because the browser owns the column, not
+                      because the node measures latency — a row shows a dash. */}
+                  <div
+                    aria-hidden
+                    className={classes(
+                      'flex shrink-0 items-center', GAP[2], PADDING_X[3], PADDING_Y[1.5],
+                      'border-b', COLOR.edgeSubtle, TYPE.caption, TRACKING.wider,
+                      COLOR.muted, 'uppercase',
+                    )}
+                  >
+                    <span className={BROWSER_COLUMNS.server}>Server</span>
+                    <span className={BROWSER_COLUMNS.address}>Address</span>
+                    <span className={BROWSER_COLUMNS.players}>Players</span>
+                    <span className={BROWSER_COLUMNS.ping}>Ping</span>
+                    <span className={BROWSER_COLUMNS.actions}>Action</span>
+                  </div>
+                  <ul className="dense-list divide-y divide-edge-subtle" aria-label="Servers" onKeyDown={onRowListKeyDown}>
+                    {serverRows.map((s) => renderRow(s))}
+                  </ul>
+                </>
               )}
               {rowContext && (
                 <ContextMenu

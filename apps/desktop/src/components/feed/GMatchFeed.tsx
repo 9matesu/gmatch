@@ -25,9 +25,6 @@ import {
   Gamepad2,
   ChevronLeft,
   ChevronRight,
-  ChevronUp,
-  ZoomIn,
-  ZoomOut,
   Zap,
   RefreshCw,
   Rows3,
@@ -52,7 +49,7 @@ import { isVideoPost } from '../../utils/media';
 import { vaultPin, vaultBridge } from '../../services/vault';
 import { PEER_ONLINE_EVENT } from '../../utils/p2pSwarm';
 import {
-  classes, COLOR, GAP, ICON, PADDING_X, RADIUS,
+  classes, COLOR, DIALOG_WIDTH, GAP, ICON, LAYOUT, PADDING_X, RADIUS,
   SHADOW, STATUS, TRANSITION, TYPE, WEIGHT,
 } from '../../ui/tokens';
 
@@ -333,9 +330,9 @@ function GMatchFeedImpl({
   // Modals State
   const [showCameraModal, setShowCameraModal] = useState(false);
   const [showExploreSearch, setShowExploreSearch] = useState(false);
-  // Inline expansion (replaces the feed lightbox): one post at a time, same
-  // card element (no remount, reader position preserved). Zoom is a bounded
-  // scale cycle on the same media node, reset on every expand/collapse.
+  // Inline expansion (replaces the feed lightbox): one post at a time. The
+  // expanded post is the one card, centred in the feed column — no second card
+  // stacked inside it.
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
   // Esc collapses the inline-expanded card.
   useEffect(() => {
@@ -346,17 +343,14 @@ function GMatchFeedImpl({
   }, [expandedPostId]);
   /** Comment to spotlight after a notification deep link lands on the post. */
   const [focusCommentId, setFocusCommentId] = useState<string | null>(null);
-  const [zoomLevel, setZoomLevel] = useState(1);
   const toggleExpand = useCallback((post: FeedPost) => {
     playPress(700);
     setFocusCommentId(null);
     setExpandedPostId((prev) => (prev === post.id ? null : post.id));
-    setZoomLevel(1);
   }, []);
   const openInline = useCallback((post: FeedPost, scroll = false) => {
     playPress(700);
     setExpandedPostId(post.id);
-    setZoomLevel(1);
     if (scroll) {
       requestAnimationFrame(() => {
         document.querySelector(`[data-post-id="${post.id}"]`)?.scrollIntoView?.({ block: 'nearest' });
@@ -1197,6 +1191,8 @@ function GMatchFeedImpl({
                onOpen={toggleExpand}
                onMediaReady={promotePost}
                onMediaDead={hidePost}
+               onSaveToVault={vaultBridge() ? (p) => void savePostToVault(p) : undefined}
+               vaultSaved={vaultSaved}
              />
            ) : (
              <>
@@ -1292,7 +1288,14 @@ function GMatchFeedImpl({
                 key={post.id}
                 data-post-id={post.id}
                 onContextMenu={(e) => { e.preventDefault(); openPostMenu(post, { x: e.clientX, y: e.clientY }) }}
-                className={`cv-row relative bg-surface-raised border border-edge rounded-lg overflow-hidden flex flex-col mb-3 break-inside-avoid ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
+                className={classes(
+                  'cv-row relative flex flex-col mb-3 break-inside-avoid',
+                  COLOR.surfaceRaised, 'border', COLOR.edge, RADIUS.control, 'overflow-hidden',
+                  // One card, centred in the feed column: the expanded post
+                  // supplies the content, not a nested card.
+                  expanded && classes(LAYOUT.center, 'w-full', DIALOG_WIDTH.lg),
+                  isNewPost ? 'animate-orbit-feed-in' : '',
+                )}
               >
                 {!expanded && (<>
                 {/* IMAGE POST: media FIRST (media → author → caption →
@@ -1307,18 +1310,14 @@ function GMatchFeedImpl({
                   const isCurrentVideo = isVideoPost(activeMime, activeUrl, siblingMimesFor(post));
 
                   return (
-                    <div
-                      className={`group/post relative w-full bg-surface-canvas flex items-center justify-center overflow-hidden rounded-none transition-[max-height] duration-300 ease-out motion-reduce:transition-none ${expanded ? 'max-h-[80vh]' : 'max-h-[min(480px,60vh)]'}`}
-                      data-expanded={expanded}
-                    >
+                    <div className="group/post relative w-full bg-surface-canvas flex items-center justify-center overflow-hidden rounded-none max-h-[min(480px,60vh)]">
                       {/* The expand surface is the MEDIA ONLY: the author
                           overlay below is a sibling, so its controls can never
                           bubble into "expand the post". */}
                       <div
                         role="button"
                         tabIndex={0}
-                        aria-expanded={expanded}
-                        aria-label={expanded ? 'Post image, expanded' : 'Expand post'}
+                        aria-label="Expand post"
                         className={`w-full ${isCurrentVideo ? '' : 'cursor-pointer'}`}
                         onClick={() => {
                           if (!isCurrentVideo) {
@@ -1336,13 +1335,6 @@ function GMatchFeedImpl({
                           handleDoubleTap(post);
                         }}
                       >
-                      {/* Zoom applies on the media node only (controls stay put);
-                          transform never affects layout, so zoom can't move
-                          the reader's scroll position. */}
-                      <div
-                        className="w-full flex items-center justify-center transition-transform duration-300 ease-out motion-reduce:transition-none"
-                        style={expanded && zoomLevel > 1 ? { transform: `scale(${zoomLevel})` } : undefined}
-                      >
                       {multiMedia ? (() => {
                         const item = multiMedia[currentIdx];
                         const url = item.url;
@@ -1358,8 +1350,8 @@ function GMatchFeedImpl({
                                 contentHash={post.content_hash}
                                 identity={identity}
                                 mimeType={mime}
-                                className="w-full h-auto max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
-                                videoClassName="w-full max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
+                                className="w-full h-auto max-h-(--max-h-dialog-fit) object-contain rounded-none"
+                                videoClassName="w-full max-h-(--max-h-dialog-fit) object-contain rounded-none"
                                 controls={true}
                                 alwaysShowControls={true}
                                 autoPlay={false}
@@ -1375,7 +1367,7 @@ function GMatchFeedImpl({
                               <NativeVideoPlayer
                                 natural
                                 src={url}
-                                videoClassName="w-full max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
+                                videoClassName="w-full max-h-(--max-h-dialog-fit) object-contain rounded-none"
                                 controls={true}
                                 alwaysShowControls={true}
                                 autoPlay={false}
@@ -1388,7 +1380,7 @@ function GMatchFeedImpl({
                               <CachedImg
                                 src={url}
                                 alt={content.text || 'Post image'}
-                                className="w-full h-auto max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
+                                className="w-full h-auto max-h-(--max-h-dialog-fit) object-contain rounded-none"
                                 loading="lazy"
                               />
                             )}
@@ -1401,7 +1393,7 @@ function GMatchFeedImpl({
                           <NativeVideoPlayer
                                 natural
                                 src={post.localPreviewUrl}
-                            videoClassName="w-full max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
+                            videoClassName="w-full max-h-(--max-h-dialog-fit) object-contain rounded-none"
                             controls={true}
                             alwaysShowControls={true}
                             autoPlay={false}
@@ -1414,7 +1406,7 @@ function GMatchFeedImpl({
                           <img
                             src={post.localPreviewUrl}
                             alt={content.text || 'Post image'}
-                            className="w-full h-auto max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
+                            className="w-full h-auto max-h-(--max-h-dialog-fit) object-contain rounded-none"
                             draggable={false}
                           />
                         )
@@ -1425,8 +1417,8 @@ function GMatchFeedImpl({
                           contentHash={post.content_hash}
                           identity={identity}
                           mimeType={media?.mimeType}
-                          className="w-full h-auto max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
-                          videoClassName="w-full max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
+                          className="w-full h-auto max-h-(--max-h-dialog-fit) object-contain rounded-none"
+                          videoClassName="w-full max-h-(--max-h-dialog-fit) object-contain rounded-none"
                           controls={true}
                           alwaysShowControls={true}
                           autoPlay={false}
@@ -1442,7 +1434,7 @@ function GMatchFeedImpl({
                         <NativeVideoPlayer
                                 natural
                                 src={mediaUrl}
-                          videoClassName="w-full max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
+                          videoClassName="w-full max-h-(--max-h-dialog-fit) object-contain rounded-none"
                           controls={true}
                           alwaysShowControls={true}
                           autoPlay={false}
@@ -1455,40 +1447,11 @@ function GMatchFeedImpl({
                         <CachedImg
                           src={mediaUrl}
                           alt={content.text || 'Post image'}
-                          className="w-full h-auto max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
+                          className="w-full h-auto max-h-(--max-h-dialog-fit) object-contain rounded-none"
                           loading="lazy"
                         />
                       )}
-                        </div>
                       </div>
-
-
-                      {/* Zoom + collapse overlays (expanded only) */}
-                      {expanded && (
-                        <>
-                          <button
-                            type="button"
-                            aria-label="Collapse post"
-                            onClick={(e) => { e.stopPropagation(); toggleExpand(post); }}
-                            className="absolute left-2 top-2 z-10 w-8 h-8 rounded-full bg-black/45 backdrop-blur-sm text-retro-fg flex items-center justify-center hover:bg-black/70 transition-colors cursor-pointer"
-                          >
-                            <ChevronUp className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            aria-label={zoomLevel > 1 ? 'Reset zoom' : 'Zoom image'}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              playPress(700);
-                              setZoomLevel((z) => (z === 1 ? 1.8 : z === 1.8 ? 2.6 : 1));
-                            }}
-                            className="absolute bottom-2 right-2 z-10 h-8 pl-2.5 pr-3 rounded-full bg-black/60 backdrop-blur-sm text-retro-fg flex items-center gap-1.5 hover:bg-black/70 transition-colors cursor-pointer"
-                          >
-                            {zoomLevel > 1 ? <ZoomOut className="w-3.5 h-3.5" /> : <ZoomIn className="w-3.5 h-3.5" />}
-                            <span className="font-mono text-2xs">{Math.round(zoomLevel * 100)}%</span>
-                          </button>
-                        </>
-                      )}
 
                       {/* Carousel controls + counter for multi-image posts */}
                       {multiMedia && multiMedia.length > 1 && (
@@ -1537,7 +1500,7 @@ function GMatchFeedImpl({
                      is never hidden, because the words ARE the content. */
                   <div
                     data-testid="post-author-overlay"
-                    className={`flex gap-3 px-3 sm:px-4 pt-3 ${expanded ? 'hidden' : ''}`}
+                    className={`flex gap-3 px-3 sm:px-4 pt-3`}
                     onContextMenu={(e) => onUserContext?.(e, post.author_id, post.author_name)}
                   >
                     {renderAuthorAvatar(post, authorHasStory)}
@@ -1567,7 +1530,7 @@ function GMatchFeedImpl({
                     {/* Author row: avatar, name, handle, time — under the media. */}
                     <div
                       data-testid="post-author-overlay"
-                      className={`flex items-center gap-3 px-3 pt-3 pb-2 ${expanded ? 'hidden' : ''}`}
+                      className={`flex items-center gap-3 px-3 pt-3 pb-2`}
                       onContextMenu={(e) => onUserContext?.(e, post.author_id, post.author_name)}
                     >
                       {renderAuthorAvatar(post, authorHasStory)}
@@ -1576,7 +1539,7 @@ function GMatchFeedImpl({
 
                     {/* Written body — under the author line. */}
                     {content.text ? (
-                      <p className={`px-3 pt-1 pb-2 text-xs leading-snug text-retro-body whitespace-pre-wrap break-words ${expanded ? 'hidden' : ''}`}>
+                      <p className={`px-3 pt-1 pb-2 text-xs leading-snug text-retro-body whitespace-pre-wrap break-words`}>
                         <Linkify text={content.text} />
                       </p>
                     ) : null}
@@ -1585,7 +1548,7 @@ function GMatchFeedImpl({
 
                 {/* Action row: no fill, no separator — it sits directly under
                     the media so the whole tile reads as one object. */}
-                <div className={`px-3 sm:px-4 pt-2.5 pb-3 flex flex-col gap-2 ${expanded ? 'hidden' : ''}`}>
+                <div className={`px-3 sm:px-4 pt-2.5 pb-3 flex flex-col gap-2`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1">
                       <button

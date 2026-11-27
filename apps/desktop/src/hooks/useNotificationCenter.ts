@@ -23,9 +23,11 @@ import {
  * sealed rooms) and peer-lane rows (signed operations about my content: a
  * report, a follow, a like, a comment, a reply) — into one newest-first list,
  * and derives the unread badge from that list. There is deliberately no second
- * unread scalar: the badge cannot
- * disagree with what the open centre shows, which is exactly what broke when the
- * WebSocket frame path updated the list but not the counter.
+ * unread scalar: the badge cannot disagree with what the open centre shows,
+ * which is exactly what broke when the WebSocket frame path updated the list
+ * but not the counter. Every new row — any server type, an invite or a system
+ * row — lands in `items` on the render it arrives, and stays until that row is
+ * explicitly read; no path here marks anything read on the player's behalf.
  *
  * `version` is the caller's room-message clock: `roomMessages` reads a mutable
  * store, so the memo needs an explicit nudge when a room message lands.
@@ -79,10 +81,10 @@ export function useNotificationCenter(input: NotificationCenterInput): Notificat
     version,
   } = input
 
-  const serverItems = useMemo(
-    () => (rows || []).map((row) => serverRowToAppNotification(row)),
-    [rows],
-  )
+  // No memo here: a new row must raise the dot on the very render it arrives,
+  // even when a caller mutates its array in place (a 50-row map is trivial).
+  // Memoising on the array reference made the badge read a stale list.
+  const serverItems = (rows || []).map((row) => serverRowToAppNotification(row))
 
   const localItems = useMemo(
     () =>

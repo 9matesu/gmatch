@@ -4,9 +4,15 @@ import App from './App'
 import { ToastProvider } from './components/Toast'
 import { ConfirmProvider } from './components/ConfirmDialog'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { setBootStatus } from './bootStatus'
 
 /** Render the app — called by main.tsx only after initSecureStorage() settled. */
 export function mount(): void {
+  // Boot phase 3 of 3 (node → identity → feed): the app is mounting, the first
+  // feed read is next. The cover is lifted by App once the feed actually lands
+  // (see the boot-cover effect there) — NOT here, so the feed's own loading
+  // state never flashes as a second, emptier splash.
+  setBootStatus('Loading your feed…')
   // Root markup mirrors orbit's layout.tsx (fonts moved to index.html links).
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
@@ -28,11 +34,6 @@ export function mount(): void {
         </ConfirmProvider>
       </div>
     </StrictMode>,
-  )
-  // The static shell in index.html has done its job: the app has its own
-  // chrome now. Two frames, so the app is painted before the cover goes.
-  requestAnimationFrame(() =>
-    requestAnimationFrame(() => document.getElementById('boot')?.remove()),
   )
   window.gmatch?.bootMark?.('renderer:mounted')
   // Two frames on purpose: the first commits the tree, the second runs after

@@ -102,8 +102,18 @@ export interface ServerNotificationRow {
   title: string
   body?: string | null
   data?: unknown
-  read?: number | boolean
+  read?: number | boolean | string | null
   created_at: string
+}
+
+/**
+ * Only an EXPLICIT read clears the bubble. The wire has carried `1`, `true`
+ * and (from older/relayed nodes) `'1'`; everything else — including a missing
+ * field, `0`, `false` or `'0'` — stays unread. `Boolean(value)` used to turn
+ * the string `'0'` into a read, silently swallowing a brand-new notification.
+ */
+export function isNotificationRead(read: unknown): boolean {
+  return read === true || read === 1 || read === '1'
 }
 
 /** Normalize one server row into the unified shape. */
@@ -143,7 +153,7 @@ export function serverRowToAppNotification(row: ServerNotificationRow): AppNotif
     title: row.title,
     body: row.body ?? null,
     createdAt: row.created_at,
-    read: Boolean(row.read),
+    read: isNotificationRead(row.read),
     ...(actorId ? { actorId } : {}),
     ...(asString(d.actor_name) ? { actorName: asString(d.actor_name) as string } : {}),
     target,
@@ -307,8 +317,9 @@ export function deriveConversationNotifications(
 }
 
 /**
- * Merge sources into one list: newest first, deduped by {@link AppNotification.key}
- * (the newest row for a key wins, so a repeated delivery cannot double-render).
+ * Merge sources into one list: newest first, deduped by {@link AppNotification.key}.
+ * The newest copy of a row wins, and an EXPLICIT read wins a tie — a re-delivered
+ * or cached copy of a row the player already cleared must not bring its dot back.
  */
 /** The key prefix shared by every PEER-lane row (reports, interactions). */
 const PEER_KEY_PREFIX = 'local:peer-';
@@ -421,7 +432,13 @@ export function mergeNotifications(
   for (const group of groups) {
     for (const item of group) {
       const prev = byKey.get(item.key)
-      if (!prev || Date.parse(item.createdAt) >= Date.parse(prev.createdAt)) {
+      if (!prev) {
+        byKey.set(item.key, item)
+        continue
+      }
+      const ts = Date.parse(item.createdAt) || 0
+      const prevTs = Date.parse(prev.createdAt) || 0
+      if (ts > prevTs || (ts === prevTs && !prev.read && item.read)) {
         byKey.set(item.key, item)
       }
     }

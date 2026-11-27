@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import type { FeedPost } from './GMatchFeed'
 
 /**
@@ -87,5 +87,25 @@ describe('ProfileExpandedPost post model', () => {
     renderPost(post())
     expect(screen.getByTestId('object-image')).toBeTruthy()
     expect(screen.getByText('hello')).toBeTruthy()
+  })
+})
+
+describe('ProfileExpandedPost · save to Vault', () => {
+  it('wires the Vault action when the caller offers it', () => {
+    const onSaveToVault = vi.fn()
+    const p = post()
+    render(<ProfileExpandedPost post={p} onClose={() => {}} identity={null} onSaveToVault={onSaveToVault} />)
+    fireEvent.click(screen.getByLabelText('Save to Vault'))
+    expect(onSaveToVault).toHaveBeenCalledWith(p)
+  })
+
+  it('has no Vault action for a text-only post', () => {
+    render(
+      <ProfileExpandedPost
+        post={post({ id: 'text-2', caption: 'just words', url: '', mime_type: undefined })}
+        onClose={() => {}} identity={null} onSaveToVault={vi.fn()}
+      />,
+    )
+    expect(screen.queryByLabelText('Save to Vault')).toBeNull()
   })
 })

@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import type { MatchSnapshot, OrbitObject, OrbitId } from '@orbit/shared'
-import { formatGc } from '@orbit/shared'
+import { computeCardRarity } from '@orbit/shared'
 import { Avatar } from './Avatar'
 import { formatCountdown, countdownMs } from '../utils/lobby'
 import { ZoomModal, useZoomModal } from './CardZoomModalHost'
 import { isMediaVideo } from '../utils/media'
 import { ObjectImage } from './ObjectImage'
-import { CardArtwork } from './cards/CardArtwork'
+import { GameCard } from './cards/GameCard'
 import { playPress } from '../utils/sounds'
 import { Button } from '../ui/kit'
 import {
@@ -236,8 +236,19 @@ export function SpectateModal({
         <div className={classes(PADDING[2.5], 'grid grid-cols-2', GAP[2], COLOR.canvasVeil)}>
           <div className={classes('space-y-1 text-center')}>
             <div className={classes(TYPE.caption, WEIGHT.semibold, COLOR.body, 'truncate')}>{pA.display_name || 'Player 1'}</div>
-            <div className={classes('relative w-full aspect-[3/4.2] overflow-hidden select-none', RADIUS.panel)} data-rarity="copper">
-              <CardArtwork objectId={pACardId} src={isRevealed ? cardAUrl : undefined} identity={identity} width={120} height={168} isVideo={Boolean(isMediaVideo(cardAUrl ?? ''))}>
+            <div className={classes('relative w-full select-none', RADIUS.panel)} data-rarity="copper">
+              <GameCard
+                objectId={pACardId}
+                src={isRevealed ? cardAUrl : undefined}
+                identity={identity}
+                width={120}
+                height={168}
+                isVideo={Boolean(isMediaVideo(cardAUrl ?? ''))}
+                interactive={false}
+                name={isRevealed ? (pA.display_name || 'Player 1') : undefined}
+                value={isRevealed ? (pA.score ?? 0) : undefined}
+                rarity={computeCardRarity(pA.score ?? 0)}
+              >
                 {!isRevealed || !cardAUrl ? (
                   <div className={classes('absolute inset-0 z-0 flex flex-col items-center justify-center', PADDING[2], COLOR.canvasVeil)}>
                     <div className={classes('w-8 h-10 border border-dashed', STATUS.infoEdge, RADIUS.control, 'flex items-center justify-center')}>
@@ -245,16 +256,25 @@ export function SpectateModal({
                     </div>
                     <span className={classes(TYPE.caption, COLOR.muted, 'mt-1')}>Picking...</span>
                   </div>
-                ) : (
-                  <div className={classes('absolute top-1.5 left-1.5 z-20', CHROME.cardChip)}>{formatGc(pA.score ?? 0)}</div>
-                )}
-              </CardArtwork>
+                ) : null}
+              </GameCard>
             </div>
           </div>
           <div className={classes('space-y-1 text-center')}>
             <div className={classes(TYPE.caption, WEIGHT.semibold, COLOR.body, 'truncate')}>{pB.display_name || 'Player 2'}</div>
-            <div className={classes('relative w-full aspect-[3/4.2] overflow-hidden select-none', RADIUS.panel)} data-rarity="gold">
-              <CardArtwork objectId={pBCardId} src={isRevealed ? cardBUrl : undefined} identity={identity} width={120} height={168} isVideo={Boolean(isMediaVideo(cardBUrl ?? ''))}>
+            <div className={classes('relative w-full select-none', RADIUS.panel)} data-rarity="gold">
+              <GameCard
+                objectId={pBCardId}
+                src={isRevealed ? cardBUrl : undefined}
+                identity={identity}
+                width={120}
+                height={168}
+                isVideo={Boolean(isMediaVideo(cardBUrl ?? ''))}
+                interactive={false}
+                name={isRevealed ? (pB.display_name || 'Player 2') : undefined}
+                value={isRevealed ? (pB.score ?? 0) : undefined}
+                rarity={computeCardRarity(pB.score ?? 0)}
+              >
                 {!isRevealed || !cardBUrl ? (
                   <div className={classes('absolute inset-0 z-0 flex flex-col items-center justify-center', PADDING[2], COLOR.canvasVeil)}>
                     <div className={classes('w-8 h-10 border border-dashed', STATUS.warningEdge, RADIUS.control, 'flex items-center justify-center')}>
@@ -262,10 +282,8 @@ export function SpectateModal({
                     </div>
                     <span className={classes(TYPE.caption, COLOR.muted, 'mt-1')}>Picking...</span>
                   </div>
-                ) : (
-                  <div className={classes('absolute top-1.5 left-1.5 z-20', CHROME.cardChip)}>{formatGc(pB.score ?? 0)}</div>
-                )}
-              </CardArtwork>
+                ) : null}
+              </GameCard>
             </div>
           </div>
         </div>
@@ -418,8 +436,19 @@ export function SpectateModal({
                       <span>{pA.display_name || 'Player 1'}&apos;s Card</span>
                     </div>
 
-                    <div className={classes('relative w-full aspect-[3/4.2] max-h-72 select-none', RADIUS.panel)} data-rarity="copper">
-                      <CardArtwork objectId={pACardId} src={isRevealed ? cardAUrl : undefined} identity={identity} width={200} height={280} isVideo={Boolean(isMediaVideo(cardAUrl ?? ''))}>
+                    <div className={classes('relative w-full max-h-72 select-none', RADIUS.panel)} data-rarity="copper">
+                      <GameCard
+                        objectId={pACardId}
+                        src={isRevealed ? cardAUrl : undefined}
+                        identity={identity}
+                        width={200}
+                        height={280}
+                        isVideo={Boolean(isMediaVideo(cardAUrl ?? ''))}
+                        interactive={false}
+                        name={isRevealed && cardAUrl ? (pA.display_name || 'Player 1') : undefined}
+                        value={isRevealed ? (pA.score ?? 0) : undefined}
+                        rarity={computeCardRarity(pA.score ?? 0)}
+                      >
                         {isRevealed && cardAUrl ? (
                           <button
                             type="button"
@@ -427,12 +456,8 @@ export function SpectateModal({
                             onClick={() => openInBoard(pACardId ?? cardAUrl, cardAUrl)}
                             className="absolute inset-0 z-10 cursor-zoom-in"
                           >
-                            <span className={classes('absolute top-2 left-2 z-20', CHROME.cardChip)}>{formatGc(pA.score ?? 0)}</span>
                             <span className={classes('absolute bottom-2 right-2 z-20', CHROME.mediaChip, 'flex items-center', GAP[1])}>
                               <ZoomIn className={ICON.sm} /> Zoom
-                            </span>
-                            <span className={classes('absolute inset-x-0 bottom-0 z-10', CHROME.cardFooter, COLOR.canvasVeil)}>
-                              <span className={CHROME.cardFooterTitle}>{pA.display_name || 'Player 1'}</span>
                             </span>
                           </button>
                         ) : (
@@ -442,7 +467,7 @@ export function SpectateModal({
                             <span className={classes(TYPE.caption, COLOR.muted)}>Card {tickIdx + 1} of {maxRounds}</span>
                           </div>
                         )}
-                      </CardArtwork>
+                      </GameCard>
                     </div>
                   </div>
 
@@ -453,8 +478,19 @@ export function SpectateModal({
                       <span>{pB.display_name || 'Player 2'}&apos;s Card</span>
                     </div>
 
-                    <div className={classes('relative w-full aspect-[3/4.2] max-h-72 select-none', RADIUS.panel)} data-rarity="gold">
-                      <CardArtwork objectId={pBCardId} src={isRevealed ? cardBUrl : undefined} identity={identity} width={200} height={280} isVideo={Boolean(isMediaVideo(cardBUrl ?? ''))}>
+                    <div className={classes('relative w-full max-h-72 select-none', RADIUS.panel)} data-rarity="gold">
+                      <GameCard
+                        objectId={pBCardId}
+                        src={isRevealed ? cardBUrl : undefined}
+                        identity={identity}
+                        width={200}
+                        height={280}
+                        isVideo={Boolean(isMediaVideo(cardBUrl ?? ''))}
+                        interactive={false}
+                        name={isRevealed && cardBUrl ? (pB.display_name || 'Player 2') : undefined}
+                        value={isRevealed ? (pB.score ?? 0) : undefined}
+                        rarity={computeCardRarity(pB.score ?? 0)}
+                      >
                         {isRevealed && cardBUrl ? (
                           <button
                             type="button"
@@ -462,12 +498,8 @@ export function SpectateModal({
                             onClick={() => openInBoard(pBCardId ?? cardBUrl, cardBUrl)}
                             className="absolute inset-0 z-10 cursor-zoom-in"
                           >
-                            <span className={classes('absolute top-2 left-2 z-20', CHROME.cardChip)}>{formatGc(pB.score ?? 0)}</span>
                             <span className={classes('absolute bottom-2 right-2 z-20', CHROME.mediaChip, 'flex items-center', GAP[1])}>
                               <ZoomIn className={ICON.sm} /> Zoom
-                            </span>
-                            <span className={classes('absolute inset-x-0 bottom-0 z-10', CHROME.cardFooter, COLOR.canvasVeil)}>
-                              <span className={CHROME.cardFooterTitle}>{pB.display_name || 'Player 2'}</span>
                             </span>
                           </button>
                         ) : (
@@ -477,7 +509,7 @@ export function SpectateModal({
                             <span className={classes(TYPE.caption, COLOR.muted)}>Card {tickIdx + 1} of {maxRounds}</span>
                           </div>
                         )}
-                      </CardArtwork>
+                      </GameCard>
                     </div>
                   </div>
                 </div>

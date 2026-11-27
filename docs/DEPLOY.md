@@ -49,9 +49,11 @@ A full node is the normal Bun API (`apps/api`): `bun run src/serve.ts`, SQLite
 snapshot, blob dir. The `Dockerfile` builds it; run it wherever you host.
 
 - Secrets live in the environment (or `apps/api/.env.local`); never in the repo.
-- Admin suite: `ADMIN_PIN_HASH` (sha256 hex of the PIN) + `ADMIN_ORBIT_ID` (the
-  one orbitId allowed to unlock). Without `ADMIN_ORBIT_ID` the PIN alone grants
-  admin (self-host model).
+- Admin suite: `ADMIN_PIN_HASH` (`scrypt$<salt-hex>$<digest-hex>` — preferred —
+  or legacy sha256 hex) + `ADMIN_ORBIT_ID` (the one orbitId allowed to unlock).
+  The packaged install writes its first identity to `admin-owner.json` and
+  passes it as `ADMIN_OWNER_FILE`, read live by `/verify-pin`. Without either
+  binding the PIN alone grants admin (self-host model).
 - A node can also run as a pure relay with `SITE_SERVICES=mail` — it then
   serves the directory and mail and 404s content routes.
 
@@ -67,17 +69,16 @@ legacy path stays implemented). This applies to full nodes.
 `ADMIN_PIN=<pin> [ADMIN_ORBIT_ID=<orbitId>] npm run dev` in apps/desktop
 (vite spawns the bun sidecar with the env). Never commit PIN values.
 
-Or put `ADMIN_PIN=...` in `apps/api/.env.local` (gitignored). Bun loads that
-file from the sidecar's cwd, so it applies to `npm run dev` AND to
-`npm run electron` — the Electron main deliberately does NOT inject a generated
-ADMIN_PIN when unpackaged, precisely so it cannot shadow `.env.local`. A real
-process env var beats a `.env` file in Bun, so injecting one silently overrode
-whatever the developer had configured.
+Or put `ADMIN_PIN_HASH=scrypt$...` in `apps/api/.env.local` (gitignored). Bun
+loads that file from the sidecar's cwd, so it applies to `npm run dev`. The
+plaintext is never written there.
 
 In a PACKAGED install there is no repo and no `.env.local`, so
-`electron/apiSidecar.cjs` mints an 8-hex PIN into
-`userData/admin-pin.txt` and Settings -> Server displays it. That is the
-self-hoster path and it is unaffected by the rule above.
+`electron/admin-pin.cjs` persists only a salted scrypt hash to
+`userData/admin-pin.hash` and `apiSidecar.cjs` injects it as `ADMIN_PIN_HASH`.
+The first identity this install loads is recorded as the node owner; the Admin
+button and `/verify-pin` both check it. Settings → Account & Security shows a
+read-only node-admin status badge instead of the passcode.
 
 Reading the failure: the admin console now names the node and the reason.
 `401` wrong PIN (or the identity is not `ADMIN_ORBIT_ID` — that gate runs

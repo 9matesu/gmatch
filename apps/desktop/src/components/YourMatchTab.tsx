@@ -11,7 +11,7 @@ import { matchEndSummary } from '../utils/matchEndSummary'
 import { notifyWhenHidden } from '../utils/notifyHidden'
 import { ZoomModal, useZoomModal } from './CardZoomModalHost'
 import { CardBack } from './CardBack'
-import { CardArtwork } from './cards/CardArtwork'
+import { GameCard } from './cards/GameCard'
 import { CreateCardModal } from './CreateCardModal'
 import { ObjectImage } from './ObjectImage'
 import { Button } from '../ui/kit'
@@ -173,13 +173,15 @@ export function YourMatchTab({
           <CardBack label="Covered" />
         ) : img?.url ? (
           <>
-            <CardArtwork
+            <GameCard
               objectId={objectId ?? null}
               src={img.url}
               identity={identity}
               width={180}
               height={252}
               isVideo={Boolean(img.url.includes('video/'))}
+              interactive={false}
+              className="rounded-none border-0"
             />
             <button
               type="button"

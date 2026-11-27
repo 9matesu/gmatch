@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { groupNotifications, groupTitle, groupItemIds, groupTarget, type NotifItem } from './groupNotifications'
 
-const row = (id: string, type: string, data: object, minutesAgo = 0, read = 0): NotifItem => ({
+const row = (id: string, type: string, data: object, minutesAgo = 0, read: NotifItem['read'] = 0): NotifItem => ({
   id, type, title: 'x', body: null, data, read,
   created_at: new Date(Date.now() - minutesAgo * 60_000).toISOString(),
 })
@@ -20,6 +20,13 @@ describe('groupNotifications', () => {
   it('pm/system rows never group', () => {
     const g = groupNotifications([row('1', 'pm', {}), row('2', 'system', {})])
     expect(g.length).toBe(2)
+  })
+  it('a new row raises the dot; only an explicit read removes it', () => {
+    const unread = groupNotifications([row('1', 'like', { post_id: 'p' }, 0, 0)])
+    expect(unread[0].unread).toBe(1)
+    expect(groupNotifications([row('1', 'like', { post_id: 'p' }, 0, 1)])[0].unread).toBe(0)
+    // '0' is not a read — Boolean('0') used to swallow the row's dot.
+    expect(groupNotifications([row('1', 'like', { post_id: 'p' }, 0, '0')])[0].unread).toBe(1)
   })
 })
 

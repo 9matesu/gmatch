@@ -4,7 +4,7 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import { Heart, Flag, X, CornerDownRight } from 'lucide-react';
 import { playMsgReceive } from '../../utils/sounds';
 import { resolveMediaUrl } from '../../utils/media';
-import { formatAbsoluteTime, timeAgo } from '../../utils/timeAgo';
+import { timeAgo } from '../../utils/timeAgo';
 import { Linkify } from '../Linkify';
 import type { FeedPost, PostComment } from './GMatchFeed';
 
@@ -22,8 +22,6 @@ export function PostComments({
   post,
   comments = [],
   commentsLoading = false,
-  authorAvatar = '',
-  onAuthorClick,
   onCommentAuthorClick,
   onAddComment,
   onToggleCommentLike,
@@ -33,9 +31,7 @@ export function PostComments({
   post: FeedPost;
   comments?: PostComment[];
   commentsLoading?: boolean;
-  authorAvatar?: string;
-  onAuthorClick?: () => void;
-  /** Open the commenter's profile (per-comment, not the post author). */
+  /** Open the commenter's profile. */
   onCommentAuthorClick?: (authorId: string) => void;
   onAddComment?: (postId: string, text: string, parentCommentId?: string | null) => void;
   onToggleCommentLike?: (postId: string, commentId: string) => void;
@@ -168,45 +164,8 @@ export function PostComments({
 
   return (
     <>
-      {/* Comments Stream (Original Caption + Real Comments) */}
+      {/* Comments Stream — the post body is shown ONCE, above this thread. */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 max-h-[300px] md:max-h-[420px] select-text">
-        {/* Caption item */}
-        {post.caption && (
-          <div className="flex items-start gap-3 pb-3 border-b border-edge">
-            <button
-              type="button"
-              onClick={onAuthorClick}
-              aria-label={onAuthorClick ? `View ${post.author_name || 'author'}'s profile` : undefined}
-              className="w-8 h-8 rounded-full bg-surface-interactive overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold text-retro-fg enabled:cursor-pointer"
-            >
-              {authorAvatar ? (
-                <img src={authorAvatar} alt="" className="w-full h-full object-cover" />
-              ) : (
-                post.author_name.charAt(0).toUpperCase()
-              )}
-            </button>
-            <div className="flex-1 min-w-0">
-              <span className="text-xs font-extrabold text-retro-fg mr-1.5">{post.author_name}</span>
-              <Linkify text={post.caption} linkClassName="text-xs text-retro-body leading-relaxed underline break-all" />
-
-              {/* Clickable Tags */}
-              {post.tags && post.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-1.5">
-                  {post.tags.map((t) => (
-                    <span key={t} className="text-xs font-semibold text-retro-accent hover:underline cursor-pointer">
-                      #{t.replace(/^#/, '')}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              <span className="text-2xs text-retro-muted font-medium block mt-1">
-                {formatAbsoluteTime(post.created_at, { dateStyle: 'short' }) || 'Recent'}
-              </span>
-            </div>
-          </div>
-        )}
-
         {/* Comments List — parents with their replies folded beneath */}
         {topLevel.map((c) => (
           <Fragment key={c.id}>

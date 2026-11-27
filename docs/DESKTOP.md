@@ -300,10 +300,14 @@ the bytes that are actually served, so the published hash is never hand-typed.
 
 ## Admin console in the exe
 
-Host-mode installs show the admin passcode in Settings → Server
-(click-to-copy; `electron/admin-pin.cjs`). Trust argument (in the file
-header): whoever can read `userData` already owns the sqlite, so the PIN
-keeps casual LAN visitors out, not the disk owner.
+Host-mode installs keep only a salted scrypt hash in `userData/admin-pin.hash`
+(`electron/admin-pin.cjs`); `apiSidecar.cjs` injects it as `ADMIN_PIN_HASH`, so
+no plaintext PIN is written to disk or shown in the renderer. The first
+identity this install loads owns the node (`userData/admin-owner.json`, also
+read live by `/verify-pin`); only that identity gets the Admin button, and
+Settings → Account & Security shows a status badge. Trust argument: whoever
+can read `userData` already owns the sqlite, so the PIN keeps casual LAN
+visitors out, not the disk owner.
 
 ## Troubleshooting quick table
 

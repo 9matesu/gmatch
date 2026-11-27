@@ -1,23 +1,22 @@
 "use client";
 
-// One row for every server in the Browser: the node running on this machine,
-// directory destinations, and the official gMatch Central entry. Identity leads,
-// infrastructure is a second line, and a row carries exactly one action
-// (join / switch — clicking the row) plus its contextual menu. Behaviour stays
-// in ServersView: this file owns layout, the vocabulary (P2P, Current /
-// Connecting / Unavailable) and the two format helpers the row needs. A row
-// never claims reachability it has not measured.
+// One row in the technical server browser. The columns are data the node
+// actually reported: status (measured here), address (a privacy-safe hostname,
+// never a raw IP), players (host-reported counts, or nothing) and ping (an
+// honest dash — this node exposes no latency metric). The row's only click
+// target joins or switches; the active row is inert. Everything else lives
+// behind the one menu, shared with the right-click actions in ServersView.
 //
-// SURFACE + TYPOGRAPHY: the tile, its menu, the status dot and every text step
-// come from ui/tokens. No per-call colour, radius, shadow, text-size or weight.
+// SURFACE + TYPOGRAPHY: the grid slots, status dot and every text step come
+// from ui/tokens. No per-call colour, radius, shadow, text-size or weight.
 import { Loader2, Lock, MoreVertical } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { serverKey, type DirectoryServer } from './directoryMerge'
-import { worldAccentStyle, worldGlyph, worldTileStyle } from './worldIdentity'
+import { worldGlyph, worldTileStyle } from './worldIdentity'
 import {
-  classes, CHROME, COLOR, GAP, ICON, MONO, PADDING_X, PADDING_Y,
+  classes, CHROME, COLOR, GAP, ICON, MONO, MOTION, PADDING_X, PADDING_Y,
   PRESENCE, RADIUS, SHADOW, STATUS, TRACKING, TRANSITION,
-  TYPE, WEIGHT, MOTION,
+  TYPE, WEIGHT,
 } from '../../ui/tokens'
 
 export interface WorldRowState {
@@ -27,9 +26,9 @@ export interface WorldRowState {
   kind?: 'P2P'
   /** Status word for the row. Omitted when the row is simply selectable. */
   status?: 'Current' | 'Connecting' | 'Unavailable'
-  /** Right-aligned figure, only when real numbers back it (never a placeholder). */
+  /** Right-aligned player figure, only when real numbers back it. */
   counts?: string | null
-  /** Secondary line: description · domain · listed 2h ago. Hidden when empty. */
+  /** Secondary line: what the world is, never its address (that owns a column). */
   meta?: string
 }
 
@@ -44,6 +43,22 @@ const STATUS_TONE: Record<NonNullable<WorldRowState['status']>, string> = {
   Connecting: PRESENCE.connectingText,
   Unavailable: PRESENCE.idleText,
 }
+
+/** The node reports no round-trip time — its only `/ping` route is an owner
+ *  heartbeat that refreshes a listing. A dash is an honest absence, never a
+ *  fabricated number. */
+const UNMEASURED = '—'
+
+/** Column slots shared by the browser's header strip and every row, so
+ *  server / address / players / ping line up down the list. Layout only: the
+ *  values here are alignment, not colour, type or spacing design values. */
+export const BROWSER_COLUMNS = {
+  server: 'min-w-0 flex-1',
+  address: 'hidden w-28 shrink-0 truncate sm:block',
+  players: 'hidden w-28 shrink-0 truncate text-right sm:block',
+  ping: 'hidden w-10 shrink-0 text-right sm:block',
+  actions: 'flex w-14 shrink-0 items-center justify-end',
+} as const
 
 export function formatDomain(hint?: string | null): string {
   if (!hint) return ''
@@ -98,55 +113,73 @@ export function WorldRow({
   const status = state.status
   const current = status === 'Current'
   const key = serverKey(server)
-  const body = (
+  const address = formatDomain(server.endpoint_hint)
+
+  const columns = (
     <>
-      {/* World identity: a deterministic colour + glyph so two worlds are
-          recognisable at a glance. It is chrome, never a reachability claim —
-          the measured status is the dot on the tile's corner. */}
-      <span className="relative shrink-0" aria-hidden>
-        <span
-          className={classes(
-            'flex size-9 items-center justify-center border',
-            RADIUS.control, TYPE.sub, WEIGHT.bold, COLOR.fgSoft, SHADOW.inset,
-          )}
-          style={worldTileStyle(key)}
-        >
-          {worldGlyph(server.name)}
-        </span>
-        <span
-          className={classes(
-            'absolute -bottom-0.5 -right-0.5 size-2.5 ring-2 ring-retro-bg',
-            RADIUS.pill, status ? DOT[status] : PRESENCE.idleDot,
-          )}
-        />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className={classes('flex min-w-0 items-baseline', GAP[2])}>
-          <span className={classes('truncate', TYPE.sub, WEIGHT.semibold, COLOR.fg, COLOR.hoverAccent, TRANSITION.micro)}>
-            {server.name}
+      <span className={classes('flex min-w-0 items-center', GAP[2.5], BROWSER_COLUMNS.server)}>
+        {/* Deterministic glyph so two worlds are recognisable at a glance. It
+            is chrome, never a reachability claim — status is the dot below. */}
+        <span className="relative shrink-0" aria-hidden>
+          <span
+            className={classes(
+              'flex size-9 items-center justify-center border',
+              RADIUS.control, TYPE.sub, WEIGHT.bold, COLOR.fgSoft, SHADOW.inset,
+            )}
+            style={worldTileStyle(key)}
+          >
+            {worldGlyph(server.name)}
           </span>
-          {state.kind && (
-            <span className={classes('shrink-0 uppercase', TYPE.caption, TRACKING.wider, COLOR.muted)}>{state.kind}</span>
-          )}
-          {status && (
-            <span
-              data-testid={status === 'Connecting' ? `connecting-${server.id}` : undefined}
-              className={classes('flex shrink-0 items-center uppercase', GAP[1], TYPE.caption, TRACKING.wider, STATUS_TONE[status])}
-            >
-              {status === 'Connecting' && <Loader2 className={classes(ICON.sm, 'animate-spin')} aria-hidden />}
-              {status}
-            </span>
-          )}
-          {!!server.password_required && (
-            <Lock className={classes(ICON.sm, COLOR.muted)} aria-label="password required" />
-          )}
-          {!!server.is_private && (
-            <span className={classes('shrink-0 uppercase', TYPE.caption, TRACKING.wider, COLOR.muted)}>private</span>
-          )}
+          <span
+            className={classes(
+              'absolute -bottom-0.5 -right-0.5 size-2.5 ring-2 ring-retro-bg',
+              RADIUS.pill, status ? DOT[status] : PRESENCE.idleDot,
+            )}
+          />
         </span>
-        {state.meta ? (
-          <span className={classes('mt-0.5 block truncate', TYPE.caption, COLOR.muted)}>{state.meta}</span>
-        ) : null}
+        <span className="min-w-0 flex-1">
+          <span className={classes('flex min-w-0 items-baseline', GAP[2])}>
+            <span className={classes('truncate', TYPE.sub, WEIGHT.semibold, COLOR.fg, COLOR.hoverAccent, TRANSITION.micro)}>
+              {server.name}
+            </span>
+            {state.kind && (
+              <span className={classes('shrink-0 uppercase', TYPE.caption, TRACKING.wider, COLOR.muted)}>{state.kind}</span>
+            )}
+            {status && (
+              <span
+                data-testid={status === 'Connecting' ? `connecting-${server.id}` : undefined}
+                className={classes('flex shrink-0 items-center uppercase', GAP[1], TYPE.caption, TRACKING.wider, STATUS_TONE[status])}
+              >
+                {status === 'Connecting' && <Loader2 className={classes(ICON.sm, 'animate-spin')} aria-hidden />}
+                {status}
+              </span>
+            )}
+            {!!server.password_required && (
+              <Lock className={classes(ICON.sm, COLOR.muted)} aria-label="password required" />
+            )}
+            {!!server.is_private && (
+              <span className={classes('shrink-0 uppercase', TYPE.caption, TRACKING.wider, COLOR.muted)}>private</span>
+            )}
+          </span>
+          {state.meta ? (
+            <span className={classes('mt-0.5 block truncate', TYPE.caption, COLOR.muted)}>{state.meta}</span>
+          ) : null}
+        </span>
+      </span>
+      <span
+        className={classes(BROWSER_COLUMNS.address, MONO, TYPE.caption, address ? COLOR.fgSoft : COLOR.faint)}
+        title={address || 'No public address reported by this node'}
+      >
+        {address || UNMEASURED}
+      </span>
+      <span
+        className={classes(BROWSER_COLUMNS.players, MONO, TYPE.caption, state.counts ? COLOR.fgSoft : COLOR.faint)}
+        title={state.counts || 'No player counts reported by this node'}
+      >
+        {state.counts || UNMEASURED}
+      </span>
+      <span className={classes(BROWSER_COLUMNS.ping, MONO, TYPE.caption, COLOR.faint)} title="This node reports no latency measurement">
+        {UNMEASURED}
       </span>
     </>
   )
@@ -154,30 +187,21 @@ export function WorldRow({
   return (
     <li
       className={classes(
-        'group relative flex items-center', PADDING_Y[2.5], PADDING_X[4], PADDING_X[3],
-        GAP[3], TRANSITION.micro, current ? COLOR.glassW8 : COLOR.hoverW5,
+        'group relative flex items-center', PADDING_Y[2.5], PADDING_X[3],
+        GAP[2], TRANSITION.micro, current ? COLOR.selectionBg : COLOR.hoverW5,
       )}
       aria-current={current || undefined}
       aria-busy={status === 'Connecting' || undefined}
       onContextMenu={onContextMenu}
     >
-      {/* The connected world keeps a colour rail so "where am I" never needs
-          reading a label. */}
-      {current && (
-        <span
-          aria-hidden
-          className={classes('absolute inset-y-1.5 left-0 w-0.5', RADIUS.pill)}
-          style={worldAccentStyle(key)}
-        />
-      )}
       {current ? (
         <span
           data-world-row-focus
           tabIndex={-1}
           aria-label={`${server.name}, current server`}
-          className={classes('flex min-w-0 flex-1 items-center focus-visible:outline-none', GAP[2.5], RADIUS.chip)}
+          className={classes('flex min-w-0 flex-1 items-center text-left', GAP[2], RADIUS.chip)}
         >
-          {body}
+          {columns}
         </span>
       ) : (
         <button
@@ -188,21 +212,20 @@ export function WorldRow({
           aria-label={`Connect to ${server.name}`}
           className={classes(
             'flex min-w-0 flex-1 items-center text-left cursor-pointer focus-visible:outline-none focus-visible:ring-1 disabled:opacity-70',
-            GAP[2.5], RADIUS.chip, COLOR.focusRing,
+            GAP[2], RADIUS.chip, COLOR.focusRing,
             status === 'Connecting' ? 'disabled:cursor-wait' : 'disabled:cursor-not-allowed',
           )}
         >
-          {body}
+          {columns}
         </button>
       )}
 
-      <div className={classes('flex shrink-0 items-center', GAP[2])}>
-        {/* Fixed slot so the ⋯ column lines up down the list, whether or not a
-            row has a figure the server actually reported. */}
-        <span className={classes('hidden sm:inline-block w-28 text-right', TYPE.caption, MONO, COLOR.muted)}>
-          {state.counts ?? ''}
-        </span>
-
+      <div className={classes(BROWSER_COLUMNS.actions, GAP[1])}>
+        {!current && (
+          <span aria-hidden className={classes('hidden uppercase', TYPE.caption, TRACKING.wider, COLOR.muted, 'sm:inline')}>
+            join
+          </span>
+        )}
         <div className="relative">
           <button
             type="button"

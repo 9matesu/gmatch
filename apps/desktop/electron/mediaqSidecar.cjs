@@ -68,9 +68,11 @@ async function startMediaq({ mediaqBin, onLog }) {
   throw new Error('mediaq did not answer /health in time')
 }
 
+/** Stop the server WE started. Returns { stopped } so IPC can report the truth:
+ *  an adopted server (healthy on boot, no child here) is not ours to kill. */
 function stopMediaq() {
   intentionalStop = true
-  if (!proc) return
+  if (!proc) return { stopped: false }
   const pid = proc.pid
   try {
     if (process.platform === 'win32' && pid) {
@@ -90,6 +92,7 @@ function stopMediaq() {
     /* already dead */
   }
   proc = null
+  return { stopped: true }
 }
 
 process.on('exit', () => stopMediaq())

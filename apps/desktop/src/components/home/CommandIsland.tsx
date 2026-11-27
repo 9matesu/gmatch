@@ -545,9 +545,8 @@ export function CommandIsland({
               <span className="text-xs hidden xl:inline">Community</span>
             </button>
 
-            {/* Admin: host mode or a node that says this identity administers
-                it. The PIN verify inside the panel is the real boundary — this
-                only keeps dead navigation away from non-admins. */}
+            {/* Admin: only this install's owner identity sees the door. The
+                PIN verify inside the panel remains the security boundary. */}
             {showAdmin && (
               <button
                 type="button"

@@ -6,6 +6,7 @@ import { playChatMessage, resetChatSfx } from '../utils/sounds'
 import { MessageSquare, ChevronUp, ChevronDown, Send } from 'lucide-react';
 import { formatAbsoluteTime } from '../utils/timeAgo'
 import { Linkify } from './Linkify';
+import { CHAT, classes } from '../ui/tokens';
 
 interface Props {
   matchId: string
@@ -90,11 +91,11 @@ export function MatchChat({ matchId, selfId, messages, onSend, onLoad, soundEnab
                 return (
                   <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
                     <div
-                      className={`max-w-[85%] px-3 py-1.5 rounded-xl text-xs shadow-xs select-text ${
-                        mine
-                          ? 'bg-retro-accent text-retro-accent-text rounded-br-xs'
-                          : 'bg-surface-interactive text-retro-fg border border-edge rounded-bl-xs'
-                      }`}
+                      className={classes(
+                        CHAT.bubbleShape,
+                        'max-w-[85%] px-3 py-1.5 text-xs',
+                        mine ? CHAT.fillOwn : CHAT.fillOther,
+                      )}
                     >
                       {!mine && (
                         <div className="text-2xs font-bold text-retro-muted uppercase tracking-wider mb-0.5 select-none">
@@ -122,7 +123,7 @@ export function MatchChat({ matchId, selfId, messages, onSend, onLoad, soundEnab
                 }
               }}
               placeholder="Send a message to your opponent..."
-              className="flex-1 bg-surface-interactive border border-edge text-retro-fg placeholder:text-retro-muted text-xs px-3 py-1.5 rounded-xl outline-none focus:border-chrome-lav transition-colors"
+              className="flex-1 bg-surface-interactive border border-edge text-retro-fg placeholder:text-retro-muted text-xs px-3 py-1.5 rounded-xl outline-none focus:border-retro-accent transition-colors"
             />
             <button
               type="button"

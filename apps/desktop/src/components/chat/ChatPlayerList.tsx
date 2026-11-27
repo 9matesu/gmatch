@@ -11,6 +11,7 @@ import { usePresence } from '../../game/presenceStore';
 import { usePresencePoll } from '../../hooks/usePresencePoll';
 import { swarmTransportLabel } from '../../hooks/useP2P';
 import { FeedbackState } from '../../ui/kit';
+import { classes } from '../../ui/tokens';
 
 export interface ChatPlayerItem {
   id: string;
@@ -32,6 +33,10 @@ export interface ChatPlayerListProps {
   /** Why invites are unavailable on this node. Never null on a blind courier,
    *  so the button explains itself instead of 404-ing. */
   inviteUnavailableReason?: string | null;
+  /** When true the list body is hidden and the header stays as the toggle. */
+  collapsed?: boolean;
+  /** Toggle the collapsed state from the Players header label. */
+  onToggleCollapse?: () => void;
 }
 
 function formatRelativeTime(iso?: string | null): string {
@@ -60,6 +65,8 @@ export function ChatPlayerList({
   onMessagePlayer,
   onInvitePlayer,
   inviteUnavailableReason = null,
+  collapsed = false,
+  onToggleCollapse,
 }: ChatPlayerListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   // Presence now lives in one app-wide store fed by one ref-counted poll, so
@@ -219,26 +226,41 @@ export function ChatPlayerList({
 
   return (
     <div className="h-full min-h-0 flex flex-col select-none overflow-hidden" data-testid="chat-player-list">
-      {/* Header */}
-      <div className="p-3 sm:p-4 border-b border-edge flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2 min-w-0">
+      {/* Header — the Players label with its icon is the collapse toggle. When
+          collapsed the column shrinks to the icon, so the label and counts hide. */}
+      <div className={classes('border-b border-edge flex items-center shrink-0', collapsed ? 'p-3 justify-center' : 'p-3 sm:p-4 justify-between')}>
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          disabled={!onToggleCollapse}
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? 'Expand players' : 'Collapse players'}
+          title={collapsed ? 'Expand players' : 'Collapse players'}
+          className="flex items-center gap-2 min-w-0 cursor-pointer disabled:cursor-default text-left"
+        >
           <Users className="w-4 h-4 text-retro-muted shrink-0" />
-          <h2 className="font-semibold text-sm text-retro-fg truncate">
-            Players
-          </h2>
-        </div>
-        <div className="flex items-center gap-1.5 text-xs font-mono shrink-0">
-          <span className="flex items-center gap-1 text-retro-online font-medium">
-            <span className="w-2 h-2 rounded-full bg-retro-online inline-block" />
-            {displayOnlineCount}
-          </span>
-          <span className="text-retro-muted">/</span>
-          <span className="text-retro-muted" title="Total active in the last 24 hours">
-            {displayActiveCount} 24h
-          </span>
-        </div>
+          {!collapsed && (
+            <h2 className="font-semibold text-sm text-retro-fg truncate">
+              Players
+            </h2>
+          )}
+        </button>
+        {!collapsed && (
+          <div className="flex items-center gap-1.5 text-xs font-mono shrink-0">
+            <span className="flex items-center gap-1 text-retro-online font-medium">
+              <span className="w-2 h-2 rounded-full bg-retro-online inline-block" />
+              {displayOnlineCount}
+            </span>
+            <span className="text-retro-muted">/</span>
+            <span className="text-retro-muted" title="Total active in the last 24 hours">
+              {displayActiveCount} 24h
+            </span>
+          </div>
+        )}
       </div>
 
+      {!collapsed && (
+        <>
       {/* Quick Search */}
       <div className="p-2.5 border-b border-edge shrink-0">
         <div className="flex items-center gap-2 bg-surface-raised border border-edge rounded-md px-2.5 py-1.5 text-xs text-retro-body">
@@ -372,6 +394,8 @@ export function ChatPlayerList({
           })
         )}
       </div>
+        </>
+      )}
     </div>
   );
 }

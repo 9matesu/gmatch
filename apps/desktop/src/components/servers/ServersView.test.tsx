@@ -101,6 +101,33 @@ describe('ServersView', () => {
     expect(screen.queryByRole('button', { name: /online \(/i })).toBeNull()
   })
 
+  it('renders a compact technical browser: status, address, players and an honest ping column', async () => {
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers')) return json({ servers: [
+        { id: 'tech', name: 'Tech Node', description: '', owner_id: 'o', password_required: 0, endpoint_hint: 'tech.example:8790', online_count: 3, user_count: 12, last_seen: 'x' },
+        { id: 'quiet', name: 'Quiet Node', description: '', owner_id: 'o', password_required: 0, endpoint_hint: '192.168.0.9:8790', last_seen: 'x' },
+      ] })
+      return json({})
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    await screen.findByText('Tech Node')
+
+    // One column strip, using the same slots as every row — never a second list.
+    for (const label of ['Server', 'Address', 'Players', 'Ping', 'Action']) {
+      expect(screen.getByText(label)).toBeInTheDocument()
+    }
+    expect(screen.getAllByRole('list', { name: 'Servers' })).toHaveLength(1)
+
+    const tech = rowOf('Tech Node')
+    expect(within(tech).getByText('tech.example:8790')).toBeInTheDocument()
+    expect(within(tech).getByText('3 online · 12 members')).toBeInTheDocument()
+    // The node measures no latency: a dash, never an invented ping number.
+    expect(within(tech).queryByText(/\d+\s*ms/)).toBeNull()
+    // Raw IPs stay out of the browser even though the row owns an address column.
+    expect(screen.queryByText(/192\.168/)).toBeNull()
+  })
+
   it('keeps one row per server and never duplicates the same address', async () => {
     const ownId = (identity as unknown as { orbitId: string }).orbitId
     stubLocalStorage({ 'gmatch.central.url': 'https://central.test', 'gmatch.api.url': 'https://world.test:8790' })
@@ -704,7 +731,7 @@ describe('ServersView', () => {
 
   it('create drawer previews the node handle before creating and offers a private toggle', async () => {
     ;(window as unknown as { gmatch?: unknown }).gmatch = {
-      serverState: async () => ({ packaged: true, mode: 'client', url: 'https://central.test', lanUrls: ['http://192.168.0.42:8790'], adminPin: 'abcd1234' }),
+      serverState: async () => ({ packaged: true, mode: 'client', url: 'https://central.test', lanUrls: ['http://192.168.0.42:8790'] }),
       serverSet: async () => ({ ok: true }),
       serverRelaunch: () => {},
     }
@@ -825,12 +852,10 @@ describe('ServersView', () => {
     })
   })
 
-  it('shows the admin passcode once on first host login and never again after dismiss', async () => {
+  it('never renders an admin passcode on the Servers page', async () => {
     ;(window as unknown as { gmatch?: unknown }).gmatch = {
-      serverState: async () => ({ packaged: true, mode: 'host', url: 'http://127.0.0.1:8790', lanUrls: [], adminPin: 'beefcafe' }),
+      serverState: async () => ({ packaged: true, mode: 'host', url: 'http://127.0.0.1:8790', lanUrls: [] }),
     }
-    // orbitFetch's 3s GET cache would leak a prior test's isAdmin:false —
-    // bypass it with a direct spy (same idiom as the tabs test above).
     const orbitApi = await import('../../utils/api')
     const spy = vi.spyOn(orbitApi, 'orbitFetch').mockImplementation(async (endpoint: string, _init?: RequestInit) => {
       const e = String(endpoint)
@@ -838,12 +863,6 @@ describe('ServersView', () => {
       if (e.includes('/api/servers/node')) return json({ name: 'My Realm', description: '', isAdmin: true })
       return json({ servers: [] })
     })
-    const { unmount } = render(<ServersView identity={identity} toast={() => {}} />)
-    const banner = await screen.findByTestId('admin-pin-banner')
-    expect(banner.textContent).toContain('beefcafe')
-    fireEvent.click(screen.getByRole('button', { name: /got it/i }))
-    expect(screen.queryByTestId('admin-pin-banner')).toBeNull()
-    unmount()
     render(<ServersView identity={identity} toast={() => {}} />)
     await screen.findByText('My Realm')
     expect(screen.queryByTestId('admin-pin-banner')).toBeNull()

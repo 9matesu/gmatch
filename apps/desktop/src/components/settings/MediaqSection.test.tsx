@@ -17,6 +17,8 @@ function stubBridge(over: Record<string, unknown> = {}) {
     mediaqInstall: vi.fn(async () => ({ ok: true, bin: 'mediaq' })),
     mediaqCancel: vi.fn(async () => ({ ok: true })),
     mediaqStart: vi.fn(async () => ({ ok: true, base: 'http://127.0.0.1:8765' })),
+    mediaqStop: vi.fn(async () => ({ ok: true, running: false, stopped: true })),
+    mediaqRestart: vi.fn(async () => ({ ok: true, base: 'http://127.0.0.1:8765' })),
     onMediaqProgress: vi.fn(() => () => {}),
     ...over,
   }
@@ -71,11 +73,55 @@ describe('MediaqSection', () => {
   })
 
   it('can start an installed server that is not running', async () => {
-    const g = stubBridge({ mediaqStatus: vi.fn(async () => ({ installed: true, running: false, base: 'x' })) })
+    let started = false
+    const g = stubBridge({
+      mediaqStatus: vi.fn(async () => ({ installed: true, running: started, base: 'x' })),
+      mediaqStart: vi.fn(async () => { started = true; return { ok: true, base: 'x' } }),
+    })
     await renderSection()
     fireEvent.click(await screen.findByRole('button', { name: /start media suite/i }))
     await waitFor(() => expect(g.mediaqStart).toHaveBeenCalledTimes(1))
+    // "Running" comes from a fresh probe, never from the click alone.
     expect(await screen.findByText(/installed and running/i)).toBeTruthy()
+  })
+
+  it('distinguishes installed from running (never claims a stopped server is ready)', async () => {
+    stubBridge({ mediaqStatus: vi.fn(async () => ({ installed: true, running: false, base: 'x' })) })
+    await renderSection()
+    expect(await screen.findByText(/installed\. start the local server/i)).toBeTruthy()
+    expect(screen.queryByText(/installed and running/i)).toBeNull()
+  })
+
+  it('can stop and restart a running server from Settings', async () => {
+    const g = stubBridge({ mediaqStatus: vi.fn(async () => ({ installed: true, running: true, base: 'x' })) })
+    await renderSection()
+    fireEvent.click(await screen.findByRole('button', { name: /stop media suite/i }))
+    await waitFor(() => expect(g.mediaqStop).toHaveBeenCalledTimes(1))
+    fireEvent.click(await screen.findByRole('button', { name: /restart media suite/i }))
+    await waitFor(() => expect(g.mediaqRestart).toHaveBeenCalledTimes(1))
+  })
+
+  it('reports a failed start with its real reason', async () => {
+    const g = stubBridge({
+      mediaqStatus: vi.fn(async () => ({ installed: true, running: false, base: 'x' })),
+      mediaqStart: vi.fn(async () => ({ ok: false, error: 'spawn ENOENT' })),
+    })
+    const toast = vi.fn()
+    await renderSection({ toast })
+    fireEvent.click(await screen.findByRole('button', { name: /start media suite/i }))
+    await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringMatching(/spawn ENOENT/), 'error'))
+    expect(g.mediaqStart).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports a stop that did not take effect instead of claiming success', async () => {
+    stubBridge({
+      mediaqStatus: vi.fn(async () => ({ installed: true, running: true, base: 'x' })),
+      mediaqStop: vi.fn(async () => ({ ok: false, running: true, error: 'still-running' })),
+    })
+    const toast = vi.fn()
+    await renderSection({ toast })
+    fireEvent.click(await screen.findByRole('button', { name: /stop media suite/i }))
+    await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringMatching(/still running/i), 'warning'))
   })
 
   it('degrades honestly without the desktop bridge', async () => {

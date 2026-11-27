@@ -13,8 +13,9 @@
 //   address never leaves the machine (mDNS `.local` hosts only). `srflx`
 //   candidates ARE exchanged: without them cross-NAT peers can never meet,
 //   and a reflexive address is exactly what any direct connection reveals.
-// - `relay` candidates carry the TURN server's address, not yours; with TURN
-//   configured the whole connection is forced through it (zero exposure).
+// - `relay` candidates carry the TURN server's address, not yours. An explicit
+//   TURN (env / Settings) forces the whole connection through it (zero exposure);
+//   the baked public default only adds a relay candidate, direct still wins.
 // - peerConnectionConfig() is the single source of truth for both the
 //   file-transfer peer (webrtc.ts) and the payload relay (removed).
 
@@ -120,28 +121,33 @@ export function turnCredentials(env: Record<string, string | undefined> = {}): {
 }
 
 /**
- * TURN is opt-in (user setup): NEXT_PUBLIC_TURN_URL/USERNAME/CREDENTIAL.
- * No community relay creds are baked into the bundle — the old defaultTurn()
- * shipped a hardcoded third-party OpenRelay credential the user never chose
- * (and that could not be removed by config). Returns null when nothing is
- * configured; the caller then uses STUN-only.
+ * Baked public TURN with shared credentials so cross-NAT works out of the box
+ * in packaged builds (no injected env). Third-party and rate-limited: env /
+ * Settings TURN still wins, and only an explicit choice forces relay.
  */
-export function effectiveTurn(env: Record<string, string | undefined> = {}): { url: string; username: string; credential: string } | null {
-  return turnCredentials(env)
+export function defaultTurn(): { url: string; username: string; credential: string } {
+  return { url: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' }
+}
+
+/** TURN for a connection: explicit env/Settings first, baked public default otherwise. */
+export function effectiveTurn(env: Record<string, string | undefined> = {}): { url: string; username: string; credential: string } {
+  return turnCredentials(env) ?? defaultTurn()
 }
 
 /**
  * The config both P2P stacks use. Two modes (SPEC §10c semantics):
- * - explicit NEXT_PUBLIC_TURN_* env → relay-forced, zero IP exposure posture.
- * - otherwise → STUN (Cloudflare): LAN pairs meet via mDNS hosts, cross-NAT
- *   pairs hole-punch through the exchanged reflexive candidates; symmetric-
- *   NAT pairs (STUN can't traverse) fall back to the WS-relay swarm. Literal
+ * - explicit NEXT_PUBLIC_TURN_* env or Settings TURN → relay-forced, zero IP
+ *   exposure posture.
+ * - otherwise → STUN (Cloudflare) + the baked public TURN as CANDIDATES, no
+ *   forced transport: LAN pairs meet via mDNS hosts, cross-NAT pairs hole-punch
+ *   through reflexive candidates or fall back to TURN, and a relay outage
+ *   cannot take all P2P down (WS-relay swarm is the last fallback). Literal
  *   LAN IPs are never signaled — the mDNS host gate stays on either way.
  */
 export function defaultIceConfig(env: Record<string, string | undefined> = {}): RTCConfiguration {
-  const envTurn = turnCredentials(env)
-  if (envTurn) return peerConnectionConfig(envTurn)
-  return peerConnectionConfig(null)
+  const userTurn = turnCredentials(env)
+  if (userTurn) return peerConnectionConfig(userTurn)
+  return { ...peerConnectionConfig(null), iceServers: iceServersFor(defaultTurn()) }
 }
 
 /** ICE server list: STUN always; TURN only when configured. */

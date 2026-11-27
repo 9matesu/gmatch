@@ -1,24 +1,23 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* Geist (OFL) is bundled: the app renders the same face offline, with no CDN
-   request on a cold start. One variable file per subset, weight 100-900. */
+/* Switzer (ITF Free Font License) is bundled: the app renders the same face
+   offline, with no CDN request on a cold start. One variable file per style,
+   weight 100-900. License ships at public/legal/ITF-FFL.txt. */
 @font-face {
-  font-family: 'Geist';
+  font-family: 'Switzer';
   font-style: normal;
   font-weight: 100 900;
   font-display: swap;
-  src: url('/fonts/geist-latin-ext.woff2') format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+  src: url('/fonts/switzer-latin.woff2') format('woff2');
 }
 
 @font-face {
-  font-family: 'Geist';
-  font-style: normal;
+  font-family: 'Switzer';
+  font-style: italic;
   font-weight: 100 900;
   font-display: swap;
-  src: url('/fonts/geist-latin.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  src: url('/fonts/switzer-latin-italic.woff2') format('woff2');
 }
 
 @custom-variant dark (&:is(.dark *));
@@ -123,11 +122,18 @@
      the header, onboarding and the pre-bundle splash show the same lockup. */
   --logo-mark-size: 1.25rem;
   --logo-mark-size-sm: 1rem;
-  --logo-mark-size-hero: 3rem;
+  --logo-mark-size-hero: 3.5rem;
   --logo-mark-min-size: 1rem;
   --logo-gap: 0.5rem;
   --logo-clear-space: 0.375rem;
   --logo-min-width: 5rem;
+  /* Hero wordmark and the boot splash share these steps: the mark is the only
+     asset, the name is live text at the top of the scale, and the status line
+     sits one deliberate step below it — one weight contrast, one hairline. */
+  --text-brand: 2rem;
+  --text-status: 0.9375rem;
+  --weight-brand: 900;
+  --boot-status-width: 14rem;
 
   /* Motion preset (ui/tokens.ts MOTION): the shell has three durations and one
      easing per direction. The orbit-* keyframes below read the SAME variables,
@@ -193,13 +199,13 @@
   --ring: #ffffff;
 
   /* Typography */
-  --font-sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-heading: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-sans: "Switzer", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-heading: "Switzer", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-roboto: Roboto, "Helvetica Neue", Arial, sans-serif;
   /* Mono retired (user directive 2026-10-17): `font-mono` now resolves to the
      sans face everywhere, so no chrome ships a monospace family. Numeric
      readouts stay aligned through `tabular-nums` (see ui/styles.ts MONO). */
-  --font-mono: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Switzer", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
   /* Radius scale (Concentric geometry) */
   /* Press feedback. 57 call sites hand-rolled scale-[0.98]/[0.96]/[0.99];
@@ -568,6 +574,200 @@
     rgba(248, 81, 73, 0.25) 50%,
     rgba(255, 215, 0, 0.30) 100%
   );
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Premium TCG card object
+   One frame, one foil, one plate, one art window, one stat row.
+   `--card-accent` is runtime card data (rarity / user payload) set by
+   GameCard; every quiet surface below reads an existing @theme role, so the
+   card keeps the shell's light/dark flip and never carries a second palette.
+   ────────────────────────────────────────────────────────────── */
+.tcg-card {
+  --card-accent: var(--color-rarity-gold);
+  position: relative;
+  isolation: isolate;
+  padding: var(--space-1);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--card-accent) 58%, #fff) 0%,
+    color-mix(in srgb, var(--card-accent) 26%, #000) 22%,
+    color-mix(in srgb, var(--card-accent) 86%, #fff) 44%,
+    color-mix(in srgb, var(--card-accent) 22%, #000) 66%,
+    color-mix(in srgb, var(--card-accent) 64%, #fff) 100%
+  );
+  box-shadow:
+    var(--shadow-panel),
+    inset 0 1px 0 rgba(255, 255, 255, 0.42),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55);
+}
+
+/* The hairline inside the metal is the second step of the bevel, not a glow. */
+.tcg-card::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  z-index: 4;
+  pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--card-accent) 48%, rgba(0, 0, 0, 0.55));
+  border-radius: var(--radius-md);
+}
+
+.tcg-card-inner {
+  position: relative;
+  z-index: 1;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--color-glass-strong);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    inset 0 2px 8px rgba(0, 0, 0, 0.65);
+}
+
+/* Foil is a fine diagonal lattice plus one soft sweep; the accent-tinted
+   lines are game material (holo foil), not shell chrome. */
+.tcg-foil {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    linear-gradient(
+      115deg,
+      transparent 12%,
+      rgba(255, 255, 255, 0.05) 32%,
+      rgba(255, 255, 255, 0.13) 46%,
+      rgba(255, 255, 255, 0.03) 60%,
+      transparent 78%
+    ),
+    repeating-linear-gradient(
+      60deg,
+      transparent 0 18px,
+      color-mix(in srgb, var(--card-accent) 15%, transparent) 18px 19px,
+      transparent 19px 38px
+    );
+  mix-blend-mode: screen;
+  opacity: 0.55;
+  transition: opacity 200ms ease;
+}
+
+@media (hover: hover) {
+  .holo-card:hover .tcg-foil {
+    opacity: 0.95;
+  }
+}
+
+/* Embossed nameplate: a beveled ribbon, highlight above / shade below. */
+.tcg-title-plate {
+  position: relative;
+  min-height: 22px;
+  padding: 2px var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--card-accent) 55%, var(--color-edge));
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--card-accent) 32%, var(--color-glass-strong)) 0%,
+    color-mix(in srgb, var(--card-accent) 10%, var(--color-glass-strong)) 52%,
+    color-mix(in srgb, var(--card-accent) 24%, var(--color-glass-strong)) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.26),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5);
+}
+
+.tcg-title-plate > span:first-child {
+  text-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.85),
+    0 -1px 0 color-mix(in srgb, var(--card-accent) 42%, transparent);
+}
+
+.tcg-title-gem {
+  width: 8px;
+  height: 8px;
+  transform: rotate(45deg);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--card-accent) 75%, #fff),
+    color-mix(in srgb, var(--card-accent) 48%, #000));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 0 0 1px rgba(0, 0, 0, 0.4);
+}
+
+.tcg-art-window {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 4.2;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--card-accent) 44%, var(--color-edge));
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-canvas);
+  box-shadow:
+    inset 0 0 0 2px rgba(0, 0, 0, 0.5),
+    inset 0 3px 8px rgba(0, 0, 0, 0.6);
+}
+
+.tcg-rarity-chip {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* No bytes anywhere: a woven lattice, a medallion and a faceted core. Pure
+   geometry — never a fabricated picture or a stand-in image request. */
+.tcg-card-back {
+  overflow: hidden;
+  background:
+    repeating-linear-gradient(
+      45deg,
+      transparent 0 9px,
+      color-mix(in srgb, var(--card-accent) 17%, transparent) 9px 10px,
+      transparent 10px 19px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      transparent 0 9px,
+      rgba(255, 255, 255, 0.05) 9px 10px,
+      transparent 10px 19px
+    ),
+    radial-gradient(
+      circle at 50% 50%,
+      color-mix(in srgb, var(--card-accent) 22%, var(--color-glass-strong)),
+      var(--color-surface-canvas) 72%
+    );
+}
+
+.tcg-card-back::before {
+  content: '';
+  position: absolute;
+  width: 52%;
+  aspect-ratio: 1;
+  border: 1px solid color-mix(in srgb, var(--card-accent) 58%, transparent);
+  border-radius: 50%;
+  box-shadow:
+    inset 0 0 0 6px rgba(0, 0, 0, 0.28),
+    inset 0 0 0 7px color-mix(in srgb, var(--card-accent) 34%, transparent);
+}
+
+.tcg-card-back-core {
+  position: relative;
+  width: 13%;
+  aspect-ratio: 1;
+  transform: rotate(45deg);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--card-accent) 80%, #fff),
+    color-mix(in srgb, var(--card-accent) 50%, #000));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    0 0 0 1px rgba(0, 0, 0, 0.45);
+}
+
+.tcg-stat-row {
+  padding: var(--space-1) var(--space-2);
+  border-top: 1px solid color-mix(in srgb, var(--card-accent) 26%, var(--color-edge));
+  border-radius: var(--radius-sm);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.18));
 }
 
 /* ──────────────────────────────────────────────────────────────

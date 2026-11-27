@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import {
-  ShieldAlert,
   FileCode,
   List,
-  Save,
   RotateCcw,
   Download,
   Upload,
@@ -31,30 +29,21 @@ interface BlocklistSectionProps {
 type EditorMode = 'visual' | 'json'
 type ActiveCategory = 'blocklist' | 'suggested' | 'noise'
 
-const CATEGORY_META: Record<
-  ActiveCategory,
-  { label: string; desc: string; color: string; badgeBg: string; commentKey: string }
-> = {
+const CATEGORY_META: Record<ActiveCategory, { label: string; desc: string; badgeBg: string }> = {
   blocklist: {
-    label: 'Hard Blocklist (blocklist)',
-    desc: 'Tags dropped at query origin and rejected by clicker feed filters.',
-    color: 'text-danger-fg',
+    label: 'Blocklist',
+    desc: 'Never shown in the feed.',
     badgeBg: 'bg-danger/10 text-danger-fg border-danger/30',
-    commentKey: '_comment_hard',
   },
   suggested: {
-    label: 'Suggested Excludes (suggested)',
-    desc: 'Polarising tags offered as one-tap excludes on setup and in Feed options.',
-    color: 'text-warning-fg',
+    label: 'Suggested',
+    desc: 'Offered as one-tap excludes.',
     badgeBg: 'bg-warning/10 text-warning-fg border-warning/30',
-    commentKey: '_comment_suggested',
   },
   noise: {
-    label: 'Noise Tags (noise)',
-    desc: 'Quality, meta, and watermarking tags excluded from tag rankings and card stats.',
-    color: 'text-info-fg',
+    label: 'Noise',
+    desc: 'Skipped in tag rankings.',
     badgeBg: 'bg-info/10 text-info-fg border-info/30',
-    commentKey: '_comment_noise',
   },
 }
 
@@ -66,7 +55,6 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
   const [jsonError, setJsonError] = useState<string | null>(null)
   const [searchFilter, setSearchFilter] = useState('')
   const [newTagInput, setNewTagInput] = useState('')
-  const [isSaving, setIsSaving] = useState(false)
   const [isCopied, setIsCopied] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   /** True once the first bridge sync resolved: before that, the panel must
@@ -76,6 +64,13 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
   /** The last state known to be ON DISK. An edit that does not differ from it
    *  is not written (opening the panel must not write anything). */
   const onDiskRef = useRef<string | null>(null)
+  /** An edit before the bridge read lands must not be overwritten by that read. */
+  const dirtyRef = useRef(false)
+  const applyData = (next: BlocklistData) => {
+    dirtyRef.current = true
+    setData(next)
+    setJsonText(JSON.stringify(next, null, 2))
+  }
 
   // Sync with main process / bridge on mount
   useEffect(() => {
@@ -84,8 +79,10 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
       .then((current) => {
         if (mounted && current) {
           onDiskRef.current = JSON.stringify(current)
-          setData(current)
-          setJsonText(JSON.stringify(current, null, 2))
+          if (!dirtyRef.current) {
+            setData(current)
+            setJsonText(JSON.stringify(current, null, 2))
+          }
         }
       })
       .catch(() => {})
@@ -166,7 +163,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
       toast?.('Cannot switch to visual mode while JSON has syntax errors.', 'error')
       return
     }
-    setData(parsed)
+    applyData(parsed)
     setMode('visual')
     playPress(800)
   }
@@ -201,9 +198,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
     }
 
     if (addedCount > 0) {
-      const updated = { ...data, [activeCategory]: currentList }
-      setData(updated)
-      setJsonText(JSON.stringify(updated, null, 2))
+      applyData({ ...data, [activeCategory]: currentList })
       toast?.(`Added ${addedCount} tag${addedCount === 1 ? '' : 's'} to ${activeCategory}.`, 'success')
       setNewTagInput('')
     } else {
@@ -216,16 +211,12 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
     const updatedList = currentList.filter(
       (t) => t.toLowerCase() !== tagToRemove.toLowerCase(),
     )
-    const updated = { ...data, [activeCategory]: updatedList }
-    setData(updated)
-    setJsonText(JSON.stringify(updated, null, 2))
+    applyData({ ...data, [activeCategory]: updatedList })
   }
 
   const clearCategory = () => {
     if (!window.confirm(`Are you sure you want to clear all tags in "${activeCategory}"?`)) return
-    const updated = { ...data, [activeCategory]: [] }
-    setData(updated)
-    setJsonText(JSON.stringify(updated, null, 2))
+    applyData({ ...data, [activeCategory]: [] })
     toast?.(`Cleared all tags in ${activeCategory}.`, 'info')
   }
 
@@ -235,6 +226,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
     setJsonText(val)
     const parsed = validateJson(val)
     if (parsed) {
+      dirtyRef.current = true
       setData(parsed)
     }
   }
@@ -242,9 +234,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
   const formatJson = () => {
     const parsed = validateJson(jsonText)
     if (parsed) {
-      const formatted = JSON.stringify(parsed, null, 2)
-      setJsonText(formatted)
-      setData(parsed)
+      applyData(parsed)
       toast?.('JSON formatted cleanly.', 'info')
     } else {
       toast?.('Cannot format invalid JSON.', 'error')
@@ -259,38 +249,6 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
     setTimeout(() => setIsCopied(false), 2000)
   }
 
-  // Save all changes
-  const handleSave = async () => {
-    setIsSaving(true)
-    playPress(900)
-    let payload = data
-    if (mode === 'json') {
-      const parsed = validateJson(jsonText)
-      if (!parsed) {
-        setIsSaving(false)
-        toast?.('Cannot save: fix JSON syntax errors first.', 'error')
-        return
-      }
-      payload = parsed
-    }
-
-    try {
-      const ok = await saveBlocklist(payload)
-      if (ok) {
-        onDiskRef.current = JSON.stringify(payload)
-        setData(payload)
-        setJsonText(JSON.stringify(payload, null, 2))
-        toast?.('blocklist.json saved and applied to active filters.', 'success')
-      } else {
-        toast?.('Failed to write blocklist.json.', 'error')
-      }
-    } catch (err: any) {
-      toast?.(`Error saving blocklist: ${err?.message || err}`, 'error')
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
   // Reset to factory defaults
   const handleReset = async () => {
     if (
@@ -303,8 +261,8 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
 
     try {
       const def = await resetBlocklist()
-      setData(def)
-      setJsonText(JSON.stringify(def, null, 2))
+      applyData(def)
+      onDiskRef.current = JSON.stringify(def)
       setJsonError(null)
       toast?.('blocklist.json restored to defaults.', 'success')
     } catch (err: any) {
@@ -339,9 +297,8 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
       const content = event.target?.result as string
       const parsed = validateJson(content)
       if (parsed) {
-        setData(parsed)
-        setJsonText(JSON.stringify(parsed, null, 2))
-        toast?.(`Loaded ${file.name}. Click "Save Changes" to apply.`, 'success')
+        applyData(parsed)
+        toast?.(`Loaded ${file.name}. Changes apply automatically.`, 'success')
       } else {
         toast?.(`Invalid JSON format in ${file.name}.`, 'error')
       }
@@ -360,60 +317,43 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
   }, [currentCategoryTags, searchFilter])
 
   return (
-    <div className="space-y-6 animate-orbit-fade-in">
-      {/* Header card */}
-      <div className="p-4 bg-surface-interactive border border-edge rounded-xl space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-danger/10 border border-danger/20 flex items-center justify-center text-danger-fg">
-              <ShieldAlert className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-semibold text-retro-fg">Content Blocklist (blocklist.json)</h3>
-                <span
-                  className={`text-2xs px-2 py-0.5 rounded-full font-mono font-medium border ${
-                    isModified
-                      ? 'bg-warning/10 text-warning-fg border-warning/30'
-                      : 'bg-success/10 text-success-fg border-success/30'
-                  }`}
-                >
-                  {isModified ? 'Customized' : 'Factory Default'}
-                </span>
-              </div>
-              <p className="text-xs text-retro-muted">
-                Full control over hard-blocked keywords, suggested exclude categories, and noise filter tags.
-              </p>
-            </div>
-          </div>
-
-          {/* Mode Switcher */}
-          <div className="flex bg-surface-raised border border-edge rounded-xl p-1 text-xs font-bold shrink-0 self-start sm:self-auto">
-            <button
-              type="button"
-              onClick={switchToVisual}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition cursor-pointer ${
-                mode === 'visual'
-                  ? 'bg-retro-bg text-retro-fg shadow-xs'
-                  : 'text-retro-muted hover:text-retro-fg'
-              }`}
-            >
-              <List className="w-3.5 h-3.5" />
-              <span>Visual Lists</span>
-            </button>
-            <button
-              type="button"
-              onClick={switchToJson}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition cursor-pointer ${
-                mode === 'json'
-                  ? 'bg-retro-bg text-retro-fg shadow-xs'
-                  : 'text-retro-muted hover:text-retro-fg'
-              }`}
-            >
-              <FileCode className="w-3.5 h-3.5" />
-              <span>Raw JSON</span>
-            </button>
-          </div>
+    <div className="space-y-3 animate-orbit-fade-in">
+      {/* Header: mode switch + honest save state (edits persist on their own). */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-retro-fg">Content Blocklist</h3>
+          <span
+            className={`text-2xs px-2 py-0.5 rounded-full font-mono font-medium border ${
+              isModified
+                ? 'bg-warning/10 text-warning-fg border-warning/30'
+                : 'bg-success/10 text-success-fg border-success/30'
+            }`}
+          >
+            {isModified ? 'Customized' : 'Default'}
+          </span>
+          <span className="text-xs text-retro-muted">Changes save automatically</span>
+        </div>
+        <div className="flex bg-surface-raised border border-edge rounded-lg p-0.5 text-xs font-semibold shrink-0 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={switchToVisual}
+            className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition cursor-pointer ${
+              mode === 'visual' ? 'bg-retro-accent text-retro-accent-text' : 'text-retro-muted hover:text-retro-fg'
+            }`}
+          >
+            <List className="w-3.5 h-3.5" />
+            <span>Visual Lists</span>
+          </button>
+          <button
+            type="button"
+            onClick={switchToJson}
+            className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition cursor-pointer ${
+              mode === 'json' ? 'bg-retro-accent text-retro-accent-text' : 'text-retro-muted hover:text-retro-fg'
+            }`}
+          >
+            <FileCode className="w-3.5 h-3.5" />
+            <span>Raw JSON</span>
+          </button>
         </div>
       </div>
 
@@ -435,7 +375,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
                     setActiveCategory(cat)
                     setSearchFilter('')
                   }}
-                  className={`p-3 rounded-xl border text-left transition cursor-pointer space-y-1 ${
+                  className={`p-2.5 rounded-lg border text-left transition cursor-pointer space-y-0.5 ${
                     isSelected
                       ? 'bg-surface-interactive border-retro-accent shadow-xs'
                       : 'bg-surface-raised border-edge hover:bg-surface-interactive'
@@ -447,14 +387,14 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
                       {count}
                     </span>
                   </div>
-                  <p className="text-2xs text-retro-muted truncate">{meta.desc}</p>
+                  <p className="text-xs text-retro-muted truncate">{meta.desc}</p>
                 </button>
               )
             })}
           </div>
 
           {/* Active Category Editor */}
-          <div className="p-4 bg-surface-raised border border-edge rounded-xl space-y-4">
+          <div className="p-3 bg-surface-raised border border-edge rounded-lg space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-edge">
               <div>
                 <h4 className="text-xs font-semibold text-retro-fg">{CATEGORY_META[activeCategory].label}</h4>
@@ -486,13 +426,13 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
                     }
                   }}
                   placeholder={`Add tag(s) to ${activeCategory}...`}
-                  className="flex-1 bg-surface-interactive border border-edge rounded-xl px-3 py-1.5 text-xs text-retro-fg outline-none focus:border-retro-accent placeholder:text-retro-muted/60"
+                  className="flex-1 bg-surface-interactive border border-edge rounded-lg px-3 py-1.5 text-xs text-retro-fg outline-none focus:border-retro-accent placeholder:text-retro-muted/60"
                 />
                 <button
                   type="button"
                   onClick={addTag}
                   disabled={!newTagInput.trim()}
-                  className="px-3 py-1.5 bg-retro-accent hover:bg-retro-accent-hover disabled:opacity-40 text-retro-accent-text rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer shrink-0"
+                  className="px-3 py-1.5 bg-retro-accent hover:bg-retro-accent-hover disabled:opacity-40 text-retro-accent-text rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer shrink-0"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Add</span>
@@ -507,7 +447,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
                   value={searchFilter}
                   onChange={(e) => setSearchFilter(e.target.value)}
                   placeholder={`Search ${currentCategoryTags.length} tags...`}
-                  className="w-full bg-surface-interactive border border-edge rounded-xl pl-8 pr-3 py-1.5 text-xs text-retro-fg outline-none focus:border-retro-accent placeholder:text-retro-muted/60"
+                  className="w-full bg-surface-interactive border border-edge rounded-lg pl-8 pr-3 py-1.5 text-xs text-retro-fg outline-none focus:border-retro-accent placeholder:text-retro-muted/60"
                 />
                 {searchFilter && (
                   <button
@@ -592,7 +532,7 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
             onChange={handleJsonChange}
             rows={16}
             spellCheck={false}
-            className={`w-full font-mono text-xs p-3 rounded-xl bg-surface-interactive border outline-none leading-relaxed resize-y styled-scrollbar ${
+            className={`w-full font-mono text-xs p-3 rounded-lg bg-surface-interactive border outline-none leading-relaxed resize-y styled-scrollbar ${
               jsonError
                 ? 'border-danger/60 focus:border-danger text-danger-fg'
                 : 'border-edge focus:border-retro-accent text-retro-fg'
@@ -601,37 +541,21 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
         </div>
       )}
 
-      {/* Action Buttons Bar */}
-      <div className="p-4 bg-surface-interactive border border-edge rounded-xl flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Save Button */}
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={isSaving || Boolean(jsonError)}
-            className="px-4 py-2 bg-retro-accent hover:bg-retro-accent-hover disabled:opacity-40 text-retro-accent-text rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
-          >
-            <Save className="w-3.5 h-3.5" />
-            <span>{isSaving ? 'Saving...' : 'Save Changes'}</span>
-          </button>
-
-          {/* Reset Defaults Button */}
-          <button
-            type="button"
-            onClick={handleReset}
-            className="px-3 py-2 bg-surface-raised border border-edge hover:border-danger/40 text-retro-muted hover:text-danger-fg rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Reset to Defaults</span>
-          </button>
-        </div>
-
+      {/* No Save button: every edit above is already persisted. */}
+      <div className="p-3 bg-glass-w5 border border-edge rounded-lg flex flex-wrap items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={handleReset}
+          className="px-3 py-1.5 bg-surface-raised border border-edge hover:border-danger/40 text-retro-muted hover:text-danger-fg rounded-lg text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+          <span>Reset to Defaults</span>
+        </button>
         <div className="flex items-center gap-2">
-          {/* Import File Button */}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="px-3 py-2 bg-surface-raised border border-edge hover:bg-surface-elevated text-retro-fg rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
+            className="px-3 py-1.5 bg-surface-raised border border-edge hover:bg-surface-elevated text-retro-fg rounded-lg text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
           >
             <Upload className="w-3.5 h-3.5 text-retro-muted" />
             <span>Import JSON</span>
@@ -643,12 +567,10 @@ export function BlocklistSection({ toast }: BlocklistSectionProps) {
             onChange={handleImportFile}
             className="hidden"
           />
-
-          {/* Export File Button */}
           <button
             type="button"
             onClick={handleExport}
-            className="px-3 py-2 bg-surface-raised border border-edge hover:bg-surface-elevated text-retro-fg rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
+            className="px-3 py-1.5 bg-surface-raised border border-edge hover:bg-surface-elevated text-retro-fg rounded-lg text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
           >
             <Download className="w-3.5 h-3.5 text-retro-muted" />
             <span>Export</span>

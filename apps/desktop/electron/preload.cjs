@@ -11,11 +11,14 @@ contextBridge.exposeInMainWorld('gmatch', {
   platform: process.platform,
   booruFetch: (request) => ipcRenderer.invoke('booru:fetch', request),
   booruTimings: () => ipcRenderer.invoke('booru:timings'),
-  // mediaq setup suite: status, one-shot install (streams progress), start.
+  // mediaq setup suite: status, one-shot install (streams progress), and the
+  // start / stop / restart controls (Settings reports what actually happened).
   mediaqStatus: () => ipcRenderer.invoke('mediaq:status'),
   mediaqInstall: () => ipcRenderer.invoke('mediaq:install'),
   mediaqCancel: () => ipcRenderer.invoke('mediaq:cancel'),
   mediaqStart: () => ipcRenderer.invoke('mediaq:start'),
+  mediaqStop: () => ipcRenderer.invoke('mediaq:stop'),
+  mediaqRestart: () => ipcRenderer.invoke('mediaq:restart'),
   onMediaqProgress: (cb) => {
     const handler = (_e, p) => cb(p)
     ipcRenderer.on('mediaq:progress', handler)
@@ -55,6 +58,7 @@ contextBridge.exposeInMainWorld('gmatch', {
   secureSet: (key, value) => ipcRenderer.invoke('secure:set', key, value),
   secureDelete: (key) => ipcRenderer.invoke('secure:delete', key),
   serverState: () => ipcRenderer.invoke('server:state'),
+  claimAdminOwner: (orbitId) => ipcRenderer.invoke('server:claim-admin-owner', orbitId),
   // Frameless window controls (renderer draws its own titlebar; absence of
   // these = plain browser/dev, chrome hides the buttons).
   winMinimize: () => ipcRenderer.send('window:minimize'),

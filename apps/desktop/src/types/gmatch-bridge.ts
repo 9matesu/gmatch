@@ -54,10 +54,12 @@ export interface GmatchBridge {
   /** Read-only feed search metrics (observability). Never a UI surface. */
   booruTimings?: () => Promise<FeedMetricsSummary>
   /** mediaq setup suite (one-shot). The app is unchanged offline when mediaq is absent. */
-  mediaqStatus?: () => Promise<{ installed: boolean; running: boolean; base: string; error?: string }>
-  mediaqInstall?: () => Promise<{ ok: boolean; bin?: string; error?: string; cancelled?: boolean }>
+  mediaqStatus?: () => Promise<{ installed: boolean; running: boolean; base: string; hasUv?: boolean; error?: string }>
+  mediaqInstall?: () => Promise<{ ok: boolean; bin?: string; running?: boolean; error?: string; cancelled?: boolean }>
   mediaqCancel?: () => Promise<{ ok: boolean }>
   mediaqStart?: () => Promise<{ ok: boolean; base?: string; error?: string }>
+  mediaqStop?: () => Promise<{ ok: boolean; running: boolean; stopped?: boolean; error?: string }>
+  mediaqRestart?: () => Promise<{ ok: boolean; base?: string; error?: string }>
   onMediaqProgress?: (cb: (p: { phase: string; message: string; percent?: number }) => void) => () => void
   cacheImage?: (url: string) => Promise<{ local: string | null }>
   cacheStats?: () => Promise<{ files: number; bytes: number }>
@@ -107,7 +109,9 @@ export interface GmatchBridge {
   secureGet?: (key: string) => Promise<string | null>
   secureSet?: (key: string, value: string) => Promise<void>
   secureDelete?: (key: string) => Promise<void>
-  serverState?: () => Promise<{ packaged: boolean; mode: 'host' | 'client'; url: string; lanUrls: string[]; adminPin?: string; pausedUrl?: string; pausedReason?: 'legacy' | 'unreachable' }>
+  serverState?: () => Promise<{ packaged: boolean; mode: 'host' | 'client'; url: string; lanUrls: string[]; nodeOwnerId?: string | null; pausedUrl?: string; pausedReason?: 'legacy' | 'unreachable' }>
+  /** Bind this install's first identity as owner; sticky across account switches. */
+  claimAdminOwner?: (orbitId: string) => Promise<{ ok: boolean; orbitId?: string; error?: string } | null>
   winMinimize?: () => void
   winToggleMaximize?: () => void
   winClose?: () => void

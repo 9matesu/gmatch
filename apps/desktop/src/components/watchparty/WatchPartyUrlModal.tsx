@@ -9,6 +9,8 @@ import { Button, Input, Modal, Textarea } from '../../ui/kit'
 import { cn } from '../../lib/utils'
 import { cx, COLOR, FEEDBACK, PRESENCE, RADIUS, STATUS, TYPE } from '../../ui/tokens'
 import { WatchLocalFile } from './WatchLocalFile'
+import { WatchRecentUrls } from './WatchRecentUrls'
+import { readRecentWatchUrls, rememberWatchUrls } from './recentWatchUrls'
 import { createParty, expandPlaylist, loadPartyVideo, loadPartyVideos, type PartyRuntime } from '../../hooks/watchPartyStore'
 
 interface IdentityLike {
@@ -40,6 +42,7 @@ export function WatchPartyUrlModal({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [statusText, setStatusText] = useState<string | null>(null)
+  const [recent, setRecent] = useState(() => readRecentWatchUrls())
 
   const inRoom = Boolean(joinPartyId)
   const blocked = inRoom && lockVideo
@@ -53,13 +56,16 @@ export function WatchPartyUrlModal({
         ? `Direct video candidate (.${hint.ext}). The server still verifies it before playing.`
         : `Provider page (${hint.provider || 'page'}). The server will try to find a playable file; some pages cannot be embedded.`
 
-  const submit = async () => {
-    if (!url.trim() || busy || blocked) return
+  /** One path for typed links and quick-launch chips: a chip replays exactly
+   *  what typing the same URL and pressing the button would do. */
+  const submit = async (override?: string) => {
+    const source = override ?? url
+    if (!source.trim() || busy || blocked) return
     setBusy(true)
     setError(null)
     setStatusText(null)
 
-    const trimmedUrl = url.trim()
+    const trimmedUrl = source.trim()
     const lines = trimmedUrl.split(/\n+/).map((l) => l.trim()).filter(Boolean)
 
     const isValidUrl = (val: string): boolean => {
@@ -198,6 +204,8 @@ export function WatchPartyUrlModal({
         }
       }
     }
+    // Only links that actually launched a session become quick-launch chips.
+    setRecent(rememberWatchUrls(lines))
     setBusy(false)
     setStatusText(null)
     onClose()
@@ -225,6 +233,11 @@ export function WatchPartyUrlModal({
             }
           }}
           className="w-full font-mono resize-y"
+        />
+        <WatchRecentUrls
+          urls={recent.map((r) => r.url)}
+          onPick={(link) => { setUrl(link); void submit(link) }}
+          disabled={busy || blocked}
         />
         <p className={cx(TYPE.caption, COLOR.muted, 'text-pretty')}>{hintText}</p>
         {!inRoom && (

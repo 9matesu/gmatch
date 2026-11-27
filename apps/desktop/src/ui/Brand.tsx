@@ -38,7 +38,13 @@ export function Brand({ size = 'default', markOnly = false, className = '' }: Br
         className={markClass}
       />
       {!markOnly && (
-        <span className={compact ? LOGO.wordmarkCompact : LOGO.wordmark}>gMatch</span>
+        <span
+          className={
+            size === 'hero' ? LOGO.wordmarkHero : compact ? LOGO.wordmarkCompact : LOGO.wordmark
+          }
+        >
+          gMatch
+        </span>
       )}
     </span>
   )

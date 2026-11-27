@@ -6,7 +6,8 @@ import { orbitFetch } from '../utils/api';
 import { userFacingError } from '../utils/userError';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { computeCashoutPayout, clampCashoutRateBps, DEFAULT_CASHOUT_RATE_BPS, formatGc } from '@orbit/shared';
-import { CardArtwork } from './cards/CardArtwork';
+import { GameCard } from './cards/GameCard';
+import { computeCardRarity } from '@orbit/shared';
 import { isMediaVideo } from '../utils/media';
 import { Button, Input } from '../ui/kit';
 import {
@@ -243,12 +244,18 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
         <div className={classes(PADDING[5], 'space-y-4 overflow-y-auto')}>
           {/* The card as a tall card, Pokemon-style holo (react-holo-card-effect). */}
           <div className="flex justify-center">
-            <CardArtwork
+            <GameCard
               objectId={card.mediaObjectId}
               identity={identity}
               width={300}
               height={340}
               isVideo={Boolean(card.mimeType?.startsWith('video/') || isMediaVideo(card.contentUrl))}
+              name={card.name}
+              rarity={computeCardRarity(card.value ?? 0)}
+              value={card.value ?? 0}
+              accentColor={card.accentColor}
+              frame={card.frame}
+              className="max-w-[300px]"
             />
           </div>
 

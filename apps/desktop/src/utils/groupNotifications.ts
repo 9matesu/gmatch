@@ -1,3 +1,5 @@
+import { isNotificationRead } from './notifications'
+
 /**
  * Instagram-style activity grouping (client-side fold over /api/notifications
  * — the server list is already capped at 50, no memo needed).
@@ -9,7 +11,7 @@ export interface NotifItem {
   body: string | null
   /** Server sends JSON strings; be tolerant of both shapes. */
   data: unknown
-  read: number
+  read: number | boolean | string | null
   created_at: string
 }
 
@@ -94,7 +96,8 @@ export function groupNotifications(rows: NotifItem[]): NotifGroup[] {
       groups.push(g)
     }
     g.items.push(n)
-    g.unread += n.read ? 0 : 1
+    // Same read rule as the badge: only an explicit read removes the row's dot.
+    g.unread += isNotificationRead(n.read) ? 0 : 1
     const actor = actorOf(n)
     if (!g.actors.includes(actor)) g.actors.push(actor)
   }

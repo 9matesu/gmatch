@@ -343,3 +343,55 @@ describe('derivePeerNotifications (the peer lane)', () => {
     expect(peerNotificationSubject('local:peer-')).toBeNull()
   })
 })
+
+/** Every type a node or a local lane can raise must move the red dot. */
+const ALL_NOTIFICATION_TYPES = [
+  'like', 'comment', 'reply', 'mention', 'comment_like', 'follow',
+  'match_invite', 'match_result', 'babecock_invite', 'babecock_start',
+  'card_received', 'card_purchase', 'pm', 'system', 'post', 'error',
+]
+
+describe('the unread bubble', () => {
+  it('marks the dot and raises the count for one pushed row of every type', () => {
+    let items: AppNotification[] = []
+    ALL_NOTIFICATION_TYPES.forEach((type, i) => {
+      const incoming = serverRowToAppNotification(row({
+        id: `n-${type}`,
+        type,
+        created_at: new Date(1_700_000_000_000 + i * 1000).toISOString(),
+      }))
+      items = mergeNotifications(items, [incoming])
+      // The dot is derived from the list, never from a second counter: every
+      // push must land on the very next count, whatever the type says.
+      expect(unreadCountOf(items)).toBe(i + 1)
+      expect(latestUnread(items)?.type).toBe(type)
+      expect(unreadByTypeOf(items)[type]).toBe(1)
+    })
+    expect(items).toHaveLength(ALL_NOTIFICATION_TYPES.length)
+  })
+
+  it('a stale re-delivery of a read row cannot resurrect the dot', () => {
+    const created = '2026-10-18T10:00:00.000Z'
+    const read = { ...serverRowToAppNotification(row({ id: 'n1', created_at: created })), read: true }
+    const staleCopy = serverRowToAppNotification(row({ id: 'n1', created_at: created, read: 0 }))
+    const merged = mergeNotifications([read], [staleCopy])
+    expect(unreadCountOf(merged)).toBe(0)
+    expect(merged[0].read).toBe(true)
+  })
+
+  it('never fabricates a read from an oddly typed row', () => {
+    for (const value of [undefined, null, 0, false, '0', 2, '']) {
+      expect(serverRowToAppNotification(row({ read: value })).read).toBe(false)
+    }
+    for (const value of [1, true, '1']) {
+      expect(serverRowToAppNotification(row({ read: value })).read).toBe(true)
+    }
+  })
+
+  it('clears the count only when the row is explicitly read', () => {
+    const unread = serverRowToAppNotification(row({ id: 'n1' }))
+    const items = mergeNotifications([unread], [])
+    expect(unreadCountOf(items)).toBe(1)
+    expect(unreadCountOf(items.map((i) => ({ ...i, read: true })))).toBe(0)
+  })
+})

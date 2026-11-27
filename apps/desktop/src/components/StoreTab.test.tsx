@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import * as api from '../utils/api'
 import { StoreTab } from './StoreTab'
 
@@ -133,6 +133,24 @@ describe('StoreTab credits card owners', () => {
 
     await waitFor(() => expect(screen.getByText('Rare Find')).toBeTruthy())
     expect(screen.getByText('by Bo')).toBeTruthy()
+  })
+
+  it('shows the shop floor with a clear price, a buy action and a collection route', async () => {
+    const onOpenCardCollection = vi.fn()
+    vi.spyOn(api, 'orbitFetch').mockImplementation(
+      mockApi([], [{ listingId: 'l-shop', cardId: 'card-9', price: 500, sellerId: 'seller-1', card: marketCard() }]) as never,
+    )
+
+    render(<StoreTab points={100} identity={identity} onOpenCardCollection={onOpenCardCollection} />)
+
+    await waitFor(() => expect(screen.getByText('Rare Find')).toBeTruthy())
+    expect(screen.getByRole('heading', { name: 'Community Market' })).toBeTruthy()
+    // One asking price per product, and the real buy path is still wired.
+    expect(screen.getByText('g$ 500')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Buy' })).toBeTruthy()
+    // The collection route lives on the shop floor, not buried in a dashboard.
+    fireEvent.click(screen.getByRole('button', { name: 'View collection' }))
+    expect(onOpenCardCollection).toHaveBeenCalledOnce()
   })
 
   it('estimates cash-out value only for the cards cash-out-all actually pays', async () => {

@@ -128,6 +128,8 @@ export const TYPE = {
   sub: 'text-sm',
   title: 'text-lg',
   display: 'text-xl',
+  /** Hero wordmark: the one step above `display`, shared with the boot splash. */
+  brand: 'text-brand',
 } as const
 export const WEIGHT = {
   regular: 'font-normal',
@@ -372,6 +374,8 @@ export const LOGO = {
   markHero: classes('block shrink-0', 'h-(--logo-mark-size-hero) w-(--logo-mark-size-hero)', 'min-w-(--logo-mark-min-size)'),
   /** Wordmark: top of the type scale, the existing type and fg roles. */
   wordmark: classes(WEIGHT.heading, TRACKING.tight, COLOR.fg, TYPE.title),
+  /** Hero wordmark for onboarding/boot: same face and fg, one type step up. */
+  wordmarkHero: classes(WEIGHT.heading, TRACKING.tight, COLOR.fg, TYPE.brand),
   /** Compact wordmark: same face/role, the field step for a slim title bar. */
   wordmarkCompact: classes(WEIGHT.heading, TRACKING.wide, COLOR.fg, TYPE.field),
 } as const
@@ -483,6 +487,54 @@ export const CHROME = {
   cardFooter: classes(PADDING[2], COLOR.canvasSurface, 'border-t', COLOR.edge, 'text-left'),
   cardFooterTitle: classes(TYPE.body, WEIGHT.semibold, COLOR.fg, 'truncate'),
   cardFooterMeta: classes(TYPE.caption, MONO, COLOR.muted, 'truncate'),
+} as const
+
+/**
+ * ONE premium TCG card object: a rarity-tinted metal frame, a foil layer, an
+ * embossed title plate, an inset art window, a value row and a card back for a
+ * row whose bytes are nowhere. The skin (bevels, lattice, foil) lives in
+ * globals.css; these are the NAMES a card surface composes, so no call site
+ * re-inlines a border, a gradient or a raw colour. The accent is runtime card
+ * data passed as `--card-accent`, never a second palette here.
+ */
+export const TCG_CARD = {
+  frame: classes('tcg-card', RADIUS.panel, 'select-none', 'overflow-hidden', SHADOW.panel),
+  inner: classes('flex flex-col h-full', 'tcg-card-inner'),
+  foil: 'tcg-foil',
+  plate: classes('tcg-title-plate', 'flex items-center justify-between', GAP[2]),
+  plateTitle: classes(TYPE.body, WEIGHT.bold, TRACKING.wide, COLOR.fg, 'uppercase truncate'),
+  plateGem: 'tcg-title-gem shrink-0',
+  artWindow: 'tcg-art-window',
+  back: classes('tcg-card-back', 'absolute inset-0 flex items-center justify-center', COLOR.muted, TYPE.caption, MONO),
+  backCore: 'tcg-card-back-core',
+  statRow: classes('tcg-stat-row', 'flex items-baseline justify-between', GAP[2]),
+  statLabel: classes(TYPE.caption, WEIGHT.semibold, TRACKING.wider, COLOR.muted, 'uppercase'),
+  statValue: classes(TYPE.body, WEIGHT.bold, MONO, COLOR.fg, 'tabular-nums'),
+  rarityChip: classes(
+    'tcg-rarity-chip absolute top-2 left-2 z-20', RADIUS.chip, PADDING_X[1.5], 'py-0.5',
+    TYPE.caption, WEIGHT.semibold, 'uppercase', TRACKING.wider, 'border backdrop-blur-xs',
+  ),
+  footer: classes(CHROME.cardFooter, 'flex flex-col', GAP[1]),
+} as const
+
+/**
+ * ONE message-bubble shape for every chat surface (DMs, rooms, groups, the
+ * card-game match chat). Opaque fills, fully rounded, a subtle hover lift; the
+ * shape and motion live here so no surface re-types them, and each surface adds
+ * only its own padding/type step and one of the fills below.
+ */
+export const CHAT = {
+  bubbleShape: classes(
+    'rounded-2xl cursor-pointer select-text break-words whitespace-pre-wrap',
+    'motion-safe:animate-orbit-fade-in',
+    MOTION.transition.quick,
+    'hover:brightness-110',
+  ),
+  fillOwn: classes('bg-retro-accent', COLOR.onAccent),
+  fillOther: classes(COLOR.interactive, COLOR.body, 'border', COLOR.edge),
+  fillDeleted: classes('bg-surface-canvas border border-dashed', COLOR.edge, COLOR.muted, 'italic'),
+  /** Compact emoji reaction input strip shown under a bubble. */
+  reactStrip: classes('flex items-center', GAP[0.5], 'mt-1'),
 } as const
 
 /**

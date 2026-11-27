@@ -93,6 +93,9 @@ export function NotificationCenter(props: NotificationCenterProps) {
 
   // One store feeds every surface: the badge, the tray, the overlay and the
   // native toast. The main process decides what the OS shows with this count.
+  // The row arrays are dependencies too: a new row with a count that happens to
+  // stay the same (the 50-row cap, or a re-delivered title) still has to resync
+  // the native bubble, so the OS badge can never lag the in-app one.
   const { settings } = useSettings();
   useEffect(() => {
     window.gmatch?.notifySync?.({
@@ -101,7 +104,7 @@ export function NotificationCenter(props: NotificationCenterProps) {
       body: preview || "",
       hideContent: !!settings.hideNotificationContent,
     });
-  }, [unreadCount, latestTitle, preview, settings.hideNotificationContent]);
+  }, [unreadCount, latestTitle, preview, settings.hideNotificationContent, notifications, localItems, peerItems]);
 
   // Auto-expire non-sticky toasts on the header's clock (single owner).
   useEffect(() => {

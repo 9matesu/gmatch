@@ -101,7 +101,9 @@ async function main() {
   assert.strictEqual(started, true, 'a packaged launch reaches a healthy node')
   assert.strictEqual(calls.length, 1, 'exactly one spawn (no silent no-op)')
   const env = calls[0].options.env
-  assert.match(env.ADMIN_PIN || '', /^[0-9a-f]{8}$/i, 'packaged installs mint and inject a PIN')
+  assert.match(env.ADMIN_PIN_HASH || '', /^scrypt\$[0-9a-f]{32}\$[0-9a-f]{64}$/i, 'only the scrypt hash is injected')
+  assert.strictEqual(env.ADMIN_PIN, undefined, 'the plaintext PIN is never injected')
+  assert.ok(env.ADMIN_OWNER_FILE.endsWith('admin-owner.json'), 'node reads the live owner file')
   assert.strictEqual(env.SNAPSHOT_PATH, path.join(dir, 'orbit.sqlite'))
   assert.strictEqual(env.BLOB_STORE_DIR, path.join(dir, 'blobs'))
   assert.match(env.STORAGE_ENCRYPTION_KEY || '', /^[0-9a-f]{64}$/i)
@@ -148,7 +150,7 @@ async function main() {
   await new Promise((resolve) => occupant.close(resolve))
   delete process.env.GMATCH_HOST_MODE
 
-  // ---- unpackaged: never shadow apps/api/.env.local with a minted PIN ----
+  // ---- unpackaged: the SAME hash is used, never a plaintext PIN ----
   calls = installStubs({ isPackaged: false, health: false })
   sidecar = freshModule()
   // Dev mode may adopt a healthy sidecar; a dead one forces the spawn path.
@@ -158,11 +160,8 @@ async function main() {
   pending.catch(() => {})
   await new Promise((resolve) => setTimeout(resolve, 100))
   assert.strictEqual(calls.length, 1, 'dev mode spawns when no sidecar answers')
-  assert.strictEqual(
-    calls[0].options.env.ADMIN_PIN,
-    undefined,
-    'dev mode lets .env.local own ADMIN_PIN',
-  )
+  assert.match(calls[0].options.env.ADMIN_PIN_HASH || '', /^scrypt\$/i, 'dev uses this install hash')
+  assert.strictEqual(calls[0].options.env.ADMIN_PIN, undefined, 'no plaintext PIN in dev either')
   sidecar.stopApi()
   pending.catch(() => {})
 

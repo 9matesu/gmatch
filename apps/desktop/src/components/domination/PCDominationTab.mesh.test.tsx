@@ -115,7 +115,10 @@ describe('PCDominationTab mesh-first send (Fase 5/6 slice 4)', () => {
       (c) => String(c[0]).includes('/api/domination/trigger'),
     );
     expect(triggerCalls).toHaveLength(0);
-    expect(toast).toHaveBeenCalledWith(expect.stringMatching(/mesh|free/i), 'success');
+    expect(toast).toHaveBeenCalledWith(
+      expect.stringMatching(/Message sent to Bob\. Receipt shows in Outbox\./),
+      'success',
+    );
   });
 
   it('mesh-unknown target: falls back to the server trigger route', async () => {
@@ -132,16 +135,17 @@ describe('PCDominationTab mesh-first send (Fase 5/6 slice 4)', () => {
     expect(meshSend).not.toHaveBeenCalled();
   });
 
-  it('mesh-known target shows Free via mesh instead of the g$ price', async () => {
+  it('mesh-known target keeps the action and g$ price text without a mesh badge', async () => {
     render(<PCDominationTab {...baseProps} mesh={{ peerKnown: () => true, send: vi.fn() }} />);
     await screen.findByRole('button', { name: /bob/i });
-    // One badge per action card, and no g$ price anywhere on the cards.
-    const badges = await screen.findAllByText(/free via mesh/i);
-    expect(badges.length).toBeGreaterThan(0);
-    expect(screen.queryByText(/500 g\$/)).toBeNull();
+    expect(screen.queryByText(/free via mesh/i)).toBeNull();
+    const cards = screen.getAllByRole('button', { name: /message/i });
+    const card = cards.find((c) => (c.textContent || '').startsWith('Message'));
+    expect(card).toBeTruthy();
+    expect(card).toHaveTextContent('500 g$');
   });
 
-  it('shows the g$ price on the action card when the send is not free via mesh', async () => {
+  it('shows the g$ price on the action card for a server-triggered send', async () => {
     render(<PCDominationTab {...baseProps} mesh={{ peerKnown: () => false, send: vi.fn() }} />);
     await screen.findByRole('button', { name: /bob/i });
     const cards = screen.getAllByRole('button', { name: /message/i });

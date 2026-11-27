@@ -1,23 +1,23 @@
-// node admin-pin.cjs test — plain asserts, mirrors customFolders.test.cjs.
-const assert = require('assert')
-const fs = require('fs')
-const os = require('os')
-const path = require('path')
+// node admin-pin.test.cjs — the install credential is a scrypt hash only.
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const os = require('node:os')
+const path = require('node:path')
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'adminpin-'))
-delete process.env.ADMIN_PIN
-const { adminPin } = require('./admin-pin.cjs')
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gmatch-pin-'))
+delete process.env.ADMIN_PIN_HASH
+delete require.cache[require.resolve('./admin-pin.cjs')]
+const { adminPinHash, isPinHash } = require('./admin-pin.cjs')
 
-const first = adminPin(dir)
-assert.match(first, /^[0-9a-f]{8}$/, 'generated PIN is 8 hex chars')
-assert.strictEqual(fs.readFileSync(path.join(dir, 'admin-pin.txt'), 'utf8').trim(), first, 'PIN persisted to userData')
-assert.strictEqual(adminPin(dir), first, 'second call reuses the saved PIN (stable across launches)')
+const first = adminPinHash(dir)
+assert.ok(isPinHash(first), 'factory credential is a salted scrypt hash')
+assert.ok(!/^\d{6}$/.test(fs.readFileSync(path.join(dir, 'admin-pin.hash'), 'utf8').trim()), 'no plaintext PIN on disk')
+assert.strictEqual(adminPinHash(dir), first, 'second call reuses the saved hash (stable across launches)')
 
-process.env.ADMIN_PIN = 'env-pin'
-assert.strictEqual(adminPin(dir), 'env-pin', 'env overrides the file')
-delete process.env.ADMIN_PIN
+process.env.ADMIN_PIN_HASH = 'scrypt$' + 'a'.repeat(32) + '$' + 'b'.repeat(64)
+assert.strictEqual(adminPinHash(dir), process.env.ADMIN_PIN_HASH, 'env hash overrides the file')
+delete process.env.ADMIN_PIN_HASH
 
-fs.writeFileSync(path.join(dir, 'admin-pin.txt'), 'garbage!')
-assert.match(adminPin(dir), /^[0-9a-f]{8}$/, 'corrupt file regenerates a valid PIN')
-
+fs.writeFileSync(path.join(dir, 'admin-pin.hash'), 'garbage!')
+assert.ok(isPinHash(adminPinHash(dir)), 'corrupt hash file regenerates a valid hash')
 console.log('admin-pin tests passed')

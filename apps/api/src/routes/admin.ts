@@ -1,4 +1,5 @@
-import { createHash } from 'node:crypto'
+import { createHash, scryptSync } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { Hono } from 'hono'
 import { orbitAuth } from '../middleware/auth'
 import { adminAuth, ADMIN_GRANT_KEY } from '../middleware/admin'
@@ -23,6 +24,9 @@ type Bindings = {
   ADMIN_PIN?: string
   ADMIN_PIN_HASH?: string
   ADMIN_ORBIT_ID?: string
+  /** userData file written by the packaged install; read live so the first
+   *  identity on this machine is bound without restarting the sidecar. */
+  ADMIN_OWNER_FILE?: string
 }
 
 const admin = new Hono<{ Bindings: Bindings, Variables: { orbitId: string, publicKeyHex: string } }>()
@@ -34,9 +38,10 @@ announcements.use('*', orbitAuth)
 // Verify secret admin passcode/PIN - accessible to any authenticated Orbit user
 // Security plan B.4: NO hardcoded default — with neither ADMIN_PIN_HASH nor
 // ADMIN_PIN configured the feature returns 503 (disabled). Prefer
-// ADMIN_PIN_HASH = sha256(pin) hex (constant-time compare); plaintext
-// ADMIN_PIN remains for dev/self-host convenience. Per-identity lockout:
-// 5 wrong attempts in 15 min → 429.
+// ADMIN_PIN_HASH = scrypt$<salt-hex>$<hash-hex> (memory-hard, salted) or the
+// legacy sha256(pin) hex; both use a constant-time compare. Plaintext
+// ADMIN_PIN remains for dev/e2e convenience, never written by this install.
+// Per-identity lockout: 5 wrong attempts in 15 min → 429.
 const PIN_WINDOW_MS = 15 * 60 * 1000
 const PIN_MAX_FAILS = 5
 const pinFails = new Map<string, number[]>() // orbitId -> failure timestamps
@@ -74,6 +79,39 @@ function constantTimeEqual(a: string, b: string): boolean {
   return diff === 0
 }
 
+const PIN_SCRYPT_PARAMS = { N: 1 << 14, r: 8, p: 1 } as const
+
+/** scrypt$<salt-hex>$<hash-hex> first, legacy sha256 hex second. */
+function verifyPinHash(pin: string, configuredHash: string): boolean {
+  if (configuredHash.startsWith('scrypt$')) {
+    const parts = configuredHash.split('$')
+    if (parts.length !== 3) return false
+    const [, saltHex, expectedHex] = parts
+    if (!/^[0-9a-f]{32}$/i.test(saltHex) || !/^[0-9a-f]{64}$/i.test(expectedHex)) return false
+    try {
+      const actual = scryptSync(pin, Buffer.from(saltHex, 'hex'), 32, PIN_SCRYPT_PARAMS).toString('hex')
+      return constantTimeEqual(actual, expectedHex.toLowerCase())
+    } catch {
+      return false
+    }
+  }
+  const presented = sha256hexSync(pin)
+  return presented ? constantTimeEqual(presented, configuredHash) : false
+}
+
+/** The install owner is written by Electron to a small JSON file. Reading it
+ *  per verify (instead of only at spawn) binds the very first identity too. */
+function ownerFromNodeFile(c: { env: Bindings }): string {
+  const file = c.env.ADMIN_OWNER_FILE
+  if (!file) return ''
+  try {
+    const parsed = JSON.parse(readFileSync(file, 'utf8')) as { orbitId?: unknown } | null
+    return typeof parsed?.orbitId === 'string' ? parsed.orbitId.trim() : ''
+  } catch {
+    return ''
+  }
+}
+
 admin.post('/verify-pin', async (c) => {
   const orbitId = c.get('orbitId')
   let pin = ''
@@ -85,7 +123,7 @@ admin.post('/verify-pin', async (c) => {
   const configuredHash = (c.env.ADMIN_PIN_HASH || '').trim().toLowerCase()
   const configuredPlain = c.env.ADMIN_PIN
   if (!configuredHash && !configuredPlain) {
-    return c.json({ error: 'Admin console disabled: set ADMIN_PIN_HASH (sha256 hex of the PIN) or ADMIN_PIN' }, 503)
+    return c.json({ error: 'Admin console disabled: set ADMIN_PIN_HASH (scrypt$<salt>$<hash> or sha256 hex) or ADMIN_PIN' }, 503)
   }
 
   // lockout check (sliding window)
@@ -103,15 +141,14 @@ admin.post('/verify-pin', async (c) => {
   // probe the PIN; the response is the same 401 as a wrong PIN and counts
   // toward this caller's lockout window. Without ADMIN_ORBIT_ID the node
   // keeps the host-is-admin model (self-host/LAN), documented in SECURITY-AUDIT.
-  const adminOrbit = (c.env.ADMIN_ORBIT_ID || '').trim()
+  const adminOrbit = (c.env.ADMIN_ORBIT_ID || ownerFromNodeFile(c) || '').trim()
   if (adminOrbit && adminOrbit !== orbitId) {
     fails.push(now)
     pinFails.set(orbitId, fails)
     return c.json({ error: 'Invalid secret admin passcode' }, 401)
   }
 
-  const presentedHash = sha256hexSync(pin)
-  const okHash = configuredHash && presentedHash ? constantTimeEqual(presentedHash, configuredHash) : false
+  const okHash = configuredHash ? verifyPinHash(pin, configuredHash) : false
   const okPlain = configuredPlain ? constantTimeEqual(pin, configuredPlain) : false
   if (!(okHash || okPlain)) {
     fails.push(now)
