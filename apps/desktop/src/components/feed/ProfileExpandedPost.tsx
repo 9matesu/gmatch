@@ -16,7 +16,6 @@ import {
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { FeedPost, PostComment } from './GMatchFeed';
 import { ObjectImage } from '../ObjectImage';
-import { NativeVideoPlayer } from '../media/NativeVideoPlayer';
 import { isVideoPost, resolveMediaUrl } from '../../utils/media';
 import { timeAgo } from '../../utils/timeAgo';
 import { formatLikedBy } from '../../utils/likedBy';
@@ -112,6 +111,12 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
     }
   }
   const activeMedia = mediaItems[activeMediaIndex] || mediaItems[0] || null;
+  // A single-media post must resolve through the SAME addressable source the
+  // fullscreen viewer uses (post.localPreviewUrl || post.url, object id post.id).
+  // A per-item media url can be a raw provider link (redgifs) that <img> cannot
+  // hotlink, so the inline tile went black while the modal — using post.url —
+  // resolved. Multi-media carousels still address each item by its own id.
+  const singleMedia = mediaItems.length <= 1;
 
   const isExpandedMediaVideo = (url?: string | null, mime?: string | null): boolean =>
     isVideoPost(mime, url, mediaItems.map((m) => m.mime));
@@ -195,33 +200,15 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
         onClick={() => { if (post.id) window.dispatchEvent(new CustomEvent('gmatch-open-image', { detail: { id: post.id, authorName: post.author_name || 'You', url: post.localPreviewUrl || post.url, contentHash: post.content_hash } })); }}
         onDoubleClick={handleDoubleTap}
       >
-        {post.localPreviewUrl ? (
-          isExpandedMediaVideo(post.localPreviewUrl, post.mime_type) ? (
-            <NativeVideoPlayer
-              key={post.localPreviewUrl}
-              src={post.localPreviewUrl}
-              className="w-full h-full max-h-(--max-h-sheet) object-contain"
-              videoClassName="w-full h-full max-h-(--max-h-sheet) object-contain"
-              autoPlay={true}
-              controls={true}
-              alwaysShowControls={true}
-              loop={true}
-              muted={true}
-              onDoubleTapLike={handleDoubleTap}
-            />
-          ) : (
-            <img
-              src={post.localPreviewUrl}
-              alt={post.caption || ''}
-              className="w-full h-full object-contain max-h-(--max-h-sheet)"
-              draggable={false}
-            />
-          )
-        ) : activeMedia && isExpandedMediaVideo(activeMedia.url, activeMedia.mime) ? (
+        {/* ObjectImage (with contentHash) is the ONE resolver — the same one the
+            fullscreen viewer uses. A raw `localPreviewUrl` <img> short-circuited
+            it and rendered blank for a peer post whose bytes resolve by hash. */}
+        {activeMedia && isExpandedMediaVideo(activeMedia.url, activeMedia.mime) ? (
           <ObjectImage
             key={activeMedia.url}
-            contentUrl={activeMedia.url}
-            objectId={activeMedia.id || post.id}
+            contentUrl={singleMedia ? (post.localPreviewUrl || post.url) : activeMedia.url}
+            objectId={singleMedia ? post.id : (activeMedia.id || post.id)}
+            contentHash={post.content_hash}
             identity={identity}
             mimeType={activeMedia.mime || post.mime_type}
             loading="eager"
@@ -236,12 +223,13 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
           />
         ) : (
           <ObjectImage
-            contentUrl={post.localPreviewUrl || activeMedia?.url || post.url}
-            objectId={activeMedia?.id || post.id}
+            contentUrl={singleMedia ? (post.localPreviewUrl || post.url) : (activeMedia?.url || post.localPreviewUrl || post.url)}
+            objectId={singleMedia ? post.id : (activeMedia?.id || post.id)}
             contentHash={post.content_hash}
             identity={identity}
             mimeType={activeMedia?.mime || post.mime_type}
             alt=""
+            loading="eager"
             hideUnavailable
             className="w-full h-full object-contain max-h-(--max-h-sheet)"
             muted={false}

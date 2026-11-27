@@ -31,6 +31,7 @@ import { PasskeyManager } from '../PasskeyManager';
 import { UpdateSection } from './UpdateSection';
 import { CommunitySection } from './CommunitySection';
 import { ImportPostsSection } from './ImportPostsSection';
+import { RecacheMediaSection } from './RecacheMediaSection';
 import { BlocklistSection } from './BlocklistSection';
 import { CacheViewer } from './CacheViewer';
 import {
@@ -929,6 +930,9 @@ export function GMatchSettingsModal({
 
             {/* Opt-in migration: share posts published before local-first. */}
             {activeTab === 'preferences' && <ImportPostsSection identity={identity} toast={toast} />}
+
+            {/* Opt-in legacy measure: fetch keepsakes that predate local bytes. */}
+            {activeTab === 'preferences' && <RecacheMediaSection toast={toast} />}
 
             {/* ──────── 2. ACCOUNT & SECURITY ──────── */}
             {activeTab === 'account' && (
