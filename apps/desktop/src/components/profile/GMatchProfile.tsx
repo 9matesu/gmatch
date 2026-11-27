@@ -614,7 +614,7 @@ export function GMatchProfile({
             {cards.slice(0, 12).map((card) => (
               <div
                 key={card.id}
-                onClick={() => zoom.showZoom(card.content_url || (card as any).data || (card as any).url || `/api/objects/${card.id}`, { title: (card as any).name || 'Card' })}
+                onClick={() => zoom.showZoom(card.content_url || (card as any).data || (card as any).url || `/api/objects/${card.id}`, { title: `${(card as any).name || 'Card'}`, subtitle: (card as any).rarity || (card as any).tier || undefined })}
                 className="relative aspect-square bg-surface-canvas overflow-hidden cursor-pointer group"
               >
                 <ObjectImage
