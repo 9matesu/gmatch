@@ -7,7 +7,7 @@
  * invented: a failed probe says it failed, and an unavailable bridge says so.
  * All side effects are injected so the component can be exercised in tests.
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { ComponentType } from 'react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import {
@@ -278,9 +278,16 @@ export function DiagnosticsSection({
   identity?: OrbitIdentity | null
   deps?: Partial<DiagnosticsDeps>
 }) {
+  // `injected` is read through a ref so the memo depends only on `identity`:
+  // a caller passing a fresh object literal every render must not rebuild the
+  // computed deps (and so every action's function identity) on each render.
+  // Shortcut: injected deps are fixed until identity changes — upgrade when a
+  // caller needs to swap deps mid-session.
+  const injectedRef = useRef(injected)
+  injectedRef.current = injected
   const deps = useMemo<DiagnosticsDeps>(
-    () => ({ ...makeDefaultDeps(identity ?? null), ...injected }),
-    [identity, injected],
+    () => ({ ...makeDefaultDeps(identity ?? null), ...injectedRef.current }),
+    [identity],
   )
   const [busy, setBusy] = useState<ActionKey | null>(null)
   const [results, setResults] = useState<Record<ActionKey, ActionResult>>({

@@ -16,11 +16,12 @@ const rowFor = (name: string): HTMLElement =>
   screen.getByText(name).closest('li') as HTMLElement;
 
 describe('peerChipStatus — the three honest states', () => {
-  it('only calls a peer "connected direct" on a validated direct phase', () => {
-    expect(peerChipStatus(peer('a', 'Alpha'), 'direct')).toBe('connected-direct');
+  it('calls a peer "connected" on a validated direct path or a live relay', () => {
+    expect(peerChipStatus(peer('a', 'Alpha'), 'direct')).toBe('connected');
+    expect(peerChipStatus(peer('a', 'Alpha'), 'relay')).toBe('connected');
     expect(peerChipStatus(peer('a', 'Alpha'), 'connecting-direct')).toBe('connecting');
-    expect(peerChipStatus(peer('a', 'Alpha'), 'relay')).toBe('connecting');
-    expect(peerChipStatus(peer('a', 'Alpha'), 'idle')).toBe('connecting');
+    // idle has no dial in flight, so it reads as cannot-connect, not connecting.
+    expect(peerChipStatus(peer('a', 'Alpha'), 'idle')).toBe('cannot-connect');
   });
 
   it('calls a failed dial or an offline roster row "cannot connect"', () => {
@@ -71,7 +72,7 @@ describe('PeerChip', () => {
     const dialog = screen.getByRole('dialog', { name: 'Connected peers' });
     expect(dialog).toHaveTextContent('Alpha');
     expect(dialog).toHaveTextContent('Beta');
-    expect(rowFor('Alpha')).toHaveTextContent(PEER_STATUS_LABEL['connected-direct']);
+    expect(rowFor('Alpha')).toHaveTextContent(PEER_STATUS_LABEL.connected);
     expect(rowFor('Beta')).toHaveTextContent(PEER_STATUS_LABEL.connecting);
   });
 
@@ -87,7 +88,7 @@ describe('PeerChip', () => {
     expect(rowFor('Beta')).toHaveTextContent(PEER_STATUS_LABEL.connecting);
 
     act(() => { registry.markDirectValidated('b') });
-    expect(rowFor('Beta')).toHaveTextContent(PEER_STATUS_LABEL['connected-direct']);
+    expect(rowFor('Beta')).toHaveTextContent(PEER_STATUS_LABEL.connected);
   });
 
   it('offers retry only for peers that cannot connect, with the peer id', () => {
@@ -97,16 +98,20 @@ describe('PeerChip', () => {
     act(() => {
       roster.upsert(peer('a', 'Alpha'));
       roster.upsert(peer('b', 'Beta'));
+      roster.upsert(peer('d', 'Delta'));
       roster.hydrate([peer('c', 'Ghost', false)]);
       registry.markDirectValidated('a');
       // hasRelay=false is the only path that parks a peer in `failed` (with a
       // relay the transport honestly reports `relay` = still reachable).
       registry.markDirectFailed('b', 'no relay path', false);
+      // Delta is left in `idle` (no dial in flight) — it must read cannot-connect
+      // and be offered Retry just like a failed dial.
     });
     render(<PeerChip roster={roster} registry={registry} onRetry={onRetry} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Peers, 2 connected' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Peers, 3 connected' }));
 
     const retryBeta = screen.getByRole('button', { name: 'Retry connecting to Beta' });
+    expect(screen.getByRole('button', { name: 'Retry connecting to Delta' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry connecting to Ghost' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Retry connecting to Alpha' })).toBeNull();
     fireEvent.click(retryBeta);

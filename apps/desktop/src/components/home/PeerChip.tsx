@@ -27,38 +27,43 @@ import {
   classes,
 } from '../../ui/tokens';
 
-/** The three honest display states. A peer is never called "direct" on
- *  presence alone — only a validated DataChannel earns that label. */
-export type PeerChipStatus = 'connected-direct' | 'connecting' | 'cannot-connect';
+/** The three honest display states. A relayed peer is still a connected peer:
+ *  `direct` and `relay` both collapse into `connected`, so the chip never
+ *  distinguishes the transport a peer happens to ride. `connecting` is a
+ *  genuinely in-flight dial; `cannot-connect` is a failed or offline peer. */
+export type PeerChipStatus = 'connected' | 'connecting' | 'cannot-connect';
 
 export const PEER_STATUS_LABEL: Record<PeerChipStatus, string> = {
-  'connected-direct': 'Connected direct',
+  connected: 'Connected',
   connecting: 'Connecting',
   'cannot-connect': 'Cannot connect',
 };
 
 /**
  * Map the transport registry's five phases onto the three statuses the chip
- * shows. `relay` and `idle` still have frames flowing (over the node), so they
- * read as "connecting" — never as a direct path we cannot prove. An offline
- * roster row is a peer we cannot reach right now.
+ * shows. `direct` and `relay` are both a live, settled connection, so they read
+ * as `connected` — the user never sees which transport is in use. Only
+ * `connecting-direct` is a genuinely in-flight dial (`connecting`); `idle` has
+ * no dial in flight and an offline roster row is a peer we cannot reach right
+ * now, so both read as `cannot-connect`.
  */
 export function peerChipStatus(peer: User | undefined, phase: PeerTransportPhase): PeerChipStatus {
   if (!peer || peer.online !== true) return 'cannot-connect';
   switch (phase) {
-    case 'direct': return 'connected-direct';
-    case 'failed': return 'cannot-connect';
-    default: return 'connecting';
+    case 'direct': return 'connected';
+    case 'relay': return 'connected';
+    case 'connecting-direct': return 'connecting';
+    default: return 'cannot-connect';
   }
 }
 
 const STATUS_TEXT: Record<PeerChipStatus, string> = {
-  'connected-direct': STATUS.success,
+  connected: STATUS.success,
   connecting: STATUS.warningSoft,
   'cannot-connect': STATUS.danger,
 };
 const STATUS_DOT: Record<PeerChipStatus, string> = {
-  'connected-direct': 'bg-success-fg',
+  connected: 'bg-success-fg',
   connecting: STATUS.warningDot,
   'cannot-connect': 'bg-retro-error',
 };

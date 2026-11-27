@@ -128,4 +128,23 @@ describe('DiagnosticsSection', () => {
       expect(screen.getByRole('button', { name })).toBeTruthy()
     }
   })
+
+  it('keeps the computed deps identity stable across a rerender with a new injected object', async () => {
+    const first = makeDeps()
+    const firstGetApiBase = vi.mocked(first.getApiBase)
+    // A brand-new injected object literal, exactly what a caller re-rendering
+    // would hand us. The memo depends only on `identity`, so the deps object
+    // (and the functions it closes over) must not be rebuilt.
+    const second = makeDeps({ getApiBase: vi.fn(() => 'http://10.0.0.9:8790') })
+    const secondGetApiBase = vi.mocked(second.getApiBase)
+
+    const { rerender } = render(<DiagnosticsSection deps={first} />)
+    await act(async () => { rerender(<DiagnosticsSection deps={second} />) })
+
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Diagnose' })) })
+
+    // The FIRST injected deps are retained; the second object is never read.
+    expect(firstGetApiBase).toHaveBeenCalled()
+    expect(secondGetApiBase).not.toHaveBeenCalled()
+  })
 })
