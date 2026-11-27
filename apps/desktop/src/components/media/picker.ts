@@ -12,7 +12,7 @@
  * No second cache: bytes stay where the vault/gallery/clipboard put them.
  */
 
-export type MediaPickerSource = 'browse' | 'upload' | 'url' | 'clipboard';
+export type MediaPickerSource = 'browse' | 'upload' | 'url' | 'clipboard' | 'camera';
 
 export type MediaSelection =
   | { kind: 'url'; url: string; name?: string; source: MediaPickerSource }
@@ -21,8 +21,8 @@ export type MediaSelection =
 export type MediaPickerOptions = {
   /** Kinds of media the caller can consume. Default: images only. */
   accept?: Array<'image' | 'video'>;
-  /** Which panes to show. Default: all three. */
-  sources?: Array<'browse' | 'upload' | 'url'>;
+  /** Which panes to show. Default: browse, upload, url. */
+  sources?: Array<'browse' | 'upload' | 'url' | 'camera'>;
   title?: string;
 };
 

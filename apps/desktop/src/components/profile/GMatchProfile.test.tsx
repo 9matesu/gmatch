@@ -68,8 +68,8 @@ describe('GMatchProfile', () => {
     );
     const avatarButton = screen.getByRole('button', { name: 'Change profile photo' });
     await userEvent.click(avatarButton);
-    expect(screen.getByText('Profile photo')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Apply' })).toBeInTheDocument();
+    // The profile photo flow IS the shared media picker now (no second modal).
+    expect(await screen.findByRole('dialog', { name: 'Pick a profile photo' })).toBeInTheDocument();
   });
 
   it('opens ProfileEditorModal when clicking Edit profile', async () => {

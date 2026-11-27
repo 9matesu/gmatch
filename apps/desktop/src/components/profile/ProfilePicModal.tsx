@@ -31,7 +31,7 @@ export function ProfilePicModal({
   const { crop, cropper } = useCropper();
   const { open: openMediaPicker, picker: mediaPickerEl } = useMediaPicker({
     accept: ['image'],
-    sources: ['browse', 'upload', 'url'],
+    sources: ['browse', 'upload', 'url', 'camera'],
     title: 'Pick a profile photo',
   });
 

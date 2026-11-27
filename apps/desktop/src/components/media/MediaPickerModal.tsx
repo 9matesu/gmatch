@@ -11,7 +11,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FolderOpen, Image as ImageIcon, LinkIcon, Loader2, UploadCloud, X } from 'lucide-react';
+import { Camera, FolderOpen, Image as ImageIcon, LinkIcon, Loader2, UploadCloud, X } from 'lucide-react';
+import { CameraCapture } from '../CameraCapture';
 import { useGame } from '../../game/store';
 import type { GalleryImage } from '../../game/types';
 import { useVaultHttpUrls, useVaultUrls } from '../../services/vault';
@@ -24,7 +25,7 @@ import {
   type MediaSelection,
 } from './picker';
 
-type Pane = 'browse' | 'upload' | 'url';
+type Pane = 'browse' | 'upload' | 'url' | 'camera';
 
 type Pending =
   | { kind: 'url'; url: string; name?: string; source: MediaSelection['source'] }
@@ -281,6 +282,7 @@ export function MediaPickerPanel({
         {sources.includes('browse') && tabBtn('browse', 'Your media', FolderOpen)}
         {sources.includes('upload') && tabBtn('upload', 'Upload', UploadCloud)}
         {sources.includes('url') && tabBtn('url', 'Paste URL', LinkIcon)}
+        {sources.includes('camera') && tabBtn('camera', 'Camera', Camera)}
       </div>
 
       <div className={`flex-1 overflow-y-auto ${compact ? 'p-3' : 'p-4'} space-y-3 styled-scrollbar`}>
@@ -436,6 +438,13 @@ export function MediaPickerPanel({
               </div>
               <p className="text-2xs text-retro-muted">The media is previewed before it is attached — broken links are caught here.</p>
             </div>
+          )}
+
+          {pane === 'camera' && (
+            <CameraCapture
+              onCapture={(file) => { takeFile(file, 'camera'); setPane('upload'); }}
+              onCancel={() => setPane(sources.includes('browse') ? 'browse' : 'upload')}
+            />
           )}
 
           {pending && (
