@@ -18,6 +18,8 @@ import type { GalleryImage } from '../../game/types';
 import { useVaultHttpUrls, useVaultUrls } from '../../services/vault';
 import { releaseLocalUrl, resolveFreshLocalUrl } from '../../services/keepsake';
 import { resolveGalleryTileUrl, useKeepsakeLocalUrls } from '../grid/IdleGalleryView';
+import { resolveContentAddressedMedia } from '../../utils/contentAddressedMedia';
+import { registerLocalObject } from '../../utils/p2pSwarm';
 import {
   fileAccepted,
   plausibleMediaUrl,
@@ -171,6 +173,7 @@ export function MediaPickerPanel({
     setBusyKeepId(img.id);
     setError(null);
     let fresh: string | null = null;
+    let blob: Blob | null = null;
     try {
       fresh = await resolveFreshLocalUrl(img);
       if (!fresh) {
@@ -184,18 +187,26 @@ export function MediaPickerPanel({
           /^https?:\/\/(127\.0\.0\.1|localhost)([:/]|$)/i.test(display);
         if (isLocalDisplay) fresh = display;
       }
-      if (!fresh) {
-        setError('No local copy of this keepsake on this device yet — open it in the Gallery first so the bytes are fetched.');
-        return;
+      if (fresh) {
+        const res = await fetch(fresh);
+        if (res.ok) blob = await res.blob();
       }
-      const res = await fetch(fresh);
-      if (!res.ok) {
-        setError('The local copy of that keepsake could not be read. Open it in the Gallery to repair it first.');
-        return;
+      // Auto-fetch from the swarm when THIS device holds no local copy yet. A
+      // keepsake is addressed by its content hash, so any peer holding the
+      // bytes can serve them now — the player never has to open the Gallery
+      // first to "fetch" what the picker can fetch itself.
+      if (!blob || !blob.size) {
+        const hash = img.localRef && /^[0-9a-f]{64}$/i.test(img.localRef) ? img.localRef : null;
+        if (hash) {
+          const fetched = await resolveContentAddressedMedia(null, hash);
+          if (fetched && fetched.size) {
+            try { registerLocalObject(hash, fetched); } catch { /* seed best-effort */ }
+            blob = fetched;
+          }
+        }
       }
-      const blob = await res.blob();
-      if (!blob.size) {
-        setError('The local copy of that keepsake is empty. Open it in the Gallery to repair it first.');
+      if (!blob || !blob.size) {
+        setError('No local copy of this keepsake on this device yet, and no peer answered. Keep a seeder online and try again.');
         return;
       }
       const mime = blob.type || 'application/octet-stream';
