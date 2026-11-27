@@ -26,7 +26,7 @@ import { useProfilePostLightbox } from '../feed/useProfilePostLightbox';
 import { ObjectImage } from '../ObjectImage';
 import { isVideoPost } from '../../utils/media';
 import { saveUserProfile } from '../../utils/profile';
-import { ZoomModal, useZoomModal } from '../CardZoomModalHost';
+import { openCardDetail } from '../../utils/openCard';
 import { profileShareUrl, orbitFetch, invalidateCache } from '../../utils/api';
 import { mergeFollowIds } from '../../utils/followList';
 import { usePeerFollowEdges } from '../../hooks/usePeerFollows';
@@ -130,7 +130,6 @@ export function GMatchProfile({
     onReportPost,
     onEditPost,
   });
-  const zoom = useZoomModal();
   const [bio, setBio] = useState(() => myUser?.bio || '');
   const [website, setWebsite] = useState(() => myUser?.website || '');
   const [displayName, setDisplayName] = useState(
@@ -614,7 +613,7 @@ export function GMatchProfile({
             {cards.slice(0, 12).map((card) => (
               <div
                 key={card.id}
-                onClick={() => zoom.showZoom(card.content_url || (card as any).data || (card as any).url || `/api/objects/${card.id}`, { title: `${(card as any).name || 'Card'}`, subtitle: (card as any).rarity || (card as any).tier || undefined })}
+                onClick={() => openCardDetail(card)}
                 className="relative aspect-square bg-surface-canvas overflow-hidden cursor-pointer group"
               >
                 <ObjectImage
@@ -681,7 +680,6 @@ export function GMatchProfile({
 
       {/* Share / options / likers sheets for the expanded post */}
       {postLightboxModals}
-      <ZoomModal zoom={zoom} identity={identity} />
     </div>
   );
 }
