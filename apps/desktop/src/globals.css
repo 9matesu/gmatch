@@ -1214,6 +1214,14 @@ select.bg-transparent {
 .animate-orbit-match-flux { animation: orbit-match-flux .45s cubic-bezier(.16,1,.3,1) both; }
 .animate-orbit-slide-left { animation: orbit-slide-left .3s cubic-bezier(.16,1,.3,1) both; }
 .animate-orbit-slide-in-left { animation: orbit-slide-in-left .3s cubic-bezier(.16,1,.3,1) both; }
+/* Holographic foil (ported from react-holo-card-effect's gold/teal palette):
+   a slow position shift, no rainbow hue. */
+@keyframes holo-shift {
+  0% { background-position: 0% 0%; }
+  50% { background-position: 100% 100%; }
+  100% { background-position: 0% 0%; }
+}
+.animate-holo { animation: holo-shift 6s ease infinite; background-size: 300% 300%; }
 .animate-orbit-tier-flash { animation: orbit-tier-flash .5s cubic-bezier(.16,1,.3,1) both; }
 .animate-orbit-feed-in { animation: orbit-feed-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .create-action {

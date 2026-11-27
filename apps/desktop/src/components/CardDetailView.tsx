@@ -229,11 +229,11 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
         </div>
 
         {/* Content */}
-        <div className="p-5 space-y-4 overflow-y-auto">
-          {/* Card media — ObjectImage does the signed object fetch (raw
-              /api/objects URLs are auth-protected and fail as plain <img>). */}
+        <div className="p-5 overflow-y-auto">
+          <div className="grid md:grid-cols-2 gap-5 items-start">
+          {/* Left: the card only, with outline + holographic foil. */}
           <div className="flex justify-center">
-            <div className="glass-card max-w-sm w-full overflow-hidden rounded-lg">
+            <div className="glass-card max-w-sm w-full overflow-hidden rounded-lg relative">
               <ObjectImage
                 objectId={card.mediaObjectId}
                 contentUrl={card.contentUrl}
@@ -243,8 +243,16 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
                 className="w-full aspect-[3/3.4] object-cover"
                 videoClassName="w-full aspect-[3/3.4] object-cover"
               />
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 opacity-30 mix-blend-color-dodge animate-holo"
+                style={{ background: 'linear-gradient(115deg, transparent 0%, #54a29e 25%, transparent 47%, transparent 53%, #a79d66 75%, transparent 100%)' }}
+              />
             </div>
           </div>
+
+          {/* Right: all the info. */}
+          <div className="space-y-4 min-w-0">
 
           {/* Compact stat row */}
           <div className="flex items-center gap-2 flex-wrap text-xs">
@@ -409,6 +417,8 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
               )}
             </div>
           )}
+          </div>
+          </div>
         </div>
       </div>
     </div>

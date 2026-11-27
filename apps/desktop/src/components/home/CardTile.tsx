@@ -229,6 +229,11 @@ export function CardTile({
             preload="none"
             onError={handleMediaError}
           />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 opacity-20 mix-blend-color-dodge animate-holo"
+            style={{ background: 'linear-gradient(115deg, transparent 0%, #54a29e 25%, transparent 47%, transparent 53%, #a79d66 75%, transparent 100%)' }}
+          />
           {isVid && <MediaBadge className="absolute bottom-1.5 right-1.5 z-10" />}
         </div>
 
