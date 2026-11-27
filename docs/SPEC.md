@@ -459,7 +459,7 @@ product path.
 - **A stuck signed fetch gives up (2026-11-25).** `ObjectImage` had no ceiling
   for a signed fetch still in flight, so a request queued behind the 3-slot pool
   (dozens of old rows) could read "Loading media…" for the life of the session.
-  A hard cap (`HARD_UNAVAILABLE_CAP_MS` = 30s) now applies when bytes are still
+  A hard cap (`HARD_UNAVAILABLE_CAP_MS` = 8s) now applies when bytes are still
   expected; an explicit budget (a 5s story) still wins.
 - **The tag browser can pin a source (2026-11-25).** A source picker (All +
   imhentai/tbib/xbooru/…) passes `source` through `fetchPosts` to the main

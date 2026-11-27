@@ -82,8 +82,10 @@ export interface ObjectImageProps {
 /** Default strict-availability budget for unbounded surfaces. */
 const DEFAULT_UNAVAILABLE_TIMEOUT_MS = 6000
 /** Absolute ceiling for a signed fetch still in flight: after this the tile
- *  gives up ("No preview") instead of loading forever behind the 3-slot pool. */
-const HARD_UNAVAILABLE_CAP_MS = 30_000
+ *  gives up (hidden, reversibly) instead of loading forever behind the 3-slot
+ *  pool. Snappy on purpose: a row with no local bytes and no seeder must not
+ *  sit in the feed waiting; a peer-online / HAVE re-promotes it. */
+const HARD_UNAVAILABLE_CAP_MS = 8_000
 
 const OBJECT_PATH = '/api/objects/'
 
