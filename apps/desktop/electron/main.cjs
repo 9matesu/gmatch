@@ -72,16 +72,7 @@ function mainLog(line) {
   try { appendWithRotation(mainLogPath(), line) } catch { /* last resort only */ }
 }
 
-// Closing the window is not quitting (gMatch lives in the tray). Only an
-// explicit "Sair do gMatch", a Windows session end, or the updater's
-// restart may end the process; every path sets this first.
-let isQuitting = false
-let appTray = null
 // Notification state (badge/overlay/flash/native toasts) lives in ./ipc/notify.cjs.
-function quitApp() {
-  isQuitting = true
-  app.quit()
-}
 
 // Startup sampler (see startupMetrics.cjs). Module-level so createWindow's
 // did-finish-load handler and the renderer's boot:mark IPC can reach it.
@@ -101,7 +92,6 @@ const { createSidecarSupervisor } = require('./sidecarSupervision.cjs')
 const mediaqInstaller = require('./mediaqInstaller.cjs')
 const mediaqSidecar = require('./mediaqSidecar.cjs')
 const registerMediaqHandlers = require('./ipc/mediaq.cjs')
-const { createTray } = require('./tray.cjs')
 const serverMode = require('./server-mode.cjs')
 
 // Secure KV (security plan B.3): renderer's sensitive localStorage keys are
@@ -1085,8 +1075,6 @@ const registerBooruHandlers = require("./ipc/booru.cjs")
 const registerUpdateHandlers = require("./ipc/update.cjs")
 const notify = registerNotifyHandlers({
   ipcMain, app, mainLog,
-  getTray: () => appTray,
-  trayStatus: (text) => appTray?.setTooltip(text),
 })
 const imhentai = createImhentaiSource({
   net, httpGet, ua: UA, htmlTimeoutMs: HTML_TIMEOUT_MS, galleryCap: GALLERY_CAP,
@@ -1265,15 +1253,6 @@ function createWindow() {
   win.on('moved', persistBounds)
   win.on('resized', persistBounds)
   win.removeMenu()
-  // Close = minimize to tray (gMatch lives in the tray). Only an explicit
-  // quit (tray "Sair", session end, updater restart) sets isQuitting and
-  // lets the close through.
-  win.on('close', (e) => {
-    if (!isQuitting) {
-      e.preventDefault()
-      win.minimize()
-    }
-  })
   // Energy: a hidden/minimized window must not keep compositing. Chromium's
   // background throttling is disabled globally here (a throttled window used
   // to come back with a stale frame), so it is switched ON only while the
@@ -1413,9 +1392,8 @@ app.whenReady().then(async () => {
   registerDominationMediaHandlers({ ipcMain, app, wallpaperWin, domVideo, mainLog })
   ipcMain.handle('camera:grant-once', () => { cameraGrantOnce = true; return { ok: true } })
   app.on('session-end', () => {
-    // Logoff/shutdown: no prompt, no tray, just go (and save what we have).
+    // Logoff/shutdown: just go (and save what we have).
     mainLog('session-end: quitting')
-    isQuitting = true
   })
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
     if (permission === 'media' && cameraGrantOnce) {
@@ -1458,7 +1436,7 @@ app.whenReady().then(async () => {
   registerUpdateHandlers({
     ipcMain, app,
     getUpdater: () => updater,
-    onInstall: () => { isQuitting = true },
+    onInstall: () => { app.quit() },
   })
   // Topology: packaged builds default to HOST mode (bundled Bun sidecar,
   // fully local — no Render required). Client mode (friend's node or central
@@ -1514,20 +1492,6 @@ app.whenReady().then(async () => {
   mainLog(`boot: creating window (v${app.getVersion()}, packaged=${app.isPackaged})`)
   createWindow()
   bootMetrics.mark('window.created')
-  // The tray is the exit: the window closing never quits, so without this
-  // there would be no way out at all.
-  const focusWindow = () => {
-    const w = BrowserWindow.getAllWindows()[0]
-    if (!w) { try { createWindow() } catch { /* best effort */ } return }
-    if (w.isMinimized()) w.restore()
-    w.show()
-    w.focus()
-  }
-  try {
-    appTray = createTray({ onOpen: focusWindow, onQuit: quitApp })
-  } catch (err) {
-    mainLog(`tray unavailable: ${err?.message || err}`)
-  }
   updater?.schedule()
   // Start the bundled server in the background (host mode only). Failures
   // surface as dialogs + log lines; they can never take the window with them.
@@ -1600,14 +1564,10 @@ app.on('before-quit', () => {
   apiSidecar.stopApi(); mediaqSidecar.stopMediaq(); try { if (secureKV) secureKV.flush() } catch { /* best effort */ }
 })
 app.on('will-quit', () => {
-  try { appTray?.destroy() } catch { /* already gone */ }
-  appTray = null
   apiSidecar.stopApi()
   mediaqSidecar.stopMediaq()
 })
 
 app.on('window-all-closed', () => {
-  // Windows/Linux: the app stays in the tray (the mesh keeps running).
-  // macOS already behaves this way.
-  if (isQuitting) quitApp()
+  app.quit()
 })

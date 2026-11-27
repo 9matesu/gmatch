@@ -57,7 +57,6 @@ contextBridge.exposeInMainWorld('gmatch', {
   winMinimize: () => ipcRenderer.send('window:minimize'),
   winToggleMaximize: () => ipcRenderer.send('window:toggle-maximize'),
   winClose: () => ipcRenderer.send('window:close'),
-  trayStatus: (text) => ipcRenderer.send('tray:status', String(text || '')),
   /** The merged unread count; the main process owns what the OS shows. */
   notifySync: (payload) =>
     ipcRenderer.send('notify:sync', payload),

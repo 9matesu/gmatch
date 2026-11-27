@@ -6,7 +6,7 @@ const { join } = require('node:path')
 const { BrowserWindow, Notification } = require('electron')
 const { ensureOverlayIcons } = require('../overlay-icons.cjs')
 
-module.exports = function registerNotifyHandlers({ ipcMain, app, mainLog, getTray, trayStatus }) {
+module.exports = function registerNotifyHandlers({ ipcMain, app, mainLog }) {
   let unreadCount = 0
 
   /** Icons are generated once per userData dir and reused. */
@@ -34,9 +34,6 @@ module.exports = function registerNotifyHandlers({ ipcMain, app, mainLog, getTra
         win.flashFrame(true)
       }
     } catch { /* overlay is an enhancement, never a crash */ }
-    getTray()?.setTooltip(
-      unreadCount > 0 ? `gMatch \u2014 ${unreadCount} unread` : 'gMatch',
-    )
     return grew
   }
 
@@ -63,10 +60,8 @@ module.exports = function registerNotifyHandlers({ ipcMain, app, mainLog, getTra
     }
   })
 
-  ipcMain.on('tray:status', (_e, text) => trayStatus(text))
   // The merged unread count is the renderer's (one store feeds the badge, the
-  // overlay, the tray and the centre). The main process only decides what the
-  // OS shows with it.
+  // overlay and the centre). The main process only decides what the OS shows.
   ipcMain.on('notify:read', () => applyUnread(0))
   ipcMain.on('notify:sync', (_e, payload) => {
     try {

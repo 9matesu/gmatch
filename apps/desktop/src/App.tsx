@@ -2139,14 +2139,6 @@ export default function Home() {
     window.gmatch?.bootMark?.('mesh:ready')
   }, [isWsConnected])
   const peerPresenceKey = peers.map((p) => p.id).filter(Boolean).join(',')
-  // The tray tooltip is the only state a user sees when the window is closed.
-  useEffect(() => {
-    const n = peerPresenceKey ? peerPresenceKey.split(',').length : 0
-    const link = isWsConnected ? 'connected' : 'reconnecting'
-    window.gmatch?.trayStatus?.(
-      n > 0 ? `gMatch - ${link} - ${n} ${n === 1 ? 'peer' : 'peers'}` : `gMatch - ${link}`,
-    )
-  }, [peerPresenceKey, isWsConnected])
   useEffect(() => {
     if (!peerPresenceKey) return
     const seenAt = new Date().toISOString()

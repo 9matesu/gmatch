@@ -109,8 +109,6 @@ export interface GmatchBridge {
   winMinimize?: () => void
   winToggleMaximize?: () => void
   winClose?: () => void
-  /** Tray tooltip text: the only state visible with the window closed. */
-  trayStatus?: (text: string) => void
   notifySync?: (payload: { count: number; title?: string; body?: string; hideContent?: boolean }) => void
   notifyRead?: () => void
   onNotifyOpened?: (cb: () => void) => () => void
