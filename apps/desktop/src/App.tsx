@@ -37,7 +37,7 @@ import { mapLimit } from "./services/booru";
 import { vaultPin, vaultHttpUrl } from "./services/vault";
 import { devFetchable } from "./services/imageCache";
 import { hashForView, resolveInitialView, viewFromHash } from "./utils/routing";
-import { playChime, playPress } from "./utils/sounds";
+import { playPress } from "./utils/sounds";
 import { useLobby } from "./hooks/useLobby";
 import { UserProfileModal } from "./components/UserProfileModal";
 import { EditPostModal } from "./components/feed/EditPostModal";
@@ -2605,9 +2605,6 @@ export default function Home() {
         if (newest && newest.owner_id !== identity.orbitId) {
           const alreadyNotified = notifiedIdsRef.current.has(newest.id)
           if (!alreadyNotified) {
-            if (currentSettings.soundEffects) {
-              try { playChime(); } catch { }
-            }
             if (currentSettings.autoOpenImages && typeof document !== 'undefined' && document.hidden) {
               // Only auto-open when the user is away at arrival so it never
               // hijacks active navigation.
@@ -3022,7 +3019,6 @@ export default function Home() {
               })
 
               setItems(prev => [newItem, ...prev])
-              try { playChime() } catch { }
               peer.close()
             }
           }
