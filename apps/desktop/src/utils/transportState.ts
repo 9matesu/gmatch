@@ -65,6 +65,8 @@ export interface TransportRegistryOptions {
 }
 
 export interface TransportRegistry {
+  /** Subscribe to phase changes — chrome reads this to stay live, never a copy. */
+  subscribe(listener: () => void): () => void
   snapshot(): ReadonlyMap<string, PeerTransportEntry>
   phaseFor(peerId: string): PeerTransportPhase
   /** A direct handshake starts; deadline-bounded. */
@@ -93,6 +95,11 @@ export function createTransportRegistry(options: TransportRegistryOptions = {}):
   const baseRetry = options.baseRetryMs ?? 1_500
   const maxRetry = options.maxRetryMs ?? 30_000
   const peers = new Map<string, PeerTransportEntry>()
+  const listeners = new Set<() => void>()
+
+  function emit(): void {
+    for (const listener of listeners) listener()
+  }
 
   function entry(peerId: string): PeerTransportEntry {
     let found = peers.get(peerId)
@@ -105,15 +112,21 @@ export function createTransportRegistry(options: TransportRegistryOptions = {}):
 
   function setPhase(peerId: string, phase: PeerTransportPhase, failure?: string): PeerTransportEntry {
     const e = entry(peerId)
-    if (e.phase !== phase) {
+    const changed = e.phase !== phase
+    if (changed) {
       e.phase = phase
       e.lastChangeAt = now()
     }
     e.lastFailure = failure
+    if (changed) emit()
     return e
   }
 
   return {
+    subscribe(listener) {
+      listeners.add(listener)
+      return () => { listeners.delete(listener) }
+    },
     snapshot() { return peers },
     phaseFor(peerId) { return peers.get(peerId)?.phase ?? 'idle' },
     startDirectAttempt(peerId) {
@@ -171,3 +184,10 @@ export function createTransportRegistry(options: TransportRegistryOptions = {}):
     },
   }
 }
+
+/**
+ * The ONE registry the P2P hook and the header peer chip read. A component
+ * never builds its own transport state: every phase transition the swarm makes
+ * is the phase this instance reports.
+ */
+export const swarmTransportRegistry = createTransportRegistry()

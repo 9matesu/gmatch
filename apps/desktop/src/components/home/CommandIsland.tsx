@@ -27,6 +27,8 @@ import { playPress } from '../../utils/sounds';
 import { useCommunityInvite, openCommunityInvite } from '../../services/community';
 import { resolveMediaUrl } from '../../utils/media';
 import { CountBadge } from './CountBadge';
+import { PeerChip } from './PeerChip';
+import type { PeerRoster } from '../../utils/peerRoster';
 import { MediaPickerPanel } from '../media/MediaPickerModal';
 import type { MediaSelection } from '../media/picker';
 import type { ViewMode } from '../../game/types';
@@ -96,6 +98,12 @@ export interface CommandIslandProps {
   /** Toggle the left notification sidebar. */
   onToggleNotifications?: () => void;
   notificationsOpen?: boolean;
+  /** Live P2P roster behind the header peer-count chip. */
+  roster?: PeerRoster;
+  /** Re-dial handler offered on peers that cannot connect. */
+  onRetryPeer?: (peerId: string) => void;
+  /** Our own id, never counted as a peer. */
+  selfId?: string;
 }
 
 export function CommandIsland({
@@ -128,6 +136,9 @@ export function CommandIsland({
   notificationCount = 0,
   onToggleNotifications,
   notificationsOpen = false,
+  roster,
+  onRetryPeer,
+  selfId,
 }: CommandIslandProps) {
   const [satelliteOpen, setSatelliteOpen] = useState<boolean>(readSatelliteOpen);
   const [postPickerOpen, setPostPickerOpen] = useState(false);
@@ -317,6 +328,12 @@ export function CommandIsland({
                 <CountBadge count={notificationCount} label={`${notificationCount} unread notifications`} />
               )}
             </button>
+          )}
+
+          {/* Live peer count: a real roster read, with a per-peer status list.
+              Hidden on hosts that do not supply a roster (tests / embeds). */}
+          {roster && (
+            <PeerChip roster={roster} onRetry={onRetryPeer} selfId={selfId} />
           )}
 
           {/* Messages Drawer Toggle Button */}

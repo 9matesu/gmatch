@@ -24,7 +24,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import type { SettingsOpenTarget } from './components/settings/GMatchSettingsModal';
 import { ImageViewer } from "./components/ImageViewer";
 import { IdleOverlay } from "./components/IdleOverlay";
-import { useP2P } from "./hooks/useP2P";
+import { useP2P, retryPeerTransport } from "./hooks/useP2P";
 import { useFeedController } from './features/feed/useFeedController';
 import type { ChatMessage } from "./hooks/useP2P";
 import { mergeMyCards, filterToActiveDeck, galleryItemVisible, type CanonicalCard } from "./utils/cardCollection";
@@ -306,7 +306,7 @@ export default function Home() {
     if (!isLoaded) return;
     syncIdleSaveSlotToIdentity();
   }, [isLoaded, identity?.orbitId]);
-  const { peers, p2pItems, sendP2PItem, sendChatMessage, chatMessages, isWsConnected } = useP2P(identity);
+  const { peers, roster, p2pItems, sendP2PItem, sendChatMessage, chatMessages, isWsConnected } = useP2P(identity);
   const { settings, update: updateSettings } = useSettings();
   useEffect(() => { setWatchDisplayName(myProfile.displayName || '') }, [myProfile.displayName]);
   // Watch-party rooms persist server-side (an emptied room is never deleted),
@@ -4604,6 +4604,9 @@ export default function Home() {
               notificationCount={notificationCenter.unreadCount}
               onToggleNotifications={() => setNotifOpen((v) => !v)}
               notificationsOpen={notifOpen}
+              roster={roster}
+              onRetryPeer={retryPeerTransport}
+              selfId={identity?.orbitId}
               recessed={mainView === 'watch' && watchRoomOpen}
               displayName={myProfile.displayName || myUser?.display_name || 'You'}
               profilePic={profilePics[identity?.orbitId || ''] || myProfile.pfpUrl}

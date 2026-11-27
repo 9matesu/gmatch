@@ -704,6 +704,18 @@ product path.
   bytes are gone. Bytes that are on disk but cannot be read/decrypted are
   reported as a read failure (with the reason), never as a missing file, and the
   record is neither dropped nor re-imported while local bytes may still exist.
+- **Settings → Preferences has a real Diagnostics & Fixes panel** (tech-savvy
+  users). `components/settings/DiagnosticsSection.tsx` runs five injected,
+  bridge-backed mechanisms and prints the REAL outcome inline: Diagnose (read
+  `/api/health`, `window.__gmatchMetrics.snapshot()` and the online peer count),
+  Reconnect node (health probe via `server:probe`, then `serverSet`; applied on
+  next launch), Re-pull roster (count from `/api/users/online` or presence
+  mailboxes, plus the app's own foreground `visibilitychange` refresh),
+  Clear media cache (`cache:clear`, keepsakes/vault untouched) and Restart
+  sidecar (`server:restart-sidecar`: stop old child → wait for `:8790` → respawn
+  → health probe; host mode only). In `import.meta.env.DEV` Diagnose also dumps
+  a structured `console.group` summary. No action fabricates success: a missing
+  bridge, a failed probe or a refused write is reported as the error it is.
 
 ## 8. Blocklist — client-side only (reject tag if a term matches on a token boundary; case-insensitive)
 

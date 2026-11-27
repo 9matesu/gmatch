@@ -119,6 +119,8 @@ export interface GmatchBridge {
   openExternal?: (url: string) => Promise<void>
   serverSet?: (payload: { mode: 'host' | 'client'; url?: string }) => Promise<{ ok: boolean; error?: string }>
   serverRelaunch?: () => Promise<void>
+  /** Manual sidecar restart: stop the old child, free :8790, respawn and health-probe. */
+  restartSidecar?: () => Promise<{ ok: boolean; error?: string }>
   serverProbe?: (url: string) => Promise<{ ok: boolean; status?: number; error?: string }>
   updateCheck?: () => Promise<GmatchUpdateStatus>
   updateState?: () => Promise<GmatchUpdateStatus>

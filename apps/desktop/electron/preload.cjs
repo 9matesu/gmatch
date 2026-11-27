@@ -75,6 +75,8 @@ contextBridge.exposeInMainWorld('gmatch', {
   openExternal: (url) => ipcRenderer.invoke('shell:open', url),
   serverSet: (payload) => ipcRenderer.invoke('server:set', payload),
   serverRelaunch: () => ipcRenderer.invoke('server:relaunch'),
+  // Settings diagnostics: respawn the bundled node without closing the window.
+  restartSidecar: () => ipcRenderer.invoke('server:restart-sidecar'),
   serverProbe: (url) => ipcRenderer.invoke('server:probe', url),
   // Portable self-update (GitHub Releases).
   updateCheck: () => ipcRenderer.invoke('update:check'),

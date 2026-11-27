@@ -32,6 +32,28 @@ module.exports = function registerServerHandlers({ ipcMain, app, serverMode, api
       return { ok: false, error: err?.message || String(err) }
     }
   })
+  // Manual restart for Settings > Diagnostics. Unlike server:relaunch this
+  // keeps the window alive: stop the old child, wait for :8790 to close, spawn
+  // a replacement and let a real health probe prove it came back. A failure
+  // at ANY step is returned to the renderer, never reported as success.
+  ipcMain.handle('server:restart-sidecar', async () => {
+    try {
+      if (app.isPackaged && serverMode.readServerMode().mode !== 'host') {
+        return { ok: false, error: 'This install is a client; it has no local sidecar to restart.' }
+      }
+      if (apiSidecar.isRunning && apiSidecar.isRunning()) apiSidecar.stopApi()
+      if (apiSidecar.waitForPortFree) {
+        const free = await apiSidecar.waitForPortFree()
+        if (!free) return { ok: false, error: 'Port 8790 is still bound after stopping the old server.' }
+      }
+      await apiSidecar.startApi()
+      const healthy = await apiSidecar.ping(3000)
+      if (!healthy) return { ok: false, error: 'Server spawned but did not answer /api/health.' }
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: err?.message || String(err) }
+    }
+  })
   // Apply the new mode NOW: relaunch the app (used by the Settings button).
   ipcMain.handle('server:relaunch', () => {
     apiSidecar.stopApi()

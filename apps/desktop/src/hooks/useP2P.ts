@@ -13,7 +13,7 @@ import { startMesh, meshPeerAsUser, type MeshHandle } from '../utils/mesh/mesh';
 import { readSettings } from './useSettings';
 import { knownNodes, rememberKnownNode, rememberPeerNode } from '../utils/peerNodes';
 import { broadcastMeshFrame, onMeshMessage, connectToPeerMesh, setMeshIceFailureHandler, MESH_BACKPRESSURE_HIGH_BYTES } from '../utils/courierSignaling';
-import { createTransportRegistry } from '../utils/transportState';
+import { swarmTransportRegistry } from '../utils/transportState';
 import { resolveDisplayName } from '../utils/displayName';
 import { parseApiTimestamp } from '../utils/timeAgo';
 import { mediaFlag, resolveClaimedOwner, descriptorUrlFromBytes } from '../utils/objectDescriptor';
@@ -25,16 +25,24 @@ const MAX_ROSTER_NODES_PER_ROUND = 8;
 /** How often the transport-selection tick runs direct retries & deadlines. */
 const TRANSPORT_TICK_MS = 4000;
 
-/**
- * Per-peer transport-selection registry (roadmap P0): idle / connecting-direct
- * / direct / relay / failed. The swarm itself keeps fanning frames over every
- * wired pipe — this layer makes WHICH path is real observable and keeps the
- * relay session alive while direct attempts retry with backoff.
- */
-const swarmTransportRegistry = createTransportRegistry();
+/** The live hook registers ONE retry dialer. The header chip calls it through
+ *  `retryPeerTransport` — no UI component ever fabricates a connection. */
+type PeerRetryDial = (peerId: string) => void
+let activePeerRetryDial: PeerRetryDial | null = null
+
+/** Re-dial a peer from the header chip's retry button. False when no live P2P
+ *  hook owns the identity (browser dev / logged out), so the UI can say so. */
+export function retryPeerTransport(peerId: string): boolean {
+  if (!peerId || !activePeerRetryDial) return false
+  activePeerRetryDial(peerId)
+  return true
+}
+
 
 /** Human label for the peer list: what path is this peer's traffic really
- *  taking? Null = nothing worth showing yet (idle/connecting). */
+ *  taking? Null = nothing worth showing yet (idle/connecting). The registry
+ *  lives in utils/transportState so the header chip reads the SAME phases the
+ *  swarm writes, never a second guessed copy. */
 export function swarmTransportLabel(peerId: string): string | null {
   switch (swarmTransportRegistry.phaseFor(peerId)) {
     case 'direct': return 'P2P direto'
@@ -912,6 +920,30 @@ export function useP2P(identity: OrbitIdentity | null) {
     };
   }, [identity, baseGen]);
 
+  // Header chip retry: the hook keeps the identity and the peers' keys, so it
+  // is the only place that can actually re-dial. startDirectAttempt clears the
+  // backoff (a delayed automatic retry is not what a button press asked for).
+  useEffect(() => {
+    if (!identity) return
+    const handler: PeerRetryDial = (peerId) => {
+      const peer = roster.get(peerId)
+      if (!peer || peerId === selfUserRef.current.id) return
+      const pubKey = peer.publicKey || (peer as any).public_key
+      const encKey = peer.encryptionPubKey || (peer as any).encryption_pub_key
+      if (!pubKey || !encKey) return
+      swarmTransportRegistry.startDirectAttempt(peerId)
+      void connectToPeerMesh({ id: peerId, public_key: pubKey, encryption_pub_key: encKey }, identity)
+        .then(() => swarmTransportRegistry.markDirectValidated(peerId))
+        .catch((err) => swarmTransportRegistry.markDirectFailed(
+          peerId,
+          err instanceof Error ? err.message : 'direct connect failed',
+          true,
+        ))
+    }
+    activePeerRetryDial = handler
+    return () => { if (activePeerRetryDial === handler) activePeerRetryDial = null }
+  }, [identity, roster]);
+
   const loadLobbyHistory = useCallback(async () => {
     if (!identity) return
     try {
@@ -1120,6 +1152,7 @@ export function useP2P(identity: OrbitIdentity | null) {
 
   return {
     peers,
+    roster,
     p2pItems,
     sendP2PItem,
     sendChatMessage,

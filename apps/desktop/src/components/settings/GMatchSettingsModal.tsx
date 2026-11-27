@@ -35,6 +35,7 @@ import { RecacheMediaSection } from './RecacheMediaSection';
 import { TurnSection } from './TurnSection';
 import { MediaqSection } from './MediaqSection';
 import { BlocklistSection } from './BlocklistSection';
+import { DiagnosticsSection } from './DiagnosticsSection';
 import { CacheViewer } from './CacheViewer';
 import {
   Settings,
@@ -942,6 +943,10 @@ export function GMatchSettingsModal({
             {/* Optional content provider: one-click install; the clicker works
                 on local sources the whole time, with or without it. */}
             {activeTab === 'preferences' && <MediaqSection onClose={onClose} toast={toast} />}
+
+            {/* Real diagnostics + repairs: health probe, roster re-pull, cache
+                clear, sidecar restart, and a DEV console dump. */}
+            {activeTab === 'preferences' && <DiagnosticsSection identity={identity} />}
 
             {/* ──────── 2. ACCOUNT & SECURITY ──────── */}
             {activeTab === 'account' && (
