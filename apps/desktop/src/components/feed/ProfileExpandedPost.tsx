@@ -255,6 +255,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
               identity={identity}
               mimeType={activeMedia?.mime || post.mime_type}
               alt=""
+              hideUnavailable
               className="w-full h-full object-contain max-h-(--max-h-sheet)"
               muted={false}
               autoPlay={false}
