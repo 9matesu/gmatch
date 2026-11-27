@@ -202,8 +202,20 @@ export function UserProfileModal({
   const tags: string[] = parseTags(user.tags);
   const userStories = stories.filter((s) => s.owner_id === user.id || (s as any).user_id === user.id);
   const hasStories = userStories.length > 0;
-  const userPosts = posts.filter((post) => post.author_id === user.id && !post.is_archived);
-  const userCards = cards.filter((c) => (c.owner_id === user.id || (c as any).user_id === user.id) && !!c.content_url);
+  // Dedupe by id: the same post can arrive from the node AND a local/peer
+  // mirror, and rendering both made the profile modal repeat posts as cards.
+  const seenPostIds = new Set<string>();
+  const userPosts = posts.filter((post) => {
+    if (post.author_id !== user.id || post.is_archived || seenPostIds.has(post.id)) return false;
+    seenPostIds.add(post.id);
+    return true;
+  });
+  const seenCardIds = new Set<string>();
+  const userCards = cards.filter((c) => {
+    if ((c.owner_id !== user.id && (c as any).user_id !== user.id) || !c.content_url || seenCardIds.has(c.id)) return false;
+    seenCardIds.add(c.id);
+    return true;
+  });
   const followHandler = onToggleFollow || onToggleContact;
   const following = onToggleFollow ? isFollowing : Boolean(isContact);
 
