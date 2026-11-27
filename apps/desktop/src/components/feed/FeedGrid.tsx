@@ -6,6 +6,7 @@ import { FeedTile } from './FeedTile'
 import { resolveMediaUrl } from '../../utils/media'
 import { resolveObjectRefId } from '../../utils/objectRef'
 import { getLocalObject } from '../../utils/p2pSwarm'
+import { isVideoUrl } from '../../services/postFilter'
 import type { OrbitIdentity } from '@orbit/crypto'
 
 interface FeedGridProps {
@@ -60,28 +61,43 @@ export function FeedGrid({ posts, identity, onOpen, likedPosts, likeCounts, onTo
   // mounts, so nothing is faked).
   useEffect(() => {
     let live = true
-    const measure = (post: FeedPost, src: string) => {
+    const measure = (post: FeedPost, src: string, isVideo: boolean) => {
+      const done = () => { if (src.startsWith('blob:')) URL.revokeObjectURL(src) }
+      if (isVideo) {
+        // A video has no naturalWidth/Height; its ratio comes from metadata.
+        const v = document.createElement('video')
+        v.preload = 'metadata'
+        v.onloadedmetadata = () => {
+          if (!live) return
+          if (rememberRatio(post, v.videoWidth, v.videoHeight)) bump((n) => n + 1)
+          done()
+        }
+        v.onerror = done
+        v.src = src
+        return
+      }
       const img = new Image()
       img.decoding = 'async'
       img.onload = () => {
         if (!live) return
         if (rememberRatio(post, img.naturalWidth, img.naturalHeight)) bump((n) => n + 1)
-        if (src.startsWith('blob:')) URL.revokeObjectURL(src)
+        done()
       }
-      img.onerror = () => { if (src.startsWith('blob:')) URL.revokeObjectURL(src) }
+      img.onerror = done
       img.src = src
     }
     for (const post of posts) {
       if (ratioOf(post) !== undefined) continue
       const url = post.media?.[0]?.url || post.url
       if (!url) continue
-      if (/^https?:/i.test(url)) { measure(post, resolveMediaUrl(url)); continue }
+      const isVideo = isVideoUrl(url) || !!post.mime_type?.startsWith('video/') || !!post.media?.[0]?.mime_type?.startsWith('video/')
+      if (/^https?:/i.test(url)) { measure(post, resolveMediaUrl(url), isVideo); continue }
       // Local object: resolve bytes (vault/IndexedDB) and measure the blob.
       const id = resolveObjectRefId(url) || post.media?.[0]?.id || post.id
       if (!id) continue
       void getLocalObject(id).then((blob) => {
         if (!live || !blob) return
-        measure(post, URL.createObjectURL(blob))
+        measure(post, URL.createObjectURL(blob), isVideo)
       }).catch(() => { /* no local bytes: stays out of the grid */ })
     }
     return () => {
