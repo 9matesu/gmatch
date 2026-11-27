@@ -41,7 +41,6 @@ import { countHidden, isRenderable } from './isRenderable';
 import { FeedGrid } from './FeedGrid';
 import { GMatchStories } from '../GMatchStories';
 import { PostComments } from './PostComments';
-import { ProfileExpandedPost } from './ProfileExpandedPost';
 import { LiveCameraModal } from '../camera/LiveCameraModal';
 import { ObjectImage } from '../ObjectImage';
 import { Avatar } from '../Avatar';
@@ -345,13 +344,12 @@ function GMatchFeedImpl({
   const toggleExpand = useCallback((post: FeedPost) => {
     playPress(700);
     setFocusCommentId(null);
-    setExpandedPostId((prev) => (prev === post.id ? null : post.id));
-    setZoomLevel(1);
+    // Clicking a post opens the fullscreen ImageViewer modal (no inline expand).
+    window.dispatchEvent(new CustomEvent('gmatch-open-image', { detail: { id: post.id } }));
   }, []);
   const openInline = useCallback((post: FeedPost, scroll = false) => {
     playPress(700);
-    setExpandedPostId(post.id);
-    setZoomLevel(1);
+    window.dispatchEvent(new CustomEvent('gmatch-open-image', { detail: { id: post.id } }));
     if (scroll) {
       requestAnimationFrame(() => {
         document.querySelector(`[data-post-id="${post.id}"]`)?.scrollIntoView?.({ block: 'nearest' });
@@ -1239,7 +1237,6 @@ function GMatchFeedImpl({
                 onContextMenu={(e) => { e.preventDefault(); openPostMenu(post, { x: e.clientX, y: e.clientY }) }}
                 className={`cv-row relative bg-surface-raised border border-edge rounded-lg overflow-hidden flex flex-col mb-3 break-inside-avoid ${expanded ? 'md:w-[min(96vw,1100px)] md:max-w-none' : ''} ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
               >
-                {!expanded && (<>
                 {/* Media comes FIRST (media → author → caption → actions). The
                     author line and written body are rendered AFTER the media
                     block below. */}
@@ -1657,30 +1654,6 @@ function GMatchFeedImpl({
                   </>
                   )}
                 </div>
-                </>)}
-                {expanded && (
-                  <ProfileExpandedPost
-                    post={post}
-                    onClose={() => toggleExpand(post)}
-                    identity={identity}
-                    profilePics={profilePics}
-                    isLiked={!!likedPosts[post.id]}
-                    isSaved={!!savedPosts[post.id]}
-                    likeCount={likeCounts[post.id] ?? post.like_count ?? 0}
-                    comments={mergeCommentRows(commentsMap[post.id] || [], peerComments.get(post.id) || [])}
-                    commentsLoading={commentsLoadingId === post.id}
-                    onToggleLike={toggleLike}
-                    onToggleSave={toggleSave}
-                    onAddComment={handleAddComment}
-                    onToggleCommentLike={handleToggleCommentLike}
-                    onReportComment={onReportComment}
-                    onOpenShare={(p) => setSharingPost(p)}
-                    onOptionsClick={(p, pos) => openPostMenu(p, pos)}
-                    onOpenLikers={(id) => setLikersModalPostId(id)}
-                    onAvatarClick={handleAvatarClick}
-                    onSelectUser={handleAvatarClick}
-                  />
-                )}
               </article>
             );
           })}

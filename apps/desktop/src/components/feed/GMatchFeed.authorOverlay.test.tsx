@@ -111,16 +111,18 @@ describe('GMatchFeed author header', () => {
     expect(screen.queryByPlaceholderText(/add a comment\.\.\./i)).toBeNull();
   });
 
-  it('clicking the media expands the card inline (no side sheet)', () => {
+  it('clicking the media opens the fullscreen image modal (no inline card)', () => {
+    const opened = vi.fn();
+    window.addEventListener('gmatch-open-image', opened);
     const { container } = renderFeed([imagePost]);
     const card = container.querySelector('article') as HTMLElement;
     const mediaBox = card.querySelector('.group\\/post div[role="button"]') as HTMLElement;
 
     fireEvent.click(mediaBox);
 
-    // Inline expand: the media wrapper reports expanded; no side sheet / dialog.
-    expect(card.querySelector('[data-expanded-post]')).not.toBeNull();
-    expect(document.querySelector('aside[role="complementary"]')).toBeNull();
-    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(opened).toHaveBeenCalled();
+    expect((opened.mock.calls[0][0] as CustomEvent).detail.id).toBe('post-img-1');
+    expect(document.querySelector('[data-expanded-post]')).toBeNull();
+    window.removeEventListener('gmatch-open-image', opened);
   });
 });
