@@ -68,10 +68,8 @@ describe('feed deep links', () => {
   it('opens the target when the hash is already set before the list loads', async () => {
     window.location.hash = '#/feed?post=p2';
     renderFeed([post('p1', 'first'), post('p2', 'second')]);
-    await waitFor(() => expect(composer()).toBeInTheDocument());
-    // Deep links open the COMMENTS SIDE SHEET ("ao lado"), not inline
-    // expansion — the composer lives in the <aside>, never in the article.
-    expect(composer()!.closest('aside')).not.toBeNull();
+    await waitFor(() => expect(document.querySelector('[data-expanded="true"]')).not.toBeNull());
+    // Deep links expand the card inline (image only); no side sheet.
     window.location.hash = '';
   });
 
@@ -84,20 +82,19 @@ describe('feed deep links', () => {
     window.location.hash = '#/feed?post=p2';
     fireHashChange();
 
-    await waitFor(() => expect(composer()).toBeInTheDocument());
-    expect(composer()!.closest('aside')).not.toBeNull();
+    await waitFor(() => expect(document.querySelector('[data-expanded="true"]')).not.toBeNull());
     window.location.hash = '';
   });
 
   it('switches to a different target when the hash names another post', async () => {
     window.location.hash = '#/feed?post=p1';
     renderFeed([post('p1', 'first'), post('p2', 'second')]);
-    await waitFor(() => expect(composer()!.closest('aside')).not.toBeNull());
+    await waitFor(() => expect(document.querySelector('[data-expanded="true"]')).not.toBeNull());
 
     window.location.hash = '#/feed?post=p2';
     fireHashChange();
 
-    await waitFor(() => expect(composer()!.closest('aside')).not.toBeNull());
+    await waitFor(() => expect(document.querySelector('[data-expanded="true"]')).not.toBeNull());
     window.location.hash = '';
   });
 
@@ -123,7 +120,7 @@ describe('feed deep links', () => {
       />,
     );
 
-    await waitFor(() => expect(composer()!.closest('aside')).not.toBeNull());
+    await waitFor(() => expect(document.querySelector('[data-expanded="true"]')).not.toBeNull());
     // Asked exactly once, not once per list change.
     expect(resolve).toHaveBeenCalledTimes(1);
     window.location.hash = '';
@@ -133,13 +130,13 @@ describe('feed deep links', () => {
     renderFeed([post('p1', 'first'), post('p2', 'second')]);
     window.location.hash = '#/feed?post=p1';
     fireHashChange();
-    await waitFor(() => expect(composer()!.closest('aside')).not.toBeNull());
+    await waitFor(() => expect(document.querySelector('[data-expanded="true"]')).not.toBeNull());
 
     // A notification taps the same post again: the intent is new, so it reopens.
     act(() => {
       fireEvent(window, new CustomEvent('gmatch-open-post', { detail: { postId: 'p2' } }));
     });
-    await waitFor(() => expect(composer()!.closest('aside')).not.toBeNull());
+    await waitFor(() => expect(document.querySelector('[data-expanded="true"]')).not.toBeNull());
     window.location.hash = '';
   });
 });

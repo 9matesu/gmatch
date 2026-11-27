@@ -139,8 +139,16 @@ export function __resetLocalObjectCacheForTests(): void {
  *  roster). Failed P2P tiles listen for it to retry an offline seeder. */
 export const PEER_ONLINE_EVENT = 'orbit-peer-online'
 
+/** Peers seen this session. A best-effort hint: an empty set means "no one to
+ *  ask", so a swarm fetch can fail fast instead of waiting out its timeout. */
+const onlinePeers = new Set<string>()
+export function hasSwarmPeers(): boolean {
+  return onlinePeers.size > 0
+}
+
 /** Emit PEER_ONLINE_EVENT (no-op outside a browser window). */
 export function announcePeerOnline(peerId: string): void {
+  if (peerId) onlinePeers.add(peerId)
   try {
     if (typeof window !== 'undefined' && peerId) {
       window.dispatchEvent(new CustomEvent(PEER_ONLINE_EVENT, { detail: { peerId } }))

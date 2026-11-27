@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { orbitFetch } from '../utils/api'
-import { getLocalObject, registerLocalObject, requestSwarmObject, PEER_ONLINE_EVENT } from '../utils/p2pSwarm'
+import { getLocalObject, registerLocalObject, requestSwarmObject, PEER_ONLINE_EVENT, hasSwarmPeers } from '../utils/p2pSwarm'
 import { vaultProbe } from '../services/vault'
 import { resolveVideoMime, sniffFileHead } from '../utils/media'
 import { normalizeObjectId, isRequestableObjectId, parseObjectRef } from '../utils/objectRef'
@@ -366,10 +366,12 @@ async function resolveObjectNetwork(
       // (WebRTC/relay, not the node's socket pool) so live rows are not starved.
       release()
       let swarmBlob: Blob | null = null
-      try {
-        swarmBlob = await requestSwarmObject(cleanId, 5000)
-      } catch {
-        swarmBlob = null
+      if (hasSwarmPeers()) {
+        try {
+          swarmBlob = await requestSwarmObject(cleanId, 5000)
+        } catch {
+          swarmBlob = null
+        }
       }
       if (swarmBlob) {
         try {
@@ -437,7 +439,7 @@ async function resolveObjectNetwork(
       } catch {
         blob = null
       }
-      if (!blob) {
+      if (!blob && hasSwarmPeers()) {
         // Ask the swarm by object id, then by content_hash alias — 5s timeout.
         // expectedHash verifies the reassembled bytes (untrusted peers).
         try {

@@ -41,8 +41,6 @@ import { countHidden, isRenderable } from './isRenderable';
 import { FeedGrid } from './FeedGrid';
 import { GMatchStories } from '../GMatchStories';
 import { PostComments } from './PostComments';
-import { SideSheet } from '../../ui/kit';
-import { ProfileExpandedPost } from './ProfileExpandedPost';
 import { LiveCameraModal } from '../camera/LiveCameraModal';
 import { ObjectImage } from '../ObjectImage';
 import { Avatar } from '../Avatar';
@@ -333,6 +331,13 @@ function GMatchFeedImpl({
   // card element (no remount, reader position preserved). Zoom is a bounded
   // scale cycle on the same media node, reset on every expand/collapse.
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
+  // Esc collapses the inline-expanded card.
+  useEffect(() => {
+    if (!expandedPostId) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setExpandedPostId(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [expandedPostId]);
   /** Comment to spotlight after a notification deep link lands on the post. */
   const [focusCommentId, setFocusCommentId] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -1173,9 +1178,9 @@ function GMatchFeedImpl({
            const isNewPost = animatedPostIds.has(post.id);
            const multiMedia = Array.isArray(post.media) && post.media.length > 1 ? post.media : null;
             const currentIdx = multiMedia ? Math.min(Math.max(0, mediaIdx[post.id] || 0), multiMedia.length - 1) : 0;
-            // The detail opens in the side sheet (like the profile photo), so a
-            // timeline row never expands inline and pushes the list around.
-            const expanded = false;
+            // Inline expand: the clicked card grows in place (image only), no
+            // side sheet. Click again / Esc collapses.
+            const expanded = expandedPostId === post.id;
 
             return post.is_sponsored ? (
               <article
@@ -1248,7 +1253,7 @@ function GMatchFeedImpl({
 
                   return (
                     <div
-                      className="group/post relative w-full bg-surface-canvas flex items-center justify-center overflow-hidden rounded-none transition-[max-height] duration-300 ease-out motion-reduce:transition-none"
+                      className={`group/post relative w-full bg-surface-canvas flex items-center justify-center overflow-hidden rounded-none transition-[max-height] duration-300 ease-out motion-reduce:transition-none ${expanded ? 'max-h-[80vh]' : 'max-h-[min(480px,60vh)]'}`}
                       data-expanded={expanded}
                     >
                       {/* The expand surface is the MEDIA ONLY: the author
@@ -1482,7 +1487,7 @@ function GMatchFeedImpl({
                 {/* Author row: avatar, name, handle, time — under the media. */}
                 <div
                   data-testid="post-author-overlay"
-                  className="flex items-center gap-3 px-3 pt-3 pb-2"
+                  className={`flex items-center gap-3 px-3 pt-3 pb-2 ${expanded ? 'hidden' : ''}`}
                   onContextMenu={(e) => onUserContext?.(e, post.author_id, post.author_name)}
                 >
                   <button
@@ -1512,14 +1517,14 @@ function GMatchFeedImpl({
 
                 {/* Written body — under the author line. */}
                 {post.caption ? (
-                  <p className="px-3 pt-1 pb-2 text-xs leading-snug text-retro-body whitespace-pre-wrap break-words">
+                  <p className={`px-3 pt-1 pb-2 text-xs leading-snug text-retro-body whitespace-pre-wrap break-words ${expanded ? 'hidden' : ''}`}>
                     <Linkify text={post.caption} />
                   </p>
                 ) : null}
 
                 {/* Action row: no fill, no separator — it sits directly under
                     the media so the whole tile reads as one object. */}
-                <div className="px-3 sm:px-4 pt-2.5 pb-3 flex flex-col gap-2">
+                <div className={`px-3 sm:px-4 pt-2.5 pb-3 flex flex-col gap-2 ${expanded ? 'hidden' : ''}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1">
                       <button
@@ -1784,51 +1789,8 @@ function GMatchFeedImpl({
         document.body,
       )}
 
-      {/* ─── Comments side sheet: comments open "ao lado", never pushing the
-              timeline down. The fetch is keyed on expandedPostId (above), so
-              opening the sheet is all it takes for the thread to load. ─── */}
-      {(() => {
-        const expandedPost = expandedPostId ? visiblePosts.find((p) => p.id === expandedPostId) : null;
-        if (!expandedPost) return null;
-        const sheetComments = mergeCommentRows(
-          commentsMap[expandedPost.id] || [],
-          peerComments.get(expandedPost.id) || [],
-        );
-        return (
-          <SideSheet
-            open
-            onClose={() => setExpandedPostId(null)}
-            title={`Post · ${expandedPost.author_name}`}
-          >
-            {/* Unified detail: the SAME ProfileExpandedPost the profile grid
-                uses, so the image sidepanel looks identical in feed and
-                profile. Footer clearance so the bottom nav never covers it. */}
-            <div className="pb-24">
-              <ProfileExpandedPost
-                post={expandedPost}
-                onClose={() => setExpandedPostId(null)}
-                identity={identity}
-                profilePics={profilePics}
-                isLiked={!!likedPosts[expandedPost.id]}
-                isSaved={!!savedPosts[expandedPost.id]}
-                likeCount={likeCounts[expandedPost.id] ?? expandedPost.like_count ?? 0}
-                comments={sheetComments}
-                commentsLoading={commentsLoadingId === expandedPost.id}
-                onToggleLike={toggleLike}
-                onToggleSave={toggleSave}
-                onAddComment={handleAddComment}
-                onToggleCommentLike={handleToggleCommentLike}
-                onReportComment={onReportComment}
-                onOpenShare={(p) => setSharingPost(p)}
-                onOptionsClick={(p, pos) => openPostMenu(p, pos)}
-                onOpenLikers={(id) => setLikersModalPostId(id)}
-                onAvatarClick={handleAvatarClick}
-                onSelectUser={handleAvatarClick}
-              />
-            </div>
-          </SideSheet>
-        );
-      })()}
+      {/* Inline expand replaces the comments side sheet: the clicked card grows
+          in place (image only). Comments are not shown inline. */}
 
       {/* ─── MODAL 5b: Likers Modal ─── */}
       {likersModalPostId && (

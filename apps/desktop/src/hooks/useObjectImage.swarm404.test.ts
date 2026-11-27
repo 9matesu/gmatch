@@ -11,6 +11,7 @@ const swarm = vi.hoisted(() => ({
   getLocalObject: vi.fn(async () => null),
   registerLocalObject: vi.fn(),
   requestSwarmObject: vi.fn(),
+  hasSwarmPeers: vi.fn(() => true),
 }))
 
 vi.mock('../utils/p2pSwarm', () => swarm)
