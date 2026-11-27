@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { ShieldAlert, CheckCircle2, XCircle } from 'lucide-react';
 import { playPress } from '../../utils/sounds';
+import { Brand } from '../../ui/Brand';
+import { classes, MOTION } from '../../ui/tokens';
 
 export function AgeGateModal() {
   // Read synchronously so the gate never flashes the login screen behind it.
@@ -37,13 +39,15 @@ export function AgeGateModal() {
       role="dialog"
       aria-modal="true"
       aria-labelledby="age-gate-title"
-      className="fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in"
+      className={classes('fixed inset-0 z-[var(--z-system)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans', MOTION.keyframe.fadeIn)}
     >
       <div
-        className="bg-retro-bg border border-edge rounded-xl max-w-md w-full p-6 sm:p-7 shadow-2xl space-y-5 text-center flex flex-col items-center animate-orbit-slide-up text-retro-fg"
+        className={classes('bg-retro-bg border border-edge rounded-xl max-w-md w-full p-6 sm:p-7 shadow-2xl space-y-5 text-center flex flex-col items-center', MOTION.keyframe.slideUp, 'text-retro-fg')}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Icon & Brand */}
+        {/* Brand lockup + the age icon: the gate stays unchanged, only the
+            name now renders through the same lockup as the header/splash. */}
+        <Brand />
         <div className="w-12 h-12 rounded-xl bg-retro-panel border border-edge text-retro-fg flex items-center justify-center">
           <ShieldAlert className="w-6 h-6 text-retro-fg" />
         </div>
@@ -63,7 +67,7 @@ export function AgeGateModal() {
           <button
             type="button"
             onClick={handleConfirmAge}
-            className="w-full py-2.5 px-4 rounded-lg bg-retro-accent hover:bg-retro-fg active:scale-(--scale-press) text-retro-accent-text font-semibold text-xs shadow-sm transition cursor-pointer flex items-center justify-center gap-2"
+            className={`w-full py-2.5 px-4 rounded-lg bg-retro-accent hover:bg-retro-fg active:scale-(--scale-press) text-retro-accent-text font-semibold text-xs shadow-sm ${MOTION.transition.quick} cursor-pointer flex items-center justify-center gap-2`}
           >
             <CheckCircle2 className="w-4 h-4 text-success-fg" />
             <span>I am 18 or Older. Enter</span>
@@ -72,7 +76,7 @@ export function AgeGateModal() {
           <button
             type="button"
             onClick={handleRejectAge}
-            className="w-full py-2 px-4 rounded-lg bg-retro-panel hover:bg-glass-w12 active:scale-(--scale-press) text-retro-fg font-medium text-xs border border-edge transition cursor-pointer flex items-center justify-center gap-2"
+            className={`w-full py-2 px-4 rounded-lg bg-retro-panel hover:bg-glass-w12 active:scale-(--scale-press) text-retro-fg font-medium text-xs border border-edge ${MOTION.transition.quick} cursor-pointer flex items-center justify-center gap-2`}
           >
             <XCircle className="w-4 h-4 text-retro-muted" />
             <span>Under 18. Exit</span>

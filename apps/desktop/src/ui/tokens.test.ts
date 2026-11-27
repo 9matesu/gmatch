@@ -10,6 +10,7 @@ import * as tokens from './tokens'
 
 const css = readFileSync(new URL('../globals.css', import.meta.url), 'utf8')
 const tokenSource = readFileSync(new URL('./tokens.ts', import.meta.url), 'utf8')
+const bootHtml = readFileSync(new URL('../../index.html', import.meta.url), 'utf8')
 const allowlist = JSON.parse(
   readFileSync(new URL('../../scripts/check-ui-tokens.allowlist.json', import.meta.url), 'utf8'),
 ) as {
@@ -23,7 +24,7 @@ describe('common UI tokens', () => {
       'LAYOUT', 'DIALOG_WIDTH', 'SURFACE_TONE',
       'RADIUS', 'SHADOW', 'TYPE', 'WEIGHT', 'COLOR', 'STATUS', 'RARITY',
       'BUTTON_BASE', 'BUTTON_VARIANT', 'BUTTON_SIZE', 'WORDMARK', 'RECIPE',
-      'CHROME', 'PRESENCE',
+      'CHROME', 'PRESENCE', 'LOGO', 'MOTION',
     ]) {
       expect(tokens, group).toHaveProperty(group)
     }
@@ -47,6 +48,48 @@ describe('common UI tokens', () => {
     expect(css).toMatch(/\.glass-panel \{[\s\S]*?box-shadow: var\(--shadow-panel-strong\)/)
     expect(css).toMatch(/\.solid-panel \{[\s\S]*?box-shadow: var\(--shadow-panel\)/)
     expect(css).toMatch(/h1, h2, h3, h4, h5, h6 \{\s*font-weight: var\(--weight-heading\)/)
+  })
+
+  it('owns the brand lockup (mark + wordmark, clear-space, min size) in one token', () => {
+    expect(tokens.LOGO.markSrc).toBe('/icon.svg')
+    expect(tokens.LOGO.lockup).toContain('gap-(--logo-gap)')
+    expect(tokens.LOGO.lockup).toContain('min-w-(--logo-min-width)')
+    expect(tokens.LOGO.clearSpace).toBe('p-(--logo-clear-space)')
+    expect(tokens.LOGO.mark).toContain('min-w-(--logo-mark-min-size)')
+    expect(tokens.WORDMARK.name).toBe(tokens.LOGO.wordmark)
+    for (const name of [
+      'logo-mark-size', 'logo-mark-size-sm', 'logo-mark-size-hero',
+      'logo-mark-min-size', 'logo-gap', 'logo-clear-space', 'logo-min-width',
+    ]) {
+      expect(css, name).toMatch(new RegExp(`^\\s*--${name}:`, 'm'))
+    }
+    // The pre-bundle splash cannot import React: it mirrors the token NAMES,
+    // not a second wordmark design.
+    expect(bootHtml).toContain('class="brand-lockup"')
+    expect(bootHtml).toContain('class="brand-mark" src="/icon.svg"')
+    expect(bootHtml).toContain('var(--logo-gap,')
+    expect(bootHtml).toContain('var(--logo-mark-size-hero,')
+    expect(bootHtml).toContain('var(--logo-clear-space,')
+  })
+
+  it('routes every shell transition and orbit keyframe through one motion preset', () => {
+    for (const name of [
+      'motion-duration-micro', 'motion-duration-fade', 'motion-duration-enter',
+      'motion-duration-dramatic', 'motion-ease-fade', 'motion-ease-enter', 'motion-ease-exit',
+    ]) {
+      expect(css, name).toMatch(new RegExp(`^\\s*--${name}:`, 'm'))
+    }
+    expect(tokens.MOTION.duration.micro).toBe('duration-(--motion-duration-micro)')
+    expect(tokens.MOTION.ease.enter).toBe('ease-(--motion-ease-enter)')
+    // The keyframes read the same variables, so a timing change has one owner.
+    expect(css).toMatch(/\.animate-orbit-fade-in \{ animation: orbit-fade-in var\(--motion-duration-fade\) var\(--motion-ease-fade\) both; \}/)
+    expect(css).toMatch(/\.animate-orbit-pop \{ animation: orbit-pop var\(--motion-duration-enter\) var\(--motion-ease-enter\) both; \}/)
+    expect(css).toMatch(/\.animate-orbit-slide-left \{ animation: orbit-slide-left var\(--motion-duration-enter\) var\(--motion-ease-enter\) both; \}/)
+    // The kit's overlay/dialog/sheet recipes consume the keyframe tokens.
+    expect(tokens.RECIPE.modalOverlay).toContain(tokens.MOTION.keyframe.fadeIn)
+    expect(tokens.RECIPE.modalDialog).toContain(tokens.MOTION.keyframe.pop)
+    expect(tokens.RECIPE.sheetPanel).toContain(tokens.MOTION.keyframe.slideLeft)
+    expect(tokens.TRANSITION.micro).toBe(tokens.MOTION.transition.micro)
   })
 
   it('keeps the game-semantic recipes that styles.ts must not tokenize', () => {

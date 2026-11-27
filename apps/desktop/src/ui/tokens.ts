@@ -132,14 +132,63 @@ export const WEIGHT = {
   heading: 'font-black',
 } as const
 export const MONO = 'font-mono tabular-nums'
-export const ICON = { sm: 'w-3.5 h-3.5', md: 'w-4 h-4' } as const
+export const ICON = { sm: 'w-3.5 h-3.5', md: 'w-4 h-4', lg: 'w-6 h-6' } as const
 export const TRACKING = {
   tight: 'tracking-tight',
   tighter: 'tracking-tighter',
   wide: 'tracking-wide',
   wider: 'tracking-wider',
 } as const
-export const TRANSITION = { micro: 'transition-colors duration-150', enter: 'transition duration-300' } as const
+
+// ─── Motion ─────────────────────────────────────────────────────────────────
+/**
+ * The ONE motion preset for shell chrome. Durations and easings are names; the
+ * values live in `globals.css` @theme (`--motion-*`) and the `orbit-*` keyframes
+ * read the same variables, so a timing change lands in one place. Loops
+ * (spin/pulse/ping) keep their user-agent timing; game semantics (HP fill, crit
+ * flash, +pts float, card tick) keep their own literals in `styles.ts`/callers.
+ */
+export const MOTION = {
+  duration: {
+    micro: 'duration-(--motion-duration-micro)',
+    fade: 'duration-(--motion-duration-fade)',
+    enter: 'duration-(--motion-duration-enter)',
+    dramatic: 'duration-(--motion-duration-dramatic)',
+  },
+  ease: {
+    fade: 'ease-(--motion-ease-fade)',
+    enter: 'ease-(--motion-ease-enter)',
+    exit: 'ease-(--motion-ease-exit)',
+  },
+  transition: {
+    /** Hover/press/state colour change on chrome. */
+    micro: classes('transition-colors', 'duration-(--motion-duration-micro)', 'ease-(--motion-ease-fade)'),
+    /** Any-property micro change (tiles, chips, compact controls). */
+    quick: classes('transition', 'duration-(--motion-duration-micro)', 'ease-(--motion-ease-fade)'),
+    /** Opacity in/out — overlay fades and content reveals. */
+    fade: classes('transition-opacity', 'duration-(--motion-duration-fade)', 'ease-(--motion-ease-fade)'),
+    fadeQuick: classes('transition-opacity', 'duration-(--motion-duration-micro)', 'ease-(--motion-ease-fade)'),
+    /** Panel/sheet entrance or exit. */
+    enter: classes('transition', 'duration-(--motion-duration-enter)', 'ease-(--motion-ease-enter)'),
+    /** Transform-only hover/press (never a hover-bump on nav pills). */
+    transform: classes('transition-transform', 'duration-(--motion-duration-micro)', 'ease-(--motion-ease-enter)'),
+    /** Deterministic progress/width chrome (e.g. an install progress bar). */
+    width: classes('transition-[width]', 'duration-(--motion-duration-enter)', 'ease-(--motion-ease-fade)'),
+  },
+  /** The house keyframes only. Each class's timing comes from the preset above
+   *  via globals.css; surfaces never re-time an animation at the call site. */
+  keyframe: {
+    fadeIn: 'animate-orbit-fade-in',
+    slideUp: 'animate-orbit-slide-up',
+    pop: 'animate-orbit-pop',
+    slideLeft: 'animate-orbit-slide-left',
+    feedIn: 'animate-orbit-feed-in',
+    tierFlash: 'animate-orbit-tier-flash',
+  },
+} as const
+/** Kept for call sites that already import TRANSITION; both names now point at
+ *  the single preset, so no recipe can re-inline a duration. */
+export const TRANSITION = { micro: MOTION.transition.micro, enter: MOTION.transition.enter } as const
 
 // ─── Colour roles ──────────────────────────────────────────────────────────
 /** One accent, one surface family, one text hierarchy. Status roles carry
@@ -148,6 +197,8 @@ export const COLOR = {
   canvas: 'bg-retro-bg',
   canvasVeil: 'bg-retro-bg/95',
   canvasSurface: 'bg-surface-canvas',
+  /** The quiet fill behind an inline status strip (media / sync feedback). */
+  canvasSurfaceSoft: 'bg-surface-canvas/40',
   panel: 'solid-panel',
   panelGlass: 'bg-[var(--color-glass)]',
   edge: 'border-edge',
@@ -285,13 +336,41 @@ export const FIELD = {
 } as const
 export type FieldTone = keyof Pick<typeof FIELD, 'base' | 'bare'>
 
-// ─── Wordmark ──────────────────────────────────────────────────────────────
+// ─── Logo / wordmark ───────────────────────────────────────────────────────
+/**
+ * ONE brand lockup: the shipped icon (favicon, PWA icon, boot splash) as the
+ * mark plus the name as live text — no baked raster wordmark, no new face or
+ * colour. Mark size, gap, clear-space and the minimum size are names whose
+ * values live in `globals.css` @theme, so the header, the splash and onboarding
+ * cannot drift apart. Call sites render `<Brand>`; they never rebuild the lockup.
+ */
+export const LOGO = {
+  /** The one brand mark asset: same bytes as the favicon and PWA icons. */
+  markSrc: '/icon.svg',
+  /** Mark + wordmark on one axis, with the one gap and a floor width. */
+  lockup: classes('inline-flex items-center', 'gap-(--logo-gap)', 'min-w-(--logo-min-width)'),
+  /** Clear-space belongs to the lockup, not to the layout around it. */
+  clearSpace: 'p-(--logo-clear-space)',
+  /** The mark; its min-size keeps it legible when a tight header shrinks it. */
+  mark: classes('block shrink-0', 'h-(--logo-mark-size) w-(--logo-mark-size)', 'min-w-(--logo-mark-min-size)'),
+  /** Compact mark for the 36px title bar. */
+  markCompact: classes('block shrink-0', 'h-(--logo-mark-size-sm) w-(--logo-mark-size-sm)', 'min-w-(--logo-mark-min-size)'),
+  /** Hero mark for the boot splash and onboarding (same asset, same lockup). */
+  markHero: classes('block shrink-0', 'h-(--logo-mark-size-hero) w-(--logo-mark-size-hero)', 'min-w-(--logo-mark-min-size)'),
+  /** Wordmark: top of the type scale, the existing type and fg roles. */
+  wordmark: classes(WEIGHT.heading, TRACKING.tight, COLOR.fg, TYPE.title),
+  /** Compact wordmark: same face/role, the field step for a slim title bar. */
+  wordmarkCompact: classes(WEIGHT.heading, TRACKING.wide, COLOR.fg, TYPE.field),
+} as const
+
 /** Typographic wordmark: the brand name is text, never a baked raster. The
  *  mark takes the one accent role; the name takes the top of the type scale. */
 export const WORDMARK = {
   root: classes('inline-flex items-baseline', GAP[1]),
   mark: classes(COLOR.accent, WEIGHT.heading, TYPE.title),
-  name: classes(COLOR.fg, WEIGHT.heading, TRACKING.tight, TYPE.title),
+  name: LOGO.wordmark,
+  lockup: LOGO.lockup,
+  clearSpace: LOGO.clearSpace,
 } as const
 
 // ─── Class recipes ─────────────────────────────────────────────────────────
@@ -317,9 +396,9 @@ export const RECIPE = {
     PADDING[4],
     'pb-[calc(1rem+var(--island-clearance))]',
     COLOR.scrim,
-    'animate-orbit-fade-in',
+    MOTION.keyframe.fadeIn,
   ),
-  modalDialog: classes(LAYOUT.full, 'max-h-full overflow-y-auto styled-scrollbar glass-panel', SHADOW.modal, 'animate-orbit-pop'),
+  modalDialog: classes(LAYOUT.full, 'max-h-full overflow-y-auto styled-scrollbar glass-panel', SHADOW.modal, MOTION.keyframe.pop),
   modalHeader: classes('flex items-center justify-between', GAP[2], PADDING_X[4], 'py-2.5 border-b', COLOR.edge),
   modalBody: classes(PADDING[4], 'space-y-3'),
   dialogTitle: classes(TYPE.base, WEIGHT.heading, TRACKING.tight, COLOR.fg, 'truncate'),
@@ -327,7 +406,7 @@ export const RECIPE = {
   sheetPanel: classes(
     'pointer-events-auto shrink-0',
     'h-[calc(100%-4.5rem)]', COLOR.panelGlass, 'backdrop-blur-xl border-l', COLOR.edge,
-    SHADOW.sheet, 'flex flex-col animate-orbit-slide-left',
+    SHADOW.sheet, 'flex flex-col', MOTION.keyframe.slideLeft,
   ),
   sheetHeader: classes('flex items-center justify-between shrink-0', GAP[2], PADDING_X[4], 'py-2.5 border-b', COLOR.edge),
   sheetBody: classes('flex-1 overflow-y-auto styled-scrollbar', PADDING[4], 'space-y-3'),
@@ -376,6 +455,39 @@ export const CHROME = {
   subCaption: classes(TYPE.body, COLOR.muted),
   /** Monospaced metadata line. */
   metaMono: classes(MONO, TYPE.caption, COLOR.muted),
+} as const
+
+/**
+ * Feedback states — empty / loading / error and the inline status strip.
+ * ONE recipe per shape, built from the same type, surface and status roles as
+ * every other common surface. Views use `center` (or `centerCompact` inside a
+ * panel); rows use `strip`. Callers supply words, an icon and an action — never
+ * a per-call colour, size, radius or weight.
+ */
+export const FEEDBACK = {
+  center: classes('flex flex-col items-center justify-center text-center', GAP[2], PADDING[6]),
+  centerCompact: classes('flex flex-col items-center justify-center text-center', GAP[1.5], PADDING[3]),
+  /** One-line status strip: feed sync, media unavailable, list footers. */
+  strip: classes(
+    'w-full flex items-center', GAP[1.5], PADDING_X[3], PADDING_Y[2],
+    TYPE.caption, MONO, COLOR.muted, COLOR.canvasSurfaceSoft,
+  ),
+  stripCenter: 'justify-center',
+  stripStart: 'justify-start',
+  icon: classes(ICON.lg, COLOR.faint, 'shrink-0'),
+  spinner: classes(ICON.lg, COLOR.muted, 'animate-spin shrink-0'),
+  spinnerSm: classes(ICON.sm, COLOR.muted, 'animate-spin shrink-0'),
+  errorIcon: classes(ICON.lg, STATUS.danger, 'shrink-0'),
+  errorIconSm: classes(ICON.sm, STATUS.danger, 'shrink-0'),
+  title: classes(TYPE.body, WEIGHT.semibold, COLOR.fg),
+  titleStrong: classes(TYPE.base, WEIGHT.heading, TRACKING.tight, COLOR.fg),
+  titleDisplay: classes(TYPE.display, WEIGHT.heading, TRACKING.tighter, COLOR.fg),
+  errorTitle: classes(TYPE.body, WEIGHT.semibold, STATUS.danger),
+  description: classes(TYPE.body, COLOR.muted),
+  descriptionTight: classes(TYPE.caption, COLOR.muted),
+  meta: classes(MONO, TYPE.caption, COLOR.muted),
+  /** A transient toast row inside the unified notification centre. */
+  toastRow: classes('flex items-start', GAP[2], PADDING_X[3], PADDING_Y[2]),
 } as const
 
 /** Peer-presence dot + text roles. A measured status is chrome, so the three

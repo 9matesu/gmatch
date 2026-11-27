@@ -16,12 +16,13 @@ import {
   type ComponentProps,
   type ReactNode,
 } from 'react'
-import { X } from 'lucide-react'
+import { AlertCircle, Loader2, X } from 'lucide-react'
 import {
   buttonClass,
   classes,
   COLOR,
   DIALOG_WIDTH,
+  FEEDBACK,
   FIELD,
   GAP,
   ICON,
@@ -37,6 +38,9 @@ import {
 } from './tokens'
 
 export type { ButtonVariant, ButtonSize, CardTone } from './tokens'
+/** The motion preset is part of the kit's public surface: surfaces consume
+ *  MOTION (not a duration literal) when they need a shell transition. */
+export { MOTION } from './tokens'
 
 // ─── Button ─────────────────────────────────────────────────────────────────
 
@@ -414,4 +418,88 @@ export function Title({ children, className = '' }: { children: ReactNode; class
 /** Caption / helper text. Used once per control, never stacked. */
 export function Caption({ children, className = '' }: { children: ReactNode; className?: string }) {
   return <div className={classes(RECIPE.caption, className)}>{children}</div>
+}
+
+// ─── FeedbackState ──────────────────────────────────────────────────────────
+
+export type FeedbackTone = 'empty' | 'loading' | 'error'
+
+/**
+ * ONE feedback surface: an empty timeline, a loading read or a failed read —
+ * centred in a view, or as an inline strip under a header / inside a media tile.
+ * Every colour, size, weight and surface comes from `FEEDBACK` in tokens; a
+ * caller supplies only the honest words, an optional icon and an action.
+ *
+ * The state is supplied by the caller, never inferred: an empty list is not a
+ * failed read, and a read in flight is not an empty list.
+ */
+export function FeedbackState({
+  state = 'empty',
+  layout = 'center',
+  align = 'center',
+  icon,
+  title,
+  description,
+  meta,
+  action,
+  compact = false,
+  size = 'sm',
+  className = '',
+  ref,
+}: {
+  state?: FeedbackTone
+  layout?: 'center' | 'strip'
+  align?: 'center' | 'start'
+  icon?: ReactNode
+  title: ReactNode
+  description?: ReactNode
+  meta?: ReactNode
+  action?: ReactNode
+  compact?: boolean
+  size?: 'sm' | 'md' | 'lg'
+  className?: string
+  /** The host element (e.g. a media tile's deferred-load observer target). */
+  ref?: React.Ref<HTMLDivElement>
+}) {
+  if (layout === 'strip') {
+    return (
+      <div
+        ref={ref}
+        role="status"
+        className={classes(FEEDBACK.strip, align === 'start' ? FEEDBACK.stripStart : FEEDBACK.stripCenter, className)}
+      >
+        {state === 'loading' && <Loader2 className={FEEDBACK.spinnerSm} aria-hidden />}
+        {(state === 'error' || state === 'empty') && (
+          icon ?? (state === 'error' ? <AlertCircle className={FEEDBACK.errorIconSm} /> : null)
+        )}
+        <span>{title}</span>
+        {action}
+      </div>
+    )
+  }
+
+  const titleClass = state === 'error'
+    ? FEEDBACK.errorTitle
+    : size === 'lg' ? FEEDBACK.titleDisplay : size === 'md' ? FEEDBACK.titleStrong : FEEDBACK.title
+
+  return (
+    <div
+      ref={ref}
+      className={classes(compact ? FEEDBACK.centerCompact : FEEDBACK.center, className)}
+    >
+      {state === 'loading' ? (
+        <Loader2 className={FEEDBACK.spinner} aria-hidden />
+      ) : state === 'error' ? (
+        icon ?? <AlertCircle className={FEEDBACK.errorIcon} />
+      ) : (
+        icon
+      )}
+      <div>
+        <div className={titleClass}>{title}</div>
+        {description != null && <div className={classes(FEEDBACK.description, 'mt-1')}>{description}</div>}
+        {meta != null && <div className={FEEDBACK.meta}>{meta}</div>}
+      </div>
+      {action && <div>{action}</div>}
+    </div>
+  )
 }

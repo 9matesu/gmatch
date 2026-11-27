@@ -10,6 +10,7 @@ import { nameFor } from '../../game/nameDirectory';
 import { UNKNOWN_NAME } from '../../utils/displayName';
 import { playPress } from '../../utils/sounds';
 import type { ThreadItem } from './GMatchDMs';
+import { FeedbackState } from '../../ui/kit';
 
 export interface PreviewRow {
   id: string;
@@ -52,9 +53,11 @@ export function RoomsPreview({ rows, onOpenRow, onOpenAll }: RoomsPreviewProps) 
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar p-1.5 space-y-0.5">
         {rows.length === 0 && (
-          <p className="text-xs text-retro-muted p-3 leading-relaxed">
-            No rooms yet. Open chat to join the lobby, create a sealed room, or message someone.
-          </p>
+          <FeedbackState
+            compact
+            title="No rooms yet"
+            description="Open chat to join the lobby, create a sealed room, or message someone."
+          />
         )}
         {rows.map((r) => {
           const Icon = ICONS[r.kind];

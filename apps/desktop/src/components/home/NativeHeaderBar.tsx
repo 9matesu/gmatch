@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { SpeakerHigh, SpeakerSlash, Minus, Square, X, CaretLeft, CaretRight } from '@phosphor-icons/react';
 import { isAudioMuted, setAudioMuted, playPress } from '../../utils/sounds';
+import { Brand } from '../../ui/Brand';
+import { MOTION } from '../../ui/tokens';
 
 export interface NativeHeaderBarProps {
   wsConnected?: boolean;
@@ -51,7 +53,7 @@ export function NativeHeaderBar({
             }}
             title="Back"
             aria-label="Back"
-            className="p-1 min-w-[28px] min-h-[28px] flex items-center justify-center rounded-md hover:bg-glass-w10 hover:text-retro-fg transition-colors cursor-pointer"
+            className={`p-1 min-w-[28px] min-h-[28px] flex items-center justify-center rounded-md hover:bg-glass-w10 hover:text-retro-fg ${MOTION.transition.micro} cursor-pointer`}
           >
             <CaretLeft className="w-3.5 h-3.5" />
           </button>
@@ -64,13 +66,13 @@ export function NativeHeaderBar({
             }}
             title="Forward"
             aria-label="Forward"
-            className="p-1 min-w-[28px] min-h-[28px] flex items-center justify-center rounded-md hover:bg-glass-w10 hover:text-retro-fg transition-colors cursor-pointer"
+            className={`p-1 min-w-[28px] min-h-[28px] flex items-center justify-center rounded-md hover:bg-glass-w10 hover:text-retro-fg ${MOTION.transition.micro} cursor-pointer`}
           >
             <CaretRight className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        <span className="text-field font-bold tracking-wide text-retro-fg select-none ml-1">gMatch</span>
+        <Brand size="compact" className="ml-1" />
       </div>
 
       {/* The notification bell lives in the footer Command Island (navbar). */}
@@ -85,7 +87,7 @@ export function NativeHeaderBar({
         <button
           type="button"
           onClick={toggleSound}
-          className="p-1.5 min-w-[28px] min-h-[28px] flex items-center justify-center rounded-md hover:bg-glass-w10 hover:text-retro-fg transition-colors cursor-pointer"
+          className={`p-1.5 min-w-[28px] min-h-[28px] flex items-center justify-center rounded-md hover:bg-glass-w10 hover:text-retro-fg ${MOTION.transition.micro} cursor-pointer`}
           aria-label={isMuted ? 'Unmute audio' : 'Mute audio'}
           title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
         >
@@ -101,7 +103,7 @@ export function NativeHeaderBar({
             <button
               type="button"
               onClick={() => window.gmatch?.winMinimize?.()}
-              className="p-1.5 rounded-md hover:bg-glass-w10 hover:text-retro-fg transition-colors cursor-pointer"
+              className={`p-1.5 rounded-md hover:bg-glass-w10 hover:text-retro-fg ${MOTION.transition.micro} cursor-pointer`}
               aria-label="Minimize window"
             >
               <Minus className="w-3.5 h-3.5" />
@@ -109,7 +111,7 @@ export function NativeHeaderBar({
             <button
               type="button"
               onClick={() => window.gmatch?.winToggleMaximize?.()}
-              className="p-1.5 rounded-md hover:bg-glass-w10 hover:text-retro-fg transition-colors cursor-pointer"
+              className={`p-1.5 rounded-md hover:bg-glass-w10 hover:text-retro-fg ${MOTION.transition.micro} cursor-pointer`}
               aria-label="Maximize window"
             >
               <Square className="w-3 h-3" />
@@ -117,7 +119,7 @@ export function NativeHeaderBar({
             <button
               type="button"
               onClick={() => window.gmatch?.winClose?.()}
-              className="p-1.5 rounded-md hover:bg-retro-error hover:text-retro-fg transition-colors cursor-pointer"
+              className={`p-1.5 rounded-md hover:bg-retro-error hover:text-retro-fg ${MOTION.transition.micro} cursor-pointer`}
               aria-label="Close window"
             >
               <X className="w-3.5 h-3.5" />

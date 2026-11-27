@@ -19,6 +19,8 @@ import {
 } from './onboardingState';
 import { saveUserProfile } from '../utils/profile';
 import { playPress } from '../utils/sounds';
+import { Brand } from '../ui/Brand';
+import { classes, LOGO, MOTION } from '../ui/tokens';
 import { isDefaultPeerName } from '@orbit/shared';
 
 type Profile = { displayName: string; tags: string[]; pfpUrl?: string };
@@ -76,8 +78,8 @@ export function OnboardingFlow(props: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-[var(--z-lightbox)] overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-retro-fg">
-      <div className="w-full max-w-2xl bg-retro-bg border border-edge rounded-xl p-6 sm:p-8 shadow-2xl space-y-5 animate-orbit-slide-up">
+    <div className={classes('fixed inset-0 z-[var(--z-lightbox)] overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans', MOTION.keyframe.fadeIn, 'text-retro-fg')}>
+      <div className={classes('w-full max-w-2xl bg-retro-bg border border-edge rounded-xl p-6 sm:p-8 shadow-2xl space-y-5', MOTION.keyframe.slideUp)}>
         <ProfileStep
           {...props}
           onDone={finish}
@@ -136,6 +138,7 @@ function ProfileStep(props: Props & { onDone: () => void }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
+          <Brand size="hero" className={classes(LOGO.clearSpace, 'mb-2')} />
           <h1 className="text-2xl font-black tracking-tighter text-retro-fg">Set up your profile</h1>
           <p className="text-xs text-retro-muted">Only your name is required. Everything else you can add later.</p>
         </div>
@@ -151,7 +154,7 @@ function ProfileStep(props: Props & { onDone: () => void }) {
               value={secretKey}
               onChange={(e) => setSecretKey(e.target.value)}
               placeholder="Paste your exported secret key"
-              className="w-full bg-retro-panel border border-edge rounded-lg px-3 py-2 text-xs font-mono text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent transition-colors"
+              className={`w-full bg-retro-panel border border-edge rounded-lg px-3 py-2 text-xs font-mono text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent ${MOTION.transition.micro}`}
             />
           </div>
           <div className="space-y-1.5">
@@ -163,7 +166,7 @@ function ProfileStep(props: Props & { onDone: () => void }) {
               onChange={(e) => setName(e.target.value)}
               placeholder="Leave blank to use existing name"
               maxLength={30}
-              className="w-full bg-retro-panel border border-edge rounded-lg px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent transition-colors"
+              className={`w-full bg-retro-panel border border-edge rounded-lg px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent ${MOTION.transition.micro}`}
             />
           </div>
         </div>
@@ -181,13 +184,13 @@ function ProfileStep(props: Props & { onDone: () => void }) {
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. AnonGooner"
               maxLength={30}
-              className="flex-1 bg-retro-panel border border-edge rounded-lg px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent transition-colors"
+              className={`flex-1 bg-retro-panel border border-edge rounded-lg px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent ${MOTION.transition.micro}`}
             />
             <button
               type="button"
               onClick={() => { playPress(500); setName(generateRandomHandle()); }}
               title="Generate random anonymous handle"
-              className="p-2 bg-retro-panel hover:bg-glass-w12 border border-edge rounded-lg text-retro-muted hover:text-retro-fg transition-colors cursor-pointer shrink-0"
+              className={`p-2 bg-retro-panel hover:bg-glass-w12 border border-edge rounded-lg text-retro-muted hover:text-retro-fg ${MOTION.transition.micro} cursor-pointer shrink-0`}
             >
               <Dices className="w-4 h-4" />
             </button>
@@ -198,7 +201,7 @@ function ProfileStep(props: Props & { onDone: () => void }) {
       <button
         type="button"
         onClick={() => { playPress(400); setIsImporting((v) => !v); }}
-        className="text-xs text-retro-muted hover:text-retro-fg inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+        className={`text-xs text-retro-muted hover:text-retro-fg inline-flex items-center gap-1.5 ${MOTION.transition.micro} cursor-pointer`}
       >
         <KeyRound className="w-3.5 h-3.5" />
         <span>{isImporting ? 'Create new anonymous identity instead' : 'Returning user? Import secret key'}</span>

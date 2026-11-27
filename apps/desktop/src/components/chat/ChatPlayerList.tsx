@@ -10,6 +10,7 @@ import { parseSeenMs } from '../../utils/presence';
 import { usePresence } from '../../game/presenceStore';
 import { usePresencePoll } from '../../hooks/usePresencePoll';
 import { swarmTransportLabel } from '../../hooks/useP2P';
+import { FeedbackState } from '../../ui/kit';
 
 export interface ChatPlayerItem {
   id: string;
@@ -266,9 +267,10 @@ export function ChatPlayerList({
       {/* Player List */}
       <div className="flex-1 min-h-0 overflow-y-auto styled-scrollbar p-2 space-y-1">
         {filteredPlayers.length === 0 ? (
-          <div className="text-center py-8 text-xs text-retro-muted">
-            {searchQuery ? `No players matching "${searchQuery}"` : 'No players active in last 24h'}
-          </div>
+          <FeedbackState
+            compact
+            title={searchQuery ? `No players matching "${searchQuery}"` : 'No players active in last 24h'}
+          />
         ) : (
           filteredPlayers.map((player) => {
             const isSelf = identity?.orbitId === player.id;

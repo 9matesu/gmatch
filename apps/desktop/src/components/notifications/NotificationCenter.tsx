@@ -10,7 +10,7 @@ import type { NotificationItem, MatchInviteItem } from '../NotificationsPanel';
 import type { AppNotification, NotificationTarget } from '../../utils/notifications';
 import { useMediaqInstall } from '../../services/mediaqInstall';
 import {
-  classes, COLOR, GAP, ICON, MONO, PADDING, PADDING_X, PADDING_Y,
+  classes, COLOR, FEEDBACK, GAP, ICON, MONO, PADDING, PADDING_X, PADDING_Y,
   RADIUS, SHADOW, STATUS, TRACKING, TYPE, WEIGHT,
 } from '../../ui/tokens';
 
@@ -132,7 +132,7 @@ export function NotificationCenter(props: NotificationCenterProps) {
     return () => window.removeEventListener('keydown', onKey);
   }, [expanded]);
 
-  const smallIconButton = classes('p-0.5 cursor-pointer', RADIUS.chip, COLOR.muted, COLOR.hoverFg);
+  const smallIconButton = classes(PADDING[0.5], 'cursor-pointer', RADIUS.chip, COLOR.muted, COLOR.hoverFg);
 
   return (
     <div
@@ -243,7 +243,7 @@ export function NotificationCenter(props: NotificationCenterProps) {
               </div>
               <ul className="max-h-28 overflow-y-auto styled-scrollbar divide-y divide-edge-subtle">
                 {[...messages].reverse().map((m) => (
-                  <li key={m.id} className={classes('flex items-start', GAP[2], PADDING_X[3], PADDING_Y[2])}>
+                  <li key={m.id} className={FEEDBACK.toastRow}>
                     <IconFor type={m.type} />
                     <span className={classes('flex-1 min-w-0 break-words', TYPE.body, COLOR.fg)}>{m.text}</span>
                     <button

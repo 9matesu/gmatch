@@ -3,10 +3,10 @@
 One design system for every tab, page, modal, button, settings and admin panel.
 Convergence contract — raw values live ONLY in `src/globals.css` (@theme).
 `src/ui/tokens.ts` is the SINGLE typed source of token names (spacing, layout,
-radius, shadow, type, colour roles, button variants/sizes, wordmark, class
-recipes). `src/ui/styles.ts` re-exports it for existing imports and adds only
-the game-semantic literals; `src/ui/kit.tsx` composes the kit from the same
-module. Components consume these names, they never re-inline equivalents.
+radius, shadow, type, colour roles, button variants/sizes, logo/wordmark
+lockup, motion preset, class recipes). `src/ui/styles.ts` re-exports it for
+existing imports and adds only the game-semantic literals; `src/ui/kit.tsx`
+composes the kit from the same module and re-exports `MOTION`. Components consume these names, they never re-inline equivalents.
 `node apps/desktop/scripts/check-ui-tokens.mjs` gates raw `#hex`, `rgb(`,
 `text-gray-*`, `p-[13px]` and numeric inline padding across `src`; the few
 legacy exceptions (HP fill, crit flash, rarity, generated art) are scoped by
@@ -70,6 +70,16 @@ A dialog uses `z-[var(--z-modal)]` — never `z-system`: 18 of them sat on the
   `duration-700` dramatic (tier-flash, rank-up) — map 75/100/200→150, 300 stays,
   700/1000→700.
 - easing: enter `ease-out`, exit `ease-in`; loops (spin/pulse/ping) stay UA.
+- **One preset, two halves (2026-11-27).** The values live only in
+  `globals.css` @theme as `--motion-duration-{micro,fade,enter,dramatic}` and
+  `--motion-ease-{fade,enter,exit}`. `ui/tokens.ts` `MOTION` is the typed set of
+  names: `MOTION.transition.{micro,quick,fade,fadeQuick,enter,transform,width}`
+  and `MOTION.keyframe.{fadeIn,slideUp,pop,slideLeft,feedIn,tierFlash}`. The
+  `orbit-*` keyframe classes read the SAME variables, so a timing change lands
+  in one place; the kit's overlay/dialog/sheet and every button/field recipe
+  consume `MOTION` through `tokens.ts` (no call-site duration literals). Game
+  semantics — HP fill, crit flash, +pts float, card tick — keep their own
+  literals and are exempt.
 - named keyframes are the house set only: `orbit-fade-in`, `orbit-pop`,
   `orbit-slide-up`, `orbit-pulse-soft`, `orbit-tier-flash`, `orbit-feed-in`.
   Bare `animate-fade-in`/`animate-slide-up`/`animate-slide-down` converge onto
@@ -78,6 +88,19 @@ A dialog uses `z-[var(--z-modal)]` — never `z-system`: 18 of them sat on the
   `prefers-reduced-motion` kill-switch already lives in globals.css — keep it first.
 - tw-animate classes (`animate-in`/`animate-out`/`fade-in`/`slide-in-from-*`) are
   banned — the `orbit-*` keyframe family only. No JS timelines.
+
+## Brand lockup (one logo, no baked wordmark)
+- `LOGO` in `ui/tokens.ts` owns the lockup: `markSrc` is the shipped
+  `/icon.svg` (favicon, PWA icon and boot splash share the same bytes), the name
+  is live text, and `--logo-gap`, `--logo-clear-space`, `--logo-min-width` and
+  `--logo-mark(-min|-size-sm|-size-hero)` are the only size source.
+- `ui/Brand.tsx` is the ONE component: `size` is `compact` (36px title bar),
+  `default` (age gate) or `hero` (onboarding / boot splash); `markOnly` keeps
+  the accessible name when no wordmark fits. No new face, weight or colour —
+  the name wears `fg` and the existing heading/field type steps.
+- The pre-bundle splash in `index.html` cannot import React, so it is a static
+  twin that mirrors the token NAMES (with matching fallbacks) and the same
+  mark asset. `tokens.test.ts` pins that contract against drift.
 
 ## Tactile rules (the anti-cafonho clause)
 - NO glow on chrome: box-shadow `0 0 Npx rgba(...)` outside the game-semantics

@@ -30,10 +30,10 @@ import {
   ZoomOut,
   Zap,
   RefreshCw,
-  Loader2,
   Rows3,
   LayoutGrid,
 } from 'lucide-react';
+import { FeedbackState, type FeedbackTone } from '../../ui/kit';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { OrbitObject as StoryItem } from '@orbit/shared';
 import { generateFallbackName } from '@orbit/shared';
@@ -51,8 +51,8 @@ import { isVideoPost } from '../../utils/media';
 import { vaultPin, vaultBridge } from '../../services/vault';
 import { PEER_ONLINE_EVENT } from '../../utils/p2pSwarm';
 import {
-  classes, COLOR, GAP, ICON, MONO, PADDING, PADDING_X, RADIUS,
-  SHADOW, STATUS, TRACKING, TRANSITION, TYPE, WEIGHT,
+  classes, COLOR, GAP, ICON, PADDING_X, RADIUS,
+  SHADOW, STATUS, TRANSITION, TYPE, WEIGHT,
 } from '../../ui/tokens';
 
 /** Sibling item MIME types for render-time video detection (see isVideoPost). */
@@ -759,9 +759,10 @@ function GMatchFeedImpl({
   // A restored snapshot is the FIFTH: the rows on screen are this device's own
   // last read, not something the node just said. Saying so is the difference
   // between "cached" and "pretending to be live".
-  const emptyCopy = useMemo(() => {
+  const emptyCopy = useMemo<{ title: string; body: string; state: FeedbackTone }>(() => {
     if (restoredFromCache && visiblePostCount > 0) {
       return {
+        state: 'empty',
         title: 'Showing your last read.',
         body: 'The node has not answered yet — this is the timeline from this device.',
       };
@@ -770,21 +771,25 @@ function GMatchFeedImpl({
       case 'loading':
       case 'idle':
         return {
+          state: 'loading',
           title: 'Loading the feed…',
           body: 'Reading the first page.',
         };
       case 'offline':
         return {
+          state: 'error',
           title: 'This node hosts no feed.',
           body: 'Your uploads and posts received from peers still appear here.',
         };
       case 'error':
         return {
+          state: 'error',
           title: 'Could not read the feed.',
           body: 'Retry, or keep reading what is already local.',
         };
       default:
         return {
+          state: 'empty',
           title: 'No posts yet.',
           body: 'Upload a post, or join a node that has some.',
         };
@@ -1095,39 +1100,33 @@ function GMatchFeedImpl({
           background publish work — active uploads / posts saved locally only.
           Non-blocking, no layout shift beyond this single row. */}
       {syncCounts.pending > 0 || syncCounts.local > 0 ? (
-        <div
-          role="status"
-          className={classes(
-            'w-full py-1 flex items-center select-none border-b',
-            PADDING_X[3], GAP[1.5], TYPE.caption, MONO, COLOR.muted, COLOR.edge, COLOR.glassW5,
-          )}
-        >
-          {syncCounts.pending > 0 ? (
-            <>
-              <Loader2 className="w-3 h-3 animate-spin shrink-0" aria-hidden="true" />
-              <span>Syncing {syncCounts.pending} post{syncCounts.pending === 1 ? '' : 's'} to the network…</span>
-            </>
-          ) : (
-            <>
-              <span className={classes('w-1.5 h-1.5 shrink-0', RADIUS.pill, STATUS.warningDot)} aria-hidden="true" />
-              <span>
-                {syncCounts.local} post{syncCounts.local === 1 ? '' : 's'} saved on this device — they upload when the network is back.
-              </span>
-            </>
-          )}
-        </div>
+        <FeedbackState
+          layout="strip"
+          align="start"
+          state={syncCounts.pending > 0 ? 'loading' : 'empty'}
+          className="select-none border-b"
+          icon={
+            syncCounts.pending > 0
+              ? undefined
+              : <span className={classes('w-1.5 h-1.5 shrink-0', RADIUS.pill, STATUS.warningDot)} aria-hidden="true" />
+          }
+          title={
+            syncCounts.pending > 0
+              ? `Syncing ${syncCounts.pending} post${syncCounts.pending === 1 ? '' : 's'} to the network…`
+              : `${syncCounts.local} post${syncCounts.local === 1 ? '' : 's'} saved on this device — they upload when the network is back.`
+          }
+        />
       ) : null}
 
 
       {/* Discreet grey loading label when stories/content are loading */}
       {storiesLoading && (
-        <div className={classes(
-          'w-full py-1.5 flex items-center justify-center select-none border-b',
-          PADDING_X[3], GAP[1.5], TYPE.caption, MONO, COLOR.muted, COLOR.edge, COLOR.glassW5,
-        )}>
-          <Loader2 className={classes('w-3 h-3 animate-spin shrink-0', COLOR.muted)} />
-          <span>Loading content...</span>
-        </div>
+        <FeedbackState
+          layout="strip"
+          state="loading"
+          className="select-none border-b"
+          title="Loading content..."
+        />
       )}
 
       {/* Stories Tray Carousel — below the header */}
@@ -1704,69 +1703,74 @@ function GMatchFeedImpl({
            )}
 
           {displayPosts.length === 0 && (
-            <div className={classes('border text-center space-y-5 my-4 max-w-md mx-auto', COLOR.edge, RADIUS.control, PADDING[10])}>
-              <div>
-                <h2 className={classes(TYPE.display, WEIGHT.heading, TRACKING.tighter, COLOR.fg)}>{emptyCopy.title}</h2>
-                <p className={classes(TYPE.body, COLOR.muted, 'mt-2 leading-relaxed')}>
-                  {emptyCopy.body}
-                </p>
-              </div>
-              {onForceRefresh && (
-                <button
-                  type="button"
-                  onClick={() => { playPress(800); onForceRefresh(); }}
-                  className={classes(
-                    'px-4 py-2 cursor-pointer transition duration-150 active:scale-(--scale-press-sm)',
-                    'inline-flex items-center border',
-                    GAP[1.5], RADIUS.chip, TYPE.body, WEIGHT.semibold,
-                    COLOR.edge, COLOR.body, COLOR.hoverFg, COLOR.hoverW10,
-                  )}
-                >
-                  <RefreshCw className={classes(ICON.md, 'stroke-[2]')} />
-                  <span>Reload feed</span>
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  if (onOpenPostCreator) onOpenPostCreator();
-                  else setShowCustomPostCreator(true);
-                }}
-                className={classes(
-                  'create-action px-4 py-2 cursor-pointer transition duration-150 active:scale-(--scale-press-sm)',
-                  'inline-flex items-center',
-                  GAP[1.5], RADIUS.chip, TYPE.body, WEIGHT.semibold, SHADOW.xs,
-                )}
-              >
-                <PlusSquare className={classes(ICON.md, 'stroke-[2]')} />
-                <span>Upload your first post</span>
-              </button>
-              {followSuggestions.length > 0 && (
-                <div className={classes('pt-2 border-t', COLOR.edge)}>
-                  <p className={classes(TYPE.caption, 'uppercase tracking-wider', COLOR.muted, 'mb-2')}>Or follow someone</p>
-                  <div className="flex items-center justify-center gap-3">
-                    {followSuggestions.map((s) => (
+            <FeedbackState
+              state={emptyCopy.state}
+              size="lg"
+              className={classes('border my-4 max-w-md mx-auto', COLOR.edge, RADIUS.control)}
+              title={emptyCopy.title}
+              description={emptyCopy.body}
+              action={
+                <>
+                  <div className={classes('flex flex-col items-center', GAP[3])}>
+                    {onForceRefresh && (
                       <button
-                        key={s.id}
                         type="button"
-                        onClick={() => { void onFollowSuggestion?.(s.id); }}
-                        className={classes('flex flex-col items-center cursor-pointer group', GAP[1])}
-                        aria-label={`Follow ${s.display_name || s.id}`}
+                        onClick={() => { playPress(800); onForceRefresh(); }}
+                        className={classes(
+                          'px-4 py-2 cursor-pointer transition duration-150 active:scale-(--scale-press-sm)',
+                          'inline-flex items-center border',
+                          GAP[1.5], RADIUS.chip, TYPE.body, WEIGHT.semibold,
+                          COLOR.edge, COLOR.body, COLOR.hoverFg, COLOR.hoverW10,
+                        )}
                       >
-                        <span className={classes(
-                          'relative w-10 h-10 overflow-hidden border flex items-center justify-center',
-                          RADIUS.pill, COLOR.edge, TYPE.body, COLOR.fg, COLOR.glassW5,
-                        )}>
-                          <Avatar id={s.id} size={40} imageUrl={profilePics?.[s.id]} fill={true} />
-                        </span>
-                        <span className={classes(TYPE.caption, COLOR.muted, 'truncate max-w-[72px]', COLOR.hoverFg)}>{s.display_name}</span>
-                        <span className={classes(TYPE.caption, COLOR.fg, 'border px-1.5 py-0.5', COLOR.edge, RADIUS.chip, COLOR.hoverW10)}>Follow</span>
+                        <RefreshCw className={classes(ICON.md, 'stroke-[2]')} />
+                        <span>Reload feed</span>
                       </button>
-                    ))}
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (onOpenPostCreator) onOpenPostCreator();
+                        else setShowCustomPostCreator(true);
+                      }}
+                      className={classes(
+                        'create-action px-4 py-2 cursor-pointer transition duration-150 active:scale-(--scale-press-sm)',
+                        'inline-flex items-center',
+                        GAP[1.5], RADIUS.chip, TYPE.body, WEIGHT.semibold, SHADOW.xs,
+                      )}
+                    >
+                      <PlusSquare className={classes(ICON.md, 'stroke-[2]')} />
+                      <span>Upload your first post</span>
+                    </button>
                   </div>
-                </div>
-              )}
-            </div>
+                  {followSuggestions.length > 0 && (
+                    <div className={classes('pt-2 border-t', COLOR.edge)}>
+                      <p className={classes(TYPE.caption, 'uppercase tracking-wider', COLOR.muted, 'mb-2')}>Or follow someone</p>
+                      <div className="flex items-center justify-center gap-3">
+                        {followSuggestions.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => { void onFollowSuggestion?.(s.id); }}
+                            className={classes('flex flex-col items-center cursor-pointer group', GAP[1])}
+                            aria-label={`Follow ${s.display_name || s.id}`}
+                          >
+                            <span className={classes(
+                              'relative w-10 h-10 overflow-hidden border flex items-center justify-center',
+                              RADIUS.pill, COLOR.edge, TYPE.body, COLOR.fg, COLOR.glassW5,
+                            )}>
+                              <Avatar id={s.id} size={40} imageUrl={profilePics?.[s.id]} fill={true} />
+                            </span>
+                            <span className={classes(TYPE.caption, COLOR.muted, 'truncate max-w-[72px]', COLOR.hoverFg)}>{s.display_name}</span>
+                            <span className={classes(TYPE.caption, COLOR.fg, 'border px-1.5 py-0.5', COLOR.edge, RADIUS.chip, COLOR.hoverW10)}>Follow</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              }
+            />
           )}
 
           {/* Render-window sentinel: grows the mounted slice as the reader
@@ -1780,10 +1784,12 @@ function GMatchFeedImpl({
           {displayPosts.length > 0 && hasMore !== false && (
             <div ref={sentinelRef} className="py-6 flex flex-col items-center justify-center gap-2">
               {(internalLoadingMore || isLoadingMore) ? (
-                <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-retro-panel border border-edge shadow-xs text-xs font-medium text-retro-fg">
-                  <span className="w-3.5 h-3.5 border-2 border-edge border-t-retro-fg rounded-full animate-spin" />
-                  <span>Loading more moments…</span>
-                </div>
+                <FeedbackState
+                  layout="strip"
+                  state="loading"
+                  title="Loading more moments…"
+                  className={classes(RADIUS.pill, COLOR.edge, SHADOW.xs)}
+                />
               ) : (
                 <div className="h-6 w-full" />
               )}

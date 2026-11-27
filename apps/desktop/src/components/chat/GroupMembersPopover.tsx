@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { playPress } from '../../utils/sounds'
 import { RefreshCw, UserPlus, Crown } from 'lucide-react'
+import { Button, FeedbackState } from '../../ui/kit'
+import { ICON } from '../../ui/tokens'
 
 export interface GroupMember {
   id: string
@@ -56,16 +58,20 @@ export function GroupMembersPopover({
 
   if (error) {
     return (
-      <div className="p-3 text-xs text-retro-muted">
-        Could not load members.{' '}
-        <button type="button" className="text-retro-accent underline cursor-pointer" onClick={() => void fetchMembers()}>
-          <RefreshCw className="w-3 h-3 inline" /> Retry
-        </button>
-      </div>
+      <FeedbackState
+        compact
+        state="error"
+        title="Could not load members."
+        action={
+          <Button variant="link" size="sm" onClick={() => void fetchMembers()}>
+            <RefreshCw className={ICON.sm} /> Retry
+          </Button>
+        }
+      />
     )
   }
   if (!members) {
-    return <div className="p-3 text-xs text-retro-muted animate-pulse">Loading members…</div>
+    return <FeedbackState compact state="loading" title="Loading members…" />
   }
 
   async function confirmAdd(ids: string[]) {

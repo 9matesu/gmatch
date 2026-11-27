@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { FeedbackState } from '../ui/kit'
 import { isMediaVideo, resolveMediaUrl } from '../utils/media'
 import { resolveObjectRefId } from '../utils/objectRef'
 import { isContentHash } from '../utils/contentAddressedMedia'
@@ -379,25 +379,17 @@ export function ObjectImage({
     if (hideUnavailable) return <div ref={placeholderRef} className="h-0 w-full" />
     const waiting = waitingForBytes
     const seeding = signed && img.awaitingSeeder
+    // One shared strip recipe for all three honest outcomes: a fetch still in
+    // flight, a seeder that has not answered, and a terminal miss. The row with
+    // no bytes is hidden (above) when the caller asks for hideUnavailable —
+    // this strip is only for surfaces that deliberately show the gap.
     return (
-      <div
+      <FeedbackState
         ref={placeholderRef}
-        className="w-full py-3.5 px-3 flex items-center justify-center gap-1.5 text-2xs font-mono text-retro-muted bg-surface-canvas/40"
-      >
-        {waiting && !seeding ? (
-          <>
-            <Loader2 className="w-3 h-3 animate-spin text-retro-muted shrink-0" aria-label="Loading media" />
-            <span>Loading media...</span>
-          </>
-        ) : seeding ? (
-          <>
-            <Loader2 className="w-3 h-3 animate-spin text-retro-muted shrink-0" />
-            <span>Waiting for poster…</span>
-          </>
-        ) : (
-          <span>No preview</span>
-        )}
-      </div>
+        layout="strip"
+        state={waiting || seeding ? 'loading' : 'empty'}
+        title={waiting && !seeding ? 'Loading media...' : seeding ? 'Waiting for poster…' : 'No preview'}
+      />
     )
   }
 
@@ -405,14 +397,7 @@ export function ObjectImage({
 
   if (hasError) {
     if (hideUnavailable) return null
-    return (
-      <div
-        ref={placeholderRef}
-        className="w-full py-3.5 px-3 flex items-center justify-center gap-1.5 text-2xs font-mono text-retro-muted bg-surface-canvas/40"
-      >
-        <span>Image unavailable</span>
-      </div>
-    )
+    return <FeedbackState ref={placeholderRef} layout="strip" state="error" title="Image unavailable" />
   }
 
   if (isVideo) {

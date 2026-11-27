@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { WifiOff } from 'lucide-react';
-import { classes, GAP, ICON, PADDING_X, PADDING_Y, RADIUS, STATUS, TYPE, WEIGHT } from '../../ui/tokens';
+import { CHROME, classes, GAP, ICON, PADDING_X, PADDING_Y } from '../../ui/tokens';
 
 /** Live connectivity: navigator.onLine at mount + online/offline events. */
 function useOnline(): boolean {
@@ -40,12 +40,7 @@ export function FeedStatusPills() {
     <div className={classes(PADDING_X[3], 'sm:px-6 pt-2')}>
       <div
         role="status"
-        className={classes(
-          'inline-flex items-center border',
-          GAP[1.5], PADDING_X[3], PADDING_Y[1.5], RADIUS.pill,
-          TYPE.body, WEIGHT.medium,
-          STATUS.warningBg, STATUS.warning, STATUS.warningEdge,
-        )}
+        className={classes('inline-flex items-center border', GAP[1.5], PADDING_X[3], PADDING_Y[1.5], CHROME.warningPill)}
       >
         <WifiOff className={ICON.sm} />
         <span>Offline — showing cached posts, may be stale</span>

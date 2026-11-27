@@ -43,8 +43,8 @@ import { nameFor, nameRoster as nameRosterFromDirectory, rememberName } from '..
 import { groupMessagesByDay } from '../../utils/chatDays';
 import { searchThread } from '../../utils/dmSearch';
 import { UNKNOWN_NAME } from '../../utils/displayName';
-import { Button, Checkbox, Input, Textarea } from '../../ui/kit';
-import { BUTTON_FEEDBACK, classes, COLOR, FIELD, STATUS } from '../../ui/tokens';
+import { Button, Checkbox, FeedbackState, Input, Textarea } from '../../ui/kit';
+import { BUTTON_FEEDBACK, classes, COLOR, FEEDBACK, FIELD, ICON, STATUS } from '../../ui/tokens';
 
 import { logger } from '../../utils/logger'
 export interface PeerInfo {
@@ -962,7 +962,7 @@ export function GMatchDMs({
           {isSearching ? (
             <div className="p-2 space-y-1">
               {searchResults.length === 0 ? (
-                <div className="text-center py-8 text-xs text-retro-muted">No results for &quot;{searchQuery}&quot;</div>
+                <FeedbackState compact title={`No results for "${searchQuery}"`} />
               ) : (
                 searchResults.map((p) => {
                   const pfp = profilePics[p.orbitId];
@@ -987,7 +987,7 @@ export function GMatchDMs({
               )}
             </div>
           ) : activeThreads.length === 0 ? (
-            <div className="p-6 text-center"><p className="text-xs text-retro-muted">No conversations yet</p></div>
+            <FeedbackState compact title="No conversations yet" />
           ) : (
             <>
               {activeThreads.map((thread) => {
@@ -1214,7 +1214,7 @@ export function GMatchDMs({
                  {conversationSearch.trim().length >= 2 && (
                    <div className="max-h-44 overflow-y-auto styled-scrollbar" role="listbox" aria-label="Conversation search results">
                      {conversationHits.length === 0 ? (
-                       <p className="text-2xs text-retro-muted py-2">No matches in this conversation.</p>
+                       <p className={FEEDBACK.descriptionTight}>No matches in this conversation.</p>
                      ) : (
                        conversationHits.map((hit) => (
                          <Button
@@ -1263,14 +1263,14 @@ export function GMatchDMs({
                >
                <div ref={messageStreamRef} className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-3 styled-scrollbar select-text bg-transparent">
                               {displayedMessages.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3 text-retro-muted my-auto select-none">
-                  <MessageSquare className="w-6 h-6 text-retro-faint" />
-                  <p className="text-base font-black tracking-tight text-retro-fg">{headerTitle}</p>
-                  <p className="text-xs text-retro-muted">No messages yet.</p>
-                  {isLobbyGroup && (
-                    <p className="text-2xs text-retro-muted flex items-center gap-1"><Clock3 className="w-3 h-3" /> Clears every 12 hours</p>
-                  )}
-                </div>
+                <FeedbackState
+                  className="h-full my-auto select-none"
+                  icon={<MessageSquare className={FEEDBACK.icon} />}
+                  title={headerTitle}
+                  size="md"
+                  description="No messages yet."
+                  meta={isLobbyGroup ? 'Clears every 12 hours' : undefined}
+                />
               ) : (
                 <>
                 {openTarget === 'peer' && onLoadHistory && hasMoreHistory && displayedMessages.length >= 20 && (
@@ -1600,20 +1600,24 @@ export function GMatchDMs({
             )}
 
             {pasteNotice && (
-              <div role="status" className="px-3 pt-2 text-xs text-retro-muted shrink-0 border-t border-edge">
-                {pasteNotice}
-              </div>
+              <FeedbackState
+                layout="strip"
+                align="start"
+                className="shrink-0 border-t"
+                title={pasteNotice}
+              />
             )}
 
             <form onSubmit={handleSend} className="p-3 border-t border-edge bg-glass-w5 flex items-center gap-2 shrink-0">
               {laneUnavailableReason ? (
-                <div
-                  role="status"
-                  className="flex-1 flex items-center gap-2 text-xs text-retro-muted bg-glass-w8 border border-edge rounded-md px-3 py-2"
-                >
-                  <Globe className="w-3.5 h-3.5 shrink-0" />
-                  <span>{laneUnavailableReason}</span>
-                </div>
+                <FeedbackState
+                  layout="strip"
+                  align="start"
+                  state="error"
+                  className="flex-1 border rounded-md"
+                  icon={<Globe className={classes(ICON.sm, COLOR.muted)} />}
+                  title={laneUnavailableReason}
+                />
               ) : (
               <>
               {(activePmPeer && openTarget === 'peer') || openTarget === 'group' || isLobbyGroup ? (
@@ -1695,13 +1699,13 @@ export function GMatchDMs({
             </form>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-8 space-y-4">
-            <MessageSquare className="w-6 h-6 text-retro-faint" />
-            <div className="space-y-1">
-              <h2 className="text-2xl font-black tracking-tighter text-retro-fg">Messages</h2>
-              <p className="text-xs text-retro-muted max-w-xs">Select a conversation.</p>
-            </div>
-          </div>
+          <FeedbackState
+            className="flex-1"
+            icon={<MessageSquare className={FEEDBACK.icon} />}
+            title="Messages"
+            size="lg"
+            description="Select a conversation."
+          />
         )}
       </div>
 

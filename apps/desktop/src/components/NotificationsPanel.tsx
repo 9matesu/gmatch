@@ -23,6 +23,8 @@ import { playPress } from "../utils/sounds";
 import { resolveMediaUrl } from "../utils/media";
 import { formatAbsoluteTime } from "../utils/timeAgo";
 import { generateFallbackName } from "@orbit/shared";
+import { FeedbackState } from "../ui/kit";
+import { classes, COLOR, FEEDBACK } from "../ui/tokens";
 
 export interface NotificationItem {
   id: string;
@@ -192,7 +194,7 @@ export function NotificationsPanel({
         </div>
       </div>
       {unreadBreakdown && (
-        <div className="px-3 py-1.5 text-2xs text-retro-muted border-b border-edge shrink-0">
+        <div className={classes(FEEDBACK.strip, FEEDBACK.stripStart, 'border-b', COLOR.edge, 'shrink-0')}>
           {unreadBreakdown}
         </div>
       )}
@@ -333,13 +335,12 @@ export function NotificationsPanel({
         )}
 
         {items.length === 0 && openInvites.length === 0 && localItems.length === 0 && peerItems.length === 0 ? (
-          <div className="py-12 text-center space-y-2">
-            <Bell className="w-6 h-6 mx-auto text-retro-muted" />
-            <p className="text-xs font-medium text-retro-body">No notifications</p>
-            <p className="text-xs text-retro-muted">
-              Likes, comments, replies, mentions, follows, duels and invites will appear here.
-            </p>
-          </div>
+          <FeedbackState
+            compact
+            icon={<Bell className={FEEDBACK.icon} />}
+            title="No notifications"
+            description="Likes, comments, replies, mentions, follows, duels and invites will appear here."
+          />
         ) : (
           groups.map((g) => {
             const n = g.items[0];
