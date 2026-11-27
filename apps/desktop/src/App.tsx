@@ -127,6 +127,15 @@ const desktopChatOnLoad = () => false;
 /** Per-identity seen stamps (see utils/scopedSeen — the `:<orbitId>` suffix). */
 const DM_SEEN_KEY = 'gmatch_dm_seen_v1';
 const ROOM_SEEN_KEY = 'gmatch_room_seen_v1';
+/** The self pfp and pfp cache are per identity: a global key let a second
+ *  account inherit the first one's picture. The current orbit id is set on
+ *  identity change; the key helpers read it so call sites never touch identity
+ *  (which is narrowed to `never` in some closures). */
+let currentOrbitId: string | null = null;
+const LEGACY_PFP = 'orbit_pfp_url';
+const LEGACY_PFPS = 'goonmatch_pfps';
+const pfpUrlKey = () => (currentOrbitId ? `orbit_pfp_url:${currentOrbitId}` : LEGACY_PFP);
+const pfpsKey = () => (currentOrbitId ? `goonmatch_pfps:${currentOrbitId}` : LEGACY_PFPS);
 /** Which conversation to restore on boot (also identity-scoped). */
 
 /**
@@ -242,7 +251,7 @@ export default function Home() {
       const localTags = JSON.parse(localStorage.getItem('orbit_tags') || '[]')
       // Read through the secure mirror first (DPAPI mode), falling back to
       // plaintext localStorage for pre-migration installs / browser dev.
-      const localPfp = getSecureItem('orbit_pfp_url') || localStorage.getItem('orbit_pfp_url') || ''
+      const localPfp = getSecureItem(pfpUrlKey()) || localStorage.getItem(pfpUrlKey()) || ''
       return { displayName: localName, tags: Array.isArray(localTags) ? localTags : [], isAdmin: false, pfpUrl: localPfp }
     } catch {
       return { displayName: '', tags: [] as string[], isAdmin: false, pfpUrl: '' }
@@ -1278,20 +1287,19 @@ export default function Home() {
   }, [])
   const [profilePics, setProfilePics] = useState<Record<string, string>>(() => {
     if (typeof window === 'undefined') return {}
-    try { return JSON.parse(getSecureItem('goonmatch_pfps') || '{}') } catch { return {} }
+    try { return JSON.parse(getSecureItem(pfpsKey()) || '{}') } catch { return {} }
   })
-  // The pfp caches are read once at boot from a global key, so switching
-  // identity inherited the previous account's picture. Clear the in-memory
-  // caches on a real identity CHANGE (not the first load) so the new profile
-  // never shows the old one's avatar; they re-fetch.
+  // The pfp caches are per identity (scoped key). Set the current id and read
+  // the scoped self pfp so a new account never shows the previous one's picture.
   const prevIdentityRef = useRef<string | null>(null)
   useEffect(() => {
     const id = identity?.orbitId ?? null
-    if (prevIdentityRef.current !== null && prevIdentityRef.current !== id) {
-      setProfilePics({})
-      setMyProfile((p) => (p.pfpUrl ? { ...p, pfpUrl: '' } : p))
-    }
+    currentOrbitId = id
+    if (prevIdentityRef.current !== null && prevIdentityRef.current !== id) setProfilePics({})
     prevIdentityRef.current = id
+    if (!id) { setMyProfile((p) => (p.pfpUrl ? { ...p, pfpUrl: '' } : p)); return }
+    const pfp = getSecureItem(pfpUrlKey()) || ''
+    setMyProfile((p) => (p.pfpUrl === pfp ? p : { ...p, pfpUrl: pfp }))
   }, [identity?.orbitId])
   const [repostedPosts, setRepostedPosts] = useState<FeedPost[]>([])
   const [archivedPostIds, setArchivedPostIds] = useState<Set<string>>(() => new Set())
@@ -2386,7 +2394,7 @@ export default function Home() {
           }
           if (updated) {
             const capped = Object.fromEntries(Object.entries(next).slice(-MAX_PROFILE_PICS_IN_MEMORY))
-            try { setSecureItem('goonmatch_pfps', JSON.stringify(capped)) } catch { }
+            try { setSecureItem(pfpsKey(), JSON.stringify(capped)) } catch { }
             return capped
           }
           return prev
@@ -2444,10 +2452,10 @@ export default function Home() {
           const serverPfp = typeof selfUser?.pfp_url === 'string' ? selfUser.pfp_url : '';
           if (serverPfp) {
             try {
-              const cached = getSecureItem('orbit_pfp_url') || (() => { try { return localStorage.getItem('orbit_pfp_url') || '' } catch { return '' } })();
+              const cached = getSecureItem(pfpUrlKey()) || (() => { try { return localStorage.getItem(pfpUrlKey()) || '' } catch { return '' } })();
               if (cached !== serverPfp) {
-                try { setSecureItem('orbit_pfp_url', serverPfp) } catch { }
-                try { localStorage.setItem('orbit_pfp_url', serverPfp) } catch { }
+                try { setSecureItem(pfpUrlKey(), serverPfp) } catch { }
+                try { localStorage.setItem(pfpUrlKey(), serverPfp) } catch { }
               }
             } catch { /* best effort */ }
           }
@@ -3609,11 +3617,11 @@ export default function Home() {
                     const targetId = res.identity.orbitId;
                     setProfilePics((prev) => {
                       const next = { ...prev, [targetId]: pfpUrl };
-                      try { setSecureItem('goonmatch_pfps', JSON.stringify(next)) } catch { }
+                      try { setSecureItem(pfpsKey(), JSON.stringify(next)) } catch { }
                       return next;
                     });
-                    try { setSecureItem('orbit_pfp_url', pfpUrl) } catch { }
-                    try { localStorage.setItem('orbit_pfp_url', pfpUrl); } catch { }
+                    try { setSecureItem(pfpUrlKey(), pfpUrl) } catch { }
+                    try { localStorage.setItem(pfpUrlKey(), pfpUrl); } catch { }
                     // Also sync to server
                     await saveUserProfile(res.identity, { pfp_url: pfpUrl }).catch(() => { });
                   }
@@ -3632,11 +3640,11 @@ export default function Home() {
                     const targetId = newId.orbitId;
                     setProfilePics((prev) => {
                       const next = { ...prev, [targetId]: pfpUrl };
-                      try { setSecureItem('goonmatch_pfps', JSON.stringify(next)) } catch { }
+                      try { setSecureItem(pfpsKey(), JSON.stringify(next)) } catch { }
                       return next;
                     });
-                    try { setSecureItem('orbit_pfp_url', pfpUrl) } catch { }
-                    try { localStorage.setItem('orbit_pfp_url', pfpUrl); } catch { }
+                    try { setSecureItem(pfpUrlKey(), pfpUrl) } catch { }
+                    try { localStorage.setItem(pfpUrlKey(), pfpUrl); } catch { }
                   }
                   setMyProfile({ displayName: name, tags: tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [], isAdmin: false, pfpUrl: pfpUrl || '' });
                 }
@@ -4429,11 +4437,11 @@ export default function Home() {
                     const targetId = result.identity.orbitId;
                     setProfilePics((prev) => {
                       const next = { ...prev, [targetId]: pfpUrl };
-                      try { setSecureItem('goonmatch_pfps', JSON.stringify(next)) } catch { }
+                      try { setSecureItem(pfpsKey(), JSON.stringify(next)) } catch { }
                       return next;
                     });
-                    try { setSecureItem('orbit_pfp_url', pfpUrl) } catch { }
-                    try { localStorage.setItem('orbit_pfp_url', pfpUrl) } catch { }
+                    try { setSecureItem(pfpUrlKey(), pfpUrl) } catch { }
+                    try { localStorage.setItem(pfpUrlKey(), pfpUrl) } catch { }
                     await saveUserProfile(result.identity, { pfp_url: pfpUrl }).catch(() => { });
                   }
                 }}
