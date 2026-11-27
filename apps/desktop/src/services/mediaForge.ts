@@ -27,6 +27,26 @@ export async function hashFileSha256(file: File | Blob): Promise<string> {
 }
 
 /**
+ * The value to send in a node URL field, or undefined.
+ *
+ * The node accepts ONLY http(s) in `content_url`/`source_url`; anything else is
+ * a 400 `Invalid URL format`. A stale descriptor (`vault://…`, `magnet:`, a bare
+ * path) must be OMITTED, never forwarded — the row is still addressable by its
+ * `/api/objects/<id>` and its bytes, so dropping the link loses nothing.
+ */
+export function httpUrlOrUndefined(value: string | null | undefined): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const trimmed = value.trim()
+  if (!trimmed) return undefined
+  try {
+    const u = new URL(trimmed)
+    return u.protocol === 'http:' || u.protocol === 'https:' ? trimmed : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
  * Bytes for the metadata registration, or undefined.
  *
  * The node is the only place a PEER can read a post's media from. Until this
@@ -89,6 +109,12 @@ export async function forgeMediaLocally(
      *  queued through the persisted outbox and retried on reconnect/boot. The
      *  call never throws on network failure — the post stays local-first. */
     durable?: boolean
+    /** Optional provider link for the row. Only an http(s) value is ever sent:
+     *  a descriptor (`vault://`, `magnet:`, a bare path) is DROPPED, because the
+     *  node's URL field rejects anything but http(s) with `Invalid URL format`
+     *  — the exact 400 a bugged/stale descriptor row produced on re-register. */
+    contentUrl?: string
+    sourceUrl?: string
   } = {}
 ): Promise<ForgedMedia> {
   const contentHash = await hashFileSha256(file)
@@ -137,6 +163,8 @@ export async function forgeMediaLocally(
   // everyone but the machine that authored it (and for that same user after a
   // reinstall). A node that does not know `data_base64` ignores the field, so
   // this stays compatible with an older server.
+  const contentUrl = httpUrlOrUndefined(options.contentUrl)
+  const sourceUrl = httpUrlOrUndefined(options.sourceUrl)
   const payload = {
     id: objectId,
     content_hash: contentHash,
@@ -153,6 +181,8 @@ export async function forgeMediaLocally(
     post_group: options.postGroup || null,
     tags: options.tags || null,
     recipients: options.recipients || null,
+    ...(contentUrl ? { content_url: contentUrl } : {}),
+    ...(sourceUrl ? { source_url: sourceUrl } : {}),
     ...(await attachBytes(file)),
   }
 

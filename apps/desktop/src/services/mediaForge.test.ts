@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { hashFileSha256, forgeMediaLocally } from './mediaForge'
+import { hashFileSha256, forgeMediaLocally, httpUrlOrUndefined } from './mediaForge'
 import { listOutbox } from './postOutbox'
 
 const mem = new Map<string, string>()
@@ -79,5 +79,48 @@ describe('mediaForge (local-first seeding)', () => {
     const stored = await getLocalObject(result.id)
     expect(stored).not.toBeNull()
     expect(stored?.size).toBe(file.size)
+  })
+})
+
+describe('mediaForge content_url guard (no Invalid URL format)', () => {
+  it('keeps only http(s) urls', () => {
+    expect(httpUrlOrUndefined('https://cdn.test/x.jpg')).toBe('https://cdn.test/x.jpg')
+    expect(httpUrlOrUndefined('http://cdn.test/x.jpg')).toBe('http://cdn.test/x.jpg')
+    // Descriptors / local schemes the node's URL field rejects:
+    expect(httpUrlOrUndefined('vault://f/' + 'a'.repeat(64))).toBeUndefined()
+    expect(httpUrlOrUndefined('magnet:?xt=urn:btih:abc')).toBeUndefined()
+    expect(httpUrlOrUndefined('urn:sha256:abc')).toBeUndefined()
+    expect(httpUrlOrUndefined('/api/objects/abc')).toBeUndefined()
+    expect(httpUrlOrUndefined('   ')).toBeUndefined()
+    expect(httpUrlOrUndefined(null)).toBeUndefined()
+  })
+
+  it('omits a descriptor content_url from the register payload (no 400)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 'x', content_hash: 'abc', magnet_uri: 'magnet:?xt=urn:btih:abc' }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const identity = { orbitId: 'u', publicKeyHex: 'a'.repeat(64), privateKeyHex: 'b'.repeat(64) }
+    const file = new File(['bytes'], 'p.jpg', { type: 'image/jpeg' })
+    await forgeMediaLocally(file, identity as any, { contentUrl: 'vault://f/' + 'a'.repeat(64) })
+    const call = fetchMock.mock.calls.find(([url]) => url.includes('/api/objects/register'))
+    const body = JSON.parse(call![1].body)
+    expect(body.content_url).toBeUndefined()
+    expect(body.source_url).toBeUndefined()
+  })
+
+  it('forwards an http content_url', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 'x', content_hash: 'abc', magnet_uri: 'magnet:?xt=urn:btih:abc' }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const identity = { orbitId: 'u', publicKeyHex: 'a'.repeat(64), privateKeyHex: 'b'.repeat(64) }
+    const file = new File(['bytes'], 'p.jpg', { type: 'image/jpeg' })
+    await forgeMediaLocally(file, identity as any, { contentUrl: 'https://cdn.test/x.jpg' })
+    const call = fetchMock.mock.calls.find(([url]) => url.includes('/api/objects/register'))
+    const body = JSON.parse(call![1].body)
+    expect(body.content_url).toBe('https://cdn.test/x.jpg')
   })
 })
