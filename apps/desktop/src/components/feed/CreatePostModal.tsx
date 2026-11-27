@@ -784,7 +784,7 @@ function addLinkToCaption(raw: string): void {
                 ) : (
                   <>
                     {itemLooksVideo(currentMedia) ? (
-                      <video src={devFetchable(currentMedia.previewUrl) || currentMedia.previewUrl} muted playsInline className={`w-full object-cover ${aspectRatio === 'square' ? 'aspect-square' : aspectRatio === 'portrait' ? 'aspect-[4/5]' : 'aspect-[16/9]'}`} />
+                      <video src={devFetchable(currentMedia.previewUrl) || currentMedia.previewUrl} muted playsInline controls preload="auto" className={`w-full object-cover ${aspectRatio === 'square' ? 'aspect-square' : aspectRatio === 'portrait' ? 'aspect-[4/5]' : 'aspect-[16/9]'}`} />
                     ) : null}
                     {!itemLooksVideo(currentMedia) && (
                     <img
