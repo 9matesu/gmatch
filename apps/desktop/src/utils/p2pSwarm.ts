@@ -49,8 +49,8 @@ export type {
  * Durable bytes live in the vault (disk) / IndexedDB, so an eviction here only
  * costs one re-read — never data. Bounded by entries AND bytes, oldest first.
  */
-const RAM_LIMIT_ENTRIES = 64
-const RAM_LIMIT_BYTES = 96 * 1024 * 1024
+const RAM_LIMIT_ENTRIES = 256
+const RAM_LIMIT_BYTES = 192 * 1024 * 1024
 const localObjects = new Map<string, Blob>()
 let localObjectBytes = 0
 

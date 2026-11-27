@@ -482,19 +482,19 @@ describe('p2pSwarm RAM cache is bounded (memory)', () => {
     __resetLocalObjectCacheForTests()
   })
 
-  it('keeps at most 64 entries and evicts oldest first', () => {
-    for (let i = 0; i < 80; i += 1) registerLocalObject(`mem-${i}`, new Blob([`b${i}`]))
+  it('keeps at most 256 entries and evicts oldest first', () => {
+    for (let i = 0; i < 300; i += 1) registerLocalObject(`mem-${i}`, new Blob([`b${i}`]))
     const { keys, bytes } = __localObjectCacheForTests()
-    expect(keys.length).toBe(64)
-    expect(keys[0]).toBe('mem-16')
-    expect(keys[keys.length - 1]).toBe('mem-79')
+    expect(keys.length).toBe(256)
+    expect(keys[0]).toBe('mem-44')
+    expect(keys[keys.length - 1]).toBe('mem-299')
     expect(hasLocalObject('mem-0')).toBe(false)
     expect(bytes).toBeGreaterThan(0)
   })
 
   it('a read refreshes recency, so a displayed object is evicted last', async () => {
     registerLocalObject('mem-first', new Blob(['1']))
-    for (let i = 0; i < 63; i += 1) registerLocalObject(`mem-f${i}`, new Blob([`x${i}`]))
+    for (let i = 0; i < 255; i += 1) registerLocalObject(`mem-f${i}`, new Blob([`x${i}`]))
     // 'mem-first' is the oldest entry; reading it (a tile rendering it) must
     // move it to the front of the queue so the next insert evicts a colder one.
     await getLocalObject('mem-first')
@@ -514,7 +514,7 @@ describe('p2pSwarm RAM cache is bounded (memory)', () => {
     // Register beyond the cap, then read an evicted id back through the durable
     // store. getLocalObject must answer from disk rather than reporting a miss.
     registerLocalObject('mem-durable', new Blob(['durable-bytes'], { type: 'image/jpeg' }))
-    for (let i = 0; i < 70; i += 1) registerLocalObject(`mem-x${i}`, new Blob([`z${i}`]))
+    for (let i = 0; i < 300; i += 1) registerLocalObject(`mem-x${i}`, new Blob([`z${i}`]))
     expect(hasLocalObject('mem-durable')).toBe(false)
     // No durable store in this environment: the honest answer is null, not a
     // phantom hit on the evicted RAM entry.
