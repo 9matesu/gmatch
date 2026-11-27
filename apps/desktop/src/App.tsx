@@ -507,11 +507,13 @@ export default function Home() {
   const [groupPickerOpen, setGroupPickerOpen] = useState(false)
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null)
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
-  // Clicking an expanded post's image opens the fullscreen ImageViewer.
+  const [imageOrigin, setImageOrigin] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+  // Clicking an expanded post's image opens the fullscreen ImageViewer, morphing
+  // from the clicked image's rect (FLIP).
   useEffect(() => {
     const onOpen = (e: Event) => {
-      const id = (e as CustomEvent<{ id?: string }>).detail?.id;
-      if (id) setExpandedItemId(id);
+      const d = (e as CustomEvent<{ id?: string; rect?: { left: number; top: number; width: number; height: number } }>).detail;
+      if (d?.id) { setImageOrigin(d.rect ?? null); setExpandedItemId(d.id); }
     };
     window.addEventListener('gmatch-open-image', onOpen);
     return () => window.removeEventListener('gmatch-open-image', onOpen);
@@ -4177,7 +4179,8 @@ export default function Home() {
                     itemId={expandedItemId}
                     items={spectateViewerItems ?? allViewerItems}
                     identity={identity}
-                    onClose={() => { setExpandedItemId(null); setSpectateViewerItems(null) }}
+                    originRect={imageOrigin}
+                    onClose={() => { setExpandedItemId(null); setSpectateViewerItems(null); setImageOrigin(null) }}
                     onNavigate={(id) => setExpandedItemId(id)}
                     onDelete={handleDelete}
                     onSetWallpaper={handleSetWallpaper}

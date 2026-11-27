@@ -1264,9 +1264,10 @@ function GMatchFeedImpl({
                         aria-expanded={expanded}
                         aria-label={expanded ? 'Post image, expanded' : 'Expand post'}
                         className={`w-full ${isCurrentVideo ? '' : 'cursor-pointer'}`}
-                        onClick={() => {
+                        onClick={(e) => {
                           if (!isCurrentVideo) {
-                            toggleExpand(post);
+                            playPress(700);
+                            window.dispatchEvent(new CustomEvent('gmatch-open-image', { detail: { id: post.id, rect: e.currentTarget.getBoundingClientRect() } }));
                           }
                         }}
                         onKeyDown={(e) => {

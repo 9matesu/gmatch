@@ -104,14 +104,14 @@ export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
   }
 
   const openPost = useCallback(
-    (post: FeedPost) => {
+    (post: FeedPost, rect?: { left: number; top: number; width: number; height: number }) => {
       setLiked((prev) => (prev[post.id] === undefined ? { ...prev, [post.id]: !!post.is_liked } : prev));
       setSaved((prev) => (prev[post.id] === undefined ? { ...prev, [post.id]: !!post.is_saved } : prev));
       setCounts((prev) => (prev[post.id] === undefined ? { ...prev, [post.id]: post.like_count ?? 0 } : prev));
       // Inline (modal right pane) shows the card; the grid opens the fullscreen
       // ImageViewer modal.
       if (inline) setActivePost(post);
-      else window.dispatchEvent(new CustomEvent('gmatch-open-image', { detail: { id: post.id } }));
+      else window.dispatchEvent(new CustomEvent('gmatch-open-image', { detail: { id: post.id, rect } }));
       // The profile endpoints don't inline comments (post.comments is only
       // populated on the single-post route, which the app never calls), so
       // seeding from it left every profile lightbox permanently empty. Fetch
