@@ -1,49 +1,66 @@
 // Stages a SELF-CONTAINED API server for packaging (1.0: no central server —
 // every copy ships the server; friends connect to one chosen host).
-// Output: I:/gmatch/api-stage/
+// Output: <repo>/api-stage/
 //   apps/api/          source + package.json (deps rewritten to file: links)
 //   packages/crypto/   + packages/shared/ (vendored @orbit/* sources)
-//   bun.exe            the runtime (copied from the local bun install)
+//   bun / bun.exe      the runtime (copied from the local bun install)
 // Then `npm install --omit=dev` inside apps/api makes it run with zero repo.
 //
 // Run: node scripts/stage-api.cjs (from apps/desktop)
 const { existsSync, mkdirSync, cpSync, writeFileSync, rmSync } = require('node:fs')
 const { join } = require('node:path')
+const { homedir } = require('node:os')
 const { execFileSync } = require('node:child_process')
 
 const ROOT = join(__dirname, '..', '..', '..')
 const STAGE = join(ROOT, 'api-stage')
+const IS_WIN = process.platform === 'win32'
+const BUN_NAME = IS_WIN ? 'bun.exe' : 'bun'
 
-function findBunExe() {
-  // Explicit override (CI can pin it): GMATCH_BUN_EXE=path/to/bun.exe
-  if (process.env.GMATCH_BUN_EXE && existsSync(process.env.GMATCH_BUN_EXE)) {
-    return process.env.GMATCH_BUN_EXE
+/** Where a bun install could live. Home is always os.homedir(); Windows-only
+ *  env vars are consulted only on Windows and a hardcoded drive letter is
+ *  never assumed. */
+function bunCandidates() {
+  const home = homedir()
+  const candidates = [join(ROOT, BUN_NAME), join(home, '.bun', 'bin', BUN_NAME)]
+  if (IS_WIN) {
+    candidates.push(join(process.env.APPDATA || '', 'npm', 'node_modules', 'bun', 'bin', 'bun.exe'))
+    candidates.push(join(process.env.USERPROFILE || '', '.bun', 'bin', 'bun.exe'))
+    if (process.env.PREFIX) candidates.push(join(process.env.PREFIX, 'node_modules', 'bun', 'bin', 'bun.exe'))
+  } else {
+    const dataHome = process.env.XDG_DATA_HOME || join(home, '.local', 'share')
+    candidates.push(join(dataHome, 'npm', 'node_modules', 'bun', 'bin', 'bun'))
+    candidates.push(join(home, '.npm-global', 'bin', 'bun'))
+    if (process.env.PREFIX) candidates.push(join(process.env.PREFIX, 'node_modules', 'bun', 'bin', 'bun'))
   }
-  const candidates = [
-    join(ROOT, 'bun.exe'),
-    join(process.env.APPDATA || '', 'npm', 'node_modules', 'bun', 'bin', 'bun.exe'),
-    join(process.env.USERPROFILE || '', '.bun', 'bin', 'bun.exe'),
-    // GitHub Actions windows-latest global npm prefix
-    'C:\\npm\\prefix\\node_modules\\bun\\bin\\bun.exe',
-    join(process.env.PREFIX || '', 'node_modules', 'bun', 'bin', 'bun.exe'),
-  ]
   // Authoritative global root (npm root -g works on runners + dev boxes).
   try {
     const globalRoot = execFileSync('npm', ['root', '-g'], { encoding: 'utf8', shell: true }).trim()
-    if (globalRoot) candidates.push(join(globalRoot, 'bun', 'bin', 'bun.exe'))
+    if (globalRoot) {
+      candidates.push(join(globalRoot, 'bun', 'bin', BUN_NAME))
+      // Legacy npm installs used bun.exe even on non-Windows hosts.
+      if (!IS_WIN) candidates.push(join(globalRoot, 'bun', 'bin', 'bun.exe'))
+    }
   } catch { /* npm not on PATH */ }
-  for (const c of candidates) if (existsSync(c)) return c
-  // Last resort: resolve `bun.exe` from PATH (npm -g shims may put it there).
+  return candidates.filter(Boolean)
+}
+
+function findBun() {
+  // Explicit override (CI can pin it): GMATCH_BUN_EXE=path/to/bun[.exe]
+  if (process.env.GMATCH_BUN_EXE && existsSync(process.env.GMATCH_BUN_EXE)) {
+    return process.env.GMATCH_BUN_EXE
+  }
+  for (const c of bunCandidates()) if (existsSync(c)) return c
+  // Last resort: resolve bun from PATH (npm -g shims may put it there).
   try {
-    const out = execFileSync('where.exe', ['bun.exe'], { encoding: 'utf8' }).trim()
-    const NL = String.fromCharCode(10)
-    const first = out.includes(NL) ? out.split(NL)[0].trim() : out
-    if (first.toLowerCase().endsWith('bun.exe') && existsSync(first)) return first
+    const out = execFileSync(IS_WIN ? 'where.exe' : 'which', [BUN_NAME], { encoding: 'utf8' }).trim()
+    const first = out.split(/\r?\n/)[0].trim()
+    if (first && existsSync(first)) return first
   } catch {
     /* not on PATH */
   }
-  console.error('[stage-api] bun.exe not found in standard locations.')
-  console.error('[stage-api] Install it first:  npm i -g --allow-scripts=bun bun   (or: powershell -c "irm bun.sh/install/npm | irsh")')
+  console.error(`[stage-api] bun not found in standard locations (looked for ${BUN_NAME}).`)
+  console.error('[stage-api] Install it first:  npm i -g --allow-scripts=bun bun')
   process.exit(1)
 }
 
@@ -51,8 +68,12 @@ rmSync(STAGE, { recursive: true, force: true })
 mkdirSync(join(STAGE, 'apps', 'api'), { recursive: true })
 mkdirSync(join(STAGE, 'shared'), { recursive: true })
 
-const bunExe = findBunExe()
-cpSync(bunExe, join(STAGE, 'bun.exe'))
+const bunExe = findBun()
+cpSync(bunExe, join(STAGE, BUN_NAME))
+// The packaged sidecar looks for api/bun.exe (electron/apiSidecar.cjs). Keep
+// that name on every OS so one staged layout works cross-platform; the bytes
+// are the platform's real bun binary regardless of the filename.
+if (BUN_NAME !== 'bun.exe') cpSync(bunExe, join(STAGE, 'bun.exe'))
 
 // Copy schema, migrations, and shared blocklist
 cpSync(join(ROOT, 'apps', 'api', 'schema.sql'), join(STAGE, 'apps', 'api', 'schema.sql'))

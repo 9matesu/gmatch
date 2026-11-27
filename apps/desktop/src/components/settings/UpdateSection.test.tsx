@@ -79,7 +79,7 @@ describe('UpdateSection (packaged self-update)', () => {
     act(() => { emit({ phase: 'error', error: 'sha256 mismatch — download discarded' }) })
     const link = await screen.findByRole('button', { name: /github releases/i })
     fireEvent.click(link)
-    expect(bridge.openExternal).toHaveBeenCalledWith('https://github.com/9matesu/goongrid/releases/latest')
+    expect(bridge.openExternal).toHaveBeenCalledWith('https://github.com/9matesu/gmatch/releases/latest')
     expect(screen.getByText(/sha256 mismatch/i)).toBeInTheDocument()
   })
 

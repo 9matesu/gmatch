@@ -48,6 +48,8 @@ export interface CachedPicture {
 
 /** The single source of truth for the preload bridge surface. */
 export interface GmatchBridge {
+  /** process.platform from the preload, for platform-specific copy only. */
+  platform?: string
   booruFetch?: (req: BooruRequest) => Promise<BooruResponse>
   /** Read-only feed search metrics (observability). Never a UI surface. */
   booruTimings?: () => Promise<FeedMetricsSummary>
@@ -129,6 +131,16 @@ export interface GmatchBridge {
   ) => Promise<{ ok: boolean; hadPrevious?: boolean; reason?: 'unsupported-platform' | 'no-data' | 'set-failed' | 'no-powershell' | 'restore-failed' | 'error' }>
   wallpaperRestore?: () => Promise<{ ok: boolean; reason?: string }>
   wallpaperCleanupFiles?: () => Promise<{ ok: boolean }>
+  /** Cross-platform desktop wallpaper (Windows registry/TranscodedWallpaper,
+   *  Linux gsettings/KDE). The source is a local path, file:// URI, or bytes.
+   *  Unsupported desktops resolve to a reason instead of rejecting. */
+  setWallpaper?: (source: string | { data: ArrayBuffer; mime?: string }) => Promise<{
+    ok: boolean
+    backend?: 'windows' | 'gnome' | 'kde'
+    path?: string
+    uri?: string
+    reason?: 'unsupported-desktop' | 'invalid-source' | 'remote-source' | 'no-data' | 'invalid-size' | 'invalid-mime' | 'no-powershell' | 'no-tool' | 'timeout' | 'set-failed' | 'write-failed' | 'restore-failed' | 'error'
+  }>
   grantCameraOnce?: () => Promise<{ ok: boolean }>
   /** Native OS toast (main-process Electron Notification). Best-effort: the
    *  in-app overlay always renders even when this is absent or fails. */

@@ -25,6 +25,7 @@ import {
   type SwarmReceiptRoles,
 } from './swarmEngine'
 import { descriptorUrlFromBytes } from './objectDescriptor'
+import { countMetric, timeMetric } from './metrics'
 
 // The wire contract (the frame shapes and their bounds) lives in
 // @orbit/protocol: the node's relay allowlist and this engine read the SAME
@@ -75,6 +76,7 @@ function rememberLocalObject(id: string, blob: Blob): void {
     if (oldest === undefined || oldest === id) break
     const victim = localObjects.get(oldest)
     localObjects.delete(oldest)
+    countMetric('media.evict', `swarmRam:${oldest}`)
     if (victim) localObjectBytes -= victim.size
   }
 }
@@ -745,7 +747,17 @@ export async function handleSwarmMessage(msg: SwarmMessage): Promise<boolean> {
  *  `expectedHash` is given, the assembled bytes must hash to it or the
  *  transfer is rejected (never registered). */
 export function requestSwarmObject(id: string, timeoutMs = 15000, opts: SwarmFetchOptions = {}): Promise<Blob> {
-  return moduleEngine.requestObject(id, timeoutMs, opts)
+  // One funnel for every swarm ask (node 404, p2p descriptor, content hash,
+  // HAVE wave). Counting here keeps the number honest — no caller can ask
+  // without it landing in the metrics ring — and the timing reports both an
+  // answered ask and a timeout/bad-transfer miss.
+  countMetric('swarm.ask', id)
+  const started = Date.now()
+  const settle = () => timeMetric('swarm.ask', Date.now() - started, id)
+  return moduleEngine.requestObject(id, timeoutMs, opts).then(
+    (blob) => { settle(); return blob },
+    (err) => { settle(); throw err },
+  )
 }
 
 /** Cancel an in-flight swarm fetch. Partial chunks are dropped, never kept. */

@@ -21,6 +21,8 @@ const asset = (name: string, url?: string, digest?: string) => ({
 describe('updater-core (portable self-update)', () => {
   it('parsePortableName matches only our artifact', () => {
     expect(parsePortableName('gMatch-1.1.4-portable.exe')).toBe('1.1.4')
+    expect(parsePortableName('gMatch-1.1.4-portable.AppImage')).toBe('1.1.4')
+    expect(parsePortableName('gMatch-1.1.4-portable.deb')).toBe('1.1.4')
     expect(parsePortableName('gMatch-Setup-1.1.4.exe')).toBe(null)
     expect(parsePortableName('other.exe')).toBe(null)
   })
@@ -66,6 +68,22 @@ describe('updater-core (portable self-update)', () => {
     expect(planCheck({ tag_name: 'v9.9.9', assets: [] }, '1.1.3').action).toBe('error')
   })
 
+  it('planCheck selects only the artifact the current OS can swap', () => {
+    const release = {
+      tag_name: 'v2.0.0',
+      assets: [
+        asset('gMatch-2.0.0-portable.exe'),
+        asset('gMatch-2.0.0-portable.AppImage'),
+        asset('gMatch-2.0.0-portable.deb'),
+      ],
+    }
+    expect(planCheck(release, '1.9.0', { platform: 'win32' })).toMatchObject({ name: 'gMatch-2.0.0-portable.exe' })
+    expect(planCheck(release, '1.9.0', { platform: 'linux' })).toMatchObject({ name: 'gMatch-2.0.0-portable.AppImage' })
+    expect(planCheck(release, '1.9.0', { platform: 'darwin' })).toMatchObject({ name: 'gMatch-2.0.0-portable.AppImage' })
+    // A deb is packaging, not a portable swap: it never becomes a download plan.
+    expect(planCheck({ ...release, assets: [release.assets[2]] }, '1.9.0', { platform: 'linux' }).action).toBe('error')
+  })
+
   it('planCheck refuses http assets unless insecure (local smoke override)', () => {
     const rel = { assets: [{ name: 'gMatch-2.0.0-portable.exe', browser_download_url: 'http://127.0.0.1:9/gMatch-2.0.0-portable.exe' }] }
     expect(planCheck(rel, '1.1.3').action).toBe('error')
@@ -97,14 +115,30 @@ describe('updater-core (portable self-update)', () => {
     expect(sanitizePath('normal\\path\\ok.exe')).toBe('normal\\path\\ok.exe')
   })
 
-  it('buildUpdaterScript: retry-move, relaunch, self-delete', () => {
-    const s = buildUpdaterScript({ source: 'C:\\d\\new.exe', target: 'C:\\d\\old.exe', logPath: 'C:\\log\\main.log' })
+  it('buildUpdaterScript: Windows batch retry-move, relaunch, self-delete', () => {
+    const s = buildUpdaterScript({ source: 'C:\\d\\new.exe', target: 'C:\\d\\old.exe', logPath: 'C:\\log\\main.log', platform: 'win32' })
     expect(s).toContain(':retry')
     expect(s).toContain('move /y "C:\\d\\new.exe" "C:\\d\\old.exe"')
     expect(s).toContain('GEQ 30')
     expect(s).toContain('start "" "C:\\d\\old.exe"')
     expect(s).toContain('del "%~f0"')
     expect(s).toContain('C:\\log\\main.log')
+  })
+
+  it('buildUpdaterScript: POSIX sh swap on Linux/macOS', () => {
+    const s = buildUpdaterScript({
+      source: '/home/u/new.AppImage', target: '/home/u/old.AppImage', logPath: '/home/u/main.log', platform: 'linux',
+    })
+    expect(s.startsWith('#!/bin/sh')).toBe(true)
+    expect(s).toContain("mv -f '/home/u/new.AppImage' '/home/u/old.AppImage'")
+    expect(s).toContain('while [ "$TRIES" -lt 30 ]')
+    expect(s).toContain('sleep "$WAIT"')
+    expect(s).toContain("chmod +x '/home/u/old.AppImage'")
+    expect(s).toContain('rm -f "$0"')
+    expect(s).toContain('/home/u/main.log')
+    expect(buildUpdaterScript({
+      source: '/home/u/new.AppImage', target: '/home/u/old.AppImage', logPath: '/home/u/main.log', platform: 'darwin',
+    })).toBe(s)
   })
 
   it('release.json shape: version, url, verified digest', () => {

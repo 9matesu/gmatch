@@ -164,7 +164,7 @@ export const INTENSITY_PRESETS: Record<string, Record<string, boolean>> = {
 
 const CONSENT_ROWS: Array<{ key: string; label: string; desc: string }> = [
   { key: 'allowDesktopBackgroundChange', label: 'Wallpaper', desc: 'Others may replace your gMatch background.' },
-  { key: 'allowDesktopWallpaperOS', label: 'OS wallpaper (high impact)', desc: 'A wallpaper effect may also change your REAL Windows desktop wallpaper for a while, then restore it. Needs Wallpaper on, off by default.' },
+  { key: 'allowDesktopWallpaperOS', label: 'OS wallpaper (high impact)', desc: 'A wallpaper effect may also change your REAL desktop wallpaper (Windows, or Linux with GNOME/KDE) for a while, then restore it. Needs Wallpaper on, off by default.' },
   { key: 'allowGameBackgroundChange', label: 'Game background', desc: 'Others may cover the app behind you.' },
   { key: 'allowPopupVideo', label: 'Video popup', desc: 'A muted, dismissible clip may appear in the app.' },
   { key: 'allowPopupMessage', label: 'Message', desc: 'A short note may pop in the app and as an OS toast.' },

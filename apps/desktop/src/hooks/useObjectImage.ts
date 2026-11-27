@@ -7,6 +7,7 @@ import { vaultProbe } from '../services/vault'
 import { resolveVideoMime, sniffFileHead } from '../utils/media'
 import { normalizeObjectId, isRequestableObjectId, parseObjectRef } from '../utils/objectRef'
 import { isContentHash, resolveContentAddressedMedia } from '../utils/contentAddressedMedia'
+import { countMetric, timeMetric } from '../utils/metrics'
 
 /**
  * Video detection for bytes in hand: trusts a concrete blob/stored MIME, but
@@ -46,6 +47,15 @@ interface ImageState {
   isVideo: boolean
   isLink: boolean
   linkUrl: string | null
+  /**
+   * A definitive "no bytes anywhere" miss. Unlike a transient failure it does
+   * NOT expire on a timer: replaying the same 5s swarm ask on every re-render
+   * is exactly the "unavailable images load forever" symptom. Only a real
+   * PEER_ONLINE_EVENT evicts it and re-resolves.
+   */
+  terminal?: boolean
+  /** The content hash the terminal miss was judged against ('' for legacy). */
+  terminalKey?: string
 }
 
 const EMPTY: ObjectImageResult = { url: null, failed: false, isVideo: false, isLink: false, linkUrl: null, awaitingSeeder: false }
@@ -114,11 +124,14 @@ function cacheGet(rawCardId: string, source: string): ImageState | null {
   const hit = objectCache.get(cardId)
   if (!hit) return null
   if (cacheSource.get(cardId) !== source) return null
-  if (hit.failed) {
+  // Terminal misses stay cached until a peer comes online; the short TTL is
+  // only for transient failures (a 404 that may be a waking node, a 5xx).
+  if (hit.failed && !hit.terminal) {
     const at = failedAt.get(cardId) ?? 0
     if (Date.now() - at > FAILED_TTL_MS) {
       // Expired failure: drop it so the consumer re-resolves (the node may be
       // back, or a seeder may have arrived).
+      countMetric('media.reload', cardId)
       objectCache.delete(cardId)
       cacheSource.delete(cardId)
       failedAt.delete(cardId)
@@ -151,6 +164,7 @@ function cacheSet(rawCardId: string, source: string, img: ImageState): void {
     if (!victim) break
     const evicted = objectCache.get(victim)
     if (evicted?.url) URL.revokeObjectURL(evicted.url)
+    countMetric('media.evict', `objectImage:${victim}`)
     objectCache.delete(victim)
     cacheSource.delete(victim)
     failedAt.delete(victim)
@@ -163,9 +177,21 @@ export function evictObjectImage(rawCardId: string): void {
   const hit = objectCache.get(cardId)
   if (!hit) return
   if (hit.url && hit.url.startsWith('blob:')) URL.revokeObjectURL(hit.url)
+  countMetric('media.evict', `objectImage:${cardId}`)
   objectCache.delete(cardId)
   cacheSource.delete(cardId)
   failedAt.delete(cardId)
+}
+
+/**
+ * The one read path for a cached image. A terminal miss is keyed by the hash
+ * it was judged against: a row first seen without a content hash and later
+ * re-rendered WITH one must not inherit the earlier "no bytes" verdict.
+ */
+function cachedFor(cardId: string, identity: IdentityLike, contentHash: string | null): ImageState | null {
+  const cached = cacheGet(cardId, identity.orbitId)
+  if (cached?.terminal && (cached.terminalKey || '') !== (contentHash || '')) return null
+  return cached
 }
 
 /**
@@ -185,8 +211,8 @@ interface ResolvedObject {
   awaitingSeeder: boolean
 }
 
-const FAILED = (cardId: string): ImageState =>
-  ({ cardId, url: '', failed: true, isVideo: false, isLink: false, linkUrl: null })
+const FAILED = (cardId: string, terminal = false, terminalKey = ''): ImageState =>
+  ({ cardId, url: '', failed: true, isVideo: false, isLink: false, linkUrl: null, terminal, terminalKey })
 
 /**
  * At most N signed object streams in flight at once.
@@ -225,8 +251,23 @@ function withObjectFetchSlot<T>(run: (release: () => void) => Promise<T>): Promi
   })
 }
 
-/** Local (P2P/vault/IndexedDB) → signed GET → swarm. Never throws. */
+/** Local (P2P/vault/IndexedDB) → signed GET → swarm. Never throws.
+ *  One timing envelope around the whole ladder, so a stuck resolution is
+ *  visible in the debug surface instead of looking like a hung tile. */
 async function resolveObject(
+  cleanId: string,
+  identity: IdentityLike,
+  contentHash?: string | null,
+): Promise<ResolvedObject> {
+  const started = Date.now()
+  try {
+    return await resolveObjectInner(cleanId, identity, contentHash)
+  } finally {
+    timeMetric('media.resolve', Date.now() - started, cleanId)
+  }
+}
+
+async function resolveObjectInner(
   cleanId: string,
   identity: IdentityLike,
   contentHash?: string | null,
@@ -247,6 +288,12 @@ async function resolveObject(
     return { state, cache: true, awaitingSeeder: false }
   }
 
+  // A terminal miss is cached (the short failure TTL does NOT apply): a view
+  // switch or a re-render must not restart the bounded swarm ask for bytes
+  // nobody holds. PEER_ONLINE_EVENT evicts it, which is the only honest reason
+  // to believe the answer could have changed.
+  const terminalMiss = (): ResolvedObject => commit(FAILED(cleanId, true, contentHash || ''))
+
   // A row that names its own CONTENT (a peer-replicated post carries the
   // sha256 of its bytes) is resolved from that content: bytes held locally,
   // then the swarm with the hash attached, so nothing unverified is ever
@@ -265,7 +312,7 @@ async function resolveObject(
           .catch(() => {})
       },
     })
-    if (!blob) return { state: FAILED(cleanId), cache: false, awaitingSeeder: false }
+    if (!blob) return terminalMiss()
     // Cache the bytes under BOTH names the row may be asked for: the object id
     // alias (a remount by url is instant) and the content hash (the durable key
     // peers address). The resolver proved the hash, so neither registration
@@ -331,13 +378,14 @@ async function resolveObject(
   }
 
   // A descriptor has no node path: the local stores were the only honest shot.
-  if (localOnly) {
-    return { state: FAILED(cleanId), cache: false, awaitingSeeder: false }
-  }
+  // Its btih can still be seeded later by a peer, so remember this as a terminal
+  // miss rather than re-parsing/re-asking on every re-render.
+  if (localOnly) return terminalMiss()
 
   // The signed object stream is the only long-held request in the app: run a
   // bounded number of them at a time (see MAX_CONCURRENT_OBJECT_FETCHES).
-  return withObjectFetchSlot((release) => resolveObjectNetwork(cleanId, identity, commit, release))
+  return withObjectFetchSlot((release) =>
+    resolveObjectNetwork(cleanId, identity, commit, terminalMiss, release))
 }
 
 /**
@@ -349,6 +397,22 @@ async function resolveObjectNetwork(
   cleanId: string,
   identity: IdentityLike,
   commit: (state: ImageState) => ResolvedObject,
+  terminalMiss: () => ResolvedObject,
+  release: () => void,
+): Promise<ResolvedObject> {
+  const started = Date.now()
+  try {
+    return await resolveObjectNetworkInner(cleanId, identity, commit, terminalMiss, release)
+  } finally {
+    timeMetric('media.network', Date.now() - started, cleanId)
+  }
+}
+
+async function resolveObjectNetworkInner(
+  cleanId: string,
+  identity: IdentityLike,
+  commit: (state: ImageState) => ResolvedObject,
+  terminalMiss: () => ResolvedObject,
   release: () => void,
 ): Promise<ResolvedObject> {
   let res: Response | null = null
@@ -365,6 +429,7 @@ async function resolveObjectNetwork(
 
   if (!res.ok) {
     if (res.status === 404) {
+      countMetric('http.404', cleanId)
       // The metadata row lives on the author's node, not necessarily on ours:
       // a DM attachment is registered only on the sender's world, and a post
       // from another world 404s here too. The bytes can still be seeded by a
@@ -486,15 +551,13 @@ async function resolveObjectNetwork(
       }
       // Terminal miss, not an endless "waiting for poster": the vault had no
       // bytes, the node keeps no media and the bounded swarm ask timed out.
-      // Failed results are never cached, so an explicit remount (Show/Retry)
-      // or an actual PEER_ONLINE_EVENT is the only thing that re-asks.
       // Persist the id (+ content hash) so the diagnostics can list it.
       void import('../utils/pendingTransfers')
         .then(({ enqueuePendingTransfer }) => enqueuePendingTransfer(cleanId, hash))
         .catch(() => {})
-      // Cache the dead state: a view switch must not re-run the 5s swarm ask
-      // for bytes nobody has. A PEER_ONLINE retry still re-resolves it.
-      return { state: FAILED(cleanId), cache: false, awaitingSeeder: false }
+      // Cached as TERMINAL: a view switch or a re-render must not re-run the
+      // 5s swarm ask for bytes nobody has. Only PEER_ONLINE_EVENT evicts it.
+      return terminalMiss()
     }
     return commit({
       cardId: cleanId,
@@ -527,6 +590,8 @@ function resolveObjectOnce(
   const key = pinKey(cleanId, identity.orbitId)
   const running = inflight.get(key)
   if (running) return running
+  // One miss = one resolution, even when many tiles share the promise.
+  countMetric('media.miss', cleanId)
   const p = resolveObject(cleanId, identity, contentHash).finally(() => inflight.delete(key))
   inflight.set(key, p)
   return p
@@ -594,7 +659,7 @@ export function useObjectImage(
         linkUrl: null,
       }
     }
-    return cacheGet(cardId, identity?.orbitId || '')
+    return identity ? cachedFor(cardId, identity, contentHash) : cacheGet(cardId, '')
   })
 
   // Retry wave for offline seeders: a failed P2P tile re-resolves when any
@@ -604,6 +669,11 @@ export function useObjectImage(
   const imgRef = useRef(img)
   imgRef.current = img
   const awaitingSeederRef = useRef(false)
+  // The exact inputs this hook instance resolved for. A resolved object must
+  // never be re-parsed or re-fetched just because the caller re-rendered with
+  // an equivalent (but freshly allocated) identity/options object.
+  const resolvedKeyRef = useRef<string | null>(null)
+  const retrySeenRef = useRef(0)
   useEffect(() => {
     if (typeof window === 'undefined') return
     const onPeerOnline = () => {
@@ -640,11 +710,25 @@ export function useObjectImage(
     // Clean any accidental /api/objects/ prefix (normalized key story below)
     const cleanId = normalizeCardId(cardId)
 
+    const resolvedKey = `${identity.orbitId}|${cleanId}|${contentHash || ''}`
+
+    // A resolved object stays resolved across re-renders: the inputs that
+    // could change the answer are all in this key (and in the effect deps).
+    if (
+      resolvedKeyRef.current === resolvedKey &&
+      imgRef.current?.cardId === cleanId &&
+      imgRef.current?.url
+    ) return
+
     // A seeder retry must not adopt a poisoned failure entry cached by an
-    // earlier attempt — evict so this wave fetches honestly.
+    // earlier attempt — evict so this wave fetches honestly. A terminal miss
+    // survives every OTHER re-render, which is the whole point of caching it.
     if (retryNonce > 0) {
-      objectCache.delete(cleanId)
-      cacheSource.delete(cleanId)
+      if (retrySeenRef.current !== retryNonce) {
+        countMetric('media.reload', cleanId)
+        retrySeenRef.current = retryNonce
+      }
+      evictObjectImage(cleanId)
     }
 
     // Adopt a cached entry immediately if present.
@@ -656,8 +740,10 @@ export function useObjectImage(
     // at the previous id, the `img.cardId !== normalized` branch below fell
     // through to EMPTY, and the tile sat on "Loading media..." until an
     // unrelated retry. Adopting the value is the whole point of the cache.
-    const cached = cacheGet(cleanId, identity.orbitId)
+    const cached = cachedFor(cleanId, identity, contentHash)
     if (cached) {
+      countMetric('media.hit', cleanId)
+      if (!cached.failed) resolvedKeyRef.current = resolvedKey
       setImg(cached)
       return
     }
@@ -671,6 +757,7 @@ export function useObjectImage(
     void resolveObjectOnce(cleanId, identity, contentHash).then(({ state, awaitingSeeder }) => {
       if (cancelled) return
       awaitingSeederRef.current = awaitingSeeder
+      if (!state.failed) resolvedKeyRef.current = resolvedKey
       setImg(state)
     }).catch(() => {
       if (!cancelled) setImg(FAILED(cleanId))
@@ -682,23 +769,25 @@ export function useObjectImage(
   }, [cardId, identity?.orbitId, enabled, retryNonce, contentHash])
 
   // Hold a pin for as long as this consumer is mounted, so the LRU can never
-  // revoke the URL we are currently rendering.
+  // revoke the URL we are currently rendering. Keyed by the ID, not the object:
+  // a caller that rebuilds `identity` on every render must not unpin/repin the
+  // live URL (an eviction in that window reloads the image under the user).
   useEffect(() => {
     if (!cardId || !identity) return
     const k = pinKey(cardId, identity.orbitId)
     pinned.add(k)
     return () => { pinned.delete(k) }
-  }, [cardId, identity])
+  }, [cardId, identity?.orbitId])
 
   const normalized = normalizeCardId(cardId || '')
   if (!img || img.cardId !== normalized) {
-    const cached = cardId && identity ? cacheGet(normalized, identity.orbitId) : null
+    const cached = cardId && identity ? cachedFor(normalized, identity, contentHash) : null
     if (!cached) return EMPTY
     return { ...cached, url: cached.url || null, awaitingSeeder: false }
   }
   // Keep the displayed card fresh in the LRU so eviction never reclaims it
   // while it is on screen.
-  if (cardId && identity) cacheGet(normalized, identity.orbitId)
+  if (cardId && identity) cachedFor(normalized, identity, contentHash)
   return {
     url: img.url || null,
     failed: img.failed,

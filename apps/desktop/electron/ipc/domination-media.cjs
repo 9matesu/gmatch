@@ -3,20 +3,35 @@
 // the dedicated popup_video player window. Both must never outlive the app.
 const { BrowserWindow, screen } = require('electron')
 
-module.exports = function registerDominationMediaHandlers({ ipcMain, app, wallpaperWin, domVideo, mainLog }) {
-  // OS wallpaper swap.
+module.exports = function registerDominationMediaHandlers({ ipcMain, app, wallpaperWin, desktopWallpaper, domVideo, mainLog }) {
+  // OS wallpaper swap. The buffer lane is the consented domination effect; the
+  // path lane is the explicit `setWallpaper` IPC. Both are async, time-bounded
+  // and resolve to a structured result — a desktop command never blocks the
+  // renderer and never throws across the bridge.
   ipcMain.handle('wallpaper:set-data', (_event, buf, mime) =>
     wallpaperWin.setWallpaperFromBuffer(Buffer.from(buf), String(mime || '')))
   ipcMain.handle('wallpaper:restore', () => wallpaperWin.restoreWallpaper())
   ipcMain.handle('wallpaper:cleanup-files', () => { wallpaperWin.cleanupWallpaperFiles(); return { ok: true } })
 
+  // Cross-platform desktop wallpaper: Windows registry + TranscodedWallpaper,
+  // Linux gsettings (GNOME) with a KDE qdbus fallback. Unsupported desktops
+  // get `{ ok: false, reason: 'unsupported-desktop' }` instead of a rejection.
+  ipcMain.handle('wallpaper:set', (_event, source) =>
+    desktopWallpaper
+      ? desktopWallpaper.setWallpaper(source)
+      : Promise.resolve({ ok: false, reason: 'unsupported-desktop' }))
+
   // A domination wallpaper that outlives the app is the worst failure mode of
   // this feature: the victim closes gMatch and their desktop is still
   // somebody else's picture, with the only copy of the original living in this
   // process. Nothing called restore on the way out (cleanup-files only deletes
-  // temp files, it does not put the wallpaper back), so close it here.
+  // temp files, it does not put the wallpaper back), so close it here — for
+  // both the Windows buffer path and the cross-platform path.
   for (const evt of ['before-quit', 'will-quit']) {
-    app.on(evt, () => { if (wallpaperWin.hasPendingSwap()) void wallpaperWin.restoreWallpaper() })
+    app.on(evt, () => {
+      if (wallpaperWin.hasPendingSwap()) void wallpaperWin.restoreWallpaper()
+      if (desktopWallpaper?.hasPendingSwap()) void desktopWallpaper.restoreWallpaper()
+    })
   }
 
   // Dedicated player window for consented popup_video effects: a real OS window

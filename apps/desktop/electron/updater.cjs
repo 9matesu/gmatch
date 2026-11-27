@@ -1,10 +1,12 @@
 // Portable self-update wiring (electron main): check the release feed,
-// auto-DOWNLOAD the new gMatch-<ver>-portable.exe next to the user's portable
-// file (PORTABLE_EXECUTABLE_FILE; fallback: %TEMP%\gmatch-update), then on the
-// renderer's "Install & Restart" hand a detached cmd.exe a retry-move script,
-// quit, and let the script swap the file and relaunch. The download is
-// verified against the published SHA-256; a source without a hash is reported
-// as 'verified: false' honestly.
+// auto-DOWNLOAD the new gMatch-<ver>-portable artifact for THIS OS next to the
+// user's portable file (PORTABLE_EXECUTABLE_FILE / APPIMAGE; fallback: the OS
+// temp dir), then on the renderer's "Install & Restart" hand a small swap
+// script to cmd.exe (Windows) or /bin/sh (Linux/macOS), quit, and let the
+// script swap the file and relaunch. The download is verified against the
+// published SHA-256; a source without a hash is reported as 'verified: false'
+// honestly. Verification and the swap are OS-independent; only the launcher
+// and the script syntax differ.
 const https = require('node:https')
 const http = require('node:http')
 const fs = require('node:fs')
@@ -92,12 +94,16 @@ function download(url, dest, onProgress, opts) {
   }))
 }
 
-/** The user-facing portable exe (not the temp-extracted copy we're running). */
-function portableExePath() {
-  return process.env.PORTABLE_EXECUTABLE_FILE || process.execPath
+/** The user-facing portable file (not the temp-extracted copy we're running).
+ *  On Linux a packaged AppImage points APPIMAGE at the real file while
+ *  process.execPath is the bundled Electron binary inside the mount. */
+function portableExePath(platform) {
+  return process.env.PORTABLE_EXECUTABLE_FILE ||
+    (platform === 'linux' ? process.env.APPIMAGE : '') ||
+    process.execPath
 }
 
-/** Where to drop the new exe: prefer next to the user's file, then TEMP. */
+/** Where to drop the new artifact: prefer next to the user's file, then TEMP. */
 function pickDestDir(userExePath, tempDir) {
   for (const dir of [path.dirname(userExePath), path.join(tempDir, 'gmatch-update')]) {
     try {
@@ -111,8 +117,9 @@ function pickDestDir(userExePath, tempDir) {
   return null
 }
 
-function createUpdater({ app, webContents, log = () => {}, spawnFn = spawn, feeds: injectedFeeds, getServerUrl = null }) {
+function createUpdater({ app, webContents, log = () => {}, spawnFn = spawn, feeds: injectedFeeds, getServerUrl = null, platform = process.platform }) {
   let state = { phase: 'idle', current: app.getVersion() }
+  const isWindows = platform === 'win32'
   // The node this install talks to can host the release feed.
   const nodeFeedUrl = () => {
     const url = typeof getServerUrl === 'function' ? getServerUrl() : ''
@@ -152,10 +159,10 @@ function createUpdater({ app, webContents, log = () => {}, spawnFn = spawn, feed
   async function startDownload(plan) {
     if (downloading) return
     downloading = true
-    const dir = pickDestDir(portableExePath(), app.getPath('temp'))
+    const dir = pickDestDir(portableExePath(platform), app.getPath('temp'))
     if (!dir) {
       downloading = false
-      setStatus({ phase: 'error', error: 'no writable folder to place the update. Run gMatch from your Downloads folder and retry' })
+      setStatus({ phase: 'error', error: 'no writable folder to place the update. Run gMatch from a writable folder and retry' })
       return
     }
     const dest = path.join(dir, plan.name)
@@ -208,7 +215,7 @@ function createUpdater({ app, webContents, log = () => {}, spawnFn = spawn, feed
           FEED_TIMEOUT_MS,
           'release host did not answer',
         )
-        const plan = core.planCheck(release, app.getVersion(), { insecure, base: feed.base })
+        const plan = core.planCheck(release, app.getVersion(), { insecure, base: feed.base, platform })
         return plan.action === 'error' ? { error: plan.error } : { plan }
       } catch (err) {
         return { error: String(err?.message || err) }
@@ -239,7 +246,7 @@ function createUpdater({ app, webContents, log = () => {}, spawnFn = spawn, feed
     return state
   }
 
-  /** Hand off to cmd.exe (replace the user's portable exe + relaunch) and quit. */
+  /** Hand the swap script to the OS shell (replace the portable file + relaunch), then quit. */
   let installing = false
   function install() {
     if (state.phase !== 'ready' || !state.destPath) return { ok: false, error: 'nothing downloaded yet' }
@@ -248,28 +255,36 @@ function createUpdater({ app, webContents, log = () => {}, spawnFn = spawn, feed
     // hash was absent or mismatched (mismatch already aborts the download).
     if (state.verified !== true) return { ok: false, error: 'refusing to install: download integrity was not verified' }
     installing = true
-    const target = portableExePath()
+    const target = portableExePath(platform)
     const script = core.buildUpdaterScript({
       source: state.destPath,
       target,
       logPath: path.join(app.getPath('userData'), 'main.log'),
+      platform,
     })
-    const cmdPath = path.join(app.getPath('temp'), 'gmatch-update.cmd')
+    const scriptPath = path.join(app.getPath('temp'), isWindows ? 'gmatch-update.cmd' : 'gmatch-update.sh')
     try {
-      fs.writeFileSync(cmdPath, script)
-      // windowsHide gives cmd.exe an INVISIBLE console that the batch's
-      // children (ping.exe, etc.) inherit. `detached: true` was removed on
-      // purpose: DETACHED_PROCESS leaves cmd with NO console, and every
-      // external console exe the batch calls then allocates its own VISIBLE
-      // window — the "reappearing ping prompts" update-loop report. Windows
-      // children survive the parent quitting (no job object), and .unref()
-      // detaches the child from this process's event loop.
-      spawnFn('cmd.exe', ['/c', cmdPath], { stdio: 'ignore', windowsHide: true }).unref()
+      fs.writeFileSync(scriptPath, script, isWindows ? undefined : { mode: 0o700 })
+      if (isWindows) {
+        // windowsHide gives cmd.exe an INVISIBLE console that the batch's
+        // children (ping.exe, etc.) inherit. `detached: true` was removed on
+        // purpose: DETACHED_PROCESS leaves cmd with NO console, and every
+        // external console exe the batch calls then allocates its own VISIBLE
+        // window — the "reappearing ping prompts" update-loop report. Windows
+        // children survive the parent quitting (no job object), and .unref()
+        // detaches the child from this process's event loop.
+        spawnFn('cmd.exe', ['/c', scriptPath], { stdio: 'ignore', windowsHide: true }).unref()
+      } else {
+        // POSIX: /bin/sh runs the bounded retry/move/relaunch script with no
+        // console to hide. .unref() lets the parent quit immediately; the
+        // script's own sleep/retry timeline owns the swap, not our event loop.
+        spawnFn('/bin/sh', [scriptPath], { stdio: 'ignore' }).unref()
+      }
     } catch (err) {
       installing = false
       return { ok: false, error: String(err?.message || err) }
     }
-    log(`[updater] handing swap of ${path.basename(target)} to ${cmdPath}`)
+    log(`[updater] handing swap of ${path.basename(target)} to ${scriptPath}`)
     app.quit()
     return { ok: true }
   }

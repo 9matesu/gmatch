@@ -1,7 +1,8 @@
 import { memo } from 'react'
 import { Layers } from 'lucide-react'
 import type { FeedPost } from './GMatchFeed'
-import { hasMedia, ratioOf } from './tileMetrics'
+import { ratioOf } from './tileMetrics'
+import { displayMedia, readPostContent } from './postModel'
 import { ObjectImage } from '../ObjectImage'
 import { isVideoPost, resolveMediaUrl } from '../../utils/media'
 import type { OrbitIdentity } from '@orbit/crypto'
@@ -37,8 +38,11 @@ export interface FeedTileProps {
  * reversibly) is untouched.
  */
 export const FeedTile = memo(function FeedTile({ post, identity, liked, likes, onOpen, onToggleLike, onMediaLoad, onMediaUnavailable }: FeedTileProps) {
-  const url = post.media?.[0]?.url || post.url
-  const mime = post.media?.[0]?.mime_type || post.mime_type
+  // One model for both kinds of post: words, plus bytes only when they exist.
+  const content = readPostContent(post)
+  const media = displayMedia(post, content)
+  const url = media?.url || ''
+  const mime = media?.mimeType
   const isObject =
     !url ||
     url.includes('/api/objects/') ||
@@ -46,8 +50,8 @@ export const FeedTile = memo(function FeedTile({ post, identity, liked, likes, o
     url.startsWith('magnet:') ||
     url.startsWith('urn:') ||
     url.startsWith('p2p-')
-  const video = isVideoPost(mime, url, (post.media || []).map((m) => m.mime_type))
-  const label = post.caption ? `Open post: ${post.caption.slice(0, 60)}` : 'Open post'
+  const video = isVideoPost(mime, url, (content.media || []).map((m) => m.mimeType || ''))
+  const label = content.text ? `Open post: ${content.text.slice(0, 60)}` : 'Open post'
 
   return (
     <div
@@ -57,14 +61,14 @@ export const FeedTile = memo(function FeedTile({ post, identity, liked, likes, o
       <button
         type="button"
         onClick={() => onOpen(post)}
-        title={post.caption || undefined}
+        title={content.text || undefined}
         aria-label={label}
         className="absolute inset-0 z-[1] cursor-pointer"
       />
-      {hasMedia(post) ? (
+      {media ? (
         isObject ? (
           <ObjectImage
-            objectId={post.media?.[0]?.id}
+            objectId={media.id}
             contentUrl={url}
             contentHash={post.content_hash}
             identity={identity}
@@ -89,23 +93,24 @@ export const FeedTile = memo(function FeedTile({ post, identity, liked, likes, o
           />
         )
       ) : null}
-      {!hasMedia(post) ? (
-        // Text-only post: the words are the tile, not a hole.
+      {!media ? (
+        // Text-only post: the words are the tile. No image panel, no
+        // placeholder, no media probe — and never hidden for missing bytes.
         <span className={classes('flex h-full w-full flex-col justify-between gap-2 text-left', PADDING[3])}>
-          <span className={classes('line-clamp-6 leading-snug', TYPE.field, COLOR.body)}>{post.caption?.trim() || '(no caption)'}</span>
+          <span className={classes('line-clamp-6 leading-snug', TYPE.field, COLOR.body)}>{content.text.trim() || '(no caption)'}</span>
           <span className={classes(TYPE.caption, COLOR.faint)}>{post.author_name}</span>
         </span>
       ) : null}
       {video && (
         <span className={classes('absolute left-2 top-2 px-1.5 py-0.5', CHROME.mediaChip)}>video</span>
       )}
-      {(post.media?.length ?? 0) > 1 && (
+      {(content.media?.length ?? 0) > 1 && (
         <span
           className={classes('absolute right-2 top-2 flex items-center gap-1 px-1.5 py-0.5', CHROME.mediaChip)}
-          aria-label={`${post.media!.length} images`}
+          aria-label={`${content.media!.length} images`}
         >
           <Layers className="h-3 w-3" />
-          {post.media!.length}
+          {content.media!.length}
         </span>
       )}
       <span className={classes(

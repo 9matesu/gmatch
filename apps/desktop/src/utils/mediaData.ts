@@ -1,6 +1,8 @@
 // Pure helpers for turning stored media payloads into browser-renderable
 // blobs/URLs. Extracted verbatim from App.tsx (behavior-preserving move).
 
+import { countMetric } from './metrics'
+
 export function dataUrlToBlob(dataUrl: string): Blob {
   const [head, base64] = dataUrl.split(',')
   const mime = (head?.match(/data:(.*?);/) || [])[1] || 'image/jpeg'
@@ -50,8 +52,10 @@ export function localObjectBlobUrl(id: string, data: ArrayBuffer | undefined, mi
     // marks this entry as the most recently used.
     localObjectUrlCache.delete(id)
     localObjectUrlCache.set(id, cached)
+    countMetric('media.hit', `localUrl:${id}`)
     return cached
   }
+  countMetric('media.miss', `localUrl:${id}`)
   if (data && data.byteLength > 0) {
     try {
       const url = URL.createObjectURL(new Blob([data], { type: mime || 'application/octet-stream' }))
@@ -62,6 +66,7 @@ export function localObjectBlobUrl(id: string, data: ArrayBuffer | undefined, mi
         const victim = localObjectUrlCache.get(oldest)
         localObjectUrlCache.delete(oldest)
         if (victim) {
+          countMetric('media.evict', `localUrl:${oldest}`)
           try { URL.revokeObjectURL(victim) } catch { /* already gone */ }
         }
       }

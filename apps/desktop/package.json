@@ -16,8 +16,10 @@
     "e2e:clean": "node scripts/clean-e2e-state.mjs",
     "check:ui-tokens": "node scripts/check-ui-tokens.mjs",
     "icon": "node scripts/make-icon.cjs",
-    "dist": "npm run icon && npm run stage:api && npm run build && electron-builder --win portable --config.directories.output=release && npm run stage:release",
-    "pack": "electron-builder --win portable",
+    "dist": "npm run dist:win && npm run dist:linux",
+    "dist:win": "npm run icon && npm run stage:api && npm run build && electron-builder --win portable --config.directories.output=release && npm run stage:release",
+    "dist:linux": "npm run icon && npm run stage:api && npm run build && electron-builder --linux AppImage deb --config.directories.output=release && npm run stage:release",
+    "pack": "electron-builder --win portable --linux AppImage deb",
     "stage:api": "node scripts/stage-api.cjs",
     "stage:release": "node scripts/stage-release.cjs"
   },
@@ -96,6 +98,11 @@
     "win": {
       "target": "portable",
       "icon": "build/icon.ico"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "build/icon.png",
+      "category": "Network"
     },
     "portable": {
       "unicode": true

@@ -1,4 +1,5 @@
 import type { FeedPost } from '../../components/feed/GMatchFeed'
+import { readPostContent, type PostLike } from '../../components/feed/postModel'
 import { findUserById } from '../../utils/userLookup'
 import type { User } from '@orbit/shared'
 
@@ -85,6 +86,32 @@ function isMediaVideo(url: string): boolean {
 }
 
 /**
+ * Read a local object through the same `{ text, media? }` model the renderer
+ * uses. A public object with bytes (or a mime type) is addressable by its id;
+ * a caption-only row with no bytes and no url is a TEXT post, so the projection
+ * must not invent a media url that would then be hidden for missing bytes.
+ */
+function objectPostContent(obj: OrbitObjectLike): { text: string; url: string; mimeType?: string } {
+  const rawData = obj.data
+  const legacyDataUrl = typeof rawData === 'string' && rawData.length > 0 ? rawData : ''
+  const hasBytes = rawData != null && typeof rawData !== 'string'
+  const source: PostLike = {
+    id: obj.id,
+    caption: obj.caption || obj.post_caption || '',
+    url: obj.content_url || obj.source_url || legacyDataUrl || obj.url
+      || (hasBytes || obj.mime_type ? `/api/objects/${obj.id}` : ''),
+    mime_type: obj.mime_type,
+  }
+  const content = readPostContent(source)
+  const media = content.media?.[0]
+  return {
+    text: content.text,
+    url: media?.url || '',
+    mimeType: media?.mimeType,
+  }
+}
+
+/**
  * Build the visible timeline. Pure: same inputs -> same array (new reference,
  * but React only re-renders when a row actually changed, which is what
  * `sameTimeline` is for at the call site).
@@ -125,19 +152,18 @@ export function projectFeed(input: FeedProjectionInput): FeedPost[] {
       const authorAvatar = isSelf
         ? (profilePics[selfId ?? ''] || null)
         : (authorUser?.pfp_url || (!unverified && obj.owner_id ? profilePics[obj.owner_id] : null) || null)
-      // `data` may be a legacy data-URL string; an ArrayBuffer here is raw
-      // media, not a URL, and must never be coerced into one.
-      const rawData = obj.data
-      const legacyDataUrl = typeof rawData === 'string' && rawData.length > 0 ? rawData : ''
-      const localUrl = obj.content_url || obj.source_url || legacyDataUrl || obj.url || `/api/objects/${obj.id}`
+      // One model for this row: words + optional media. No fabricated url for
+      // a caption-only object — that would make a text post look like a broken
+      // picture and get hidden by the no-preview rule.
+      const content = objectPostContent(obj)
       return {
         id: obj.id,
         author_id: obj.owner_id || selfId || 'peer',
         author_name: authorName,
         author_avatar: authorAvatar,
-        url: localUrl,
-        mime_type: obj.mime_type || (isMediaVideo(localUrl) ? 'video/mp4' : 'image/jpeg'),
-        caption: obj.caption || obj.post_caption || '',
+        url: content.url,
+        mime_type: content.mimeType || (isMediaVideo(content.url) ? 'video/mp4' : undefined),
+        caption: content.text,
         location: obj.location || '',
         tags: Array.isArray(obj.tags) ? obj.tags as string[] : [],
         created_at: obj.created_at || new Date().toISOString(),

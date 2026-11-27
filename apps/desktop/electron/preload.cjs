@@ -6,6 +6,9 @@ const apiArg = process.argv.find((a) => a.startsWith('--api-base='))
 if (apiArg) contextBridge.exposeInMainWorld('__API_BASE__', apiArg.slice('--api-base='.length))
 
 contextBridge.exposeInMainWorld('gmatch', {
+  // OS identifier for platform-specific copy (verification commands); the
+  // renderer never branches on it for behaviour.
+  platform: process.platform,
   booruFetch: (request) => ipcRenderer.invoke('booru:fetch', request),
   booruTimings: () => ipcRenderer.invoke('booru:timings'),
   // mediaq setup suite: status, one-shot install (streams progress), start.
@@ -82,10 +85,16 @@ contextBridge.exposeInMainWorld('gmatch', {
     ipcRenderer.on('update:status', listener)
     return () => ipcRenderer.removeListener('update:status', listener)
   },
-  // OS integration for consented domination effects (Windows only, best-effort).
+  // OS integration for consented domination effects (best-effort). The buffer
+  // lane is the legacy Windows swap (now also serves Linux via gsettings/KDE);
+  // setWallpaper is the path/data lane used by the cross-platform IPC.
   wallpaperSetData: (buf, mime) => ipcRenderer.invoke('wallpaper:set-data', buf, mime),
   wallpaperRestore: () => ipcRenderer.invoke('wallpaper:restore'),
   wallpaperCleanupFiles: () => ipcRenderer.invoke('wallpaper:cleanup-files'),
+  /** Change the real desktop wallpaper. Source is an absolute local path, a
+   *  file:// URI, or { data: ArrayBuffer, mime }. Resolves
+   *  { ok, backend?, reason? } — never rejects on an unsupported desktop. */
+  setWallpaper: (source) => ipcRenderer.invoke('wallpaper:set', source),
   grantCameraOnce: () => ipcRenderer.invoke('camera:grant-once'),
   // Native OS toast for consented domination message/banner effects
   // (main-process Electron Notification; works minimized). Best-effort.

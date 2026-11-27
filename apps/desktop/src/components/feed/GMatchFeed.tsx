@@ -38,6 +38,7 @@ import type { OrbitIdentity } from '@orbit/crypto';
 import type { OrbitObject as StoryItem } from '@orbit/shared';
 import { generateFallbackName } from '@orbit/shared';
 import { countHidden, isRenderable } from './isRenderable';
+import { displayMedia, hasMedia, readPostContent } from './postModel';
 import { FeedGrid } from './FeedGrid';
 import { GMatchStories } from '../GMatchStories';
 import { PostComments } from './PostComments';
@@ -57,7 +58,7 @@ import {
 
 /** Sibling item MIME types for render-time video detection (see isVideoPost). */
 function siblingMimesFor(post: FeedPost): string[] {
-  return Array.isArray(post.media) ? post.media.map((m) => m.mime_type) : [];
+  return readPostContent(post).media?.map((m) => m.mimeType || '') || [];
 }
 
 /**
@@ -490,6 +491,37 @@ function GMatchFeedImpl({
     onSelectUser?.(userId);
   };
 
+  /** The author identity is ONE shape on both card kinds: a text post and an
+   *  image post open a profile the same way, with the same story affordance. */
+  const renderAuthorAvatar = (post: FeedPost, hasStory: boolean) => (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); handleAvatarClick(post.author_id); }}
+      title={hasStory ? 'Watch story' : 'View profile'}
+      aria-label={hasStory ? `Watch story of ${post.author_name}` : `View profile of ${post.author_name}`}
+      className={`relative w-10 h-10 rounded-full p-[2px] flex-shrink-0 cursor-pointer ${hasStory ? 'bg-retro-accent' : 'bg-transparent'}`}
+    >
+      <span className="relative block w-full h-full rounded-full bg-surface-raised overflow-hidden">
+        <Avatar id={post.author_id} size={40} imageUrl={profilePics[post.author_id] || post.author_avatar} fill={true} />
+      </span>
+    </button>
+  );
+
+  const renderAuthorLine = (post: FeedPost) => (
+    <div className="flex min-w-0 flex-1 items-baseline gap-1.5">
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); handleNameClick(post.author_id); }}
+        className="truncate text-sm font-semibold text-retro-fg hover:underline cursor-pointer"
+      >
+        {post.author_name || generateFallbackName(post.author_id)}
+      </button>
+      <span className="shrink-0 text-xs text-retro-faint">@{post.author_id.slice(0, 8)}</span>
+      <span className="shrink-0 text-xs text-retro-faint" aria-hidden="true">·</span>
+      <PostTimestamp createdAt={post.created_at} className="shrink-0 text-xs text-retro-faint" />
+    </div>
+  );
+
   // Initialize likes/saves and comments state (without fake mock comments)
   useEffect(() => {
     const initialLikes: Record<string, boolean> = {};
@@ -639,7 +671,9 @@ function GMatchFeedImpl({
     [posts],
   );
   const visiblePosts = useMemo(
-    () => posts.filter((p) => !p.is_archived && isRenderable(p) && !isPostDeleted(p.id) && !deadPosts.has(p.id)),
+    // Text-only posts have no media to miss, so the reversible media hide never
+    // applies to them — text is content and is never hidden.
+    () => posts.filter((p) => !p.is_archived && isRenderable(p) && !isPostDeleted(p.id) && !(hasMedia(p) && deadPosts.has(p.id))),
     [posts, deadPosts],
   );
 
@@ -1188,10 +1222,17 @@ function GMatchFeedImpl({
             // post has been opened (inline expansion or lightbox).
             const postCommentCount = Math.max(post.comment_count ?? 0, postComments.length);
             const authorHasStory = storyOwners.has(post.author_id);
-            const isObjectMedia = OBJECT_URL_RE.test(post.url || '');
+            // ONE post model for every branch below: a post is text plus
+            // optional media. Text-only never enters a media panel or the
+            // no-preview hide; image posts keep exactly the same media path.
+            const content = readPostContent(post);
+            const media = displayMedia(post, content);
+            const textOnly = !media;
+            const mediaUrl = media?.url || '';
+            const isObjectMedia = OBJECT_URL_RE.test(mediaUrl) || !mediaUrl;
             const isVideo = videoCache(post);
            const isNewPost = animatedPostIds.has(post.id);
-           const multiMedia = Array.isArray(post.media) && post.media.length > 1 ? post.media : null;
+           const multiMedia = content.media && content.media.length > 1 ? content.media : null;
             const currentIdx = multiMedia ? Math.min(Math.max(0, mediaIdx[post.id] || 0), multiMedia.length - 1) : 0;
             // Inline expand: the clicked card grows in place (image only), no
             // side sheet. Click again / Esc collapses.
@@ -1254,17 +1295,15 @@ function GMatchFeedImpl({
                 className={`cv-row relative bg-surface-raised border border-edge rounded-lg overflow-hidden flex flex-col mb-3 break-inside-avoid ${isNewPost ? 'animate-orbit-feed-in' : ''}`}
               >
                 {!expanded && (<>
-                {/* Media comes FIRST (media → author → caption → actions). The
-                    author line and written body are rendered AFTER the media
-                    block below. */}
+                {/* IMAGE POST: media FIRST (media → author → caption →
+                    actions). A text-only post takes the separate card branch
+                    below — no media panel, no placeholder, never hidden. */}
 
-                {/* Media. A post with no bytes at all renders nothing here
-                    (no empty frame, no "No preview"). The written body sits
-                    BELOW the image (see after the media block). */}
-                {!post.url && !post.localPreviewUrl ? null : (() => {
+                {/* Media — only when the post actually carries bytes. */}
+                {textOnly ? null : (() => {
                   const activeItem = multiMedia ? multiMedia[currentIdx] : null;
-                  const activeUrl = activeItem ? activeItem.url : post.url;
-                  const activeMime = activeItem ? activeItem.mime_type : post.mime_type;
+                  const activeUrl = activeItem ? activeItem.url : mediaUrl;
+                  const activeMime = activeItem ? activeItem.mimeType : media?.mimeType;
                   const isCurrentVideo = isVideoPost(activeMime, activeUrl, siblingMimesFor(post));
 
                   return (
@@ -1307,7 +1346,7 @@ function GMatchFeedImpl({
                       {multiMedia ? (() => {
                         const item = multiMedia[currentIdx];
                         const url = item.url;
-                        const mime = item.mime_type;
+                        const mime = item.mimeType;
                         const isObj = url.includes('/api/objects/') || url.startsWith('vault://') || !url || url.startsWith('magnet:') || url.startsWith('urn:sha256:') || url.startsWith('p2p-');
                         const isVid = isVideoPost(mime, url, siblingMimesFor(post));
                         return (
@@ -1348,7 +1387,7 @@ function GMatchFeedImpl({
                             ) : (
                               <CachedImg
                                 src={url}
-                                alt={post.caption || 'Post image'}
+                                alt={content.text || 'Post image'}
                                 className="w-full h-auto max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
                                 loading="lazy"
                               />
@@ -1374,18 +1413,18 @@ function GMatchFeedImpl({
                         ) : (
                           <img
                             src={post.localPreviewUrl}
-                            alt={post.caption || 'Post image'}
+                            alt={content.text || 'Post image'}
                             className="w-full h-auto max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
                             draggable={false}
                           />
                         )
                       ) : isObjectMedia ? (
                         <ObjectImage
-                          objectId={post.id}
-                          contentUrl={post.url}
+                          objectId={media?.id || post.id}
+                          contentUrl={mediaUrl}
                           contentHash={post.content_hash}
                           identity={identity}
-                          mimeType={post.mime_type}
+                          mimeType={media?.mimeType}
                           className="w-full h-auto max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
                           videoClassName="w-full max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
                           controls={true}
@@ -1402,7 +1441,7 @@ function GMatchFeedImpl({
                       ) : isVideo ? (
                         <NativeVideoPlayer
                                 natural
-                                src={post.url}
+                                src={mediaUrl}
                           videoClassName="w-full max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
                           controls={true}
                           alwaysShowControls={true}
@@ -1414,8 +1453,8 @@ function GMatchFeedImpl({
                         />
                       ) : (
                         <CachedImg
-                          src={post.url}
-                          alt={post.caption || 'Post image'}
+                          src={mediaUrl}
+                          alt={content.text || 'Post image'}
                           className="w-full h-auto max-h-(--max-h-dialog-fit) group-data-[expanded=true]/post:max-h-(--max-h-dialog-sm) object-contain rounded-none"
                           loading="lazy"
                         />
@@ -1492,51 +1531,57 @@ function GMatchFeedImpl({
                   );
                 })()}
 
-                {/* Repost attribution (kept with the author block, under the media). */}
-                {post.is_reposted && (
-                  <div className="flex items-center gap-1.5 px-3 pt-2.5 text-xs text-retro-muted">
-                    <Repeat className="w-3.5 h-3.5 text-retro-fg" />
-                    <span>Reposted by <strong className="text-retro-fg font-medium">@{post.reposted_by || 'Peer'}</strong></span>
-                  </div>
-                )}
-
-                {/* Author row: avatar, name, handle, time — under the media. */}
-                <div
-                  data-testid="post-author-overlay"
-                  className={`flex items-center gap-3 px-3 pt-3 pb-2 ${expanded ? 'hidden' : ''}`}
-                  onContextMenu={(e) => onUserContext?.(e, post.author_id, post.author_name)}
-                >
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); handleAvatarClick(post.author_id); }}
-                    title={authorHasStory ? 'Watch story' : 'View profile'}
-                    aria-label={authorHasStory ? `Watch story of ${post.author_name}` : `View profile of ${post.author_name}`}
-                    className={`relative w-10 h-10 rounded-full p-[2px] flex-shrink-0 cursor-pointer ${authorHasStory ? 'bg-retro-accent' : 'bg-transparent'}`}
+                {textOnly ? (
+                  /* TEXT POST — a clean card: author, words, actions. There is
+                     no media panel, no placeholder and no media probe; the row
+                     is never hidden, because the words ARE the content. */
+                  <div
+                    data-testid="post-author-overlay"
+                    className={`flex gap-3 px-3 sm:px-4 pt-3 ${expanded ? 'hidden' : ''}`}
+                    onContextMenu={(e) => onUserContext?.(e, post.author_id, post.author_name)}
                   >
-                    <span className="relative block w-full h-full rounded-full bg-surface-raised overflow-hidden">
-                      <Avatar id={post.author_id} size={40} imageUrl={profilePics[post.author_id] || post.author_avatar} fill={true} />
-                    </span>
-                  </button>
-                  <div className="flex min-w-0 flex-1 items-baseline gap-1.5">
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); handleNameClick(post.author_id); }}
-                      className="truncate text-sm font-semibold text-retro-fg hover:underline cursor-pointer"
-                    >
-                      {post.author_name || generateFallbackName(post.author_id)}
-                    </button>
-                    <span className="shrink-0 text-xs text-retro-faint">@{post.author_id.slice(0, 8)}</span>
-                    <span className="shrink-0 text-xs text-retro-faint" aria-hidden="true">·</span>
-                    <PostTimestamp createdAt={post.created_at} className="shrink-0 text-xs text-retro-faint" />
+                    {renderAuthorAvatar(post, authorHasStory)}
+                    <div className="min-w-0 flex-1">
+                      {post.is_reposted && (
+                        <div className="flex items-center gap-1.5 pb-1 text-xs text-retro-muted">
+                          <Repeat className="w-3.5 h-3.5 text-retro-fg" />
+                          <span>Reposted by <strong className="text-retro-fg font-medium">@{post.reposted_by || 'Peer'}</strong></span>
+                        </div>
+                      )}
+                      {renderAuthorLine(post)}
+                      <p className="pt-2 pb-1 text-sm sm:text-base leading-relaxed text-retro-fg whitespace-pre-wrap break-words">
+                        <Linkify text={content.text} />
+                      </p>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <>
+                    {/* Repost attribution (kept with the author block, under the media). */}
+                    {post.is_reposted && (
+                      <div className="flex items-center gap-1.5 px-3 pt-2.5 text-xs text-retro-muted">
+                        <Repeat className="w-3.5 h-3.5 text-retro-fg" />
+                        <span>Reposted by <strong className="text-retro-fg font-medium">@{post.reposted_by || 'Peer'}</strong></span>
+                      </div>
+                    )}
 
-                {/* Written body — under the author line. */}
-                {post.caption ? (
-                  <p className={`px-3 pt-1 pb-2 text-xs leading-snug text-retro-body whitespace-pre-wrap break-words ${expanded ? 'hidden' : ''}`}>
-                    <Linkify text={post.caption} />
-                  </p>
-                ) : null}
+                    {/* Author row: avatar, name, handle, time — under the media. */}
+                    <div
+                      data-testid="post-author-overlay"
+                      className={`flex items-center gap-3 px-3 pt-3 pb-2 ${expanded ? 'hidden' : ''}`}
+                      onContextMenu={(e) => onUserContext?.(e, post.author_id, post.author_name)}
+                    >
+                      {renderAuthorAvatar(post, authorHasStory)}
+                      {renderAuthorLine(post)}
+                    </div>
+
+                    {/* Written body — under the author line. */}
+                    {content.text ? (
+                      <p className={`px-3 pt-1 pb-2 text-xs leading-snug text-retro-body whitespace-pre-wrap break-words ${expanded ? 'hidden' : ''}`}>
+                        <Linkify text={content.text} />
+                      </p>
+                    ) : null}
+                  </>
+                )}
 
                 {/* Action row: no fill, no separator — it sits directly under
                     the media so the whole tile reads as one object. */}
@@ -1592,7 +1637,7 @@ function GMatchFeedImpl({
                         one click, no modal, deduped by the vault's content
                         hash. Hidden in browser dev where the bridge is absent
                         — it would never be functional there. */}
-                    {vaultBridge() && post.url && (
+                    {vaultBridge() && media && (
                       <button
                         type="button"
                         onClick={() => void savePostToVault(post)}

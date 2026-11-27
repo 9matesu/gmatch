@@ -1,21 +1,15 @@
-// End-to-end verification of the Windows update swap (run: node electron/updater-swap.e2e.cjs).
+// End-to-end verification of the update swap on THIS machine
+// (run: node electron/updater-swap.e2e.cjs).
 //
-// This is the check the unit tests cannot make: on THIS machine, with the real
-// Windows shell, does the swap (a) show a console window, (b) survive a file
-// lock like the ones antivirus scanners hold, and (c) actually replace the
-// installed file?
+// Windows: A/B prove why cmd.exe must be spawned WITHOUT `detached` (a
+// detached cmd has no console, so its console-exe children allocate their own
+// visible window). C runs the real updater against a local feed with a locked
+// target and checks the swap log and bytes. The relaunch target is a harmless
+// console tool (where.exe) instead of a 96 MB app.
 //
-// Phase A/B are the A/B proof of the root cause: the same `ping` batch spawned
-// WITH and WITHOUT `detached` — a detached cmd has no console, so the console
-// exe it calls allocates its own visible window (the "reappearing prompts"
-// report). Windows reports a visible console as a non-zero MainWindowHandle.
-//
-// Phase C runs the real updater end to end against a local release feed with a
-// locked target file, then checks the swap log and the resulting bytes.
-//
-// The relaunch target is a copy of a harmless console tool (where.exe): the
-// batch starts whatever it replaced, and we do not want a 96 MB app to pop up
-// during a test.
+// Linux/macOS: the POSIX script is executed by /bin/sh and must replace the
+// portable AppImage with verified bytes, then signal its (neutralized)
+// relaunch. No console/window concept exists there.
 
 const assert = require('assert')
 const fs = require('fs')
@@ -25,7 +19,12 @@ const http = require('http')
 const crypto = require('crypto')
 const { spawn, execSync } = require('child_process')
 
-const WHERE = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'where.exe')
+/** No hardcoded drive letter: derive the Windows root from SystemRoot/windir
+ *  or from the drive Electron itself is running on. */
+const whereExe = () => path.join(
+  process.env.SystemRoot || process.env.windir || path.join(path.parse(process.execPath).root, 'Windows'),
+  'System32', 'where.exe',
+)
 
 /** New console processes with a VISIBLE window (non-zero MainWindowHandle). */
 const PS_VISIBLE = path.join(os.tmpdir(), 'gmatch-visible-consoles.ps1')
@@ -94,12 +93,12 @@ async function phaseB() {
 async function phaseC() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gmatch-swap-'))
   const payload = path.join(tmp, 'gMatch-9.9.9-portable.exe')
-  fs.copyFileSync(WHERE, payload)
+  fs.copyFileSync(whereExe(), payload)
   const bytes = fs.readFileSync(payload)
   const sha256 = crypto.createHash('sha256').update(bytes).digest('hex')
 
   const target = path.join(tmp, 'gMatch-1.6.0-portable.exe')
-  fs.copyFileSync(WHERE, target) // the "installed" app
+  fs.copyFileSync(whereExe(), target) // the "installed" app
 
   let server
   const base = () => `http://127.0.0.1:${server.address().port}`
@@ -193,14 +192,44 @@ async function phaseC() {
   try { fs.rmSync(tmp, { recursive: true, force: true }) } catch { /* best effort */ }
 }
 
+async function phaseLinux() {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gmatch-swap-linux-'))
+  const { buildUpdaterScript } = require('./updater-core.cjs')
+  const target = path.join(tmp, 'gMatch-1.6.0-portable.AppImage')
+  const source = path.join(tmp, 'gMatch-9.9.9-portable.AppImage')
+  const bytes = Buffer.from('PORTABLE-APPIMAGE-PAYLOAD-'.repeat(64))
+  fs.writeFileSync(target, 'OLD-APPIMAGE')
+  fs.writeFileSync(source, bytes)
+  const logPath = path.join(tmp, 'main.log')
+  const scriptPath = path.join(tmp, 'gmatch-update.sh')
+  const marker = path.join(tmp, 'relaunched.txt')
+  const script = buildUpdaterScript({ source, target, logPath, platform: 'linux' })
+  // Neutralize the relaunch (we do not want to exec a fake AppImage).
+  fs.writeFileSync(scriptPath, script.split(`'${target}' >/dev/null 2>&1 &`).join(`echo swapped > '${marker}'`))
+  const child = spawn('/bin/sh', [scriptPath], { stdio: 'ignore' })
+  child.unref()
+  const started = Date.now()
+  while (!fs.existsSync(marker) && Date.now() - started < 30000) await sleep(100)
+  const log = fs.existsSync(logPath) ? fs.readFileSync(logPath, 'utf8') : ''
+  console.log(`[linux] swap log:\n${log.split('\n').filter(Boolean).map((l) => `      ${l}`).join('\n')}`)
+  assert.ok(fs.existsSync(marker), 'the POSIX script relaunched (neutralized marker)')
+  assert.ok(fs.readFileSync(target).equals(bytes), 'the target portable file was replaced with verified bytes')
+  assert.ok(!fs.existsSync(source), 'the downloaded artifact was consumed by the move')
+  assert.match(log, /finished Tries=/)
+  try { fs.rmSync(tmp, { recursive: true, force: true }) } catch { /* best effort */ }
+}
+
 async function main() {
-  if (process.platform !== 'win32') {
-    console.log('updater-swap.e2e.cjs: windows only, skipping')
+  if (process.platform === 'win32') {
+    await phaseA()
+    await phaseB()
+    await phaseC()
+  } else if (process.platform === 'linux' || process.platform === 'darwin') {
+    await phaseLinux()
+  } else {
+    console.log('updater-swap.e2e.cjs: unsupported platform, skipping')
     return
   }
-  await phaseA()
-  await phaseB()
-  await phaseC()
   console.log('updater-swap.e2e.cjs: all checks passed')
 }
 

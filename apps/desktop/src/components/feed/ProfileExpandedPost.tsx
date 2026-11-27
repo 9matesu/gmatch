@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { FeedPost, PostComment } from './GMatchFeed';
+import { displayMedia, readPostContent } from './postModel';
+import { Linkify } from '../Linkify';
 import { ObjectImage } from '../ObjectImage';
 import { isVideoPost, resolveMediaUrl } from '../../utils/media';
 import { timeAgo } from '../../utils/timeAgo';
@@ -97,35 +99,11 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
     setDoubleTapAnimation(false);
   }, [post?.id]);
 
-  interface ExpandedMediaItem {
-    id?: string;
-    url: string;
-    mime?: string;
-  }
-
-  // Media model mirrors the feed cards: post.media[] (per-item mime) first,
-  // then legacy mediaUrls, then the single url + mime_type. Keeps mime per
-  // item so extension-less object videos are detected as video. Legacy
-  // mediaUrls rows carry no per-item mime — fall back to the matching
-  // post.media[] entry, then the post-level mime_type (legacy vault://
-  // reposts only store the mime on the post).
-  const mediaItems: ExpandedMediaItem[] = post
-    ? (Array.isArray((post as any).media) && (post as any).media.length > 0
-      ? (post as any).media
-        .map((m: any) => ({ id: m?.id as string | undefined, url: m?.url as string, mime: m?.mime_type as string | undefined }))
-        .filter((m: ExpandedMediaItem) => Boolean(m.url))
-      : [...((post as any).mediaUrls || [])].map((u: string) => ({
-        url: u,
-        mime: ((post as any).media?.find?.((m: any) => m?.url === u)?.mime_type ?? (post as any).mime_type) as string | undefined,
-      }))
-    )
-    : [];
-  if (post && mediaItems.length === 0) {
-    const fallbackUrl = post.localPreviewUrl || (post as any).url;
-    if (fallbackUrl) {
-      mediaItems.push({ id: post.id, url: fallbackUrl, mime: (post as any).mime_type });
-    }
-  }
+  // One model for both kinds of post: the words are always there; media is
+  // optional. A text-only post has NO media panel at all — not an empty frame
+  // and not a "No preview" placeholder — and is never hidden for missing bytes.
+  const content = readPostContent(post);
+  const mediaItems = content.media ?? [];
   const activeMedia = mediaItems[activeMediaIndex] || mediaItems[0] || null;
   // A single-media post must resolve through the SAME addressable source the
   // fullscreen viewer uses (post.localPreviewUrl || post.url, object id post.id).
@@ -133,9 +111,10 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
   // hotlink, so the inline tile went black while the modal — using post.url —
   // resolved. Multi-media carousels still address each item by its own id.
   const singleMedia = mediaItems.length <= 1;
+  const primaryMedia = displayMedia(post, content);
 
   const isExpandedMediaVideo = (url?: string | null, mime?: string | null): boolean =>
-    isVideoPost(mime, url, mediaItems.map((m) => m.mime));
+    isVideoPost(mime, url, mediaItems.map((m) => m.mimeType ?? ''));
 
   const handleDoubleTap = () => {
     if (!isLiked && post && onToggleLike) {
@@ -210,23 +189,25 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
         </div>
       </div>
 
-      {/* Media. Click opens the fullscreen ImageViewer; double-click still likes. */}
+      {/* Media — only when the post HAS media. A text-only post has no image
+          panel at all: no empty frame, no "No preview" placeholder. */}
+      {mediaItems.length > 0 && (
       <div
         className={classes('relative flex items-center justify-center overflow-hidden min-h-[280px] cursor-pointer', COLOR.canvas)}
-        onClick={() => { if (post.id) window.dispatchEvent(new CustomEvent('gmatch-open-image', { detail: { id: post.id, authorName: post.author_name || 'You', url: post.localPreviewUrl || post.url, contentHash: post.content_hash } })); }}
+        onClick={() => { if (post.id) window.dispatchEvent(new CustomEvent('gmatch-open-image', { detail: { id: post.id, authorName: post.author_name || 'You', url: primaryMedia?.url || post.url, contentHash: post.content_hash } })); }}
         onDoubleClick={handleDoubleTap}
       >
         {/* ObjectImage (with contentHash) is the ONE resolver — the same one the
             fullscreen viewer uses. A raw `localPreviewUrl` <img> short-circuited
             it and rendered blank for a peer post whose bytes resolve by hash. */}
-        {activeMedia && isExpandedMediaVideo(activeMedia.url, activeMedia.mime) ? (
+        {activeMedia && isExpandedMediaVideo(activeMedia.url, activeMedia.mimeType) ? (
           <ObjectImage
             key={activeMedia.url}
-            contentUrl={singleMedia ? (post.localPreviewUrl || post.url) : activeMedia.url}
-            objectId={singleMedia ? post.id : (activeMedia.id || post.id)}
+            contentUrl={singleMedia ? (primaryMedia?.url || post.url) : activeMedia.url}
+            objectId={singleMedia ? (primaryMedia?.id || post.id) : (activeMedia.id || post.id)}
             contentHash={post.content_hash}
             identity={identity}
-            mimeType={activeMedia.mime || post.mime_type}
+            mimeType={activeMedia.mimeType || primaryMedia?.mimeType || post.mime_type}
             loading="eager"
             className="w-full h-full max-h-(--max-h-sheet) object-contain"
             videoClassName="w-full h-full max-h-(--max-h-sheet) object-contain"
@@ -239,11 +220,11 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
           />
         ) : (
           <ObjectImage
-            contentUrl={singleMedia ? (post.localPreviewUrl || post.url) : (activeMedia?.url || post.localPreviewUrl || post.url)}
-            objectId={singleMedia ? post.id : (activeMedia?.id || post.id)}
+            contentUrl={singleMedia ? (primaryMedia?.url || post.url) : (activeMedia?.url || post.url)}
+            objectId={singleMedia ? (primaryMedia?.id || post.id) : (activeMedia?.id || post.id)}
             contentHash={post.content_hash}
             identity={identity}
-            mimeType={activeMedia?.mime || post.mime_type}
+            mimeType={activeMedia?.mimeType || primaryMedia?.mimeType || post.mime_type}
             alt=""
             loading="eager"
             hideUnavailable
@@ -314,6 +295,22 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
         )}
 
       </div>
+      )}
+
+      {/* The written body. Text is content on every post; on a text-only post
+          it is the whole card, set at reading size instead of caption size. */}
+      {content.text ? (
+        <p className={classes(
+          'whitespace-pre-wrap break-words leading-relaxed',
+          mediaItems.length
+            ? classes(PADDING_X[3], PADDING_Y[3])
+            : classes(PADDING_X[3], PADDING_X_SM[4], PADDING_Y[3]),
+          mediaItems.length ? TYPE.body : TYPE.base,
+          COLOR.fg,
+        )}>
+          <Linkify text={content.text} />
+        </p>
+      ) : null}
 
       {/* Action Bar — same icons, order, colors and padding as the standard card. */}
       <div className={classes(PADDING_X[3], PADDING_X_SM[4], 'pt-2.5', PADDING_Y[3])}>
@@ -361,7 +358,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
                 : classes(COLOR.muted, COLOR.hoverFg),
               )} />
             </button>
-            {onSaveToVault && post.url && (
+            {onSaveToVault && primaryMedia && (
               <button
                 type="button"
                 onClick={() => onSaveToVault(post)}
@@ -393,7 +390,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
 
       {/* Peer-confirmed durability: a peer's signed receipt proved it stored
           these bytes. Absent until that proof exists — never inferred. */}
-      {custody.label && (
+      {mediaItems.length > 0 && custody.label && (
         <div
           className={classes(
             'flex items-center', GAP[1], PADDING_X[3], PADDING_Y[2],

@@ -221,6 +221,33 @@ describe('projectFeed', () => {
     expect((rows[0] as FeedPost & { mediaUrls?: string[] }).mediaUrls).toEqual(['one', 'two'])
   })
 
+  it('projects a caption-only local object as a text post, not a broken picture', () => {
+    // The old projection invented `/api/objects/<id>` for every local row, so a
+    // text-only object became an image tile with no bytes — hidden forever by
+    // the no-preview rule even though its words were content.
+    const rows = projectFeed({
+      ...base,
+      items: [{
+        id: 'text-1', owner_id: 'self', is_public: 1, caption: 'just words',
+        created_at: '2026-01-01T00:00:00.000Z',
+      } as unknown as OrbitObject],
+    })
+    expect(rows).toHaveLength(1)
+    expect(rows[0].caption).toBe('just words')
+    expect(rows[0].url).toBe('')
+  })
+
+  it('keeps a local object with media bytes addressable by its object id', () => {
+    const rows = projectFeed({
+      ...base,
+      items: [{
+        id: 'obj-1', owner_id: 'self', is_public: 1, mime_type: 'image/jpeg',
+        data: new Uint8Array([1, 2, 3]), created_at: '2026-01-01T00:00:00.000Z',
+      } as unknown as OrbitObject],
+    })
+    expect(rows[0].url).toBe('/api/objects/obj-1')
+  })
+
   it('returns an empty timeline when there is no input', () => {
     expect(projectFeed({ ...base })).toEqual([])
   })

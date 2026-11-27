@@ -2,8 +2,9 @@
 
 // Updates (Settings). Packaged builds drive the portable self-update in the
 // main process (GitHub Releases -> auto-download -> "Install & Restart" swaps
-// this very .exe and relaunches). Dev/browser builds fall back to the old
-// release.json check that links straight to the download.
+// this very portable file and relaunches, on Windows and Linux alike).
+// Dev/browser builds fall back to the old release.json check that links
+// straight to the download.
 import { useEffect, useState } from 'react';
 import { Download, RefreshCw, ShieldCheck, ShieldAlert, Rocket, Sparkles } from 'lucide-react';
 import { getApiBaseUrl } from '../../utils/api';
@@ -18,12 +19,21 @@ interface ReleaseMeta {
   buildDate?: string;
 }
 
-const RELEASES_URL = 'https://github.com/9matesu/goongrid/releases/latest';
+const RELEASES_URL = 'https://github.com/9matesu/gmatch/releases/latest';
+
+/** The hash command we show is copy, never a behaviour branch. */
+function verifyCommand(file: string, platform?: string): string {
+  if (platform === 'win32') return `Get-FileHash "$env:USERPROFILE\\Downloads\\${file}" -Algorithm SHA256`;
+  if (platform === 'darwin') return `shasum -a 256 ~/Downloads/${file}`;
+  return `sha256sum ~/Downloads/${file}`;
+}
 
 export function UpdateSection({ toast }: {
   toast?: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 }) {
   const bridge = window.gmatch;
+  // Copy only: which hash command to show next to the manual download link.
+  const os = bridge?.platform || (/Windows/i.test(navigator.userAgent) ? 'win32' : 'linux');
   const updater = Boolean(bridge?.updateCheck && bridge?.onUpdateStatus);
   const [installed, setInstalled] = useState<string | null>('1.5.2');
   const [status, setStatus] = useState<GmatchUpdateStatus | null>(null);
@@ -172,7 +182,7 @@ export function UpdateSection({ toast }: {
         <div className="flex items-start justify-between gap-3 text-2xs text-retro-muted">
           <p className="flex items-start gap-1.5 min-w-0">
             <ShieldAlert className="w-3 h-3 shrink-0 mt-px text-warning-fg" />
-            <span className="break-words">{status?.error || 'Update failed'}. You can grab the .exe manually.</span>
+            <span className="break-words">{status?.error || 'Update failed'}. You can grab the portable build manually.</span>
           </p>
           <button type="button" onClick={openReleases} className="shrink-0 underline hover:text-retro-fg cursor-pointer">
             GitHub releases
@@ -190,8 +200,9 @@ export function UpdateSection({ toast }: {
       {!updater && hasUpdateFallback && (
         <p className="text-2xs text-retro-muted flex items-start gap-1.5">
           <ShieldCheck className="w-3 h-3 shrink-0 mt-px" />
-          Verify before running: <code className="font-mono break-all">SHA-256 {latest?.sha256}</code>. In
-          PowerShell: <code className="font-mono">Get-FileHash $env:USERPROFILE\Downloads\{latest?.file} -Algorithm SHA256</code>
+          Verify before running: <code className="font-mono break-all">SHA-256 {latest?.sha256}</code>.{' '}
+          {os === 'win32' ? 'In PowerShell: ' : 'In a terminal: '}
+          <code className="font-mono break-all">{latest?.file ? verifyCommand(latest.file, os) : 'sha256sum <downloaded file>'}</code>
         </p>
       )}
     </div>

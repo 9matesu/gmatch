@@ -15,6 +15,10 @@ const {
   classifySetResult,
   getWallpaperPath,
 } = require('./wallpaper-core.cjs')
+// Linux has no SystemParametersInfo; the cross-platform controller owns
+// gsettings/KDE there. Keeping the delegation here means the renderer's one
+// buffer bridge works on both OSes without a second consent decision.
+const desktopWallpaper = require('./desktop-wallpaper.cjs')
 
 const PS = 'powershell.exe'
 const SCRIPT = `
@@ -85,6 +89,7 @@ function hasPendingSwap() {
 
 /** Write the image to a session temp file and set it as the OS wallpaper. */
 async function setWallpaperFromBuffer(buf, mime) {
+  if (process.platform === 'linux') return desktopWallpaper.setWallpaper({ data: buf, mime })
   const reject = rejectReason(process.platform, buf)
   if (reject) return { ok: false, reason: reject }
   let tmpFile = null
@@ -124,6 +129,7 @@ function cleanupWallpaperFiles() {
 
 /** Restore the wallpaper captured before the first swap; clears the temp file. */
 async function restoreWallpaper() {
+  if (process.platform === 'linux') return desktopWallpaper.restoreWallpaper()
   const plan = restorePlan(process.platform, swapped, previousPath)
   if (!plan.ok) return plan
   if (plan.skipSet && !swapped) { cleanupWallpaperFiles(); return plan }

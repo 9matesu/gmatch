@@ -16,6 +16,7 @@ import { expect, test, type Browser, type BrowserContext, type Page } from '@pla
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { generateIdentity } from '../src/identity.cjs';
 import { legalVersionKey } from '../src/legal/documents';
@@ -28,9 +29,13 @@ const API_DIR = resolve(fileURLToPath(import.meta.url), '../../../api');
 // Same resolution order the vite plugin uses (vite.config.ts) — a machine
 // without bun on PATH still finds the per-user install.
 function resolveBun(): string {
+  const home = homedir();
+  const name = process.platform === 'win32' ? 'bun.exe' : 'bun';
   const candidates = [
-    join(process.env.APPDATA || '', 'npm', 'node_modules', 'bun', 'bin', 'bun.exe'),
-    join(process.env.USERPROFILE || '', '.bun', 'bin', 'bun.exe'),
+    join(home, '.bun', 'bin', name),
+    ...(process.platform === 'win32'
+      ? [join(process.env.APPDATA || '', 'npm', 'node_modules', 'bun', 'bin', 'bun.exe')]
+      : [join(process.env.XDG_DATA_HOME || join(home, '.local', 'share'), 'npm', 'node_modules', 'bun', 'bin', 'bun')]),
   ].filter((p) => p && existsSync(p));
   return candidates[0] || 'bun';
 }

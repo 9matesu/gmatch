@@ -1,10 +1,11 @@
 // Standalone test for the updater wiring (run: node electron/updater.test.cjs).
 // Uses a local http server as the release feed (GMATCH_RELEASE_URL insecure
 // override, by design the same hook the smoke test uses) and a stubbed spawnFn
-// so no real cmd.exe is ever launched. Covers: happy path + verification,
+// so no real shell is ever launched. Covers: happy path + verification,
 // missing asset (404), interrupted download, size mismatch, hash mismatch,
 // 503 cold start, repeated checks not re-downloading, install single-flight,
-// the hidden-window spawn options, and never executing an unverified file.
+// both swap launchers (cmd.exe on Windows, /bin/sh on Linux), and never
+// executing an unverified file.
 const assert = require('assert')
 const http = require('http')
 const fs = require('fs')
@@ -31,6 +32,8 @@ function makeFeedServer() {
     switch (url) {
       case '/ok.json':
         return json(res, { file: 'gMatch-9.9.9-portable.exe', version: '9.9.9', sha256: NEW_SHA, sizeBytes: NEW_EXE.length, downloadUrl: dl('exe') })
+      case '/ok-linux.json':
+        return json(res, { file: 'gMatch-9.9.9-portable.AppImage', version: '9.9.9', sha256: NEW_SHA, sizeBytes: NEW_EXE.length, downloadUrl: dl('appimage') })
       case '/missing.json':
         return json(res, { file: 'gMatch-9.9.9-portable.exe', version: '9.9.9', sha256: NEW_SHA, sizeBytes: NEW_EXE.length, downloadUrl: dl('missing') })
       case '/corrupt.json':
@@ -47,6 +50,10 @@ function makeFeedServer() {
         // A host that never answers.
         return setTimeout(() => {}, 60000)
       case '/exe':
+        hits.exe += 1
+        res.writeHead(200, { 'content-length': String(NEW_EXE.length), 'content-type': 'application/octet-stream' })
+        return res.end(NEW_EXE)
+      case '/appimage':
         hits.exe += 1
         res.writeHead(200, { 'content-length': String(NEW_EXE.length), 'content-type': 'application/octet-stream' })
         return res.end(NEW_EXE)
@@ -89,10 +96,10 @@ async function main() {
     }
     return app
   }
-  const makeUpdater = (feedPath, spawnStub, extraFeeds) => {
+  const makeUpdater = (feedPath, spawnStub, extraFeeds, platform = 'win32') => {
     process.env.GMATCH_RELEASE_URL = `http://127.0.0.1:${port()}${feedPath}`
     const app = makeApp()
-    const updater = createUpdater({ app, webContents: () => [], log: () => {}, spawnFn: spawnStub, feeds: extraFeeds })
+    const updater = createUpdater({ app, webContents: () => [], log: () => {}, spawnFn: spawnStub, feeds: extraFeeds, platform })
     return { updater, app }
   }
   const waitFor = async (updater, predicate, label, timeoutMs = 5000) => {
@@ -147,6 +154,27 @@ async function main() {
     const script = fs.readFileSync(path.join(tempDir, 'gmatch-update.cmd'), 'utf8')
     assert.match(script, /if %TRIES% GEQ 30 goto giveup/)
     assert.match(script, /ping -n %WAIT% 127\.0\.0\.1 >nul/)
+
+    // 3b) Linux: same verified download, but a POSIX script run by /bin/sh.
+    const linuxSpawns = []
+    const linuxStub = (...args) => { linuxSpawns.push(args); return { unref() {} } }
+    const linux = makeUpdater('/ok-linux.json', linuxStub, undefined, 'linux')
+    await linux.updater.check(true)
+    await waitFor(linux.updater, (s) => s.phase === 'ready', 'ready (linux AppImage)')
+    const linuxInstall = linux.updater.install()
+    assert.strictEqual(linuxInstall.ok, true)
+    assert.strictEqual(linuxSpawns.length, 1, 'exactly one shell handed the swap')
+    const [shExe, shArgv, shOpts] = linuxSpawns[0]
+    assert.strictEqual(shExe, '/bin/sh')
+    assert.strictEqual(shArgv[0], path.join(tempDir, 'gmatch-update.sh'))
+    assert.strictEqual(shOpts.stdio, 'ignore')
+    assert.strictEqual(shOpts.windowsHide, undefined, 'no Windows console to hide on Linux')
+    assert.strictEqual(linux.app.quits, 1, 'Linux install also quits exactly once')
+    const shScript = fs.readFileSync(shArgv[0], 'utf8')
+    assert.match(shScript, /^#!\/bin\/sh/)
+    assert.match(shScript, /mv -f .*gMatch-9\.9\.9-portable\.AppImage/)
+    assert.match(shScript, /chmod \+x/)
+    assert.match(shScript, /rm -f "\$0"/)
 
     // 4) Never execute an unverified artifact (feed publishes no hash).
     const spawnsBefore = spawns.length

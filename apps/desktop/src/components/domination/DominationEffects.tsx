@@ -101,7 +101,8 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
     };
   }, [clearAll, update]);
 
-  // OS-level wallpaper swap (Windows). Applies for the effect duration, then
+  // OS-level wallpaper swap (Windows registry/TranscodedWallpaper, or Linux
+  // gsettings with a KDE fallback). Applies for the effect duration, then
   // restores the previous wallpaper. No-ops in the browser. The OS swap is a
   // HIGH-IMPACT tier with its own consent (allowDesktopWallpaperOS) — the
   // in-app swap alone does not unlock it. The execution outcome reported to

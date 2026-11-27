@@ -74,3 +74,18 @@ describe('ProfileExpandedPost · peer-confirmed durability', () => {
     expect(screen.getByText('Stored on 2 devices')).toBeTruthy()
   })
 })
+
+describe('ProfileExpandedPost post model', () => {
+  it('renders a text-only post with no media panel or placeholder', () => {
+    renderPost(post({ id: 'text-1', caption: 'words on their own', url: '', mime_type: undefined }))
+    expect(screen.getByText('words on their own')).toBeTruthy()
+    expect(screen.queryByTestId('object-image')).toBeNull()
+    expect(screen.queryByText(/No preview|Loading media/i)).toBeNull()
+  })
+
+  it('renders an image post with its media and its caption', () => {
+    renderPost(post())
+    expect(screen.getByTestId('object-image')).toBeTruthy()
+    expect(screen.getByText('hello')).toBeTruthy()
+  })
+})

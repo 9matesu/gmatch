@@ -563,6 +563,16 @@ product path.
   handle, time), then the written body, then the action row. The old
   caption-under-the-image block is gone; the repost line sits with the author
   block under the media.
+- **Text posts are their own card (2026-11-27).** A post is read through ONE
+  model — `{ text, media? }` (`components/feed/postModel.ts`) — so the storage
+  variants (`url`, `media[]`, `mediaUrls`, `localPreviewUrl`, `caption`) are one
+  concept, not two code paths. A row with words and no media renders as a clean
+  Twitter-like text card (left avatar, author + handle + time, larger body,
+  the same action row) with NO image panel and NO placeholder; it is never
+  hidden, because text is content. The reversible no-preview hide still applies
+  to MEDIA rows whose bytes cannot be resolved, and the feed projection no
+  longer invents `/api/objects/<id>` for a caption-only local object. The 18+
+  gate is untouched.
 - **One detail sidepanel for feed and profile (2026-11-25).** Clicking a post in
   the feed opens the SAME `ProfileExpandedPost` inside the right `SideSheet` that
   the profile grid uses, so the image sidepanel is visually identical in both
@@ -760,6 +770,18 @@ heat streak). Each +5% click power. Persist across prestige.
   actionId, so retries never double-charge or double-pay.
 - `GET /api/domination/prices` exposes the table; the UI shows the price on
   every action card and the payout in the success toast.
+- **The high-impact OS wallpaper tier works on Windows and Linux** (2026-11-27).
+  It is still gated on the separate `allowDesktopWallpaperOS` consent (off by
+  default, and useless without `allowDesktopBackgroundChange`), and it reports
+  the real OS outcome as the execution ack. Windows writes the registry
+  `HKCU\Control Panel\Desktop\WallPaper` and `TranscodedWallpaper`, then applies
+  it with `SystemParametersInfo`; Linux uses
+  `gsettings set org.gnome.desktop.background picture-uri` with a KDE `qdbus`
+  fallback. The `wallpaper:set` IPC (`window.gmatch.setWallpaper`) takes a local
+  path/file URI or bytes, is fully async and time-bounded, and resolves
+  `{ ok: false, reason: 'unsupported-desktop' }` on any other desktop instead of
+  throwing. The previous wallpaper is captured once and restored when the effect
+  ends and on quit, so a prank never outlives the app.
 - **Spy feed is real**: `GET /api/users/hacks/spy-feed/:targetId` returns the
   target's recent public posts + intercepted DM peeks, server-gated to the
   ATTACKER of a still-active hack (403 otherwise). HackSpyView polls it every

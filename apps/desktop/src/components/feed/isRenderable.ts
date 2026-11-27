@@ -1,27 +1,22 @@
+import { hasMedia, type PostLike } from './postModel';
+
 /**
- * The one rule for "is this row a post?" (SPEC: an image network shows no empty
- * card). A row is rendered only when it carries MEDIA — a resolvable url or
- * media bytes. A caption-only row with no bytes is dropped: the player has
- * nothing to see, so it must not sit in the feed waiting.
+ * The one rule for "is this row a post?".
  *
- * `ObjectImage` reports the separate, later failure: bytes that never arrive.
- * That is the tile's own `onMediaUnavailable` → `hidePost`, not this predicate,
- * because at this point the row may still be in flight.
+ * A post is CONTENT: words or media. Text is content, so a text-only row shows
+ * immediately as a clean text card — it is NEVER hidden for having no picture.
+ * Only a row with no words AND no media is dropped: it is an empty card.
+ *
+ * `ObjectImage` reports the separate, later failure: MEDIA bytes that never
+ * arrive. That is the tile's own `onMediaUnavailable` → `hidePost`, not this
+ * predicate, because at this point the row may still be in flight; text-only
+ * rows never make that call.
  */
-export type RenderablePost = {
-  caption?: string | null
-  url?: string | null
-  localPreviewUrl?: string | null
-  media?: { url?: string | null }[] | null
-  mediaUrls?: string[] | null
-}
+export type RenderablePost = PostLike;
 
 export function isRenderable(post: RenderablePost): boolean {
-  if (post.url && post.url.trim()) return true
-  if (post.localPreviewUrl) return true
-  if (post.mediaUrls?.some((u) => !!u && u.trim())) return true
-  if (post.media?.some((m) => !!m?.url && m.url.trim())) return true
-  return false
+  if (hasMedia(post)) return true;
+  return typeof post?.caption === 'string' && post.caption.trim().length > 0;
 }
 
 /** Rows dropped by the predicate, for the dev-only counter in the feed header. */

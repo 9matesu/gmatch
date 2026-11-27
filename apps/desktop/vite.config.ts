@@ -7,6 +7,7 @@ import https from 'node:https'
 import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { homedir } from 'node:os'
 import type { Duplex } from 'node:stream'
 import registry from '../../shared/sources.json'
 import { pxAllowPattern } from './src/services/booruSources'
@@ -291,9 +292,13 @@ async function isSidecarHealthy(): Promise<boolean> {
 }
 
 function devBunBin(): string {
+  const home = homedir()
+  const name = process.platform === 'win32' ? 'bun.exe' : 'bun'
   const candidates = [
-    join(process.env.APPDATA || '', 'npm', 'node_modules', 'bun', 'bin', 'bun.exe'),
-    join(process.env.USERPROFILE || '', '.bun', 'bin', 'bun.exe'),
+    join(home, '.bun', 'bin', name),
+    ...(process.platform === 'win32'
+      ? [join(process.env.APPDATA || '', 'npm', 'node_modules', 'bun', 'bin', 'bun.exe')]
+      : [join(process.env.XDG_DATA_HOME || join(home, '.local', 'share'), 'npm', 'node_modules', 'bun', 'bin', 'bun')]),
   ]
   for (const c of candidates) {
     try {

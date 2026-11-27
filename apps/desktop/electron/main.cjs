@@ -26,6 +26,7 @@ const vault = require('./vault.cjs')
 const vaultServer = require('./vaultServer.cjs')
 const customFolders = require('./customFolders.cjs')
 const wallpaperWin = require('./wallpaperWin.cjs')
+const desktopWallpaper = require('./desktop-wallpaper.cjs')
 const domVideo = require('./dom-video-core.cjs')
 const { sanitizeBounds } = require('./window-bounds-core.cjs')
 const { dapiSource, booruOrgSource, gateBooruOrgEntry } = require('./booru-sources-core.cjs')
@@ -1388,8 +1389,10 @@ app.whenReady().then(async () => {
     },
   })
   // Consented domination media (wallpaper + popup_video window) + one-shot
-  // camera grant: handlers live in ./ipc/domination-media.cjs.
-  registerDominationMediaHandlers({ ipcMain, app, wallpaperWin, domVideo, mainLog })
+  // camera grant: handlers live in ./ipc/domination-media.cjs. The desktop
+  // wallpaper controller handles Windows and Linux on the `wallpaper:set` IPC
+  // and the cross-platform half of the consented buffer swap.
+  registerDominationMediaHandlers({ ipcMain, app, wallpaperWin, desktopWallpaper, domVideo, mainLog })
   ipcMain.handle('camera:grant-once', () => { cameraGrantOnce = true; return { ok: true } })
   app.on('session-end', () => {
     // Logoff/shutdown: just go (and save what we have).
