@@ -67,4 +67,18 @@ describe('serialize / deserialize round-trip', () => {
     expect(back!.points).toBe(777)
     expect(back!.totalEarned).toBe(888)
   })
+
+  it('migrates pre-v3 saves instead of discarding the whole run', () => {
+    const v1 = deserialize(JSON.stringify({ version: 1, gp: 1500, totalEarnedGP: 9000, clickCount: 42 }))
+    expect(v1?.version).toBe(SAVE_VERSION)
+    expect(v1?.points).toBe(1500)
+    expect(v1?.totalEarned).toBe(9000)
+    expect(v1?.clickCount).toBe(42)
+    expect(v1?.maxHeatStreak).toBe(0) // field did not exist yet
+
+    const v2 = deserialize(JSON.stringify({ version: 2, gc: 777, totalEarnedGc: 888 }))
+    expect(v2?.version).toBe(SAVE_VERSION)
+    expect(v2?.points).toBe(777)
+    expect(v2?.totalEarned).toBe(888)
+  })
 })

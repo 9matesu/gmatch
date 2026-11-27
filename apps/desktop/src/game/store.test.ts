@@ -561,6 +561,21 @@ describe('brainmelt', () => {
     expect(useGame.getState().brainmelt()).toBe(false)
     expect(useGame.getState().shards).toBe(0)
   })
+
+  it('starts the new run with a cold heat combo but keeps the best-ever stat', () => {
+    useGame.setState({
+      xp: 1600,
+      totalEarned: 4_000_000,
+      heatStreak: 42,
+      lastClickAt: Date.now(),
+      maxHeatStreak: 42,
+    })
+    expect(useGame.getState().brainmelt()).toBe(true)
+    const s = useGame.getState()
+    expect(s.heatStreak).toBe(0)
+    expect(s.lastClickAt).toBe(0)
+    expect(s.maxHeatStreak).toBe(42) // achievement stat, not part of the run
+  })
 })
 
 describe('save / load / offline earnings', () => {
@@ -892,6 +907,27 @@ describe('purgePost (T3)', () => {
     // 2+ learned tags leave a count-1 co-occurrence pair behind (T4)
     expect(useGame.getState().coRules.length).toBeGreaterThan(0)
     expect(useGame.getState().coRules[0].count).toBe(1)
+  })
+
+  it('a purged foe cannot come back from the queue or the back arrow', () => {
+    const purged = { id: 'p1', url: 'https://x/p1.jpg', tags: ['blonde_hair', 'big_breasts'] }
+    useGame.setState({
+      current: purged as never,
+      queue: [purged, { id: 'p2', url: 'https://x/p2.jpg', tags: [] }] as never,
+      past: [purged] as never,
+      foeHp: 1,
+      foeMaxHp: 8,
+      foeClicks: 3,
+      defeated: 5,
+    })
+    useGame.getState().purgePost(purged as never)
+    const s = useGame.getState()
+    expect(s.queue.some((p) => p.id === 'p1')).toBe(false)
+    expect(s.past.some((p) => p.id === 'p1')).toBe(false)
+    expect(s.current?.id).toBe('p2')
+    // The replacement starts a fresh fight, not with the purged foe's HP.
+    expect(s.foeHp).toBe(s.foeMaxHp)
+    expect(s.foeClicks).toBe(0)
   })
 })
 

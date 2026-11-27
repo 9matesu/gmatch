@@ -1397,9 +1397,23 @@ export const useGame = create<GameState>((set, get) => ({
   purgePost: (post) => {
     const s = get()
     void evictImage(post.url)
-    // Pull it off-screen instantly; the queue head refills if one exists.
-    if (s.current && s.current.id === post.id) set({ current: s.queue[0] ?? null, queue: s.queue.slice(1) })
-    if (isGridMode(s.viewMode)) set({ grid: s.grid.filter((c) => c.post.id !== post.id) })
+    // "Never show this again" applies everywhere, not just to the visible
+    // tile: a purged foe used to survive in the queue and the back-arrow
+    // history (with its bytes already evicted), so it came straight back.
+    // The foe promoted off the queue also needs its OWN full HP bar — the
+    // old code left the drained foe's remaining HP on the replacement.
+    const purgingCurrent = !!s.current && s.current.id === post.id
+    const nextCurrent = purgingCurrent ? s.queue.find((p) => p.id !== post.id) ?? null : s.current
+    const freshHp = foeMaxHp(s.defeated)
+    set({
+      current: nextCurrent,
+      queue: s.queue.filter((p) => p.id !== post.id),
+      past: s.past.filter((p) => p.id !== post.id),
+      grid: isGridMode(s.viewMode) ? s.grid.filter((c) => c.post.id !== post.id) : s.grid,
+      ...(purgingCurrent
+        ? { foeHp: nextCurrent ? freshHp : 0, foeMaxHp: nextCurrent ? freshHp : 0, foeClicks: 0 }
+        : {}),
+    })
     // Learn: the 3 rarest content tags become anti-tags, but never a tag the
     // player is actively feeding on (intent beats the algorithm).
     const feed = new Set(feedQuery(s.tags))
@@ -1511,6 +1525,10 @@ export const useGame = create<GameState>((set, get) => ({
       xp: 0,
       tags: [],
       caps: [],
+      // A new run starts with a cold combo: carrying the old streak across a
+      // prestige would pay an unearned heat multiplier on the first click.
+      heatStreak: 0,
+      lastClickAt: 0,
       shards: out.shards,
       prestigeCount: out.prestigeCount,
     }
@@ -1521,6 +1539,8 @@ export const useGame = create<GameState>((set, get) => ({
       xp: 0,
       tags: [],
       caps: [],
+      heatStreak: 0,
+      lastClickAt: 0,
       shards: out.shards,
       prestigeCount: out.prestigeCount,
       ...progress(next, s.xp),

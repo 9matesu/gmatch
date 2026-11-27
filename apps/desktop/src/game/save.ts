@@ -2,6 +2,12 @@ import type { ActiveCap, CapId, CustomSource, GalleryImage, OwnedTag, ViewMode }
 
 export const SAVE_KEY = 'gmatch.save.v1'
 export const SAVE_VERSION = 3
+/**
+ * Saves written by v1/v2 of the clicker are still real player runs — they just
+ * predate the points rename and a few optional fields. They must be migrated,
+ * not read as corrupt (which used to wipe the entire run on upgrade).
+ */
+const LEGACY_SAVE_VERSIONS = new Set([1, 2])
 
 export interface SaveData {
   version: number
@@ -81,7 +87,13 @@ export function deserialize(raw: string | null | undefined): SaveData | null {
   }
   if (typeof parsed !== 'object' || parsed === null) return null
   const d = parsed as Partial<SaveData> & { gp?: unknown; totalEarnedGP?: unknown; gc?: unknown; totalEarnedGc?: unknown }
-  if (d.version !== SAVE_VERSION) return null
+  // v1/v2 carry the same shape (gp/gc era); the field defaults below migrate
+  // them forward. Unknown NEWER versions are still rejected: their shape is
+  // not known, so guessing would corrupt a run rather than preserve it.
+  if (
+    typeof d.version !== 'number' ||
+    (d.version !== SAVE_VERSION && !LEGACY_SAVE_VERSIONS.has(d.version))
+  ) return null
   const num = (v: unknown, fallback: number): number =>
     typeof v === 'number' && Number.isFinite(v) ? v : fallback
   const arr = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : [])
