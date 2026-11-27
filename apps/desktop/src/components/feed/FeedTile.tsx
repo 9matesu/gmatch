@@ -5,6 +5,7 @@ import { hasMedia, ratioOf } from './tileMetrics'
 import { ObjectImage } from '../ObjectImage'
 import { isVideoPost, resolveMediaUrl } from '../../utils/media'
 import type { OrbitIdentity } from '@orbit/crypto'
+import { CHROME, classes, COLOR, MONO, PADDING, TYPE, WEIGHT } from '../../ui/tokens'
 
 export interface FeedTileProps {
   post: FeedPost
@@ -29,6 +30,11 @@ export interface FeedTileProps {
  * it also carries a like button, and interactive content must never nest inside
  * a button. The open button is the card's accessible name; the like sits above
  * it in the stacking order so it stays clickable.
+ *
+ * Surface + type drink from ui/tokens: `CHROME.tile` is the one raised card,
+ * `CHROME.mediaChip` the only label-on-media, and TYPE/WEIGHT/MONO the text
+ * steps. The `hideUnavailable` contract (a row with no bytes is hidden
+ * reversibly) is untouched.
  */
 export const FeedTile = memo(function FeedTile({ post, identity, liked, likes, onOpen, onToggleLike, onMediaLoad, onMediaUnavailable }: FeedTileProps) {
   const url = post.media?.[0]?.url || post.url
@@ -45,7 +51,7 @@ export const FeedTile = memo(function FeedTile({ post, identity, liked, likes, o
 
   return (
     <div
-      className="cv-row group relative min-w-0 overflow-hidden bg-surface-raised border border-edge rounded-lg"
+      className={classes('cv-row group relative min-w-0 overflow-hidden', CHROME.tile)}
       style={{ flexGrow: ratioOf(post) || 1, flexBasis: 0 }}
     >
       <button
@@ -85,25 +91,29 @@ export const FeedTile = memo(function FeedTile({ post, identity, liked, likes, o
       ) : null}
       {!hasMedia(post) ? (
         // Text-only post: the words are the tile, not a hole.
-        <span className="flex h-full w-full flex-col justify-between gap-2 p-3 text-left">
-          <span className="line-clamp-6 text-field leading-snug text-retro-body">{post.caption?.trim() || '(no caption)'}</span>
-          <span className="text-2xs text-retro-faint">{post.author_name}</span>
+        <span className={classes('flex h-full w-full flex-col justify-between gap-2 text-left', PADDING[3])}>
+          <span className={classes('line-clamp-6 leading-snug', TYPE.field, COLOR.body)}>{post.caption?.trim() || '(no caption)'}</span>
+          <span className={classes(TYPE.caption, COLOR.faint)}>{post.author_name}</span>
         </span>
       ) : null}
       {video && (
-        <span className="absolute left-2 top-2 rounded bg-black/60 px-1.5 py-0.5 text-2xs text-white">video</span>
+        <span className={classes('absolute left-2 top-2 px-1.5 py-0.5', CHROME.mediaChip)}>video</span>
       )}
       {(post.media?.length ?? 0) > 1 && (
         <span
-          className="absolute right-2 top-2 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-2xs text-white"
+          className={classes('absolute right-2 top-2 flex items-center gap-1 px-1.5 py-0.5', CHROME.mediaChip)}
           aria-label={`${post.media!.length} images`}
         >
           <Layers className="h-3 w-3" />
           {post.media!.length}
         </span>
       )}
-      <span className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] flex items-center justify-between gap-2 bg-gradient-to-t from-black/70 to-transparent px-2 pb-1.5 pt-6 text-[12px] text-white opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
-        <span className="truncate font-medium">{post.author_name}</span>
+      <span className={classes(
+        'pointer-events-none absolute inset-x-0 bottom-0 z-[2] flex items-center justify-between gap-2',
+        'bg-gradient-to-t from-black/70 to-transparent px-2 pb-1.5 pt-6',
+        TYPE.body, COLOR.onMedia, 'opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100',
+      )}>
+        <span className={classes('truncate', WEIGHT.medium)}>{post.author_name}</span>
         <button
           type="button"
           aria-label={liked ? 'Unlike post' : 'Like post'}
@@ -112,7 +122,7 @@ export const FeedTile = memo(function FeedTile({ post, identity, liked, likes, o
             e.stopPropagation()
             onToggleLike(post)
           }}
-          className="pointer-events-auto shrink-0 cursor-pointer tabular-nums"
+          className={classes('pointer-events-auto shrink-0 cursor-pointer', MONO)}
         >
           {likes > 0 ? likes.toLocaleString() : ''}
         </button>

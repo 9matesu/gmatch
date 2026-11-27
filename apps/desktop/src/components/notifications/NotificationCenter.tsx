@@ -9,13 +9,17 @@ import { NotificationsPanel } from '../NotificationsPanel';
 import type { NotificationItem, MatchInviteItem } from '../NotificationsPanel';
 import type { AppNotification, NotificationTarget } from '../../utils/notifications';
 import { useMediaqInstall } from '../../services/mediaqInstall';
+import {
+  classes, COLOR, GAP, ICON, MONO, PADDING, PADDING_X, PADDING_Y,
+  RADIUS, SHADOW, STATUS, TRACKING, TYPE, WEIGHT,
+} from '../../ui/tokens';
 
 function IconFor({ type }: { type: ToastMessage['type'] }) {
-  const cls = 'w-3.5 h-3.5 shrink-0';
-  if (type === 'success') return <CheckCircle2 className={`${cls} text-success-fg`} />;
-  if (type === 'error') return <AlertCircle className={`${cls} text-danger-fg`} />;
-  if (type === 'warning') return <AlertTriangle className={`${cls} text-warning-fg`} />;
-  return <Info className={`${cls} text-retro-body`} />;
+  const cls = classes(ICON.sm, 'shrink-0');
+  if (type === 'success') return <CheckCircle2 className={classes(cls, STATUS.success)} />;
+  if (type === 'error') return <AlertCircle className={classes(cls, STATUS.danger)} />;
+  if (type === 'warning') return <AlertTriangle className={classes(cls, STATUS.warning)} />;
+  return <Info className={classes(cls, COLOR.body)} />;
 }
 
 export interface NotificationCenterProps {
@@ -55,7 +59,9 @@ export interface NotificationCenterProps {
  * mobile duplicates were removed: this is where notifications live now.
  *
  * The badge is derived from the list by `useNotificationCenter`, so the number
- * on the bell and the rows behind it cannot disagree.
+ * on the bell and the rows behind it cannot disagree. Every surface here reads
+ * a ui/tokens role: the popover surface, the progress bar, the status tints and
+ * the two text steps — no per-call colour/size/weight.
  */
 export function NotificationCenter(props: NotificationCenterProps) {
   const {
@@ -74,8 +80,8 @@ export function NotificationCenter(props: NotificationCenterProps) {
     onRespondInvite,
     onRespondBabecock,
     onOpenBabecock,
-  defaultOpen = false,
-  sidebar = false,
+    defaultOpen = false,
+    sidebar = false,
   } = props;
 
   const mediaq = useMediaqInstall();
@@ -126,6 +132,8 @@ export function NotificationCenter(props: NotificationCenterProps) {
     return () => window.removeEventListener('keydown', onKey);
   }, [expanded]);
 
+  const smallIconButton = classes('p-0.5 cursor-pointer', RADIUS.chip, COLOR.muted, COLOR.hoverFg);
+
   return (
     <div
       className={sidebar ? 'relative flex w-full flex-col' : 'relative flex items-center'}
@@ -145,10 +153,10 @@ export function NotificationCenter(props: NotificationCenterProps) {
             aria-expanded={expanded}
             aria-label={`Notifications${unreadCount > 0 ? `: ${unreadCount} unread` : ''}${preview ? `. ${preview}` : ''}. Activate to ${expanded ? 'collapse' : 'expand'}.`}
             title="Notifications"
-            className="shrink-0 bg-glass-w8 text-retro-fg hover:bg-glass-w10"
+            className={classes('shrink-0', COLOR.glassW8, COLOR.fg, COLOR.hoverW10)}
           />
           {preview && (
-            <span aria-live="polite" className="min-w-0 truncate text-xs text-retro-fg/80 px-2">
+            <span aria-live="polite" className={classes('min-w-0 truncate px-2', TYPE.body, COLOR.fgSoft)}>
               {preview}
             </span>
           )}
@@ -161,46 +169,50 @@ export function NotificationCenter(props: NotificationCenterProps) {
           aria-label="Notification centre"
           className={sidebar
             ? 'relative flex w-full max-h-none flex-col overflow-visible'
-            : 'absolute left-1/2 -translate-x-1/2 top-full mt-1 w-[min(420px,92vw)] max-h-(--max-h-sheet) flex flex-col bg-retro-bg/95 border border-edge rounded-lg shadow-2xl backdrop-blur-md z-[var(--z-dropdown)] overflow-hidden'}
+            : classes(
+              'absolute left-1/2 -translate-x-1/2 top-full mt-1 w-[min(420px,92vw)] max-h-(--max-h-sheet)',
+              'flex flex-col backdrop-blur-md z-[var(--z-dropdown)] overflow-hidden',
+              COLOR.canvasVeil, 'border', COLOR.edge, RADIUS.control, SHADOW.sheet,
+            )}
         >
           {/* Active mediaq setup: the install survives the modal being closed
               ("Send to background"), so its progress lives here too. */}
           {mediaq.status !== 'idle' && (
-            <div className="shrink-0 border-b border-edge p-3">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-medium text-retro-fg">Media suite</span>
+            <div className={classes('shrink-0 border-b', COLOR.edge, PADDING[3])}>
+              <div className={classes('flex items-center justify-between', GAP[2])}>
+                <span className={classes(TYPE.body, WEIGHT.medium, COLOR.fg)}>Media suite</span>
                 <button
                   type="button"
                   onClick={() => mediaq.reset()}
                   aria-label="Dismiss media suite"
-                  className="p-0.5 rounded text-retro-muted hover:text-retro-fg cursor-pointer"
+                  className={smallIconButton}
                 >
                   <X className="w-3 h-3" />
                 </button>
               </div>
               {mediaq.status === 'installing' && (
                 <div className="mt-1.5 space-y-1">
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-glass-w8">
+                  <div className={classes('h-1.5 w-full overflow-hidden', RADIUS.pill, COLOR.glassW8)}>
                     {mediaq.percent !== null ? (
-                      <div className="h-full rounded-full bg-retro-accent transition-[width] duration-300" style={{ width: `${mediaq.percent}%` }} />
+                      <div className={classes('h-full transition-[width] duration-300', RADIUS.pill, COLOR.accentBg)} style={{ width: `${mediaq.percent}%` }} />
                     ) : (
-                      <div className="h-full w-1/3 animate-pulse rounded-full bg-retro-accent" />
+                      <div className={classes('h-full w-1/3 animate-pulse', RADIUS.pill, COLOR.accentBg)} />
                     )}
                   </div>
-                  <div className="flex justify-between text-2xs text-retro-muted">
+                  <div className={classes('flex justify-between', TYPE.caption, COLOR.muted)}>
                     <span className="truncate">{mediaq.message || 'Installing…'}</span>
-                    {mediaq.percent !== null && <span className="tabular-nums">{mediaq.percent}%</span>}
+                    {mediaq.percent !== null && <span className={MONO}>{mediaq.percent}%</span>}
                   </div>
                 </div>
               )}
-              {mediaq.status === 'done' && <p className="mt-1 text-2xs text-success-fg">mediaq is ready</p>}
-              {mediaq.status === 'error' && <p className="mt-1 text-2xs text-danger-fg">{mediaq.message}</p>}
-              {mediaq.status === 'cancelled' && <p className="mt-1 text-2xs text-warning-fg">Cancelled</p>}
-              <div className="mt-2 flex gap-2">
+              {mediaq.status === 'done' && <p className={classes('mt-1', TYPE.caption, STATUS.success)}>mediaq is ready</p>}
+              {mediaq.status === 'error' && <p className={classes('mt-1', TYPE.caption, STATUS.danger)}>{mediaq.message}</p>}
+              {mediaq.status === 'cancelled' && <p className={classes('mt-1', TYPE.caption, STATUS.warning)}>Cancelled</p>}
+              <div className={classes('mt-2 flex', GAP[2])}>
                 <button
                   type="button"
                   onClick={() => mediaq.openModal()}
-                  className="glass-action px-2 py-0.5 rounded text-2xs cursor-pointer text-retro-muted hover:text-retro-fg"
+                  className={classes('glass-action px-2 py-0.5 cursor-pointer', RADIUS.chip, TYPE.caption, COLOR.muted, COLOR.hoverFg)}
                 >
                   Show setup
                 </button>
@@ -208,7 +220,7 @@ export function NotificationCenter(props: NotificationCenterProps) {
                   <button
                     type="button"
                     onClick={() => mediaq.cancel()}
-                    className="glass-action px-2 py-0.5 rounded text-2xs cursor-pointer text-danger-fg hover:bg-danger/20"
+                    className={classes('glass-action px-2 py-0.5 cursor-pointer', RADIUS.chip, TYPE.caption, STATUS.danger, STATUS.dangerTintHover)}
                   >
                     Cancel
                   </button>
@@ -220,25 +232,25 @@ export function NotificationCenter(props: NotificationCenterProps) {
           {/* Transient toasts: an error stays until dismissed, so it needs a
               home inside the same surface rather than a floating overlay. */}
           {messages.length > 0 && (
-            <div className="shrink-0 border-b border-edge">
-              <div className="flex items-center justify-between px-3 py-1.5">
-                <span className="text-2xs font-bold uppercase tracking-wide text-retro-muted">
-                  Recent{overflowCount > 0 && <span className="font-normal"> · +{overflowCount} more</span>}
+            <div className={classes('shrink-0 border-b', COLOR.edge)}>
+              <div className={classes('flex items-center justify-between', PADDING_X[3], PADDING_Y[1.5])}>
+                <span className={classes(TYPE.caption, WEIGHT.bold, 'uppercase', TRACKING.wide, COLOR.muted)}>
+                  Recent{overflowCount > 0 && <span className={WEIGHT.regular}> · +{overflowCount} more</span>}
                 </span>
-                <button type="button" onClick={clearAll} className="text-xs text-retro-muted hover:text-retro-fg cursor-pointer">
+                <button type="button" onClick={clearAll} className={classes(TYPE.body, COLOR.muted, COLOR.hoverFg, 'cursor-pointer')}>
                   Clear
                 </button>
               </div>
               <ul className="max-h-28 overflow-y-auto styled-scrollbar divide-y divide-edge-subtle">
                 {[...messages].reverse().map((m) => (
-                  <li key={m.id} className="flex items-start gap-2 px-3 py-2">
+                  <li key={m.id} className={classes('flex items-start', GAP[2], PADDING_X[3], PADDING_Y[2])}>
                     <IconFor type={m.type} />
-                    <span className="flex-1 min-w-0 text-xs text-retro-fg break-words">{m.text}</span>
+                    <span className={classes('flex-1 min-w-0 break-words', TYPE.body, COLOR.fg)}>{m.text}</span>
                     <button
                       type="button"
                       onClick={() => dismiss(m.id)}
                       aria-label={`Dismiss: ${m.text}`}
-                      className="p-0.5 rounded text-retro-muted hover:text-retro-fg cursor-pointer"
+                      className={smallIconButton}
                     >
                       <X className="w-3 h-3" />
                     </button>

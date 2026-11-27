@@ -24,6 +24,8 @@ import { mediaUrlToCachedFile } from '../../utils/cacheMedia';
 import { isMediaVideo, isTwitterUrl, isVideoPageUrl, isVideoPost, resolveTwitterMediaAll, resolveVideoMime, sniffFileHead, urlFallbackMime } from '../../utils/media';
 import { forgeMediaLocally } from '../../services/mediaForge';
 import { devFetchable } from '../../services/imageCache';
+import { Button, Input, Textarea } from '../../ui/kit';
+import { COLOR, FIELD } from '../../ui/tokens';
 
 interface PostMediaItem {
   id: string;
@@ -585,13 +587,12 @@ function addLinkToCaption(raw: string): void {
   // text-only one (no bytes attached).
   const captionField = (
               <div>
-                <textarea
+                <Textarea
                   value={caption}
                   onChange={(e) => setCaption(e.target.value)}
                   placeholder={mediaList.length === 0 ? 'What is happening?!' : 'Write a caption...'}
                   rows={3}
                   maxLength={1000}
-                  className="w-full bg-retro-bg border border-edge rounded-lg p-3 text-xs text-retro-fg focus:outline-none focus:border-retro-accent transition-colors placeholder:text-retro-muted resize-none"
                 />
                 <div className="text-right text-2xs font-mono text-retro-muted mt-0.5">
                   {caption.length}/1000
@@ -611,66 +612,59 @@ function addLinkToCaption(raw: string): void {
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-edge shrink-0">
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={onClose}
             aria-label="Close"
-            className="p-1.5 text-retro-muted hover:text-retro-fg rounded-md cursor-pointer hover:bg-glass-w12 transition-colors"
+            className="p-1.5"
           >
             <X className="w-5 h-5" />
-          </button>
+          </Button>
 
           <span className="font-black uppercase tracking-tight text-base text-retro-fg">
             {mode === 'story' ? 'Create Story' : 'Create Post'} {mediaList.length > 0 ? `(${mediaList.length} media)` : ''}
           </span>
 
-          <button
-            type="button"
+          <Button
+            variant="primary"
+            size="sm"
             onClick={handleShare}
             disabled={uploading || (mediaList.length === 0 && !caption.trim())}
-            className="text-xs font-semibold text-retro-bg bg-retro-accent hover:bg-retro-fg disabled:opacity-40 cursor-pointer transition duration-150 active:scale-(--scale-press-sm) px-4 py-1.5 rounded-md shadow-xs"
+            className="px-4"
           >
             {uploading ? 'Sharing...' : (mode === 'story' ? 'Share Story' : 'Share')}
-          </button>
+          </Button>
         </div>
 
         {/* Mode Selector Tabs */}
         <div className="flex items-center border-b border-edge px-3 pt-2 pb-2 gap-1.5 text-xs">
-          <button
-            type="button"
+          <Button
+            variant={activeTab === 'upload' ? 'secondary' : 'ghost'}
+            size="md"
             onClick={() => { playPress(750); setActiveTab('upload'); }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition duration-150 cursor-pointer font-medium ${activeTab === 'upload'
-              ? 'bg-glass-w12 text-retro-fg'
-              : 'text-retro-muted hover:text-retro-fg'
-              }`}
           >
             <UploadCloud className="w-4 h-4" />
             <span>Upload / Files</span>
-          </button>
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant={activeTab === 'camera' ? 'secondary' : 'ghost'}
+            size="md"
             onClick={() => { playPress(750); setActiveTab('camera'); }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition duration-150 cursor-pointer font-medium ${activeTab === 'camera'
-              ? 'bg-glass-w12 text-retro-fg'
-              : 'text-retro-muted hover:text-retro-fg'
-              }`}
           >
             <Camera className="w-4 h-4" />
             <span>Camera</span>
-          </button>
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant={activeTab === 'pick' ? 'secondary' : 'ghost'}
+            size="md"
             onClick={() => { playPress(750); setActiveTab('pick'); }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition duration-150 cursor-pointer font-medium ${activeTab === 'pick'
-              ? 'bg-glass-w12 text-retro-fg'
-              : 'text-retro-muted hover:text-retro-fg'
-              }`}
           >
             <FolderOpen className="w-4 h-4" />
             <span>Pick media</span>
-          </button>
+          </Button>
         </div>
 
         {/* Body Content */}
@@ -687,7 +681,7 @@ function addLinkToCaption(raw: string): void {
               <div className="flex items-center gap-2">
                 <div className="relative flex-1 min-w-0">
                   <Link2 className="w-3.5 h-3.5 text-retro-muted absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
+                  <Input
                     type="url"
                     inputMode="url"
                     value={linkUrl}
@@ -700,17 +694,18 @@ function addLinkToCaption(raw: string): void {
                     }}
                     placeholder="Paste a link to share…"
                     aria-label="Link to share"
-                    className="w-full bg-retro-bg border border-edge rounded-lg pl-9 pr-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted focus:outline-none focus:border-retro-accent"
+                    className="pl-9"
                   />
                 </div>
-                <button
-                  type="button"
+                <Button
+                  variant="primary"
+                  size="md"
                   disabled={!linkUrl.trim()}
                   onClick={() => { addLinkToCaption(linkUrl.trim()); setLinkUrl(''); }}
-                  className="shrink-0 rounded-lg chrome-accent px-3 py-2 text-xs font-bold text-retro-accent-text disabled:opacity-40 cursor-pointer active:scale-95 transition"
+                  className="shrink-0"
                 >
                   Add
-                </button>
+                </Button>
               </div>
               <div
                 onClick={() => fileInputRef.current?.click()}
@@ -742,28 +737,25 @@ function addLinkToCaption(raw: string): void {
                   <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
                 </div>
               )}
-              <button
-                type="button"
-                onClick={capturePhoto}
-                className="px-5 py-2 rounded-xl chrome-accent text-retro-accent-text text-xs font-bold flex items-center gap-2 shadow-md cursor-pointer active:scale-95 transition"
-              >
+              <Button variant="primary" size="md" onClick={capturePhoto} className="px-5">
                 <Camera className="w-4 h-4" />
                 <span>Snap Picture</span>
-              </button>
+              </Button>
             </div>
           )}
 
           {activeTab === 'pick' && (
             <div className="space-y-2">
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="md"
                 onClick={() => void openMediaPicker().then((sel) => { if (sel) void takePickerSelection(sel); })}
-                className="w-full border-2 border-dashed border-edge hover:border-retro-accent rounded-xl bg-surface-interactive hover:bg-glass-w10 p-5 flex flex-col items-center justify-center gap-2 cursor-pointer transition text-center group"
+                className="w-full h-auto flex-col border-2 border-dashed p-5 text-center"
               >
-                <FolderOpen className="w-7 h-7 text-retro-muted group-hover:text-retro-accent transition-colors" />
+                <FolderOpen className="w-7 h-7 text-retro-muted transition-colors" />
                 <p className="text-xs font-bold text-retro-body">From your media, this device, or a link</p>
                 <span className="text-2xs text-retro-muted">Previewed before it attaches. {mediaList.length}/{MAX_MEDIA} added</span>
-              </button>
+              </Button>
             </div>
           )}
 
@@ -805,49 +797,50 @@ function addLinkToCaption(raw: string): void {
                 {/* Aspect Ratio Switcher */}
                 <div className="absolute bottom-3 left-3 bg-black/75 backdrop-blur-md rounded-xl p-1 flex items-center gap-1 text-2xs font-bold text-retro-fg z-10">
                   {(['square', 'portrait', 'landscape'] as const).map((ratio) => (
-                    <button
+                    <Button
                       key={ratio}
-                      type="button"
+                      variant={aspectRatio === ratio ? 'secondary' : 'ghost'}
+                      size="sm"
                       onClick={() => setAspectRatio(ratio)}
-                      className={`px-2 py-1 rounded-lg capitalize transition ${aspectRatio === ratio
-                        ? 'bg-surface-raised text-retro-fg font-black'
-                        : 'text-retro-body hover:text-retro-fg'
-                        }`}
+                      className="px-2 py-1 capitalize"
                     >
                       {ratio}
-                    </button>
+                    </Button>
                   ))}
                 </div>
 
                 {/* Left/Right Cycle Arrows */}
                 {mediaList.length > 1 && (
                   <>
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => { playPress(750); setActiveMediaIndex((prev) => (prev > 0 ? prev - 1 : mediaList.length - 1)); }}
-                      className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 hover:bg-black/90 text-retro-fg flex items-center justify-center transition cursor-pointer"
+                      className={`absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full p-0 ${COLOR.scrim}`}
                     >
                       <ChevronLeft className="w-5 h-5" />
-                    </button>
-                    <button
-                      type="button"
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => { playPress(750); setActiveMediaIndex((prev) => (prev < mediaList.length - 1 ? prev + 1 : 0)); }}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 hover:bg-black/90 text-retro-fg flex items-center justify-center transition cursor-pointer"
+                      className={`absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full p-0 ${COLOR.scrim}`}
                     >
                       <ChevronRight className="w-5 h-5" />
-                    </button>
+                    </Button>
                   </>
                 )}
 
                 {/* Delete Media Button */}
-                <button
-                  type="button"
+                <Button
+                  variant="danger"
+                  size="sm"
                   onClick={() => removeMedia(activeMediaIndex)}
-                  className="absolute top-3 right-3 p-1.5 rounded-xl bg-black/75 hover:bg-danger text-retro-fg transition-colors cursor-pointer"
+                  className="absolute top-3 right-3 p-1.5 rounded-xl"
                   title="Remove this photo"
                 >
                   <Trash2 className="w-4 h-4" />
-                </button>
+                </Button>
               </div>
 
               {/* Thumbnails & Reorder Bar */}
@@ -874,24 +867,26 @@ function addLinkToCaption(raw: string): void {
                   ))}
 
                   <div className="flex items-center gap-1 pl-2">
-                    <button
-                      type="button"
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       onClick={() => moveMedia(activeMediaIndex, activeMediaIndex - 1)}
                       disabled={activeMediaIndex === 0}
-                      className="px-2 py-1 bg-glass-w12 border border-edge rounded text-2xs font-mono font-semibold disabled:opacity-30 hover:bg-glass-w20 cursor-pointer transition duration-150 active:scale-(--scale-press-sm)"
+                      className="px-2 py-1 font-mono"
                       title="Move photo left"
                     >
                       ←
-                    </button>
-                    <button
-                      type="button"
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       onClick={() => moveMedia(activeMediaIndex, activeMediaIndex + 1)}
                       disabled={activeMediaIndex === mediaList.length - 1}
-                      className="px-2 py-1 bg-glass-w12 border border-edge rounded text-2xs font-mono font-semibold disabled:opacity-30 hover:bg-glass-w20 cursor-pointer transition duration-150 active:scale-(--scale-press-sm)"
+                      className="px-2 py-1 font-mono"
                       title="Move photo right"
                     >
                       →
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
@@ -900,25 +895,25 @@ function addLinkToCaption(raw: string): void {
 
               {/* Location & Tags inputs */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div className="flex items-center gap-2 bg-retro-bg border border-edge rounded-lg px-3 py-2 text-xs">
+                <div className={FIELD.shell}>
                   <MapPin className="w-4 h-4 text-retro-muted shrink-0" />
-                  <input
+                  <Input
                     type="text"
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
                     placeholder="Add location"
-                    className="w-full bg-transparent focus:outline-none placeholder:text-retro-muted text-retro-fg"
+                    bare
                   />
                 </div>
 
-                <div className="flex items-center gap-2 bg-retro-bg border border-edge rounded-lg px-3 py-2 text-xs">
+                <div className={FIELD.shell}>
                   <Tag className="w-4 h-4 text-retro-muted shrink-0" />
-                  <input
+                  <Input
                     type="text"
                     value={tags}
                     onChange={(e) => setTags(e.target.value)}
                     placeholder="Tags (e.g. anime, art, arcade)"
-                    className="w-full bg-transparent focus:outline-none placeholder:text-retro-muted text-retro-fg"
+                    bare
                   />
                 </div>
               </div>

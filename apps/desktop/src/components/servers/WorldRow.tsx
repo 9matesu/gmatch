@@ -7,11 +7,18 @@
 // in ServersView: this file owns layout, the vocabulary (P2P, Current /
 // Connecting / Unavailable) and the two format helpers the row needs. A row
 // never claims reachability it has not measured.
+//
+// SURFACE + TYPOGRAPHY: the tile, its menu, the status dot and every text step
+// come from ui/tokens. No per-call colour, radius, shadow, text-size or weight.
 import { Loader2, Lock, MoreVertical } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { serverKey, type DirectoryServer } from './directoryMerge'
 import { worldAccentStyle, worldGlyph, worldTileStyle } from './worldIdentity'
-import { MONO } from '../../ui/styles'
+import {
+  classes, COLOR, GAP, ICON, MONO, PADDING_X, PADDING_Y,
+  PRESENCE, RADIUS, RECIPE, SHADOW, STATUS, TRACKING, TRANSITION,
+  TYPE, WEIGHT,
+} from '../../ui/tokens'
 
 export interface WorldRowState {
   /** At most one quiet type label, and only when it helps: a world running on
@@ -27,15 +34,15 @@ export interface WorldRowState {
 }
 
 const DOT: Record<NonNullable<WorldRowState['status']>, string> = {
-  Current: 'bg-retro-online',
-  Connecting: 'bg-retro-warning',
-  Unavailable: 'bg-retro-muted/40',
+  Current: PRESENCE.currentDot,
+  Connecting: PRESENCE.connectingDot,
+  Unavailable: PRESENCE.idleDot,
 }
 
 const STATUS_TONE: Record<NonNullable<WorldRowState['status']>, string> = {
-  Current: 'text-retro-online',
-  Connecting: 'text-retro-warning',
-  Unavailable: 'text-retro-muted',
+  Current: PRESENCE.currentText,
+  Connecting: PRESENCE.connectingText,
+  Unavailable: PRESENCE.idleText,
 }
 
 export function formatDomain(hint?: string | null): string {
@@ -95,43 +102,47 @@ export function WorldRow({
           the measured status is the dot on the tile's corner. */}
       <span className="relative shrink-0" aria-hidden>
         <span
-          className="flex h-9 w-9 items-center justify-center rounded-lg border text-xs font-bold text-retro-fg/90 shadow-inner"
+          className={classes(
+            'flex h-9 w-9 items-center justify-center border',
+            RADIUS.control, TYPE.sub, WEIGHT.bold, COLOR.fgSoft, SHADOW.inset,
+          )}
           style={worldTileStyle(key)}
         >
           {worldGlyph(server.name)}
         </span>
         <span
-          className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-retro-bg ${
-            status ? DOT[status] : 'bg-retro-muted/40'
-          }`}
+          className={classes(
+            'absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 ring-2 ring-retro-bg',
+            RADIUS.pill, status ? DOT[status] : PRESENCE.idleDot,
+          )}
         />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="flex min-w-0 items-baseline gap-2">
-          <span className="truncate text-sm font-semibold text-retro-fg group-hover:text-retro-accent transition-colors duration-150">
+        <span className={classes('flex min-w-0 items-baseline', GAP[2])}>
+          <span className={classes('truncate group-hover:text-retro-accent', TYPE.sub, WEIGHT.semibold, COLOR.fg, TRANSITION.micro)}>
             {server.name}
           </span>
           {state.kind && (
-            <span className="shrink-0 text-2xs uppercase tracking-wider text-retro-muted">{state.kind}</span>
+            <span className={classes('shrink-0 uppercase', TYPE.caption, TRACKING.wider, COLOR.muted)}>{state.kind}</span>
           )}
           {status && (
             <span
               data-testid={status === 'Connecting' ? `connecting-${server.id}` : undefined}
-              className={`flex shrink-0 items-center gap-1 text-2xs uppercase tracking-wider ${STATUS_TONE[status]}`}
+              className={classes('flex shrink-0 items-center uppercase', GAP[1], TYPE.caption, TRACKING.wider, STATUS_TONE[status])}
             >
               {status === 'Connecting' && <Loader2 className="w-3 h-3 animate-spin" aria-hidden />}
               {status}
             </span>
           )}
           {!!server.password_required && (
-            <Lock className="w-3 h-3 shrink-0 text-retro-muted" aria-label="password required" />
+            <Lock className={classes('w-3 h-3 shrink-0', COLOR.muted)} aria-label="password required" />
           )}
           {!!server.is_private && (
-            <span className="shrink-0 text-2xs uppercase tracking-wider text-retro-muted">private</span>
+            <span className={classes('shrink-0 uppercase', TYPE.caption, TRACKING.wider, COLOR.muted)}>private</span>
           )}
         </span>
         {state.meta ? (
-          <span className="mt-0.5 block truncate text-2xs text-retro-muted">{state.meta}</span>
+          <span className={classes('mt-0.5 block truncate', TYPE.caption, COLOR.muted)}>{state.meta}</span>
         ) : null}
       </span>
     </>
@@ -139,9 +150,10 @@ export function WorldRow({
 
   return (
     <li
-      className={`group relative flex items-center gap-3 py-2.5 pl-4 pr-3 transition-colors duration-150 ${
-        current ? 'bg-glass-w8' : 'hover:bg-glass-w5'
-      }`}
+      className={classes(
+        'group relative flex items-center py-2.5 pl-4 pr-3',
+        GAP[3], TRANSITION.micro, current ? COLOR.glassW8 : COLOR.hoverW5,
+      )}
       aria-current={current || undefined}
       aria-busy={status === 'Connecting' || undefined}
     >
@@ -150,7 +162,7 @@ export function WorldRow({
       {current && (
         <span
           aria-hidden
-          className="absolute inset-y-1.5 left-0 w-0.5 rounded-full"
+          className={classes('absolute inset-y-1.5 left-0 w-0.5', RADIUS.pill)}
           style={worldAccentStyle(key)}
         />
       )}
@@ -159,7 +171,7 @@ export function WorldRow({
           data-world-row-focus
           tabIndex={-1}
           aria-label={`${server.name}, current server`}
-          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md focus-visible:outline-none"
+          className={classes('flex min-w-0 flex-1 items-center focus-visible:outline-none', GAP[2.5], RADIUS.chip)}
         >
           {body}
         </span>
@@ -170,18 +182,20 @@ export function WorldRow({
           onClick={onJoin}
           disabled={joinDisabled}
           aria-label={`Connect to ${server.name}`}
-          className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-md text-left cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-retro-accent disabled:opacity-70 ${
-            status === 'Connecting' ? 'disabled:cursor-wait' : 'disabled:cursor-not-allowed'
-          }`}
+          className={classes(
+            'flex min-w-0 flex-1 items-center text-left cursor-pointer focus-visible:outline-none focus-visible:ring-1 disabled:opacity-70',
+            GAP[2.5], RADIUS.chip, COLOR.focusRing,
+            status === 'Connecting' ? 'disabled:cursor-wait' : 'disabled:cursor-not-allowed',
+          )}
         >
           {body}
         </button>
       )}
 
-      <div className="flex shrink-0 items-center gap-2">
+      <div className={classes('flex shrink-0 items-center', GAP[2])}>
         {/* Fixed slot so the ⋯ column lines up down the list, whether or not a
             row has a figure the server actually reported. */}
-        <span className={`hidden sm:inline-block w-28 text-right text-2xs ${MONO} text-retro-muted`}>
+        <span className={classes('hidden sm:inline-block w-28 text-right', TYPE.caption, MONO, COLOR.muted)}>
           {state.counts ?? ''}
         </span>
 
@@ -192,9 +206,12 @@ export function WorldRow({
             onClick={onMenuToggle}
             aria-label={`More actions for ${server.name}`}
             title="More actions"
-            className="h-7 w-7 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w10 flex items-center justify-center cursor-pointer transition-colors duration-150"
+            className={classes(
+              'h-7 w-7 flex items-center justify-center cursor-pointer',
+              RADIUS.chip, COLOR.muted, COLOR.hoverFg, COLOR.hoverW10, TRANSITION.micro,
+            )}
           >
-            <MoreVertical className="w-3.5 h-3.5" />
+            <MoreVertical className={ICON.sm} />
           </button>
 
           {menuOpen && (
@@ -202,7 +219,10 @@ export function WorldRow({
               data-menu-content
               role="menu"
               aria-label={`Actions for ${server.name}`}
-              className="absolute right-0 top-full mt-1 w-52 bg-surface-raised border border-edge rounded-lg py-1 shadow-lg z-[var(--z-dropdown)] space-y-0.5 animate-orbit-fade-in"
+              className={classes(
+                'absolute right-0 top-full mt-1 w-52 py-1 z-[var(--z-dropdown)] space-y-0.5 animate-orbit-fade-in',
+                RECIPE.card, COLOR.surfaceRaised, SHADOW.large,
+              )}
             >
               {menuItems}
             </div>
@@ -235,9 +255,11 @@ export function WorldMenuItem({
       disabled={disabled}
       title={title}
       onClick={onClick}
-      className={`w-full px-3 py-1.5 text-xs text-left flex items-center gap-2 cursor-pointer transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed ${
-        danger ? 'text-retro-error hover:bg-retro-error/10' : 'text-retro-fg hover:bg-glass-w10'
-      }`}
+      className={classes(
+        'w-full text-left flex items-center cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed',
+        PADDING_X[3], PADDING_Y[1.5], GAP[2], TRANSITION.micro, TYPE.body,
+        danger ? classes(STATUS.danger, STATUS.dangerHoverBg) : classes(COLOR.fg, COLOR.hoverW10),
+      )}
     >
       {icon}
       {label}

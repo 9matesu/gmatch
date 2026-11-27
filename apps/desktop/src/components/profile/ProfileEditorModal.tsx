@@ -8,6 +8,11 @@ import type { OrbitIdentity } from '@orbit/crypto';
 import { MAX_TAGS } from '@orbit/shared';
 import { saveUserProfile, addRemovedProfileTag, clearRemovedProfileTag } from '../../utils/profile';
 import { resolveMediaUrl } from '../../utils/media';
+import { Button, Input, Textarea } from '../../ui/kit';
+import {
+  classes, COLOR, FIELD, GAP, ICON, PADDING, PADDING_X, PADDING_Y,
+  RADIUS, SHADOW, TYPE, WEIGHT,
+} from '../../ui/tokens';
 import { ProfilePicModal } from './ProfilePicModal';
 
 export function ProfileEditorModal({
@@ -150,66 +155,65 @@ export function ProfileEditorModal({
 
   const modalContent = (
     <div
-      className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-orbit-fade-in text-retro-fg"
+      className={classes(
+        'fixed inset-0 z-[var(--z-modal)] backdrop-blur-sm flex items-center justify-center',
+        'font-sans animate-orbit-fade-in',
+        COLOR.scrim, PADDING[4], COLOR.fg,
+      )}
     >
       <div
-        className="w-full max-w-md bg-surface-raised border border-edge rounded-lg shadow-xl overflow-hidden flex flex-col max-h-(--max-h-dialog-sm) animate-orbit-pop"
+        className={classes(
+          'w-full max-w-md overflow-hidden flex flex-col max-h-(--max-h-dialog-sm) animate-orbit-pop',
+          COLOR.surfaceRaised, 'border', COLOR.edge, RADIUS.control, SHADOW.modal,
+        )}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-edge">
-          <button
-            type="button"
+        <div className={classes('flex items-center justify-between border-b', PADDING_X[4], PADDING_Y[3], COLOR.edge)}>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={onClose}
             aria-label="Close profile editor"
-            className="p-1 text-retro-muted hover:text-retro-body rounded cursor-pointer"
+            className="p-1"
           >
             <X className="w-5 h-5" />
-          </button>
-          <span className="text-sm font-medium text-retro-fg">Edit Profile</span>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="text-xs font-medium text-retro-accent hover:text-retro-accent-hover cursor-pointer disabled:opacity-50"
-          >
+          </Button>
+          <span className={classes(TYPE.sub, WEIGHT.medium, COLOR.fg)}>Edit Profile</span>
+          <Button variant="link" size="sm" onClick={handleSave} disabled={saving}>
             {saving ? 'Saving...' : 'Done'}
-          </button>
+          </Button>
         </div>
 
         {/* Body */}
-        <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-5 space-y-4 styled-scrollbar">
+        <form onSubmit={handleSave} className={classes('flex-1 overflow-y-auto space-y-4 styled-scrollbar', PADDING[5])}>
           {/* Avatar */}
-          <div className="flex flex-col items-center gap-2 pb-2">
+          <div className={classes('flex flex-col items-center pb-2', GAP[2])}>
             <div
-              className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-edge cursor-pointer group"
+              className={classes('relative w-20 h-20 overflow-hidden border-2 cursor-pointer group', RADIUS.pill, COLOR.edge)}
               onClick={() => setShowPicModal(true)}
             >
               {pfpUrl ? (
                 <img src={resolveMediaUrl(pfpUrl)} alt="Avatar" className="w-full h-full object-cover" onError={() => setPfpUrl('')} />
               ) : (
-                <div className="w-full h-full bg-surface-interactive flex items-center justify-center text-xl font-medium text-retro-muted">
+                <div className={classes('w-full h-full flex items-center justify-center', COLOR.interactive, TYPE.display, WEIGHT.medium, COLOR.muted)}>
                   {(name || 'U').charAt(0).toUpperCase()}
                 </div>
               )}
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-retro-fg">
+              <div className={classes('absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center', COLOR.scrimSoft, COLOR.fg)}>
                 <Camera className="w-5 h-5" />
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setShowPicModal(true)}
-              className="text-xs text-retro-accent hover:text-retro-accent-hover cursor-pointer"
-            >
+            <Button variant="link" size="sm" onClick={() => setShowPicModal(true)}>
               Change photo
-            </button>
+            </Button>
           </div>
 
           {/* Form Fields */}
           <div className="space-y-3">
             <div>
-              <label htmlFor="profile-name" className="text-xs font-medium text-retro-body block mb-1.5">Name</label>
-              <input
+              <label htmlFor="profile-name" className={classes(TYPE.body, WEIGHT.medium, COLOR.body, 'block mb-1.5')}>Name</label>
+              <Input
                 id="profile-name"
                 type="text"
                 value={name}
@@ -217,67 +221,70 @@ export function ProfileEditorModal({
                 placeholder="Name"
                 maxLength={40}
                 required
-                className="w-full bg-surface-interactive border border-edge rounded-lg px-3 py-2 text-sm text-retro-fg focus:outline-none focus:border-retro-accent transition-colors placeholder:text-retro-muted"
               />
             </div>
 
             <div>
-              <label htmlFor="profile-bio" className="text-xs font-medium text-retro-body block mb-1.5">Bio</label>
-              <textarea
+              <label htmlFor="profile-bio" className={classes(TYPE.body, WEIGHT.medium, COLOR.body, 'block mb-1.5')}>Bio</label>
+              <Textarea
                 id="profile-bio"
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
                 placeholder="Write a pornified bio... What do you like?"
                 rows={3}
                 maxLength={150}
-                className="w-full bg-surface-interactive border border-edge rounded-lg p-3 text-sm text-retro-fg focus:outline-none focus:border-retro-accent transition-colors resize-none placeholder:text-retro-muted"
               />
-              <div className="text-right text-xs text-retro-muted mt-0.5">
+              <div className={classes('text-right mt-0.5', TYPE.body, COLOR.muted)}>
                 {bio.length}/150
               </div>
             </div>
 
             <div>
-              <label htmlFor="profile-website" className="text-xs font-medium text-retro-body block mb-1.5">Favorite Website</label>
-              <div className="flex items-center gap-2 bg-surface-interactive border border-edge rounded-lg px-3 py-2">
-                <Globe className="w-4 h-4 text-retro-muted shrink-0" />
-                <input
-                id="profile-website"
+              <label htmlFor="profile-website" className={classes(TYPE.body, WEIGHT.medium, COLOR.body, 'block mb-1.5')}>Favorite Website</label>
+              <div className={FIELD.shell}>
+                <Globe className={classes(ICON.md, COLOR.muted, 'shrink-0')} />
+                <Input
+                  id="profile-website"
                   type="url"
                   value={website}
                   onChange={(e) => setWebsite(e.target.value)}
                   placeholder="https://pmvhaven.com"
-                  className="w-full bg-transparent focus:outline-none text-sm text-retro-fg placeholder:text-retro-muted"
+                  bare
                 />
               </div>
             </div>
 
             <div>
-              <span className="text-xs font-medium text-retro-body block mb-1.5">
-                Tags <span className="text-retro-muted font-normal">· {tags.length}/{MAX_TAGS} · drive your feed</span>
+              <span className={classes(TYPE.body, WEIGHT.medium, COLOR.body, 'block mb-1.5')}>
+                Tags <span className={classes(COLOR.muted, WEIGHT.regular)}>· {tags.length}/{MAX_TAGS} · drive your feed</span>
               </span>
               {tags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mb-2">
+                <div className={classes('flex flex-wrap mb-2', GAP[1.5])}>
                   {tags.map((t) => (
                     <span
                       key={t}
-                      className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full bg-glass-w12 border border-edge text-xs font-semibold text-retro-fg"
+                      className={classes(
+                        'inline-flex items-center pl-2.5 pr-1.5 py-1 border',
+                        GAP[1], RADIUS.pill, COLOR.glassW12, COLOR.edge,
+                        TYPE.body, WEIGHT.semibold, COLOR.fg,
+                      )}
                     >
                       #{t}
-                      <button
-                        type="button"
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => removeTag(t)}
                         aria-label={`Remove tag ${t}`}
-                        className="p-0.5 rounded-full text-retro-muted hover:text-danger-fg hover:bg-glass-w12 cursor-pointer"
+                        className="p-0.5 rounded-full"
                       >
                         <X className="w-3 h-3" />
-                      </button>
+                      </Button>
                     </span>
                   ))}
                 </div>
               )}
-              <div className="flex items-center gap-2">
-                <input
+              <div className={classes('flex items-center', GAP[2])}>
+                <Input
                   type="text"
                   value={tagDraft}
                   onChange={(e) => setTagDraft(e.target.value)}
@@ -290,17 +297,18 @@ export function ProfileEditorModal({
                   placeholder={tags.length >= MAX_TAGS ? `Tag limit reached (${MAX_TAGS})` : 'Add a tag...'}
                   disabled={tags.length >= MAX_TAGS}
                   maxLength={20}
-                  className="flex-1 bg-surface-interactive border border-edge rounded-lg px-3 py-2 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent transition-colors disabled:opacity-40"
+                  className="flex-1"
                 />
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={commitTagDraft}
                   disabled={tags.length >= MAX_TAGS || !tagDraft.trim()}
                   aria-label="Add tag"
-                  className="p-2 bg-surface-interactive hover:bg-glass-w12 border border-edge rounded-lg text-retro-muted hover:text-retro-fg transition-colors cursor-pointer shrink-0 disabled:opacity-40"
+                  className="shrink-0"
                 >
                   <Plus className="w-4 h-4" />
-                </button>
+                </Button>
               </div>
             </div>
 

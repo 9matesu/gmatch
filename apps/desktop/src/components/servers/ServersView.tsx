@@ -36,6 +36,16 @@ import { resolveMediaUrl } from '../../utils/media'
 import { CentralAdminPanel } from './CentralAdminPanel'
 import { subscribeApiBase } from '../../utils/api'
 import type { User } from '@orbit/shared'
+import {
+  classes, COLOR, FIELD, GAP, MONO, PADDING, PADDING_X, PADDING_Y,
+  RADIUS, SHADOW, STATUS, TRACKING, TYPE, WEIGHT,
+} from '../../ui/tokens'
+
+/** SURFACE + TYPOGRAPHY chrome shared by this view's panels, banners and
+ *  headers. Connectivity/join/delivery logic is untouched — only these names. */
+const FORM_LABEL = classes('block', TYPE.body, COLOR.muted)
+const FORM_INPUT = classes('glass-field mt-0.5 w-full px-2.5 py-1', TYPE.body)
+const ADMIN_ACTION = classes('glass-action glass-action-primary cursor-pointer', PADDING_X[3], PADDING_Y[1.5], RADIUS.control, TYPE.body, WEIGHT.bold)
 
 export interface DirectoryServer {
   id: string
@@ -1330,44 +1340,44 @@ export function ServersView({
   /** The host form — handed to the Add server dialog so hosting has one door. */
   const hostForm = identity ? (
     <div className="space-y-2">
-      <p className="text-xs text-retro-muted">
+      <p className={classes(TYPE.body, COLOR.muted)}>
         This machine becomes the server: you are logged into it (and off the node
         you were connected to) automatically, and you are its admin. Friends join
         from the address below.
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <label className="block text-xs text-retro-muted">
+        <label className={FORM_LABEL}>
           Server name
           <input aria-label="Server name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60}
-            className="glass-field mt-0.5 w-full px-2.5 py-1 text-xs" />
+            className={FORM_INPUT} />
         </label>
-        <label className="block text-xs text-retro-muted">
+        <label className={FORM_LABEL}>
           Advanced address override (optional)
           <input aria-label="Address hint" value={hint} onChange={(e) => setHint(e.target.value)} maxLength={120} placeholder=""
-            className="glass-field mt-0.5 w-full px-2.5 py-1 text-xs font-mono" />
+            className={classes(FORM_INPUT, MONO)} />
         </label>
       </div>
       {(() => {
         const preview = buildNodeCode(hint.trim() || pickShareableHint(hostState?.lanUrls ?? node?.lanUrls ?? []), name.trim())
         return preview ? (
-          <div data-testid="create-handle-preview" className="flex items-center gap-2 text-xs font-mono text-retro-muted">
+          <div data-testid="create-handle-preview" className={classes('flex items-center', GAP[2], TYPE.body, MONO, COLOR.muted)}>
             <span className="truncate max-w-[240px]">{preview.slice(0, 28)}…</span>
             <button type="button" onClick={() => void navigator.clipboard.writeText(preview)}
-              className="glass-action px-2 py-0.5 rounded text-2xs font-bold cursor-pointer">Copy code</button>
+              className={classes('glass-action px-2 py-0.5 cursor-pointer', RADIUS.chip, TYPE.caption, WEIGHT.bold)}>Copy code</button>
           </div>
-        ) : <p className="text-xs text-retro-muted">Type a name to get your share code.</p>
+        ) : <p className={classes(TYPE.body, COLOR.muted)}>Type a name to get your share code.</p>
       })()}
-      <label className="block text-xs text-retro-muted">
+      <label className={FORM_LABEL}>
         Description (public)
         <input aria-label="Description" value={description} onChange={(e) => setDescription(e.target.value)} maxLength={200}
-          className="glass-field mt-0.5 w-full px-2.5 py-1 text-xs" />
+          className={FORM_INPUT} />
       </label>
-      <label className="flex items-center gap-2 text-xs text-retro-muted cursor-pointer pt-0.5">
-        <input type="checkbox" className="w-4 h-4 accent-retro-accent cursor-pointer" checked={needsPassword} onChange={(e) => setNeedsPassword(e.target.checked)} />
+      <label className={classes('flex items-center cursor-pointer pt-0.5', GAP[2], TYPE.body, COLOR.muted)}>
+        <input type="checkbox" className={FIELD.check} checked={needsPassword} onChange={(e) => setNeedsPassword(e.target.checked)} />
         Ask visitors for a join password
       </label>
-      <label className="flex items-center gap-2 text-xs text-retro-muted cursor-pointer pt-0.5">
-        <input type="checkbox" className="w-4 h-4 accent-retro-accent cursor-pointer" aria-label="Private server" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />
+      <label className={classes('flex items-center cursor-pointer pt-0.5', GAP[2], TYPE.body, COLOR.muted)}>
+        <input type="checkbox" className={FIELD.check} aria-label="Private server" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />
         Private. Hide from the public browser (friends join with your code)
       </label>
       {needsPassword && (
@@ -1381,12 +1391,12 @@ export function ServersView({
           className="glass-field w-full px-2.5 py-1 text-xs"
         />
       )}
-      <div className="flex gap-2 pt-1">
+      <div className={classes('flex pt-1', GAP[2])}>
         <button type="button" disabled={!name.trim() || busy} onClick={() => void create()}
-          className="glass-action glass-action-primary px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer">
+          className={ADMIN_ACTION}>
           {busy ? '…' : 'Create'}
         </button>
-        <button type="button" onClick={closeCreateForm} className="glass-action px-3 py-1.5 rounded-lg text-xs text-retro-muted cursor-pointer">Cancel</button>
+        <button type="button" onClick={closeCreateForm} className={classes('glass-action cursor-pointer', PADDING_X[3], PADDING_Y[1.5], RADIUS.control, TYPE.body, COLOR.muted)}>Cancel</button>
       </div>
     </div>
   ) : undefined
@@ -1395,13 +1405,16 @@ export function ServersView({
     <div className="h-full min-h-0 flex-1 overflow-hidden p-2 animate-orbit-fade-in flex flex-col items-center">
       {/* First-login admin passcode */}
       {serverMode === 'host' && node?.isAdmin && pinToDismiss && (
-        <div role="alert" data-testid="admin-pin-banner" className="mb-2 bg-surface-interactive/90 border border-warning/40 p-3 rounded-lg space-y-1.5 shrink-0 shadow-lg">
-          <p className="text-xs text-retro-fg font-bold">You are the admin of this server</p>
-          <p className="text-xs text-retro-muted">
+        <div role="alert" data-testid="admin-pin-banner" className={classes(
+          'mb-2 border space-y-1.5 shrink-0',
+          COLOR.interactiveStrong, STATUS.warningEdge, PADDING[3], RADIUS.control, SHADOW.large,
+        )}>
+          <p className={classes(TYPE.body, COLOR.fg, WEIGHT.bold)}>You are the admin of this server</p>
+          <p className={classes(TYPE.body, COLOR.muted)}>
             Your admin passcode (unlocks the console. Store it somewhere safe):{' '}
             <button
               type="button"
-              className="font-mono text-warning-fg hover:text-warning-fg cursor-pointer"
+              className={classes(MONO, STATUS.warning, 'cursor-pointer')}
               onClick={() => { void navigator.clipboard.writeText(pinToDismiss); toast('Passcode copied', 'success'); }}
             >
               {pinToDismiss}
@@ -1410,7 +1423,7 @@ export function ServersView({
           <button
             type="button"
             onClick={() => { try { localStorage.setItem(PIN_SEEN_KEY, '1'); } catch { /* session-only */ } setPinToDismiss(''); }}
-            className="glass-action glass-action-primary px-2.5 py-1 rounded-lg text-2xs font-bold cursor-pointer"
+            className={classes('glass-action glass-action-primary cursor-pointer', PADDING_X[2.5], PADDING_Y[1], RADIUS.control, TYPE.caption, WEIGHT.bold)}
           >
             Got it
           </button>
@@ -1420,19 +1433,22 @@ export function ServersView({
       {/* One narrow column on the page background: no card wrapping the list. */}
       <div className="flex flex-col h-full min-h-0 flex-1 w-full max-w-[720px] overflow-hidden">
         {/* One page header: one title, one primary action, a quiet search. */}
-        <div className="glass-toolbar border-0 border-b border-edge rounded-none px-4 py-2.5 flex items-center gap-2 shrink-0">
+        <div className={classes(
+          'glass-toolbar border-0 border-b rounded-none flex items-center shrink-0',
+          COLOR.edge, PADDING_X[4], 'py-2.5', GAP[2],
+        )}>
           <div className="min-w-0 shrink-0">
-            <h1 className="text-sm font-bold text-retro-fg leading-tight truncate">
+            <h1 className={classes(TYPE.sub, WEIGHT.bold, COLOR.fg, 'leading-tight truncate')}>
               {activeTab === 'hub' ? 'Hub' : 'Servers'}
             </h1>
             {activeTab === 'hub' && (
-              <p className="text-2xs text-retro-muted truncate">Members, invites and settings</p>
+              <p className={classes(TYPE.caption, COLOR.muted, 'truncate')}>Members, invites and settings</p>
             )}
           </div>
 
           {activeTab === 'browse' && (
-            <div className="glass-field ml-1 flex min-w-0 max-w-[13rem] flex-1 items-center gap-1 px-2 h-7 text-xs">
-              <Search className="w-3 h-3 text-retro-muted shrink-0" />
+            <div className={classes('glass-field ml-1 flex min-w-0 max-w-[13rem] flex-1 items-center h-7', GAP[1], PADDING_X[2], TYPE.body)}>
+              <Search className={classes('w-3 h-3 shrink-0', COLOR.muted)} />
               <input
                 aria-label="Search servers"
                 value={query}
@@ -1590,27 +1606,27 @@ export function ServersView({
             </div>
 
             {/* Current Node Hero */}
-           <section className="glass-inset p-4 sm:p-5 space-y-3" aria-label="Server dashboard">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-3">
+           <section className={classes('glass-inset space-y-3', PADDING[4], 'sm:p-5')} aria-label="Server dashboard">
+              <div className={classes('flex flex-wrap items-start justify-between', GAP[3])}>
+                <div className={classes('flex min-w-0 items-center', GAP[3])}>
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h2 className="truncate text-2xl font-black tracking-tighter text-retro-fg">{currentServerTitle || serverName || 'gmatch'}</h2>
+                    <div className={classes('flex items-center', GAP[2])}>
+                      <h2 className={classes('truncate', TYPE.display, WEIGHT.heading, TRACKING.tighter, COLOR.fg)}>{currentServerTitle || serverName || 'gmatch'}</h2>
                       {serverMode && (
-                        <span className="text-2xs px-2 py-0.5 rounded font-mono uppercase tracking-wider bg-surface-interactive border border-edge-subtle text-retro-muted">
+                        <span className={classes('px-2 py-0.5 rounded font-mono uppercase tracking-wider', COLOR.interactive, 'border', COLOR.edgeSubtle, TYPE.caption, COLOR.muted)}>
                           {serverMode}
                         </span>
                       )}
                       {node?.isAdmin && (
                         <span
-                          className="text-2xs px-2 py-0.5 rounded font-mono uppercase tracking-wider text-warning-fg border border-warning/30 bg-warning/10"
+                          className={classes('px-2 py-0.5 rounded font-mono uppercase tracking-wider border', TYPE.caption, STATUS.warning, STATUS.warningEdge, STATUS.warningBg)}
                           title="You administer this server"
                         >
                           Admin
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-retro-muted mt-1">
+                    <p className={classes(TYPE.body, COLOR.muted, 'mt-1')}>
                       {dash ? `${dash.members_total} members · ${dash.posts_24h} posts/24h` : (serverDescription || 'Connected')}
                     </p>
                     {/* The one line that says WHERE this world lives and that

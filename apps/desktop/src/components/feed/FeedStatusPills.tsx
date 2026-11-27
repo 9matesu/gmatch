@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { WifiOff } from 'lucide-react';
+import { classes, GAP, ICON, PADDING_X, PADDING_Y, RADIUS, STATUS, TYPE, WEIGHT } from '../../ui/tokens';
 
 /** Live connectivity: navigator.onLine at mount + online/offline events. */
 function useOnline(): boolean {
@@ -26,6 +27,9 @@ function useOnline(): boolean {
  * banner: local posts may be stale vs the server, so it is always disclosed.
  * An empty timeline is already explained by the single empty-state card below —
  * a second "empty feed" pill duplicated that message, so it is gone.
+ *
+ * The warning tint is `STATUS.warning*` — one role, readable in both themes —
+ * and the pill's type/radius/gap come from the token scale, never per call.
  */
 export function FeedStatusPills() {
   const online = useOnline();
@@ -33,12 +37,17 @@ export function FeedStatusPills() {
   if (online) return null;
 
   return (
-    <div className="px-3 sm:px-6 pt-2">
+    <div className={classes(PADDING_X[3], 'sm:px-6 pt-2')}>
       <div
         role="status"
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-warning/10 text-warning-fg border border-warning/30"
+        className={classes(
+          'inline-flex items-center border',
+          GAP[1.5], PADDING_X[3], PADDING_Y[1.5], RADIUS.pill,
+          TYPE.body, WEIGHT.medium,
+          STATUS.warningBg, STATUS.warning, STATUS.warningEdge,
+        )}
       >
-        <WifiOff className="w-3.5 h-3.5" />
+        <WifiOff className={ICON.sm} />
         <span>Offline — showing cached posts, may be stale</span>
       </div>
     </div>

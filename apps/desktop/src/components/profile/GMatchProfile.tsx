@@ -30,6 +30,39 @@ import { openCardDetail } from '../../utils/openCard';
 import { profileShareUrl, orbitFetch, invalidateCache } from '../../utils/api';
 import { mergeFollowIds } from '../../utils/followList';
 import { usePeerFollowEdges } from '../../hooks/usePeerFollows';
+import {
+  classes, COLOR, GAP, ICON, MONO, PADDING, PADDING_X, PADDING_Y,
+  PRESENCE, RADIUS, SHADOW, TRACKING, TRANSITION, TYPE, WEIGHT,
+} from '../../ui/tokens';
+
+/**
+ * SURFACE + TYPOGRAPHY recipes for the repeated profile chrome. Every value is
+ * composed from ui/tokens; the grid, the lightbox contract and the 18+ gate are
+ * untouched. One recipe per shape means the raised header, the action buttons,
+ * the tabs and the media cells cannot drift apart in colour/size/weight.
+ */
+const PROFILE_ROOT = classes(
+  'w-full font-sans select-none overflow-hidden animate-orbit-fade-in',
+  COLOR.canvasSurface, 'border', COLOR.edge, RADIUS.panel, COLOR.fg, SHADOW.modal,
+);
+const PROFILE_HEADER = classes(COLOR.surfaceRaised, 'border-b', COLOR.edge, PADDING[4], 'sm:p-6', 'flex flex-col', GAP[4]);
+const ACTION_BTN = classes(
+  'flex-1 py-2 px-3 border cursor-pointer', RADIUS.control,
+  COLOR.interactive, COLOR.edge, COLOR.body, WEIGHT.medium, TYPE.body, TRANSITION.micro,
+);
+const ICON_ACTION_BTN = classes('p-2 border cursor-pointer', RADIUS.control, COLOR.interactive, COLOR.edge, COLOR.body, TRANSITION.micro);
+const TAB_BTN = classes(
+  'py-1.5 px-3 flex items-center justify-center cursor-pointer',
+  GAP[1.5], TYPE.body, WEIGHT.medium, RADIUS.chip, TRANSITION.micro,
+);
+const GRID_CELL = classes('relative aspect-square overflow-hidden cursor-pointer group', COLOR.canvasSurface);
+const CELL_GRID = classes('grid grid-cols-3 sm:gap-1', GAP[0.5]);
+const EMPTY_CELL = classes('col-span-3 py-16 text-center', TYPE.body, COLOR.muted);
+const VIDEO_CHIP = classes('absolute top-1.5 right-1.5 p-1 pointer-events-none z-10', COLOR.scrim, 'backdrop-blur-xs', RADIUS.chip, COLOR.fg);
+const CELL_SCRIM = classes(
+  'absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity',
+  'flex items-center justify-center z-10', COLOR.fg, TYPE.body, WEIGHT.medium,
+);
 
 /**
  * The ids a follower/following JSON answer carries.
@@ -322,11 +355,11 @@ export function GMatchProfile({
   ];
 
   return (
-    <div className="w-full bg-surface-canvas font-sans select-none border border-edge rounded-xl overflow-hidden text-retro-fg animate-orbit-fade-in shadow-xl">
+    <div className={PROFILE_ROOT}>
       {/* Profile Header */}
-      <div className="bg-surface-raised border-b border-edge p-4 sm:p-6 flex flex-col gap-4">
+      <div className={PROFILE_HEADER}>
         {/* Avatar & Stats */}
-        <div className="flex items-center gap-5 sm:gap-6">
+        <div className={classes('flex items-center gap-5 sm:gap-6')}>
           {/* Avatar */}
           <button
             type="button"
@@ -338,11 +371,12 @@ export function GMatchProfile({
             }}
             disabled={!isSelf}
             aria-label={isSelf ? 'Change profile photo' : displayName}
-            className={`relative w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden shrink-0 group border-2 p-0 text-left ${
-              isSelf ? 'cursor-pointer' : 'cursor-default'
-            } ${
-              isFlashing ? 'border-retro-accent' : 'border-edge'
-            }`}
+            className={classes(
+              'relative w-20 h-20 sm:w-24 sm:h-24 shrink-0 group p-0 text-left',
+              RADIUS.pill, 'overflow-hidden border-2',
+              isSelf ? 'cursor-pointer' : 'cursor-default',
+              isFlashing ? COLOR.accentEdge : COLOR.edge,
+            )}
           >
             {pfp ? (
               <ObjectImage
@@ -357,29 +391,29 @@ export function GMatchProfile({
                 onMediaUnavailable={() => setPfp('')}
               />
             ) : (
-              <div className="w-full h-full bg-surface-interactive flex items-center justify-center text-xl sm:text-2xl font-medium text-retro-muted">
+              <div className={classes('w-full h-full flex items-center justify-center sm:text-2xl', COLOR.interactive, TYPE.display, WEIGHT.medium, COLOR.muted)}>
                 {(displayName || 'U').charAt(0).toUpperCase()}
               </div>
             )}
             {isSelf && (
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <Camera className="w-5 h-5 text-retro-fg" />
+              <div className={classes('absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center', COLOR.scrimSoft)}>
+                <Camera className={classes('w-5 h-5', COLOR.fg)} />
               </div>
             )}
           </button>
 
           {/* Stats */}
-          <div className="flex-1 flex items-center justify-around text-center gap-2">
+          <div className={classes('flex-1 flex items-center justify-around text-center', GAP[2])}>
             {stats.map((stat) => (
               <div
                 key={stat.label}
                 className="flex flex-col cursor-pointer"
                 onClick={(stat as any).onClick}
               >
-                <span className="text-sm sm:text-base font-semibold text-retro-fg tabular-nums">
+                <span className={classes('sm:text-base', TYPE.sub, WEIGHT.semibold, COLOR.fg, MONO)}>
                   {stat.value}
                 </span>
-                <span className="text-xs text-retro-muted">{stat.label}</span>
+                <span className={classes(TYPE.body, COLOR.muted)}>{stat.label}</span>
               </div>
             ))}
           </div>
@@ -387,28 +421,28 @@ export function GMatchProfile({
 
         {/* Name & Bio */}
         <div className="space-y-1">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <h2 className="text-xl font-black tracking-tight text-retro-fg truncate">{displayName}</h2>
+          <div className={classes('flex items-center min-w-0', GAP[1.5])}>
+            <h2 className={classes(TYPE.display, WEIGHT.heading, TRACKING.tight, COLOR.fg, 'truncate')}>{displayName}</h2>
             {isVerified && (
               <span title="Verified">
-                <CheckCircle2 className="w-4 h-4 text-retro-accent shrink-0" />
+                <CheckCircle2 className={classes(ICON.md, COLOR.accent, 'shrink-0')} />
               </span>
             )}
             {isFlashing && (
               <span title="Flash active">
-                <Flame className="w-3.5 h-3.5 text-retro-accent fill-retro-accent" />
+                <Flame className={classes(ICON.sm, COLOR.accent, 'fill-retro-accent')} />
               </span>
             )}
           </div>
           {bio && (
-            <p className="text-xs text-retro-body whitespace-pre-line break-words">{bio}</p>
+            <p className={classes(TYPE.body, COLOR.body, 'whitespace-pre-line break-words')}>{bio}</p>
           )}
           {website && (
             <a
               href={website.startsWith('http') ? website : `https://${website}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs text-retro-accent hover:underline flex items-center gap-1"
+              className={classes(TYPE.body, COLOR.accent, 'hover:underline flex items-center', GAP[1])}
             >
               <ExternalLink className="w-3 h-3" />
               <span>{website.replace(/^https?:\/\//, '')}</span>
@@ -417,11 +451,11 @@ export function GMatchProfile({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2">
+        <div className={classes('flex items-center', GAP[2])}>
           <button
             type="button"
             onClick={() => { playPress(800); setShowEditor(true); }}
-            className="flex-1 py-2 px-3 rounded-lg bg-surface-interactive border border-edge hover:border-edge text-retro-body font-medium text-xs transition-colors cursor-pointer"
+            className={ACTION_BTN}
           >
             Edit profile
           </button>
@@ -429,9 +463,9 @@ export function GMatchProfile({
           <button
             type="button"
             onClick={handleShareProfile}
-            className="flex-1 py-2 px-3 rounded-lg bg-surface-interactive border border-edge hover:border-edge text-retro-body font-medium text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+            className={classes(ACTION_BTN, 'flex items-center justify-center', GAP[1.5])}
           >
-            <Share2 className="w-3.5 h-3.5" />
+            <Share2 className={ICON.sm} />
             <span>Share</span>
           </button>
 
@@ -444,15 +478,15 @@ export function GMatchProfile({
             // on one screen are indistinguishable to a screen reader, so this
             // one names its surface. Behaviour is unchanged.
             aria-label="Profile settings"
-            className="p-2 rounded-lg bg-surface-interactive border border-edge hover:border-edge text-retro-body cursor-pointer transition-colors"
+            className={ICON_ACTION_BTN}
           >
-            <Settings className="w-4 h-4" />
+            <Settings className={ICON.md} />
           </button>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="bg-surface-raised border-b border-edge flex items-center gap-1 px-2 py-2">
+      <div className={classes(COLOR.surfaceRaised, 'border-b', COLOR.edge, 'flex items-center', GAP[1], PADDING_X[2], PADDING_Y[2])}>
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = profileTab === tab.id;
@@ -461,12 +495,12 @@ export function GMatchProfile({
               key={tab.id}
               type="button"
               onClick={() => { playPress(750); setProfileTab(tab.id as any); }}
-              className={`py-1.5 px-3 flex items-center justify-center gap-1.5 text-xs font-medium rounded-md transition-colors cursor-pointer ${isActive
-                  ? 'bg-glass-w12 text-retro-fg'
-                  : 'text-retro-muted hover:text-retro-body'
-                }`}
+              className={classes(TAB_BTN, isActive
+                ? classes(COLOR.glassW12, COLOR.fg)
+                : classes(COLOR.muted, COLOR.hoverBody),
+              )}
             >
-              <Icon className="w-4 h-4" />
+              <Icon className={ICON.md} />
               <span className="hidden sm:inline">{tab.label}</span>
             </button>
           );
@@ -474,9 +508,9 @@ export function GMatchProfile({
       </div>
 
       {/* Grid */}
-      <div className="p-1 sm:p-1.5">
+      <div className={classes(PADDING[1], 'sm:p-1.5')}>
         {profileTab === 'posts' && (
-          <div className="grid grid-cols-3 gap-0.5 sm:gap-1">
+          <div className={CELL_GRID}>
             {expandedNode}
             {displayPosts.map((post) => (
               <div
@@ -486,7 +520,7 @@ export function GMatchProfile({
                   playPress(700);
                   openPost(post);
                 }}
-                className="relative aspect-square bg-surface-canvas overflow-hidden cursor-pointer group"
+                className={GRID_CELL}
               >
                 <ObjectImage
                   objectId={post.id}
@@ -501,11 +535,11 @@ export function GMatchProfile({
                   playsInline
                 />
                 {videoPostIds.has(post.id) && (
-                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-retro-fg z-10">
+                  <div className={VIDEO_CHIP}>
                     <Play className="w-3 h-3 fill-white" />
                   </div>
                 )}
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 text-retro-fg text-xs font-medium z-10">
+                <div className={classes(CELL_SCRIM, GAP[4])}>
                   <div className="flex items-center gap-1">
                     <Heart className="w-4 h-4 fill-white" />
                     <span>{post.like_count || 0}</span>
@@ -518,7 +552,7 @@ export function GMatchProfile({
               </div>
             ))}
             {displayPosts.length === 0 && (
-              <div className="col-span-3 py-16 text-center text-xs text-retro-muted">
+              <div className={EMPTY_CELL}>
                 No posts yet
               </div>
             )}
@@ -526,7 +560,7 @@ export function GMatchProfile({
         )}
 
         {profileTab === 'saved' && (
-          <div className="grid grid-cols-3 gap-0.5 sm:gap-1">
+          <div className={CELL_GRID}>
             {(savedPosts && savedPosts.length > 0 ? savedPosts : []).map((post) => (
               <div
                 key={post.id}
@@ -535,7 +569,7 @@ export function GMatchProfile({
                   playPress(700);
                   openPost(post);
                 }}
-                className="relative aspect-square bg-surface-canvas overflow-hidden cursor-pointer group"
+                className={GRID_CELL}
               >
                 <ObjectImage
                   objectId={post.id}
@@ -550,17 +584,17 @@ export function GMatchProfile({
                   playsInline
                 />
                 {videoPostIds.has(post.id) && (
-                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-retro-fg z-10">
+                  <div className={VIDEO_CHIP}>
                     <Play className="w-3 h-3 fill-white" />
                   </div>
                 )}
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-retro-fg z-10">
+                <div className={CELL_SCRIM}>
                   <Bookmark className="w-5 h-5 fill-white" />
                 </div>
               </div>
             ))}
             {(!savedPosts || savedPosts.length === 0) && (
-              <div className="col-span-3 py-16 text-center text-xs text-retro-muted">
+              <div className={EMPTY_CELL}>
                 No saved posts
               </div>
             )}
@@ -568,7 +602,7 @@ export function GMatchProfile({
         )}
 
         {profileTab === 'reposts' && (
-          <div className="grid grid-cols-3 gap-0.5 sm:gap-1">
+          <div className={CELL_GRID}>
             {(repostPosts && repostPosts.length > 0 ? repostPosts : []).map((post) => (
               <div
                 key={post.id}
@@ -576,7 +610,7 @@ export function GMatchProfile({
                   playPress(700);
                   openPost(post);
                 }}
-                className="relative aspect-square bg-surface-canvas overflow-hidden cursor-pointer group"
+                className={GRID_CELL}
               >
                 <ObjectImage
                   contentUrl={post.url}
@@ -591,17 +625,17 @@ export function GMatchProfile({
                   playsInline
                 />
                 {videoPostIds.has(post.id) && (
-                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-retro-fg z-10">
+                  <div className={VIDEO_CHIP}>
                     <Play className="w-3 h-3 fill-white" />
                   </div>
                 )}
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-retro-online z-10">
+                <div className={classes(CELL_SCRIM, PRESENCE.currentText)}>
                   <Repeat className="w-5 h-5" />
                 </div>
               </div>
             ))}
             {repostPosts.length === 0 && (
-              <div className="col-span-3 py-16 text-center text-xs text-retro-muted">
+              <div className={EMPTY_CELL}>
                 No reposts yet
               </div>
             )}
@@ -609,12 +643,12 @@ export function GMatchProfile({
         )}
 
         {profileTab === 'cards' && (
-          <div className="grid grid-cols-3 gap-0.5 sm:gap-1">
+          <div className={CELL_GRID}>
             {cards.slice(0, 12).map((card) => (
               <div
                 key={card.id}
                 onClick={() => openCardDetail(card)}
-                className="relative aspect-square bg-surface-canvas overflow-hidden cursor-pointer group"
+                className={GRID_CELL}
               >
                 <ObjectImage
                   contentUrl={card.content_url || (card as any).data || (card as any).url || `/api/objects/${card.id}`}
@@ -629,14 +663,14 @@ export function GMatchProfile({
                   playsInline
                 />
                 {videoCardIds.has(card.id) && (
-                  <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs rounded-md p-1 pointer-events-none text-retro-fg z-10">
+                  <div className={VIDEO_CHIP}>
                     <Play className="w-3 h-3 fill-white" />
                   </div>
                 )}
               </div>
             ))}
             {cards.length === 0 && (
-              <div className="col-span-3 py-16 text-center text-xs text-retro-muted">
+              <div className={EMPTY_CELL}>
                 No cards yet
               </div>
             )}

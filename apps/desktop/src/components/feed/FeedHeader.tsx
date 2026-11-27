@@ -2,6 +2,10 @@
 
 import { ChevronDown, Radio, RefreshCw, Search } from 'lucide-react';
 import { playPress } from '../../utils/sounds';
+import {
+  classes, COLOR, GAP, ICON, PADDING_X, PADDING_Y,
+  RADIUS, TRANSITION, TYPE, WEIGHT,
+} from '../../ui/tokens';
 
 interface FeedHeaderProps {
   onOpenSearch?: () => void;
@@ -17,6 +21,13 @@ interface FeedHeaderProps {
   onPingAttention?: () => void;
 }
 
+/** One toolbar shell: the glass material, one hairline edge and the token
+ *  spacing/type/hover roles. The three icon buttons share one recipe instead of
+ *  re-typing colour, radius, size and weight per call. */
+const iconButton = classes(
+  'p-2 cursor-pointer', RADIUS.chip, COLOR.body, COLOR.hoverW8, TRANSITION.micro,
+);
+
 export function FeedHeader({
   onOpenSearch,
   onRefresh,
@@ -26,12 +37,16 @@ export function FeedHeader({
   onPingAttention,
 }: FeedHeaderProps) {
   return (
-    <header className="sticky top-0 z-30 w-full glass-toolbar border-0 border-b border-edge rounded-none px-3 sm:px-6 py-1.5 flex items-center justify-between gap-2">
-      <div className="flex items-center gap-2 shrink-0">
+    <header className={classes(
+      'sticky top-0 z-30 w-full glass-toolbar border-0 border-b rounded-none',
+      'flex items-center justify-between',
+      COLOR.edge, PADDING_X[3], 'sm:px-6', PADDING_Y[1.5], GAP[2],
+    )}>
+      <div className={classes('flex items-center shrink-0', GAP[2])}>
         {sortTabs}
       </div>
 
-      <div className="flex items-center gap-1 shrink-0">
+      <div className={classes('flex items-center shrink-0', GAP[1])}>
         {layoutToggle}
 
         {onPingAttention && (
@@ -40,9 +55,13 @@ export function FeedHeader({
             onClick={() => { playPress(880); onPingAttention(); }}
             title="Ping: put yourself at the top of the roster for 30s"
             aria-label="Ping for attention"
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold text-retro-body hover:text-retro-fg hover:bg-glass-w8 transition-colors cursor-pointer"
+            className={classes(
+              'flex items-center px-2.5 py-1.5 cursor-pointer',
+              GAP[1], RADIUS.chip, TYPE.body, WEIGHT.semibold,
+              COLOR.body, COLOR.hoverFg, COLOR.hoverW8, TRANSITION.micro,
+            )}
           >
-            <Radio className="w-4 h-4" />
+            <Radio className={ICON.md} />
             <span className="hidden sm:inline">Ping</span>
           </button>
         )}
@@ -57,9 +76,9 @@ export function FeedHeader({
             // distinguished by where they are, which the name has to carry
             // because a screen reader announces neither position.
             aria-label="Reload feed toolbar"
-            className="p-2 rounded-md text-retro-body hover:bg-glass-w8 transition-colors cursor-pointer"
+            className={iconButton}
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className={ICON.md} />
           </button>
         )}
 
@@ -68,9 +87,9 @@ export function FeedHeader({
           onClick={() => { playPress(800); onOpenSearch?.(); }}
           title="Search"
           aria-label="Search"
-          className="p-2 rounded-md text-retro-body hover:bg-glass-w8 transition-colors cursor-pointer"
+          className={iconButton}
         >
-          <Search className="w-4 h-4" />
+          <Search className={ICON.md} />
         </button>
 
         {onToggleCollapse && (
@@ -79,9 +98,9 @@ export function FeedHeader({
             onClick={() => { playPress(800); onToggleCollapse(); }}
             title="Collapse Timeline"
             aria-label="Collapse Timeline"
-            className="p-2 rounded-md text-retro-body hover:bg-glass-w8 transition-colors cursor-pointer"
+            className={iconButton}
           >
-            <ChevronDown className="w-4 h-4" />
+            <ChevronDown className={ICON.md} />
           </button>
         )}
       </div>

@@ -20,6 +20,8 @@ import { releaseLocalUrl, resolveFreshLocalUrl } from '../../services/keepsake';
 import { resolveGalleryTileUrl, useKeepsakeLocalUrls } from '../grid/IdleGalleryView';
 import { resolveContentAddressedMedia } from '../../utils/contentAddressedMedia';
 import { registerLocalObject } from '../../utils/p2pSwarm';
+import { Button, Input } from '../../ui/kit';
+import { COLOR, classes } from '../../ui/tokens';
 import {
   fileAccepted,
   plausibleMediaUrl,
@@ -248,20 +250,19 @@ export function MediaPickerPanel({
   };
 
   const tabBtn = (p: Pane, label: string, Icon: typeof FolderOpen) => (
-    <button
+    <Button
       key={p}
-      type="button"
+      variant={pane === p ? 'secondary' : 'ghost'}
+      size="sm"
       onClick={() => {
         setPane(p);
         setError(null);
       }}
-      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition cursor-pointer ${
-        pane === p ? 'bg-glass-w12 text-retro-fg' : 'text-retro-muted hover:text-retro-fg hover:bg-glass-w8'
-      }`}
+      className={classes('rounded-full', pane === p && COLOR.glassW12)}
     >
       <Icon className="w-3.5 h-3.5" />
       <span>{label}</span>
-    </button>
+    </Button>
   );
 
   return (
@@ -279,14 +280,15 @@ export function MediaPickerPanel({
     >
       <div className={`flex items-center justify-between ${compact ? 'px-3 py-2' : 'px-4 py-2.5'} border-b border-edge`}>
         <h2 className="text-base font-black tracking-tight">{options.title ?? 'Pick media'}</h2>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={onClose}
           aria-label="Close media picker"
-          className="p-1 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w8 cursor-pointer"
+          className="p-1"
         >
           <X className="w-4 h-4" />
-        </button>
+        </Button>
       </div>
 
       <div className={`flex items-center gap-1.5 ${compact ? 'px-3 py-1.5' : 'px-4 py-2'} border-b border-edge`}>
@@ -310,7 +312,7 @@ export function MediaPickerPanel({
             </p>
           ) : (
             <>
-              <input
+              <Input
                 type="text"
                 value={tagFilter}
                 onChange={(e) => {
@@ -318,7 +320,6 @@ export function MediaPickerPanel({
                   setVisibleCount(PAGE);
                 }}
                 placeholder="Filter by tag…"
-                className="w-full px-3 py-1.5 rounded-lg bg-glass-w8 border border-edge text-xs text-retro-fg placeholder:text-retro-muted focus:outline-none focus:border-retro-accent"
               />
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                 {shownGallery.map((g: GalleryImage) => {
@@ -329,17 +330,12 @@ export function MediaPickerPanel({
                     // No local bytes and no preview: an empty tile is honest.
                     const unresolvable = !src;
                     return (
-                      <button
+                      <Button
                         key={g.id}
-                        type="button"
+                        variant={busyKeepId === g.id ? 'primary' : 'secondary'}
+                        size="md"
                         onClick={() => void pickKeep(g)}
-                        className={`relative aspect-square rounded-lg overflow-hidden border transition bg-glass-w8 ${
-                          unresolvable
-                            ? 'border-edge opacity-50 cursor-not-allowed'
-                            : busyKeepId === g.id
-                              ? 'border-retro-accent cursor-progress'
-                              : 'border-edge hover:border-retro-accent/60 cursor-pointer'
-                        }`}
+                        className="relative aspect-square w-full overflow-hidden p-0"
                         title={unresolvable ? 'No local copy yet' : g.tags?.join(', ')}
                         disabled={unresolvable || busyKeepId === g.id}
                       >
@@ -370,18 +366,19 @@ export function MediaPickerPanel({
                         {raw.startsWith('vault://') && !httpUrlMap[raw] && !unresolvable && (
                           <span className="absolute inset-x-0 bottom-0 py-0.5 text-center text-2xs bg-black/60 text-retro-fg/80">…</span>
                         )}
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
                 {filteredGallery.length > shownGallery.length && (
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     onClick={() => setVisibleCount((c) => c + PAGE)}
-                    className="w-full py-2 rounded-lg bg-glass-w8 border border-edge text-xs font-bold text-retro-muted hover:text-retro-fg hover:bg-glass-w12 transition-colors cursor-pointer"
+                    className="w-full"
                   >
                     Load more ({filteredGallery.length - shownGallery.length} left)
-                  </button>
+                  </Button>
                 )}
                 {filteredGallery.length === 0 && (
                   <p className="text-xs text-retro-muted text-center">No keepsakes match that tag.</p>
@@ -426,7 +423,7 @@ export function MediaPickerPanel({
           {pane === 'url' && (
             <div className="space-y-2">
               <div className="flex gap-2">
-                <input
+                <Input
                   type="url"
                   value={urlInput}
                   onChange={(e) => setUrlInput(e.target.value)}
@@ -437,15 +434,11 @@ export function MediaPickerPanel({
                     }
                   }}
                   placeholder="https://…"
-                  className="flex-1 px-3 py-1.5 rounded-lg bg-glass-w8 border border-edge text-xs text-retro-fg placeholder:text-retro-muted focus:outline-none focus:border-retro-accent"
+                  className="flex-1"
                 />
-                <button
-                  type="button"
-                  onClick={previewUrlInput}
-                  className="px-3 py-1.5 rounded-lg chrome-accent text-retro-accent-text text-xs font-bold cursor-pointer active:scale-95 transition-transform"
-                >
+                <Button variant="primary" size="sm" onClick={previewUrlInput}>
                   Preview
-                </button>
+                </Button>
               </div>
               <p className="text-2xs text-retro-muted">The media is previewed before it is attached — broken links are caught here.</p>
             </div>
@@ -464,23 +457,19 @@ export function MediaPickerPanel({
                 <Preview url={pending.kind === 'file' ? pending.previewUrl : pending.url} isVideo={pending.kind === 'file' ? fileAccepted(pending.file, ['video']) && !fileAccepted(pending.file, ['image']) : /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(pending.url)} />
               </div>
               <div className="flex justify-end gap-2">
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => {
                     setSelectedKeepId(null);
                     setPending(null);
                   }}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium text-retro-muted hover:text-retro-fg hover:bg-glass-w8 cursor-pointer"
                 >
                   Clear
-                </button>
-                <button
-                  type="button"
-                  onClick={confirm}
-                  className="px-4 py-1.5 rounded-lg chrome-accent text-retro-accent-text text-xs font-bold cursor-pointer active:scale-95 transition-transform"
-                >
+                </Button>
+                <Button variant="primary" size="sm" onClick={confirm}>
                   Use this media
-                </button>
+                </Button>
               </div>
             </div>
           )}

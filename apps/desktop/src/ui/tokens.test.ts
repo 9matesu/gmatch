@@ -23,6 +23,7 @@ describe('common UI tokens', () => {
       'LAYOUT', 'DIALOG_WIDTH', 'SURFACE_TONE',
       'RADIUS', 'SHADOW', 'TYPE', 'WEIGHT', 'COLOR', 'STATUS', 'RARITY',
       'BUTTON_BASE', 'BUTTON_VARIANT', 'BUTTON_SIZE', 'WORDMARK', 'RECIPE',
+      'CHROME', 'PRESENCE',
     ]) {
       expect(tokens, group).toHaveProperty(group)
     }

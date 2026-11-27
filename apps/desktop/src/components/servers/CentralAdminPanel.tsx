@@ -4,12 +4,19 @@
 // Self-gating: it fetches the admin dashboard and renders NOTHING unless the
 // central node authorizes this caller (ADMIN_PIN holder → Users.is_admin).
 // Only ever hits the CENTRAL node's /api/servers/admin/* endpoints.
+//
+// Chrome is tokenized: the warning role owns both tints, the monospace number
+// role owns counts/ids, and every card/badge/button reads ui/tokens.
 import { useCallback, useEffect, useState } from 'react'
 import { ShieldCheck, EyeOff, Eye, Trash2, RefreshCw } from 'lucide-react'
 import { orbitFetch } from '../../utils/api'
 import { playPress } from '../../utils/sounds'
 
 import { generateIdentity } from '@orbit/crypto'
+import {
+  classes, COLOR, GAP, ICON, MONO, PADDING, PADDING_X, PADDING_Y,
+  RADIUS, STATUS, TYPE, WEIGHT,
+} from '../../ui/tokens'
 
 interface DirRow {
   id: string
@@ -27,6 +34,9 @@ interface Totals { total: number; online: number; stale: number; hidden: number;
 
 type Identity = Parameters<typeof orbitFetch>[2]
 type Toast = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void
+
+const statChip = classes('glass-inset', PADDING_X[2], PADDING_Y[1], RADIUS.pill)
+const smallBadge = classes(PADDING_X[1.5], 'py-0.5', RADIUS.pill, TYPE.caption, MONO)
 
 export function CentralAdminPanel({ central, identity, toast }: { central: string; identity?: Identity | null; toast: Toast }) {
   const [totals, setTotals] = useState<Totals | null>(null)
@@ -130,38 +140,46 @@ export function CentralAdminPanel({ central, identity, toast }: { central: strin
         (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1'))
 
     return (
-      <div className="glass-card p-3 space-y-2.5" aria-label="Central admin login">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-warning-fg" />
-          <span className="text-xs font-medium text-retro-fg">Central Node Authentication</span>
+      <div className={classes('glass-card space-y-2.5', PADDING[3])} aria-label="Central admin login">
+        <div className={classes('flex items-center', GAP[2])}>
+          <ShieldCheck className={classes(ICON.md, STATUS.warning)} />
+          <span className={classes(TYPE.body, WEIGHT.medium, COLOR.fg)}>Central Node Authentication</span>
         </div>
-        <p className="text-xs text-retro-muted leading-relaxed">
+        <p className={classes(TYPE.body, COLOR.muted, 'leading-relaxed')}>
           Authenticate with the central node passcode to manage the directory.
         </p>
         {isDev && (
-          <div className="flex items-center justify-between text-xs bg-warning/10 border border-warning/20 text-warning-fg px-2.5 py-1.5 rounded">
-            <span>Dev mode: default passcode is <code className="font-mono font-bold bg-black/30 px-1 py-0.5 rounded">admin</code></span>
+          <div className={classes(
+            'flex items-center justify-between border',
+            STATUS.warningBg, STATUS.warningEdgeSoft, STATUS.warning,
+            PADDING_X[2.5], PADDING_Y[1.5], RADIUS.chip, TYPE.body,
+          )}>
+            <span>Dev mode: default passcode is <code className={classes(MONO, WEIGHT.bold, COLOR.scrimFaint, PADDING[1], 'py-0.5', RADIUS.chip)}>admin</code></span>
             <button
               type="button"
               onClick={() => setUnlockPin('admin')}
-              className="text-2xs font-bold underline hover:text-retro-fg cursor-pointer ml-2 shrink-0"
+              className={classes(TYPE.caption, WEIGHT.bold, 'underline cursor-pointer ml-2 shrink-0', COLOR.hoverFg)}
             >
               Use admin
             </button>
           </div>
         )}
-        <form onSubmit={handleUnlock} className="flex items-center gap-2">
+        <form onSubmit={handleUnlock} className={classes('flex items-center', GAP[2])}>
           <input
             type="password"
             value={unlockPin}
             onChange={(e) => setUnlockPin(e.target.value)}
             placeholder="Central admin passcode"
-            className="flex-1 bg-surface-raised border border-edge focus:border-retro-accent/60 px-2.5 py-1.5 text-xs text-retro-fg placeholder:text-retro-muted rounded-md outline-none font-mono"
+            className={classes(
+              'flex-1 border outline-none placeholder:text-retro-muted',
+              COLOR.surfaceRaised, COLOR.edge, COLOR.focusAccent,
+              PADDING_X[2.5], PADDING_Y[1.5], TYPE.body, COLOR.fg, RADIUS.chip, MONO,
+            )}
           />
           <button
             type="submit"
             disabled={unlocking || !unlockPin.trim()}
-            className="glass-action glass-action-primary px-3 py-1.5 rounded-md text-xs font-bold disabled:opacity-40 cursor-pointer"
+            className={classes('glass-action glass-action-primary disabled:opacity-40 cursor-pointer', PADDING_X[3], PADDING_Y[1.5], RADIUS.chip, TYPE.body, WEIGHT.bold)}
           >
             {unlocking ? 'Verifying…' : 'Unlock'}
           </button>
@@ -172,59 +190,63 @@ export function CentralAdminPanel({ central, identity, toast }: { central: strin
 
   return (
     <section className="space-y-2" aria-label="Central admin">
-      <div className="flex items-center gap-2">
-        <ShieldCheck className="w-4 h-4 text-warning-fg" />
-        <span className="text-xs font-medium text-retro-fg">Central admin</span>
+      <div className={classes('flex items-center', GAP[2])}>
+        <ShieldCheck className={classes(ICON.md, STATUS.warning)} />
+        <span className={classes(TYPE.body, WEIGHT.medium, COLOR.fg)}>Central admin</span>
         <button
           type="button"
           onClick={() => { playPress(700); void load() }}
-          className="glass-action ml-auto px-3 py-1.5 rounded-lg text-retro-muted hover:text-retro-fg text-xs font-bold cursor-pointer flex items-center gap-1"
+          className={classes(
+            'glass-action ml-auto cursor-pointer flex items-center',
+            PADDING_X[3], PADDING_Y[1.5], RADIUS.control,
+            COLOR.muted, COLOR.hoverFg, TYPE.body, WEIGHT.bold, GAP[1],
+          )}
         >
           <RefreshCw className="w-3 h-3" /> Refresh
         </button>
       </div>
 
       {totals && (
-        <div className="flex flex-wrap gap-1.5 text-xs font-mono text-retro-muted">
-          <span className="glass-inset px-2 py-1 rounded-full">total {totals.total}</span>
-          <span className="glass-inset px-2 py-1 rounded-full">online {totals.online}</span>
-          <span className="glass-inset px-2 py-1 rounded-full">stale {totals.stale}</span>
-          <span className="glass-inset px-2 py-1 rounded-full">hidden {totals.hidden}</span>
-          <span className="glass-inset px-2 py-1 rounded-full">blocked {totals.blocked}</span>
+        <div className={classes('flex flex-wrap', GAP[1.5], TYPE.body, MONO, COLOR.muted)}>
+          <span className={statChip}>total {totals.total}</span>
+          <span className={statChip}>online {totals.online}</span>
+          <span className={statChip}>stale {totals.stale}</span>
+          <span className={statChip}>hidden {totals.hidden}</span>
+          <span className={statChip}>blocked {totals.blocked}</span>
         </div>
       )}
 
       <ul className="space-y-2">
-        {loading && rows.length === 0 && <li className="text-xs text-retro-muted">Loading directory…</li>}
-        {!loading && rows.length === 0 && <li className="text-xs text-retro-muted">Directory is empty.</li>}
+        {loading && rows.length === 0 && <li className={classes(TYPE.body, COLOR.muted)}>Loading directory…</li>}
+        {!loading && rows.length === 0 && <li className={classes(TYPE.body, COLOR.muted)}>Directory is empty.</li>}
         {rows.map((row) => (
-          <li key={row.id} className={`glass-card p-3 flex items-start gap-3 ${row.hidden ? 'opacity-60' : ''}`}>
+          <li key={row.id} className={classes('glass-card flex items-start', PADDING[3], GAP[3], row.hidden ? 'opacity-60' : '')}>
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-retro-fg truncate">{row.name}</span>
-                {!!row.hidden && <span className="text-2xs px-1.5 py-0.5 rounded-full glass-inset text-retro-muted font-mono">HIDDEN</span>}
-                {!!row.blocked && <span className="text-2xs px-1.5 py-0.5 rounded-full glass-action-danger font-mono">BLOCKED</span>}
+              <div className={classes('flex items-center', GAP[2])}>
+                <span className={classes('truncate', TYPE.body, WEIGHT.medium, COLOR.fg)}>{row.name}</span>
+                {!!row.hidden && <span className={classes(smallBadge, 'glass-inset', COLOR.muted)}>HIDDEN</span>}
+                {!!row.blocked && <span className={classes(smallBadge, 'glass-action-danger', STATUS.danger)}>BLOCKED</span>}
               </div>
-              <p className="text-2xs font-mono text-retro-muted mt-0.5 truncate">{row.endpoint_hint || 'no address'} · {row.id.slice(0, 8)}</p>
+              <p className={classes('mt-0.5 truncate', TYPE.caption, MONO, COLOR.muted)}>{row.endpoint_hint || 'no address'} · {row.id.slice(0, 8)}</p>
             </div>
-            <div className="flex items-center gap-1 shrink-0">
+            <div className={classes('flex items-center shrink-0', GAP[1])}>
               <button
                 type="button"
                 disabled={busyId === row.id}
                 onClick={() => void patch(row, { hidden: !row.hidden }, row.hidden ? 'Unhidden' : 'Hidden from public')}
                 title={row.hidden ? 'Show in public directory' : 'Hide from public directory'}
-                className="glass-action p-1.5 rounded-lg text-retro-muted hover:text-retro-fg disabled:opacity-40 cursor-pointer"
+                className={classes('glass-action disabled:opacity-40 cursor-pointer', PADDING[1.5], RADIUS.control, COLOR.muted, COLOR.hoverFg)}
               >
-                {row.hidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                {row.hidden ? <Eye className={ICON.sm} /> : <EyeOff className={ICON.sm} />}
               </button>
               <button
                 type="button"
                 disabled={busyId === row.id}
                 onClick={() => void remove(row)}
                 title="Force-unregister from directory"
-                className="glass-action glass-action-danger p-1.5 rounded-lg disabled:opacity-40 cursor-pointer"
+                className={classes('glass-action glass-action-danger disabled:opacity-40 cursor-pointer', PADDING[1.5], RADIUS.control)}
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 className={ICON.sm} />
               </button>
             </div>
           </li>

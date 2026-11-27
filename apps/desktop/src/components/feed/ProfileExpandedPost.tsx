@@ -22,6 +22,22 @@ import { formatLikedBy } from '../../utils/likedBy';
 import { custodyStatus } from '../../utils/durableCustody';
 import { useDurableCustody } from '../../hooks/useDurableCustody';
 import { PostComments } from './PostComments';
+import {
+  classes, COLOR, GAP, ICON, PADDING, PADDING_X, PADDING_Y,
+  RADIUS, STATUS, TRACKING, TRANSITION, TYPE, WEIGHT,
+} from '../../ui/tokens';
+
+/** Every expanded-post chrome shape, composed from ui/tokens. The media model,
+ *  the right-click menu and the durability label contract are untouched. */
+const ARTICLE = classes('mt-2 overflow-hidden animate-orbit-slide-up', RADIUS.panel, 'border', COLOR.edge, COLOR.panelGlass, COLOR.fg);
+const ACTION_ICON = classes(
+  'p-1.5 cursor-pointer transition-transform duration-150 active:scale-(--scale-press)',
+  RADIUS.chip, COLOR.hoverW10,
+);
+const CAROUSEL_ARROW = classes(
+  'absolute top-1/2 -translate-y-1/2 p-2 cursor-pointer',
+  RADIUS.pill, COLOR.scrim, COLOR.fg, COLOR.scrimHover,
+);
 
 /**
  * Inline expanded post for profile surfaces (own grid, other-user modal).
@@ -153,18 +169,18 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
         e.preventDefault();
         onOptionsClick?.(post, { x: e.clientX, y: e.clientY });
       }}
-      className="mt-2 rounded-xl border border-edge bg-retro-panel text-retro-fg overflow-hidden animate-orbit-slide-up"
+      className={ARTICLE}
     >
       {/* Header: author + collapse */}
-      <div className="p-3 border-b border-edge flex items-center justify-between">
+      <div className={classes(PADDING[3], 'border-b flex items-center justify-between', COLOR.edge)}>
         <button
           type="button"
           onClick={handleAuthorClick}
           aria-label={`View profile of ${post.author_name}`}
-          className="flex items-center gap-3 text-left cursor-pointer"
+          className={classes('flex items-center text-left cursor-pointer', GAP[3])}
         >
-          <div className="w-8 h-8 rounded-full bg-glass-w12 border border-edge p-[1px] flex-shrink-0">
-            <div className="w-full h-full rounded-full bg-retro-panel overflow-hidden flex items-center justify-center text-xs font-semibold text-retro-fg">
+          <div className={classes('w-8 h-8 p-[1px] shrink-0', RADIUS.pill, COLOR.glassW12, 'border', COLOR.edge)}>
+            <div className={classes('w-full h-full overflow-hidden flex items-center justify-center', RADIUS.pill, COLOR.panelGlass, TYPE.body, WEIGHT.semibold, COLOR.fg)}>
               {authorAvatar ? (
                 <img src={resolvedAuthorAvatar} alt="" className="w-full h-full object-cover" />
               ) : (
@@ -173,30 +189,30 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
             </div>
           </div>
           <div>
-            <div className="flex items-center gap-1">
-              <span className="text-sm font-semibold text-retro-fg hover:underline">{post.author_name}</span>
+            <div className={classes('flex items-center', GAP[1])}>
+              <span className={classes(TYPE.sub, WEIGHT.semibold, COLOR.fg, 'hover:underline')}>{post.author_name}</span>
             </div>
-            <span className="text-2xs text-retro-muted font-medium block">
+            <span className={classes(TYPE.caption, COLOR.muted, WEIGHT.medium, 'block')}>
               {post.location ? `${post.location} · ` : ''}{timeAgo(post.created_at)}
             </span>
           </div>
         </button>
 
-        <div className="flex items-center gap-1">
+        <div className={classes('flex items-center', GAP[1])}>
           <button
             type="button"
             onClick={() => { playPress(700); onClose(); }}
             aria-label="Collapse post"
-            className="p-1.5 text-retro-muted hover:text-retro-fg rounded-md cursor-pointer hover:bg-glass-w12 transition-colors"
+            className={classes('p-1.5 cursor-pointer', RADIUS.chip, COLOR.muted, COLOR.hoverFg, COLOR.hoverW12, TRANSITION.micro)}
           >
-            <X className="w-4 h-4" />
+            <X className={ICON.md} />
           </button>
         </div>
       </div>
 
       {/* Media. Click opens the fullscreen ImageViewer; double-click still likes. */}
       <div
-        className="relative bg-retro-bg flex items-center justify-center overflow-hidden min-h-[280px] cursor-pointer"
+        className={classes('relative flex items-center justify-center overflow-hidden min-h-[280px] cursor-pointer', COLOR.canvas)}
         onClick={() => { if (post.id) window.dispatchEvent(new CustomEvent('gmatch-open-image', { detail: { id: post.id, authorName: post.author_name || 'You', url: post.localPreviewUrl || post.url, contentHash: post.content_hash } })); }}
         onDoubleClick={handleDoubleTap}
       >
@@ -243,7 +259,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
         {/* Double Tap Heart Pop */}
         {doubleTapAnimation && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 animate-orbit-pop">
-            <Heart className="w-28 h-28 text-retro-fg fill-white drop-shadow-2xl opacity-90 animate-pulse" />
+            <Heart className={classes('w-28 h-28 fill-white drop-shadow-2xl opacity-90 animate-pulse', COLOR.fg)} />
           </div>
         )}
 
@@ -259,7 +275,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
                   setActiveMediaIndex((i) => Math.max(0, i - 1));
                 }}
                 aria-label="Previous image"
-                className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 text-retro-fg hover:bg-black/80 cursor-pointer"
+                className={classes(CAROUSEL_ARROW, 'left-3')}
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
@@ -273,19 +289,24 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
                   setActiveMediaIndex((i) => Math.min(mediaItems.length - 1, i + 1));
                 }}
                 aria-label="Next image"
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 text-retro-fg hover:bg-black/80 cursor-pointer"
+                className={classes(CAROUSEL_ARROW, 'right-3')}
               >
                 <ChevronRight className="w-5 h-5" />
               </button>
             )}
 
             {/* Dots indicator */}
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-10 bg-black/60 px-2 py-1 rounded-full">
+            <div className={classes(
+              'absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center z-10 px-2 py-1',
+              GAP[1.5], COLOR.scrim, RADIUS.pill,
+            )}>
               {mediaItems.map((_, idx) => (
                 <span
                   key={idx}
-                  className={`w-1.5 h-1.5 rounded-full transition ${idx === activeMediaIndex ? 'bg-retro-accent w-3' : 'bg-glass-w20'
-                    }`}
+                  className={classes('w-1.5 h-1.5 transition', RADIUS.pill, idx === activeMediaIndex
+                    ? classes(COLOR.accentBg, 'w-3')
+                    : COLOR.glassW20,
+                  )}
                 />
               ))}
             </div>
@@ -295,44 +316,50 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
       </div>
 
       {/* Action Bar — same icons, order, colors and padding as the standard card. */}
-      <div className="px-3 sm:px-4 pt-2.5 pb-3">
+      <div className={classes(PADDING_X[3], 'sm:px-4', 'pt-2.5', PADDING_Y[3])}>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1">
+          <div className={classes('flex items-center', GAP[1])}>
             <button
               type="button"
               onClick={() => onToggleLike?.(post)}
               aria-label={isLiked ? 'Unlike' : 'Like'}
               aria-pressed={isLiked}
-              className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-(--scale-press)"
+              className={ACTION_ICON}
             >
-              <Heart className={`w-4 h-4 transition-colors stroke-[1.75] ${isLiked ? 'text-danger-fg fill-danger' : 'text-retro-muted hover:text-retro-fg'}`} />
+              <Heart className={classes(ICON.md, 'transition-colors stroke-[1.75]', isLiked
+                ? classes(STATUS.dangerFg, 'fill-danger')
+                : classes(COLOR.muted, COLOR.hoverFg),
+              )} />
             </button>
             <button
               type="button"
               onClick={() => articleRef.current?.querySelector('input')?.focus()}
               aria-label="Comment"
-              className="p-1.5 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-(--scale-press)"
+              className={classes(ACTION_ICON, COLOR.muted, COLOR.hoverFg)}
             >
-              <MessageCircle className="w-4 h-4 stroke-[1.75]" />
+              <MessageCircle className={classes(ICON.md, 'stroke-[1.75]')} />
             </button>
             <button
               type="button"
               onClick={() => onOpenShare?.(post)}
               aria-label="Share post"
-              className="p-1.5 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-(--scale-press)"
+              className={classes(ACTION_ICON, COLOR.muted, COLOR.hoverFg)}
             >
-              <Send className="w-4 h-4 stroke-[1.75]" />
+              <Send className={classes(ICON.md, 'stroke-[1.75]')} />
             </button>
           </div>
-          <div className="flex items-center gap-1">
+          <div className={classes('flex items-center', GAP[1])}>
             <button
               type="button"
               onClick={() => onToggleSave?.(post)}
               aria-label={isSaved ? 'Remove from saved' : 'Save post'}
               aria-pressed={isSaved}
-              className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-(--scale-press)"
+              className={ACTION_ICON}
             >
-              <Bookmark className={`w-4 h-4 transition-colors stroke-[1.75] ${isSaved ? 'text-retro-fg fill-retro-fg' : 'text-retro-muted hover:text-retro-fg'}`} />
+              <Bookmark className={classes(ICON.md, 'transition-colors stroke-[1.75]', isSaved
+                ? classes(COLOR.fg, 'fill-retro-fg')
+                : classes(COLOR.muted, COLOR.hoverFg),
+              )} />
             </button>
             {onSaveToVault && post.url && (
               <button
@@ -340,9 +367,9 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
                 onClick={() => onSaveToVault(post)}
                 aria-label="Save to Vault"
                 title="Save the media to your Vault (offline copy)"
-                className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-(--scale-press)"
+                className={ACTION_ICON}
               >
-                <FolderPlus className="w-4 h-4 stroke-[1.75] text-retro-muted hover:text-retro-fg" />
+                <FolderPlus className={classes(ICON.md, 'stroke-[1.75]', COLOR.muted, COLOR.hoverFg)} />
               </button>
             )}
           </div>
@@ -354,7 +381,11 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
       <button
         type="button"
         onClick={() => onOpenLikers?.(post.id)}
-        className="text-left px-3 pb-2 text-xs font-semibold text-retro-fg tracking-tight hover:underline cursor-pointer w-fit transition-colors"
+        className={classes(
+          'text-left hover:underline cursor-pointer w-fit',
+          PADDING_X[3], PADDING_Y[2], TYPE.body, WEIGHT.semibold,
+          COLOR.fg, TRACKING.tight, TRANSITION.micro,
+        )}
         aria-label="View who liked this post"
       >
         {likedByLabel || `${likeCount.toLocaleString()} ${likeCount === 1 ? 'like' : 'likes'}`}
@@ -364,10 +395,13 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
           these bytes. Absent until that proof exists — never inferred. */}
       {custody.label && (
         <div
-          className="flex items-center gap-1 px-3 pb-2 text-2xs font-medium text-retro-muted"
+          className={classes(
+            'flex items-center', GAP[1], PADDING_X[3], PADDING_Y[2],
+            TYPE.caption, WEIGHT.medium, COLOR.muted,
+          )}
           aria-label="Media replication"
         >
-          <ShieldCheck className="w-3.5 h-3.5 text-success-fg" />
+          <ShieldCheck className={classes(ICON.sm, STATUS.success)} />
           <span>{custody.label}</span>
         </div>
       )}

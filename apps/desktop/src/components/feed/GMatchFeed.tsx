@@ -50,6 +50,10 @@ import { NativeVideoPlayer } from '../media/NativeVideoPlayer';
 import { isVideoPost } from '../../utils/media';
 import { vaultPin, vaultBridge } from '../../services/vault';
 import { PEER_ONLINE_EVENT } from '../../utils/p2pSwarm';
+import {
+  classes, COLOR, GAP, ICON, MONO, PADDING, PADDING_X, RADIUS,
+  SHADOW, STATUS, TRACKING, TRANSITION, TYPE, WEIGHT,
+} from '../../ui/tokens';
 
 /** Sibling item MIME types for render-time video detection (see isVideoPost). */
 function siblingMimesFor(post: FeedPost): string[] {
@@ -1019,7 +1023,7 @@ function GMatchFeedImpl({
   }, [lightboxPostId, identity]);
 
   return (
-    <div className="w-full flex flex-col font-sans select-none pb-12 text-retro-fg">
+    <div className={classes('w-full flex flex-col font-sans select-none pb-12', COLOR.fg)}>
       {/* Feed Top Header — sort tabs, grid 1-5, search. Notifications live in
           the single header centre, so this bar carries no bell. */}
       <FeedHeader
@@ -1027,16 +1031,19 @@ function GMatchFeedImpl({
         onOpenSearch={() => setShowExploreSearch(true)}
         onPingAttention={onPingAttention}
         sortTabs={
-          <div className="flex items-center gap-1 text-xs">
+          <div className={classes('flex items-center', GAP[1], TYPE.body)}>
             {(['latest', 'trending'] as const).map((mode) => (
               <button
                 key={mode}
                 type="button"
                 onClick={() => { playPress(720); onFeedSortChange?.(mode); }}
-                className={`px-3 py-1.5 rounded-md transition duration-150 active:scale-(--scale-press-sm) cursor-pointer font-medium ${feedSort === mode
-                    ? 'bg-glass-w12 text-retro-fg shadow-xs border border-edge'
-                    : 'text-retro-muted hover:text-retro-fg'
-                  }`}
+                className={classes(
+                  'px-3 py-1.5 cursor-pointer transition duration-150 active:scale-(--scale-press-sm)',
+                  RADIUS.chip, WEIGHT.medium,
+                  feedSort === mode
+                    ? classes(COLOR.glassW12, COLOR.fg, SHADOW.xs, 'border', COLOR.edge)
+                    : classes(COLOR.muted, COLOR.hoverFg),
+                )}
               >
                 {FEED_SORT_LABELS[mode]}
               </button>
@@ -1047,7 +1054,7 @@ function GMatchFeedImpl({
           <div
             role="group"
             aria-label="Feed layout"
-            className="flex items-center rounded-md bg-glass-w5 border border-edge p-0.5"
+            className={classes('flex items-center p-0.5', RADIUS.chip, COLOR.glassW5, 'border', COLOR.edge)}
           >
             {(['list', 'grid'] as const).map((layout) => (
               <button
@@ -1057,12 +1064,14 @@ function GMatchFeedImpl({
                 aria-pressed={feedLayout === layout}
                 title={layout === 'list' ? 'Timeline' : 'Grid'}
                 aria-label={layout === 'list' ? 'Timeline layout' : 'Grid layout'}
-                className={`p-1.5 rounded transition-colors duration-150 cursor-pointer ${feedLayout === layout
-                    ? 'bg-glass-w20 text-retro-fg'
-                    : 'text-retro-muted hover:text-retro-fg'
-                  }`}
+                className={classes(
+                  'p-1.5 cursor-pointer', RADIUS.chip, TRANSITION.micro,
+                  feedLayout === layout
+                    ? classes(COLOR.glassW20, COLOR.fg)
+                    : classes(COLOR.muted, COLOR.hoverFg),
+                )}
               >
-                {layout === 'list' ? <Rows3 className="w-4 h-4" /> : <LayoutGrid className="w-4 h-4" />}
+                {layout === 'list' ? <Rows3 className={ICON.md} /> : <LayoutGrid className={ICON.md} />}
               </button>
             ))}
           </div>
@@ -1077,7 +1086,7 @@ function GMatchFeedImpl({
           the honest way to see that the predicate, not the network, is
           what emptied the timeline. */}
       {import.meta.env.DEV && hiddenCount > 0 && (
-        <div className="px-3 sm:px-6 pt-1 text-2xs text-retro-faint" data-testid="feed-hidden-count">
+        <div className={classes(PADDING_X[3], 'sm:px-6 pt-1', TYPE.caption, COLOR.faint)} data-testid="feed-hidden-count">
           {hiddenCount} hidden: no content
         </div>
       )}
@@ -1088,7 +1097,10 @@ function GMatchFeedImpl({
       {syncCounts.pending > 0 || syncCounts.local > 0 ? (
         <div
           role="status"
-          className="w-full py-1 px-3 flex items-center gap-1.5 text-2xs font-mono text-retro-muted border-b border-edge bg-glass-w5 select-none"
+          className={classes(
+            'w-full py-1 flex items-center select-none border-b',
+            PADDING_X[3], GAP[1.5], TYPE.caption, MONO, COLOR.muted, COLOR.edge, COLOR.glassW5,
+          )}
         >
           {syncCounts.pending > 0 ? (
             <>
@@ -1097,7 +1109,7 @@ function GMatchFeedImpl({
             </>
           ) : (
             <>
-              <span className="w-1.5 h-1.5 rounded-full bg-warning/90 shrink-0" aria-hidden="true" />
+              <span className={classes('w-1.5 h-1.5 shrink-0', RADIUS.pill, STATUS.warningDot)} aria-hidden="true" />
               <span>
                 {syncCounts.local} post{syncCounts.local === 1 ? '' : 's'} saved on this device — they upload when the network is back.
               </span>
@@ -1109,14 +1121,17 @@ function GMatchFeedImpl({
 
       {/* Discreet grey loading label when stories/content are loading */}
       {storiesLoading && (
-        <div className="w-full py-1.5 px-3 flex items-center justify-center gap-1.5 text-2xs font-mono text-retro-muted border-b border-edge bg-glass-w5 select-none">
-          <Loader2 className="w-3 h-3 animate-spin text-retro-muted shrink-0" />
+        <div className={classes(
+          'w-full py-1.5 flex items-center justify-center select-none border-b',
+          PADDING_X[3], GAP[1.5], TYPE.caption, MONO, COLOR.muted, COLOR.edge, COLOR.glassW5,
+        )}>
+          <Loader2 className={classes('w-3 h-3 animate-spin shrink-0', COLOR.muted)} />
           <span>Loading content...</span>
         </div>
       )}
 
       {/* Stories Tray Carousel — below the header */}
-      <div className="bg-transparent border-b border-edge py-3 px-1">
+      <div className={classes('bg-transparent border-b py-3', PADDING_X[1], COLOR.edge)}>
         <GMatchStories
           stories={stories}
           loading={storiesLoading}
@@ -1689,10 +1704,10 @@ function GMatchFeedImpl({
            )}
 
           {displayPosts.length === 0 && (
-            <div className="border border-edge rounded-lg p-10 text-center space-y-5 my-4 max-w-md mx-auto">
+            <div className={classes('border text-center space-y-5 my-4 max-w-md mx-auto', COLOR.edge, RADIUS.control, PADDING[10])}>
               <div>
-                <h2 className="text-2xl font-black tracking-tighter text-retro-fg">{emptyCopy.title}</h2>
-                <p className="text-xs text-retro-muted mt-2 leading-relaxed">
+                <h2 className={classes(TYPE.display, WEIGHT.heading, TRACKING.tighter, COLOR.fg)}>{emptyCopy.title}</h2>
+                <p className={classes(TYPE.body, COLOR.muted, 'mt-2 leading-relaxed')}>
                   {emptyCopy.body}
                 </p>
               </div>
@@ -1700,9 +1715,14 @@ function GMatchFeedImpl({
                 <button
                   type="button"
                   onClick={() => { playPress(800); onForceRefresh(); }}
-                  className="px-4 py-2 text-xs font-semibold rounded-md transition duration-150 active:scale-(--scale-press-sm) cursor-pointer inline-flex items-center gap-1.5 border border-edge text-retro-body hover:text-retro-fg hover:bg-glass-w10"
+                  className={classes(
+                    'px-4 py-2 cursor-pointer transition duration-150 active:scale-(--scale-press-sm)',
+                    'inline-flex items-center border',
+                    GAP[1.5], RADIUS.chip, TYPE.body, WEIGHT.semibold,
+                    COLOR.edge, COLOR.body, COLOR.hoverFg, COLOR.hoverW10,
+                  )}
                 >
-                  <RefreshCw className="w-4 h-4 stroke-[2]" />
+                  <RefreshCw className={classes(ICON.md, 'stroke-[2]')} />
                   <span>Reload feed</span>
                 </button>
               )}
@@ -1712,28 +1732,35 @@ function GMatchFeedImpl({
                   if (onOpenPostCreator) onOpenPostCreator();
                   else setShowCustomPostCreator(true);
                 }}
-                className="create-action px-4 py-2 text-xs font-semibold rounded-md transition duration-150 active:scale-(--scale-press-sm) shadow-xs cursor-pointer inline-flex items-center gap-1.5"
+                className={classes(
+                  'create-action px-4 py-2 cursor-pointer transition duration-150 active:scale-(--scale-press-sm)',
+                  'inline-flex items-center',
+                  GAP[1.5], RADIUS.chip, TYPE.body, WEIGHT.semibold, SHADOW.xs,
+                )}
               >
-                <PlusSquare className="w-4 h-4 stroke-[2]" />
+                <PlusSquare className={classes(ICON.md, 'stroke-[2]')} />
                 <span>Upload your first post</span>
               </button>
               {followSuggestions.length > 0 && (
-                <div className="pt-2 border-t border-edge">
-                  <p className="text-2xs uppercase tracking-wider text-retro-muted mb-2">Or follow someone</p>
+                <div className={classes('pt-2 border-t', COLOR.edge)}>
+                  <p className={classes(TYPE.caption, 'uppercase tracking-wider', COLOR.muted, 'mb-2')}>Or follow someone</p>
                   <div className="flex items-center justify-center gap-3">
                     {followSuggestions.map((s) => (
                       <button
                         key={s.id}
                         type="button"
                         onClick={() => { void onFollowSuggestion?.(s.id); }}
-                        className="flex flex-col items-center gap-1 cursor-pointer group"
+                        className={classes('flex flex-col items-center cursor-pointer group', GAP[1])}
                         aria-label={`Follow ${s.display_name || s.id}`}
                       >
-                        <span className="relative w-10 h-10 rounded-full overflow-hidden border border-edge flex items-center justify-center text-xs text-retro-fg bg-glass-w5">
+                        <span className={classes(
+                          'relative w-10 h-10 overflow-hidden border flex items-center justify-center',
+                          RADIUS.pill, COLOR.edge, TYPE.body, COLOR.fg, COLOR.glassW5,
+                        )}>
                           <Avatar id={s.id} size={40} imageUrl={profilePics?.[s.id]} fill={true} />
                         </span>
-                        <span className="text-2xs text-retro-muted truncate max-w-[72px] group-hover:text-retro-fg">{s.display_name}</span>
-                        <span className="text-2xs text-retro-fg border border-edge rounded-md px-1.5 py-0.5 group-hover:bg-glass-w10">Follow</span>
+                        <span className={classes(TYPE.caption, COLOR.muted, 'truncate max-w-[72px]', COLOR.hoverFg)}>{s.display_name}</span>
+                        <span className={classes(TYPE.caption, COLOR.fg, 'border px-1.5 py-0.5', COLOR.edge, RADIUS.chip, COLOR.hoverW10)}>Follow</span>
                       </button>
                     ))}
                   </div>

@@ -9,6 +9,8 @@ import type { User, OrbitObject } from '@orbit/shared'
 import { LazyVideo } from './LazyVideo'
 import { logger } from '../utils/logger';
 import { forgeMediaLocally } from '../services/mediaForge'
+import { Button, Checkbox, Input, Select } from '../ui/kit'
+import { BUTTON_FEEDBACK, classes } from '../ui/tokens'
 
 function compressImageForP2P(file: File, maxDim = 1200, quality = 0.8): Promise<string> {
   return new Promise((resolve) => {
@@ -96,12 +98,14 @@ function PreviewThumbnail({ file, onRemove, onDragStart }: {
           ▶
         </div>
       )}
-      <button
+      <Button
+        variant="danger"
+        size="sm"
         onClick={(e) => { e.stopPropagation(); onRemove() }}
-        className="absolute top-1 right-1 w-5 h-5 bg-retro-error text-retro-fg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-retro-error"
+        className="absolute top-1 right-1 w-5 h-5 p-0 opacity-0 group-hover:opacity-100"
       >
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-      </button>
+      </Button>
       <div className="absolute bottom-1 left-1 text-2xs text-retro-fg bg-black/70 px-1">
         {(file.size / 1024).toFixed(0)}KB
       </div>
@@ -423,13 +427,9 @@ export const SendPanel = forwardRef<SendPanelHandle, {
           <span>Upload</span>
         </h3>
         {recipientIds.length > 0 && (
-          <button
-            type="button"
-            onClick={() => onRecipientsChange([])}
-            className="text-retro-muted hover:text-retro-accent transition-colors text-xs font-bold"
-          >
+          <Button variant="link" size="sm" onClick={() => onRecipientsChange([])}>
             Clear ({recipientIds.length})
-          </button>
+          </Button>
         )}
       </div>
 
@@ -494,20 +494,22 @@ export const SendPanel = forwardRef<SendPanelHandle, {
         )}
 
         <div className="flex border border-edge bg-retro-bg p-1 text-xs font-bold rounded-lg">
-          <button
-            type="button"
+          <Button
+            variant={mode === 'file' ? 'primary' : 'ghost'}
+            size="md"
             onClick={() => setMode('file')}
-            className={`flex-1 py-1.5 transition-colors rounded whitespace-nowrap ${mode === 'file' ? 'bg-retro-accent text-retro-accent-text font-extrabold' : 'text-retro-muted hover:text-retro-fg'}`}
+            className="flex-1 whitespace-nowrap"
           >
             Media Files (Img/Vid)
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant={mode === 'link' ? 'primary' : 'ghost'}
+            size="md"
             onClick={() => setMode('link')}
-            className={`flex-1 py-1.5 transition-colors rounded whitespace-nowrap ${mode === 'link' ? 'bg-retro-accent text-retro-accent-text font-extrabold' : 'text-retro-muted hover:text-retro-fg'}`}
+            className="flex-1 whitespace-nowrap"
           >
             Media Link (Img/Vid)
-          </button>
+          </Button>
         </div>
 
         {mode === 'file' ? (
@@ -523,13 +525,14 @@ export const SendPanel = forwardRef<SendPanelHandle, {
               {forwardedFile ? (
                 <div className="text-xs text-retro-accent flex items-center justify-center gap-2">
                   <span>Forwarding: {forwardedFile.name}</span>
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={(e) => { e.stopPropagation(); onForwardClear?.() }}
-                    className="text-retro-muted hover:text-retro-fg transition-colors"
+                    className="p-0"
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
-                  </button>
+                  </Button>
                 </div>
               ) : allFiles.length > 0 ? (
                 <div className="text-xs text-retro-fg flex items-center justify-center gap-2">
@@ -540,21 +543,19 @@ export const SendPanel = forwardRef<SendPanelHandle, {
             </DropZone>
           </>
         ) : (
-          <input
+          <Input
             type="url"
             value={linkUrl}
             onChange={e => setLinkUrl(e.target.value)}
-            className="w-full p-3 bg-retro-bg border border-edge text-xs text-retro-fg focus:outline-none placeholder:text-retro-muted rounded-lg"
             placeholder="https://example.com/media.mp4 or .jpg"
             maxLength={2048}
           />
         )}
 
-        <input
+        <Input
           type="text"
           value={caption}
           onChange={e => setCaption(e.target.value)}
-          className="w-full p-3 bg-retro-bg border border-edge text-xs text-retro-fg focus:outline-none placeholder:text-retro-muted"
           placeholder="Caption (optional)"
           maxLength={200}
         />
@@ -563,7 +564,7 @@ export const SendPanel = forwardRef<SendPanelHandle, {
           <button
             type="button"
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="w-full p-2.5 flex items-center justify-between text-retro-muted hover:text-retro-fg text-xs font-bold transition-colors"
+            className={classes(BUTTON_FEEDBACK, 'w-full p-2.5 flex items-center justify-between text-xs font-bold text-retro-muted hover:text-retro-fg')}
           >
             <div className="flex items-center gap-2">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -579,12 +580,10 @@ export const SendPanel = forwardRef<SendPanelHandle, {
                   <div className="text-xs font-semibold text-retro-fg">Encrypt</div>
                   <div className="text-2xs text-retro-muted">End-to-end encrypted</div>
                 </div>
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={isEncrypted}
                   onChange={(e) => setIsEncrypted(e.target.checked)}
                   disabled={otherRecipients.length > 0 && missingEncKeys.length > 0}
-                  className="w-4 h-4 accent-retro-accent disabled:opacity-30 cursor-pointer"
                 />
               </label>
 
@@ -593,11 +592,9 @@ export const SendPanel = forwardRef<SendPanelHandle, {
                   <div className="text-xs font-semibold text-retro-warning">Set as Background</div>
                   <div className="text-2xs text-retro-muted">Remote wallpaper</div>
                 </div>
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={isWallpaper}
                   onChange={(e) => setIsWallpaper(e.target.checked)}
-                  className="w-4 h-4 accent-retro-accent cursor-pointer"
                 />
               </label>
 
@@ -607,26 +604,23 @@ export const SendPanel = forwardRef<SendPanelHandle, {
                     <div className="text-xs font-semibold text-retro-warning">Auto-Delete</div>
                     <div className="text-2xs text-retro-muted">Auto-removes after timer</div>
                   </div>
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={timebombHours > 0}
                     onChange={(e) => setTimebombHours(e.target.checked ? 24 : 0)}
-                    className="w-4 h-4 accent-retro-accent cursor-pointer"
                   />
                 </label>
                 {timebombHours > 0 && (
                   <div className="flex items-center gap-2 pl-3">
                     <span className="text-2xs text-retro-muted">Expires in:</span>
-                    <select
+                    <Select
                       value={timebombHours}
                       onChange={(e) => setTimebombHours(parseInt(e.target.value, 10))}
-                      className="bg-retro-bg border border-edge text-xs text-retro-fg px-2 py-1 focus:outline-none"
                     >
                       <option value={1}>1 hour</option>
                       <option value={6}>6 hours</option>
                       <option value={12}>12 hours</option>
                       <option value={24}>24 hours</option>
-                    </select>
+                    </Select>
                   </div>
                 )}
               </div>
@@ -636,29 +630,29 @@ export const SendPanel = forwardRef<SendPanelHandle, {
                   <div className="text-xs font-semibold text-retro-accent">Auto-Forward</div>
                   <div className="text-2xs text-retro-muted">Forward to all contacts</div>
                 </div>
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={autoForward}
                   onChange={(e) => setAutoForward(e.target.checked)}
-                  className="w-4 h-4 accent-retro-accent cursor-pointer"
                 />
               </label>
             </div>
           )}
         </div>
 
-        <button
-          type="button"
+        <Button
+          variant="primary"
+          size="md"
           onClick={handleUpload}
           disabled={!canSend}
-          className={`w-full chrome-accent text-retro-accent-text font-bold py-3 px-6 transition disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-xs uppercase tracking-wider ${
-            buttonClicked ? 'scale-(--scale-press) brightness-125' : ''
-          }`}
+          className={classes(
+            'w-full py-3 px-6 uppercase tracking-wider',
+            buttonClicked && 'scale-(--scale-press) brightness-125',
+          )}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 2L11 13" /><path d="M22 2l-7 20-4-9-9-4 20-7z" /></svg>
           {mode === 'link' ? 'Send Link' : forwardedFile ? 'Forward' : 'Upload'}
           {mode === 'file' && allFiles.length > 0 ? ` (${allFiles.length})` : ''}
-        </button>
+        </Button>
 
         {status && (
           <div className="space-y-1 pt-1">

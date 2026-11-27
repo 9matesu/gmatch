@@ -10,13 +10,19 @@
  * and the same scrim, radius, type and press feedback everywhere. Game
  * semantics (HP/rarity/crit) stay in ui/styles.ts, not in this kit.
  */
-import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
+import {
+  useEffect, useId, useRef,
+  type ButtonHTMLAttributes,
+  type ComponentProps,
+  type ReactNode,
+} from 'react'
 import { X } from 'lucide-react'
 import {
   buttonClass,
   classes,
   COLOR,
   DIALOG_WIDTH,
+  FIELD,
   GAP,
   ICON,
   LAYOUT,
@@ -24,6 +30,7 @@ import {
   RECIPE,
   SURFACE_TONE,
   TYPE,
+  WEIGHT,
   type ButtonSize,
   type ButtonVariant,
   type CardTone,
@@ -72,6 +79,38 @@ export function Button({
   )
 }
 
+// ─── Fields ─────────────────────────────────────────────────────────────────
+
+/** `bare` renders the transparent variant for an input that sits INSIDE an
+ *  already-bordered shell (search rows, website/location/tags rows). */
+export interface FieldProps {
+  bare?: boolean
+  className?: string
+}
+
+/**
+ * ONE text field. Every colour, radius and focus border comes from `FIELD` in
+ * tokens; a caller only supplies layout through `className`. `ref` is a normal
+ * prop here (React 19), so callers keep focus management and autoFocus.
+ */
+export function Input({ bare = false, className = '', ...rest }: ComponentProps<'input'> & FieldProps) {
+  return <input className={classes(bare ? FIELD.bare : classes(FIELD.base, FIELD.input), className)} {...rest} />
+}
+
+export function Textarea({ bare = false, className = '', ...rest }: ComponentProps<'textarea'> & FieldProps) {
+  return <textarea className={classes(bare ? FIELD.bare : classes(FIELD.base, FIELD.textarea), className)} {...rest} />
+}
+
+export function Select({ className = '', ...rest }: ComponentProps<'select'> & FieldProps) {
+  return <select className={classes(FIELD.base, FIELD.select, className)} {...rest} />
+}
+
+/** Checkboxes are inputs too: one named recipe instead of an accent/fill
+ *  re-typed at every call site. */
+export function Checkbox({ className = '', ...rest }: ComponentProps<'input'>) {
+  return <input type="checkbox" className={classes(FIELD.check, className)} {...rest} />
+}
+
 // ─── Card ───────────────────────────────────────────────────────────────────
 
 /** ONE card: solid panel + hairline border + rounded-lg. */
@@ -107,7 +146,7 @@ export function CardHeader({
       <div className={classes('flex items-center min-w-0', GAP[2])}>
         {icon && <span className={classes('shrink-0', COLOR.muted)}>{icon}</span>}
         <div className="min-w-0">
-          <div className={classes(TYPE.body, 'font-semibold', COLOR.fg, 'truncate')}>{title}</div>
+          <div className={classes(TYPE.body, WEIGHT.semibold, COLOR.fg, 'truncate')}>{title}</div>
           {caption != null && <div className={classes(TYPE.caption, COLOR.muted, 'truncate')}>{caption}</div>}
         </div>
       </div>

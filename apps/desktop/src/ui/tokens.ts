@@ -41,6 +41,7 @@ export const PADDING = {
   0: 'p-0',
   0.5: 'p-0.5',
   1: 'p-1',
+  1.5: 'p-1.5',
   2: 'p-2',
   3: 'p-3',
   3.5: 'p-3.5',
@@ -52,9 +53,9 @@ export const PADDING = {
   12: 'p-12',
 } as const
 export const PADDING_SM = { 3: 'sm:p-3', 4: 'sm:p-4', 6: 'sm:p-6' } as const
-export const PADDING_X = { 0: 'px-0', 1: 'px-1', 1.5: 'px-1.5', 2: 'px-2', 3: 'px-3', 4: 'px-4', 5: 'px-5', 6: 'px-6' } as const
+export const PADDING_X = { 0: 'px-0', 1: 'px-1', 1.5: 'px-1.5', 2: 'px-2', 2.5: 'px-2.5', 3: 'px-3', 4: 'px-4', 5: 'px-5', 6: 'px-6' } as const
 export const PADDING_Y = { 0: 'py-0', 1: 'py-1', 1.5: 'py-1.5', 2: 'py-2', 3: 'py-3', 4: 'py-4' } as const
-export const GAP = { 0: 'gap-0', 1: 'gap-1', 1.5: 'gap-1.5', 2: 'gap-2', 3: 'gap-3', 4: 'gap-4', 5: 'gap-5' } as const
+export const GAP = { 0: 'gap-0', 0.5: 'gap-0.5', 1: 'gap-1', 1.5: 'gap-1.5', 2: 'gap-2', 2.5: 'gap-2.5', 3: 'gap-3', 4: 'gap-4', 5: 'gap-5' } as const
 export type PaddingStep = keyof typeof PADDING
 export function spaceVar(step: SpaceStep): string {
   return SPACE_VAR[step]
@@ -103,9 +104,11 @@ export const SHADOW = {
   toolbar: 'shadow-toolbar',
   surface: 'shadow-surface',
   control: 'shadow-control',
+  xs: 'shadow-xs',
   inset: 'shadow-inner',
   modal: 'shadow-xl',
   sheet: 'shadow-2xl',
+  large: 'shadow-lg',
   none: 'shadow-none',
 } as const
 
@@ -122,6 +125,7 @@ export const TYPE = {
   display: 'text-xl',
 } as const
 export const WEIGHT = {
+  regular: 'font-normal',
   medium: 'font-medium',
   semibold: 'font-semibold',
   bold: 'font-bold',
@@ -129,7 +133,12 @@ export const WEIGHT = {
 } as const
 export const MONO = 'font-mono tabular-nums'
 export const ICON = { sm: 'w-3.5 h-3.5', md: 'w-4 h-4' } as const
-export const TRACKING = { tight: 'tracking-tight', wide: 'tracking-wide' } as const
+export const TRACKING = {
+  tight: 'tracking-tight',
+  tighter: 'tracking-tighter',
+  wide: 'tracking-wide',
+  wider: 'tracking-wider',
+} as const
 export const TRANSITION = { micro: 'transition-colors duration-150', enter: 'transition duration-300' } as const
 
 // ─── Colour roles ──────────────────────────────────────────────────────────
@@ -137,6 +146,7 @@ export const TRANSITION = { micro: 'transition-colors duration-150', enter: 'tra
  *  tints; their -fg value is what text wears, and both flip with the theme. */
 export const COLOR = {
   canvas: 'bg-retro-bg',
+  canvasVeil: 'bg-retro-bg/95',
   canvasSurface: 'bg-surface-canvas',
   panel: 'solid-panel',
   panelGlass: 'bg-[var(--color-glass)]',
@@ -146,6 +156,7 @@ export const COLOR = {
   glassW5: 'bg-glass-w5',
   glassW8: 'bg-glass-w8',
   glassW12: 'bg-glass-w12',
+  glassW20: 'bg-glass-w20',
   hoverW8: 'hover:bg-glass-w8',
   hoverW12: 'hover:bg-glass-w12',
   accent: 'text-retro-accent',
@@ -153,10 +164,32 @@ export const COLOR = {
   accentHover: 'hover:bg-retro-accent-hover',
   onAccent: 'text-retro-accent-text',
   fg: 'text-retro-fg',
+  fgSoft: 'text-retro-fg/90',
   body: 'text-retro-body',
   muted: 'text-retro-muted',
   faint: 'text-retro-faint',
   scrim: 'bg-black/60',
+  /** Softer scrim for the left notification rail (chrome, not a dialog). */
+  scrimSoft: 'bg-black/40',
+  scrimFaint: 'bg-black/30',
+  scrimHover: 'hover:bg-black/80',
+  /** The shell's raised plate: same `--color-glass` as `solid-panel`, without
+   *  its shadow. Named so a tile never re-types `bg-surface-raised`. */
+  surfaceRaised: 'bg-surface-raised',
+  interactive: 'bg-surface-interactive',
+  interactiveSoft: 'bg-surface-interactive/60',
+  interactiveStrong: 'bg-surface-interactive/90',
+  /** Chrome hover roles — one each, so call sites stop re-typing them. */
+  hoverFg: 'hover:text-retro-fg',
+  hoverBody: 'hover:text-retro-body',
+  accentEdge: 'border-retro-accent',
+  hoverW5: 'hover:bg-glass-w5',
+  hoverW10: 'hover:bg-glass-w10',
+  hoverW12Soft: 'hover:bg-glass-w12/80',
+  focusRing: 'focus-visible:ring-retro-accent',
+  focusAccent: 'focus:border-retro-accent/60',
+  /** Label ON media (image/video scrim): the only white text in the shell. */
+  onMedia: 'text-white',
 } as const
 export const STATUS = {
   danger: 'text-retro-error',
@@ -166,6 +199,21 @@ export const STATUS = {
   warning: 'text-retro-warning',
   success: 'text-success-fg',
   info: 'text-info-fg',
+  infoBg: 'bg-info/20',
+  infoEdge: 'border-info/40',
+  infoHover: 'hover:bg-info/30',
+  warningBg: 'bg-warning/10',
+  warningEdge: 'border-warning/30',
+  warningEdgeSoft: 'border-warning/20',
+  warningSoft: 'text-warning/90',
+  warningDot: 'bg-warning/90',
+  warningHoverSoft: 'hover:bg-warning/20',
+  dangerSoft: 'text-retro-error/80',
+  dangerFg: 'text-danger-fg',
+  dangerHoverBg: 'hover:bg-retro-error/10',
+  dangerTintHover: 'hover:bg-danger/20',
+  dangerHoverHard: 'hover:bg-danger',
+  dangerFgHover: 'hover:text-danger-fg',
 } as const
 /** Rarity is game semantics, but the TEXT colours are card chrome read in
  *  both themes — one named token per tier keeps that ladder readable. */
@@ -200,6 +248,12 @@ export const BUTTON_VARIANT = {
   secondary: classes('border', COLOR.edge, COLOR.glassW8, COLOR.hoverW12, COLOR.fg),
   danger: classes(STATUS.dangerBg, STATUS.dangerEdge, STATUS.danger, STATUS.dangerHover, 'border'),
   ghost: classes(COLOR.muted, 'hover:text-retro-fg border border-transparent', COLOR.hoverW8),
+  /** Text-only accent action ("Done", "Change photo", "Add"): no fill, one
+   *  accent label. The old call sites re-typed this colour inline. */
+  link: classes(COLOR.accent, 'hover:text-retro-accent-hover border border-transparent', COLOR.hoverW8, WEIGHT.semibold),
+  /** The one informational action tint (validate / add-cards), kept as a
+   *  named variant instead of a per-call `bg-info/20 text-info-fg`. */
+  info: classes('border', STATUS.infoEdge, STATUS.infoBg, STATUS.infoHover, STATUS.info, WEIGHT.semibold),
 } as const satisfies Record<string, string>
 export type ButtonVariant = keyof typeof BUTTON_VARIANT
 export const BUTTON_SIZE = { sm: 'px-2.5 py-1', md: 'px-3.5 py-2' } as const satisfies Record<string, string>
@@ -207,6 +261,29 @@ export type ButtonSize = keyof typeof BUTTON_SIZE
 export function buttonClass(variant: ButtonVariant, size: ButtonSize, extra?: string): string {
   return classes(BUTTON_BASE, BUTTON_VARIANT[variant], BUTTON_SIZE[size], extra)
 }
+
+// ─── Fields ────────────────────────────────────────────────────────────────
+/** ONE text-field recipe for `<input>`, `<textarea>` and `<select>`: the same
+ *  canvas fill, hairline edge, radius, body type and single accent focus border.
+ *  Callers pass only layout (`w-full`, `flex-1`) via the kit's `className`;
+ *  there is no per-call `focus:border-retro-accent/50` or glass-tier choice. */
+export const FIELD = {
+  base: classes(
+    RADIUS.control, 'border', COLOR.edge, 'bg-surface-canvas',
+    TYPE.body, COLOR.fg, 'placeholder:text-retro-muted',
+    'focus:outline-none focus:border-retro-accent', TRANSITION.micro,
+  ),
+  input: classes('w-full px-3 py-2'),
+  textarea: classes('w-full p-3 resize-none'),
+  select: classes('px-2.5 py-1.5 cursor-pointer'),
+  /** Transparent, borderless field embedded in an already-shelled control. */
+  bare: classes('w-full bg-transparent border-none focus:outline-none', COLOR.fg, 'placeholder:text-retro-muted'),
+  /** The bordered wrapper around a `bare` field with a leading icon. */
+  shell: classes(RADIUS.control, 'border', COLOR.edge, 'bg-surface-canvas', PADDING_X[3], PADDING_Y[2]),
+  /** Checkboxes/radios: one accent and one disabled contract, no bespoke fills. */
+  check: 'w-4 h-4 accent-retro-accent cursor-pointer disabled:opacity-30',
+} as const
+export type FieldTone = keyof Pick<typeof FIELD, 'base' | 'bare'>
 
 // ─── Wordmark ──────────────────────────────────────────────────────────────
 /** Typographic wordmark: the brand name is text, never a baked raster. The
@@ -265,4 +342,49 @@ export const RECIPE = {
   pageMeta: classes(TYPE.caption, COLOR.muted, 'mt-0.5 truncate'),
   title: classes(TYPE.sub, WEIGHT.semibold, COLOR.fg),
   caption: classes(TYPE.body, COLOR.muted),
+} as const
+
+// ─── SURFACE + TYPOGRAPHY chrome ───────────────────────────────────────────
+/**
+ * The recurring card / header / badge / icon shapes. Every value is composed
+ * from names above: no raw colour, size, radius or weight is re-inlined at a
+ * call site. Both themes flip with the roles, and the retro-glass identity
+ * (one hairline edge, one raised plate, one scrim) stays owned here.
+ */
+export const CHROME = {
+  /** Raised tile: one hairline edge + the raised plate + card radius. */
+  tile: classes(RECIPE.card, COLOR.surfaceRaised),
+  /** Inset dropdown / popover floating over a tile. */
+  popover: classes(RECIPE.card, COLOR.surfaceRaised, PADDING[3], SHADOW.modal),
+  /** Icon-only control (close, search clear, ...). */
+  iconButton: classes('p-1.5 cursor-pointer', RADIUS.chip, COLOR.muted, COLOR.hoverFg, COLOR.hoverW10, TRANSITION.micro),
+  /** Small label that sits ON media — the one white text in the shell. */
+  mediaChip: classes(RADIUS.chip, COLOR.scrim, COLOR.onMedia, TYPE.caption),
+  /** Neutral metadata pill / count badge. */
+  badge: classes(RADIUS.pill, COLOR.glassW8, COLOR.fg, TYPE.caption),
+  /** Warning-tinted status pill. */
+  warningPill: classes(RADIUS.pill, STATUS.warningEdge, STATUS.warningBg, STATUS.warning, TYPE.body, WEIGHT.medium),
+  /** Section header label (card chrome / list title). */
+  headerTitle: classes(TYPE.body, WEIGHT.bold, COLOR.fg),
+  /** Danger text action (no fill): one role, one hover. */
+  dangerLink: classes(WEIGHT.semibold, STATUS.danger, STATUS.dangerHoverBg, COLOR.hoverFg, 'cursor-pointer', TRANSITION.micro),
+  /** Header strip shared by panels and the notification sidebar. */
+  barHeader: classes('flex items-center justify-between shrink-0', GAP[2], PADDING_X[4], 'py-2.5 border-b', COLOR.edge),
+  /** Panel / sidebar body that scrolls. */
+  scrollBody: classes('flex-1 overflow-y-auto styled-scrollbar', PADDING[4]),
+  /** Muted caption under a title. */
+  subCaption: classes(TYPE.body, COLOR.muted),
+  /** Monospaced metadata line. */
+  metaMono: classes(MONO, TYPE.caption, COLOR.muted),
+} as const
+
+/** Peer-presence dot + text roles. A measured status is chrome, so the three
+ *  states share one owner here instead of being re-typed per roster row. */
+export const PRESENCE = {
+  currentDot: 'bg-retro-online',
+  connectingDot: 'bg-retro-warning',
+  idleDot: 'bg-retro-muted/40',
+  currentText: 'text-retro-online',
+  connectingText: 'text-retro-warning',
+  idleText: 'text-retro-muted',
 } as const

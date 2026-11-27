@@ -43,6 +43,8 @@ import { nameFor, nameRoster as nameRosterFromDirectory, rememberName } from '..
 import { groupMessagesByDay } from '../../utils/chatDays';
 import { searchThread } from '../../utils/dmSearch';
 import { UNKNOWN_NAME } from '../../utils/displayName';
+import { Button, Checkbox, Input, Textarea } from '../../ui/kit';
+import { BUTTON_FEEDBACK, classes, COLOR, FIELD, STATUS } from '../../ui/tokens';
 
 import { logger } from '../../utils/logger'
 export interface PeerInfo {
@@ -788,32 +790,31 @@ export function GMatchDMs({
             </h2>
           </div>
           <div className="flex items-center gap-1">
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => { playPress(800); setShowNewGroup((v) => !v); }}
               title="New group"
               aria-label="New group"
-              className="p-1.5 rounded-md text-retro-muted hover:text-retro-fg transition-colors cursor-pointer"
+              className="p-1.5"
             >
               <Plus className="w-4 h-4" />
-            </button>
+            </Button>
           </div>
         </div>
 
         {showNewGroup && (
           <div className="p-3 border-b border-edge space-y-2 shrink-0">
-            <input
+            <Input
               type="text"
               value={newGroupName}
               onChange={(e) => setNewGroupName(e.target.value)}
               placeholder="Group name"
-              className="w-full bg-surface-raised border border-edge rounded-md px-3 py-1.5 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent/60"
             />
             <div className="max-h-32 overflow-y-auto styled-scrollbar space-y-1">
               {peers.filter((p) => p.orbitId !== identity?.orbitId).map((p) => (
                 <label key={p.orbitId} className="flex items-center gap-2 text-xs text-retro-body cursor-pointer">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={newGroupMembers.has(p.orbitId)}
                     onChange={() => setNewGroupMembers((prev) => {
                       const next = new Set(prev);
@@ -826,22 +827,22 @@ export function GMatchDMs({
               ))}
             </div>
             <div className="flex gap-2">
-              <button type="button" onClick={submitNewGroup} className="px-3 py-1.5 bg-retro-accent text-retro-accent-text rounded-md text-xs font-bold cursor-pointer hover:bg-retro-accent-hover">Create</button>
-              <button type="button" onClick={() => { setShowNewGroup(false); setNewGroupMembers(new Set()); }} className="px-3 py-1.5 bg-glass-w8 border border-edge rounded-md text-xs cursor-pointer hover:bg-glass-w12">Cancel</button>
+              <Button variant="primary" size="sm" onClick={submitNewGroup}>Create</Button>
+              <Button variant="secondary" size="sm" onClick={() => { setShowNewGroup(false); setNewGroupMembers(new Set()); }}>Cancel</Button>
             </div>
           </div>
         )}
 
         <div className="p-2.5 border-b border-edge shrink-0">
-          <div className="flex items-center gap-2 bg-surface-raised border border-edge rounded-md px-3 py-1.5 text-xs text-retro-body">
+          <div className={FIELD.shell}>
             <Search className="w-3.5 h-3.5 text-retro-muted shrink-0" />
-            <input
+            <Input
               type="text"
               aria-label="Search conversations"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search..."
-              className="w-full bg-transparent focus:outline-none placeholder:text-retro-muted text-retro-fg border-none"
+              bare
             />
           </div>
         </div>
@@ -850,7 +851,7 @@ export function GMatchDMs({
           <button
             type="button"
             onClick={() => { playPress(800); setListMode(false); setSidebarOpen(false); onSelectGroup?.(null); onSelectRoom?.(null); onSelectPeer({ orbitId: 'global_lobby', name: 'Lobby Lounge (Everyone)' }); }}
-            className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors border-b border-edge text-left cursor-pointer ${openTarget === 'lobby' ? 'bg-glass-w8 border-edge' : ''}`}
+            className={classes(BUTTON_FEEDBACK, 'w-full p-3 flex items-center gap-3 border-b text-left', COLOR.edge, COLOR.hoverW5, openTarget === 'lobby' && COLOR.glassW8)}
           >
             <div className="relative w-10 h-10 rounded-full bg-surface-raised border border-edge text-retro-muted shrink-0 overflow-hidden flex items-center justify-center">
               <Globe className="w-4 h-4" />
@@ -867,7 +868,7 @@ export function GMatchDMs({
           <button
             type="button"
             onClick={() => { playPress(800); setListMode(false); setSidebarOpen(false); onSelectGroup?.(null); onSelectRoom?.(null); onSelectPeer({ orbitId: 'card_queue', name: 'Card Game Queue' }); }}
-            className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors border-b border-edge text-left cursor-pointer ${openTarget === 'queue' ? 'bg-glass-w8 border-edge' : ''}`}
+            className={classes(BUTTON_FEEDBACK, 'w-full p-3 flex items-center gap-3 border-b text-left', COLOR.edge, COLOR.hoverW5, openTarget === 'queue' && COLOR.glassW8)}
           >
             <div className="relative w-10 h-10 rounded-full bg-surface-raised border border-edge text-retro-muted shrink-0 overflow-hidden flex items-center justify-center">
               <Gamepad2 className="w-4 h-4" />
@@ -889,7 +890,7 @@ export function GMatchDMs({
                   key={g.id}
                   type="button"
                   onClick={() => openGroup(g)}
-                  className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors border-b border-edge text-left cursor-pointer ${activeGroupId === g.id && openTarget === 'group' ? 'bg-glass-w8 border-edge' : ''}`}
+                  className={classes(BUTTON_FEEDBACK, 'w-full p-3 flex items-center gap-3 border-b text-left', COLOR.edge, COLOR.hoverW5, activeGroupId === g.id && openTarget === 'group' && COLOR.glassW8)}
                 >
                   <div className="w-10 h-10 rounded-full bg-surface-raised border border-edge text-retro-muted shrink-0 overflow-hidden flex items-center justify-center"><Users className="w-4 h-4" /></div>
                   <div className="flex-1 min-w-0">
@@ -907,27 +908,28 @@ export function GMatchDMs({
             <>
               <div className="px-3 py-1.5 border-b border-edge text-xs text-retro-muted flex items-center justify-between gap-1.5">
                 <span className="flex items-center gap-1.5"><Lock className="w-3 h-3" /> Rooms</span>
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => { playPress(780); setShowNewRoom((v) => !v); }}
                   title="New room"
                   aria-label="New room"
-                  className="p-0.5 rounded text-retro-muted hover:text-retro-fg cursor-pointer"
+                  className="p-0.5"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                </button>
+                </Button>
               </div>
               {showNewRoom && (
                 <div className="p-2.5 border-b border-edge flex gap-1.5 shrink-0">
-                  <input
+                  <Input
                     value={newRoomName}
                     onChange={(e) => setNewRoomName(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') submitNewRoom(); }}
                     placeholder="room name"
                     aria-label="New room name"
-                    className="flex-1 min-w-0 bg-surface-raised border border-edge rounded-md px-2 py-1.5 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent/60"
+                    className="flex-1 min-w-0"
                   />
-                  <button type="button" onClick={submitNewRoom} className="px-2.5 py-1.5 bg-retro-accent text-retro-accent-text rounded-md text-xs font-bold cursor-pointer hover:bg-retro-accent-hover">Create</button>
+                  <Button variant="primary" size="sm" onClick={submitNewRoom}>Create</Button>
                 </div>
               )}
               {rooms.map((r) => {
@@ -938,7 +940,7 @@ export function GMatchDMs({
                     key={r.id}
                     type="button"
                     onClick={() => openRoom(r.id)}
-                    className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors border-b border-edge text-left cursor-pointer ${isRoomSelected ? 'bg-glass-w8 border-edge' : ''}`}
+                    className={classes(BUTTON_FEEDBACK, 'w-full p-3 flex items-center gap-3 border-b text-left', COLOR.edge, COLOR.hoverW5, isRoomSelected && COLOR.glassW8)}
                   >
                     <div className="w-10 h-10 rounded-full bg-surface-raised border border-edge text-retro-muted shrink-0 overflow-hidden flex items-center justify-center"><Lock className="w-4 h-4" /></div>
                     <div className="flex-1 min-w-0">
@@ -970,7 +972,7 @@ export function GMatchDMs({
                       key={p.orbitId}
                       type="button"
                       onClick={() => { playPress(800); setListMode(false); setSidebarOpen(false); onSelectGroup?.(null); onSelectRoom?.(null); onSelectPeer(p); setSearchQuery(''); }}
-                      className="w-full p-2.5 rounded-md flex items-center gap-3 hover:bg-glass-w5 transition-colors text-left cursor-pointer"
+                      className={classes(BUTTON_FEEDBACK, 'w-full p-2.5 flex items-center gap-3 text-left', COLOR.hoverW5)}
                     >
                       <div className="w-9 h-9 rounded-full bg-surface-raised border border-edge text-retro-muted font-medium text-xs flex items-center justify-center overflow-hidden shrink-0">
                         {pfp ? <img src={resolveMediaUrl(pfp)} alt="" className="w-full h-full object-cover" /> : name.charAt(0).toUpperCase()}
@@ -1023,7 +1025,7 @@ export function GMatchDMs({
                   <button
                     type="button"
                     onClick={() => { playPress(800); setListMode(false); setSidebarOpen(false); onSelectGroup?.(null); onSelectRoom?.(null); onSelectPeer({ orbitId: peerId, name, pfp }); setDeleteThreadPeerId(null); }}
-                    className={`w-full p-3 flex items-center gap-3 hover:bg-glass-w5 transition-colors border-b border-edge text-left cursor-pointer ${isSelected ? 'bg-glass-w8 border-edge' : ''}`}
+                    className={classes(BUTTON_FEEDBACK, 'w-full p-3 flex items-center gap-3 border-b text-left', COLOR.edge, COLOR.hoverW5, isSelected && COLOR.glassW8)}
                   >
                     <div className="relative w-10 h-10 rounded-full bg-surface-raised border border-edge text-retro-muted shrink-0 overflow-hidden flex items-center justify-center font-medium text-xs">
                       {pfp ? <img src={resolveMediaUrl(pfp)} alt="" className="w-full h-full object-cover" /> : name.charAt(0).toUpperCase()}
@@ -1057,13 +1059,14 @@ export function GMatchDMs({
                   </button>
                   {showThreadActions && (
                     <div className="absolute left-full top-0 ml-2 mt-1 z-10 bg-surface-raised border border-edge rounded-md shadow-lg py-1 min-w-[140px] animate-orbit-pop">
-                      <button
-                        type="button"
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => { handleDeleteThread(peerId); setDeleteThreadPeerId(null); }}
-                        className="w-full px-3 py-2 text-left text-xs text-danger-fg hover:bg-glass-w5 cursor-pointer"
+                        className={classes('w-full text-left', STATUS.danger)}
                       >
                         Delete Conversation
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -1084,13 +1087,14 @@ export function GMatchDMs({
           <>
             <div className="p-3 sm:p-3.5 px-4 border-b border-edge bg-glass-w5 flex items-center justify-between shrink-0 select-none">
               <div className="flex items-center gap-3 min-w-0">
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => { playPress(700); setListMode(true); onSelectGroup?.(null); onBackToThreads?.(); }}
-                  className="md:hidden p-1 text-retro-muted hover:text-retro-fg cursor-pointer"
+                  className="md:hidden p-1"
                 >
                   <ChevronLeft className="w-5 h-5" />
-                </button>
+                </Button>
 
                 <div className="w-8 h-8 rounded-full bg-surface-raised border border-edge shrink-0 overflow-hidden flex items-center justify-center text-xs font-medium text-retro-muted">
                   {openTarget === 'room' ? (
@@ -1122,8 +1126,9 @@ export function GMatchDMs({
 
               <div className="flex items-center gap-2 text-retro-muted shrink-0">
                 {openTarget === 'peer' && (
-                  <button
-                    type="button"
+                  <Button
+                    variant={searchOpen ? 'secondary' : 'ghost'}
+                    size="sm"
                     onClick={() => {
                       playPress(700);
                       setSearchOpen((v) => !v);
@@ -1132,46 +1137,50 @@ export function GMatchDMs({
                     title="Search this conversation"
                     aria-label="Search this conversation"
                     aria-expanded={searchOpen}
-                    className={`p-1.5 rounded-md transition-colors cursor-pointer ${searchOpen ? 'text-retro-accent bg-glass-w10' : 'text-retro-muted hover:text-retro-fg'}`}
+                    className={classes('p-1.5', searchOpen && COLOR.accent)}
                   >
                     <Search className="w-4 h-4" />
-                  </button>
+                  </Button>
                 )}
                 {openTarget === 'room' && activeRoom && identity && activeRoom.ownerId !== identity.orbitId && onLeaveRoom && (
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => { playPress(520); onLeaveRoom(activeRoom.id); onSelectRoom?.(null); setListMode(true); }}
                     title="Leave room"
                     aria-label="Leave room"
-                    className="p-1.5 rounded-md text-retro-muted hover:text-danger-fg transition-colors cursor-pointer"
+                    className={classes('p-1.5', STATUS.danger)}
                   >
                     <LogOut className="w-4 h-4" />
-                  </button>
+                  </Button>
                 )}
                 {canShowMembers && (
-                  <button
-                    type="button"
+                  <Button
+                    variant={showMembers ? 'secondary' : 'ghost'}
+                    size="sm"
                     onClick={() => { playPress(700); setShowMembers((v) => !v); }}
                     title="Group members"
                     aria-label="Group members"
                     aria-expanded={showMembers}
-                    className={`p-1.5 rounded-md transition-colors cursor-pointer ${showMembers ? 'text-retro-accent bg-glass-w10' : 'text-retro-muted hover:text-retro-fg'}`}
+                    className={classes('p-1.5', showMembers && COLOR.accent)}
                   >
                     <Users className="w-4 h-4" />
-                  </button>
+                  </Button>
                 )}
                 {openTarget === 'group' && activeGroupId && onLeaveGroup && (
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => { playPress(800); onLeaveGroup(activeGroupId); onSelectGroup?.(null); setListMode(true); }}
                     title="Leave group"
-                    className="p-1.5 rounded-md text-retro-muted hover:text-danger-fg transition-colors cursor-pointer"
+                    className={classes('p-1.5', STATUS.danger)}
                   >
                     <X className="w-4 h-4" />
-                  </button>
+                  </Button>
                 )}
-                <button
-                  type="button"
+                <Button
+                  variant={sidebarOpen ? 'secondary' : 'ghost'}
+                  size="sm"
                   onClick={() => {
                     playPress(700);
                     if (typeof window !== 'undefined' && window.innerWidth < 768) {
@@ -1185,23 +1194,22 @@ export function GMatchDMs({
                   title={sidebarOpen ? "Hide groups and players" : "Show groups and players"}
                   aria-label={sidebarOpen ? "Hide groups and players" : "Show groups and players"}
                   aria-expanded={sidebarOpen}
-                  className={`p-1.5 rounded-md transition-colors cursor-pointer ${sidebarOpen ? 'text-retro-accent bg-glass-w10' : 'text-retro-muted hover:text-retro-fg'}`}
+                  className={classes('p-1.5', sidebarOpen && COLOR.accent)}
                 >
                   <Users className="w-4 h-4" />
-                </button>
+                </Button>
               </div>
              </div>
 
              {searchOpen && openTarget === 'peer' && (
                <div className="border-b border-edge bg-glass-w5 px-3 py-2 shrink-0 space-y-1">
-                 <input
+                 <Input
                    autoFocus
                    value={conversationSearch}
                    onChange={(e) => setConversationSearch(e.target.value)}
                    onKeyDown={(e) => { if (e.key === 'Escape') { setSearchOpen(false); setConversationSearch(''); } }}
                    placeholder="Search this conversation…"
                    aria-label="Search this conversation"
-                   className="w-full bg-glass-w10 border border-edge rounded-md px-3 py-1.5 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent/50"
                  />
                  {conversationSearch.trim().length >= 2 && (
                    <div className="max-h-44 overflow-y-auto styled-scrollbar" role="listbox" aria-label="Conversation search results">
@@ -1209,17 +1217,19 @@ export function GMatchDMs({
                        <p className="text-2xs text-retro-muted py-2">No matches in this conversation.</p>
                      ) : (
                        conversationHits.map((hit) => (
-                         <button
+                         <Button
+                           variant="ghost"
+                           size="sm"
                            key={hit.messageId}
                            type="button"
                            role="option"
                            aria-selected={false}
                            onClick={() => jumpToMessage(hit.messageId)}
-                           className="w-full text-left px-2 py-1.5 rounded hover:bg-glass-w8 cursor-pointer"
+                           className="w-full text-left"
                          >
                            <span className="block text-2xs text-retro-muted">{new Date(hit.ts).toLocaleString()}</span>
                            <span className="block text-xs text-retro-body truncate">{hit.text}</span>
-                         </button>
+                         </Button>
                        ))
                      )}
                    </div>
@@ -1265,14 +1275,15 @@ export function GMatchDMs({
                 <>
                 {openTarget === 'peer' && onLoadHistory && hasMoreHistory && displayedMessages.length >= 20 && (
                   <div className="flex justify-center pb-2">
-                    <button
-                      type="button"
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       onClick={handleLoadHistory}
                       disabled={loadingHistory}
-                      className="px-3 py-1.5 rounded-md bg-glass-w8 border border-edge text-2xs text-retro-muted hover:text-retro-fg hover:bg-glass-w12 transition-colors cursor-pointer disabled:opacity-40"
-                    >
-                      {loadingHistory ? 'Loading…' : 'Load earlier messages'}
-                    </button>
+                    className="text-2xs"
+                      >
+                    {loadingHistory ? 'Loading…' : 'Load earlier messages'}
+</Button>
                   </div>
                 )}
                 {messageRows.map((row) => {
@@ -1321,13 +1332,14 @@ export function GMatchDMs({
                       )}
                       <div className={`flex flex-col max-w-[86%] sm:max-w-[76%] ${isOwn ? 'items-end' : 'items-start'}`}>
                         {!isOwn && (
-                          <button
-                            type="button"
-                            className="text-2xs font-semibold text-retro-muted ml-2 mb-0.5 select-text cursor-pointer hover:text-retro-accent transition-colors inline-flex items-center"
-                            onClick={() => onOpenProfile?.(first.senderId)}
-                          >
-                            {senderName}
-                          </button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-2xs ml-2 mb-0.5 select-text"
+                          onClick={() => onOpenProfile?.(first.senderId)}
+                            >
+                          {senderName}
+</Button>
                         )}
                         {block.map((msg) => {
                           const replyTarget = findMessage(msg.replyToId);
@@ -1367,7 +1379,7 @@ export function GMatchDMs({
                                       onOpenImage?.(msg);
                                     }}
                                     title="Open image viewer"
-                                    className={`-mx-1 -mt-1 mb-1.5 rounded-md overflow-hidden bg-retro-bg cursor-pointer block ${msg.text ? '' : 'mb-0'}`}
+                                    className={classes(BUTTON_FEEDBACK, '-mx-1 -mt-1 mb-1.5 rounded-md overflow-hidden block', COLOR.canvas, msg.text ? '' : 'mb-0')}
                                   >
                                     <ObjectImage
                                       contentUrl={msg.attachmentUrl}
@@ -1384,15 +1396,15 @@ export function GMatchDMs({
                                 )}
                                 {editingMessage?.id === msg.id ? (
                                   <div className="flex items-center gap-1">
-                                    <input
+                                    <Input
                                       type="text"
                                       value={editingMessage.text}
                                       onChange={(e) => setEditingMessage({ ...editingMessage!, text: e.target.value })}
-                                      className="bg-glass-w10 border border-edge rounded px-2 py-1 text-xs text-retro-fg outline-none focus:border-retro-accent w-64"
+                                      className="w-64"
                                       autoFocus
                                     />
-                                    <button type="button" onClick={() => handleEditMessage(msg)} className="px-2 py-1 bg-retro-accent text-retro-accent-text text-2xs rounded cursor-pointer">Save</button>
-                                    <button type="button" onClick={() => setEditingMessage(null)} className="px-2 py-1 bg-glass-w8 border border-edge text-2xs rounded cursor-pointer">Cancel</button>
+                                    <Button variant="primary" size="sm" onClick={() => handleEditMessage(msg)} className="text-2xs">Save</Button>
+                                    <Button variant="secondary" size="sm" onClick={() => setEditingMessage(null)} className="text-2xs">Cancel</Button>
                                   </div>
                                 ) : (
                                   <Linkify text={msg.text} />
@@ -1442,16 +1454,17 @@ export function GMatchDMs({
                                   {Object.entries(msg.reactions).map(([emoji, actors]) => {
                                     const mine = !!identity && actors.includes(identity.orbitId);
                                     return (
-                                      <button
+                                      <Button
                                         key={emoji}
-                                        type="button"
+                                        variant={mine ? 'secondary' : 'ghost'}
+                                        size="sm"
                                         onClick={() => onReactMessage?.(activePmPeer?.orbitId || '', msg.id, emoji, !mine)}
                                         title={`${actors.length} reaction${actors.length === 1 ? '' : 's'}`}
                                         aria-pressed={mine}
-                                        className={`px-1.5 py-0.5 rounded-full border text-2xs cursor-pointer transition-colors ${mine ? 'border-retro-accent/60 bg-retro-accent/15 text-retro-fg' : 'border-edge bg-glass-w8 text-retro-muted hover:bg-glass-w12'}`}
-                                      >
-                                        {emoji} {actors.length}
-                                      </button>
+                                      className="px-1.5 py-0.5 rounded-full text-2xs"
+                                        >
+                                      {emoji} {actors.length}
+</Button>
                                     );
                                   })}
                                 </div>
@@ -1463,9 +1476,9 @@ export function GMatchDMs({
                                 if (openTarget === 'room') {
                                   return (
                                     <div className={`flex flex-wrap items-center gap-1 mt-1 ${isOwn ? 'justify-end' : ''}`}>
-                                      <button type="button" onClick={() => copyMessage(msg.text)} className="px-2 py-1 rounded-md bg-glass-w8 border border-edge text-2xs flex items-center gap-1 cursor-pointer hover:bg-glass-w12"><Copy className="w-3 h-3" /> Copy</button>
+                                      <Button variant="secondary" size="sm" onClick={() => copyMessage(msg.text)} className="text-2xs"><Copy className="w-3 h-3" /> Copy</Button>
                                       {!msg.attachmentMime?.startsWith('video/') && msg.attachmentUrl && (
-                                        <button type="button" onClick={() => void copyAttachmentImage(msg)} disabled={copyingImage === msg.id} className="px-2 py-1 rounded-md bg-glass-w8 border border-edge text-2xs flex items-center gap-1 cursor-pointer hover:bg-glass-w12 disabled:opacity-50"><ImagePlus className="w-3 h-3" /> {copyingImage === msg.id ? 'Copying…' : 'Copy image'}</button>
+                                        <Button variant="secondary" size="sm" onClick={() => void copyAttachmentImage(msg)} disabled={copyingImage === msg.id} className="text-2xs"><ImagePlus className="w-3 h-3" /> {copyingImage === msg.id ? 'Copying…' : 'Copy image'}</Button>
                                       )}
                                     </div>
                                   );
@@ -1483,52 +1496,56 @@ export function GMatchDMs({
                                       {['🔥', '💦', '😈', '❤️'].map((emoji) => {
                                         const mine = !!identity && (msg.reactions?.[emoji] || []).includes(identity.orbitId);
                                         return (
-                                          <button
+                                          <Button
                                             key={emoji}
-                                            type="button"
+                                            variant={mine ? 'secondary' : 'ghost'}
+                                            size="sm"
                                             title={mine ? `Remove ${emoji}` : `React with ${emoji}`}
                                             aria-label={mine ? `Remove reaction ${emoji}` : `React with ${emoji}`}
                                             aria-pressed={mine}
                                             onClick={() => { onReactMessage?.(activePmPeer?.orbitId || '', msg.id, emoji, !mine); setActionFor(null); }}
-                                            className={`w-6 h-6 rounded-md text-xs cursor-pointer transition-colors ${mine ? 'bg-retro-accent/25 text-retro-fg' : 'bg-glass-w8 border border-edge text-retro-muted hover:bg-glass-w12'}`}
-                                          >
-                                            {emoji}
-                                          </button>
+                                          className="w-6 h-6 p-0 text-xs"
+                                            >
+                                          {emoji}
+</Button>
                                         );
                                       })}
                                     </div>
                                   )}
-                                  <button type="button" onClick={() => { setReplyingTo(msg); setActionFor(null); }} className="px-2 py-1 rounded-md bg-glass-w8 border border-edge text-2xs flex items-center gap-1 cursor-pointer hover:bg-glass-w12"><Reply className="w-3 h-3" /> Reply</button>
-                                  <button type="button" onClick={() => copyMessage(msg.text)} className="px-2 py-1 rounded-md bg-glass-w8 border border-edge text-2xs flex items-center gap-1 cursor-pointer hover:bg-glass-w12"><Copy className="w-3 h-3" /> Copy</button>
+                                  <Button variant="secondary" size="sm" onClick={() => { setReplyingTo(msg); setActionFor(null); }} className="text-2xs"><Reply className="w-3 h-3" /> Reply</Button>
+                                  <Button variant="secondary" size="sm" onClick={() => copyMessage(msg.text)} className="text-2xs"><Copy className="w-3 h-3" /> Copy</Button>
                                   {!msg.attachmentMime?.startsWith('video/') && msg.attachmentUrl && (
-                                    <button type="button" onClick={() => void copyAttachmentImage(msg)} disabled={copyingImage === msg.id} className="px-2 py-1 rounded-md bg-glass-w8 border border-edge text-2xs flex items-center gap-1 cursor-pointer hover:bg-glass-w12 disabled:opacity-50"><ImagePlus className="w-3 h-3" /> {copyingImage === msg.id ? 'Copying…' : 'Copy image'}</button>
+                                    <Button variant="secondary" size="sm" onClick={() => void copyAttachmentImage(msg)} disabled={copyingImage === msg.id} className="text-2xs"><ImagePlus className="w-3 h-3" /> {copyingImage === msg.id ? 'Copying…' : 'Copy image'}</Button>
                                   )}
                                   {canEdit && (
-                                    <button
-                                      type="button"
+                                    <Button
+                                      variant="secondary"
+                                      size="sm"
                                       onClick={() => { setEditingMessage({ id: msg.id, text: msg.text }); setActionFor(null); }}
-                                      className="px-2 py-1 rounded-md bg-glass-w8 border border-edge text-2xs flex items-center gap-1 cursor-pointer hover:bg-glass-w12"
-                                    ><Edit2 className="w-3 h-3" /> Edit</button>
+                                    className="text-2xs"
+><Edit2 className="w-3 h-3" /> Edit</Button>
                                   )}
                                   {canDeleteEveryone && (
-                                    <button
-                                      type="button"
+                                    <Button
+                                      variant="danger"
+                                      size="sm"
                                       onClick={() => handleDeleteForEveryone(msg)}
-                                      className="px-2 py-1 rounded-md bg-glass-w8 border border-edge text-2xs flex items-center gap-1 cursor-pointer text-danger-fg hover:bg-glass-w12"
-                                    ><Trash className="w-3 h-3" /> Delete for Everyone</button>
+                                    className="text-2xs"
+><Trash className="w-3 h-3" /> Delete for Everyone</Button>
                                   )}
                                   {isOwn && (
-                                    <button
-                                      type="button"
+                                    <Button
+                                      variant="danger"
+                                      size="sm"
                                       onClick={() => { onDeleteMessage?.(msg.id, activePmPeer?.orbitId || ''); setActionFor(null); }}
-                                      className="px-2 py-1 rounded-md bg-glass-w8 border border-edge text-2xs flex items-center gap-1 cursor-pointer text-danger-fg hover:bg-glass-w12"
-                                    ><Trash2 className="w-3 h-3" /> Delete for Me</button>
+                                    className="text-2xs"
+><Trash2 className="w-3 h-3" /> Delete for Me</Button>
                                   )}
                                   {!isOwn && onReportMessage && (
-                                    <button type="button" onClick={() => { onReportMessage(msg.id); setActionFor(null); }} className="px-2 py-1 rounded-md bg-glass-w8 border border-edge text-2xs flex items-center gap-1 cursor-pointer text-danger-fg hover:bg-glass-w12"><Flag className="w-3 h-3" /> Report</button>
+                                    <Button variant="danger" size="sm" onClick={() => { onReportMessage(msg.id); setActionFor(null); }} className="text-2xs"><Flag className="w-3 h-3" /> Report</Button>
                                   )}
                                   {!isOwn && onReportUser && (
-                                    <button type="button" onClick={() => { onReportUser(msg.senderId); setActionFor(null); }} className="px-2 py-1 rounded-md bg-glass-w8 border border-edge text-2xs cursor-pointer text-danger-fg hover:bg-glass-w12">Report user</button>
+                                    <Button variant="danger" size="sm" onClick={() => { onReportUser(msg.senderId); setActionFor(null); }} className="text-2xs">Report user</Button>
                                   )}
                                 </div>
                                 );
@@ -1548,21 +1565,21 @@ export function GMatchDMs({
 
              {openTarget === 'room' && activeRoom && (
               <div className="px-3 pt-2 flex items-center gap-2 shrink-0 border-t border-edge">
-                <input
+                <Input
                   value={roomInvitePeer}
                   onChange={(e) => setRoomInvitePeer(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void inviteRoomPeer(); } }}
                   placeholder="invite a contact by name…"
                   aria-label="Invite contact to room"
                   list="room-invite-peers"
-                  className="flex-1 min-w-0 bg-glass-w10 border border-edge rounded-md px-3 py-1.5 text-xs text-retro-fg placeholder:text-retro-muted outline-none focus:border-retro-accent/50"
+                  className="flex-1 min-w-0"
                 />
                 <datalist id="room-invite-peers">
                   {peers.filter((p) => !activeRoom.members.includes(p.orbitId)).map((p) => (
                     <option key={p.orbitId} value={p.name || p.orbitId} />
                   ))}
                 </datalist>
-                <button type="button" onClick={() => void inviteRoomPeer()} className="px-2.5 py-1.5 rounded-md glass-action text-xs font-medium cursor-pointer">Invite</button>
+                <Button variant="secondary" size="sm" onClick={() => void inviteRoomPeer()}>Invite</Button>
               </div>
             )}
 
@@ -1570,7 +1587,7 @@ export function GMatchDMs({
               <div className="px-3 pt-2 flex items-center gap-2 text-xs text-retro-muted shrink-0 border-t border-edge">
                 <CornerUpLeft className="w-3.5 h-3.5" />
                 <span className="truncate">Replying to {replyingTo.senderId === identity?.orbitId ? 'you' : displayNameFor(replyingTo.senderId)}: {replyingTo.text}</span>
-                <button type="button" onClick={() => setReplyingTo(null)} className="ml-auto text-retro-muted hover:text-retro-fg cursor-pointer"><X className="w-3.5 h-3.5" /></button>
+                <Button variant="ghost" size="sm" onClick={() => setReplyingTo(null)} className="ml-auto p-0"><X className="w-3.5 h-3.5" /></Button>
               </div>
             )}
 
@@ -1578,7 +1595,7 @@ export function GMatchDMs({
               <div className="px-3 pt-2 flex items-center gap-2 text-xs text-retro-muted shrink-0 border-t border-edge">
                 <ImagePlus className="w-3.5 h-3.5" />
                 <span className="truncate">Attachment ready to send</span>
-                <button type="button" onClick={() => setPendingAttachment(null)} className="ml-auto text-retro-muted hover:text-retro-fg cursor-pointer"><X className="w-3.5 h-3.5" /></button>
+                <Button variant="ghost" size="sm" onClick={() => setPendingAttachment(null)} className="ml-auto p-0"><X className="w-3.5 h-3.5" /></Button>
               </div>
             )}
 
@@ -1600,26 +1617,27 @@ export function GMatchDMs({
               ) : (
               <>
               {(activePmPeer && openTarget === 'peer') || openTarget === 'group' || isLobbyGroup ? (
-                <button
-                  type="button"
-                  onClick={() => {
+                <Button
+                  variant="ghost"
+                  size="sm"
+                    onClick={() => {
                     playPress(840);
-                    if (openTarget === 'group' && activeGroupId) {
-                      onOpenAttachment?.('group', undefined, activeGroupId, replyingTo?.id);
-                    } else if (isLobbyGroup) {
-                      onOpenAttachment?.('lobby');
-                    } else if (activePmPeer) {
-                      onOpenAttachment?.('pm', activePmPeer.orbitId, undefined, replyingTo?.id);
-                    }
+                      if (openTarget === 'group' && activeGroupId) {
+                    onOpenAttachment?.('group', undefined, activeGroupId, replyingTo?.id);
+                      } else if (isLobbyGroup) {
+                    onOpenAttachment?.('lobby');
+                      } else if (activePmPeer) {
+                    onOpenAttachment?.('pm', activePmPeer.orbitId, undefined, replyingTo?.id);
+                  }
                   }}
                   title="Attach an image or video — or just paste one"
-                  className="p-2 rounded-md bg-glass-w10 border border-edge text-retro-muted hover:text-retro-accent cursor-pointer transition-colors"
-                >
-                  <ImagePlus className="w-4 h-4" />
-                </button>
+                className="p-2"
+                  >
+                <ImagePlus className="w-4 h-4" />
+</Button>
               ) : null}
-              <div className="flex-1 flex items-center gap-2 bg-glass-w10 border border-edge rounded-md px-3 py-2 text-xs focus-within:border-retro-accent/50 transition-colors">
-                <textarea
+              <div className={classes(FIELD.shell, 'flex-1 flex items-center gap-2 text-xs focus-within:border-retro-accent')}>
+                <Textarea
                   ref={textareaRef}
                   rows={1}
                   value={inputText}
@@ -1657,18 +1675,21 @@ export function GMatchDMs({
                   }}
                   placeholder={openTarget === 'room' ? `Message ${activeRoom?.name || 'room'} (sealed)…` : openTarget === 'group' ? 'Message group...' : isLobbyGroup ? 'Message Lobby Lounge...' : isQueueGroup ? 'Message Card Queue...' : activePmPeer ? `Message ${displayNameFor(activePmPeer.orbitId, activePmPeer.name)}...` : 'Message...'}
                   aria-label="Write a message"
-                  className="w-full bg-transparent focus:outline-none placeholder:text-retro-muted text-retro-fg border-none resize-none max-h-32 py-0.5 leading-normal text-xs styled-scrollbar"
-                />
-              </div>
-              <button
+                  bare
+                className="max-h-32 py-0.5 leading-normal styled-scrollbar"
+              />
+</div>
+              <Button
+                variant="primary"
+                size="sm"
                 type="submit"
                 aria-label="Send message"
                 title="Send message"
-                disabled={!inputText.trim() && !pendingAttachment}
-                className="p-2 rounded-md bg-retro-accent hover:bg-retro-accent-hover text-retro-accent-text disabled:opacity-30 cursor-pointer transition-colors"
+              disabled={!inputText.trim() && !pendingAttachment}
+                className="p-2"
               >
-                <Send className="w-4 h-4" />
-              </button>
+<Send className="w-4 h-4" />
+</Button>
               </>
               )}
             </form>

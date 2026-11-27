@@ -9,6 +9,8 @@ import { logger } from '../../utils/logger';
 import { CardTile } from '../home/CardTile';
 import { DND_CARD } from '../DropZone';
 import { openCardDetail } from '../../utils/openCard';
+import { Button, Input } from '../../ui/kit';
+import { BUTTON_FEEDBACK, classes, FIELD, STATUS } from '../../ui/tokens';
 
 export const ACTIVE_DECK_STORAGE_KEY = 'orbit_active_deck_id';
 
@@ -301,24 +303,22 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => {
               setSelectedDeck(null);
               setValidation(null);
               setAddingCards(false);
             }}
-            className="text-xs text-retro-muted hover:text-retro-body flex items-center gap-1"
           >
             <X className="w-3 h-3" />
             Back to Decks
-          </button>
-          <button
-            onClick={validateDeck}
-            className="text-xs bg-info/20 hover:bg-info/30 text-info-fg px-3 py-1.5 rounded-lg flex items-center gap-1.5"
-          >
+          </Button>
+          <Button variant="info" size="sm" onClick={validateDeck}>
             <Check className="w-3 h-3" />
             Validate Deck
-          </button>
+          </Button>
         </div>
 
         <div className="bg-surface-raised border border-edge rounded-xl p-4">
@@ -326,26 +326,28 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
             <div>
                <div className="flex items-center gap-2">
                  <h2 className="text-lg font-bold text-retro-fg">{selectedDeck.name}</h2>
-                 <button
-                   type="button"
+                 <Button
+                   variant="ghost"
+                   size="sm"
                    onClick={() => setEditingName(selectedDeck.name)}
-                   className="text-retro-muted hover:text-retro-fg cursor-pointer"
+                   className="p-1"
                    title="Rename deck"
                  >
                    <Pencil className="w-3.5 h-3.5" />
-                 </button>
+                 </Button>
                  {activeDeckId === selectedDeck.id ? (
                    <span className="px-2 py-0.5 rounded-full bg-success/20 border border-success/40 text-success-fg font-mono text-2xs font-bold flex items-center gap-1">
                      <Star className="w-3 h-3 fill-success text-success-fg" /> Active Deck
                    </span>
                  ) : (
-                   <button
-                     type="button"
+                   <Button
+                     variant="secondary"
+                     size="sm"
                      onClick={() => setActiveDeck(selectedDeck.id)}
-                     className="px-2 py-0.5 rounded-full bg-surface-interactive border border-edge hover:border-success/40 text-retro-muted hover:text-success-fg text-2xs font-bold cursor-pointer transition-colors"
+                     className={classes('rounded-full', STATUS.success)}
                    >
                      Set as Active
-                   </button>
+                   </Button>
                  )}
                </div>
               <p className="text-xs text-retro-muted mt-1">
@@ -354,25 +356,22 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
            </div>
 
              <div className="flex items-center gap-2">
-              <button
-                onClick={() => setAddingCards(!addingCards)}
-                className="text-xs bg-info/20 hover:bg-info/30 text-info-fg px-3 py-1.5 rounded-lg flex items-center gap-1.5 cursor-pointer font-semibold"
-              >
+              <Button variant="info" size="sm" onClick={() => setAddingCards(!addingCards)}>
                 <Plus className="w-3 h-3" />
                 {addingCards ? 'Done' : 'Add Cards'}
-              </button>
+              </Button>
               {selectedDeck.cards.length === 5 && onEnterArena && (
-                <button
-                  type="button"
+                <Button
+                  variant="primary"
+                  size="sm"
                   onClick={() => {
                     setActiveDeck(selectedDeck.id);
                     onEnterArena();
                   }}
-                  className="text-xs bg-retro-accent text-retro-accent-text font-black px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 hover:bg-retro-accent-hover cursor-pointer shadow-md"
                 >
                   <Swords className="w-3.5 h-3.5" />
                   Enter Arena
-                </button>
+                </Button>
               )}
            </div>
 
@@ -380,15 +379,15 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
 
            {editingName !== '' && (
              <div className="flex gap-2 mb-4">
-               <input
+               <Input
                  autoFocus
                  value={editingName}
                  onChange={(e) => setEditingName(e.target.value)}
                  maxLength={60}
-                 className="flex-1 bg-surface-interactive border border-edge rounded-lg px-3 py-1.5 text-xs text-retro-fg outline-none focus:border-retro-accent/50"
+                 className="flex-1"
                />
-               <button type="button" onClick={renameDeck} className="px-3 py-1.5 rounded-lg bg-info text-retro-fg text-xs font-bold cursor-pointer">Save</button>
-               <button type="button" onClick={() => setEditingName('')} className="px-3 py-1.5 rounded-lg border border-edge text-retro-muted text-xs cursor-pointer">Cancel</button>
+               <Button variant="info" size="sm" onClick={renameDeck}>Save</Button>
+               <Button variant="secondary" size="sm" onClick={() => setEditingName('')}>Cancel</Button>
              </div>
            )}
 
@@ -443,13 +442,15 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
                 {getCardsInDeck().map(card => (
                   <div key={card.id} className="relative group">
                     <CardTile item={card} identity={identity} onClick={() => openCardDetail(card)} />
-                    <button
+                    <Button
+                      variant="danger"
+                      size="sm"
                       onClick={() => removeCardFromDeck(canonicalId(card))}
-                      className="absolute top-2 right-2 bg-danger/80 hover:bg-danger text-retro-fg p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute top-2 right-2 p-1.5 opacity-0 group-hover:opacity-100"
                       title="Remove from deck"
                     >
                       <Trash2 className="w-3 h-3" />
-                    </button>
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -459,14 +460,14 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
           {addingCards && (
             <div className="mt-6">
               <h3 className="text-sm font-bold text-retro-body mb-2">Available cards</h3>
-              <div className="mb-3 flex items-center gap-2 bg-surface-canvas border border-edge rounded-lg px-3 py-2">
+              <div className={FIELD.shell}>
                 <Search className="w-4 h-4 text-retro-muted shrink-0" />
-                <input
+                <Input
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Filter cards…"
-                  className="flex-1 bg-transparent text-sm text-retro-fg placeholder:text-retro-muted focus:outline-none"
+                  bare
                 />
               </div>
               {availableCards.length === 0 ? (
@@ -486,13 +487,15 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
                       }}
                     >
                       <CardTile item={card} identity={identity} onClick={() => openCardDetail(card)} />
-                      <button
+                      <Button
+                        variant="info"
+                        size="sm"
                         onClick={() => addCardToDeck(canonicalId(card))}
-                        className="absolute top-2 right-2 bg-info/80 hover:bg-info text-retro-fg p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute top-2 right-2 p-1.5 opacity-0 group-hover:opacity-100"
                         title="Add to deck (or drag into the deck above)"
                       >
                         <Plus className="w-3 h-3" />
-                      </button>
+                      </Button>
                     </div>
                   ))}
                 </div>
@@ -509,22 +512,23 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
       <div className="bg-surface-raised border border-edge rounded-xl p-4">
         <h2 className="text-lg font-bold text-retro-fg mb-4">Create new deck</h2>
         <div className="flex gap-2">
-          <input
+          <Input
             type="text"
             value={newDeckName}
             onChange={(e) => setNewDeckName(e.target.value)}
             placeholder="Deck name..."
-            className="flex-1 bg-surface-canvas border border-edge rounded-lg px-3 py-2 text-sm text-retro-fg placeholder:text-retro-muted focus:outline-none focus:border-retro-accent/50"
+            className="flex-1"
             maxLength={60}
           />
-          <button
+          <Button
+            variant="info"
+            size="md"
             onClick={() => void createDeck()}
             disabled={!newDeckName.trim()}
-            className="bg-info hover:bg-info disabled:bg-surface-interactive disabled:text-retro-muted text-retro-fg px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1.5"
           >
             <Plus className="w-4 h-4" />
             Create
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -545,7 +549,7 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
               >
                 <button
                   onClick={() => setSelectedDeck(deck)}
-                  className="flex-1 text-left"
+                  className={classes(BUTTON_FEEDBACK, 'flex-1 text-left')}
                 >
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-bold text-retro-fg">{deck.name}</h3>
@@ -562,13 +566,15 @@ export function DeckBuilder({ identity, cards, onEnterArena, toast }: DeckBuilde
                     {deck.cards.length === 5 ? '5/5 Cards Complete' : `${5 - deck.cards.length} cards needed`} • Updated {new Date(deck.updatedAt).toLocaleDateString()}
                   </p>
                 </button>
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => deleteDeck(deck.id)}
-                  className="text-danger-fg hover:text-danger-fg p-2 rounded-lg hover:bg-danger/10 transition-colors"
+                  className={classes('p-2', STATUS.danger)}
                   title="Delete deck"
                 >
                   <Trash2 className="w-4 h-4" />
-                </button>
+                </Button>
               </div>
             ))}
           </div>

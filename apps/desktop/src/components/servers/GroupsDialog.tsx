@@ -5,9 +5,16 @@
 // confers no authority. It is deliberately NOT part of the server list — a
 // label is not a server and must never look joinable. Hosting and joining live
 // in AddWorldDialog; this is the secondary management flow for labels alone.
+//
+// Chrome drinks from ui/tokens: the kit Modal owns the shell, RECIPE.card the
+// list surface, and TYPE/WEIGHT/STATUS the text and hover roles.
 import { useEffect, useState } from 'react'
 import { createLabel, isOwnLabel, type LocalMeshLabel } from './meshLabels'
 import { Modal } from '../../ui/kit'
+import {
+  classes, COLOR, GAP, PADDING_X, PADDING_Y, RADIUS,
+  RECIPE, STATUS, TRANSITION, TYPE, WEIGHT,
+} from '../../ui/tokens'
 
 export function GroupsDialog({
   open,
@@ -32,13 +39,13 @@ export function GroupsDialog({
   return (
     <Modal title="Local groups" onClose={onClose} maxWidth="max-w-sm">
       <div className="space-y-3">
-        <p className="text-2xs text-retro-muted">
+        <p className={classes(TYPE.caption, COLOR.muted)}>
           A label on this device for peers you keep track of. It adds no network and is
           visible to nobody else.
         </p>
 
         <form
-          className="flex items-end gap-2"
+          className={classes('flex items-end', GAP[2])}
           onSubmit={(e) => {
             e.preventDefault()
             const clean = name.trim()
@@ -47,7 +54,7 @@ export function GroupsDialog({
             setName('')
           }}
         >
-          <label className="block flex-1 text-xs text-retro-muted">
+          <label className={classes('block flex-1', TYPE.body, COLOR.muted)}>
             Group name
             <input
               aria-label="New group name"
@@ -55,31 +62,31 @@ export function GroupsDialog({
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Friday crew"
               maxLength={40}
-              className="glass-field mt-1 w-full px-2.5 py-1.5 text-xs"
+              className={classes('glass-field mt-1 w-full px-2.5 py-1.5', TYPE.body)}
             />
           </label>
           <button
             type="submit"
             disabled={!name.trim()}
-            className="glass-action glass-action-primary h-[30px] px-3 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-50"
+            className={classes('glass-action glass-action-primary h-[30px] cursor-pointer disabled:opacity-50', PADDING_X[3], RADIUS.control, TYPE.body, WEIGHT.bold)}
           >
             Create
           </button>
         </form>
 
         {labels.length === 0 ? (
-          <p className="text-2xs text-retro-muted">None yet.</p>
+          <p className={classes(TYPE.caption, COLOR.muted)}>None yet.</p>
         ) : (
-          <ul className="rounded-lg border border-edge divide-y divide-edge-subtle overflow-hidden">
+          <ul className={classes('divide-y divide-edge-subtle overflow-hidden', RECIPE.card)}>
             {labels.map((l) => (
-              <li key={l.id} className="flex items-center justify-between gap-2 px-3 py-2 text-xs">
-                <span className="truncate text-retro-fg">
+              <li key={l.id} className={classes('flex items-center justify-between', GAP[2], PADDING_X[3], PADDING_Y[2], TYPE.body)}>
+                <span className={classes('truncate', COLOR.fg)}>
                   {l.name}
-                  <span className="ml-1 font-normal text-retro-muted">
+                  <span className={classes('ml-1', WEIGHT.regular, COLOR.muted)}>
                     · {l.memberOrbitIds.length} peers{l.nodeCodes.length ? ` · ${l.nodeCodes.length} codes` : ''}
                   </span>
                   {isOwnLabel(l, ownerId) && (
-                    <span className="ml-1 text-2xs text-retro-muted">(this device)</span>
+                    <span className={classes('ml-1', TYPE.caption, COLOR.muted)}>(this device)</span>
                   )}
                 </span>
                 <button
@@ -87,7 +94,7 @@ export function GroupsDialog({
                   aria-label={`Forget group ${l.name}`}
                   title="Forget this group (local only, removes nothing remotely)"
                   onClick={() => onSave(labels.filter((x) => x.id !== l.id))}
-                  className="px-1.5 py-0.5 rounded text-2xs text-retro-muted hover:text-retro-error hover:bg-glass-w8 cursor-pointer transition-colors"
+                  className={classes('px-1.5 py-0.5 cursor-pointer', RADIUS.chip, TYPE.caption, COLOR.muted, STATUS.danger, STATUS.dangerHoverBg, TRANSITION.micro)}
                 >
                   Forget
                 </button>
@@ -99,4 +106,3 @@ export function GroupsDialog({
     </Modal>
   )
 }
-

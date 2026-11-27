@@ -8,11 +8,25 @@
  * handed in as `hostForm`, so there is one dialog and one modal implementation.
  * Device-local groups are a separate, secondary flow (GroupsDialog): a label is
  * not a server and must never be offered as one.
+ *
+ * All chrome (choice tiles, labels, captions, buttons) reads ui/tokens; the
+ * dialog itself is the kit Modal, so the surface and type ladder have one owner.
  */
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { Modal } from '../../ui/kit';
+import {
+  classes, COLOR, GAP, PADDING_X, PADDING_Y, RADIUS,
+  STATUS, TRANSITION, TYPE, WEIGHT,
+} from '../../ui/tokens';
+
+/** The two chooser cards share one raised-glass surface recipe. */
+const choice = classes(
+  'w-full text-left cursor-pointer border',
+  RADIUS.control, COLOR.edge, COLOR.glassW5, COLOR.hoverW10,
+  PADDING_X[3], 'py-2.5', TRANSITION.micro,
+);
 
 export function AddWorldDialog({
   open,
@@ -52,7 +66,7 @@ export function AddWorldDialog({
     <button
       type="button"
       onClick={() => setStep('choose')}
-      className="flex items-center gap-1 text-xs text-retro-muted hover:text-retro-fg cursor-pointer transition-colors"
+      className={classes('flex items-center cursor-pointer', GAP[1], TYPE.body, COLOR.muted, COLOR.hoverFg, TRANSITION.micro)}
     >
       <ArrowLeft className="w-3 h-3" /> All options
     </button>
@@ -65,10 +79,10 @@ export function AddWorldDialog({
           <button
             type="button"
             onClick={() => setStep('join')}
-            className="w-full rounded-lg border border-edge bg-glass-w5 hover:bg-glass-w10 px-3 py-2.5 text-left cursor-pointer transition-colors duration-150"
+            className={choice}
           >
-            <span className="block text-xs font-bold text-retro-fg">Join with code</span>
-            <span className="mt-0.5 block text-2xs text-retro-muted">
+            <span className={classes('block', TYPE.body, WEIGHT.bold, COLOR.fg)}>Join with code</span>
+            <span className={classes('mt-0.5 block', TYPE.caption, COLOR.muted)}>
               Paste the code the host sent you.
             </span>
           </button>
@@ -76,10 +90,10 @@ export function AddWorldDialog({
             <button
               type="button"
               onClick={() => setStep('host')}
-              className="w-full rounded-lg border border-edge bg-glass-w5 hover:bg-glass-w10 px-3 py-2.5 text-left cursor-pointer transition-colors duration-150"
+              className={choice}
             >
-              <span className="block text-xs font-bold text-retro-fg">Host a server</span>
-              <span className="mt-0.5 block text-2xs text-retro-muted">
+              <span className={classes('block', TYPE.body, WEIGHT.bold, COLOR.fg)}>Host a server</span>
+              <span className={classes('mt-0.5 block', TYPE.caption, COLOR.muted)}>
                 Run a world on this computer and share its code.
               </span>
             </button>
@@ -105,7 +119,7 @@ export function AddWorldDialog({
           }}
         >
           {back}
-          <label className="block text-xs text-retro-muted">
+          <label className={classes('block', TYPE.body, COLOR.muted)}>
             Invite code
             <input
               ref={firstRef}
@@ -114,24 +128,24 @@ export function AddWorldDialog({
               onChange={(e) => { setCode(e.target.value); setJoinError('') }}
               placeholder="gmatch://node/…"
               aria-invalid={joinError ? true : undefined}
-              className="glass-field mt-1 w-full px-2.5 py-1.5 text-xs"
+              className={classes('glass-field mt-1 w-full px-2.5 py-1.5', TYPE.body)}
             />
           </label>
           {joinError ? (
-            <p role="alert" className="text-2xs text-retro-error">{joinError}</p>
+            <p role="alert" className={classes(TYPE.caption, STATUS.danger)}>{joinError}</p>
           ) : (
-            <p className="text-2xs text-retro-muted">
+            <p className={classes(TYPE.caption, COLOR.muted)}>
               Paste the code the host sent you. It carries the address, not a secret.
             </p>
           )}
-          <div className="flex justify-end gap-2 pt-1">
-            <button type="button" onClick={onClose} className="glass-action px-3 py-1.5 rounded-lg text-xs text-retro-muted cursor-pointer">
+          <div className={classes('flex justify-end pt-1', GAP[2])}>
+            <button type="button" onClick={onClose} className={classes('glass-action cursor-pointer', PADDING_X[3], PADDING_Y[1.5], RADIUS.control, TYPE.body, COLOR.muted)}>
               Cancel
             </button>
             <button
               type="submit"
               disabled={!code.trim() || joining}
-              className="glass-action glass-action-primary px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-50"
+              className={classes('glass-action glass-action-primary cursor-pointer disabled:opacity-50', PADDING_X[3], PADDING_Y[1.5], RADIUS.control, TYPE.body, WEIGHT.bold)}
             >
               {joining ? 'Joining…' : 'Join'}
             </button>
@@ -148,4 +162,3 @@ export function AddWorldDialog({
     </Modal>
   )
 }
-
