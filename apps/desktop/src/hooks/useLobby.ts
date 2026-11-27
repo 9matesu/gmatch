@@ -387,6 +387,32 @@ export function useLobby({
     void initLobby()
   }, [identity, refresh, refreshNotifications])
 
+  // Keep the unread badge honest without a WS push: a like/comment/follow that
+  // lands while the window sits open must still mark. Re-pull on focus and on
+  // return-to-visible (bounded to once per 15s), plus a gentle 60s poll while
+  // visible — the same cadence rule the feed uses, so a background tab is never
+  // hammered.
+  useEffect(() => {
+    if (!identity) return
+    let last = 0
+    const pull = () => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
+      const now = Date.now()
+      if (now - last < 15_000) return
+      last = now
+      void refreshNotifications()
+    }
+    const onVisible = () => { if (document.visibilityState === 'visible') pull() }
+    window.addEventListener('focus', pull)
+    document.addEventListener('visibilitychange', onVisible)
+    const id = setInterval(pull, 60_000)
+    return () => {
+      window.removeEventListener('focus', pull)
+      document.removeEventListener('visibilitychange', onVisible)
+      clearInterval(id)
+    }
+  }, [identity, refreshNotifications])
+
   // Poll the lobby (DB truth) as a fast fallback behind the WS push. A single
   // stable interval avoids tearing down/recreating the timer on every poll
   // (state?.match changes identity each refresh, which used to reset the
