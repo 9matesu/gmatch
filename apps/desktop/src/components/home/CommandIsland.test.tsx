@@ -43,11 +43,11 @@ describe('CommandIsland navigation coverage', () => {
   it('toggles satellite bar visibility when clicking More options', async () => {
     const setMainView = vi.fn()
     render(<CommandIsland mainView="feed" setMainView={setMainView} />)
-    expect(screen.getByText('Domination')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'More options' }))
     expect(screen.queryByText('Domination')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'More options' }))
     expect(screen.getByText('Domination')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'More options' }))
+    expect(screen.queryByText('Domination')).not.toBeInTheDocument()
   })
 
   it('Clicker button appears on the pill and the island carries no notification entry point', async () => {

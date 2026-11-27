@@ -46,9 +46,9 @@ const SATELLITE_KEY = 'gmatch.satellite_bar.visible';
 function readSatelliteOpen(): boolean {
   try {
     const v = localStorage.getItem(SATELLITE_KEY);
-    return v === null ? true : v === '1';
+    return v === null ? false : v === '1';
   } catch {
-    return true;
+    return false;
   }
 }
 
@@ -341,7 +341,6 @@ export function CommandIsland({
               className="w-4 h-4"
               weight={messagesOpen || mainView === 'messages' || mainView === 'rooms' ? 'fill' : 'regular'}
             />
-            <span className="text-xs font-medium hidden md:inline">Chat</span>
             <CountBadge count={unreadMessagesCount} />
           </button>
 
