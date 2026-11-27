@@ -348,6 +348,10 @@ export function ObjectImage({
 
   if (!src) {
     if (hideUnavailable && (signed ? img.failed || unresolvable : hasError)) return null
+    // Hide-until-available: a row with no bytes yet takes NO space and shows
+    // nothing, but the element stays mounted (ref) so the deferred signed
+    // fetch's IntersectionObserver still fires and the row promotes on load.
+    if (hideUnavailable) return <div ref={placeholderRef} className="h-0 w-full" />
     const waiting = waitingForBytes
     const seeding = signed && img.awaitingSeeder
     return (

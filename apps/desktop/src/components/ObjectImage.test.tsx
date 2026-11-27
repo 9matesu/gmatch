@@ -139,16 +139,16 @@ describe('ObjectImage placeholder (T-W3)', () => {
 })
 
 describe('ObjectImage strict availability (2026-11-24)', () => {
-  it('never collapses a tile while the signed fetch is still in flight', () => {
-    // The 6s availability timer used to fire while useObjectImage was still
-    // fetching, and hideUnavailable then removed the tile: every profile image
-    // "disappeared" mid-load. A fetch in flight is waiting, not unavailable.
+  it('hides a loading tile (no strip) while the signed fetch is in flight, without unmounting it', () => {
+    // Hide-until-available: no bytes yet -> no space and no "Loading media..."
+    // strip, but the element stays mounted (0-height, ref kept) so the deferred
+    // signed fetch's IntersectionObserver still fires and the row promotes.
     vi.useFakeTimers()
     try {
-      render(<ObjectImage contentUrl="/api/objects/pending" identity={identity} hideUnavailable />)
+      const { container } = render(<ObjectImage contentUrl="/api/objects/pending" identity={identity} hideUnavailable />)
       act(() => { vi.advanceTimersByTime(30_000) })
-      expect(screen.getByText('Loading media...')).toBeInTheDocument()
-      expect(screen.queryByText('Image unavailable')).toBeNull()
+      expect(screen.queryByText('Loading media...')).toBeNull()
+      expect(container.querySelector('.h-0')).not.toBeNull()
     } finally {
       vi.useRealTimers()
     }
