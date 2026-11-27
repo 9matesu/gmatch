@@ -37,7 +37,7 @@ describe('GMatchFeed timeline filtering and resilience', () => {
     { id: 'offline-author', display_name: 'Offline User', online: false, last_seen: '2020-01-01T00:00:00Z' },
   ];
 
-  it('keeps a text-only post and drops a row with no body and no media', () => {
+  it('drops a text-only post and a row with no media (no empty cards)', () => {
     const posts: any[] = [
       {
         id: 'text-post-1',
@@ -84,7 +84,7 @@ describe('GMatchFeed timeline filtering and resilience', () => {
     );
 
     expect(screen.getByText('Valid working post')).toBeInTheDocument();
-    expect(screen.getByText('Text only, no media')).toBeInTheDocument();
+    expect(screen.queryByText('Text only, no media')).not.toBeInTheDocument();
   });
 
   it('keeps offline-author posts visible on the timeline so content remains shared', () => {

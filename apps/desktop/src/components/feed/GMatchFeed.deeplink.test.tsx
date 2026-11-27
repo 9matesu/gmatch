@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { GMatchFeed } from './GMatchFeed';
 
@@ -59,15 +59,6 @@ function renderFeed(
 
 const fireHashChange = () => act(() => { window.dispatchEvent(new Event('hashchange')); });
 
-const openImage = vi.fn();
-beforeEach(() => {
-  window.addEventListener('gmatch-open-image', openImage);
-});
-afterEach(() => {
-  window.removeEventListener('gmatch-open-image', openImage);
-  openImage.mockClear();
-});
-
 beforeEach(() => {
   window.location.hash = '';
   vi.clearAllMocks();
@@ -77,7 +68,7 @@ describe('feed deep links', () => {
   it('opens the target when the hash is already set before the list loads', async () => {
     window.location.hash = '#/feed?post=p2';
     renderFeed([post('p1', 'first'), post('p2', 'second')]);
-    await waitFor(() => expect(openImage).toHaveBeenCalled());
+    await waitFor(() => expect(document.querySelector('[data-expanded-post]')).not.toBeNull());
     // Deep links expand the card inline (image only); no side sheet.
     window.location.hash = '';
   });
@@ -91,19 +82,19 @@ describe('feed deep links', () => {
     window.location.hash = '#/feed?post=p2';
     fireHashChange();
 
-    await waitFor(() => expect(openImage).toHaveBeenCalled());
+    await waitFor(() => expect(document.querySelector('[data-expanded-post]')).not.toBeNull());
     window.location.hash = '';
   });
 
   it('switches to a different target when the hash names another post', async () => {
     window.location.hash = '#/feed?post=p1';
     renderFeed([post('p1', 'first'), post('p2', 'second')]);
-    await waitFor(() => expect(openImage).toHaveBeenCalled());
+    await waitFor(() => expect(document.querySelector('[data-expanded-post]')).not.toBeNull());
 
     window.location.hash = '#/feed?post=p2';
     fireHashChange();
 
-    await waitFor(() => expect(openImage).toHaveBeenCalled());
+    await waitFor(() => expect(document.querySelector('[data-expanded-post]')).not.toBeNull());
     window.location.hash = '';
   });
 
@@ -129,7 +120,7 @@ describe('feed deep links', () => {
       />,
     );
 
-    await waitFor(() => expect(openImage).toHaveBeenCalled());
+    await waitFor(() => expect(document.querySelector('[data-expanded-post]')).not.toBeNull());
     // Asked exactly once, not once per list change.
     expect(resolve).toHaveBeenCalledTimes(1);
     window.location.hash = '';
@@ -139,13 +130,13 @@ describe('feed deep links', () => {
     renderFeed([post('p1', 'first'), post('p2', 'second')]);
     window.location.hash = '#/feed?post=p1';
     fireHashChange();
-    await waitFor(() => expect(openImage).toHaveBeenCalled());
+    await waitFor(() => expect(document.querySelector('[data-expanded-post]')).not.toBeNull());
 
     // A notification taps the same post again: the intent is new, so it reopens.
     act(() => {
       fireEvent(window, new CustomEvent('gmatch-open-post', { detail: { postId: 'p2' } }));
     });
-    await waitFor(() => expect(openImage).toHaveBeenCalled());
+    await waitFor(() => expect(document.querySelector('[data-expanded-post]')).not.toBeNull());
     window.location.hash = '';
   });
 });

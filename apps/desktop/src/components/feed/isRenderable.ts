@@ -1,8 +1,8 @@
 /**
  * The one rule for "is this row a post?" (SPEC: an image network shows no empty
- * card). A row is rendered only when it carries something to show — words, a
- * resolvable url, or media bytes — and a row with nothing is dropped before it
- * can take a slot in the list or the grid.
+ * card). A row is rendered only when it carries MEDIA — a resolvable url or
+ * media bytes. A caption-only row with no bytes is dropped: the player has
+ * nothing to see, so it must not sit in the feed waiting.
  *
  * `ObjectImage` reports the separate, later failure: bytes that never arrive.
  * That is the tile's own `onMediaUnavailable` → `hidePost`, not this predicate,
@@ -17,7 +17,6 @@ export type RenderablePost = {
 }
 
 export function isRenderable(post: RenderablePost): boolean {
-  if (post.caption && post.caption.trim()) return true
   if (post.url && post.url.trim()) return true
   if (post.localPreviewUrl) return true
   if (post.mediaUrls?.some((u) => !!u && u.trim())) return true

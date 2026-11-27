@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { playPress } from '../../utils/sounds';
 import {
   Heart,
@@ -10,6 +10,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
+  FolderPlus,
+  MessageCircle,
 } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { FeedPost, PostComment } from './GMatchFeed';
@@ -29,7 +31,7 @@ import { PostComments } from './PostComments';
  * same wired action bar and comment thread — but rendered as an <article> in
  * the page flow under the grid instead of a fixed overlay dialog.
  */
-export function ProfileExpandedPost({ post, onClose, identity, profilePics = {}, isLiked = false, isSaved = false, likeCount = 0, comments = [], commentsLoading = false, onToggleLike, onToggleSave, onAddComment, onToggleCommentLike, onReportComment, onOpenShare, onOptionsClick, onOpenLikers, onSelectUser, onAvatarClick, onOpenNetwork }: {
+export function ProfileExpandedPost({ post, onClose, identity, profilePics = {}, isLiked = false, isSaved = false, likeCount = 0, comments = [], commentsLoading = false, onToggleLike, onToggleSave, onAddComment, onToggleCommentLike, onReportComment, onOpenShare, onOptionsClick, onOpenLikers, onSelectUser, onAvatarClick, onOpenNetwork, onSaveToVault }: {
   post: FeedPost;
   onClose: () => void;
   identity: OrbitIdentity | null;
@@ -46,6 +48,8 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
   onToggleCommentLike?: (postId: string, commentId: string) => void;
   onReportComment?: (commentId: string) => void;
   onOpenShare?: (post: FeedPost) => void;
+  /** Save the media bytes to the local Vault (desktop only). */
+  onSaveToVault?: (post: FeedPost) => void;
   /**
    * Open the post context menu. The optional position is the CURSOR point of
    * the right-click; when absent the caller picks a sensible spot (the menu
@@ -70,6 +74,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
   // back from its own store counts, and only when it proves at least one OTHER
   // device holds them (this node alone is not replication).
   const custody = custodyStatus(useDurableCustody(post?.content_hash || post?.id));
+  const articleRef = useRef<HTMLElement>(null);
 
   // Reset carousel whenever a different post is opened.
   useEffect(() => {
@@ -135,6 +140,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
 
   return (
     <article
+      ref={articleRef}
       data-expanded-post={post.id}
       onContextMenu={(e) => {
         // The context menu REPLACED the three-dots button: right-click the
@@ -186,7 +192,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
       {/* Media. Click opens the fullscreen ImageViewer; double-click still likes. */}
       <div
         className="relative bg-retro-bg flex items-center justify-center overflow-hidden min-h-[280px] cursor-pointer"
-        onClick={() => { if (post.id) window.dispatchEvent(new CustomEvent('gmatch-open-image', { detail: { id: post.id } })); }}
+        onClick={() => { if (post.id) window.dispatchEvent(new CustomEvent('gmatch-open-image', { detail: { id: post.id, authorName: post.author_name || 'You', url: post.localPreviewUrl || post.url } })); }}
         onDoubleClick={handleDoubleTap}
       >
         {post.localPreviewUrl ? (
@@ -300,35 +306,59 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
 
       </div>
 
-      {/* Action Bar */}
-      <div className="flex items-center gap-1 px-2 pt-1">
-        <button
-          type="button"
-          onClick={() => onToggleLike?.(post)}
-          aria-label={isLiked ? 'Unlike' : 'Like'}
-          aria-pressed={isLiked}
-          className="p-1.5 hover:bg-glass-w12 rounded-full transition-colors cursor-pointer"
-        >
-          <Heart className={`w-5 h-5 ${isLiked ? 'fill-danger text-danger-fg' : 'text-retro-fg'}`} />
-        </button>
-        <button
-          type="button"
-          onClick={() => onOpenShare?.(post)}
-          aria-label="Share post"
-          className="p-1.5 hover:bg-glass-w12 rounded-full transition-colors cursor-pointer"
-        >
-          <Send className="w-5 h-5 text-retro-fg" />
-        </button>
-        <div className="flex-1" />
-        <button
-          type="button"
-          onClick={() => onToggleSave?.(post)}
-          aria-label={isSaved ? 'Remove from saved' : 'Save post'}
-          aria-pressed={isSaved}
-          className="p-1.5 hover:bg-glass-w12 rounded-full transition-colors cursor-pointer"
-        >
-          <Bookmark className={`w-5 h-5 ${isSaved ? 'fill-warning text-warning-fg' : 'text-retro-fg'}`} />
-        </button>
+      {/* Action Bar — same icons, order, colors and padding as the standard card. */}
+      <div className="px-3 sm:px-4 pt-2.5 pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => onToggleLike?.(post)}
+              aria-label={isLiked ? 'Unlike' : 'Like'}
+              aria-pressed={isLiked}
+              className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-(--scale-press)"
+            >
+              <Heart className={`w-4 h-4 transition-colors stroke-[1.75] ${isLiked ? 'text-danger-fg fill-danger' : 'text-retro-muted hover:text-retro-fg'}`} />
+            </button>
+            <button
+              type="button"
+              onClick={() => articleRef.current?.querySelector('input')?.focus()}
+              aria-label="Comment"
+              className="p-1.5 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-(--scale-press)"
+            >
+              <MessageCircle className="w-4 h-4 stroke-[1.75]" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onOpenShare?.(post)}
+              aria-label="Share post"
+              className="p-1.5 rounded-md text-retro-muted hover:text-retro-fg hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-(--scale-press)"
+            >
+              <Send className="w-4 h-4 stroke-[1.75]" />
+            </button>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => onToggleSave?.(post)}
+              aria-label={isSaved ? 'Remove from saved' : 'Save post'}
+              aria-pressed={isSaved}
+              className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-(--scale-press)"
+            >
+              <Bookmark className={`w-4 h-4 transition-colors stroke-[1.75] ${isSaved ? 'text-retro-fg fill-retro-fg' : 'text-retro-muted hover:text-retro-fg'}`} />
+            </button>
+            {onSaveToVault && post.url && (
+              <button
+                type="button"
+                onClick={() => onSaveToVault(post)}
+                aria-label="Save to Vault"
+                title="Save the media to your Vault (offline copy)"
+                className="p-1.5 rounded-md hover:bg-glass-w10 cursor-pointer transition-transform duration-150 active:scale-(--scale-press)"
+              >
+                <FolderPlus className="w-4 h-4 stroke-[1.75] text-retro-muted hover:text-retro-fg" />
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Likes Summary — "Liked by Ana, Bo and 12 others" when the

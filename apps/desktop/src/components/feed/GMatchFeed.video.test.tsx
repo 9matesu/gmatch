@@ -126,14 +126,10 @@ describe('GMatchFeed video player on timeline', () => {
     });
 
     const expandBtn = screen.getByTitle(/expand to lightbox/i);
-    const opened = vi.fn();
-    window.addEventListener('gmatch-open-image', opened);
     await userEvent.click(expandBtn);
 
-    // Opens the fullscreen image modal (no inline card).
-    expect(opened).toHaveBeenCalled();
-    expect(document.querySelector('[data-expanded-post]')).toBeNull();
-    window.removeEventListener('gmatch-open-image', opened);
+    // Inline expand (image + caption + actions + comments).
+    expect(document.querySelector('[data-expanded-post]')).not.toBeNull();
   });
 
   it('routes a legacy vault:// video repost through ObjectImage (localhost http), never raw vault:// or signed post-id fetch', async () => {

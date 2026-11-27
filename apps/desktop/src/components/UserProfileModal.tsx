@@ -109,7 +109,6 @@ export function UserProfileModal({
   // must stack above it instead of the default z-modal(50).
   const { openPost, expandedNode, modals: postLightboxModals } = useProfilePostLightbox({
     identity: identity || null,
-    inline: true,
     profilePics: profilePic ? { [user?.id || '']: profilePic } : {},
     users,
     followingIds,
