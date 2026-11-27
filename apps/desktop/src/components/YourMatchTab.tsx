@@ -11,10 +11,14 @@ import { matchEndSummary } from '../utils/matchEndSummary'
 import { notifyWhenHidden } from '../utils/notifyHidden'
 import { ZoomModal, useZoomModal } from './CardZoomModalHost'
 import { CardBack } from './CardBack'
+import { CardArtwork } from './cards/CardArtwork'
 import { CreateCardModal } from './CreateCardModal'
-import { LazyVideo } from './LazyVideo'
 import { ObjectImage } from './ObjectImage'
-import { resolveMediaUrl } from '../utils/media'
+import { Button } from '../ui/kit'
+import {
+  classes, CHROME, COLOR, GAP, ICON, MONO, MOTION, PADDING, PADDING_X,
+  RADIUS, SHADOW, STATUS, TYPE, WEIGHT,
+} from '../ui/tokens'
 import { ZoomIn, Heart, X, Sparkles } from 'lucide-react'
 import type { OrbitIdentity } from '@orbit/crypto'
 
@@ -128,12 +132,19 @@ export function YourMatchTab({
     border: string,
     pulsing: boolean,
     hidden?: boolean,
-    profileUser?: User | null
+    profileUser?: User | null,
+    objectId?: string | null
   ) => (
-    <div className="flex-1 min-w-0">
+    <div className={classes('flex-1 min-w-0')}>
       <div
-        className={`aspect-square border-2 overflow-hidden relative group ${border} ${pulsing ? 'animate-orbit-pulse-soft' : ''} ${!hidden && img?.url ? 'cursor-pointer hover:opacity-95' : ''
-          }`}
+        role={!hidden && img?.url && !profileUser ? 'button' : undefined}
+        tabIndex={!hidden && img?.url && !profileUser ? 0 : undefined}
+        aria-label={!hidden && img?.url && !profileUser ? `${label} card, zoom` : undefined}
+        className={classes(
+          'relative w-full aspect-[3/4.2] overflow-hidden group', RADIUS.panel, SHADOW.sheet,
+          border, pulsing ? 'animate-orbit-pulse-soft' : '',
+          !hidden && img?.url ? 'cursor-pointer' : '',
+        )}
         onClick={() => {
           if (hidden || !img?.url) return
           if (profileUser) {
@@ -142,162 +153,178 @@ export function YourMatchTab({
           }
           zoom.showZoom(img.url, {
             title: `${label} Card`,
-            subtitle: `Tier ${st.tier} · ${opponentName}`,
+            subtitle: `Tier ${st.tier}, ${opponentName}`,
           })
         }}
-        title={!hidden && img?.url ? (profileUser ? `View ${label}'s profile` : `Click to zoom into ${label.toLowerCase()} card`) : undefined}
+        onKeyDown={(e) => {
+          if (hidden || !img?.url) return
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            if (profileUser) onOpenProfile?.(profileUser)
+            else zoom.showZoom(img.url, {
+              title: `${label} Card`,
+              subtitle: `Tier ${st.tier}, ${opponentName}`,
+            })
+          }
+        }}
+        title={!hidden && img?.url ? (profileUser ? `View ${label}'s profile` : `Zoom into ${label.toLowerCase()} card`) : undefined}
       >
         {hidden ? (
           <CardBack label="Covered" />
         ) : img?.url ? (
           <>
-            {img.url.split('?')[0].toLowerCase().match(/\.(mp4|webm|mov|ogg)$/) || img.url.includes('video/') ? (
-              <LazyVideo src={resolveMediaUrl(img.url)} videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150" />
-            ) : (
-              <img src={resolveMediaUrl(img.url)} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-150" />
-            )}
+            <CardArtwork
+              objectId={objectId ?? null}
+              src={img.url}
+              identity={identity}
+              width={180}
+              height={252}
+              isVideo={Boolean(img.url.includes('video/'))}
+            />
             <button
               type="button"
+              aria-label={`Zoom into ${label} card`}
               onClick={(e) => {
                 e.stopPropagation()
                 if (img?.url) {
                   zoom.showZoom(img.url, {
                     title: `${label} Card`,
-                    subtitle: `Tier ${st.tier} · ${opponentName}`,
+                    subtitle: `Tier ${st.tier}, ${opponentName}`,
                   })
                 }
               }}
-              className="absolute top-1.5 right-1.5 bg-black/80 border border-edge text-retro-fg text-2xs px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity font-bold flex items-center gap-1 cursor-pointer"
+              className={classes('absolute top-1.5 right-1.5 z-20', CHROME.mediaChip, 'flex items-center', GAP[1], 'opacity-0 group-hover:opacity-100', MOTION.transition.fade)}
               title="Zoom into card"
             >
-              <ZoomIn className="w-3 h-3" />
-              <span>ZOOM</span>
+              <ZoomIn className={ICON.sm} />
+              <span>Zoom</span>
             </button>
           </>
         ) : img?.failed ? (
-          <div className="w-full h-full flex items-center justify-center text-retro-muted text-2xs px-1 text-center">Unavailable</div>
+          <div className={classes('w-full h-full flex items-center justify-center', TYPE.caption, COLOR.muted, PADDING_X[1], 'text-center')}>Unavailable</div>
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-retro-muted text-2xs px-1 text-center">{placeholder}</div>
+          <div className={classes('w-full h-full flex items-center justify-center', TYPE.caption, COLOR.muted, PADDING_X[1], 'text-center')}>{placeholder}</div>
         )}
       </div>
-      <div className="mt-1 text-center text-2xs font-medium text-retro-muted truncate">{label}</div>
+      <div className={classes('mt-1 text-center', TYPE.caption, WEIGHT.medium, COLOR.muted, 'truncate')}>{label}</div>
     </div>
   )
 
   return (
-    <section className="module animate-orbit-fade-in">
-      <div className="module-header allow-wrap flex items-center gap-2">
-        <span className="module-title">Special Match</span>
-        <span
-          className="w-2 h-2 rounded-full shrink-0"
-          style={{ backgroundColor: color }}
-        />
-        <span className="module-subtitle" style={{ color }}>Tier {st.tier} · {label}</span>
-        <span className="module-subtitle module-subtitle-truncate ml-auto text-retro-fg">
+    <section className={classes(CHROME.tile, PADDING[3], 'space-y-3', MOTION.keyframe.fadeIn)}>
+      <div className={classes('flex items-center flex-wrap', GAP[2])}>
+        <span className={classes(TYPE.sub, WEIGHT.semibold, COLOR.fg)}>Special Match</span>
+        <span className={classes('w-2 h-2 rounded-full shrink-0')} style={{ backgroundColor: color }} />
+        <span style={{ color }} className={classes(TYPE.caption, WEIGHT.medium)}>Tier {st.tier}, {label}</span>
+        <span className={classes('ml-auto truncate', COLOR.fg)}>
           vs{' '}
           {opponentUser && (
             <button
               type="button"
               onClick={() => onOpenProfile?.(opponentUser)}
               title={`View ${opponentName}'s profile`}
-              className="cursor-pointer hover:underline"
+              className={classes('cursor-pointer hover:underline', WEIGHT.medium)}
             >
               {opponentName}
             </button>
           )}
           {!opponentUser && <span>{opponentName}</span>}
         </span>
-        <button
-          onClick={() => void onEnd(match.id)}
-          disabled={submitting}
-          className="text-xs font-medium px-2.5 py-1 border border-edge text-retro-muted hover:text-retro-fg hover:border-retro-fg disabled:opacity-30 rounded transition-colors"
-        >
+        <Button type="button" variant="ghost" size="sm" onClick={() => void onEnd(match.id)} disabled={submitting}>
           End
-        </button>
+        </Button>
       </div>
 
-      <div className="module-body space-y-3">
+      <div className={classes('space-y-3')}>
         {/* Celebration */}
         {celebrate && (
           <div
-            className={`p-4 text-center space-y-2 animate-orbit-tier-flash rounded-lg ${celebrate.final ? 'bg-retro-warning/10 border border-retro-warning/30' : 'bg-glass-w5 border border-retro-accent/20'}`}
+            className={classes(PADDING[4], 'text-center space-y-2 animate-orbit-tier-flash', RADIUS.control, celebrate.final ? classes(STATUS.warningBg, STATUS.warningEdge) : classes(COLOR.glassW5, 'border', COLOR.accentEdge))}
           >
-            <div className={`text-sm font-medium ${celebrate.final ? 'text-retro-warning' : 'text-retro-accent'}`}>
+            <div className={classes(TYPE.sub, WEIGHT.semibold, celebrate.final ? STATUS.warning : COLOR.accent)}>
               {celebrate.final ? 'Match complete' : specialTierLine(celebrate.tier)}
             </div>
-            <div className="text-xs text-retro-fg">
+            <div className={classes(TYPE.body, COLOR.fg, MONO)}>
               +{celebrate.points} pts {celebrate.final ? 'Match complete' : `Tier ${celebrate.tier}`}
-              {lastPayout?.reason === 'mutual_like' ? ` · +${lastPayout.gp} g$` : ''}
+              {lastPayout?.reason === 'mutual_like' ? `, +${lastPayout.gp} g$` : ''}
             </div>
           </div>
         )}
 
         {/* No match */}
         {!celebrate && st.phase === 'ended' && st.lastResult === 'ended' && (
-          <div className="border border-danger/30 bg-danger/ p-4 text-center space-y-2 animate-orbit-slide-up rounded-lg">
-            <div className="text-sm font-medium text-danger-fg">{matchEndSummary(st.lastResult, lastPayout, false)}</div>
-            <div className="text-xs text-retro-muted">Cards revealed below.</div>
-            <div className="grid grid-cols-2 gap-2">
-              {cardSlot('You', revealMineImg, 'Your card', 'border-danger/30', false)}
-              {cardSlot(opponentName, revealTheirsImg, 'Their card', 'border-danger/30', false, false, opponentUser)}
+          <div className={classes('border', STATUS.dangerEdge, STATUS.dangerBg, PADDING[4], 'text-center space-y-2', MOTION.keyframe.slideUp, RADIUS.control)}>
+            <div className={classes(TYPE.sub, WEIGHT.semibold, STATUS.dangerFg)}>{matchEndSummary(st.lastResult, lastPayout, false)}</div>
+            <div className={classes(TYPE.body, COLOR.muted)}>Cards revealed below.</div>
+            <div className={classes('grid grid-cols-2', GAP[2])}>
+              {cardSlot('You', revealMineImg, 'Your card', STATUS.dangerEdge, false, false, null, reveal.mine)}
+              {cardSlot(opponentName, revealTheirsImg, 'Their card', STATUS.dangerEdge, false, false, opponentUser, reveal.theirs)}
             </div>
           </div>
         )}
 
         {/* Quit */}
         {!celebrate && st.phase === 'ended' && st.lastResult === 'quit' && (
-          <div className="border border-edge p-3 text-center text-xs text-retro-muted animate-orbit-fade-in rounded-lg">
+          <div className={classes('border', COLOR.edge, PADDING[3], 'text-center', TYPE.body, COLOR.muted, MOTION.keyframe.fadeIn, RADIUS.control)}>
             {matchEndSummary(st.lastResult, lastPayout, false)}
           </div>
         )}
 
         {st.phase !== 'ended' && (
-          <div className="grid grid-cols-2 gap-2">
-            {cardSlot('You', myCardImg, needCard ? 'Send a card' : 'Your card', st.myCardId ? 'border-retro-accent bg-glass-w5' : 'border-edge border-dashed', needCard)}
+          <div className={classes('grid grid-cols-2', GAP[2])}>
+            {cardSlot('You', myCardImg, needCard ? 'Send a card' : 'Your card', st.myCardId ? classes(COLOR.accentEdge, COLOR.glassW5) : classes(COLOR.edge, 'border-dashed'), needCard, false, null, st.myCardId)}
             {cardSlot(
               opponentName,
               oppCardImg,
               'Waiting...',
-              opponentHidden ? 'border-edge border-dashed' : st.opponentCardId ? 'border-retro-accent bg-glass-w5' : 'border-edge border-dashed',
+              opponentHidden ? classes(COLOR.edge, 'border-dashed') : st.opponentCardId ? classes(COLOR.accentEdge, COLOR.glassW5) : classes(COLOR.edge, 'border-dashed'),
               !st.opponentCardId,
               opponentHidden,
-              opponentUser
+              opponentUser,
+              st.opponentCardId,
             )}
           </div>
         )}
 
         {st.phase === 'pick' && needCard && !celebrate && (
-          <div className="text-center text-xs text-retro-muted">
+          <div className={classes('text-center', TYPE.body, COLOR.muted)}>
             Cards reveal when both have played
           </div>
         )}
 
-        {error && <div className="border border-edge p-2 text-center text-xs text-retro-muted rounded-lg">{error}</div>}
+        {error && <div className={classes('border', COLOR.edge, PADDING[2], 'text-center', TYPE.body, COLOR.muted, RADIUS.control)}>{error}</div>}
 
         {(waitingForCard || waitingForDecision) && !celebrate && (
-          <div className="border border-edge p-2 text-center text-xs text-retro-muted animate-orbit-pulse-soft rounded-lg">
+          <div className={classes('border', COLOR.edge, PADDING[2], 'text-center', TYPE.body, COLOR.muted, 'animate-orbit-pulse-soft', RADIUS.control)}>
             Waiting for {opponentName}...
           </div>
         )}
 
         {st.phase === 'pick' && needCard && (
-          <div className="space-y-3">
-            <button
+          <div className={classes('space-y-3')}>
+            <Button
               type="button"
+              variant="primary"
               onClick={() => setShowCreateCardModal(true)}
-              className="w-full py-3 text-sm font-medium bg-retro-accent text-retro-accent-text rounded-lg hover:bg-retro-accent-hover transition-colors cursor-pointer flex items-center justify-center gap-2"
+              className="w-full justify-center"
             >
-              <Sparkles className="w-4 h-4" />
+              <Sparkles className={ICON.md} />
               <span>Create Card</span>
-            </button>
+            </Button>
             {myCards.length > 0 && (
-              <div className="space-y-2">
-                <div className="grid grid-cols-5 gap-2">
+              <div className={classes('space-y-2')}>
+                <div className={classes('grid grid-cols-5', GAP[2])}>
                   {myCards.slice(0, 10).map((card) => (
                     <button
                       key={card.id}
+                      type="button"
+                      aria-label={`Select ${card.caption || card.id}`}
+                      aria-pressed={selectedCard === card.id}
                       onClick={() => setSelectedCard(card.id)}
-                      className={`relative aspect-square overflow-hidden border-2 rounded ${selectedCard === card.id ? 'border-retro-fg ring-2 ring-retro-fg/30' : 'border-edge hover:border-retro-muted'}`}
+                      className={classes(
+                        'relative aspect-square overflow-hidden border-2', RADIUS.chip, MOTION.transition.micro,
+                        selectedCard === card.id ? classes(COLOR.edgeStrong, 'ring-2 ring-retro-fg/30') : classes(COLOR.edge, COLOR.hoverEdgeStrong),
+                      )}
                     >
                       {card.content_url ? (
                         <ObjectImage
@@ -309,46 +336,52 @@ export function YourMatchTab({
                           thumb
                         />
                       ) : (
-                        <div className="w-full h-full bg-retro-border" />
+                        <div className={classes('w-full h-full', COLOR.surfaceRaised)} />
                       )}
                     </button>
                   ))}
                 </div>
-                <button
+                <Button
+                  type="button"
+                  variant="secondary"
                   disabled={!selectedCard || submitting}
                   onClick={() => selectedCard && handlePlay(selectedCard)}
-                  className="w-full py-2.5 text-xs font-medium bg-retro-fg text-retro-bg disabled:opacity-30 hover:opacity-90 cursor-pointer rounded-lg transition-opacity"
+                  className="w-full justify-center"
                 >
                   {submitting ? 'Playing...' : 'Play selected card'}
-                </button>
+                </Button>
               </div>
             )}
           </div>
         )}
 
         {st.phase === 'decide' && !st.myDecision && (
-          <div className="grid grid-cols-2 gap-2">
-            <button
+          <div className={classes('grid grid-cols-2', GAP[2])}>
+            <Button
+              type="button"
+              variant="secondary"
               disabled={submitting}
               onClick={() => void decideAndCapture('reject')}
-              className="py-2.5 text-xs font-medium border border-edge text-retro-muted hover:text-danger-fg hover:border-danger/30 bg-surface-interactive hover:bg-danger/ rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              className={classes('justify-center', STATUS.dangerFg, STATUS.dangerTintHover)}
             >
-              <X className="w-3.5 h-3.5" />
+              <X className={ICON.sm} />
               <span>Reject</span>
-            </button>
-            <button
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
               disabled={submitting}
               onClick={() => void decideAndCapture('like')}
-              className="py-2.5 text-xs font-medium bg-retro-fg text-retro-bg hover:bg-retro-fg/90 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              className="justify-center"
             >
-              <Heart className="w-3.5 h-3.5 fill-current text-danger-fg" />
+              <Heart className={classes(ICON.sm, 'fill-current', STATUS.dangerFg)} />
               <span>Like</span>
-            </button>
+            </Button>
           </div>
         )}
 
         {st.phase === 'decide' && st.myDecision && (
-          <div className="border border-edge p-3 text-center text-xs text-retro-muted rounded-lg">
+          <div className={classes('border', COLOR.edge, PADDING[3], 'text-center', TYPE.body, COLOR.muted, RADIUS.control)}>
             Decision recorded. Waiting for {opponentName}...
           </div>
         )}

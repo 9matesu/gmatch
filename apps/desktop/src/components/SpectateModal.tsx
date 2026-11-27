@@ -2,13 +2,19 @@
 
 import { useState, useEffect } from 'react'
 import type { MatchSnapshot, OrbitObject, OrbitId } from '@orbit/shared'
+import { formatGc } from '@orbit/shared'
 import { Avatar } from './Avatar'
 import { formatCountdown, countdownMs } from '../utils/lobby'
 import { ZoomModal, useZoomModal } from './CardZoomModalHost'
-import {  formatGc } from '@orbit/shared'
 import { isMediaVideo } from '../utils/media'
 import { ObjectImage } from './ObjectImage'
+import { CardArtwork } from './cards/CardArtwork'
 import { playPress } from '../utils/sounds'
+import { Button } from '../ui/kit'
+import {
+  classes, CHROME, COLOR, GAP, ICON, MONO, MOTION, PADDING, PADDING_X,
+  PADDING_Y, RADIUS, SHADOW, STATUS, TRACKING, TYPE, WEIGHT,
+} from '../ui/tokens'
 import {
   Star,
   X,
@@ -17,6 +23,7 @@ import {
   ZoomIn,
   Sparkles,
   Award,
+  Clock,
 } from 'lucide-react'
 
 interface IdentityLike {
@@ -154,8 +161,8 @@ export function SpectateModal({
     add(pACardId, pA.card, pA.id, `${pA.display_name || 'Player 1'}'s Card`)
     add(pBCardId, pB.card, pB.id, `${pB.display_name || 'Player 2'}'s Card`)
     for (const h of history) {
-      add(h.card_a, h.card_a_url, pA.id, `R${h.round} · ${pA.display_name || 'Player 1'}'s Card`)
-      add(h.card_b, h.card_b_url, pB.id, `R${h.round} · ${pB.display_name || 'Player 2'}'s Card`)
+      add(h.card_a, h.card_a_url, pA.id, `R${h.round}, ${pA.display_name || 'Player 1'}'s Card`)
+      add(h.card_b, h.card_b_url, pB.id, `R${h.round}, ${pB.display_name || 'Player 2'}'s Card`)
     }
     return Array.from(map.values())
   }
@@ -193,117 +200,72 @@ export function SpectateModal({
   const cardAUrl = formatCardUrl(pA.card)
   const cardBUrl = formatCardUrl(pB.card)
 
-  
-
-  // Minimized Picture-in-Picture (PiP) floating window with Shadcn Yellow/Cyan Theme
+  // Minimized Picture-in-Picture (PiP) floating window.
   if (isMinimized) {
     return (
       <div
         style={pipPos ? { left: `${pipPos.x}px`, top: `${pipPos.y}px`, bottom: 'auto', right: 'auto' } : undefined}
-        className="fixed bottom-6 right-6 z-[var(--z-lightbox)] w-80 bg-surface-canvas/95 border-2 border-info/60 rounded-xl shadow-2xl overflow-hidden flex flex-col select-none backdrop-blur-2xl animate-orbit-fade-in font-sans"
+        className={classes(
+          'fixed bottom-6 right-6 z-[var(--z-lightbox)] w-80', COLOR.canvasVeil, 'border', STATUS.infoEdge,
+          RADIUS.panel, SHADOW.sheet, 'overflow-hidden flex flex-col select-none backdrop-blur-md', MOTION.keyframe.fadeIn,
+        )}
       >
         <div
           onMouseDown={handleMouseDown}
-          className="flex items-center justify-between px-3 py-2 bg-surface-canvas border-b border-edge cursor-grab active:cursor-grabbing"
+          className={classes('flex items-center justify-between', PADDING_X[3], PADDING_Y[2], COLOR.canvasSurface, 'border-b', COLOR.edge, 'cursor-grab active:cursor-grabbing')}
         >
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="w-2 h-2 rounded-full bg-info animate-pulse" />
-            <span className="text-2xs font-black tracking-widest text-info-fg uppercase truncate">
-              DUEL R{currentRound}/{maxRounds}
+          <div className={classes('flex items-center min-w-0', GAP[2])}>
+            <span className="w-2 h-2 rounded-full bg-success shrink-0" />
+            <span className={classes(TYPE.caption, WEIGHT.bold, TRACKING.wide, STATUS.info, 'uppercase truncate')}>
+              Duel R{currentRound}/{maxRounds}
             </span>
-            <span className="text-2xs font-mono text-warning-fg font-bold bg-warning/40 px-1.5 py-0.2 rounded border border-warning/30">
+            <span className={classes(CHROME.badge, MONO, WEIGHT.semibold, COLOR.fg)}>
               {pA.score ?? 0} : {pB.score ?? 0}
             </span>
           </div>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => { playPress(720); setIsMinimized(false) }}
-              className="px-2 py-0.5 text-2xs font-bold bg-info hover:bg-info text-retro-fg rounded-lg cursor-pointer transition active:scale-95 shadow"
-            >
-              EXPAND
-            </button>
-            <button
-              type="button"
-              onClick={() => { playPress(680); onClose() }}
-              className="p-1 text-retro-muted hover:text-retro-fg cursor-pointer"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
+          <div className={classes('flex items-center', GAP[1])}>
+            <Button type="button" variant="info" size="sm" onClick={() => { playPress(720); setIsMinimized(false) }}>
+              Expand
+            </Button>
+            <Button type="button" variant="ghost" size="sm" aria-label="Close spectator" onClick={() => { playPress(680); onClose() }} className={PADDING_X[1.5]}>
+              <X className={ICON.sm} />
+            </Button>
           </div>
         </div>
 
-        <div className="p-2.5 grid grid-cols-2 gap-2 bg-surface-canvas/90">
-          <div className="space-y-1 text-center">
-            <div className="text-2xs font-bold text-retro-body truncate">{pA.display_name || 'Player 1'}</div>
-            <div className="metallic-card-border aspect-[3/4.2] rounded-xl overflow-hidden relative flex items-center justify-center select-none" data-rarity="copper">
-              <div className="metallic-card w-full h-full flex flex-col">
-                {isRevealed && cardAUrl ? (
-                  <>
-                    <div className="absolute top-1.5 left-1.5 z-20 flex items-center gap-1">
-                      <span className="text-2xs font-mono font-bold px-1 rounded bg-black/80 text-warning-fg border border-warning/30">
-                        {formatGc(pA.score ?? 0)}
-                      </span>
+        <div className={classes(PADDING[2.5], 'grid grid-cols-2', GAP[2], COLOR.canvasVeil)}>
+          <div className={classes('space-y-1 text-center')}>
+            <div className={classes(TYPE.caption, WEIGHT.semibold, COLOR.body, 'truncate')}>{pA.display_name || 'Player 1'}</div>
+            <div className={classes('relative w-full aspect-[3/4.2] overflow-hidden select-none', RADIUS.panel)} data-rarity="copper">
+              <CardArtwork objectId={pACardId} src={isRevealed ? cardAUrl : undefined} identity={identity} width={120} height={168} isVideo={Boolean(isMediaVideo(cardAUrl ?? ''))}>
+                {!isRevealed || !cardAUrl ? (
+                  <div className={classes('absolute inset-0 z-0 flex flex-col items-center justify-center', PADDING[2], COLOR.canvasVeil)}>
+                    <div className={classes('w-8 h-10 border border-dashed', STATUS.infoEdge, RADIUS.control, 'flex items-center justify-center')}>
+                      <Clock className={classes(ICON.sm, STATUS.info)} />
                     </div>
-                    <div className="relative w-full flex-1 min-h-0 bg-surface-canvas overflow-hidden">
-                      <ObjectImage
-                        contentUrl={cardAUrl}
-                        objectId={pACardId}
-                        identity={identity}
-                        className="w-full h-full object-cover"
-                        videoClassName="w-full h-full object-cover"
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center p-2 bg-surface-canvas/80">
-                    <div className="w-8 h-10 border border-dashed border-info/40 rounded-lg flex items-center justify-center animate-pulse">
-                      <span className="text-xs text-info-fg font-mono">◈</span>
-                    </div>
-                    <span className="text-2xs text-retro-muted mt-1">Picking...</span>
+                    <span className={classes(TYPE.caption, COLOR.muted, 'mt-1')}>Picking...</span>
                   </div>
+                ) : (
+                  <div className={classes('absolute top-1.5 left-1.5 z-20', CHROME.cardChip)}>{formatGc(pA.score ?? 0)}</div>
                 )}
-              </div>
+              </CardArtwork>
             </div>
           </div>
-          <div className="space-y-1 text-center">
-            <div className="text-2xs font-bold text-retro-body truncate">{pB.display_name || 'Player 2'}</div>
-            <div className="metallic-card-border aspect-[3/4.2] rounded-xl overflow-hidden relative flex items-center justify-center select-none" data-rarity="gold">
-              <div className="metallic-card w-full h-full flex flex-col">
-                {isRevealed && cardBUrl ? (
-                  <>
-                    <div className="absolute top-1.5 left-1.5 z-20 flex items-center gap-1">
-                      <span className="text-2xs font-mono font-bold px-1 rounded bg-black/80 text-warning-fg border border-warning/30">
-                        {formatGc(pB.score ?? 0)}
-                      </span>
+          <div className={classes('space-y-1 text-center')}>
+            <div className={classes(TYPE.caption, WEIGHT.semibold, COLOR.body, 'truncate')}>{pB.display_name || 'Player 2'}</div>
+            <div className={classes('relative w-full aspect-[3/4.2] overflow-hidden select-none', RADIUS.panel)} data-rarity="gold">
+              <CardArtwork objectId={pBCardId} src={isRevealed ? cardBUrl : undefined} identity={identity} width={120} height={168} isVideo={Boolean(isMediaVideo(cardBUrl ?? ''))}>
+                {!isRevealed || !cardBUrl ? (
+                  <div className={classes('absolute inset-0 z-0 flex flex-col items-center justify-center', PADDING[2], COLOR.canvasVeil)}>
+                    <div className={classes('w-8 h-10 border border-dashed', STATUS.warningEdge, RADIUS.control, 'flex items-center justify-center')}>
+                      <Clock className={classes(ICON.sm, STATUS.warning)} />
                     </div>
-                    <div className="relative w-full flex-1 min-h-0 bg-surface-canvas overflow-hidden">
-                      <ObjectImage
-                        contentUrl={cardBUrl}
-                        objectId={pBCardId}
-                        identity={identity}
-                        className="w-full h-full object-cover"
-                        videoClassName="w-full h-full object-cover"
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center p-2 bg-surface-canvas/80">
-                    <div className="w-8 h-10 border border-dashed border-warning/40 rounded-lg flex items-center justify-center animate-pulse">
-                      <span className="text-xs text-warning-fg font-mono">◈</span>
-                    </div>
-                    <span className="text-2xs text-retro-muted mt-1">Picking...</span>
+                    <span className={classes(TYPE.caption, COLOR.muted, 'mt-1')}>Picking...</span>
                   </div>
+                ) : (
+                  <div className={classes('absolute top-1.5 left-1.5 z-20', CHROME.cardChip)}>{formatGc(pB.score ?? 0)}</div>
                 )}
-              </div>
+              </CardArtwork>
             </div>
           </div>
         </div>
@@ -315,62 +277,57 @@ export function SpectateModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-[var(--z-lightbox)] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/70 backdrop-blur-sm animate-orbit-fade-in font-sans select-none"
+        className={classes('fixed inset-0 z-[var(--z-lightbox)] flex items-center justify-center', PADDING[1], 'sm:p-4 md:p-6', 'bg-black/70 backdrop-blur-sm', MOTION.keyframe.fadeIn, 'font-sans select-none')}
         onClick={onClose}
       >
         <div
-          className={`relative w-full ${isExpanded ? 'max-w-6xl h-[92vh]' : 'max-w-3xl max-h-[88vh]'
-            } bg-surface-raised border border-edge rounded-xl shadow-2xl overflow-hidden flex flex-col transition duration-300`}
+          className={classes(
+            'relative w-full', isExpanded ? 'max-w-6xl h-[92dvh]' : 'max-w-3xl max-h-[88dvh]',
+            COLOR.surfaceRaised, 'border', COLOR.edge, RADIUS.panel, SHADOW.sheet, 'overflow-hidden flex flex-col', MOTION.transition.quick,
+          )}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header Bar */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-edge bg-surface-raised shrink-0">
-            <div className="flex items-center gap-2.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-info animate-pulse shadow-xs" />
-              <span className="text-xs font-black tracking-widest text-retro-fg uppercase">
-                SPECTATING LIVE DUEL
+          <div className={classes('flex items-center justify-between', PADDING_X[4], PADDING_Y[3], 'border-b', COLOR.edge, COLOR.surfaceRaised, 'shrink-0')}>
+            <div className={classes('flex items-center', GAP[2.5])}>
+              <span className="w-2.5 h-2.5 rounded-full bg-success animate-pulse" />
+              <span className={classes(TYPE.body, WEIGHT.bold, TRACKING.wide, COLOR.fg, 'uppercase')}>
+                Spectating live duel
               </span>
-              <span className="text-2xs font-mono font-bold text-info-fg bg-info/10 px-2.5 py-0.5 border border-info/30 rounded-full">
-                ROUND {currentRound} OF {maxRounds}
+              <span className={classes(TYPE.caption, MONO, WEIGHT.semibold, STATUS.info, STATUS.infoBg, 'border', STATUS.infoEdge, RADIUS.pill, PADDING_X[2.5], 'py-0.5')}>
+                Round {currentRound} of {maxRounds}
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className={classes('flex items-center', GAP[2])}>
               {!isEnded && (
-                <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-warning-fg bg-warning px-2.5 py-1 border border-warning rounded-xl mr-1">
-                  <span>⏱</span>
+                <div className={classes('flex items-center', GAP[1.5], TYPE.body, MONO, WEIGHT.semibold, STATUS.warning, STATUS.warningBg, 'border', STATUS.warningEdge, RADIUS.control, PADDING_X[2.5], PADDING_Y[1], 'mr-1')}>
+                  <Clock className={ICON.sm} />
                   <span>{countdown}</span>
                 </div>
               )}
-              <button
+              <Button
                 type="button"
-                onClick={() => { playPress(720); setIsExpanded((v) => !v) }}
+                variant="ghost"
+                size="sm"
+                aria-label={isExpanded ? 'Restore view' : 'Maximize view'}
                 title={isExpanded ? 'Restore View' : 'Maximize View'}
-                className="w-8 h-8 rounded-xl text-retro-muted hover:text-retro-fg hover:bg-glass-w10 flex items-center justify-center transition cursor-pointer"
+                onClick={() => { playPress(720); setIsExpanded((v) => !v) }}
+                className={PADDING_X[2]}
               >
-                {isExpanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-              </button>
-              <button
-                type="button"
-                onClick={() => { playPress(720); setIsMinimized(true) }}
-                title="Picture-in-Picture Mini View"
-                className="w-8 h-8 rounded-xl text-retro-muted hover:text-retro-fg hover:bg-glass-w10 flex items-center justify-center transition cursor-pointer"
-              >
-                <Minimize2 className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => { playPress(680); onClose() }}
-                title="Close Spectator"
-                className="w-8 h-8 rounded-xl text-retro-muted hover:text-danger-fg hover:bg-glass-w10 flex items-center justify-center transition cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
+                {isExpanded ? <Minimize2 className={ICON.sm} /> : <Maximize2 className={ICON.sm} />}
+              </Button>
+              <Button type="button" variant="ghost" size="sm" aria-label="Picture in picture" title="Picture-in-Picture Mini View" onClick={() => { playPress(720); setIsMinimized(true) }} className={PADDING_X[2]}>
+                <Minimize2 className={ICON.sm} />
+              </Button>
+              <Button type="button" variant="ghost" size="sm" aria-label="Close spectator" title="Close Spectator" onClick={() => { playPress(680); onClose() }} className={PADDING_X[2]}>
+                <X className={ICON.md} />
+              </Button>
             </div>
           </div>
 
           {/* Round Progress Indicator */}
-          <div className="flex items-center gap-1.5 p-2 bg-surface-raised border-b border-edge justify-center">
+          <div className={classes('flex items-center justify-center', GAP[1.5], PADDING[2], COLOR.surfaceRaised, 'border-b', COLOR.edge)}>
             {Array.from({ length: maxRounds }).map((_, idx) => {
               const rNum = idx + 1
               const pastRound = history.find((h) => h.round === rNum)
@@ -378,19 +335,21 @@ export function SpectateModal({
               return (
                 <div
                   key={rNum}
-                  className={`flex items-center gap-1.5 px-3 py-1 text-2xs font-bold rounded-xl border transition ${isCurrent
-                      ? 'border-chrome-lav bg-info/10 text-info-fg shadow-xs animate-pulse'
+                  className={classes(
+                    'flex items-center', GAP[1.5], PADDING_X[3], PADDING_Y[1], TYPE.caption, WEIGHT.bold, RADIUS.control, 'border', MOTION.transition.micro,
+                    isCurrent
+                      ? classes(STATUS.infoEdge, STATUS.infoBg, STATUS.info)
                       : pastRound
                         ? pastRound.matched
-                          ? 'border-success bg-success text-success-fg'
-                          : 'border-edge bg-surface-raised text-retro-muted'
-                        : 'border-edge bg-transparent text-retro-muted'
-                    }`}
+                          ? classes('border-success bg-success text-success-fg')
+                          : classes(COLOR.edge, COLOR.surfaceRaised, COLOR.muted)
+                        : classes(COLOR.edge, 'bg-transparent', COLOR.muted),
+                  )}
                 >
                   <span>R{rNum}</span>
                   {pastRound && (
-                    <span className={pastRound.matched ? 'text-success-fg font-black' : 'text-retro-muted font-bold'}>
-                      {pastRound.matched ? <Star className="w-3.5 h-3.5 fill-current" /> : <X className="w-3.5 h-3.5" />}
+                    <span className={pastRound.matched ? classes(STATUS.success, WEIGHT.bold) : classes(COLOR.muted, WEIGHT.bold)}>
+                      {pastRound.matched ? <Star className={classes(ICON.sm, 'fill-current')} /> : <X className={ICON.sm} />}
                     </span>
                   )}
                 </div>
@@ -399,50 +358,46 @@ export function SpectateModal({
           </div>
 
           {/* Arena Body */}
-          <div className="p-3 sm:p-5 overflow-y-auto flex-1 styled-scrollbar">
-            <div className={`grid gap-4 ${history.length > 0 ? 'lg:grid-cols-[1fr_minmax(280px,36%)]' : 'grid-cols-1'}`}>
+          <div className={classes(PADDING[3], 'sm:p-5 overflow-y-auto flex-1 styled-scrollbar')}>
+            <div className={classes('grid gap-4', history.length > 0 ? 'lg:grid-cols-[1fr_minmax(280px,36%)]' : 'grid-cols-1')}>
               {/* Left Column: Live Arena & Cards */}
-              <div className="space-y-4 flex flex-col">
+              <div className={classes('space-y-4 flex flex-col')}>
                 {/* Scoreboard Players Card Header */}
-                <div className="grid grid-cols-2 gap-3 items-center bg-surface-raised p-3.5 border border-edge rounded-xl shadow-xs">
+                <div className={classes('grid grid-cols-2 gap-3 items-center', COLOR.surfaceRaised, PADDING[3.5], 'border', COLOR.edge, RADIUS.control, SHADOW.xs)}>
                   {/* Player A */}
-                  <div className="flex items-center gap-3">
+                  <div className={classes('flex items-center', GAP[3])}>
                     <div className="relative">
                       <Avatar id={pA.id} imageUrl={pA.pfp_url || undefined} size={42} />
-                      <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-info border-2 border-edge" />
+                      <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-success border-2 border-edge" />
                     </div>
                     <div className="min-w-0">
-                      <div className="text-xs font-bold truncate text-retro-fg">
+                      <div className={classes(TYPE.body, WEIGHT.bold, 'truncate', COLOR.fg)}>
                         {pA.display_name?.trim() || 'Unknown User'}
                       </div>
-                      <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                        <span className="text-2xs text-retro-muted">Score:</span>
-                        <span className="text-xs font-mono font-bold text-info-fg bg-info/10 px-1.5 py-0.2 rounded border border-info/30">
+                      <div className={classes('flex items-center flex-wrap mt-0.5', GAP[1.5])}>
+                        <span className={classes(TYPE.caption, COLOR.muted)}>Score:</span>
+                        <span className={classes(TYPE.body, MONO, WEIGHT.bold, STATUS.info, STATUS.infoBg, 'border', STATUS.infoEdge, PADDING_X[1.5], 'py-0.5', RADIUS.chip)}>
                           {pA.score ?? 0}
                         </span>
                         {pATags.slice(0, 2).map((t, idx) => (
-                          <span key={idx} className="text-2xs bg-surface-raised text-retro-muted px-1.5 py-0.5 rounded border border-edge">
-                            #{t}
-                          </span>
+                          <span key={idx} className={classes(TYPE.caption, COLOR.surfaceRaised, COLOR.muted, PADDING_X[1.5], 'py-0.5', RADIUS.chip, 'border', COLOR.edge)}>#{t}</span>
                         ))}
                       </div>
                     </div>
                   </div>
 
                   {/* Player B */}
-                  <div className="flex items-center gap-3 justify-end text-right">
+                  <div className={classes('flex items-center justify-end text-right', GAP[3])}>
                     <div className="min-w-0">
-                      <div className="text-xs font-bold truncate text-retro-fg">
+                      <div className={classes(TYPE.body, WEIGHT.bold, 'truncate', COLOR.fg)}>
                         {pB.display_name?.trim() || 'Unknown User'}
                       </div>
-                      <div className="flex items-center justify-end gap-1.5 flex-wrap mt-0.5">
+                      <div className={classes('flex items-center justify-end flex-wrap mt-0.5', GAP[1.5])}>
                         {pBTags.slice(0, 2).map((t, idx) => (
-                          <span key={idx} className="text-2xs bg-surface-raised text-retro-muted px-1.5 py-0.5 rounded border border-edge">
-                            #{t}
-                          </span>
+                          <span key={idx} className={classes(TYPE.caption, COLOR.surfaceRaised, COLOR.muted, PADDING_X[1.5], 'py-0.5', RADIUS.chip, 'border', COLOR.edge)}>#{t}</span>
                         ))}
-                        <span className="text-2xs text-retro-muted">Score:</span>
-                        <span className="text-xs font-mono font-bold text-warning-fg bg-warning px-1.5 py-0.2 rounded border border-warning">
+                        <span className={classes(TYPE.caption, COLOR.muted)}>Score:</span>
+                        <span className={classes(TYPE.body, MONO, WEIGHT.bold, STATUS.warning, STATUS.warningBg, PADDING_X[1.5], 'py-0.5', RADIUS.chip, 'border', STATUS.warningEdge)}>
                           {pB.score ?? 0}
                         </span>
                       </div>
@@ -454,127 +409,75 @@ export function SpectateModal({
                   </div>
                 </div>
 
-                {/* Duel Cards Display */}
-                <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                {/* Duel Cards Display — the same HoloCard surface as every card. */}
+                <div className={classes('grid grid-cols-2', GAP[3], 'sm:gap-4')}>
                   {/* Card A */}
-                  <div className="flex flex-col items-center gap-2.5 bg-surface-raised p-3 sm:p-4 border border-edge rounded-xl shadow-xs">
-                    <div className="text-2xs font-bold tracking-wider text-info-fg uppercase flex items-center gap-1.5">
+                  <div className={classes('flex flex-col items-center', GAP[2.5], COLOR.surfaceRaised, PADDING[3], 'sm:p-4 border border-edge rounded-xl shadow-xs')}>
+                    <div className={classes(TYPE.caption, WEIGHT.bold, STATUS.info, 'uppercase flex items-center', GAP[1.5])}>
                       <span className="w-1.5 h-1.5 rounded-full bg-info" />
                       <span>{pA.display_name || 'Player 1'}&apos;s Card</span>
                     </div>
 
-                    <div className="metallic-card-border w-full aspect-[3/4.2] max-h-72 select-none" data-rarity="copper">
-                      <div className="metallic-card flex flex-col h-full">
+                    <div className={classes('relative w-full aspect-[3/4.2] max-h-72 select-none', RADIUS.panel)} data-rarity="copper">
+                      <CardArtwork objectId={pACardId} src={isRevealed ? cardAUrl : undefined} identity={identity} width={200} height={280} isVideo={Boolean(isMediaVideo(cardAUrl ?? ''))}>
                         {isRevealed && cardAUrl ? (
                           <button
                             type="button"
+                            aria-label={`Open ${pA.display_name || 'Player 1'}'s card`}
                             onClick={() => openInBoard(pACardId ?? cardAUrl, cardAUrl)}
-                            className="w-full h-full cursor-zoom-in relative flex flex-col"
+                            className="absolute inset-0 z-10 cursor-zoom-in"
                           >
-                            <div className="absolute top-2 left-2 z-20 flex items-center gap-1">
-                              <span className="text-2xs font-mono font-black px-1.5 py-0.5 rounded-md bg-black/80 text-warning-fg border border-warning/40 shadow-md backdrop-blur-xs">
-                                {formatGc(pA.score ?? 0)}
-                              </span>
-                            </div>
-                            <div className="relative w-full flex-1 min-h-0 bg-surface-canvas overflow-hidden">
-                              <ObjectImage
-                                contentUrl={cardAUrl}
-                                objectId={pACardId}
-                                identity={identity}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                autoPlay
-                                loop
-                                muted
-                                playsInline
-                              />
-                              <span className="absolute bottom-2 right-2 bg-black/70 border border-edge text-2xs font-bold text-retro-fg px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                                <ZoomIn className="w-3 h-3" />
-                                <span>ZOOM</span>
-                              </span>
-                            </div>
-                            <div className="p-2 bg-surface-canvas/90 border-t border-edge backdrop-blur-md text-left">
-                              <div className="text-xs font-semibold text-retro-fg truncate">{pA.display_name || 'Player 1'}</div>
-                            </div>
+                            <span className={classes('absolute top-2 left-2 z-20', CHROME.cardChip)}>{formatGc(pA.score ?? 0)}</span>
+                            <span className={classes('absolute bottom-2 right-2 z-20', CHROME.mediaChip, 'flex items-center', GAP[1])}>
+                              <ZoomIn className={ICON.sm} /> Zoom
+                            </span>
+                            <span className={classes('absolute inset-x-0 bottom-0 z-10', CHROME.cardFooter, COLOR.canvasVeil)}>
+                              <span className={CHROME.cardFooterTitle}>{pA.display_name || 'Player 1'}</span>
+                            </span>
                           </button>
                         ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-surface-canvas relative overflow-hidden text-retro-muted">
-                            <div className={`absolute inset-0 bg-glass-w5 transition duration-300`} />
-                            <div className="relative z-10 flex flex-col items-center gap-2 text-center">
-                              <div className="w-10 h-14 rounded-xl border border-edge-strong bg-surface-raised/10 backdrop-blur-md flex items-center justify-center shadow-lg animate-bounce">
-                                <Sparkles className="w-4 h-4 text-info-fg animate-spin" />
-                              </div>
-                              <span className="text-2xs font-mono font-black text-chrome-lav uppercase tracking-wider">
-                                Shuffling... (Tick #{tickIdx + 1})
-                              </span>
-                              <span className="text-2xs font-mono text-retro-muted">
-                                [Encrypted Hand]
-                              </span>
-                            </div>
+                          <div className={classes('absolute inset-0 z-0 flex flex-col items-center justify-center', PADDING[4], COLOR.canvasVeil, COLOR.muted)}>
+                            <Sparkles className={classes(ICON.lg, STATUS.info, 'animate-orbit-pulse-soft')} />
+                            <span className={classes(TYPE.caption, STATUS.info, 'uppercase')}>Shuffling</span>
+                            <span className={classes(TYPE.caption, COLOR.muted)}>Card {tickIdx + 1} of {maxRounds}</span>
                           </div>
                         )}
-                      </div>
+                      </CardArtwork>
                     </div>
                   </div>
 
                   {/* Card B */}
-                  <div className="flex flex-col items-center gap-2.5 bg-surface-raised p-3 sm:p-4 border border-edge rounded-xl shadow-xs">
-                    <div className="text-2xs font-bold tracking-wider text-warning-fg uppercase flex items-center gap-1.5">
+                  <div className={classes('flex flex-col items-center', GAP[2.5], COLOR.surfaceRaised, PADDING[3], 'sm:p-4 border border-edge rounded-xl shadow-xs')}>
+                    <div className={classes(TYPE.caption, WEIGHT.bold, STATUS.warning, 'uppercase flex items-center', GAP[1.5])}>
                       <span className="w-1.5 h-1.5 rounded-full bg-warning" />
                       <span>{pB.display_name || 'Player 2'}&apos;s Card</span>
                     </div>
 
-                    <div className="metallic-card-border w-full aspect-[3/4.2] max-h-72 select-none" data-rarity="gold">
-                      <div className="metallic-card flex flex-col h-full">
+                    <div className={classes('relative w-full aspect-[3/4.2] max-h-72 select-none', RADIUS.panel)} data-rarity="gold">
+                      <CardArtwork objectId={pBCardId} src={isRevealed ? cardBUrl : undefined} identity={identity} width={200} height={280} isVideo={Boolean(isMediaVideo(cardBUrl ?? ''))}>
                         {isRevealed && cardBUrl ? (
                           <button
                             type="button"
+                            aria-label={`Open ${pB.display_name || 'Player 2'}'s card`}
                             onClick={() => openInBoard(pBCardId ?? cardBUrl, cardBUrl)}
-                            className="w-full h-full cursor-zoom-in relative flex flex-col"
+                            className="absolute inset-0 z-10 cursor-zoom-in"
                           >
-                            <div className="absolute top-2 left-2 z-20 flex items-center gap-1">
-                              <span className="text-2xs font-mono font-black px-1.5 py-0.5 rounded-md bg-black/80 text-warning-fg border border-warning/40 shadow-md backdrop-blur-xs">
-                                {formatGc(pB.score ?? 0)}
-                              </span>
-                            </div>
-                            <div className="relative w-full flex-1 min-h-0 bg-surface-canvas overflow-hidden">
-                              <ObjectImage
-                                contentUrl={cardBUrl}
-                                objectId={pBCardId}
-                                identity={identity}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                autoPlay
-                                loop
-                                muted
-                                playsInline
-                              />
-                              <span className="absolute bottom-2 right-2 bg-black/70 border border-edge text-2xs font-bold text-retro-fg px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                                <ZoomIn className="w-3 h-3" />
-                                <span>ZOOM</span>
-                              </span>
-                            </div>
-                            <div className="p-2 bg-surface-canvas/90 border-t border-edge backdrop-blur-md text-left">
-                              <div className="text-xs font-semibold text-retro-fg truncate">{pB.display_name || 'Player 2'}</div>
-                            </div>
+                            <span className={classes('absolute top-2 left-2 z-20', CHROME.cardChip)}>{formatGc(pB.score ?? 0)}</span>
+                            <span className={classes('absolute bottom-2 right-2 z-20', CHROME.mediaChip, 'flex items-center', GAP[1])}>
+                              <ZoomIn className={ICON.sm} /> Zoom
+                            </span>
+                            <span className={classes('absolute inset-x-0 bottom-0 z-10', CHROME.cardFooter, COLOR.canvasVeil)}>
+                              <span className={CHROME.cardFooterTitle}>{pB.display_name || 'Player 2'}</span>
+                            </span>
                           </button>
                         ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-surface-canvas relative overflow-hidden text-retro-muted">
-                            <div className={`absolute inset-0 bg-glass-w5 transition duration-300`} />
-                            <div className="relative z-10 flex flex-col items-center gap-2 text-center">
-                              <div className="w-10 h-14 rounded-xl border border-edge-strong bg-surface-raised/10 backdrop-blur-md flex items-center justify-center shadow-lg animate-bounce">
-                                <Sparkles className="w-4 h-4 text-warning-fg animate-spin" />
-                              </div>
-                              <span className="text-2xs font-mono font-black text-warning-fg uppercase tracking-wider">
-                                Shuffling... (Tick #{tickIdx + 1})
-                              </span>
-                              <span className="text-2xs font-mono text-retro-muted">
-                                [Encrypted Hand]
-                              </span>
-                            </div>
+                          <div className={classes('absolute inset-0 z-0 flex flex-col items-center justify-center', PADDING[4], COLOR.canvasVeil, COLOR.muted)}>
+                            <Sparkles className={classes(ICON.lg, STATUS.warning, 'animate-orbit-pulse-soft')} />
+                            <span className={classes(TYPE.caption, STATUS.warning, 'uppercase')}>Shuffling</span>
+                            <span className={classes(TYPE.caption, COLOR.muted)}>Card {tickIdx + 1} of {maxRounds}</span>
                           </div>
                         )}
-                      </div>
+                      </CardArtwork>
                     </div>
                   </div>
                 </div>
@@ -582,27 +485,28 @@ export function SpectateModal({
 
               {/* Right Column: Rounds History */}
               {history.length > 0 && (
-                <div className="border border-edge bg-surface-raised p-3.5 rounded-xl flex flex-col min-h-0 lg:h-full shadow-xs">
-                  <div className="text-xs font-black text-retro-body uppercase tracking-widest shrink-0 mb-3 flex items-center gap-2">
-                    <Award className="w-3.5 h-3.5 text-warning-fg" />
-                    <span>Duel Round History</span>
+                <div className={classes('border border-edge', COLOR.surfaceRaised, PADDING[3.5], RADIUS.control, 'flex flex-col min-h-0 lg:h-full', SHADOW.xs)}>
+                  <div className={classes(TYPE.body, WEIGHT.bold, COLOR.body, 'uppercase shrink-0 mb-3 flex items-center', GAP[2])}>
+                    <Award className={classes(ICON.sm, STATUS.warning)} />
+                    <span>Duel round history</span>
                   </div>
 
-                  <div className="space-y-2 flex-1 min-h-0 overflow-y-auto styled-scrollbar pr-1 max-h-80 lg:max-h-none">
+                  <div className={classes('space-y-2 flex-1 min-h-0 overflow-y-auto styled-scrollbar pr-1 max-h-80 lg:max-h-none')}>
                     {history.map((h) => {
                       const mediaThumb = (id: string | null | undefined, url: string | null | undefined) => {
                         if (!url) {
                           return (
-                            <span className="w-14 h-14 shrink-0 flex items-center justify-center text-2xs text-retro-muted bg-surface-interactive border border-edge rounded-xl">
-                              —
+                            <span className={classes('w-14 h-14 shrink-0 flex items-center justify-center', TYPE.caption, COLOR.muted, COLOR.interactive, 'border border-edge rounded-xl')}>
+                              None
                             </span>
                           )
                         }
                         return (
                           <button
                             type="button"
+                            aria-label="Open duel round card"
                             onClick={() => openInBoard(id ?? url, url)}
-                            className="w-14 h-14 shrink-0 overflow-hidden border border-edge bg-retro-bg group relative cursor-zoom-in rounded-xl shadow-xs"
+                            className={classes('w-14 h-14 shrink-0 overflow-hidden border border-edge bg-retro-bg group relative cursor-zoom-in rounded-xl', SHADOW.xs)}
                           >
                             <ObjectImage
                               contentUrl={url}
@@ -620,23 +524,20 @@ export function SpectateModal({
                       }
 
                       return (
-                        <div
-                          key={h.round}
-                          className="flex items-center gap-2 p-2 bg-surface-raised border border-edge rounded-xl shadow-xs"
-                        >
-                          <span className="font-mono font-bold text-retro-muted text-xs shrink-0">R{h.round}</span>
-                          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                        <div key={h.round} className={classes('flex items-center', GAP[2], PADDING[2], COLOR.surfaceRaised, 'border border-edge rounded-xl', SHADOW.xs)}>
+                          <span className={classes(MONO, WEIGHT.bold, COLOR.muted, TYPE.body, 'shrink-0')}>R{h.round}</span>
+                          <div className={classes('flex items-center', GAP[1.5], 'flex-1 min-w-0')}>
                             {mediaThumb(h.card_a, h.card_a_url)}
-                            <span className="text-2xs text-retro-muted font-bold shrink-0">VS</span>
+                            <span className={classes(TYPE.caption, COLOR.muted, WEIGHT.bold, 'shrink-0')}>vs</span>
                             {mediaThumb(h.card_b, h.card_b_url)}
                           </div>
                           <span
-                            className={`font-bold px-2 py-0.5 text-2xs rounded-lg shrink-0 border ${h.matched
-                                ? 'bg-success text-success-fg border-success shadow-xs'
-                                : 'bg-surface-interactive text-retro-muted border-edge'
-                              }`}
+                            className={classes(
+                              WEIGHT.bold, PADDING_X[2], 'py-0.5', TYPE.caption, 'rounded-lg shrink-0 border',
+                              h.matched ? classes('bg-success text-success-fg border-success', SHADOW.xs) : classes(COLOR.interactive, COLOR.muted, COLOR.edge),
+                            )}
                           >
-                            {h.matched ? 'MUTUAL' : 'MISSED'}
+                            {h.matched ? 'Mutual' : 'Missed'}
                           </span>
                         </div>
                       )

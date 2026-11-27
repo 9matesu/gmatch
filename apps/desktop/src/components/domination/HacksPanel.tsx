@@ -2,6 +2,7 @@
 
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { User } from '@orbit/shared';
+import { Card, FeedbackState } from '../../ui/kit';
 import { StoreTab } from '../StoreTab';
 import { HackSpyView } from '../hacks/HackSpyView';
 import type { ActiveHackSession } from '../home/CommandIsland';
@@ -50,11 +51,14 @@ export function HacksPanel({
           onExpire={expireHack}
         />
       ) : (
-        <div className="glass-inset p-4 rounded-xl">
-          <p className="text-xs text-retro-muted">
-            No hack running. Buy one below to open a spy session on a player.
-          </p>
-        </div>
+        <Card tone="raised">
+          <FeedbackState
+            state="empty"
+            compact
+            title="No hack running."
+            description="Buy one below to open a spy session on a player."
+          />
+        </Card>
       )}
 
       <div>

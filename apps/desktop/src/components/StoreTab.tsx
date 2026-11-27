@@ -14,7 +14,6 @@ import {
 } from '../ui/tokens';
 import type { CanonicalCard } from '../utils/cardCollection';
 import { TargetSelectorModal } from './hacks/TargetSelectorModal';
-import { ObjectImage } from './ObjectImage';
 import { CardDetailView } from './CardDetailView';
 import {
   Zap,
@@ -24,7 +23,9 @@ import {
   EyeOff,
   Flame,
   ShieldAlert,
-} from 'lucide-react';
+  ArrowRight,
+} from 'lucide-react'
+import { CardArtwork } from './cards/CardArtwork';
 
 /**
  * A row in the "your portfolio" table. `ownerName` is joined server-side with
@@ -346,7 +347,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
               targetUserName: targetName || 'Target Player',
               expiresAt,
             });
-            if (!expiresAt) toast?.('Session length unknown — recheck the Hacks tab for the timer', 'info');
+            if (!expiresAt) toast?.('Session length unknown. Recheck the Hacks tab for the timer', 'info');
           }, 0);
           return;
         }
@@ -529,7 +530,10 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                     </span>
                   )}
                   <span className={classes(TYPE.body, WEIGHT.bold, MONO, 'tabular-nums', COLOR.fg, 'shrink-0')}>{formatGc(c.value)}</span>
-                  <span className={classes(TYPE.caption, MONO, 'tabular-nums', STATUS.warning, 'shrink-0')}>→ {formatGc(computeCashoutPayout(c.value, cashoutRate))}</span>
+                  <span className={classes(TYPE.caption, MONO, 'tabular-nums', STATUS.warning, 'shrink-0', 'flex items-center', GAP[1])} title="Cash-out payout">
+                    <ArrowRight className={ICON.sm} aria-hidden />
+                    {formatGc(computeCashoutPayout(c.value, cashoutRate))}
+                  </span>
                 </div>
               );
             })}
@@ -548,7 +552,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
               {owned.map((item) => (
                 <div key={item.id} className={classes(CHROME.rowTile, 'flex items-center', GAP[2.5])}>
                   <span className={classes('min-w-0 flex-1 truncate', TYPE.body, COLOR.body)}>{item.name}</span>
-                  <span className={classes(TYPE.body, MONO, 'tabular-nums', COLOR.muted, 'shrink-0')}>×{inventory[item.id]}</span>
+                  <span className={classes(TYPE.body, MONO, 'tabular-nums', COLOR.muted, 'shrink-0')}>x{inventory[item.id]}</span>
                 </div>
               ))}
             </div>
@@ -574,16 +578,14 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
                   className="block w-full text-left cursor-pointer"
                   aria-label={`View card ${l.card?.name || l.cardId.slice(0, 8)}`}
                 >
-                  <div className="aspect-square bg-retro-bg">
-                    <ObjectImage
-                      objectId={l.card?.mediaObjectId}
-                      contentUrl={l.card?.contentUrl}
-                      mimeType={l.card?.mimeType}
+                  <div className={classes('aspect-square bg-retro-bg flex items-center justify-center overflow-hidden', RADIUS.control)}>
+                    <CardArtwork
+                      objectId={l.card?.mediaObjectId ?? null}
+                      src={l.card?.contentUrl}
                       identity={identity ?? null}
-                      alt={l.card?.name || 'market card'}
-                      className="w-full h-full object-cover"
-                      videoClassName="w-full h-full object-cover"
-                      thumb
+                      width={190}
+                      height={190}
+                      isVideo={Boolean(l.card?.mimeType?.startsWith('video/'))}
                     />
                   </div>
                   <div className={classes(PADDING[2], 'pb-0')}>

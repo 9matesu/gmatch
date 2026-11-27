@@ -140,4 +140,13 @@ describe('PCDominationTab mesh-first send (Fase 5/6 slice 4)', () => {
     expect(badges.length).toBeGreaterThan(0);
     expect(screen.queryByText(/500 g\$/)).toBeNull();
   });
+
+  it('shows the g$ price on the action card when the send is not free via mesh', async () => {
+    render(<PCDominationTab {...baseProps} mesh={{ peerKnown: () => false, send: vi.fn() }} />);
+    await screen.findByRole('button', { name: /bob/i });
+    const cards = screen.getAllByRole('button', { name: /message/i });
+    const card = cards.find((c) => (c.textContent || '').startsWith('Message'));
+    expect(card).toBeTruthy();
+    expect(card).toHaveTextContent('500 g$');
+  });
 });

@@ -6,8 +6,21 @@
 // without interrupting playback.
 
 import { useRef, useState } from 'react'
-import { ListVideo, Play, Plus, X, Download, Loader2, Flag } from 'lucide-react'
-import { BTN, BTN_PRIMARY, MUTED } from '../../ui/styles'
+import { Download, Flag, ListVideo, Loader2, Play, Plus, X } from 'lucide-react'
+import { cn } from '../../lib/utils'
+import { Button, Textarea } from '../../ui/kit'
+import {
+  CHROME,
+  COLOR,
+  GAP,
+  ICON,
+  MONO,
+  RADIUS,
+  STATUS,
+  TRACKING,
+  TYPE,
+  cx,
+} from '../../ui/tokens'
 import { loadPartyVideos, moveQueueEntry, queueOp, canControlParty, type PartyRuntime } from '../../hooks/watchPartyStore'
 import { signalLocalReady, useLocalEntryTransfer } from '../../hooks/watchLocalShare'
 
@@ -49,26 +62,26 @@ function LocalEntryTransfer({ partyId, entryId, objectId, hash }: {
         onClick={() => signalLocalReady(partyId, entryId, hash)}
         title="Bytes verified on this machine — tell the room"
         aria-label="Mark local file ready"
-        className="p-1 rounded-md hover:bg-glass-w10 text-success-fg hover:text-success-fg cursor-pointer"
+        className={cx(CHROME.iconButton, STATUS.success)}
       >
-        <Download className="w-3 h-3" />
+        <Download className={ICON.sm} />
       </button>
     )
   }
   if (status === 'receiving') {
     const pct = total > 0 ? Math.min(100, Math.round((received / total) * 100)) : 0
     return (
-      <span className="flex items-center gap-1" title={`Receiving from peers (${pct}%)`}>
-        <Loader2 className="w-3 h-3 animate-spin text-retro-muted" />
-        <span className="font-mono text-2xs text-retro-muted">{pct}%</span>
+      <span className={cx('flex items-center', GAP[1])} title={`Receiving from peers (${pct}%)`}>
+        <Loader2 className={cx(ICON.sm, 'animate-spin', COLOR.muted)} />
+        <span className={cx(TYPE.caption, MONO, COLOR.muted)}>{pct}%</span>
         <button
           type="button"
           onClick={cancel}
           aria-label="Cancel transfer"
           title="Cancel transfer"
-          className="p-1 rounded-md hover:bg-glass-w10 text-retro-muted hover:text-retro-fg cursor-pointer"
+          className={CHROME.iconButton}
         >
-          <X className="w-3 h-3" />
+          <X className={ICON.sm} />
         </button>
       </span>
     )
@@ -79,9 +92,9 @@ function LocalEntryTransfer({ partyId, entryId, objectId, hash }: {
       onClick={() => void receive()}
       title={error ? `Receive from peers (last try: ${error})` : 'Receive from peers'}
       aria-label="Receive local file from peers"
-      className="p-1 rounded-md hover:bg-glass-w10 text-retro-muted hover:text-retro-fg cursor-pointer"
+      className={CHROME.iconButton}
     >
-      <Download className="w-3 h-3" />
+      <Download className={ICON.sm} />
     </button>
   )
 }
@@ -132,20 +145,26 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
 
   return (
     <div className="border-t border-edge">
-      <div className="flex items-center justify-between px-3 pt-2 pb-1">
-        <p className="flex items-center gap-1.5 text-2xs font-bold uppercase tracking-wider text-retro-muted">
-          <ListVideo className="w-3.5 h-3.5" />
+      <div className={cx('flex items-center justify-between px-3 pt-2 pb-1')}>
+        <p className={cx('flex items-center', GAP[1.5], TYPE.caption, 'font-bold uppercase', TRACKING.wider, COLOR.muted)}>
+          <ListVideo className={ICON.sm} aria-hidden />
           Queue {party.queue.length > 0 && `(${party.queue.length})`}
         </p>
         {canAdd && (
-          <button type="button" onClick={() => setAdding((v) => !v)} aria-label="Add to queue" className="p-1 rounded-md hover:bg-glass-w10 text-retro-muted hover:text-retro-fg cursor-pointer">
-            <Plus className="w-3.5 h-3.5" />
+          <button
+            type="button"
+            onClick={() => setAdding((v) => !v)}
+            aria-label="Add to queue"
+            className={CHROME.iconButton}
+          >
+            <Plus className={ICON.sm} />
           </button>
         )}
       </div>
+
       {adding && (
         <div className="px-3 pb-2 space-y-1.5">
-          <textarea
+          <Textarea
             autoFocus
             aria-label="Queue video URLs"
             value={text}
@@ -159,20 +178,21 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
                 void submit(true)
               }
             }}
-            className="glass-inset w-full px-2.5 py-1.5 text-xs font-mono resize-y"
+            className={cx('w-full font-mono resize-y')}
           />
-          <p className={`text-2xs ${MUTED}`}>Up to 10 per add, or one pmvhaven playlist link per line. Parsing runs server-side.</p>
-          {error && <p className="text-2xs text-retro-error">{error}</p>}
-          <div className="flex gap-2">
-            <button type="button" onClick={() => void submit(true)} disabled={busy} className={`${BTN} flex-1 py-1 text-2xs uppercase tracking-wider disabled:opacity-40`}>
+          <p className={cx(TYPE.caption, COLOR.muted, 'text-pretty')}>Up to 10 per add, or one pmvhaven playlist link per line. Parsing runs server-side.</p>
+          {error && <p className={cx(TYPE.caption, STATUS.danger)}>{error}</p>}
+          <div className={cn('flex', GAP[2])}>
+            <Button variant="secondary" size="sm" onClick={() => void submit(true)} disabled={busy} className="flex-1 py-1 text-2xs uppercase tracking-wider">
               {busy ? 'Parsing...' : 'Add'}
-            </button>
-            <button type="button" onClick={() => void submit(false)} disabled={busy} className={`${BTN_PRIMARY} flex-1 py-1 text-2xs uppercase tracking-wider disabled:opacity-40`}>
+            </Button>
+            <Button variant="primary" size="sm" onClick={() => void submit(false)} disabled={busy} className="flex-1 py-1 text-2xs uppercase tracking-wider">
               Add and play
-            </button>
+            </Button>
           </div>
         </div>
       )}
+
       {party.queue.length > 0 && (
         <ul
           className="px-3 pb-2 max-h-28 overflow-y-auto space-y-0.5 styled-scrollbar"
@@ -200,24 +220,34 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
                 // last slot: drop the tail entry onto its own successor).
                 if (src && src !== q.id) moveQueueEntry(party.id, src, q.id)
               }}
-              className={`flex items-center gap-2 text-xs ${canControl ? 'cursor-grab active:cursor-grabbing' : ''} ${q.status === 'unavailable' ? 'opacity-50' : ''}`}
+              className={cn(
+                'flex items-center', GAP[2], TYPE.body,
+                canControl && 'cursor-grab active:cursor-grabbing',
+                q.status === 'unavailable' && 'opacity-50',
+              )}
             >
-              <span className={MUTED}>{i + 1}</span>
-              <span className={`truncate flex-1 ${q.id === party.current ? 'text-retro-fg font-semibold' : 'text-retro-muted'}`} title={q.provider ? `via ${q.provider}` : undefined}>
+              <span className={COLOR.muted}>{i + 1}</span>
+              <span
+                className={cn('truncate flex-1', q.id === party.current ? cx(TYPE.body, 'font-semibold', COLOR.fg) : COLOR.muted)}
+                title={q.provider ? `via ${q.provider}` : undefined}
+              >
                 {q.name || q.url}
               </span>
               {q.status === 'proposed' && (
-                <span className="rounded-full border border-warning/40 px-1.5 py-px text-2xs font-semibold uppercase tracking-wider text-warning-fg" title="A participant suggestion — the host approves it before it can play">
+                <span className={CHROME.warningPill} title="A participant suggestion — the host approves it before it can play">
                   proposed
                 </span>
               )}
               {q.status === 'unavailable' && (
-                <span className="rounded-full border border-retro-error/40 px-1.5 py-px text-2xs font-semibold uppercase tracking-wider text-retro-error" title="Flagged as unplayable — skipped by next/previous">
+                <span className={cx(RADIUS.pill, 'border', STATUS.dangerEdge, TYPE.caption, 'font-semibold uppercase', TRACKING.wider, STATUS.danger)} title="Flagged as unplayable — skipped by next/previous">
                   unavailable
                 </span>
               )}
               {q.local && (
-                <span className="font-mono text-2xs text-retro-muted" title={`Local file · sha256:${(q.hash || '').slice(0, 12)}… · ready ${(party.ready[q.id] || []).length}/${party.members.length}`}>
+                <span
+                  className={cx(MONO, TYPE.caption, COLOR.muted)}
+                  title={`Local file · sha256:${(q.hash || '').slice(0, 12)}… · ready ${(party.ready[q.id] || []).length}/${party.members.length}`}
+                >
                   {(party.ready[q.id] || []).length}/{party.members.length} ready
                 </span>
               )}
@@ -230,27 +260,34 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
                 />
               )}
               {isHost && q.status === 'proposed' && (
-                <button type="button" onClick={() => queueOp(party.id, 'approve', q.id)} aria-label={`Approve ${q.name || 'video'}`} title="Approve suggestion" className="px-2 py-0.5 rounded-md bg-success/20 border border-success/40 text-success-fg hover:bg-success/30 cursor-pointer text-2xs font-bold uppercase tracking-wider">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => queueOp(party.id, 'approve', q.id)}
+                  aria-label={`Approve ${q.name || 'video'}`}
+                  title="Approve suggestion"
+                  className={cx('px-2 py-0.5', TYPE.caption, 'font-bold uppercase', TRACKING.wider)}
+                >
                   Approve
-                </button>
+                </Button>
               )}
               {canControl && q.id !== party.current && q.status !== 'proposed' && q.status !== 'unavailable' && (
-                <button type="button" onClick={() => queueOp(party.id, 'play', q.id)} aria-label="Play now" className="p-1 rounded-md hover:bg-glass-w10 text-retro-muted hover:text-retro-fg cursor-pointer">
-                  <Play className="w-3 h-3" />
+                <button type="button" onClick={() => queueOp(party.id, 'play', q.id)} aria-label="Play now" className={CHROME.iconButton}>
+                  <Play className={ICON.sm} />
                 </button>
               )}
               {canControl && (
-                <button type="button" onClick={() => queueOp(party.id, 'remove', q.id)} aria-label="Remove from queue" className="p-1 rounded-md hover:bg-glass-w10 text-retro-muted hover:text-retro-fg cursor-pointer">
-                  <X className="w-3 h-3" />
+                <button type="button" onClick={() => queueOp(party.id, 'remove', q.id)} aria-label="Remove from queue" className={CHROME.iconButton}>
+                  <X className={ICON.sm} />
                 </button>
               )}
               {canControl && q.status !== 'unavailable' && (
-                <button type="button" onClick={() => queueOp(party.id, 'flag', q.id)} aria-label="Flag as unavailable" title="Flag as unavailable" className="p-1 rounded-md hover:bg-glass-w10 text-retro-muted hover:text-retro-error cursor-pointer">
-                  <Flag className="w-3 h-3" />
+                <button type="button" onClick={() => queueOp(party.id, 'flag', q.id)} aria-label="Flag as unavailable" title="Flag as unavailable" className={cx(CHROME.iconButton, STATUS.dangerHoverHard)}>
+                  <Flag className={ICON.sm} />
                 </button>
               )}
               {canControl && q.status === 'unavailable' && (
-                <button type="button" onClick={() => queueOp(party.id, 'unflag', q.id)} aria-label="Mark as available" title="Mark as available again" className="px-2 py-0.5 rounded-md hover:bg-glass-w10 text-retro-muted hover:text-retro-fg cursor-pointer text-2xs font-semibold uppercase tracking-wider">
+                <button type="button" onClick={() => queueOp(party.id, 'unflag', q.id)} aria-label="Mark as available" title="Mark as available again" className={cx(CHROME.iconButton, TYPE.caption, 'font-semibold uppercase', TRACKING.wider)}>
                   Retry
                 </button>
               )}
@@ -258,12 +295,12 @@ export function WatchPartyQueue({ party, identity }: { party: PartyRuntime; iden
           ))}
         </ul>
       )}
-      {party.queue.length === 0 && !adding && <p className="px-3 pb-2 text-2xs text-retro-muted">Empty.</p>}
+      {party.queue.length === 0 && !adding && <p className={cx('px-3 pb-2', TYPE.caption, COLOR.muted)}>Empty.</p>}
       {canControl && party.queue.length > 0 && (
         <div className="px-3 pb-2">
-          <button type="button" onClick={() => queueOp(party.id, 'next')} className={`${BTN} px-2 py-1 text-2xs uppercase tracking-wider`}>
+          <Button variant="secondary" size="sm" onClick={() => queueOp(party.id, 'next')} className={cx('px-2 py-1', TYPE.caption, 'uppercase', TRACKING.wider)}>
             Play next
-          </button>
+          </Button>
         </div>
       )}
     </div>

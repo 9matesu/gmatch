@@ -1,14 +1,28 @@
 'use client'
 
-// Watch tab: in a room the video viewer and docked side rail fit neatly side-by-side.
-// When the rail is toggled off, the video expands to 100% width.
-// Browse mode (no active room) renders the two-column layout with room list on the left and side rail on the right.
+// Watch tab. Browse mode is one aligned gallery: a single create action, one
+// join field, and room cards with equal edges. In-room mode keeps the video
+// full-bleed and the rail docked; secondary room facts live in ONE Details
+// disclosure so the player reads title / host / controls / queue only.
 
 import { useEffect, useState } from 'react'
-import { Clapperboard } from 'lucide-react'
+import { ChevronDown, Clapperboard, Users } from 'lucide-react'
+import { cn } from '../../lib/utils'
 import { Avatar } from '../Avatar'
+import {
+  CHROME,
+  COLOR,
+  ICON,
+  MOTION,
+  PADDING_X,
+  PADDING_Y,
+  RADIUS,
+  TRACKING,
+  TYPE,
+  cx,
+} from '../../ui/tokens'
 import { MUTED } from '../../ui/styles'
-import { useWatchParty, joinPartyById, canControlParty, MAX_SLOTS } from '../../hooks/watchPartyStore'
+import { useWatchParty, joinPartyById, canControlParty, MAX_SLOTS, type PartyRuntime } from '../../hooks/watchPartyStore'
 import { watchInviteFromHash, stripWatchRoom } from './invite'
 import { WatchPartySlot } from './WatchPartySlot'
 import { WatchPartyTimeline } from './WatchPartyTimeline'
@@ -22,6 +36,63 @@ interface IdentityLike {
   orbitId: string
   publicKeyHex: string
   privateKeyHex: string
+}
+
+/** Secondary room facts: shown only when the player asks for them. */
+function RoomDetails({ party, identity, profilePics }: {
+  party: PartyRuntime
+  identity: IdentityLike
+  profilePics: Record<string, string>
+}) {
+  const currentEntry = party.queue.find((q) => q.id === party.current) || null
+  const readyCount = currentEntry ? (party.ready?.[currentEntry.id] || []).length : 0
+  const syncLabel = !currentEntry
+    ? null
+    : currentEntry.local
+      ? `${readyCount}/${party.members.length} ready`
+      : 'synced'
+
+  return (
+    <details className={cx('border-b', COLOR.edge, 'group/details')}>
+      <summary
+        className={cx(
+          'flex items-center justify-between cursor-pointer list-none',
+          PADDING_X[3], PADDING_Y[2],
+          TYPE.caption, 'font-bold uppercase', TRACKING.wider, COLOR.muted,
+          COLOR.hoverW10, COLOR.hoverFg, MOTION.transition.micro,
+        )}
+      >
+        Details
+        <ChevronDown className={cx(ICON.sm, MOTION.transition.transform, 'group-open/details:rotate-180')} aria-hidden />
+      </summary>
+      <div className={cx(PADDING_X[3], PADDING_Y[2], 'space-y-1')}>
+        <p className={cx('flex items-center gap-1.5', MUTED)}>
+          <Users className={ICON.sm} aria-hidden />
+          {party.members.length} watching
+        </p>
+        {party.mediaName && <p className={cx('truncate', MUTED)}>{party.mediaName}</p>}
+        {currentEntry && (
+          <p className={cx('truncate font-mono text-2xs', MUTED)}>
+            via {currentEntry.provider || 'direct'} · {syncLabel}
+          </p>
+        )}
+        <p className={cx(TYPE.caption, 'font-bold uppercase', TRACKING.wider, COLOR.fg)}>In this room</p>
+        {party.members.length > 0 && (
+          <ul className="space-y-1.5 max-h-36 overflow-y-auto styled-scrollbar">
+            {party.members.map((m) => (
+              <li key={m.id} className="flex items-center gap-2">
+                <Avatar id={m.id} size={18} imageUrl={profilePics[m.id] || null} />
+                <span className={cx(TYPE.body, COLOR.fg, 'truncate flex-1')}>{m.name || m.id}</span>
+                {m.muted && <span className={cx(TYPE.caption, 'uppercase', TRACKING.wider, MUTED)}>muted</span>}
+                {m.id === party.host && <span className={cx(TYPE.caption, 'uppercase', TRACKING.wider, MUTED)}>host</span>}
+                {m.id === identity.orbitId && <span className={cx(TYPE.caption, 'uppercase', TRACKING.wider, MUTED)}>you</span>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </details>
+  )
 }
 
 export function WatchPartyView({ identity, profilePics }: { identity: IdentityLike; profilePics: Record<string, string> }) {
@@ -51,14 +122,14 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
 
   const inRoom = parties.length > 0
 
-  // BROWSE MODE: Full-width gallery layout (room list gallery without placeholder chat rail)
+  // BROWSE MODE: one panel, one action to create, one field to join.
   if (!inRoom) {
     return (
       <div className="p-2 sm:p-4 h-full flex-1 flex flex-col min-h-0 overflow-hidden">
-        <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden glass-card rounded-xl border border-edge bg-surface-canvas/60 backdrop-blur-md">
-          <div className="glass-header flex items-center justify-between px-4 py-3 border-b border-edge">
-            <h3 className="text-xs font-bold tracking-wider text-retro-fg flex items-center gap-2">
-              <Clapperboard className="w-4 h-4 text-retro-accent" />
+        <div className={cn('flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden', COLOR.panel, RADIUS.panel, 'border', COLOR.edge)}>
+          <div className={CHROME.barHeader}>
+            <h3 className={cx(TYPE.body, 'font-bold', TRACKING.wider, COLOR.fg, 'flex items-center gap-2 text-balance')}>
+              <Clapperboard className={cx(ICON.md, COLOR.accent)} aria-hidden />
               Watch
             </h3>
           </div>
@@ -83,11 +154,11 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
     )
   }
 
-  // ROOM MODE: Full-bleed theater layout with video viewer and docked side rail
+  // ROOM MODE: full-bleed video; the rail holds only the room identity, the
+  // queue and chat. Everything else is one Details disclosure away.
   return (
-    <div className="group/watch relative h-full flex-1 flex flex-row min-h-0 overflow-hidden bg-retro-bg">
-      {/* Video Viewer Container: takes remaining width, resizes automatically */}
-      <div className="flex-1 min-w-0 min-h-0 relative flex flex-col bg-retro-bg overflow-hidden">
+    <div className="group/watch relative h-full flex-1 flex flex-row min-h-0 overflow-hidden">
+      <div className={cn('flex-1 min-w-0 min-h-0 relative flex flex-col overflow-hidden', COLOR.canvas)}>
         {parties.length === 1 ? (
           <WatchPartySlot
             party={parties[0]}
@@ -115,7 +186,6 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
           </div>
         )}
 
-        {/* Cohesive Video Player Controls */}
         <WatchPartyTimeline
           party={active}
           isHost={!!canControl}
@@ -124,31 +194,15 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
         />
       </div>
 
-      {/* Docked Side Rail (Room info + Participants + Queue + Chat) */}
       <aside
-        className={`w-72 lg:w-80 shrink-0 h-full flex-col min-h-0 overflow-hidden border-l border-edge solid-panel z-20 ${
-          railOpen ? 'flex animate-orbit-fade-in' : 'hidden'
-        }`}
+        className={cn(
+          'w-72 lg:w-80 shrink-0 h-full flex-col min-h-0 overflow-hidden border-l z-20',
+          COLOR.edge, COLOR.panel,
+          railOpen ? ['flex', MOTION.keyframe.fadeIn] : 'hidden',
+        )}
       >
         {active && <WatchRoomHeader party={active} identity={identity} profilePics={profilePics} />}
-
-        <div className="flex items-start justify-between gap-2 px-3 py-1.5 border-b border-edge">
-          <p className="text-2xs font-bold uppercase tracking-wider text-retro-fg">In this room</p>
-        </div>
-
-        {active && active.members.length > 0 && (
-          <ul className="px-3 py-2 space-y-1.5 border-b border-edge max-h-36 overflow-y-auto styled-scrollbar">
-            {active.members.map((m) => (
-              <li key={m.id} className="flex items-center gap-2">
-                <Avatar id={m.id} size={18} imageUrl={profilePics[m.id] || null} />
-                <span className="text-xs text-retro-fg truncate flex-1">{m.name || m.id}</span>
-                {m.muted ? <span className={`text-2xs uppercase tracking-wider ${MUTED}`}>muted</span> : null}
-                {m.id === active.host && <span className="text-2xs uppercase tracking-wider text-retro-muted">host</span>}
-                {m.id === identity.orbitId && <span className="text-2xs uppercase tracking-wider text-retro-muted">you</span>}
-              </li>
-            ))}
-          </ul>
-        )}
+        {active && <RoomDetails party={active} identity={identity} profilePics={profilePics} />}
 
         {active && <WatchPartyQueue party={active} identity={identity} />}
         <WatchPartyChat party={active} profilePics={profilePics} myId={identity.orbitId} isHost={isHost} />

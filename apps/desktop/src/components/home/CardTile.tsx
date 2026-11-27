@@ -193,19 +193,22 @@ export function CardTile({
             </span>
           )}
           {/* Selection Checkbox */}
-          <div
+          <button
+            type="button"
+            aria-label={selected ? `Deselect ${cardTitle}` : `Select ${cardTitle}`}
+            aria-pressed={selected}
             onClick={(e) => {
               e.stopPropagation()
               onSelect?.(item.id)
             }}
-            className={classes('w-5 h-5 flex items-center justify-center', RADIUS.chip, 'border', MOTION.transition.micro,
+            className={classes('size-5 flex items-center justify-center', RADIUS.chip, 'border cursor-pointer', MOTION.transition.micro,
               selected
                 ? classes(COLOR.interactive, COLOR.edge, COLOR.fg, SHADOW.large)
                 : classes(COLOR.scrim, COLOR.edge, 'opacity-0 group-hover:opacity-100 text-transparent hover:border-edge'),
             )}
           >
             <Check className={classes(ICON.sm, 'stroke-[3]')} />
-          </div>
+          </button>
         </div>
 
         {/* Card Image */}

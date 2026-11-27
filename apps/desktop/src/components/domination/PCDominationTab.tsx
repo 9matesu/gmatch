@@ -13,13 +13,35 @@ import {
   Paintbrush,
   Gamepad2,
   AlertTriangle,
-  Loader2,
   Target,
   RefreshCw,
   WifiOff,
   Inbox,
   Radio,
 } from 'lucide-react';
+import { cn } from '../../lib/utils';
+import {
+  Button,
+  Card,
+  CardHeader,
+  Caption,
+  FeedbackState,
+  Input,
+  PageHeader,
+  Tabs,
+  Title,
+} from '../../ui/kit';
+import { Switch } from '../../ui/Switch';
+import {
+  BUTTON_CONTRACT,
+  CHROME,
+  COLOR,
+  FEEDBACK,
+  MONO,
+  STATUS,
+  TYPE,
+  WEIGHT,
+} from '../../ui/tokens';
 import { orbitFetch } from '../../utils/api';
 import { ownDisplayName } from '../../utils/displayName';
 import { useSettings } from '../../hooks/useSettings';
@@ -451,6 +473,10 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
   const consentCountOf = (t: DominationTarget) =>
     ACTION_ORDER.filter((a) => Boolean(t.consents?.[ACTION_LABELS[a].consent])).length;
 
+  // One stated fact for every card: a mesh-known target costs nothing. Cards
+  // carry only their own exception, never a second copy of this line.
+  const allFree = Boolean(selectedTarget && mesh && mesh.peerKnown(selectedTarget.id));
+
   // Server outbox + local mesh outbox, newest first. Mesh entries never come
   // from the server history fetch, so they merge here at render.
   const outgoingAll = useMemo(
@@ -464,22 +490,11 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
   // ── unauthenticated shell ─────────────────────────────────────────────
   if (!identity) {
     return (
-      <div className="w-full max-w-5xl mx-auto px-3 sm:px-6 py-6 font-sans select-none">
-        <div className="glass-card overflow-hidden">
-          <div className="glass-header p-4 flex items-center gap-2">
-            <div className="glass-inset w-7 h-7 rounded-lg flex items-center justify-center text-retro-muted shrink-0">
-              <Monitor className="w-4 h-4" />
-            </div>
-            <div>
-              <h2 className="text-xs font-bold text-retro-fg tracking-wider">
-                PC Domination
-              </h2>
-            </div>
-          </div>
-          <div className="p-8 text-center">
-            <p className="text-xs text-retro-muted">Log in to use Domination.</p>
-          </div>
-        </div>
+      <div className="mx-auto w-full max-w-5xl space-y-4 px-3 py-6 font-sans select-none sm:px-6">
+        <PageHeader title="PC Domination" meta="Send effects, manage consent, and run hacks." />
+        <Card>
+          <FeedbackState state="empty" compact title="Log in to use Domination." />
+        </Card>
       </div>
     );
   }
@@ -490,152 +505,109 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
     return { text: `seen ${timeAgo(t.last_seen)}`, cls: 'text-warning-fg/80 border-warning/20' };
   };
 
-  const SUBTAB_LABELS: Record<DominationSubtab, string> = {
-    send: 'Send',
-    consent: 'My consent',
-    history: 'History',
-    hacks: 'Hacks',
-  };
-
   return (
-    <div className="w-full max-w-5xl mx-auto px-3 sm:px-6 py-6 font-sans select-none">
-      <div className="glass-card overflow-hidden">
-      {/* Header */}
-      <div className="glass-header p-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="glass-inset w-7 h-7 rounded-lg flex items-center justify-center text-retro-muted shrink-0">
-            <Monitor className="w-4 h-4" />
-          </div>
-          <div className="min-w-0">
-            <h2 className="text-xs font-bold text-retro-fg tracking-wider">
-              PC Domination
-            </h2>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 rounded-xl glass-panel px-3 py-2">
-          <Radio className={`w-3.5 h-3.5 ${receiving && !paused ? 'text-success-fg' : 'text-retro-muted'}`} />
-          <div className="text-xs leading-tight font-medium">
-            {receiving ? (paused ? 'Receiving (paused)' : 'Receiving') : 'Not receiving'}
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={receiving}
-            aria-label="Receive domination effects"
-            onClick={() => handleUpdateMaster(!receiving)}
-            className="relative flex h-4 w-9 shrink-0 cursor-pointer items-center border-0 p-0 ml-1"
-          >
-            <span
+    <div className="mx-auto w-full max-w-5xl space-y-4 px-3 py-6 font-sans select-none sm:px-6">
+      {/* ONE title at the top of the scale; the receiving state is its only action. */}
+      <PageHeader
+        title="PC Domination"
+        meta="Send effects, manage consent, and run hacks."
+        action={
+          <div className="flex flex-wrap items-center justify-end gap-2 rounded-lg glass-panel px-3 py-2">
+            <Radio
+              className={cn('size-3.5', receiving && !paused ? STATUS.success : COLOR.muted)}
               aria-hidden="true"
-              className={`absolute inset-x-0 h-1 rounded-full transition-colors ${receiving ? 'bg-success/50' : 'bg-surface-raised'}`}
             />
-            <span
-              aria-hidden="true"
-              className={`absolute left-0 h-3 w-3 rounded-full shadow transition-transform ${receiving ? 'translate-x-6 bg-success' : 'translate-x-0 bg-retro-muted'}`}
+            <span className={cn(TYPE.body, WEIGHT.medium)}>
+              {receiving ? (paused ? 'Receiving (paused)' : 'Receiving') : 'Not receiving'}
+            </span>
+            <Switch
+              checked={receiving}
+              label="Receive domination effects"
+              onChange={() => handleUpdateMaster(!receiving)}
             />
-          </button>
-          {receiving && (
-            <button
-              type="button"
-              onClick={togglePause}
-              className={`ml-1 px-2 py-1 rounded-md text-xs font-medium border cursor-pointer transition-colors ${
-                paused ? 'border-success/30 text-success-fg' : 'border-edge text-retro-muted hover:text-retro-fg'
-              }`}
-            >
-              {paused ? 'Resume' : 'Pause 15m'}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Subtabs Bar */}
-      <div className="px-4 py-2.5 border-b border-edge-subtle flex items-center justify-between gap-2 shrink-0">
-        <div className="flex items-center gap-1.5" role="tablist" aria-label="Domination categories">
-          {DOMINATION_SUBTABS.map((tab) => {
-            const isSel = subtab === tab;
-            return (
-              <button
-                key={tab}
-                role="tab"
-                aria-selected={isSel}
-                type="button"
-                onClick={() => setSubtab(tab)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold capitalize cursor-pointer transition-colors ${
-                  isSel ? 'glass-nav-active text-retro-fg shadow-sm' : 'glass-action text-retro-muted hover:text-retro-fg'
-                }`}
+            {receiving && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={togglePause}
+                className={paused ? STATUS.success : COLOR.muted}
               >
-                {SUBTAB_LABELS[tab]}
-              </button>
-            );
-          })}
-        </div>
+                {paused ? 'Resume' : 'Pause 15m'}
+              </Button>
+            )}
+          </div>
+        }
+      />
+      <Card className="overflow-hidden">
+      <div className="border-b border-edge-subtle px-4 py-2.5">
+        <Tabs
+          tabs={DOMINATION_SUBTABS.map((id) => ({
+            id,
+            label: id === 'send' ? 'Send' : id === 'consent' ? 'My consent' : id === 'history' ? 'History' : 'Hacks',
+          }))}
+          value={subtab}
+          onChange={setSubtab}
+        />
       </div>
 
-      <div className="p-4 sm:p-5">
+      <div className="p-4">
       {subtab === 'send' && (
       <section aria-label="Send">
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
-          {/* Target column */}
-          <div className="lg:col-span-2 rounded-xl glass-panel flex flex-col overflow-hidden">
-            <div className="px-4 py-3 border-b border-edge-subtle flex items-center justify-between gap-2">
-              <div className="text-xs font-medium flex items-center gap-1.5 text-retro-fg">
-                <Target className="w-3.5 h-3.5 text-retro-muted" /> Target
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-mono text-retro-muted">{onlineCount} online</span>
-                <button
-                  type="button"
-                  onClick={() => void loadTargets()}
-                  className="p-1 rounded glass-action text-retro-muted hover:text-retro-fg cursor-pointer"
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+          {/* Targets: one list, one status chip per row, equal padding. */}
+          <Card className="flex flex-col overflow-hidden lg:col-span-2" tone="raised">
+            <CardHeader
+              title="Targets"
+              caption={`${onlineCount} online`}
+              icon={<Target className="size-3.5" aria-hidden="true" />}
+              right={
+                <Button
+                  variant="ghost"
+                  size="sm"
                   aria-label="Refresh targets"
+                  onClick={() => void loadTargets()}
                 >
-                  <RefreshCw className={`w-3 h-3 ${targetsState === 'loading' ? 'animate-spin' : ''}`} />
-                </button>
-              </div>
-            </div>
-            <div className="p-3 border-b border-edge-subtle">
-              <input
+                  <RefreshCw className={cn('size-3.5', targetsState === 'loading' && 'animate-spin')} />
+                </Button>
+              }
+            />
+            <div className="border-b border-edge-subtle p-3">
+              <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search players…"
                 aria-label="Search players"
-                className="w-full glass-field rounded-md px-3 py-1.5 text-xs outline-none placeholder:text-retro-muted"
               />
             </div>
-            <div className="max-h-[420px] overflow-y-auto styled-scrollbar">
+            <div className="styled-scrollbar max-h-[420px] overflow-y-auto">
               {targetsState === 'loading' && targets.length === 0 && (
-                <div className="p-6 text-center text-xs text-retro-muted flex items-center justify-center gap-2">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading players…
-                </div>
+                <FeedbackState state="loading" compact title="Loading players…" />
               )}
               {targetsState === 'error' && (
-                <div className="p-6 text-center space-y-3">
-                  <p className="text-xs text-danger-fg">Couldn't load the player list.</p>
-                  <button
-                    type="button"
-                    onClick={() => void loadTargets()}
-                    className="glass-action glass-action-primary px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer"
-                  >
-                    Try again
-                  </button>
-                </div>
+                <FeedbackState
+                  state="error"
+                  compact
+                  icon={<WifiOff className={FEEDBACK.errorIcon} aria-hidden="true" />}
+                  title="Couldn't load the player list."
+                  action={
+                    <Button variant="primary" size="sm" onClick={() => void loadTargets()}>
+                      Try again
+                    </Button>
+                  }
+                />
               )}
               {targetsState === 'ready' && filteredTargets.length === 0 && (
-                <div className="p-6 text-center space-y-3">
-                  <WifiOff className="w-5 h-5 mx-auto text-retro-muted" />
-                  <p className="text-xs text-retro-muted">
-                    {search ? 'No player matches that name.' : 'Nobody has Domination switched on yet.'}
-                  </p>
-                  {!search && (
-                    <button
-                      type="button"
-                      onClick={() => setSubtab('consent')}
-                      className="glass-action glass-action-primary px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors"
-                    >
+                <FeedbackState
+                  state="empty"
+                  compact
+                  icon={<WifiOff className={FEEDBACK.icon} aria-hidden="true" />}
+                  title={search ? 'No player matches that name.' : 'Nobody has Domination switched on yet.'}
+                  action={!search ? (
+                    <Button variant="primary" size="sm" onClick={() => setSubtab('consent')}>
                       Set up my consent
-                    </button>
-                  )}
-                </div>
+                    </Button>
+                  ) : undefined}
+                />
               )}
               {filteredTargets.map((t) => {
                 const chip = statusChip(t);
@@ -645,45 +617,51 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                     key={t.id}
                     type="button"
                     onClick={() => setSelectedTarget(t)}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-left border-b border-edge-subtle transition-colors cursor-pointer ${
-                      isSel ? 'glass-nav-active' : 'hover:bg-glass-w10'
-                    }`}
+                    className={cn(
+                      'flex w-full items-center gap-3 border-b border-edge-subtle px-4 py-3 text-left transition-colors',
+                      isSel ? 'glass-nav-active' : 'hover:bg-glass-w10',
+                    )}
                   >
                     {t.pfpUrl ? (
-                      <img src={resolveMediaUrl(t.pfpUrl)} alt="" className="w-7 h-7 rounded-md object-cover border border-edge" />
+                      <img src={resolveMediaUrl(t.pfpUrl)} alt="" className="size-7 rounded-md border border-edge object-cover" />
                     ) : (
-                      <div className="w-7 h-7 rounded-md glass-inset flex items-center justify-center text-xs font-semibold text-retro-fg">
+                      <span className="flex size-7 shrink-0 items-center justify-center rounded-md glass-inset text-xs font-semibold text-retro-fg">
                         {t.displayName.charAt(0).toUpperCase()}
-                      </div>
+                      </span>
                     )}
-                    <div className="min-w-0 flex-1">
-                      <div className="text-xs font-medium truncate text-retro-fg">{t.displayName}</div>
-                      <div className="text-2xs text-retro-muted">{consentCountOf(t)}/7 effects allowed</div>
-                    </div>
-                    <span className={`text-2xs font-mono px-1.5 py-0.5 rounded border shrink-0 ${chip.cls}`}>{chip.text}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-xs font-medium text-retro-fg">{t.displayName}</span>
+                      <span className={cn(MONO, TYPE.caption, COLOR.muted)}>{consentCountOf(t)}/7 effects allowed</span>
+                    </span>
+                    <span className={cn('shrink-0 rounded-md border px-1.5 py-0.5 font-mono text-2xs', chip.cls)}>{chip.text}</span>
                   </button>
                 );
               })}
             </div>
-          </div>
+          </Card>
 
-          {/* Effects column */}
-          <div className="lg:col-span-3 space-y-3">
+          {/* Effects: every card is the same shape — label, icon, price. */}
+          <div className="space-y-3 lg:col-span-3">
             {!selectedTarget ? (
-              <div className="rounded-xl border border-dashed border-edge p-10 text-center text-sm text-retro-muted">
-                Pick a target on the left to start.
-              </div>
+              <FeedbackState
+                state="empty"
+                icon={<Target className={FEEDBACK.icon} aria-hidden="true" />}
+                title="Pick a target on the left to start."
+                className="rounded-lg border border-dashed border-edge"
+              />
             ) : (
               <>
-                <div className="flex items-center justify-between rounded-xl glass-panel px-4 py-2.5">
-                  <div className="text-xs text-retro-fg">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg glass-panel px-4 py-2.5">
+                  <Title>
                     Effects for <span className="font-semibold">{selectedTarget.displayName}</span>
-                    {selectedTarget.enabled && !selectedTarget.online && (
-                      <span className="text-warning-fg/80"> · offline, sends will be refused (free)</span>
-                    )}
-                  </div>
-                  <div className="text-xs font-mono text-retro-muted">{formatCount(points)} g$</div>
+                  </Title>
+                  <span className={cn(MONO, TYPE.body, COLOR.muted)}>{formatCount(points)} g$</span>
                 </div>
+                {selectedTarget.enabled && !selectedTarget.online && (
+                  <Caption className="text-warning-fg/80 text-pretty">
+                    They are offline. Sends will be refused and nothing will be charged.
+                  </Caption>
+                )}
                 {(() => {
                   // A state shared by every card is stated once here; the cards then
                   // carry only the exception.
@@ -692,21 +670,26 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                   ).length
                   const allAllowed = allowedCount === ACTION_ORDER.length
                   const noneAllowed = allowedCount === 0
-                  const allFree = Boolean(mesh && mesh.peerKnown(selectedTarget.id))
-                  if (allAllowed && !allFree) return null
+                  // Free is stated ON every card; do not say it twice here.
+                  if (allAllowed || allFree) return null
                   return (
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-retro-muted -mt-1">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-retro-muted">
                       {noneAllowed && <span>No consent yet — ask in the Consent tab.</span>}
-                      {!noneAllowed && !allAllowed && <span>Some effects are not consented.</span>}
-                      {allFree && <span className="text-success-fg/80">Free via mesh.</span>}
+                      {!noneAllowed && <span>Some effects are not consented.</span>}
                     </div>
                   )
                 })()}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {ACTION_ORDER.map((action) => {
                     const { label, icon: Icon, consent } = ACTION_LABELS[action];
                     const allowed = Boolean(selectedTarget.consents?.[consent]);
                     const sendable = allowed && Boolean(selectedTarget.enabled) && selectedTarget.online !== false;
+                    const priceText = allFree
+                      ? 'Free via mesh'
+                      : prices[action] != null
+                        ? `${prices[action]} g$`
+                        : 'Price unavailable';
+                    const exceptionText = sending === action ? 'sending…' : !allowed ? 'no consent' : null;
                     return (
                       <button
                         key={action}
@@ -719,25 +702,29 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                               : !allowed ? `They have "${label}" turned off in their consent`
                                 : undefined
                         }
-                        className={`rounded-xl border p-4 text-left transition-colors relative glass-action ${
+                        className={cn(
+                          BUTTON_CONTRACT,
+                          'flex min-h-24 w-full flex-col items-stretch justify-start gap-3 border p-4 text-left',
+                          COLOR.surfaceRaised,
                           sending === action
-                            ? 'border-retro-accent cursor-wait'
+                            ? 'cursor-wait border-retro-accent'
                             : sendable
-                              ? 'border-edge hover:border-retro-accent/60 cursor-pointer'
-                              : 'border-edge-subtle opacity-45 cursor-not-allowed'
-                        }`}
+                              ? 'border-edge hover:border-retro-accent/60'
+                              : 'border-edge-subtle',
+                        )}
                       >
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                          <Icon className="w-4 h-4 text-retro-muted" />
-                        </div>
-                        <div className="text-xs font-semibold text-retro-fg">{label}</div>
-                        {/* Consented is the default and lives in the group line; the card
-                            only states what is different. */}
-                        {!allowed || sending === action ? (
-                          <div className={`mt-2 text-2xs font-mono ${allowed ? 'text-success-fg/80' : 'text-danger-fg/80'}`}>
-                            {sending === action ? 'sending…' : 'no consent'}
-                          </div>
-                        ) : null}
+                        <span className="flex w-full items-center justify-between gap-2">
+                          <span className="text-xs font-semibold text-retro-fg">{label}</span>
+                          <Icon className="size-4 shrink-0 text-retro-muted" aria-hidden="true" />
+                        </span>
+                        <span className="mt-auto flex w-full items-center justify-between gap-2">
+                          <span className={cn(MONO, TYPE.caption, allFree ? STATUS.success : COLOR.muted)}>{priceText}</span>
+                          {exceptionText && (
+                            <span className={cn('font-mono text-2xs', allowed ? STATUS.success : STATUS.danger)}>
+                              {exceptionText}
+                            </span>
+                          )}
+                        </span>
                       </button>
                     );
                   })}
@@ -752,71 +739,50 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
       {subtab === 'consent' && (
       <section id="pc-dom-consent" aria-label="My consent">
         <div className="space-y-4">
-          <div className="rounded-xl glass-panel p-4 space-y-3">
-            <div className="text-xs font-medium flex items-center gap-1.5 text-retro-fg">
-              <Zap className="w-3.5 h-3.5 text-retro-muted" /> Preset
-            </div>
-            <p className="text-xs text-retro-muted">
+          <Card className="space-y-3 p-4">
+            <Title className="flex items-center gap-1.5">
+              <Zap className="size-3.5 text-retro-muted" aria-hidden="true" /> Preset
+            </Title>
+            <Caption className="text-pretty">
               One-tap starting points for the switches below. Your public-photo setting is never touched.
-            </p>
+            </Caption>
             <div className="flex flex-wrap gap-2">
-              {(['mild', 'medium', 'extreme'] as const).map((preset) => {
-                const selected = settings.dominationIntensity === preset;
-                return (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => applyIntensityPreset(preset)}
-                    className={`px-3.5 py-1.5 rounded-md text-xs font-medium border capitalize cursor-pointer transition-colors ${
-                      selected ? 'glass-action glass-action-primary' : 'glass-action text-retro-muted hover:text-retro-fg'
-                    }`}
-                  >
-                    {preset}
-                  </button>
-                );
-              })}
+              {(['mild', 'medium', 'extreme'] as const).map((preset) => (
+                <Button
+                  key={preset}
+                  variant={settings.dominationIntensity === preset ? 'primary' : 'secondary'}
+                  size="sm"
+                  className="capitalize"
+                  onClick={() => applyIntensityPreset(preset)}
+                >
+                  {preset}
+                </Button>
+              ))}
             </div>
-          </div>
+          </Card>
 
-          <div className="rounded-xl glass-panel overflow-hidden">
-            <div className="px-4 py-3 border-b border-edge-subtle flex items-center gap-1.5">
-              <Shield className="w-3.5 h-3.5 text-retro-muted" />
-              <span className="text-xs font-medium text-retro-fg">What others may send you</span>
-              {!receiving && <span className="text-2xs text-retro-muted ml-2">(saved. Inactive while Receiving is off)</span>}
-            </div>
+          <Card className="overflow-hidden">
+            <CardHeader
+              title="What others may send you"
+              icon={<Shield className="size-3.5" aria-hidden="true" />}
+              caption={!receiving ? 'Saved. Inactive while Receiving is off.' : undefined}
+            />
             <div className="divide-y divide-edge-subtle">
               {CONSENT_ROWS.map(({ key, label }) => {
                 const value = Boolean((settings as any)[key]);
                 return (
-                  <div key={key} className="flex items-start gap-3 px-4 py-3 hover:bg-glass-w10 cursor-pointer transition-colors">
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={value}
-                        aria-label={label}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleUpdateConsent(key, !value);
-                        }}
-                        className="relative flex h-4 w-9 shrink-0 cursor-pointer items-center border-0 p-0 mt-0.5"
-                      >
-                        <span
-                          aria-hidden="true"
-                          className={`absolute inset-x-0 h-1 rounded-full transition-colors ${value ? 'bg-success/50' : 'bg-surface-raised'}`}
-                        />
-                        <span
-                          aria-hidden="true"
-                          className={`absolute left-0 h-3 w-3 rounded-full shadow transition-transform ${value ? 'translate-x-6 bg-success' : 'translate-x-0 bg-retro-muted'}`}
-                        />
-                      </button>
-                    <div className="min-w-0">
-                      <div className="text-xs font-medium text-retro-fg">{label}</div>
-                    </div>
+                  <div key={key} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-glass-w10">
+                    <Switch
+                      checked={value}
+                      label={label}
+                      onChange={() => handleUpdateConsent(key, !value)}
+                    />
+                    <span className={cn(TYPE.body, WEIGHT.medium, COLOR.fg)}>{label}</span>
                   </div>
                 );
               })}
             </div>
-          </div>
+          </Card>
         </div>
       </section>
       )}
@@ -824,56 +790,47 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
       {subtab === 'history' && (
       <section aria-label="History">
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5" role="tablist" aria-label="History direction">
-              {(['outgoing', 'incoming'] as const).map((pane) => (
-                <button
-                  key={pane}
-                  type="button"
-                  onClick={() => setHistoryPane(pane)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize cursor-pointer transition-colors ${
-                    historyPane === pane ? 'glass-nav-active text-retro-fg' : 'glass-action text-retro-muted hover:text-retro-fg'
-                  }`}
-                >
-                  {pane === 'outgoing' ? 'Sent by you' : 'Received'}
-                </button>
-              ))}
-            </div>
-            <button
-              type="button"
+          <div className="flex items-center justify-between gap-2">
+            <Tabs
+              tabs={[
+                { id: 'outgoing' as const, label: 'Sent by you' },
+                { id: 'incoming' as const, label: 'Received' },
+              ]}
+              value={historyPane}
+              onChange={setHistoryPane}
+            />
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => void loadHistory()}
               disabled={historyState === 'loading'}
-              className="glass-action px-2.5 py-1.5 rounded-md text-xs font-medium text-retro-muted hover:text-retro-fg cursor-pointer flex items-center gap-1.5 transition-colors"
             >
-              <RefreshCw className={`w-3 h-3 ${historyState === 'loading' ? 'animate-spin' : ''}`} />
+              <RefreshCw className={cn('size-3.5', historyState === 'loading' && 'animate-spin')} />
               Refresh
-            </button>
+            </Button>
           </div>
 
           {historyState === 'loading' && history.length === 0 && outgoing.length === 0 && (
-            <div className="py-12 text-center text-xs text-retro-muted flex items-center justify-center gap-2">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…
-            </div>
+            <FeedbackState state="loading" title="Loading…" />
           )}
           {historyState === 'error' && (
-            <div className="py-10 text-center space-y-3">
-              <p className="text-xs text-danger-fg">Couldn't load history.</p>
-              <button
-                type="button"
-                onClick={() => void loadHistory()}
-                className="glass-action glass-action-primary px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer"
-              >
-                Try again
-              </button>
-            </div>
+            <FeedbackState
+              state="error"
+              title="Couldn't load history."
+              action={
+                <Button variant="primary" size="sm" onClick={() => void loadHistory()}>
+                  Try again
+                </Button>
+              }
+            />
           )}
           {historyState === 'ready' && (historyPane === 'outgoing' ? outgoingAll : history).length === 0 && (
-            <div className="py-12 text-center space-y-2 rounded-xl border border-dashed border-edge">
-              <Inbox className="w-5 h-5 mx-auto text-retro-muted" />
-              <p className="text-xs text-retro-muted">
-                {historyPane === 'outgoing' ? 'You have not sent anything yet.' : 'Nothing has landed on your screen yet.'}
-              </p>
-            </div>
+            <FeedbackState
+              state="empty"
+              icon={<Inbox className={FEEDBACK.icon} aria-hidden="true" />}
+              title={historyPane === 'outgoing' ? 'You have not sent anything yet.' : 'Nothing has landed on your screen yet.'}
+              className="rounded-lg border border-dashed border-edge"
+            />
           )}
           <div className="space-y-2">
             {(historyPane === 'outgoing' ? outgoingAll : history).map((action: any) => {
@@ -883,28 +840,29 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
               const summary = payloadSummary(action.action, typeof action.payload === 'string' ? (() => { try { return JSON.parse(action.payload); } catch { return null; } })() : action.payload);
               const other = historyPane === 'outgoing' ? action.victim_name : action.dominator_name;
               return (
-                <div key={action.id} className="flex items-center gap-3 rounded-xl glass-inset px-4 py-3">
-                  <Icon className="w-4 h-4 text-retro-muted shrink-0" />
+                <div key={action.id} className={cn(CHROME.rowTile, 'gap-3 px-4 py-3')}>
+                  <Icon className="size-4 shrink-0 text-retro-muted" aria-hidden="true" />
                   <div className="min-w-0 flex-1">
-                    <div className="text-xs font-medium truncate text-retro-fg">
+                    <div className="truncate text-xs font-medium text-retro-fg">
                       {meta?.label || action.action}
-                      {summary && <span className="text-retro-muted font-normal">. {summary}</span>}
+                      {summary && <span className="font-normal text-retro-muted">. {summary}</span>}
                     </div>
-                    <div className="text-xs text-retro-muted truncate">
+                    <div className={cn(MONO, TYPE.caption, COLOR.muted, 'truncate')}>
                       {historyPane === 'outgoing' ? `to ${other || 'unknown'}` : `from ${other || 'unknown'}`}
                       {' · '}{formatAbsoluteTime(action.created_at, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </div>
                   </div>
                   <span
-                    className={`shrink-0 text-2xs font-mono px-1.5 py-0.5 rounded border ${
+                    className={cn(
+                      'shrink-0 rounded-md border px-1.5 py-0.5 font-mono text-2xs',
                       st === 'executed' || st === 'completed'
-                        ? 'text-success-fg border-success/30'
+                        ? 'border-success/30 text-success-fg'
                         : st === 'sent' || st === 'landed'
-                          ? 'text-retro-muted border-edge'
+                          ? 'border-edge text-retro-muted'
                           : st === 'expired'
-                            ? 'text-warning-fg border-warning/30'
-                            : 'text-danger-fg border-danger/30'
-                    }`}
+                            ? 'border-warning/30 text-warning-fg'
+                            : 'border-danger/30 text-danger-fg',
+                    )}
                     title={
                       st === 'sent' ? 'Accepted by the server, waiting for their screen to confirm'
                         : st === 'landed' ? 'Reached their screen (consented); execution still pending'
@@ -929,7 +887,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
             })}
           </div>
           {historyPane === 'outgoing' && historyState === 'ready' && outgoingAll.length > 0 && (
-            <p className="text-xs text-retro-muted px-1">
+            <p className="px-1 text-xs text-retro-muted text-pretty">
               <span className="font-mono">awaiting</span> = charged and relayed; it flips to{' '}
               <span className="font-mono text-success-fg/80">landed</span> once their client confirms, or to{' '}
               <span className="font-mono text-warning-fg/80">fizzled</span> after 30 min if it never rendered.
@@ -957,7 +915,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
       )}
 
       </div>
-      </div>
+      </Card>
 
       {actionModal && (
         <ActionModal
@@ -965,6 +923,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
           actionTitle={actionModal.title}
           targetName={selectedTarget?.displayName}
           price={prices[actionModal.action]}
+          freeViaMesh={allFree}
           isOpen={Boolean(actionModal)}
           onClose={() => setActionModal(null)}
           onSubmit={handleModalSubmit}

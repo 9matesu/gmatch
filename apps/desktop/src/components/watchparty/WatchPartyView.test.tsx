@@ -103,4 +103,34 @@ describe('WatchPartyView Component', () => {
     fireEvent.click(toggleBtn)
     expect(screen.getByText('In this room')).toBeDefined()
   })
+
+  it('keeps secondary room facts behind a single Details disclosure', () => {
+    mockParties = [
+      {
+        id: 'party-1',
+        name: 'Cool Party',
+        url: 'https://example.com/v.mp4',
+        mediaName: 'Cool Video',
+        host: 'user-1',
+        queue: [],
+        current: 'q1',
+        members: [{ id: 'user-1', name: 'User 1' }],
+        chat: [],
+        mutedIds: {},
+        lockVideo: false,
+        isPrivate: false,
+        frame: { url: 'https://example.com/v.mp4', action: 'play', position: 0, rate: 1, updatedAt: 100 },
+      } as unknown as PartyRuntime,
+    ]
+
+    render(<WatchPartyView identity={identity} profilePics={{}} />)
+    const details = screen.getByText('Details').closest('details') as HTMLDetailsElement
+    expect(details).toBeTruthy()
+    expect(details.open).toBe(false)
+    expect(screen.getByText('In this room')).toBeDefined()
+
+    fireEvent.click(screen.getByText('Details'))
+    expect(details.open).toBe(true)
+    expect(screen.getByText('Cool Video')).toBeDefined()
+  })
 })

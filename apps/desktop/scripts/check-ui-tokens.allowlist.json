@@ -27,11 +27,6 @@
       "smells": { "hex-color": ["#0b0e14"] }
     },
     {
-      "file": "components/CardBack.tsx",
-      "why": "card-back artwork gradients — game semantics",
-      "smells": { "raw-rgb": ["rgba(168, 85, 247, 0.15)", "rgba(255,255,255,0.03)"] }
-    },
-    {
       "file": "components/CardDetailView.tsx",
       "why": "card accent #9FE3FF — user-editable card payload (docs/DESIGN.md exemptions)",
       "smells": { "hex-color": ["#9FE3FF"] }
@@ -42,14 +37,6 @@
       "smells": { "hex-color": ["#211799"] }
     },
     {
-      "file": "components/CreateCardModal.tsx",
-      "why": "card forge preview + accent — user-editable card payload",
-      "smells": {
-        "hex-color": ["#9FE3FF", "#9FE3FF44", "#9FE3FF88"],
-        "raw-rgb": ["rgba(255,255,255,.55)"]
-      }
-    },
-    {
       "file": "components/domination/ActionModal.tsx",
       "why": "domination colour picker default — card accent payload",
       "smells": { "hex-color": ["#9FE3FF"] }
@@ -57,7 +44,7 @@
     {
       "file": "components/domination/DominationEffects.tsx",
       "why": "domination effect runtime colour + card accent — game semantics",
-      "smells": { "hex-color": ["#9FE3FF"], "raw-rgb": ["rgba(0,0,0,0.1)"] }
+      "smells": { "hex-color": ["#9FE3FF"] }
     },
     {
       "file": "components/feed/GMatchFeed.tsx",

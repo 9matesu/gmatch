@@ -1,16 +1,32 @@
 'use client'
 
-// Watch section room gallery (theater landing before a party is open).
-// Displays a responsive grid of 16:9 cards:
-// 1. First card: "Create Room" dashed silhouette card
-// 2. Open rooms with video miniature/thumbnail, title, media title, and member count badge.
+// Watch browse gallery. One create action, one join field, then room cards on
+// a shared grid. Every card has the same edges, the same thumbnail ratio and
+// the same footer alignment — no gradients, no decorative badges over media.
 
 import { useEffect, useState } from 'react'
-import { Plus, Users, Play, Film, History, Ticket } from 'lucide-react'
+import { Film, History, Play, Plus, Ticket, Users } from 'lucide-react'
+import { cn } from '../../lib/utils'
 import { orbitFetch } from '../../utils/api'
 import { joinPartyById, rememberedRooms, type RememberedRoom } from '../../hooks/watchPartyStore'
 import { watchInviteFromHash } from './invite'
 import { useObjectImage } from '../../hooks/useObjectImage'
+import { Button, Input } from '../../ui/kit'
+import {
+  CHROME,
+  COLOR,
+  ICON,
+  MONO,
+  MOTION,
+  PADDING,
+  PRESENCE,
+  RADIUS,
+  SHADOW,
+  STATUS,
+  TRACKING,
+  TYPE,
+  cx,
+} from '../../ui/tokens'
 
 interface IdentityLike {
   orbitId: string
@@ -38,38 +54,30 @@ function RoomThumbnail({
   const media = useObjectImage(mediaUrl || null, identity, { enabled: Boolean(mediaUrl) })
 
   if (media.url) {
-    if (media.isVideo || mediaUrl?.includes('.mp4') || mediaUrl?.includes('.webm') || mediaUrl?.includes('/stream')) {
-      return (
-        <div className="relative w-full h-full bg-retro-bg flex items-center justify-center overflow-hidden">
+    const isVideo = media.isVideo || mediaUrl?.includes('.mp4') || mediaUrl?.includes('.webm') || mediaUrl?.includes('/stream')
+    return (
+      <div className={cx('relative w-full h-full overflow-hidden', COLOR.canvas)}>
+        {isVideo ? (
           <video
             src={media.url}
             muted
             preload="metadata"
             playsInline
-            className="w-full h-full object-cover pointer-events-none opacity-80 group-hover:opacity-100 group-hover:scale-105 transition duration-300"
+            aria-label={name}
+            className="w-full h-full object-cover pointer-events-none"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-        </div>
-      )
-    }
-    return (
-      <div className="relative w-full h-full bg-retro-bg flex items-center justify-center overflow-hidden">
-        <img
-          src={media.url}
-          alt={name}
-          className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition duration-300"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+        ) : (
+          <img src={media.url} alt={name} className="w-full h-full object-cover" />
+        )}
       </div>
     )
   }
 
   return (
-    <div className="relative w-full h-full bg-surface-canvas flex flex-col items-center justify-center overflow-hidden border-b border-edge-subtle group-hover:border-retro-fg/20 transition-colors">
-      <div className="p-3 rounded-xl bg-surface-raised/80 border border-edge shadow-lg group-hover:scale-110 group-hover:border-retro-fg/30 transition duration-150">
-        <Film className="w-6 h-6 text-retro-muted group-hover:text-retro-fg transition-colors" />
-      </div>
-      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+    <div className={cx('w-full h-full flex flex-col items-center justify-center border-b', COLOR.canvasSurface, COLOR.edgeSubtle)}>
+      <span className={cx('p-3', RADIUS.panel, COLOR.surfaceRaised, 'border', COLOR.edge, SHADOW.sm)}>
+        <Film className={cx(ICON.lg, COLOR.muted)} aria-hidden />
+      </span>
     </div>
   )
 }
@@ -132,20 +140,18 @@ export function WatchPartyRoomList({
   return (
     <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 styled-scrollbar">
       {kickedNotice && (
-        <div role="status" className="mb-4 p-3 rounded-lg bg-retro-error/10 border border-retro-error/30 text-center text-xs text-retro-error">
+        <p role="status" className={cx('mb-4 text-center', PADDING[3], RADIUS.control, 'border', STATUS.dangerEdge, STATUS.dangerBg, TYPE.body, STATUS.danger)}>
           {kickedNotice}
-        </div>
+        </p>
       )}
 
-      {/* Join by room id or invite link */}
+      {/* One join field, one join action. The id or token never touches storage. */}
       <form
         className="mb-4 flex items-center gap-2"
         onSubmit={(e) => {
           e.preventDefault()
           const raw = joinText.trim()
           if (!raw || joinBusy) return
-          // Accept a bare 8-hex id or a full invite link; the token never
-          // touches storage — it goes straight into the join handshake.
           const parsed = watchInviteFromHash(raw.includes('?') || raw.includes('#') ? raw : `#/watch?room=${raw}`)
           if (!parsed) {
             setJoinError('Enter a room id or paste an invite link.')
@@ -160,31 +166,26 @@ export function WatchPartyRoomList({
           })
         }}
       >
-        <Ticket className="w-4 h-4 text-retro-muted shrink-0" />
-        <input
+        <Ticket className={cx(ICON.md, COLOR.muted, 'shrink-0')} aria-hidden />
+        <Input
           type="text"
           value={joinText}
           onChange={(e) => setJoinText(e.target.value)}
           placeholder="Room id or invite link"
           aria-label="Room id or invite link"
-          className="glass-field min-w-0 flex-1 px-3 py-1.5 text-xs font-mono"
+          className="min-w-0 flex-1"
         />
-        <button
-          type="submit"
-          disabled={!joinText.trim() || joinBusy}
-          className="glass-action px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-40"
-        >
+        <Button type="submit" variant="primary" disabled={!joinText.trim() || joinBusy} className="shrink-0">
           {joinBusy ? 'Joining…' : 'Join'}
-        </button>
+        </Button>
       </form>
-      {joinError && <p className="mb-4 text-xs text-retro-error">{joinError}</p>}
+      {joinError && <p className={cx('mb-4', TYPE.body, STATUS.danger)}>{joinError}</p>}
 
-      {/* Recently watched: rooms this device opened that are not joined right
-          now. The server listing hides private rooms, so without this a room
-          you left was simply gone from the UI. */}
+      {/* Private rooms are hidden from the listing, so a room left a moment ago
+          would otherwise vanish. These chips are the way back into it. */}
       {recents.length > 0 && (
         <div className="mb-5">
-          <h3 className="text-2xs font-semibold tracking-wider text-retro-muted mb-2">
+          <h3 className={cx(TYPE.body, 'font-bold', TRACKING.wider, COLOR.muted, 'mb-2 text-balance')}>
             Recently watched
           </h3>
           <div className="flex flex-wrap gap-2">
@@ -194,9 +195,12 @@ export function WatchPartyRoomList({
                 type="button"
                 onClick={() => void joinPartyById(identity, r.id)}
                 aria-label={`Reopen room ${r.name}`}
-                className="px-3 py-1.5 rounded-full border border-edge bg-surface-canvas/60 hover:bg-surface-raised text-xs text-retro-fg hover:text-retro-fg transition-colors cursor-pointer active:scale-(--scale-press)"
+                className={cn(
+                  CHROME.badge, COLOR.hoverW12, COLOR.hoverFg,
+                  MOTION.transition.micro, 'cursor-pointer active:scale-(--scale-press)',
+                )}
               >
-                <History className="w-3 h-3 inline mr-1.5 -mt-0.5" />
+                <History className={cx(ICON.sm, 'inline mr-1.5 -mt-0.5')} aria-hidden />
                 {r.name}
               </button>
             ))}
@@ -204,72 +208,79 @@ export function WatchPartyRoomList({
         </div>
       )}
 
-      {/* Gallery Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {/* Create Room Silhouette Card */}
+        {/* The single create action. */}
         <button
           type="button"
           onClick={onNewParty}
           aria-label="Create a new room"
-          className="group relative flex flex-col aspect-video sm:aspect-auto sm:min-h-[220px] rounded-xl border border-dashed border-edge hover:border-retro-fg bg-surface-canvas/40 hover:bg-glass-w8 p-5 items-center justify-center text-center transition duration-150 cursor-pointer active:scale-(--scale-press) shadow-sm"
+          className={cn(
+            'group relative flex flex-col aspect-video w-full items-center justify-center text-center',
+            PADDING[5], RADIUS.panel, 'border border-dashed', COLOR.edge,
+            COLOR.canvasSurfaceSoft, COLOR.hoverEdgeStrong,
+            MOTION.transition.micro, 'cursor-pointer active:scale-(--scale-press)',
+          )}
         >
-          <div className="w-12 h-12 rounded-full border border-edge bg-surface-raised flex items-center justify-center text-retro-muted group-hover:text-retro-fg group-hover:border-retro-fg/50 group-hover:scale-110 transition duration-150 mb-3 shadow-md">
-            <Plus className="w-6 h-6 stroke-[2.5]" />
-          </div>
-          <span className="text-xs font-bold text-retro-fg group-hover:text-retro-fg transition-colors">
-            Create Room
+          <span className={cx(
+            'size-12 flex items-center justify-center', RADIUS.pill, COLOR.surfaceRaised,
+            'border', COLOR.edge, COLOR.muted, COLOR.hoverFg, COLOR.hoverEdgeStrong,
+            MOTION.transition.quick,
+          )}>
+            <Plus className={cx(ICON.lg, 'stroke-[2.5]')} aria-hidden />
           </span>
-          <span className="text-xs text-retro-muted mt-1">
-            Start a new watch party
-          </span>
+          <span className={cx(TYPE.body, 'font-bold', COLOR.fg)}>Create Room</span>
+          <span className={cx(TYPE.body, COLOR.muted)}>Start a new watch party</span>
         </button>
 
-        {/* Existing Room Cards */}
         {rooms.map((r) => (
           <button
             key={r.id}
             type="button"
             onClick={() => void joinPartyById(identity, r.id)}
             aria-label={`Join room ${r.name}`}
-            className="group relative flex flex-col rounded-xl border border-edge hover:border-retro-fg/60 bg-surface-canvas/60 hover:bg-surface-raised/80 overflow-hidden text-left transition duration-150 cursor-pointer active:scale-(--scale-press) shadow-md hover:shadow-xl"
+            className={cn(
+              'group relative flex flex-col w-full text-left overflow-hidden',
+              RADIUS.panel, 'border', COLOR.edge, COLOR.surfaceRaised, SHADOW.sm,
+              COLOR.hoverEdgeStrong, MOTION.transition.micro,
+              'cursor-pointer active:scale-(--scale-press)',
+            )}
           >
-            {/* 16:9 Thumbnail Area */}
-            <div className="relative aspect-video w-full overflow-hidden bg-retro-bg">
+            <div className={cx('relative aspect-video w-full overflow-hidden', COLOR.canvas)}>
               <RoomThumbnail mediaUrl={r.mediaUrl} name={r.name} identity={identity} />
 
-              {/* Top-Right Member Badge */}
-              <div className="absolute top-2 right-2 flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs font-mono font-bold bg-black/80 backdrop-blur-md text-retro-fg border border-edge shadow-sm z-10">
-                <Users className="w-3 h-3 text-retro-muted" />
-                <span>{r.members}</span>
-              </div>
+              <span className={cx(
+                'absolute top-2 right-2 flex items-center gap-1.5 px-2 py-0.5',
+                CHROME.mediaChip, 'border', COLOR.edge, SHADOW.sm,
+              )}>
+                <Users className={ICON.sm} aria-hidden />
+                <span className={MONO}>{r.members}</span>
+              </span>
 
-              {/* Hover Play Button Overlay */}
-              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150 bg-black/40 backdrop-blur-[2px] z-10">
-                <div className="p-3 rounded-full bg-retro-accent text-retro-accent-text shadow-lg transform group-hover:scale-110 transition-transform">
-                  <Play className="w-4 h-4 fill-black text-retro-accent-text ml-0.5" />
-                </div>
-              </div>
+              <span className={cx(
+                'absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100',
+                COLOR.mediaVeil, MOTION.transition.fade,
+              )}>
+                <span className={cx('flex items-center justify-center', RADIUS.pill, COLOR.accentBg, COLOR.onAccent, SHADOW.sm)}>
+                  <Play className={cx(ICON.md, 'fill-current ml-0.5')} aria-hidden />
+                </span>
+              </span>
             </div>
 
-            {/* Room Info Bottom Area */}
-            <div className="p-3 flex flex-col flex-1 justify-between gap-1 border-t border-edge/40">
+            <div className={cx(PADDING[3], 'flex flex-col flex-1 justify-between gap-1', 'border-t', COLOR.edgeSubtle)}>
               <div className="space-y-0.5 min-w-0">
-                <h4 className="text-xs font-bold text-retro-fg truncate group-hover:text-retro-fg transition-colors">
-                  {r.name}
-                </h4>
-                <p className="text-xs text-retro-muted truncate font-sans">
-                  {r.mediaName || 'No media playing'}
-                </p>
+                <h4 className={cx(TYPE.body, 'font-bold', COLOR.fg, 'truncate')}>{r.name}</h4>
+                <p className={cx(TYPE.body, COLOR.muted, 'truncate')}>{r.mediaName || 'No media playing'}</p>
               </div>
 
-              <div className="flex items-center justify-between pt-1.5 border-t border-edge-subtle/40 text-2xs text-retro-muted">
+              <div className={cx(
+                'flex items-center justify-between pt-1.5 border-t',
+                COLOR.edgeSubtle, TYPE.caption, COLOR.muted,
+              )}>
                 <span className="flex items-center gap-1.5">
-                  <span className={`w-1.5 h-1.5 rounded-full ${r.members > 0 ? 'bg-success animate-pulse' : 'bg-retro-muted/40'}`} />
+                  <span className={cx('w-1.5 h-1.5 rounded-full', r.members > 0 ? PRESENCE.currentDot : PRESENCE.idleDot)} />
                   {r.members > 0 ? 'Active' : 'Persistent'}
                 </span>
-                <span className="font-mono text-2xs uppercase tracking-wider text-retro-muted/60">
-                  {r.id.slice(0, 8)}
-                </span>
+                <span className={cx(MONO, 'uppercase')}>{r.id.slice(0, 8)}</span>
               </div>
             </div>
           </button>
@@ -277,9 +288,13 @@ export function WatchPartyRoomList({
       </div>
 
       {failed && (
-        <div className="mt-8 p-4 rounded-xl border border-danger/20 bg-danger/10 text-center max-w-md mx-auto text-xs text-danger-fg">
-          Could not load watch rooms. Please check your network connection.
-        </div>
+        <p className={cx(
+          'mt-8 mx-auto max-w-md flex items-center justify-center',
+          PADDING[4], RADIUS.panel, 'border', STATUS.dangerEdge, STATUS.dangerBg,
+          TYPE.body, STATUS.danger, 'text-pretty',
+        )}>
+          Could not load watch rooms. Check your connection and reopen Watch.
+        </p>
       )}
     </div>
   )

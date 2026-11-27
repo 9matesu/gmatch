@@ -16,6 +16,15 @@ camera/search/slideshow modals, profile grids and admin primitives) now compose
 `tokens.ts` recipes and `ui/kit` primitives; only game semantics (holo foil,
 card accent, art placeholder, 18+ gate, no-preview hide) stay literal.
 
+One card surface everywhere (2026-11-27): `components/cards/CardArtwork.tsx`
+is the single Pokemon `HoloCard` wrapper for the tile, the detail view, the
+market tile, the card forge preview, both duel stages and the spectator arena
+(including PiP). Signed bytes from an object id win; a server-resolved snapshot
+URL (`src`) is the second leg for bot/match-local cards. Card chrome is the
+`CHROME.cardChip` / `CHROME.cardFooter` / `cardFooterTitle` / `cardFooterMeta`
+recipes; deck-picker grids stay compact thumbnail selectors (`ObjectImage`),
+not full card surfaces. No emoji or raw colour lives on any card screen.
+
 Reviewed absorption of the Antigravity "Social-Native Gaming HUD" plan
 (2026-09-12): cyber-slate canvas + electric-blue interactive accent + floating
 CommandIsland are the system. Sheets/drawers and the second audio engine were

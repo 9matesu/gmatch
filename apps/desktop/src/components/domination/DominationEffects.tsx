@@ -5,6 +5,9 @@ import { X, Camera } from 'lucide-react';
 import { orbitFetch } from '../../utils/api';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { useSettings } from '../../hooks/useSettings';
+import { cn } from '../../lib/utils';
+import { Button } from '../../ui/kit';
+import { CHROME, COLOR, MOTION, RECIPE, TYPE, WEIGHT } from '../../ui/tokens';
 import { logger } from '../../utils/logger';
 import { useGame } from '../../game/store';
 import { validateDomPayload } from '../../utils/dominationMesh';
@@ -474,11 +477,8 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
       {blurEffect && (
         <button
           type="button"
-          className="fixed inset-0 z-[var(--z-modal)] cursor-pointer"
-          style={{
-            backdropFilter: `blur(${blurEffect.data.intensity}px)`,
-            backgroundColor: 'rgba(0,0,0,0.1)',
-          }}
+          className={cn('fixed inset-0 z-[var(--z-modal)] cursor-pointer', COLOR.canvasSurfaceSoft)}
+          style={{ backdropFilter: `blur(${blurEffect.data.intensity}px)` }}
           onClick={() => removeEffect(blurEffect.id)}
           aria-label="Clear blur"
         />
@@ -486,8 +486,7 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
 
       {gameBgEffect && (
         <div
-          className="fixed inset-0 z-30 pointer-events-none overflow-hidden"
-          style={{ animation: 'fadeIn 0.3s ease-out' }}
+          className={cn('pointer-events-none fixed inset-0 z-[var(--z-dropdown)] overflow-hidden', MOTION.keyframe.fadeIn)}
         >
           {/\.(mp4|webm|ogv|mov)(\?|$)/i.test(gameBgEffect.data.url.split('?')[0]) ? (
             <video
@@ -503,19 +502,20 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
               style={{ backgroundImage: `url(${gameBgEffect.data.url})` }}
             />
           )}
-          <div className="absolute inset-0 bg-black/40 pointer-events-none" />
-          <button
-            type="button"
-            className="pointer-events-auto absolute top-4 left-4 text-2xs font-mono font-bold px-2 py-1 bg-black/75 border border-edge text-retro-fg rounded hover:bg-retro-bg transition-colors cursor-pointer"
+          <div className={cn('pointer-events-none absolute inset-0', COLOR.mediaVeil)} />
+          <Button
+            variant="secondary"
+            size="sm"
+            className="pointer-events-auto absolute left-4 top-4"
             onClick={() => removeEffect(gameBgEffect.id)}
           >
             Clear background
-          </button>
+          </Button>
         </div>
       )}
 
       {popupVideoEffect && (
-        <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70" onClick={() => removeEffect(popupVideoEffect.id)}>
+        <div className={cn('fixed inset-0 z-[var(--z-modal)] flex items-center justify-center', COLOR.scrim)} onClick={() => removeEffect(popupVideoEffect.id)}>
           <video
             ref={videoRef}
             src={popupVideoEffect.data.url}
@@ -526,17 +526,19 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
             className="max-w-full max-h-full object-contain"
             onClick={(e) => e.stopPropagation()}
           />
-          <button
-            type="button"
-            className="absolute top-4 right-4 p-2 bg-retro-panel/80 rounded-full text-retro-fg hover:text-retro-fg cursor-pointer"
+          <Button
+            variant="ghost"
+            size="sm"
+            className="absolute right-4 top-4"
             onClick={() => removeEffect(popupVideoEffect.id)}
             aria-label="Close video"
           >
-            <X className="w-5 h-5" />
-          </button>
-          <button
-            type="button"
-            className="absolute bottom-6 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg bg-retro-panel/80 border border-edge text-retro-fg text-xs font-bold cursor-pointer"
+            <X className="size-5" />
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="absolute bottom-6 left-1/2 -translate-x-1/2"
             onClick={(e) => {
               e.stopPropagation();
               setVideoUnmuted((v) => {
@@ -547,41 +549,38 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
             }}
           >
             {videoUnmuted ? 'Mute' : 'Unmute'}
-          </button>
+          </Button>
         </div>
       )}
 
       {messageEffect && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 max-w-md animate-domination-toast-up" onClick={() => removeEffect(messageEffect.id)}>
-          <div className="glass-panel p-6 rounded-xl border border-edge text-center shadow-2xl">
-            <p className="text-retro-fg text-lg">{messageEffect.data.text}</p>
-            <p className="text-xs text-retro-muted mt-2">Click to dismiss</p>
+        <div className="fixed bottom-8 left-1/2 z-[var(--z-toast)] max-w-md -translate-x-1/2" onClick={() => removeEffect(messageEffect.id)}>
+          <div className={cn(CHROME.overlayPanel, 'p-6 text-center', MOTION.keyframe.slideUp)}>
+            <p className={cn(TYPE.sub, COLOR.fg, 'text-balance')}>{messageEffect.data.text}</p>
+            <p className={cn(TYPE.caption, COLOR.muted, 'mt-2')}>Click to dismiss</p>
           </div>
         </div>
       )}
 
       {textOverlayEffect && (
         <div
-          className="fixed inset-0 z-[var(--z-dropdown)] flex pointer-events-none"
+          className="pointer-events-none fixed inset-0 z-[var(--z-dropdown)] flex p-8"
           style={{
             alignItems: textOverlayEffect.data.position === 'top' ? 'flex-start'
               : textOverlayEffect.data.position === 'bottom' ? 'flex-end' : 'center',
             justifyContent: textOverlayEffect.data.position === 'left' ? 'flex-start'
               : textOverlayEffect.data.position === 'right' ? 'flex-end' : 'center',
-            padding: '2rem',
           }}
         >
           <div
-            className="pointer-events-auto bg-black/70 px-6 py-4 rounded-xl border border-edge shadow-2xl animate-orbit-fade-in cursor-pointer"
+            className={cn(
+              'pointer-events-auto max-w-[90vw] cursor-pointer break-words px-6 py-4 text-center',
+              COLOR.scrim, COLOR.edge, MOTION.keyframe.fadeIn, RECIPE.card, WEIGHT.heading,
+            )}
             style={{
               fontSize: textOverlayEffect.data.size === 'small' ? '1.5rem'
                 : textOverlayEffect.data.size === 'medium' ? '3rem' : '5rem',
               color: textOverlayEffect.data.color,
-              fontWeight: '900',
-              textShadow: '0 0 20px currentColor, 0 0 40px currentColor',
-              maxWidth: '90vw',
-              wordBreak: 'break-word',
-              textAlign: 'center',
             }}
             onClick={() => removeEffect(textOverlayEffect.id)}
           >
@@ -591,22 +590,23 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
       )}
 
       {cameraAsk && (
-        <div className="fixed inset-0 z-[var(--z-lightbox)] flex items-center justify-center bg-black/70 p-4">
-          <div className="max-w-sm w-full glass-surface rounded-xl border border-edge bg-retro-bg p-6 space-y-4 text-center">
-            <div className="w-12 h-12 mx-auto rounded-xl bg-surface-interactive flex items-center justify-center">
-              <Camera className="w-6 h-6 text-retro-fg" />
+        <div className={cn('fixed inset-0 z-[var(--z-lightbox)] flex items-center justify-center p-4', COLOR.scrim)}>
+          <div className={cn(CHROME.overlayPanel, COLOR.canvas, 'w-full max-w-sm space-y-4 p-6 text-center')}>
+            <div className="mx-auto flex size-12 items-center justify-center rounded-xl bg-surface-interactive">
+              <Camera className={cn('size-6', COLOR.fg)} aria-hidden="true" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-retro-fg">
+              <h3 className={cn(TYPE.body, WEIGHT.bold, COLOR.fg, 'text-balance')}>
                 {cameraAsk.senderName || 'Someone'} is asking for a photo
               </h3>
-              <p className="text-xs text-retro-muted mt-1 leading-relaxed">
+              <p className={cn(TYPE.body, COLOR.muted, 'mt-1 text-pretty')}>
                 Your camera turns on for one frame, and the photo goes to them. Nothing is captured unless you allow it.
               </p>
             </div>
             <div className="flex gap-2">
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                className="flex-1"
                 onClick={() => {
                   const ask = cameraAsk;
                   setCameraAsk(null);
@@ -621,12 +621,12 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
                     }, identity).catch(() => { });
                   }
                 }}
-                className="flex-1 px-4 py-2 rounded-lg border border-edge text-xs font-bold text-retro-muted hover:text-retro-fg cursor-pointer"
               >
                 Decline
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="primary"
+                className="flex-1"
                 onClick={() => {
                   const ask = cameraAsk;
                   setCameraAsk(null);
@@ -636,22 +636,13 @@ export function DominationEffects({ identity }: { identity: OrbitIdentity | null
                     void captureAndSend(ask.from, ask.payload);
                   }
                 }}
-                className="flex-1 px-4 py-2 rounded-lg bg-retro-accent text-retro-accent-text text-xs font-bold hover:bg-retro-fg cursor-pointer"
               >
                 Allow once
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       )}
-
-      <style>{`
-        @keyframes domination-toast-up {
-          from { opacity: 0; transform: translateX(-50%) translateY(20px); }
-          to { opacity: 1; transform: translateX(-50%) translateY(0); }
-        }
-        .animate-domination-toast-up { animation: domination-toast-up 0.3s ease-out; }
-      `}</style>
     </>
   );
 }

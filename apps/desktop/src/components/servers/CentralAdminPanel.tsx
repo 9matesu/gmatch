@@ -13,8 +13,9 @@ import { orbitFetch } from '../../utils/api'
 import { playPress } from '../../utils/sounds'
 
 import { generateIdentity } from '@orbit/crypto'
+import { Button, Input } from '../../ui/kit'
 import {
-  classes, COLOR, GAP, ICON, MONO, PADDING, PADDING_X, PADDING_Y,
+  classes, CHROME, COLOR, GAP, ICON, MONO, PADDING, PADDING_X, PADDING_Y,
   RADIUS, STATUS, TYPE, WEIGHT,
 } from '../../ui/tokens'
 
@@ -35,7 +36,7 @@ interface Totals { total: number; online: number; stale: number; hidden: number;
 type Identity = Parameters<typeof orbitFetch>[2]
 type Toast = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void
 
-const statChip = classes('glass-inset', PADDING_X[2], PADDING_Y[1], RADIUS.pill)
+const statChip = classes(CHROME.badge, PADDING_X[2], PADDING_Y[1])
 const smallBadge = classes(PADDING_X[1.5], 'py-0.5', RADIUS.pill, TYPE.caption, MONO)
 
 export function CentralAdminPanel({ central, identity, toast }: { central: string; identity?: Identity | null; toast: Toast }) {
@@ -140,12 +141,12 @@ export function CentralAdminPanel({ central, identity, toast }: { central: strin
         (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1'))
 
     return (
-      <div className={classes('glass-card space-y-2.5', PADDING[3])} aria-label="Central admin login">
+      <div className={classes(CHROME.tile, 'space-y-2.5', PADDING[3])} aria-label="Central admin login">
         <div className={classes('flex items-center', GAP[2])}>
           <ShieldCheck className={classes(ICON.md, STATUS.warning)} />
           <span className={classes(TYPE.body, WEIGHT.medium, COLOR.fg)}>Central Node Authentication</span>
         </div>
-        <p className={classes(TYPE.body, COLOR.muted, 'leading-relaxed')}>
+        <p className={classes(TYPE.body, COLOR.muted)}>
           Authenticate with the central node passcode to manage the directory.
         </p>
         {isDev && (
@@ -154,7 +155,7 @@ export function CentralAdminPanel({ central, identity, toast }: { central: strin
             STATUS.warningBg, STATUS.warningEdgeSoft, STATUS.warning,
             PADDING_X[2.5], PADDING_Y[1.5], RADIUS.chip, TYPE.body,
           )}>
-            <span>Dev mode: default passcode is <code className={classes(MONO, WEIGHT.bold, COLOR.scrimFaint, PADDING[1], 'py-0.5', RADIUS.chip)}>admin</code></span>
+            <span>Dev mode: default passcode is <code className={classes(MONO, WEIGHT.bold, COLOR.interactive, PADDING_X[1], 'py-0.5', RADIUS.chip)}>admin</code></span>
             <button
               type="button"
               onClick={() => setUnlockPin('admin')}
@@ -165,24 +166,16 @@ export function CentralAdminPanel({ central, identity, toast }: { central: strin
           </div>
         )}
         <form onSubmit={handleUnlock} className={classes('flex items-center', GAP[2])}>
-          <input
+          <Input
             type="password"
             value={unlockPin}
             onChange={(e) => setUnlockPin(e.target.value)}
             placeholder="Central admin passcode"
-            className={classes(
-              'flex-1 border outline-none placeholder:text-retro-muted',
-              COLOR.surfaceRaised, COLOR.edge, COLOR.focusAccent,
-              PADDING_X[2.5], PADDING_Y[1.5], TYPE.body, COLOR.fg, RADIUS.chip, MONO,
-            )}
+            className={classes('flex-1', MONO)}
           />
-          <button
-            type="submit"
-            disabled={unlocking || !unlockPin.trim()}
-            className={classes('glass-action glass-action-primary disabled:opacity-40 cursor-pointer', PADDING_X[3], PADDING_Y[1.5], RADIUS.chip, TYPE.body, WEIGHT.bold)}
-          >
+          <Button type="submit" variant="primary" size="sm" disabled={unlocking || !unlockPin.trim()}>
             {unlocking ? 'Verifying…' : 'Unlock'}
-          </button>
+          </Button>
         </form>
       </div>
     )
@@ -193,17 +186,14 @@ export function CentralAdminPanel({ central, identity, toast }: { central: strin
       <div className={classes('flex items-center', GAP[2])}>
         <ShieldCheck className={classes(ICON.md, STATUS.warning)} />
         <span className={classes(TYPE.body, WEIGHT.medium, COLOR.fg)}>Central admin</span>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => { playPress(700); void load() }}
-          className={classes(
-            'glass-action ml-auto cursor-pointer flex items-center',
-            PADDING_X[3], PADDING_Y[1.5], RADIUS.control,
-            COLOR.muted, COLOR.hoverFg, TYPE.body, WEIGHT.bold, GAP[1],
-          )}
+          className={classes('ml-auto', GAP[1])}
         >
-          <RefreshCw className="w-3 h-3" /> Refresh
-        </button>
+          <RefreshCw className={ICON.sm} /> Refresh
+        </Button>
       </div>
 
       {totals && (
@@ -220,34 +210,36 @@ export function CentralAdminPanel({ central, identity, toast }: { central: strin
         {loading && rows.length === 0 && <li className={classes(TYPE.body, COLOR.muted)}>Loading directory…</li>}
         {!loading && rows.length === 0 && <li className={classes(TYPE.body, COLOR.muted)}>Directory is empty.</li>}
         {rows.map((row) => (
-          <li key={row.id} className={classes('glass-card flex items-start', PADDING[3], GAP[3], row.hidden ? 'opacity-60' : '')}>
+          <li key={row.id} className={classes(CHROME.tile, 'flex items-start', PADDING[3], GAP[3], row.hidden ? 'opacity-60' : '')}>
             <div className="min-w-0 flex-1">
               <div className={classes('flex items-center', GAP[2])}>
                 <span className={classes('truncate', TYPE.body, WEIGHT.medium, COLOR.fg)}>{row.name}</span>
-                {!!row.hidden && <span className={classes(smallBadge, 'glass-inset', COLOR.muted)}>HIDDEN</span>}
-                {!!row.blocked && <span className={classes(smallBadge, 'glass-action-danger', STATUS.danger)}>BLOCKED</span>}
+                {!!row.hidden && <span className={classes(smallBadge, COLOR.glassW8, COLOR.muted)}>HIDDEN</span>}
+                {!!row.blocked && <span className={classes(smallBadge, STATUS.dangerBg, STATUS.dangerEdge, STATUS.danger)}>BLOCKED</span>}
               </div>
               <p className={classes('mt-0.5 truncate', TYPE.caption, MONO, COLOR.muted)}>{row.endpoint_hint || 'no address'} · {row.id.slice(0, 8)}</p>
             </div>
             <div className={classes('flex items-center shrink-0', GAP[1])}>
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
                 disabled={busyId === row.id}
                 onClick={() => void patch(row, { hidden: !row.hidden }, row.hidden ? 'Unhidden' : 'Hidden from public')}
                 title={row.hidden ? 'Show in public directory' : 'Hide from public directory'}
-                className={classes('glass-action disabled:opacity-40 cursor-pointer', PADDING[1.5], RADIUS.control, COLOR.muted, COLOR.hoverFg)}
+                aria-label={row.hidden ? 'Show in public directory' : 'Hide from public directory'}
               >
                 {row.hidden ? <Eye className={ICON.sm} /> : <EyeOff className={ICON.sm} />}
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
                 disabled={busyId === row.id}
                 onClick={() => void remove(row)}
                 title="Force-unregister from directory"
-                className={classes('glass-action glass-action-danger disabled:opacity-40 cursor-pointer', PADDING[1.5], RADIUS.control)}
+                aria-label={`Force-unregister ${row.name} from directory`}
               >
                 <Trash2 className={ICON.sm} />
-              </button>
+              </Button>
             </div>
           </li>
         ))}

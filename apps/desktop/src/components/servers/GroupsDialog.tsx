@@ -10,10 +10,10 @@
 // list surface, and TYPE/WEIGHT/STATUS the text and hover roles.
 import { useEffect, useState } from 'react'
 import { createLabel, isOwnLabel, type LocalMeshLabel } from './meshLabels'
-import { Modal } from '../../ui/kit'
+import { Button, Input, Modal } from '../../ui/kit'
 import {
-  classes, COLOR, GAP, PADDING_X, PADDING_Y, RADIUS,
-  RECIPE, STATUS, TRANSITION, TYPE, WEIGHT,
+  classes, COLOR, DIALOG_WIDTH, GAP, PADDING_X, PADDING_Y,
+  RECIPE, STATUS, TYPE, WEIGHT,
 } from '../../ui/tokens'
 
 export function GroupsDialog({
@@ -37,7 +37,7 @@ export function GroupsDialog({
   if (!open) return null
 
   return (
-    <Modal title="Local groups" onClose={onClose} maxWidth="max-w-sm">
+    <Modal title="Local groups" onClose={onClose} maxWidth={DIALOG_WIDTH.sm}>
       <div className="space-y-3">
         <p className={classes(TYPE.caption, COLOR.muted)}>
           A label on this device for peers you keep track of. It adds no network and is
@@ -56,22 +56,18 @@ export function GroupsDialog({
         >
           <label className={classes('block flex-1', TYPE.body, COLOR.muted)}>
             Group name
-            <input
+            <Input
               aria-label="New group name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Friday crew"
               maxLength={40}
-              className={classes('glass-field mt-1 w-full px-2.5 py-1.5', TYPE.body)}
+              className="mt-1"
             />
           </label>
-          <button
-            type="submit"
-            disabled={!name.trim()}
-            className={classes('glass-action glass-action-primary h-[30px] cursor-pointer disabled:opacity-50', PADDING_X[3], RADIUS.control, TYPE.body, WEIGHT.bold)}
-          >
+          <Button type="submit" variant="primary" size="sm" disabled={!name.trim()}>
             Create
-          </button>
+          </Button>
         </form>
 
         {labels.length === 0 ? (
@@ -89,15 +85,16 @@ export function GroupsDialog({
                     <span className={classes('ml-1', TYPE.caption, COLOR.muted)}>(this device)</span>
                   )}
                 </span>
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="sm"
                   aria-label={`Forget group ${l.name}`}
                   title="Forget this group (local only, removes nothing remotely)"
                   onClick={() => onSave(labels.filter((x) => x.id !== l.id))}
-                  className={classes('px-1.5 py-0.5 cursor-pointer', RADIUS.chip, TYPE.caption, COLOR.muted, STATUS.danger, STATUS.dangerHoverBg, TRANSITION.micro)}
+                  className={classes(STATUS.danger, STATUS.dangerHoverBg)}
                 >
                   Forget
-                </button>
+                </Button>
               </li>
             ))}
           </ul>

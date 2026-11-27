@@ -9,9 +9,11 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Trash2 } from 'lucide-react'
+import { cx, CHROME, COLOR, ICON, STATUS, TRACKING, TYPE } from '../../ui/tokens'
+import { Textarea } from '../../ui/kit'
+import { MUTED } from '../../ui/styles'
 import { sendPartyChat, deletePartyChat, type PartyRuntime } from '../../hooks/watchPartyStore'
 import { Avatar } from '../Avatar'
-import { MUTED } from '../../ui/styles'
 import { renderChatText } from './chatText'
 
 export function WatchPartyChat({ party, profilePics, myId, isHost }: {
@@ -45,38 +47,38 @@ export function WatchPartyChat({ party, profilePics, myId, isHost }: {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col border-t border-edge">
-      <p className={`px-3 pt-2 pb-1 uppercase tracking-wider ${MUTED}`}>Chat</p>
+      <p className={cx('px-3 pt-2 pb-1 uppercase', MUTED, TYPE.caption, TRACKING.wider)}>Chat</p>
       <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto px-3 pb-2 space-y-1.5 styled-scrollbar">
         {chat.map((m, i) => m.sys ? (
-          <p key={`${m.at}-${i}`} className="text-center text-2xs uppercase tracking-wider text-retro-muted">{m.text}</p>
+          <p key={`${m.at}-${i}`} className={cx('text-center', TYPE.caption, 'uppercase', TRACKING.wider, COLOR.muted)}>{m.text}</p>
         ) : (
           <div key={`${m.at}-${i}`} className="group flex items-start gap-2">
             <Avatar id={m.from || m.id} size={18} imageUrl={profilePics[m.from || m.id] || null} />
             <div className="min-w-0 flex-1">
-              <span className={`text-2xs font-bold uppercase tracking-wider ${m.from === myId ? 'text-retro-fg' : 'text-retro-muted'}`}>
+              <span className={cx(TYPE.caption, 'font-bold uppercase', TRACKING.wider, m.from === myId ? COLOR.fg : COLOR.muted)}>
                 {m.name}
               </span>
-              <p className="text-xs text-retro-fg break-words">{renderChatText(m.text)}</p>
+              <p className={cx(TYPE.body, COLOR.fg, 'break-words text-pretty')}>{renderChatText(m.text)}</p>
             </div>
             {(isHost || m.from === myId) && (
               <button
                 type="button"
                 onClick={() => party && deletePartyChat(party.id, m.id)}
                 aria-label="Delete message"
-                className="p-1 rounded-md text-retro-muted hover:text-retro-error hover:bg-glass-w10 opacity-0 group-hover:opacity-100 cursor-pointer shrink-0"
+                className={cx(CHROME.iconButton, STATUS.danger, 'opacity-0 group-hover:opacity-100 shrink-0')}
               >
-                <Trash2 className="w-3 h-3" />
+                <Trash2 className={ICON.sm} />
               </button>
             )}
           </div>
         ))}
         {chat.length === 0 && (
-          <p className="text-2xs text-retro-muted">No messages yet.</p>
+          <p className={cx(TYPE.caption, COLOR.muted)}>No messages yet.</p>
         )}
       </div>
       {party && (
         <div className="p-2 border-t border-edge">
-          <textarea
+          <Textarea
             ref={textareaRef}
             rows={1}
             value={text}
@@ -90,9 +92,9 @@ export function WatchPartyChat({ party, profilePics, myId, isHost }: {
                 send()
               }
             }}
-            className="glass-inset w-full px-2.5 py-1.5 text-xs resize-none max-h-24 styled-scrollbar leading-normal"
+            className="w-full px-2.5 py-1.5 resize-none max-h-24 styled-scrollbar leading-normal"
           />
-          {text.length >= 60 && <p className={`pt-1 text-right ${MUTED}`}>{text.length}/80</p>}
+          {text.length >= 60 && <p className={cx('pt-1 text-right', MUTED)}>{text.length}/80</p>}
         </div>
       )}
     </div>

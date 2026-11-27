@@ -15,9 +15,9 @@ import type { ReactNode } from 'react'
 import { serverKey, type DirectoryServer } from './directoryMerge'
 import { worldAccentStyle, worldGlyph, worldTileStyle } from './worldIdentity'
 import {
-  classes, COLOR, GAP, ICON, MONO, PADDING_X, PADDING_Y,
-  PRESENCE, RADIUS, RECIPE, SHADOW, STATUS, TRACKING, TRANSITION,
-  TYPE, WEIGHT,
+  classes, CHROME, COLOR, GAP, ICON, MONO, PADDING_X, PADDING_Y,
+  PRESENCE, RADIUS, SHADOW, STATUS, TRACKING, TRANSITION,
+  TYPE, WEIGHT, MOTION,
 } from '../../ui/tokens'
 
 export interface WorldRowState {
@@ -103,7 +103,7 @@ export function WorldRow({
       <span className="relative shrink-0" aria-hidden>
         <span
           className={classes(
-            'flex h-9 w-9 items-center justify-center border',
+            'flex size-9 items-center justify-center border',
             RADIUS.control, TYPE.sub, WEIGHT.bold, COLOR.fgSoft, SHADOW.inset,
           )}
           style={worldTileStyle(key)}
@@ -112,14 +112,14 @@ export function WorldRow({
         </span>
         <span
           className={classes(
-            'absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 ring-2 ring-retro-bg',
+            'absolute -bottom-0.5 -right-0.5 size-2.5 ring-2 ring-retro-bg',
             RADIUS.pill, status ? DOT[status] : PRESENCE.idleDot,
           )}
         />
       </span>
       <span className="min-w-0 flex-1">
         <span className={classes('flex min-w-0 items-baseline', GAP[2])}>
-          <span className={classes('truncate group-hover:text-retro-accent', TYPE.sub, WEIGHT.semibold, COLOR.fg, TRANSITION.micro)}>
+          <span className={classes('truncate', TYPE.sub, WEIGHT.semibold, COLOR.fg, COLOR.hoverAccent, TRANSITION.micro)}>
             {server.name}
           </span>
           {state.kind && (
@@ -130,12 +130,12 @@ export function WorldRow({
               data-testid={status === 'Connecting' ? `connecting-${server.id}` : undefined}
               className={classes('flex shrink-0 items-center uppercase', GAP[1], TYPE.caption, TRACKING.wider, STATUS_TONE[status])}
             >
-              {status === 'Connecting' && <Loader2 className="w-3 h-3 animate-spin" aria-hidden />}
+              {status === 'Connecting' && <Loader2 className={classes(ICON.sm, 'animate-spin')} aria-hidden />}
               {status}
             </span>
           )}
           {!!server.password_required && (
-            <Lock className={classes('w-3 h-3 shrink-0', COLOR.muted)} aria-label="password required" />
+            <Lock className={classes(ICON.sm, COLOR.muted)} aria-label="password required" />
           )}
           {!!server.is_private && (
             <span className={classes('shrink-0 uppercase', TYPE.caption, TRACKING.wider, COLOR.muted)}>private</span>
@@ -151,7 +151,7 @@ export function WorldRow({
   return (
     <li
       className={classes(
-        'group relative flex items-center py-2.5 pl-4 pr-3',
+        'group relative flex items-center', PADDING_Y[2.5], PADDING_X[4], PADDING_X[3],
         GAP[3], TRANSITION.micro, current ? COLOR.glassW8 : COLOR.hoverW5,
       )}
       aria-current={current || undefined}
@@ -206,10 +206,7 @@ export function WorldRow({
             onClick={onMenuToggle}
             aria-label={`More actions for ${server.name}`}
             title="More actions"
-            className={classes(
-              'h-7 w-7 flex items-center justify-center cursor-pointer',
-              RADIUS.chip, COLOR.muted, COLOR.hoverFg, COLOR.hoverW10, TRANSITION.micro,
-            )}
+            className={classes('flex size-7 items-center justify-center cursor-pointer', CHROME.iconButton)}
           >
             <MoreVertical className={ICON.sm} />
           </button>
@@ -220,8 +217,8 @@ export function WorldRow({
               role="menu"
               aria-label={`Actions for ${server.name}`}
               className={classes(
-                'absolute right-0 top-full mt-1 w-52 py-1 z-[var(--z-dropdown)] space-y-0.5 animate-orbit-fade-in',
-                RECIPE.card, COLOR.surfaceRaised, SHADOW.large,
+                'absolute right-0 top-full mt-1 w-52 py-1 z-[var(--z-dropdown)]',
+                CHROME.popover, SHADOW.large, MOTION.keyframe.fadeIn,
               )}
             >
               {menuItems}

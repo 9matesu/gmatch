@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from 'react';
-import { X, Send, Loader2, Sparkles, Layers, Sliders, Palette, FolderOpen } from 'lucide-react';
+import { Send, Sparkles, Layers, Sliders, Palette, FolderOpen } from 'lucide-react';
+import { cn } from '../../lib/utils';
+import { Button, Checkbox, Caption, Modal, Select, Textarea } from '../../ui/kit';
+import { COLOR, DIALOG_WIDTH, FIELD, MONO, STATUS, TYPE } from '../../ui/tokens';
 import { DOM_LIMITS, validateDomPayload } from '../../utils/dominationMesh';
 import { selectionToFile } from '../media/picker';
 import { useMediaPicker } from '../media/MediaPickerModal';
@@ -16,6 +19,9 @@ interface ActionModalProps {
   /** Context for the honest confirm line: who + how much. */
   targetName?: string;
   price?: number;
+  /** A mesh-known target is free on every lane; the confirm line agrees with
+   *  the card instead of quoting a server price nobody will be charged. */
+  freeViaMesh?: boolean;
 }
 
 export function ActionModal({
@@ -27,6 +33,7 @@ export function ActionModal({
   loading = false,
   targetName,
   price,
+  freeViaMesh = false,
 }: ActionModalProps) {
   const [url, setUrl] = useState('');
   const [inlineName, setInlineName] = useState<string | null>(null);
@@ -143,231 +150,179 @@ export function ActionModal({
     await onSubmit(payload);
   };
 
-  const field = "w-full glass-field rounded-md p-2.5 text-xs outline-none placeholder:text-retro-muted";
-
   return (
-    <div className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 select-none font-sans">
-      <div
-        className="glass-surface rounded-xl max-w-lg w-full shadow-2xl overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-label={`${actionTitle} settings`}
-      >
-        {/* Header */}
-        <div className="px-5 py-3.5 border-b border-edge-subtle flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-md glass-inset flex items-center justify-center">
-              <Sparkles className="w-3.5 h-3.5 text-retro-muted" />
+    <Modal
+      title={<span className="inline-flex items-center gap-2"><Sparkles className="size-3.5 text-retro-muted" aria-hidden="true" />{actionTitle}</span>}
+      onClose={onClose}
+      maxWidth={DIALOG_WIDTH.lg}
+    >
+      {/* One form, one caption, one cost line. Every error sits by its field. */}
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {targetName && <Caption>to {targetName}</Caption>}
+        {formError && (
+          <p className={cn(TYPE.body, STATUS.danger, 'text-pretty')} role="alert">{formError}</p>
+        )}
+        {needsUrl && (
+          <div className="space-y-1.5">
+            <div className={cn(TYPE.body, COLOR.fg, 'font-medium')}>
+              {action === 'popup_video' ? 'Video (mp4/webm)' : 'Image'}
+            </div>
+            <Button
+              variant="secondary"
+              className={cn('w-full', formError ? STATUS.dangerEdge : '')}
+              onClick={() => void openMediaPicker().then((sel) => { if (sel) void takeSelection(sel); })}
+            >
+              <FolderOpen className="size-3.5 text-retro-muted" aria-hidden="true" />
+              <span className="truncate">
+                {inlineName
+                  ? `Inline: ${inlineName}`
+                  : url
+                    ? url.startsWith('data:')
+                      ? 'Picked media (inline)'
+                      : url
+                    : action === 'popup_video'
+                      ? 'Paste a video URL — picked with preview'
+                      : 'From your media, this device, or a link'}
+              </span>
+            </Button>
+            {inlineName && (
+              <Caption className="text-pretty">
+                Inline: {inlineName} — the image rides sealed in the request, so it reaches them with no shared server.
+              </Caption>
+            )}
+            <Caption className="text-pretty">
+              {action === 'popup_video'
+                ? 'Paste a direct https media link. Their client loads it straight.'
+                : 'From your media, this device, or a direct https link (picked images ride sealed to them, up to 4 MB).'}
+            </Caption>
+          </div>
+        )}
+
+        {needsText && (
+          <div className="space-y-1.5">
+            <label htmlFor="domination-message" className={cn(TYPE.body, COLOR.fg, 'block font-medium')}>
+              Message
+            </label>
+            <Textarea
+              id="domination-message"
+              rows={3}
+              maxLength={action === 'text_overlay' ? 120 : 280}
+              placeholder="What they will see…"
+              value={text}
+              onChange={(e) => { setText(e.target.value); setFormError(null); }}
+            />
+          </div>
+        )}
+
+        {action === 'text_overlay' && (
+          <div className="grid grid-cols-3 gap-2.5 rounded-lg glass-inset p-3">
+            <div>
+              <label htmlFor="domination-position" className="mb-1 flex items-center gap-1 text-2xs text-retro-muted">
+                <Layers className="size-3" aria-hidden="true" /> Position
+              </label>
+              <Select
+                id="domination-position"
+                value={position}
+                onChange={(e) => setPosition(e.target.value as any)}
+                className="w-full"
+              >
+                <option value="top">Top</option>
+                <option value="center">Center</option>
+                <option value="bottom">Bottom</option>
+                <option value="left">Left</option>
+                <option value="right">Right</option>
+              </Select>
             </div>
             <div>
-              <h3 className="text-sm font-semibold tracking-tight text-retro-fg">{actionTitle}</h3>
-              {targetName && (
-                <p className="text-xs text-retro-muted">to {targetName}</p>
-              )}
+              <label htmlFor="domination-size" className="mb-1 flex items-center gap-1 text-2xs text-retro-muted">
+                <Sliders className="size-3" aria-hidden="true" /> Size
+              </label>
+              <Select
+                id="domination-size"
+                value={size}
+                onChange={(e) => setSize(e.target.value as any)}
+                className="w-full"
+              >
+                <option value="small">Small</option>
+                <option value="medium">Medium</option>
+                <option value="large">Large</option>
+              </Select>
+            </div>
+            <div>
+              <label htmlFor="domination-color" className="mb-1 flex items-center gap-1 text-2xs text-retro-muted">
+                <Palette className="size-3" aria-hidden="true" /> Color
+              </label>
+              <input
+                id="domination-color"
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className={cn(FIELD.base, 'h-9 w-full cursor-pointer p-1')}
+              />
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-retro-muted hover:text-retro-fg p-1.5 rounded-md hover:bg-glass-w10 transition-colors cursor-pointer"
-            aria-label="Close"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+        )}
 
-        {/* Body */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs">
-          {needsUrl && (
-            <div className="space-y-1.5">
-              <span className="block text-xs font-medium text-retro-fg">
-                {action === 'popup_video' ? 'Video (mp4/webm)' : 'Image'}
+        {action === 'blur' && (
+          <div className="space-y-2 rounded-lg glass-inset p-3.5">
+            <div className="flex items-center justify-between text-xs">
+              <label htmlFor="domination-blur" className="font-medium text-retro-fg">Blur strength</label>
+              <span className={MONO}>{intensity}px</span>
+            </div>
+            <input id="domination-blur" type="range" min="2" max="24" value={intensity}
+              onChange={(e) => setIntensity(Number(e.target.value))}
+              className="w-full cursor-pointer accent-retro-accent" />
+          </div>
+        )}
+
+        {action !== 'camera' && (
+          <div className="space-y-2 rounded-lg glass-inset p-3.5">
+            <div className="flex items-center justify-between text-xs">
+              <label htmlFor="domination-duration" className="font-medium text-retro-fg">Duration</label>
+              <span className={MONO}>{duration}s</span>
+            </div>
+            <input id="domination-duration" type="range" aria-label="Duration" min="3" max="60" value={duration}
+              onChange={(e) => setDuration(Number(e.target.value))}
+              className="w-full cursor-pointer accent-retro-accent" />
+          </div>
+        )}
+
+        {action === 'camera' && (
+          <label className="flex cursor-pointer items-start gap-3 rounded-lg glass-inset p-3.5">
+            <Checkbox
+              checked={isPublicCamera}
+              onChange={(e) => setIsPublicCamera(e.target.checked)}
+              className="mt-0.5 shrink-0"
+            />
+            <span className="min-w-0">
+              <span className={cn(TYPE.body, COLOR.fg, 'font-medium')}>Ask for a public photo</span>
+              <span className={cn(TYPE.body, COLOR.muted, 'mt-0.5 block text-pretty')}>
+                Off: the snapshot goes only to you. Either way the target approves the capture, and
+                their consent decides whether public is even possible. If their OS blocks the camera,
+                this quietly fizzles — check your Outbox.
               </span>
-              <button
-                type="button"
-                onClick={() => void openMediaPicker().then((sel) => { if (sel) void takeSelection(sel); })}
-                className={`w-full flex items-center gap-2 px-3 py-2 rounded-md border text-left transition-colors cursor-pointer ${
-                  formError ? 'border-retro-error' : 'border-edge hover:border-retro-accent'
-                } bg-surface-interactive`}
-              >
-                <FolderOpen className="w-3.5 h-3.5 text-retro-muted shrink-0" />
-                <span className="text-xs text-retro-fg truncate">
-                  {inlineName
-                    ? `Inline: ${inlineName}`
-                    : url
-                      ? url.startsWith('data:')
-                        ? 'Picked media (inline)'
-                        : url
-                      : action === 'popup_video'
-                        ? 'Paste a video URL — picked with preview'
-                        : 'From your media, this device, or a link'}
-                </span>
-              </button>
-              {inlineName && (
-                <p className="text-2xs text-retro-muted">
-                  Inline: {inlineName} — the image rides sealed in the request, so it reaches them with no shared server.
-                </p>
-              )}
-              <p className="text-2xs text-retro-muted">
-                {action === 'popup_video'
-                  ? 'Paste a direct https media link. Their client loads it straight.'
-                  : 'From your media, this device, or a direct https link (picked images ride sealed to them, up to 4 MB).'}
-              </p>
-            </div>
-          )}
-
-          {needsText && (
-            <div className="space-y-1.5">
-              <label htmlFor="domination-message" className="block text-xs font-medium text-retro-fg">Message</label>
-              <textarea
-                id="domination-message"
-                rows={3}
-                maxLength={action === 'text_overlay' ? 120 : 280}
-                placeholder="What they will see…"
-                value={text}
-                onChange={(e) => { setText(e.target.value); setFormError(null); }}
-                className={`${field} resize-none`}
-              />
-            </div>
-          )}
-
-          {action === 'text_overlay' && (
-            <div className="grid grid-cols-3 gap-2.5 p-3 rounded-lg glass-inset">
-              <div>
-                <label htmlFor="domination-position" className="block text-2xs text-retro-muted mb-1 flex items-center gap-1">
-                  <Layers className="w-3 h-3" /> Position
-                </label>
-                <select
-                  id="domination-position"
-                  value={position}
-                  onChange={(e) => setPosition(e.target.value as any)}
-                  className={`${field} p-2`}
-                >
-                  <option value="top">Top</option>
-                  <option value="center">Center</option>
-                  <option value="bottom">Bottom</option>
-                  <option value="left">Left</option>
-                  <option value="right">Right</option>
-                </select>
-              </div>
-              <div>
-                <label htmlFor="domination-size" className="block text-2xs text-retro-muted mb-1 flex items-center gap-1">
-                  <Sliders className="w-3 h-3" /> Size
-                </label>
-                <select
-                  id="domination-size"
-                  value={size}
-                  onChange={(e) => setSize(e.target.value as any)}
-                  className={`${field} p-2`}
-                >
-                  <option value="small">Small</option>
-                  <option value="medium">Medium</option>
-                  <option value="large">Large</option>
-                </select>
-              </div>
-              <div>
-                <label htmlFor="domination-color" className="block text-2xs text-retro-muted mb-1 flex items-center gap-1">
-                  <Palette className="w-3 h-3" /> Color
-                </label>
-                <input
-                  id="domination-color"
-                  type="color"
-                  value={color}
-                  onChange={(e) => setColor(e.target.value)}
-                  className="w-full h-[34px] glass-field rounded-md p-1 cursor-pointer"
-                />
-              </div>
-            </div>
-          )}
-
-          {action === 'blur' && (
-            <div className="p-3.5 rounded-lg glass-inset space-y-2">
-              <div className="flex justify-between items-center text-xs">
-                <label htmlFor="domination-blur" className="font-medium text-retro-fg">Blur strength</label>
-                <span className="font-mono text-retro-muted">{intensity}px</span>
-              </div>
-              <input
-                  id="domination-blur"
-                type="range"
-                min="2"
-                max="24"
-                value={intensity}
-                onChange={(e) => setIntensity(Number(e.target.value))}
-                className="w-full accent-retro-accent cursor-pointer"
-              />
-            </div>
-          )}
-
-          {action !== 'camera' && (
-            <div className="p-3.5 rounded-lg glass-inset space-y-2">
-              <div className="flex justify-between items-center text-xs">
-                <label htmlFor="domination-duration" className="font-medium text-retro-fg">Duration</label>
-                <span className="font-mono text-retro-muted">{duration}s</span>
-              </div>
-              <input
-                  id="domination-duration"
-                type="range"
-                aria-label="Duration"
-                min="3"
-                max="60"
-                value={duration}
-                onChange={(e) => setDuration(Number(e.target.value))}
-                className="w-full accent-retro-accent cursor-pointer"
-              />
-            </div>
-          )}
-
-          {action === 'camera' && (
-            <label className="flex items-start gap-3 p-3.5 rounded-lg glass-inset cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isPublicCamera}
-                onChange={(e) => setIsPublicCamera(e.target.checked)}
-                className="w-4 h-4 mt-0.5 accent-retro-accent rounded cursor-pointer shrink-0"
-              />
-              <div className="min-w-0">
-                <div className="font-medium text-retro-fg text-xs">Ask for a public photo</div>
-                <div className="text-xs text-retro-muted leading-snug mt-0.5">
-                  Off: the snapshot goes only to you. Either way the target approves the capture, and
-                  their consent decides whether public is even possible. If their OS blocks the camera,
-                  this quietly fizzles &mdash; check your Outbox.
-                </div>
-              </div>
-            </label>
-          )}
-
-          {formError && (
-            <p className="text-xs text-danger-fg" role="alert">{formError}</p>
-          )}
-
-          {/* Footer: honest cost line */}
-          <div className="pt-1 flex items-center justify-between gap-2">
-            <span className="text-xs text-retro-muted">
-              {price != null
-                ? <><span className="font-mono">{price} g$</span> charged only if the send is accepted.</>
-                : 'Charged only if the send is accepted.'}
             </span>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="glass-action px-3.5 py-1.5 text-retro-muted font-medium cursor-pointer transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="glass-action glass-action-primary px-4 py-1.5 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-wait cursor-pointer transition-colors"
-              >
-                {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                <span>{loading ? 'Sending…' : 'Send'}</span>
-              </button>
-            </div>
+          </label>
+        )}
+
+        {/* One cost line, one primary action. The cost is never guessed. */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-edge-subtle pt-3">
+          <span className={cn(TYPE.body, COLOR.muted, 'text-pretty')}>
+            {freeViaMesh
+              ? 'Free via mesh — nothing is charged.'
+              : price != null
+                ? <><span className={MONO}>{price} g$</span> charged only if the send is accepted.</>
+                : 'Charged only if the send is accepted.'}
+          </span>
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+            <Button type="submit" variant="primary" size="sm" loading={loading} loadingLabel="Sending…">
+              <Send className="size-3.5" aria-hidden="true" /> Send
+            </Button>
           </div>
-        </form>
-        {mediaPickerEl}
-      </div>
-    </div>
+        </div>
+      </form>
+      {mediaPickerEl}
+    </Modal>
   );
 }

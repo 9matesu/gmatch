@@ -15,17 +15,17 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ArrowLeft } from 'lucide-react';
-import { Modal } from '../../ui/kit';
+import { Button, Input, Modal } from '../../ui/kit';
 import {
-  classes, COLOR, GAP, PADDING_X, PADDING_Y, RADIUS,
-  STATUS, TRANSITION, TYPE, WEIGHT,
+  classes, COLOR, DIALOG_WIDTH, GAP, ICON, MONO, PADDING_X, PADDING_Y,
+  RECIPE, STATUS, TRANSITION, TYPE, WEIGHT,
 } from '../../ui/tokens';
 
 /** The two chooser cards share one raised-glass surface recipe. */
 const choice = classes(
-  'w-full text-left cursor-pointer border',
-  RADIUS.control, COLOR.edge, COLOR.glassW5, COLOR.hoverW10,
-  PADDING_X[3], 'py-2.5', TRANSITION.micro,
+  'w-full text-left cursor-pointer',
+  RECIPE.card, COLOR.surfaceRaised, COLOR.hoverW10, TRANSITION.micro,
+  PADDING_X[4], PADDING_Y[3], GAP[0.5],
 );
 
 export function AddWorldDialog({
@@ -68,12 +68,12 @@ export function AddWorldDialog({
       onClick={() => setStep('choose')}
       className={classes('flex items-center cursor-pointer', GAP[1], TYPE.body, COLOR.muted, COLOR.hoverFg, TRANSITION.micro)}
     >
-      <ArrowLeft className="w-3 h-3" /> All options
+      <ArrowLeft className={ICON.sm} /> All options
     </button>
   )
 
   return (
-    <Modal title="Add server" onClose={onClose} maxWidth="max-w-md">
+    <Modal title="Add server" onClose={onClose} maxWidth={DIALOG_WIDTH.md}>
       {step === 'choose' && (
         <div className="space-y-1.5">
           <button
@@ -82,7 +82,7 @@ export function AddWorldDialog({
             className={choice}
           >
             <span className={classes('block', TYPE.body, WEIGHT.bold, COLOR.fg)}>Join with code</span>
-            <span className={classes('mt-0.5 block', TYPE.caption, COLOR.muted)}>
+            <span className={classes('block', TYPE.caption, COLOR.muted)}>
               Paste the code the host sent you.
             </span>
           </button>
@@ -93,7 +93,7 @@ export function AddWorldDialog({
               className={choice}
             >
               <span className={classes('block', TYPE.body, WEIGHT.bold, COLOR.fg)}>Host a server</span>
-              <span className={classes('mt-0.5 block', TYPE.caption, COLOR.muted)}>
+              <span className={classes('block', TYPE.caption, COLOR.muted)}>
                 Run a world on this computer and share its code.
               </span>
             </button>
@@ -103,7 +103,7 @@ export function AddWorldDialog({
 
       {step === 'join' && (
         <form
-          className="space-y-2"
+          className={classes('space-y-2')}
           onSubmit={async (e) => {
             e.preventDefault()
             const entered = code.trim()
@@ -121,14 +121,14 @@ export function AddWorldDialog({
           {back}
           <label className={classes('block', TYPE.body, COLOR.muted)}>
             Invite code
-            <input
+            <Input
               ref={firstRef}
               aria-label="Invite code"
               value={code}
               onChange={(e) => { setCode(e.target.value); setJoinError('') }}
               placeholder="gmatch://node/…"
               aria-invalid={joinError ? true : undefined}
-              className={classes('glass-field mt-1 w-full px-2.5 py-1.5', TYPE.body)}
+              className={classes('mt-1', MONO)}
             />
           </label>
           {joinError ? (
@@ -138,23 +138,17 @@ export function AddWorldDialog({
               Paste the code the host sent you. It carries the address, not a secret.
             </p>
           )}
-          <div className={classes('flex justify-end pt-1', GAP[2])}>
-            <button type="button" onClick={onClose} className={classes('glass-action cursor-pointer', PADDING_X[3], PADDING_Y[1.5], RADIUS.control, TYPE.body, COLOR.muted)}>
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={!code.trim() || joining}
-              className={classes('glass-action glass-action-primary cursor-pointer disabled:opacity-50', PADDING_X[3], PADDING_Y[1.5], RADIUS.control, TYPE.body, WEIGHT.bold)}
-            >
+          <div className={classes('flex justify-end', GAP[2], 'pt-1')}>
+            <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+            <Button type="submit" variant="primary" size="sm" disabled={!code.trim() || joining}>
               {joining ? 'Joining…' : 'Join'}
-            </button>
+            </Button>
           </div>
         </form>
       )}
 
       {step === 'host' && hostForm && (
-        <div className="space-y-2">
+        <div className={classes('space-y-2')}>
           {back}
           {hostForm}
         </div>

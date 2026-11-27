@@ -1,11 +1,11 @@
 'use client'
 
-// Transport overlay for the ACTIVE party slot: 2-tier player layout.
-// Tier 1: Full-width precision scrubber with hover timestamp preview and buffer indication.
-// Tier 2: Left cluster (Prev/Play/Next, Volume icon + slider, Time), Right cluster (Rail toggle, PiP, Fullscreen).
-// Overlaid on a bottom gradient scrim per DESIGN.md.
+// Transport overlay for the ACTIVE party slot. Two aligned tiers: a full-width
+// scrubber, then one control row with the transport/volume/time cluster on the
+// left and view controls on the right. The bar is a flat token plate — no
+// gradient, no raw colour, no per-call duration.
 
-import React, { useEffect, useRef, useState, useCallback } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ChevronLeft,
   ChevronRight,
@@ -13,19 +13,29 @@ import {
   Pause,
   PictureInPicture2,
   Play,
-  Volume2,
-  Volume1,
-  VolumeX,
   PanelRightClose,
   PanelRightOpen,
+  Volume1,
+  Volume2,
+  VolumeX,
 } from 'lucide-react'
+import { cn } from '../../lib/utils'
+import {
+  CHROME,
+  COLOR,
+  GAP,
+  ICON,
+  MONO,
+  MOTION,
+  SHADOW,
+  TYPE,
+} from '../../ui/tokens'
 import { formatVideoTime } from '../media/NativeVideoPlayer'
 import { controlPlayback, queueOp, serverNow, type PartyRuntime } from '../../hooks/watchPartyStore'
 import { computeTargetPosition } from '../../utils/watchSync'
 import { getRoomVolume, setRoomVolume, readElementVolume, applyRoomVolume } from '../../utils/watchVolume'
 
-const BTN_ICON =
-  'p-1.5 rounded-md hover:bg-glass-w10 text-retro-fg/90 hover:text-retro-fg cursor-pointer transition-colors duration-150 select-none'
+const BTN_ICON = cn(CHROME.iconButton, COLOR.fgSoft)
 
 export function WatchPartyTimeline({
   party,
@@ -77,14 +87,8 @@ export function WatchPartyTimeline({
   }, [])
 
   /**
-   * Volume ownership.
-   *
-   * The slider used to be a mirror of the last *command* (`useState(1)`, never
-   * seeded from the element, never reset per room, and there is not a single
-   * `volumechange` listener in the app), so it disagreed with the element and
-   * lost the value on every media change. Now: seeded from localStorage per
-   * room, re-applied to the element whenever it appears, and kept in sync by
-   * listening to the element itself.
+   * Volume ownership. Seeded from localStorage per room, re-applied to the
+   * element whenever it appears, and kept in sync by listening to the element.
    */
   useEffect(() => {
     const el = video()
@@ -105,8 +109,6 @@ export function WatchPartyTimeline({
     el.addEventListener('volumechange', onVolumeChange)
     const cleanup = () => el.removeEventListener('volumechange', onVolumeChange)
     return cleanup
-    // Re-runs when the slot announces a new element (see WatchPartySlot), so a
-    // media change re-applies the remembered volume to the fresh <video>.
   }, [roomId, video, videoNonce])
 
   // Re-apply on room switch: the element is recreated, so the remembered value
@@ -222,13 +224,16 @@ export function WatchPartyTimeline({
   return (
     <div
       onClick={(e) => e.stopPropagation()}
-      className={`absolute bottom-0 inset-x-0 z-20 flex flex-col justify-end pt-10 px-3 sm:px-4 pb-[calc(0.75rem+var(--island-clearance))] bg-gradient-to-t from-black/95 via-black/60 to-transparent transition-opacity duration-300 select-none ${
+      className={cn(
+        'absolute bottom-0 inset-x-0 z-20 flex flex-col justify-end border-t pt-2',
+        COLOR.edge, COLOR.canvasVeil, MOTION.transition.fade,
+        'px-3 sm:px-4 pb-[calc(0.75rem+var(--island-clearance))] select-none',
         playing && !isScrubbing
           ? 'opacity-0 group-hover/watch:opacity-100 focus-within:opacity-100 pointer-events-none group-hover/watch:pointer-events-auto focus-within:pointer-events-auto'
-          : 'opacity-100 pointer-events-auto'
-      }`}
+          : 'opacity-100 pointer-events-auto',
+      )}
     >
-      {/* Tier 1: Full-width Scrubber Bar */}
+      {/* Tier 1: full-width scrubber */}
       <div
         ref={scrubBarRef}
         role="slider"
@@ -243,26 +248,30 @@ export function WatchPartyTimeline({
         onMouseLeave={() => setHoverTime(null)}
         className="relative w-full h-4 flex items-center cursor-pointer group/scrub"
       >
-        <div className="w-full h-1 group-hover/scrub:h-1.5 rounded-full bg-glass-w20 overflow-hidden transition duration-150">
-          <div
-            className="h-full bg-glass-w20 rounded-full transition duration-150"
-            style={{ width: `${bufferedPct}%` }}
-          />
+        <div className={cn('w-full h-1 group-hover/scrub:h-1.5 rounded-full overflow-hidden', COLOR.glassW20, MOTION.transition.quick)}>
+          <div className={cn('h-full rounded-full', COLOR.glassW20, MOTION.transition.quick)} style={{ width: `${bufferedPct}%` }} />
         </div>
 
         <div
-          className="absolute left-0 top-1/2 -translate-y-1/2 h-1 group-hover/scrub:h-1.5 rounded-full bg-retro-accent pointer-events-none transition duration-150"
+          className={cn('absolute left-0 top-1/2 -translate-y-1/2 h-1 group-hover/scrub:h-1.5 rounded-full pointer-events-none', COLOR.accentBg, MOTION.transition.quick)}
           style={{ width: `${progressPct}%` }}
         />
 
         <div
-          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-retro-accent shadow-lg border border-black/20 pointer-events-none transition-transform duration-150 scale-0 group-hover/scrub:scale-100"
+          className={cn(
+            'absolute top-1/2 -translate-y-1/2 -translate-x-1/2 size-3.5 rounded-full pointer-events-none',
+            'border', COLOR.edge, COLOR.accentBg, SHADOW.large, MOTION.transition.transform,
+            'scale-0 group-hover/scrub:scale-100',
+          )}
           style={{ left: `${progressPct}%` }}
         />
 
         {hoverTime !== null && (
           <div
-            className="absolute -top-7 -translate-x-1/2 px-2 py-0.5 rounded-md bg-black/90 border border-edge text-2xs font-mono font-bold text-retro-fg shadow-lg pointer-events-none whitespace-nowrap"
+            className={cn(
+              'absolute -top-7 -translate-x-1/2 px-2 py-0.5 rounded-md pointer-events-none whitespace-nowrap',
+              COLOR.scrim, COLOR.edge, TYPE.caption, 'font-bold', COLOR.fg, SHADOW.large, MONO,
+            )}
             style={{ left: `${hoverPosition}%` }}
           >
             {formatVideoTime(hoverTime)}
@@ -270,36 +279,31 @@ export function WatchPartyTimeline({
         )}
       </div>
 
-      {/* Tier 2: Grouped Controls Bar */}
-      <div className="flex items-center justify-between gap-2 mt-1 text-retro-fg">
-        {/* Left Cluster: Transport, Volume, and Time Readout */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Transport is host-only server-side. A viewer clicking these had
-              their frame refused and simply nothing happened; render them
-              disabled with a reason instead of a dead control. */}
+      {/* Tier 2: one control row, two aligned clusters */}
+      <div className={cn('flex items-center justify-between', GAP[2], 'mt-1', COLOR.fg)}>
+        <div className={cn('flex items-center', GAP[1.5], 'sm:gap-2')}>
+          {/* Transport is host-only server-side; viewers see it disabled. */}
           <button
             type="button"
             aria-label="Previous video"
             disabled={!isHost}
             title={isHost ? undefined : 'Playback control is not shared with you in this room'}
             onClick={() => isHost && queueOp(party.id, 'prev')}
-            className={`${BTN_ICON} disabled:opacity-40 disabled:cursor-not-allowed`}
+            className={BTN_ICON}
           >
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft className={ICON.md} />
           </button>
 
           <button
             type="button"
             aria-label={playing ? 'Pause party' : 'Play party'}
-            // The slot's big centre button has the same accessible label, so
-            // give the transport one a stable hook.
             data-testid="watch-transport-play"
             disabled={!isHost}
             title={isHost ? undefined : 'Playback control is not shared with you in this room'}
             onClick={handleTogglePlay}
-            className={`${BTN_ICON} disabled:opacity-40 disabled:cursor-not-allowed`}
+            className={BTN_ICON}
           >
-            {playing ? <Pause className="w-4 h-4 fill-white" /> : <Play className="w-4 h-4 fill-white translate-x-0.5" />}
+            {playing ? <Pause className={cn(ICON.md, 'fill-current')} /> : <Play className={cn(ICON.md, 'fill-current translate-x-0.5')} />}
           </button>
 
           <button
@@ -308,13 +312,12 @@ export function WatchPartyTimeline({
             disabled={!isHost}
             title={isHost ? undefined : 'Playback control is not shared with you in this room'}
             onClick={() => isHost && queueOp(party.id, 'next')}
-            className={`${BTN_ICON} disabled:opacity-40 disabled:cursor-not-allowed`}
+            className={BTN_ICON}
           >
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className={ICON.md} />
           </button>
 
-          {/* Volume Control Cluster */}
-          <div className="flex items-center gap-1 group/vol ml-1">
+          <div className={cn('flex items-center', GAP[1], 'ml-1')}>
             <button
               type="button"
               aria-label={isMuted || volume === 0 ? 'Unmute' : 'Mute'}
@@ -322,11 +325,11 @@ export function WatchPartyTimeline({
               className={BTN_ICON}
             >
               {isMuted || volume === 0 ? (
-                <VolumeX className="w-4 h-4 text-retro-muted" />
+                <VolumeX className={cn(ICON.md, COLOR.muted)} />
               ) : volume < 0.5 ? (
-                <Volume1 className="w-4 h-4 text-retro-body" />
+                <Volume1 className={cn(ICON.md, COLOR.body)} />
               ) : (
-                <Volume2 className="w-4 h-4 text-retro-body" />
+                <Volume2 className={cn(ICON.md, COLOR.body)} />
               )}
             </button>
 
@@ -338,29 +341,27 @@ export function WatchPartyTimeline({
               value={isMuted ? 0 : volume}
               aria-label="Volume"
               onChange={handleVolumeChange}
-              className="w-14 sm:w-18 h-1 bg-glass-w20 rounded-full appearance-none cursor-pointer accent-white opacity-75 hover:opacity-100 transition-opacity"
+              className={cn('w-14 sm:w-18 h-1 rounded-full appearance-none cursor-pointer', COLOR.glassW20, 'accent-retro-accent opacity-75 hover:opacity-100', MOTION.transition.fade)}
             />
           </div>
 
-          {/* Time Readout: Current / Duration grouped together */}
-          <div className="text-2xs font-mono tabular-nums text-retro-body ml-1.5 select-none">
+          <div className={cn(TYPE.caption, MONO, COLOR.body, 'ml-1.5 select-none')}>
             <span>{formatVideoTime(target)}</span>
             <span className="opacity-40 mx-1">/</span>
             <span className="opacity-75">{duration > 0 ? formatVideoTime(duration) : '--:--'}</span>
           </div>
         </div>
 
-        {/* Right Cluster: Rail toggle, PiP, and Fullscreen */}
-        <div className="flex items-center gap-1">
+        <div className={cn('flex items-center', GAP[1])}>
           {onToggleRail && (
             <button
               type="button"
               aria-label="Toggle side panel"
               title={railOpen ? 'Hide side panel' : 'Show chat and queue'}
               onClick={onToggleRail}
-              className={`${BTN_ICON} ${railOpen ? 'bg-glass-w10 text-retro-fg' : ''}`}
+              className={cn(BTN_ICON, railOpen && COLOR.glassW8)}
             >
-              {railOpen ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
+              {railOpen ? <PanelRightClose className={ICON.md} /> : <PanelRightOpen className={ICON.md} />}
             </button>
           )}
 
@@ -378,7 +379,7 @@ export function WatchPartyTimeline({
             }}
             className={BTN_ICON}
           >
-            <PictureInPicture2 className="w-4 h-4" />
+            <PictureInPicture2 className={ICON.md} />
           </button>
 
           <button
@@ -392,7 +393,7 @@ export function WatchPartyTimeline({
             }}
             className={BTN_ICON}
           >
-            <Maximize className="w-4 h-4" />
+            <Maximize className={ICON.md} />
           </button>
         </div>
       </div>

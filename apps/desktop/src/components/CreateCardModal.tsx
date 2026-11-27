@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { ImagePlus, Loader2, Plus, Sparkles, Tag, X } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { DropZone, DND_KEEPSAKE } from './DropZone';
+import { CardArtwork } from './cards/CardArtwork';
 import { useMediaPicker } from './media/MediaPickerModal';
 import { selectionToFile, type MediaSelection } from './media/picker';
 import { mediaUrlToCachedFile } from '../utils/cacheMedia';
@@ -15,7 +16,7 @@ import { isCropableImage } from './CropModal';
 import { playPress } from '../utils/sounds';
 import { Button, Input, Textarea } from '../ui/kit';
 import {
-  classes, CHROME, COLOR, GAP, ICON, MONO, MOTION, PADDING, PADDING_X, PADDING_Y,
+  classes, CHROME, COLOR, GAP, ICON, MONO, PADDING, PADDING_X, PADDING_Y,
   RADIUS, RECIPE, STATUS, TRACKING, TYPE, WEIGHT,
 } from '../ui/tokens';
 
@@ -144,7 +145,7 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0,
     }
     const file = await selectionToFile(sel, 'keepsake');
     if (file) await handleFiles([file]);
-    else setError('That media could not be read from this device — paste a public link instead.');
+    else setError('That media could not be read from this device. Paste a public link instead.');
   };
 
   // Drag a keepsake from the idle Gallery panel straight into the forge.
@@ -244,26 +245,29 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0,
 
         <div className="grid lg:grid-cols-[minmax(220px,0.7fr)_minmax(0,1.3fr)] gap-5">
           <div className={classes('flex flex-col items-center', GAP[3])}>
-            <div className={classes('w-full max-w-[270px] aspect-[3/4.2]', RADIUS.panel, PADDING[1.5], MOTION.transition.quick)} style={{ background: `linear-gradient(135deg, #9FE3FF, rgba(255,255,255,.55), #9FE3FF)`, boxShadow: '0 18px 50px #9FE3FF44' }}>
-              <div className={classes('relative w-full h-full overflow-hidden', RADIUS.panel, 'bg-surface-canvas flex flex-col')}>
-                <div className={classes('absolute inset-0 pointer-events-none bg-gradient-to-br from-white/20 via-transparent to-transparent z-[var(--z-dropdown)]')} />
-                <div className="aspect-[3/3.1] bg-black/30 overflow-hidden flex items-center justify-center">
-                  {previewUrl ? (isVideo ? <video src={previewUrl} className="w-full h-full object-cover" autoPlay muted loop playsInline /> : <img src={previewUrl} alt="Card preview" className="w-full h-full object-cover" />) : <ImagePlus className="w-10 h-10 text-retro-muted" />}
-                </div>
-                <div className={classes(PADDING[3], 'flex-1 flex flex-col justify-between')}>
-                  <div>
-                    <div className={classes(TYPE.caption, 'uppercase', TRACKING.wider, COLOR.muted)}>Chrome edition</div>
-                    <div className={classes(TYPE.base, WEIGHT.heading, 'truncate mt-1')}>{name.trim() || 'Your Card Name'}</div>
-                    <div className={classes('flex flex-wrap mt-2', GAP[1])}>
-                      {(tags.length ? tags : ['your-tags']).map((tag) => <span key={tag} className={classes(TYPE.caption, RADIUS.pill, 'border', PADDING_X[1.5], 'py-0.5')} style={{ borderColor: '#9FE3FF88', color: '#9FE3FF' }}>#{tag}</span>)}
-                    </div>
+            <div className={classes('w-full max-w-[270px] aspect-[3/4.2]', RADIUS.panel, 'overflow-hidden')}>
+              <CardArtwork
+                objectId={null}
+                src={previewUrl}
+                identity={identity}
+                width={210}
+                height={294}
+                isVideo={isVideo}
+              >
+                <span className={classes('absolute top-2 left-2 z-20', CHROME.cardChip)}>Chrome edition</span>
+                <div className={classes('absolute inset-x-0 bottom-0 z-10', CHROME.cardFooter, COLOR.canvasVeil)}>
+                  <div className={classes(CHROME.cardFooterTitle, 'mt-1')}>{name.trim() || 'Your Card Name'}</div>
+                  <div className={classes('flex flex-wrap mt-1', GAP[1])}>
+                    {(tags.length ? tags : ['your-tags']).map((tag) => (
+                      <span key={tag} className={classes(TYPE.caption, RADIUS.chip, 'border', PADDING_X[1.5], 'py-0.5', COLOR.muted)}>#{tag}</span>
+                    ))}
                   </div>
-                  <div className={classes('mt-4 flex items-end justify-between', GAP[2])}>
+                  <div className={classes('mt-1 flex items-end justify-between', GAP[2])}>
                     <span className={classes(TYPE.caption, COLOR.muted, 'line-clamp-2')}>{description.trim() || 'Polished silver edge'}</span>
-                    <span className={classes(TYPE.caption, MONO, WEIGHT.bold)} style={{ color: '#9FE3FF' }}>VALUE TBD</span>
+                    <span className={classes(TYPE.caption, MONO, WEIGHT.bold, COLOR.accent)}>VALUE TBD</span>
                   </div>
                 </div>
-              </div>
+              </CardArtwork>
             </div>
             <span className={classes(TYPE.caption, COLOR.muted)}>Live preview</span>
           </div>

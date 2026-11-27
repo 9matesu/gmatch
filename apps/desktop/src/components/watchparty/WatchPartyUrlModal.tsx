@@ -5,9 +5,10 @@
 
 import { useState } from 'react'
 import { classifyStaticUrl } from '@orbit/shared'
-import { Modal } from '../../ui/kit'
+import { Button, Input, Modal, Textarea } from '../../ui/kit'
+import { cn } from '../../lib/utils'
+import { cx, COLOR, FEEDBACK, PRESENCE, RADIUS, STATUS, TYPE } from '../../ui/tokens'
 import { WatchLocalFile } from './WatchLocalFile'
-import { BTN_PRIMARY } from '../../ui/styles'
 import { createParty, expandPlaylist, loadPartyVideo, loadPartyVideos, type PartyRuntime } from '../../hooks/watchPartyStore'
 
 interface IdentityLike {
@@ -205,7 +206,7 @@ export function WatchPartyUrlModal({
   return (
     <Modal title={inRoom ? (queueMode ? 'Add to queue' : 'Load video') : 'Watch Party'} onClose={onClose}>
       <div className="space-y-3">
-        <textarea
+        <Textarea
           autoFocus
           aria-label="Video URL"
           value={url}
@@ -223,39 +224,37 @@ export function WatchPartyUrlModal({
               }
             }
           }}
-          className="glass-field w-full px-3 py-2 text-xs font-mono resize-y"
+          className="w-full font-mono resize-y"
         />
-        <p className="text-2xs text-retro-muted">
-          {hintText}
-        </p>
+        <p className={cx(TYPE.caption, COLOR.muted, 'text-pretty')}>{hintText}</p>
         {!inRoom && (
-          <input
+          <Input
             aria-label="Party name"
             value={name}
             placeholder="Party name (optional)"
             maxLength={40}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') void submit() }}
-            className="glass-field w-full px-3 py-2 text-xs"
+            className="w-full"
           />
         )}
-        {blocked && <p className="text-xs text-retro-muted">Only the host can load videos in this room.</p>}
+        {blocked && <p className={cx(TYPE.body, COLOR.muted)}>Only the host can load videos in this room.</p>}
         {statusText && (
-          <div className="flex items-center gap-2 px-3 py-2 rounded bg-glass-w5 border border-edge text-xs font-mono text-retro-fg animate-orbit-fade-in">
-            <span className="w-2 h-2 rounded-full bg-success animate-pulse shrink-0" />
+          <div className={cn(FEEDBACK.strip, RADIUS.control, COLOR.edge, TYPE.body, COLOR.fg)}>
+            <span className={cx('size-2 rounded-full shrink-0', PRESENCE.currentDot)} aria-hidden />
             <span className="truncate">{statusText}</span>
           </div>
         )}
-        {error && <p className="text-xs text-retro-error">{error}</p>}
+        {error && <p className={cx(TYPE.body, STATUS.danger)}>{error}</p>}
         <div className="flex gap-2">
-          <button
-            type="button"
+          <Button
+            variant="primary"
             onClick={() => void submit()}
             disabled={!url.trim() || busy || blocked}
-            className={`${BTN_PRIMARY} flex-1 py-2 text-xs disabled:opacity-40`}
+            className="flex-1 py-2"
           >
             {busy ? (statusText || 'Parsing...') : inRoom ? (queueMode ? 'ADD TO QUEUE' : 'LOAD VIDEO') : 'START PARTY'}
-          </button>
+          </Button>
         </div>
         {(!inRoom || (party && (party.host === identity.orbitId || !party.lockVideo))) && (
           <div className="border-t border-edge pt-3">

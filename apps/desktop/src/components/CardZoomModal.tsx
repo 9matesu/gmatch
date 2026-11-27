@@ -7,6 +7,10 @@ import { orbitFetch } from '../utils/api';
 import { localHeldMediaUrl } from '../utils/localMedia';
 import { MediaBadge } from './MediaBadge';
 import { ObjectImage } from './ObjectImage';
+import {
+  classes, CHROME, COLOR, GAP, ICON, MONO, MOTION, PADDING, PADDING_X, PADDING_Y,
+  RADIUS, STATUS, TYPE, WEIGHT,
+} from '../ui/tokens';
 
 import { logger } from '../utils/logger'
 interface IdentityLike {
@@ -146,7 +150,7 @@ export function CardZoomModal({
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-lightbox)] bg-black/70 backdrop-blur-sm flex flex-col justify-between p-3 sm:p-6 animate-orbit-fade-in select-none"
+      className={classes('fixed inset-0 z-[var(--z-lightbox)] bg-black/70 backdrop-blur-sm flex flex-col justify-between', PADDING[3], 'sm:p-6', MOTION.keyframe.fadeIn, 'select-none')}
       onClick={onClose}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
@@ -154,48 +158,51 @@ export function CardZoomModal({
     >
       {/* Top Header Bar */}
       <div
-        className="glass-card flex items-center justify-between z-10 p-2.5 sm:px-4 rounded-xl text-retro-fg"
+        className={classes(CHROME.tile, 'flex items-center justify-between z-10', PADDING[2.5], 'sm:px-4', COLOR.fg)}
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center gap-2.5 min-w-0">
+        <div className={classes('flex items-center min-w-0', GAP[2.5])}>
           <div className="truncate">
-            <h3 className="text-xs font-bold tracking-wide text-retro-fg truncate">{title}</h3>
-            {subtitle && <p className="text-2xs text-retro-muted truncate">{subtitle}</p>}
+            <h3 className={classes(TYPE.body, WEIGHT.bold, COLOR.fg, 'truncate')}>{title}</h3>
+            {subtitle && <p className={classes(TYPE.caption, COLOR.muted, 'truncate')}>{subtitle}</p>}
           </div>
         </div>
 
         {/* Zoom Controls & Close Button */}
-        <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
-          <div className="glass-inset flex items-center gap-1 rounded-lg p-1">
+        <div className={classes('flex items-center', GAP[1], 'sm:gap-1.5', 'shrink-0')}>
+          <div className={classes('flex items-center', GAP[1], COLOR.interactiveSoft, RADIUS.control, PADDING[1])}>
             <button
               type="button"
+              aria-label="Zoom out"
               onClick={handleZoomOut}
               disabled={scale <= 1}
-              className="glass-action h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer disabled:opacity-30"
+              className={classes(CHROME.iconButton, 'size-8', RADIUS.control)}
               title="Zoom Out (-)"
             >
-              <ZoomOut className="w-3.5 h-3.5" />
+              <ZoomOut className={ICON.sm} />
             </button>
-            <span className="text-2xs font-mono px-1 text-retro-muted min-w-[36px] text-center tabular-nums">
+            <span className={classes(TYPE.caption, MONO, PADDING_X[1], 'min-w-9 text-center')}>
               {Math.round(scale * 100)}%
             </span>
             <button
               type="button"
+              aria-label="Zoom in"
               onClick={handleZoomIn}
               disabled={scale >= 4}
-              className="glass-action h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer disabled:opacity-30"
+              className={classes(CHROME.iconButton, 'size-8', RADIUS.control)}
               title="Zoom In (+)"
             >
-              <ZoomIn className="w-3.5 h-3.5" />
+              <ZoomIn className={ICON.sm} />
             </button>
             {scale !== 1 && (
               <button
                 type="button"
+                aria-label="Reset zoom"
                 onClick={handleResetZoom}
-                className="glass-action h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer"
+                className={classes(CHROME.iconButton, 'size-8', RADIUS.control)}
                 title="Reset Zoom (0)"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
+                <RotateCcw className={ICON.sm} />
               </button>
             )}
           </div>
@@ -203,6 +210,7 @@ export function CardZoomModal({
           {isObjectPath(imageUrl) && identity ? (
             <button
               type="button"
+              aria-label="Open original image in new tab"
               onClick={() => {
                 void (async () => {
                   try {
@@ -225,31 +233,33 @@ export function CardZoomModal({
                   }
                 })()
               }}
-              className="glass-action h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer"
+              className={classes(CHROME.iconButton, 'size-8', RADIUS.control)}
               title="Open original image in new tab"
             >
-              <ExternalLink className="w-3.5 h-3.5" />
+              <ExternalLink className={ICON.sm} />
             </button>
           ) : (
             <a
               href={mediaSrc || undefined}
               target="_blank"
               rel="noopener noreferrer"
+              aria-label="Open original image in new tab"
               download="orbit-card.jpg"
-              className="glass-action h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer"
+              className={classes(CHROME.iconButton, 'size-8', RADIUS.control)}
               title="Open original image in new tab"
             >
-              <ExternalLink className="w-3.5 h-3.5" />
+              <ExternalLink className={ICON.sm} />
             </a>
           )}
 
           <button
             type="button"
+            aria-label="Close preview"
             onClick={onClose}
-            className="glass-action glass-action-danger h-8 w-8 rounded-lg flex items-center justify-center cursor-pointer"
+            className={classes(CHROME.iconButton, 'size-8', RADIUS.control, STATUS.dangerFg)}
             title="Close (Esc)"
           >
-            <X className="w-4 h-4" />
+            <X className={ICON.md} />
           </button>
         </div>
       </div>
@@ -307,14 +317,14 @@ export function CardZoomModal({
 
       {/* Bottom Caption Bar / Instructions */}
       <div
-        className="flex flex-wrap items-center justify-between gap-2 z-10 bg-retro-panel/80 border border-edge px-4 py-2 rounded-lg text-retro-muted text-2xs"
+        className={classes('flex flex-wrap items-center justify-between', GAP[2], 'z-10', COLOR.canvasVeil, 'border', COLOR.edge, PADDING_X[4], PADDING_Y[2], RADIUS.control, TYPE.caption, COLOR.muted)}
         onClick={e => e.stopPropagation()}
       >
         <span>
-          {caption ? <strong className="text-retro-fg">{caption}</strong> : 'Click image to toggle 2x zoom · Drag to pan when zoomed'}
+          {caption ? <strong className={classes(COLOR.fg, WEIGHT.semibold)}>{caption}</strong> : 'Click image to toggle 2x zoom. Drag to pan when zoomed'}
         </span>
-        <span className="font-mono text-2xs text-retro-muted hidden sm:inline">
-          [Esc] to close · [+] / [−] to zoom
+        <span className={classes(MONO, TYPE.caption, COLOR.muted, 'hidden sm:inline')}>
+          [Esc] to close, [+] / [-] to zoom
         </span>
       </div>
     </div>

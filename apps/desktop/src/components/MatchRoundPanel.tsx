@@ -17,10 +17,16 @@ import { ZoomModal, useZoomModal } from './CardZoomModalHost'
 import { computeCardRarity, formatGc, matchEconomy } from '@orbit/shared'
 import { isMediaVideo } from '../utils/media'
 import { CardBack } from './CardBack'
+import { CardArtwork } from './cards/CardArtwork'
 import { ObjectImage } from './ObjectImage'
 import { Avatar } from './Avatar'
 import { ValuationSummary } from './game/ValuationSummary'
-import { ZoomIn, Check, X, Sparkles, Heart, Zap, Link as LinkIcon,   LayoutGrid } from 'lucide-react'
+import { Button } from '../ui/kit'
+import {
+  classes, CHROME, COLOR, GAP, ICON, MONO, MOTION, PADDING, PADDING_X,
+  PADDING_Y, RADIUS, SHADOW, STATUS, TYPE, WEIGHT,
+} from '../ui/tokens'
+import { ZoomIn, Check, X, Sparkles, Heart, Zap, LayoutGrid, ExternalLink } from 'lucide-react'
 
 interface IdentityLike {
   orbitId: string
@@ -240,17 +246,17 @@ export function MatchRoundPanel({
   }
 
   return (
-    <section className="module module-primary">
-      <div className="module-header allow-wrap flex items-center gap-2">
-        <span className="module-title flex items-center gap-2 min-w-0">
+    <section className={classes(CHROME.tile, PADDING[3], 'space-y-3')}>
+      <div className={classes('flex items-center flex-wrap', GAP[2])}>
+        <span className={classes('flex items-center min-w-0', GAP[2], TYPE.sub, WEIGHT.semibold, COLOR.fg)}>
           <Avatar id={match.opponent.id} imageUrl={match.opponent.pfp_url || opponentUser?.pfp_url || undefined} size={20} />
-          <span className="truncate text-sm">
+          <span className="truncate">
             vs{' '}
             <button
               type="button"
               onClick={() => onOpenProfile?.(opponentUser)}
               title={`View ${opponentName}'s profile`}
-              className="text-retro-fg font-medium hover:underline cursor-pointer"
+              className={classes('cursor-pointer hover:underline', WEIGHT.medium, COLOR.fg)}
             >
               {opponentName}
             </button>
@@ -258,25 +264,23 @@ export function MatchRoundPanel({
         </span>
 
         {/* Score */}
-        <div className="flex items-center gap-1 px-2 py-0.5 bg-surface-interactive border border-edge rounded-md text-xs tabular-nums">
-          <span className="text-retro-accent font-medium">{match.score_mine || 0}</span>
-          <span className="text-retro-muted">:</span>
-          <span className="text-retro-fg font-medium">{match.score_opponent || 0}</span>
+        <div className={classes('flex items-center', GAP[1], PADDING_X[2], PADDING_Y[1], COLOR.interactive, 'border', COLOR.edge, RADIUS.chip, MONO, TYPE.caption)}>
+          <span className={classes(COLOR.accent, WEIGHT.semibold)}>{match.score_mine || 0}</span>
+          <span className={COLOR.muted}>:</span>
+          <span className={classes(COLOR.fg, WEIGHT.semibold)}>{match.score_opponent || 0}</span>
         </div>
 
-        <span className="module-subtitle module-subtitle-truncate ml-auto hidden sm:inline text-retro-muted text-xs">
+        <span className={classes('ml-auto hidden sm:inline truncate', TYPE.caption, COLOR.muted)}>
           R{currentRound}/{maxRounds}
         </span>
-        <span className={`module-subtitle ml-2 text-retro-fg tabular-nums text-xs ${phase === 'result' ? '' : 'animate-orbit-pulse-soft'}`}>{countdown}</span>
+        <span className={classes('ml-2', TYPE.caption, MONO, COLOR.fg, phase === 'result' ? '' : 'animate-orbit-pulse-soft')}>{countdown}</span>
       </div>
 
-      <div className="module-body space-y-2">
+      <div className={classes('space-y-2')}>
         {/* Round Progress */}
-        <div className="flex items-center justify-between gap-1 p-2 bg-surface-canvas border border-edge rounded-lg">
-          <div className="text-xs font-medium text-retro-muted">
-            Progress
-          </div>
-          <div className="flex items-center gap-1">
+        <div className={classes('flex items-center justify-between', GAP[1], PADDING[2], COLOR.canvasSurface, 'border', COLOR.edge, RADIUS.control)}>
+          <div className={classes(TYPE.body, WEIGHT.medium, COLOR.muted)}>Progress</div>
+          <div className={classes('flex items-center', GAP[1])}>
             {Array.from({ length: maxRounds }).map((_, idx) => {
               const rNum = idx + 1
               const past = roundsHistory.find((h) => h.round === rNum)
@@ -284,31 +288,33 @@ export function MatchRoundPanel({
               return (
                 <div
                   key={rNum}
-                  className={`flex items-center gap-0.5 px-1.5 py-0.5 text-2xs font-medium border rounded transition-colors ${isCurrent && !isResult
-                      ? 'border-retro-accent bg-glass-w10 text-retro-accent'
+                  className={classes(
+                    'flex items-center', GAP[0.5], PADDING_X[1.5], 'py-0.5', TYPE.caption, WEIGHT.medium, 'border', RADIUS.chip, MOTION.transition.micro,
+                    isCurrent && !isResult
+                      ? classes(COLOR.accentEdge, COLOR.glassW12, COLOR.accent)
                       : past
                         ? past.matched
-                          ? 'border-retro-online/40 bg-retro-online/10 text-retro-online'
-                          : 'border-edge bg-surface-interactive text-retro-muted'
-                        : 'border-edge/40 bg-transparent text-retro-muted/40'
-                    }`}
+                          ? classes('border-retro-online/40 bg-retro-online/10 text-retro-online')
+                          : classes(COLOR.edge, COLOR.interactive, COLOR.muted)
+                        : classes('border-edge/40 bg-transparent text-retro-muted/40'),
+                  )}
                 >
                   <span>R{rNum}</span>
-                  {past && <span>{past.matched ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}</span>}
+                  {past && <span>{past.matched ? <Check className={ICON.sm} /> : <X className={ICON.sm} />}</span>}
                 </div>
               )
             })}
           </div>
         </div>
 
-        <div className="flex flex-col gap-1">
-          <div className="h-1 w-full bg-surface-interactive border border-edge rounded-full overflow-hidden">
+        <div className={classes('flex flex-col', GAP[1])}>
+          <div className={classes('h-1 w-full overflow-hidden rounded-full border', COLOR.edge, COLOR.interactive)}>
             <div
-              className={`h-full transition duration-700 ease-linear ${isResult ? 'bg-retro-muted' : msLeft <= 10000 ? 'bg-danger' : 'bg-retro-accent'}`}
+              className={classes('h-full', MOTION.transition.width, isResult ? 'bg-retro-muted' : msLeft <= 10000 ? 'bg-danger' : COLOR.accentBg)}
               style={{ width: `${isResult ? 100 : pct}%` }}
             />
           </div>
-          <div className="flex justify-between text-2xs text-retro-muted">
+          <div className={classes('flex justify-between', TYPE.caption, COLOR.muted)}>
             <span>
               {phase === 'lobby'
                 ? 'Match starting'
@@ -329,9 +335,9 @@ export function MatchRoundPanel({
         </div>
 
         {notices.length > 0 && (
-          <div className="space-y-1">
+          <div className={classes('space-y-1')}>
             {notices.slice(-2).map((msg, i) => (
-              <div key={i} className="border border-retro-accent/30 bg-glass-w5 p-2 text-xs text-retro-fg animate-orbit-fade-in rounded">
+              <div key={i} className={classes('border', COLOR.accentEdge, COLOR.glassW5, PADDING[2], TYPE.body, COLOR.fg, MOTION.keyframe.fadeIn, RADIUS.chip)}>
                 {msg}
               </div>
             ))}
@@ -339,20 +345,20 @@ export function MatchRoundPanel({
         )}
 
         {phase === 'lobby' && (
-          <div className="border border-dashed border-edge p-4 text-center space-y-2 rounded-lg">
-            <p className="text-xs text-retro-muted">
-              Matched with <span className="text-retro-fg font-medium">{opponentName}</span>
+          <div className={classes('border border-dashed', COLOR.edge, PADDING[4], 'text-center', 'space-y-2', RADIUS.control)}>
+            <p className={classes(TYPE.body, COLOR.muted)}>
+              Matched with <span className={classes(COLOR.fg, WEIGHT.semibold)}>{opponentName}</span>
             </p>
-            <p className="text-xs text-retro-muted">
-              Starting in <span className="text-retro-accent tabular-nums">{countdown}</span>
+            <p className={classes(TYPE.body, COLOR.muted)}>
+              Starting in <span className={classes(COLOR.accent, MONO)}>{countdown}</span>
             </p>
           </div>
         )}
 
         {phase === 'pick' && (
           <>
-            <div className="border border-edge p-2.5 text-xs text-retro-muted flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg">
-              <span className="font-medium text-retro-fg">Round {currentRound}/{maxRounds}:</span>
+            <div className={classes(PADDING[2.5], TYPE.body, COLOR.muted, 'flex flex-wrap items-center', GAP[2], RADIUS.control, 'border', COLOR.edge)}>
+              <span className={classes(WEIGHT.semibold, COLOR.fg)}>Round {currentRound}/{maxRounds}:</span>
               <span>
                 {deckExhausted
                   ? 'Deck exhausted. Cards can be replayed.'
@@ -361,110 +367,88 @@ export function MatchRoundPanel({
             </div>
 
             {match.my_card ? (
-              <div className="py-2 space-y-3 animate-orbit-fade-in">
-                <div className="grid grid-cols-2 gap-3 items-center">
-                  {/* Player's locked-in card */}
+              <div className={classes('py-2', 'space-y-3', MOTION.keyframe.fadeIn)}>
+                <div className={classes('grid grid-cols-2', GAP[3], 'items-center')}>
+                  {/* Player's locked-in card — the same HoloCard surface as the tile. */}
                   {(() => {
                     const c = myCards.find(card => card.id === match.my_card)
                     const val = Math.max(0, (c as any)?.value ?? c?.gacha_downloads_count ?? 0)
                     const rarity = computeCardRarity(val)
                     const name = c?.caption || 'Your Card'
                     return (
-                      <div className="space-y-1 text-center">
-                        <div
-                          className="metallic-card-border w-full max-w-[280px] aspect-[3/4.2] mx-auto select-none"
-                          data-rarity={rarity.rarity}
-                        >
-                          <div className="metallic-card flex flex-col h-full">
-                            <div className="absolute top-2 left-2 z-20 flex items-center gap-1">
-                              <span className={`text-2xs font-black uppercase tracking-wider px-2 py-0.5 rounded-md border shadow-md ${rarity.badgeClass}`}>
-                                {rarity.label}
-                              </span>
-                              <span className="text-2xs font-mono font-black px-1.5 py-0.5 rounded-md bg-black/80 text-warning-fg border border-warning/40 shadow-md backdrop-blur-xs">
-                                {formatGc(val)}
-                              </span>
+                      <div className={classes('space-y-1 text-center')}>
+                        <div className={classes('relative w-full aspect-[3/4.2] mx-auto select-none overflow-hidden', RADIUS.panel)} data-rarity={rarity.rarity}>
+                          <CardArtwork
+                            objectId={myPlayedCardId}
+                            src={myPlayedUrl}
+                            identity={identity}
+                            width={220}
+                            height={308}
+                            isVideo={Boolean(isMediaVideo(myPlayedUrl ?? '') || myPlayed?.mime_type?.startsWith('video/'))}
+                          >
+                            <div className={classes('absolute top-2 left-2 z-20 flex items-center', GAP[1])}>
+                              <span className={classes(CHROME.cardChip, rarity.badgeClass)}>{rarity.label}</span>
+                              <span className={CHROME.cardChip}>{formatGc(val)}</span>
                             </div>
-                            <span className="absolute bottom-2 right-2 z-20 text-2xs bg-retro-accent text-retro-accent-text font-black px-2 py-0.5 rounded-md shadow-md">
-                              Locked in
-                            </span>
-                            <div className="relative w-full flex-1 min-h-0 bg-surface-canvas overflow-hidden">
-                              {myPlayedUrl || myPlayedCardId ? (
-                                <ObjectImage
-                                  contentUrl={myPlayedUrl}
-                                  objectId={myPlayedCardId}
-                                  identity={identity}
-                                  mimeType={myPlayed?.mime_type}
-                                  className="w-full h-full object-cover"
-                                  videoClassName="pointer-events-none w-full h-full object-cover"
-                                />
-                              ) : (
-                                <div className="w-full h-full bg-surface-interactive flex items-center justify-center text-xs text-retro-muted">
-                                  Locked
-                                </div>
-                              )}
+                            <span className={classes('absolute bottom-2 right-2 z-20', CHROME.cardChip, COLOR.accentBg, COLOR.onAccent)}>Locked in</span>
+                            <div className={classes('absolute inset-x-0 bottom-0 z-10', CHROME.cardFooter, COLOR.canvasVeil)}>
+                              <div className={CHROME.cardFooterTitle}>{name}</div>
+                              <div className={CHROME.cardFooterMeta}>by You</div>
                             </div>
-                            <div className="p-2 bg-surface-canvas/90 border-t border-edge backdrop-blur-md text-left">
-                              <div className="text-xs font-semibold text-retro-fg truncate">{name}</div>
-                              <div className="text-2xs font-mono text-retro-muted truncate">by You</div>
-                            </div>
-                          </div>
+                          </CardArtwork>
                         </div>
-                        <div className="text-2xs font-medium text-retro-muted">You</div>
+                        <div className={classes(TYPE.caption, WEIGHT.medium, COLOR.muted)}>You</div>
                       </div>
                     )
                   })()}
 
                   {/* Opponent's placeholder / card-back */}
-                  <div className="space-y-1 text-center">
-                    <div className="metallic-card-border w-full max-w-[280px] aspect-[3/4.2] mx-auto select-none" data-rarity="common">
-                      <div className="metallic-card flex flex-col items-center justify-center h-full p-3 bg-surface-interactive/50">
+                  <div className={classes('space-y-1 text-center')}>
+                    <div className={classes('relative w-full aspect-[3/4.2] mx-auto select-none overflow-hidden', RADIUS.panel, COLOR.interactiveSoft)} data-rarity="common">
+                      <div className={classes('flex flex-col items-center justify-center h-full', PADDING[3])}>
                         {match.opponent_played ? (
-                          <div className="space-y-2">
+                          <div className={classes('space-y-2')}>
                             <CardBack className="w-16 h-22 mx-auto" />
-                            <div className="text-xs text-retro-accent font-black tracking-wide">Card submitted</div>
+                            <div className={classes(TYPE.body, COLOR.accent, WEIGHT.semibold)}>Card submitted</div>
                           </div>
                         ) : (
-                          <div className="space-y-2 text-retro-muted">
-                            <div className="w-12 h-16 border border-dashed border-edge rounded-lg mx-auto flex items-center justify-center text-sm opacity-50">?</div>
-                            <div className="text-2xs">Picking card...</div>
+                          <div className={classes('space-y-2', COLOR.muted)}>
+                            <div className={classes('w-12 h-16 border border-dashed', COLOR.edge, RADIUS.control, 'mx-auto flex items-center justify-center opacity-50')}>?</div>
+                            <div className={TYPE.caption}>Picking card...</div>
                           </div>
                         )}
                       </div>
                     </div>
-                    <div className="text-2xs font-medium text-retro-muted">{opponentName || 'Opponent'}</div>
+                    <div className={classes(TYPE.caption, WEIGHT.medium, COLOR.muted)}>{opponentName || 'Opponent'}</div>
                   </div>
                 </div>
 
-                <div className="p-2.5 bg-surface-interactive border border-edge rounded-lg text-center text-xs text-retro-fg">
+                <div className={classes(PADDING[2.5], COLOR.interactive, 'border', COLOR.edge, RADIUS.control, 'text-center', TYPE.body, COLOR.fg)}>
                   {match.opponent_played ? 'Both cards submitted. Revealing soon' : `Waiting for ${opponentName}...`}
                 </div>
               </div>
             ) : (
               <>
                 {match.opponent_played && (
-                  <div className="border border-retro-accent/30 bg-glass-w5 p-2 text-center text-xs text-retro-fg animate-orbit-fade-in rounded-lg">
+                  <div className={classes('border', COLOR.accentEdge, COLOR.glassW5, PADDING[2], 'text-center', TYPE.body, COLOR.fg, MOTION.keyframe.fadeIn, RADIUS.control)}>
                     {opponentName} played. Select your card!
                   </div>
                 )}
 
                 {myCards.length === 0 ? (
-                  <div className="border border-edge p-6 text-center text-xs text-retro-muted space-y-3 rounded-xl bg-surface-canvas/40">
-                    <p className="text-retro-fg font-semibold">No playable cards in your active deck.</p>
-                    <p className="text-retro-muted text-xs">Select or build a 5-card deck in the Deck Builder to play duels.</p>
+                  <div className={classes('border', COLOR.edge, PADDING[6], 'text-center space-y-3', RADIUS.panel, COLOR.canvasSurfaceSoft)}>
+                    <p className={classes(TYPE.body, WEIGHT.semibold, COLOR.fg)}>No playable cards in your active deck.</p>
+                    <p className={classes(TYPE.body, COLOR.muted)}>Select or build a 5-card deck in the Deck Builder to play duels.</p>
                     {onOpenDeckBuilder && (
-                      <button
-                        type="button"
-                        onClick={onOpenDeckBuilder}
-                        className="px-4 py-2 bg-retro-accent text-retro-accent-text font-bold text-xs rounded-lg hover:bg-retro-accent-hover transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                      >
-                        <LayoutGrid className="w-3.5 h-3.5" />
+                      <Button type="button" variant="primary" onClick={onOpenDeckBuilder} className={classes('flex items-center', GAP[1.5])}>
+                        <LayoutGrid className={ICON.sm} />
                         Open Deck Builder
-                      </button>
+                      </Button>
                     )}
                   </div>
                 ) : (
                   <>
-                    <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2 max-h-[min(34vh,22rem)] overflow-y-auto styled-scrollbar p-0.5">
+                    <div className={classes('grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5', GAP[2], 'max-h-[min(34vh,22rem)] overflow-y-auto styled-scrollbar p-0.5')}>
                       {myCards.map((card) => {
                         const isVid = isMediaVideo(card.content_url) || Boolean(card.mime_type?.startsWith('video/'))
                         const cardVal = Math.max(0, (card as any).value ?? card.gacha_downloads_count ?? 0)
@@ -473,14 +457,20 @@ export function MatchRoundPanel({
                         return (
                           <button
                             key={card.id}
+                            type="button"
+                            aria-label={`Play ${card.caption || card.id}`}
+                            aria-pressed={selectedCard === card.id}
                             disabled={isAlreadyPlayed}
                             onClick={() => !isAlreadyPlayed && setSelectedCard(card.id)}
-                            className={`relative aspect-square overflow-hidden border-2 transition rounded ${rarity.borderClass} ${isAlreadyPlayed
-                                ? 'opacity-30 grayscale cursor-not-allowed border-edge'
+                            className={classes(
+                              'relative aspect-square overflow-hidden border-2', MOTION.transition.micro, RADIUS.chip,
+                              rarity.borderClass,
+                              isAlreadyPlayed
+                                ? classes('opacity-30 grayscale cursor-not-allowed', COLOR.edge)
                                 : selectedCard === card.id
-                                  ? 'border-retro-fg ring-2 ring-retro-fg/30'
-                                  : 'hover:border-retro-muted'
-                              }`}
+                                  ? classes(COLOR.edgeStrong, 'ring-2 ring-retro-fg/30')
+                                  : COLOR.hoverEdgeStrong,
+                            )}
                           >
                             {card.content_url || card.id ? (
                               <ObjectImage
@@ -490,30 +480,23 @@ export function MatchRoundPanel({
                                 mimeType={card.mime_type}
                                 className="w-full h-full object-cover"
                                 videoClassName="pointer-events-none w-full h-full object-cover"
+                                thumb
                               />
                             ) : (
-                              <div className="w-full h-full bg-retro-border" />
+                              <div className={classes('w-full h-full', COLOR.surfaceRaised)} />
                             )}
                             {isVid && (
-                              <span className="absolute bottom-0.5 left-0.5 text-2xs bg-black/80 text-retro-fg font-medium px-1 rounded">
-                                Video
-                              </span>
+                              <span className={classes('absolute bottom-0.5 left-0.5', TYPE.caption, CHROME.mediaChip, RADIUS.chip)}>Video</span>
                             )}
-                            <div className="absolute top-0.5 left-0.5 flex items-center gap-0.5 z-10">
-                              <span className={`text-2xs font-medium px-1 rounded ${rarity.badgeClass}`}>
-                                {rarity.label}
-                              </span>
-                              <span className="text-2xs font-mono font-bold px-1 rounded bg-black/80 text-warning-fg border border-warning/30">
-                                {formatGc(cardVal)}
-                              </span>
+                            <div className={classes('absolute top-0.5 left-0.5 flex items-center', GAP[0.5], 'z-10')}>
+                              <span className={classes(TYPE.caption, WEIGHT.medium, RADIUS.chip, rarity.badgeClass)}>{rarity.label}</span>
+                              <span className={classes(CHROME.cardChip, STATUS.warning)}>{formatGc(cardVal)}</span>
                             </div>
                             {isAlreadyPlayed && (
-                              <span className="absolute inset-0 bg-black/70 flex items-center justify-center text-2xs font-medium text-danger-fg p-1 text-center rounded">
-                                Used
-                              </span>
+                              <span className={classes('absolute inset-0', COLOR.scrim, 'flex items-center justify-center', TYPE.caption, WEIGHT.medium, STATUS.dangerFg, 'p-1 text-center', RADIUS.chip)}>Used</span>
                             )}
                             {selectedCard === card.id && !isAlreadyPlayed && (
-                              <span className="absolute top-0.5 right-0.5 text-2xs bg-retro-fg text-retro-bg font-medium px-1 rounded">Selected</span>
+                              <span className={classes('absolute top-0.5 right-0.5', TYPE.caption, COLOR.accentBg, COLOR.onAccent, WEIGHT.medium, RADIUS.chip)}>Selected</span>
                             )}
                           </button>
                         )
@@ -521,50 +504,52 @@ export function MatchRoundPanel({
                     </div>
                   </>
                 )}
-                <button
+                <Button
+                  type="button"
+                  variant="secondary"
                   disabled={!selectedCard || submitting}
                   onClick={() => selectedCard && handlePick(selectedCard)}
-                  className="w-full py-2.5 text-xs font-medium bg-retro-fg text-retro-bg disabled:opacity-30 hover:opacity-90 cursor-pointer rounded-lg transition-opacity"
+                  className="w-full justify-center"
                 >
                   {submitting ? 'Playing...' : `Play card. Round ${currentRound}`}
-                </button>
+                </Button>
               </>
             )}
           </>
         )}
 
         {(phase === 'reveal' || waitingDecide) && (
-          <div className="border border-edge p-3 text-center text-xs text-retro-muted animate-orbit-fade-in rounded-lg">
+          <div className={classes('border', COLOR.edge, PADDING[3], 'text-center', TYPE.body, COLOR.muted, MOTION.keyframe.fadeIn, RADIUS.control)}>
             {phase === 'reveal' ? (
               <>
-                <span className="font-medium text-retro-fg">Cards revealed</span>. Deciding in {countdown}
+                <span className={classes(WEIGHT.semibold, COLOR.fg)}>Cards revealed</span>. Deciding in {countdown}
               </>
             ) : (
               <>
-                <span className="font-medium">Decision recorded</span>. Waiting for {opponentName}
+                <span className={WEIGHT.semibold}>Decision recorded</span>. Waiting for {opponentName}
               </>
             )}
           </div>
         )}
 
         {isRoundResult && (
-          <div className="border border-retro-accent/30 bg-glass-w5 p-3 text-center text-xs animate-orbit-fade-in space-y-1 rounded-lg">
-            <div className="font-medium text-retro-fg flex items-center justify-center gap-2">
+          <div className={classes('border', COLOR.accentEdge, COLOR.glassW5, PADDING[3], 'text-center space-y-1', MOTION.keyframe.fadeIn, RADIUS.control)}>
+            <div className={classes(WEIGHT.semibold, COLOR.fg, 'flex items-center justify-center', GAP[2])}>
               <span>Round {currentRound}:</span>
               {match.matched ? (
-                <span className="text-retro-online font-medium flex items-center gap-1"><Sparkles className="w-3.5 h-3.5" /> Match! +50 pts</span>
+                <span className={classes(STATUS.success, WEIGHT.semibold, 'flex items-center', GAP[1])}><Sparkles className={ICON.sm} /> Match! +50 pts</span>
               ) : (
-                <span className="text-retro-muted">No match</span>
+                <span className={COLOR.muted}>No match</span>
               )}
             </div>
-            <div className="text-xs text-retro-muted">
-              Next round in <span className="text-retro-fg tabular-nums">{countdown}</span>
+            <div className={classes(TYPE.body, COLOR.muted)}>
+              Next round in <span className={MONO}>{countdown}</span>
             </div>
           </div>
         )}
 
         {(phase === 'reveal' || phase === 'decide' || waitingDecide || isRoundResult) && (
-          <div className="grid grid-cols-2 gap-3 max-w-2xl mx-auto w-full">
+          <div className={classes('grid grid-cols-2', GAP[3], 'max-w-2xl mx-auto w-full')}>
             {/* Player's card */}
             {(() => {
               const myCardObj = myCards.find(c => c.id === (match.my_card || myPlayedCardId))
@@ -573,91 +558,84 @@ export function MatchRoundPanel({
               const myTitle = myCardObj?.caption || 'Your Card'
 
               return (
-                <div className="space-y-1 text-center">
+                <div className={classes('space-y-1 text-center')}>
                   <div
-                    className={`metallic-card-border w-full aspect-[3/4.2] mx-auto select-none transition ${
-                      isRoundResult && match.matched ? 'ring-2 ring-success shadow-2xl' : ''
-                    } ${myPlayedImg.url ? 'cursor-pointer' : ''}`}
+                    role={myPlayedImg.url && !myPlayedImg.isLink ? 'button' : undefined}
+                    tabIndex={myPlayedImg.url && !myPlayedImg.isLink ? 0 : undefined}
+                    aria-label={myPlayedImg.url && !myPlayedImg.isLink ? `Zoom ${myTitle}` : undefined}
+                    className={classes(
+                      'relative w-full aspect-[3/4.2] mx-auto select-none overflow-hidden', RADIUS.panel, SHADOW.sheet,
+                      isRoundResult && match.matched ? 'ring-2 ring-success' : '',
+                      myPlayedImg.url ? 'cursor-pointer' : '',
+                    )}
                     data-rarity={myRarity.rarity}
                     onClick={() => {
                       if (myPlayedImg.url) {
                         zoom.showZoom(myPlayedImg.url, {
                           isVideo: myPlayedImg.isVideo,
                           title: myTitle,
-                          subtitle: `Valuation: ${formatGc(myVal)} · Round ${currentRound}`,
+                          subtitle: `Valuation: ${formatGc(myVal)}, Round ${currentRound}`,
+                        })
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (myPlayedImg.url && !myPlayedImg.isLink && (e.key === 'Enter' || e.key === ' ')) {
+                        e.preventDefault()
+                        zoom.showZoom(myPlayedImg.url, {
+                          isVideo: myPlayedImg.isVideo,
+                          title: myTitle,
+                          subtitle: `Valuation: ${formatGc(myVal)}, Round ${currentRound}`,
                         })
                       }
                     }}
                   >
-                    <div className="metallic-card flex flex-col h-full">
-                      {/* Top Badges */}
-                      <div className="absolute top-2 left-2 z-20 flex items-center gap-1">
-                        <span className={`text-2xs font-black uppercase tracking-wider px-2 py-0.5 rounded-md border shadow-md ${myRarity.badgeClass}`}>
-                          {myRarity.label}
+                    <CardArtwork
+                      objectId={myPlayedCardId}
+                      src={myPlayedUrl}
+                      identity={identity}
+                      width={220}
+                      height={308}
+                      isVideo={Boolean(isMediaVideo(myPlayedUrl ?? '') || myPlayed?.mime_type?.startsWith('video/'))}
+                    >
+                      <div className={classes('absolute top-2 left-2 z-20 flex items-center', GAP[1])}>
+                        <span className={classes(CHROME.cardChip, myRarity.badgeClass)}>{myRarity.label}</span>
+                        <span className={CHROME.cardChip}>{formatGc(myVal)}</span>
+                      </div>
+                      {myPlayedImg.url && (
+                        <span className={classes('absolute top-2 right-2 z-20', CHROME.mediaChip, 'flex items-center', GAP[1])}>
+                          <ZoomIn className={ICON.sm} /> Zoom
                         </span>
-                        <span className="text-2xs font-mono font-black px-1.5 py-0.5 rounded-md bg-black/80 text-warning-fg border border-warning/40 shadow-md backdrop-blur-xs">
-                          {formatGc(myVal)}
+                      )}
+                      {myPlayedImg.isLink ? (
+                        <a
+                          href={myPlayedImg.linkUrl || '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={classes('absolute inset-0 z-10 flex flex-col items-center justify-center', GAP[2], COLOR.muted, COLOR.hoverFg, MOTION.transition.micro)}
+                          title={myPlayedImg.linkUrl || undefined}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <ExternalLink className={ICON.lg} />
+                          <span className={TYPE.body}>Link card</span>
+                          <span className={classes(TYPE.caption, MONO, 'border', COLOR.edge, PADDING_X[2], 'py-0.5', RADIUS.chip)}>Open</span>
+                        </a>
+                      ) : !myPlayedUrl && !myPlayedCardId ? (
+                        <div className="absolute inset-0 z-0"><CardBack label="Your card" /></div>
+                      ) : null}
+                      {isRoundResult && match.my_decision && (
+                        <span
+                          className={classes('absolute bottom-2 left-2 z-20', CHROME.cardChip, match.my_decision === 'like' ? 'bg-success text-retro-accent-text' : 'bg-danger text-retro-fg', 'flex items-center', GAP[1])}
+                        >
+                          {match.my_decision === 'like' ? <><Check className={ICON.sm} /> Liked</> : <><X className={ICON.sm} /> Rejected</>}
                         </span>
+                      )}
+                      <div className={classes('absolute inset-x-0 bottom-0 z-10', CHROME.cardFooter, COLOR.canvasVeil)}>
+                        <div className={CHROME.cardFooterTitle}>{myTitle}</div>
+                        <div className={CHROME.cardFooterMeta}>by You</div>
                       </div>
-
-                      <div className="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div className="bg-black/80 border border-edge text-retro-fg text-2xs px-1.5 py-0.5 rounded flex items-center gap-1">
-                          <ZoomIn className="w-3 h-3" />
-                          <span>Zoom</span>
-                        </div>
-                      </div>
-
-                      {/* Image container */}
-                      <div className="relative w-full flex-1 min-h-0 bg-surface-canvas overflow-hidden">
-                        {myPlayedUrl || myPlayedCardId ? (
-                          <ObjectImage
-                            contentUrl={myPlayedUrl}
-                            objectId={myPlayedCardId}
-                            identity={identity}
-                            mimeType={myPlayed?.mime_type}
-                            className="w-full h-full object-cover"
-                            videoClassName="w-full h-full object-cover"
-                            autoPlay
-                            loop
-                            muted
-                            playsInline
-                          />
-                        ) : myPlayedImg.isLink ? (
-                          <a
-                            href={myPlayedImg.linkUrl || '#'}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="w-full h-full flex flex-col items-center justify-center gap-2 text-retro-muted hover:text-retro-fg transition-colors"
-                            title={myPlayedImg.linkUrl || undefined}
-                          >
-                            <LinkIcon className="w-5 h-5 text-chrome-lav" />
-                            <span className="text-xs font-medium">Link card</span>
-                            <span className="text-2xs font-mono border border-edge px-2 py-0.5 rounded">Open ↗</span>
-                          </a>
-                        ) : (
-                          <CardBack label="Your card" />
-                        )}
-
-                        {/* Decision stamp */}
-                        {isRoundResult && match.my_decision && (
-                          <span
-                            className={`absolute bottom-2 left-2 text-2xs font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shadow-lg ${
-                              match.my_decision === 'like' ? 'bg-success text-retro-accent-text' : 'bg-danger text-retro-fg'
-                            }`}
-                          >
-                            {match.my_decision === 'like' ? <><Check className="w-3 h-3 stroke-[3]" /> Liked</> : <><X className="w-3 h-3 stroke-[3]" /> Rejected</>}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Card Info Footer */}
-                      <div className="p-2 bg-surface-canvas/90 border-t border-edge backdrop-blur-md text-left">
-                        <div className="text-xs font-semibold text-retro-fg truncate">{myTitle}</div>
-                        <div className="text-2xs font-mono text-retro-muted truncate">by You</div>
-                      </div>
-                    </div>
+                    </CardArtwork>
                   </div>
-                  <div className="text-2xs font-medium text-retro-muted">You</div>
+                  <div className={classes(TYPE.caption, WEIGHT.medium, COLOR.muted)}>You</div>
                 </div>
               )
             })()}
@@ -666,16 +644,21 @@ export function MatchRoundPanel({
             {(() => {
               const oppRarity = computeCardRarity(oppKnownValue ?? 0)
               const oppTitle = `${opponentName}'s Card`
+              const zoomUrl = oppUrl || opponentImg.url
 
               return (
-                <div className="space-y-1 text-center">
+                <div className={classes('space-y-1 text-center')}>
                   <div
-                    className={`metallic-card-border w-full aspect-[3/4.2] mx-auto select-none transition ${
-                      isRoundResult && match.matched ? 'ring-2 ring-success shadow-2xl' : ''
-                    } ${oppUrl || oppCardId ? 'cursor-pointer hover:opacity-80' : ''}`}
+                    role={zoomUrl && !opponentImg.isLink ? 'button' : undefined}
+                    tabIndex={zoomUrl && !opponentImg.isLink ? 0 : undefined}
+                    aria-label={zoomUrl && !opponentImg.isLink ? `Zoom ${oppTitle}` : undefined}
+                    className={classes(
+                      'relative w-full aspect-[3/4.2] mx-auto select-none overflow-hidden', RADIUS.panel, SHADOW.sheet,
+                      isRoundResult && match.matched ? 'ring-2 ring-success' : '',
+                      zoomUrl ? 'cursor-pointer' : '',
+                    )}
                     data-rarity={oppRarity.rarity}
                     onClick={() => {
-                      const zoomUrl = oppUrl || opponentImg.url
                       if (zoomUrl) {
                         zoom.showZoom(zoomUrl, {
                           isVideo: opponentImg.isVideo,
@@ -684,83 +667,73 @@ export function MatchRoundPanel({
                         })
                       }
                     }}
+                    onKeyDown={(e) => {
+                      if (zoomUrl && !opponentImg.isLink && (e.key === 'Enter' || e.key === ' ')) {
+                        e.preventDefault()
+                        zoom.showZoom(zoomUrl, {
+                          isVideo: opponentImg.isVideo,
+                          title: oppTitle,
+                          subtitle: `Round ${currentRound}`,
+                        })
+                      }
+                    }}
                   >
-                    <div className="metallic-card flex flex-col h-full">
-                      {/* Top Badges */}
+                    <CardArtwork
+                      objectId={oppCardId}
+                      src={oppUrl}
+                      identity={identity}
+                      width={220}
+                      height={308}
+                      isVideo={opponentImg.isVideo}
+                    >
                       {(oppUrl || oppCardId) && (
-                        <div className="absolute top-2 left-2 z-20 flex items-center gap-1">
-                          <span className={`text-2xs font-black uppercase tracking-wider px-2 py-0.5 rounded-md border shadow-md ${oppRarity.badgeClass}`}>
-                            {oppRarity.label}
-                          </span>
-                          {oppKnownValue !== null && (
-                            <span className="text-2xs font-mono font-black px-1.5 py-0.5 rounded-md bg-black/80 text-warning-fg border border-warning/40 shadow-md backdrop-blur-xs">
-                              {formatGc(oppKnownValue)}
-                            </span>
-                          )}
+                        <div className={classes('absolute top-2 left-2 z-20 flex items-center', GAP[1])}>
+                          <span className={classes(CHROME.cardChip, oppRarity.badgeClass)}>{oppRarity.label}</span>
+                          {oppKnownValue !== null && <span className={CHROME.cardChip}>{formatGc(oppKnownValue)}</span>}
                         </div>
                       )}
-
-                      <div className="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div className="bg-black/80 border border-edge text-retro-fg text-2xs px-1.5 py-0.5 rounded flex items-center gap-1">
-                          <ZoomIn className="w-3 h-3" />
-                          <span>Zoom</span>
-                        </div>
-                      </div>
-
-                      {/* Image container */}
-                      <div className="relative w-full flex-1 min-h-0 bg-surface-canvas overflow-hidden">
-                        {oppUrl || oppCardId ? (
-                          <ObjectImage
-                            contentUrl={oppUrl}
-                            objectId={oppCardId}
-                            identity={identity}
-                            className="w-full h-full object-cover"
-                            videoClassName="w-full h-full object-cover"
-                            autoPlay
-                            loop
-                            muted
-                            playsInline
+                      {zoomUrl && (
+                        <span className={classes('absolute top-2 right-2 z-20', CHROME.mediaChip, 'flex items-center', GAP[1])}>
+                          <ZoomIn className={ICON.sm} /> Zoom
+                        </span>
+                      )}
+                      {opponentImg.isLink ? (
+                        <a
+                          href={opponentImg.linkUrl || '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={classes('absolute inset-0 z-10 flex flex-col items-center justify-center', GAP[2], COLOR.muted, COLOR.hoverFg, MOTION.transition.micro)}
+                          title={opponentImg.linkUrl || undefined}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <ExternalLink className={ICON.lg} />
+                          <span className={TYPE.body}>Link card</span>
+                          <span className={classes(TYPE.caption, MONO, 'border', COLOR.edge, PADDING_X[2], 'py-0.5', RADIUS.chip)}>Open</span>
+                        </a>
+                      ) : !oppUrl && !oppCardId ? (
+                        <div className="absolute inset-0 z-0">
+                          <CardBack
+                            label={phase === 'reveal' ? 'Revealing...' : 'Waiting for card'}
+                            className="animate-orbit-pulse-soft"
                           />
-                        ) : opponentImg.isLink ? (
-                          <a
-                            href={opponentImg.linkUrl || '#'}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="w-full h-full flex flex-col items-center justify-center gap-2 text-retro-muted hover:text-retro-fg transition-colors"
-                            title={opponentImg.linkUrl || undefined}
-                          >
-                            <LinkIcon className="w-5 h-5 text-chrome-lav" />
-                            <span className="text-xs font-medium">Link card</span>
-                            <span className="text-2xs font-mono border border-edge px-2 py-0.5 rounded">Open ↗</span>
-                          </a>
-                        ) : opponentImg.failed ? (
-                          <div className="w-full h-full flex items-center justify-center text-retro-muted text-xs">
-                            Card unavailable
-                          </div>
-                        ) : (
-                          <CardBack label={phase === 'reveal' ? 'Revealing...' : 'Waiting for card'} className="animate-orbit-pulse-soft" />
-                        )}
-
-                        {/* Decision stamp */}
-                        {isRoundResult && match.opponent_decision && (
-                          <span
-                            className={`absolute bottom-2 left-2 text-2xs font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shadow-lg ${
-                              match.opponent_decision === 'like' ? 'bg-success text-retro-accent-text' : 'bg-danger text-retro-fg'
-                            }`}
-                          >
-                            {match.opponent_decision === 'like' ? <><Check className="w-3 h-3 stroke-[3]" /> Liked</> : <><X className="w-3 h-3 stroke-[3]" /> Rejected</>}
-                          </span>
-                        )}
+                        </div>
+                      ) : opponentImg.failed ? (
+                        <div className={classes('absolute inset-0 z-0 flex items-center justify-center', TYPE.body, COLOR.muted)}>Card unavailable</div>
+                      ) : null}
+                      {isRoundResult && match.opponent_decision && (
+                        <span
+                          className={classes('absolute bottom-2 left-2 z-20', CHROME.cardChip, match.opponent_decision === 'like' ? 'bg-success text-retro-accent-text' : 'bg-danger text-retro-fg', 'flex items-center', GAP[1])}
+                        >
+                          {match.opponent_decision === 'like' ? <><Check className={ICON.sm} /> Liked</> : <><X className={ICON.sm} /> Rejected</>}
+                        </span>
+                      )}
+                      <div className={classes('absolute inset-x-0 bottom-0 z-10', CHROME.cardFooter, COLOR.canvasVeil)}>
+                        <div className={CHROME.cardFooterTitle}>{oppTitle}</div>
+                        <div className={CHROME.cardFooterMeta}>by {opponentName}</div>
                       </div>
-
-                      {/* Card Info Footer */}
-                      <div className="p-2 bg-surface-canvas/90 border-t border-edge backdrop-blur-md text-left">
-                        <div className="text-xs font-semibold text-retro-fg truncate">{oppTitle}</div>
-                        <div className="text-2xs font-mono text-retro-muted truncate">by {opponentName}</div>
-                      </div>
-                    </div>
+                    </CardArtwork>
                   </div>
-                  <div className="text-2xs font-medium text-retro-muted">{opponentName}</div>
+                  <div className={classes(TYPE.caption, WEIGHT.medium, COLOR.muted)}>{opponentName}</div>
                 </div>
               )
             })()}
@@ -769,53 +742,56 @@ export function MatchRoundPanel({
 
         {phase === 'decide' && !isMyDecided && (
           <>
-            <p className="text-center text-xs text-retro-muted">
-              Both cards revealed. Decide if you like <span className="text-retro-fg font-medium">{opponentName}</span>&apos;s card
+            <p className={classes('text-center', TYPE.body, COLOR.muted)}>
+              Both cards revealed. Decide if you like <span className={classes(COLOR.fg, WEIGHT.semibold)}>{opponentName}</span>&apos;s card
             </p>
             {lastResult && (
-              <div className={`border p-3 text-center text-sm font-medium animate-orbit-slide-up rounded-lg ${lastResult.matched ? 'text-retro-fg border-retro-accent bg-glass-w10 animate-orbit-match-flux' : 'text-retro-muted border-edge'}`}>
+              <div className={classes('border', PADDING[3], 'text-center', TYPE.sub, WEIGHT.semibold, MOTION.keyframe.slideUp, RADIUS.control, lastResult.matched ? classes(COLOR.fg, COLOR.accentEdge, COLOR.glassW12) : classes(COLOR.muted, COLOR.edge))}>
                 {lastResult.matched ? 'It\'s a match!' : 'Decision recorded'}
                 {typeof lastResult.points === 'number' && lastResult.points > 0 && (
-                  <span className="ml-2 text-retro-accent font-medium">+{lastResult.points} pts</span>
+                  <span className={classes('ml-2', COLOR.accent, WEIGHT.medium)}>+{lastResult.points} pts</span>
                 )}
               </div>
             )}
             {decideError && (
-              <div className="border border-edge p-3 text-center text-xs text-retro-muted rounded-lg">
+              <div className={classes('border', COLOR.edge, PADDING[3], 'text-center', TYPE.body, COLOR.muted, RADIUS.control)}>
                 {decideError}
               </div>
             )}
-            <div className="grid grid-cols-3 gap-2">
-              <button
+            <div className={classes('grid grid-cols-3', GAP[2])}>
+              <Button
+                type="button"
+                variant="secondary"
                 disabled={submitting}
                 onClick={() => handleDecide('reject')}
-                className="py-2.5 px-2 text-xs font-medium border border-edge text-retro-muted hover:text-danger-fg hover:border-danger/30 cursor-pointer rounded-lg bg-surface-interactive hover:bg-danger/ transition-colors flex items-center justify-center gap-1.5"
                 title="Reject (-5 pts)"
+                className={classes('justify-center', STATUS.dangerFg, STATUS.dangerTintHover)}
               >
-                <X className="w-3.5 h-3.5" />
+                <X className={ICON.sm} />
                 <span>Reject</span>
-              </button>
-              <button
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
                 disabled={submitting}
                 onClick={() => handleDecide('like')}
-                className="py-2.5 px-2 text-xs font-medium bg-retro-fg text-retro-bg hover:bg-retro-fg/90 cursor-pointer rounded-lg transition-colors flex items-center justify-center gap-1.5"
                 title="Like (+10 pts)"
+                className="justify-center"
               >
-                <Heart className="w-3.5 h-3.5 fill-current text-danger-fg" />
+                <Heart className={classes(ICON.sm, 'fill-current', STATUS.dangerFg)} />
                 <span>Like</span>
-              </button>
-              <button
+              </Button>
+              <Button
+                type="button"
+                variant="info"
                 disabled={submitting || boostsRemaining <= 0}
                 onClick={() => handleDecide('boost')}
-                className={`py-2.5 px-2 text-xs font-medium rounded-lg border transition-colors cursor-pointer flex items-center justify-center gap-1.5 ${boostsRemaining > 0
-                    ? 'bg-glass-w10 text-retro-accent border-retro-accent/30 hover:bg-glass-w20'
-                    : 'opacity-40 border-edge text-retro-muted cursor-not-allowed bg-surface-interactive'
-                  }`}
                 title={boostsRemaining > 0 ? `Conviction Boost (+25 pts). Costs ${formatGc(matchEconomy(myCardVal, 0).boostCost)} g$` : 'No boosts remaining'}
+                className="justify-center"
               >
-                <Zap className="w-3.5 h-3.5 fill-current" />
-                <span>Boost {boostsRemaining > 0 ? `(${boostsRemaining} · ${formatGc(matchEconomy(myCardVal, 0).boostCost)} g$)` : ''}</span>
-              </button>
+                <Zap className={classes(ICON.sm, 'fill-current')} />
+                <span>Boost {boostsRemaining > 0 ? `(${boostsRemaining}, ${formatGc(matchEconomy(myCardVal, 0).boostCost)} g$)` : ''}</span>
+              </Button>
             </div>
           </>
         )}
@@ -832,13 +808,15 @@ export function MatchRoundPanel({
         )}
 
         {(phase === 'lobby' || phase === 'pick' || phase === 'reveal' || phase === 'decide') && (
-          <button
+          <Button
+            type="button"
+            variant="ghost"
             disabled={submitting}
             onClick={handleQuit}
-            className="w-full py-2 text-xs font-medium text-retro-muted hover:text-retro-fg border border-edge hover:border-retro-fg cursor-pointer rounded-lg transition-colors"
+            className="w-full justify-center"
           >
             {submitting ? 'Leaving...' : 'Leave match'}
-          </button>
+          </Button>
         )}
       </div>
 

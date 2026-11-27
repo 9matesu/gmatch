@@ -5,6 +5,7 @@
 
 import { useState } from 'react'
 import { Crown, Settings, Share, X } from 'lucide-react'
+import { cx, ICON, STATUS, TYPE } from '../../ui/tokens'
 import { BTN, BTN_PRIMARY, MUTED } from '../../ui/styles'
 import { Modal } from '../../ui/kit'
 import { Switch } from '../../ui/Switch'
@@ -25,13 +26,9 @@ export function WatchRoomHeader({ party, identity, profilePics: _profilePics }: 
   const [copied, setCopied] = useState(false)
   const [inviteBusy, setInviteBusy] = useState(false)
   const [inviteError, setInviteError] = useState('')
-  const currentEntry = party.queue.find((q) => q.id === party.current) || null
-  const readyCount = currentEntry ? (party.ready?.[currentEntry.id] || []).length : 0
-  const syncLabel = !currentEntry
-    ? null
-    : currentEntry.local
-      ? `${readyCount}/${party.members.length} ready`
-      : 'synced'
+  // The only identity line kept on the player: who is steering the room.
+  // Counts, media name and transport detail live in the one Details disclosure.
+  const hostName = party.members.find((m) => m.id === party.host)?.name || party.host.slice(0, 8)
   const invite = async () => {
     setInviteError('')
     // Public rooms keep the plain ID link. Private rooms need the host-minted,
@@ -92,17 +89,11 @@ export function WatchRoomHeader({ party, identity, profilePics: _profilePics }: 
             <X className="w-4 h-4" />
           </button>
         </div>
-        <p className={`flex items-center gap-1 ${MUTED}`}>
-          <Crown className="w-3 h-3" />
-          {party.members.length} watching
+        <p className={cx('flex items-center gap-1.5', MUTED)}>
+          <Crown className={ICON.sm} aria-hidden />
+          <span className="truncate">Host · {hostName}</span>
         </p>
-        {inviteError && <p className="text-xs text-retro-error">{inviteError}</p>}
-        {party.mediaName && <p className={`truncate ${MUTED}`}>{party.mediaName}</p>}
-        {currentEntry && (
-          <p className={`truncate font-mono text-2xs ${MUTED}`}>
-            via {currentEntry.provider || 'direct'} · {syncLabel}
-          </p>
-        )}
+        {inviteError && <p className={cx(TYPE.body, STATUS.danger)}>{inviteError}</p>}
       </div>
 
       {settingsOpen && (

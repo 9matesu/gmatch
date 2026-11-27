@@ -5,6 +5,19 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Play, Plus } from 'lucide-react'
+import { cn } from '../../lib/utils'
+import {
+  COLOR,
+  ICON,
+  MONO,
+  MOTION,
+  RADIUS,
+  SHADOW,
+  STATUS,
+  TRACKING,
+  TYPE,
+  cx,
+} from '../../ui/tokens'
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer'
 import { useObjectImage } from '../../hooks/useObjectImage'
 import { controlPlayback, serverNow, queueOp, type PartyRuntime } from '../../hooks/watchPartyStore'
@@ -244,10 +257,13 @@ export function WatchPartySlot({
       <button
         type="button"
         onClick={onEmptyClick}
-        className="relative aspect-video border border-dashed border-edge bg-glass-w5 hover:bg-glass-w10 flex flex-col items-center justify-center gap-2 text-retro-muted transition-colors cursor-pointer"
+        className={cn(
+          'relative aspect-video border border-dashed flex flex-col items-center justify-center gap-2 cursor-pointer',
+          COLOR.edge, COLOR.canvasSurfaceSoft, COLOR.hoverW10, COLOR.muted, MOTION.transition.micro,
+        )}
       >
-        <Plus className="w-6 h-6" />
-        <span className="text-2xs font-bold uppercase tracking-wider">Start playing</span>
+        <Plus className={ICON.lg} />
+        <span className={cx(TYPE.caption, 'font-bold uppercase', TRACKING.wider)}>Start playing</span>
       </button>
     )
   }
@@ -283,9 +299,12 @@ export function WatchPartySlot({
       ref={wrapRef}
       data-active={active ? 'true' : 'false'}
       onClick={onSelect}
-      className={`watch-party-slot relative ${fill ? 'w-full h-full' : 'aspect-video'} bg-retro-bg cursor-pointer overflow-hidden flex items-center justify-center ${
-        active ? '' : 'border border-edge'
-      }`}
+      className={cn(
+        'watch-party-slot relative cursor-pointer overflow-hidden flex items-center justify-center',
+        fill ? 'w-full h-full' : 'aspect-video',
+        COLOR.canvas,
+        !active && ['border', COLOR.edge],
+      )}
     >
       {videoSrc ? (
         <>
@@ -333,7 +352,7 @@ export function WatchPartySlot({
           {/* Big Center Play Button when paused */}
           {!isPlaying && (
             <div
-              className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 transition-opacity duration-300"
+              className={cx('absolute inset-0 flex items-center justify-center pointer-events-none z-10', MOTION.transition.fade)}
             >
               <button
                 type="button"
@@ -342,16 +361,20 @@ export function WatchPartySlot({
                   e.stopPropagation()
                   togglePlayback()
                 }}
-                className="pointer-events-auto w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-black/60 hover:bg-black/80 border border-edge text-retro-fg flex items-center justify-center shadow-lg transition-transform duration-150 active:scale-95 cursor-pointer"
+                className={cn(
+                  'pointer-events-auto size-14 sm:size-16 rounded-full border flex items-center justify-center',
+                  'active:scale-95 cursor-pointer',
+                  COLOR.scrim, COLOR.scrimHover, COLOR.edge, COLOR.fg, SHADOW.large, MOTION.transition.transform,
+                )}
               >
-                <Play className="w-7 h-7 sm:w-8 sm:h-8 fill-white text-retro-fg translate-x-0.5" />
+                <Play className={cx('size-7 sm:size-8 fill-current translate-x-0.5')} />
               </button>
             </div>
           )}
         </>
       ) : (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-4 text-center">
-          <span className="text-2xs uppercase tracking-wider text-retro-muted">
+          <span className={cx(TYPE.caption, 'uppercase', TRACKING.wider, COLOR.muted)}>
             {media.failed ? 'Media unavailable' : 'Loading...'}
           </span>
           {/* Say WHY, not just that it failed. "Media unavailable" is
@@ -360,7 +383,7 @@ export function WatchPartySlot({
               to diagnose from the UI. The real element state is right here. */}
           {diag && (
             <span
-              className="text-2xs font-mono text-retro-muted/70 tabular-nums"
+              className={cx(TYPE.caption, MONO, COLOR.faint)}
               data-testid="watch-media-diag"
               title="readyState / networkState — 0 = nothing requested, 1 = loading, 4 = enough data"
             >
@@ -368,7 +391,7 @@ export function WatchPartySlot({
             </span>
           )}
           {media.failed && !diag && (
-            <span className="text-2xs font-mono text-retro-muted/70">{videoSrc?.slice(0, 60)}</span>
+            <span className={cx(TYPE.caption, MONO, COLOR.faint)}>{videoSrc?.slice(0, 60)}</span>
           )}
         </div>
       )}
@@ -381,8 +404,8 @@ export function WatchPartySlot({
           transfer.status === 'receiving' ||
           transfer.status === 'failed' ||
           transfer.status === 'cancelled') && (
-          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-1.5 bg-black/70 px-4 text-center">
-            <span className="text-2xs font-bold uppercase tracking-wider text-retro-fg">
+          <div className={cn('absolute inset-0 z-20 flex flex-col items-center justify-center gap-1.5 px-4 text-center', COLOR.scrim)}>
+            <span className={cx(TYPE.caption, 'font-bold uppercase', TRACKING.wider, COLOR.fg)}>
               {transfer.status === 'receiving'
                 ? 'Receiving from the sharer…'
                 : transfer.status === 'failed'
@@ -392,18 +415,21 @@ export function WatchPartySlot({
                     : 'Waiting for the sharer…'}
             </span>
             {transfer.status === 'receiving' && transfer.total > 0 && (
-              <span className="font-mono text-2xs text-retro-muted tabular-nums">
+              <span className={cx(TYPE.caption, MONO, COLOR.muted)}>
                 {Math.round((transfer.received / transfer.total) * 100)}% · {formatBytes(transfer.received)} / {formatBytes(transfer.total)}
               </span>
             )}
             {transfer.status === 'failed' && (
-              <span className="text-2xs text-danger-fg">{transfer.error || 'No peer answered.'}</span>
+              <span className={cx(TYPE.caption, STATUS.dangerFg)}>{transfer.error || 'No peer answered.'}</span>
             )}
             {(transfer.status === 'failed' || transfer.status === 'cancelled' || transfer.status === 'idle') && (
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); void transfer.receive() }}
-                className="mt-1 rounded-md border border-edge bg-glass-w10 px-2 py-1 text-2xs font-bold uppercase tracking-wider text-retro-fg hover:bg-glass-w10/80 cursor-pointer"
+                className={cn(
+                  'mt-1 border px-2 py-1 cursor-pointer', RADIUS.chip, COLOR.edge, COLOR.glassW8,
+                  TYPE.caption, 'font-bold uppercase', TRACKING.wider, COLOR.fg, COLOR.hoverW12,
+                )}
               >
                 Retry transfer
               </button>

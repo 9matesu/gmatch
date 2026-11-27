@@ -476,6 +476,13 @@ export const CHROME = {
   rowTile: classes(RECIPE.card, COLOR.interactiveSoft, PADDING_X[3], PADDING_Y[1.5]),
   /** Short uppercase section label above a list or grid. */
   sectionLabel: classes(TYPE.body, WEIGHT.bold, COLOR.fg, TRACKING.wide),
+  /** ONE chip on a premium (HoloCard) card surface — rarity, value, state.
+   *  It sits on art, so it uses the media scrim and the one on-media text role. */
+  cardChip: classes(RADIUS.chip, COLOR.scrim, COLOR.onMedia, TYPE.caption, WEIGHT.semibold, PADDING_X[1.5], 'py-0.5', 'border', COLOR.edge),
+  /** Footer plate under a premium card's art. */
+  cardFooter: classes(PADDING[2], COLOR.canvasSurface, 'border-t', COLOR.edge, 'text-left'),
+  cardFooterTitle: classes(TYPE.body, WEIGHT.semibold, COLOR.fg, 'truncate'),
+  cardFooterMeta: classes(TYPE.caption, MONO, COLOR.muted, 'truncate'),
 } as const
 
 /**
