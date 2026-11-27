@@ -134,4 +134,26 @@ describe('StoreTab credits card owners', () => {
     await waitFor(() => expect(screen.getByText('Rare Find')).toBeTruthy())
     expect(screen.getByText('by Bo')).toBeTruthy()
   })
+
+  it('estimates cash-out value only for the cards cash-out-all actually pays', async () => {
+    vi.spyOn(api, 'orbitFetch').mockImplementation(
+      mockApi(
+        [
+          { ...marketCard(), id: 'card-a', name: 'Cashable', ownerId: 'me-1', marketStatus: 'none', value: 1000 },
+          { ...marketCard(), id: 'card-b', name: 'Listed', ownerId: 'me-1', marketStatus: 'listed', value: 1000 },
+        ],
+        [],
+      ) as never,
+    )
+
+    render(<StoreTab points={100} identity={identity} />)
+
+    // 50% rate: only the unlisted card's 1000 is payable; 2000 would promise
+    // money the confirm step explicitly skips.
+    await waitFor(() => {
+      const panel = screen.getByText('Cashout Value').parentElement
+      expect(panel?.textContent).toContain('g$ 500')
+      expect(panel?.textContent).not.toContain('g$ 1,000')
+    })
+  })
 })

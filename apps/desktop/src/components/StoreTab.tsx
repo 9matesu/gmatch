@@ -377,7 +377,11 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
   }, [identity]);
 
   const portfolioValue = portfolio.reduce((a, c) => a + c.value, 0);
-  const cashoutEstimate = portfolio.reduce((a, c) => a + computeCashoutPayout(c.value, cashoutRate), 0);
+  // Estimate the SAME set handleCashOutAll actually pays. Counting listed
+  // cards here promised a payout that the confirm step explicitly skips.
+  const cashoutEstimate = portfolio
+    .filter((c) => c.marketStatus !== 'cashed_out' && c.marketStatus !== 'listed')
+    .reduce((a, c) => a + computeCashoutPayout(c.value, cashoutRate), 0);
   const cashableCount = portfolio.filter((c) => c.marketStatus !== 'cashed_out' && c.marketStatus !== 'listed').length;
   const skippedCount = portfolio.length - cashableCount;
   const rarityDist = portfolio.reduce((acc, c) => {

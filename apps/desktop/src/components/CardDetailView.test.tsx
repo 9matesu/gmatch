@@ -86,6 +86,24 @@ describe('CardDetailView marketplace actions (P3.1–3.3)', () => {
     })
   })
 
+  it('a listed card stays buyable when the capped market feed does not contain its listing', async () => {
+    mockFetch({
+      '/api/cards/c-1': () => json({ card: { ...card, ownerId: 'bob', creatorId: 'bob', marketStatus: 'listed', listingPrice: 750 } }),
+      '/api/cards/market': () => json({ listings: [] }),
+    })
+    render(<CardDetailView cardId="c-1" identity={identity} onClose={() => {}} toast={vi.fn()} />)
+    const buy = await screen.findByRole('button', { name: /buy now/i })
+    expect(screen.getByText(/750/)).toBeTruthy()
+    await userEvent.click(buy)
+    await waitFor(() => {
+      expect(orbitFetch).toHaveBeenCalledWith(
+        '/api/cards/c-1/buy',
+        expect.objectContaining({ method: 'POST' }),
+        identity,
+      )
+    })
+  })
+
   it('owners get list/cancel/cash-out — no transfer picker anymore', async () => {
     render(<CardDetailView cardId="c-1" identity={identity} onClose={() => {}} toast={vi.fn()} />)
     await screen.findByRole('button', { name: /list for sale/i })

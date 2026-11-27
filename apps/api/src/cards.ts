@@ -47,6 +47,8 @@ export async function getCashoutRateBps(db: D1Turso): Promise<number> {
 }
 
 export interface CardRecord {
+  /** Ask price of the card's OPEN listing, joined by getCard (null when unlisted). */
+  listingPrice?: number | null
   id: string
   creatorId: string
   mediaObjectId: string
@@ -119,6 +121,7 @@ export interface MarketListingRecord {
 }
 
 interface CardRow {
+  listing_price?: number | string | null
   id: string
   creator_id: string
   media_object_id: string
@@ -162,6 +165,7 @@ function parseTags(raw: string | null | undefined): string[] {
 
 function mapCard(row: CardRow, ownerId: string): CardRecord {
   return {
+    listingPrice: row.listing_price == null ? null : Number(row.listing_price),
     id: row.id,
     creatorId: row.creator_id,
     mediaObjectId: row.media_object_id,
@@ -256,13 +260,14 @@ export class CardService {
              WHERE (c.media_object_id = ? OR (o.content_hash IS NOT NULL AND LOWER(o.content_hash) = ?))
                AND c.creator_id = ?
                AND c.moderation_state != 'burned'
+               AND EXISTS (SELECT 1 FROM CardOwnership co WHERE co.card_id = c.id AND co.owner_id = ?)
              LIMIT 1`
           )
-          .bind(mediaObjectId, contentHash, creatorId)
+          .bind(mediaObjectId, contentHash, creatorId, creatorId)
           .first<{ id: string; name: string | null }>()
       : await this.db
-          .prepare("SELECT id, name FROM Cards WHERE media_object_id = ? AND creator_id = ? AND moderation_state != 'burned'")
-          .bind(mediaObjectId, creatorId)
+          .prepare("SELECT c.id, c.name FROM Cards c WHERE c.media_object_id = ? AND c.creator_id = ? AND c.moderation_state != 'burned' AND EXISTS (SELECT 1 FROM CardOwnership co WHERE co.card_id = c.id AND co.owner_id = ?)")
+          .bind(mediaObjectId, creatorId, creatorId)
           .first<{ id: string; name: string | null }>()
     if (existing) {
       if (name && name !== existing.name) {
@@ -286,11 +291,12 @@ export class CardService {
                 AND NOT EXISTS (
                   SELECT 1 FROM Cards c2
                   JOIN Objects o2 ON c2.media_object_id = o2.id
+                  JOIN CardOwnership co2 ON co2.card_id = c2.id AND co2.owner_id = ?
                   WHERE (c2.media_object_id = ? OR (? IS NOT NULL AND o2.content_hash IS NOT NULL AND LOWER(o2.content_hash) = ?))
                     AND c2.creator_id = ?
                     AND c2.moderation_state != 'burned'
                 )`,
-        args: [cardId, creatorId, mediaObjectId, name, rarity, score, likeCount, JSON.stringify(tags), description, frame, accentColor, nowIso, nowIso, mediaObjectId, creatorId, mediaObjectId, contentHash, contentHash, creatorId],
+        args: [cardId, creatorId, mediaObjectId, name, rarity, score, likeCount, JSON.stringify(tags), description, frame, accentColor, nowIso, nowIso, mediaObjectId, creatorId, creatorId, mediaObjectId, contentHash, contentHash, creatorId],
       },
       { sql: 'INSERT INTO CardOwnership (card_id, owner_id, acquired_at) SELECT ?, ?, ? WHERE changes() = 1', args: [cardId, creatorId, nowIso] },
       { sql: "INSERT INTO CardHistory (id, card_id, event, from_user, to_user, meta, created_at) SELECT ?, ?, 'created', NULL, ?, ?, ? WHERE changes() = 1", args: [historyId, cardId, creatorId, JSON.stringify({ mediaObjectId }), nowIso] },
@@ -307,13 +313,14 @@ export class CardService {
                WHERE (c.media_object_id = ? OR (o.content_hash IS NOT NULL AND LOWER(o.content_hash) = ?))
                  AND c.creator_id = ?
                  AND c.moderation_state != 'burned'
+                 AND EXISTS (SELECT 1 FROM CardOwnership co WHERE co.card_id = c.id AND co.owner_id = ?)
                LIMIT 1`
             )
-            .bind(mediaObjectId, contentHash, creatorId)
+            .bind(mediaObjectId, contentHash, creatorId, creatorId)
             .first<{ id: string }>()
         : await this.db
-            .prepare("SELECT id FROM Cards WHERE media_object_id = ? AND creator_id = ? AND moderation_state != 'burned'")
-            .bind(mediaObjectId, creatorId)
+            .prepare("SELECT c.id FROM Cards c WHERE c.media_object_id = ? AND c.creator_id = ? AND c.moderation_state != 'burned' AND EXISTS (SELECT 1 FROM CardOwnership co WHERE co.card_id = c.id AND co.owner_id = ?)")
+            .bind(mediaObjectId, creatorId, creatorId)
             .first<{ id: string }>()
       if (winner) {
         if (name) {
@@ -336,7 +343,9 @@ export class CardService {
   async getCard(cardId: string, callerId?: string): Promise<CardRecord | null> {
     requireId(cardId, 'cardId')
     const row = await this.db
-      .prepare('SELECT c.*, o.content_url, o.mime_type, o.caption FROM Cards c LEFT JOIN Objects o ON o.id = c.media_object_id WHERE c.id = ?')
+      .prepare(`SELECT c.*, o.content_url, o.mime_type, o.caption,
+                       (SELECT ml.price FROM MarketListings ml WHERE ml.card_id = c.id AND ml.status = 'open' LIMIT 1) AS listing_price
+                FROM Cards c LEFT JOIN Objects o ON o.id = c.media_object_id WHERE c.id = ?`)
       .bind(cardId)
       .first<CardRow>()
     if (!row) return null
@@ -487,6 +496,16 @@ export class CardService {
       .first<{ owner_id: string }>()
     if (!owner) throw notFound('card not found')
     if (owner.owner_id !== sellerId) throw forbidden('you do not own this card')
+
+    // A hidden/banned card is excluded from listMarket and refused by buyCard.
+    // Listing one would strand it as "On Market" forever: it can never sell
+    // and cannot be cashed out while listed. Refuse at the write boundary.
+    const state = await this.db
+      .prepare('SELECT moderation_state FROM Cards WHERE id = ?')
+      .bind(cardId)
+      .first<{ moderation_state: string }>()
+    if (!state) throw notFound('card not found')
+    if (state.moderation_state !== 'active') throw forbidden('this card is not available')
 
     const open = await this.db
       .prepare("SELECT 1 FROM MarketListings WHERE card_id = ? AND status = 'open'")
@@ -676,6 +695,12 @@ export class CardService {
     const res = await this.db.atomicBatch([
       { sql: 'UPDATE CardOwnership SET owner_id = ?, acquired_at = ? WHERE card_id = ? AND owner_id = ? RETURNING owner_id', args: [toUserId, nowIso, cardId, fromUserId] },
       { sql: "INSERT INTO CardHistory (id, card_id, event, from_user, to_user) SELECT ?, ?, 'transferred', ?, ? WHERE changes() = 1", args: [historyId, cardId, fromUserId, toUserId] },
+      // Gifting must retire the giver's listing. Otherwise the open row keeps
+      // naming the old seller while the card belongs to somebody else: the
+      // buyer's debit gate fails, the new owner cannot cancel or re-list, and
+      // the card reads "On Market" with no honest way out.
+      { sql: "UPDATE MarketListings SET status = 'cancelled', updated_at = ? WHERE card_id = ? AND status = 'open' AND EXISTS (SELECT 1 FROM CardOwnership co WHERE co.card_id = ? AND co.owner_id = ?)", args: [nowIso, cardId, cardId, toUserId] },
+      { sql: "UPDATE Cards SET market_status = 'none', updated_at = ? WHERE id = ? AND EXISTS (SELECT 1 FROM CardOwnership co WHERE co.card_id = ? AND co.owner_id = ?)", args: [nowIso, cardId, cardId, toUserId] },
     ])
 
     if ((res[0].rows?.length ?? 0) === 0) throw conflict('card ownership changed concurrently')
@@ -711,9 +736,18 @@ export class CardService {
       .bind(cardId)
       .first<{ id: string; media_object_id: string; value: number; moderation_state: string; market_status: string }>()
     if (!card) throw notFound('card not found')
+    if (card.market_status === 'cashed_out') throw conflict('card already cashed out')
+    // The wallet credit below is conditional on ownership, but the batch still
+    // commits when that condition fails. Without this check a stranger could
+    // skip the credit and still reach the (ungated) media cleanup statements,
+    // permanently deleting somebody else's card bytes.
+    const owner = await this.db
+      .prepare('SELECT owner_id FROM CardOwnership WHERE card_id = ?')
+      .bind(cardId)
+      .first<{ owner_id: string }>()
+    if (!owner || owner.owner_id !== ownerId) throw forbidden('you do not own this card')
     if (card.moderation_state !== 'active') throw forbidden('this card is not available')
     if (card.market_status === 'listed') throw conflict('unlist the card before cashing out')
-    if (card.market_status === 'cashed_out') throw conflict('card already cashed out')
 
     const payout = computeCashoutPayout(card.value, rateBps)
 
@@ -759,13 +793,16 @@ export class CardService {
         },
         // A burned card's media must not remain in the owner's inbox and be
         // re-discovered by the legacy gallery after CardOwnership is removed.
-        { sql: 'DELETE FROM Recipients WHERE object_id = ?', args: [card.media_object_id] },
-        { sql: 'DELETE FROM Favorites WHERE object_id = ?', args: [card.media_object_id] },
-        { sql: 'DELETE FROM Likes WHERE object_id = ?', args: [card.media_object_id] },
-        { sql: 'DELETE FROM Objects WHERE id = ?', args: [card.media_object_id] },
+        // Every cleanup is gated on ownership having actually been removed by
+        // this batch — a skipped credit can never reach these deletes, even if
+        // an older node's row drifts past the ownership check above.
+        { sql: 'DELETE FROM Recipients WHERE object_id = ? AND NOT EXISTS (SELECT 1 FROM CardOwnership WHERE card_id = ?)', args: [card.media_object_id, cardId] },
+        { sql: 'DELETE FROM Favorites WHERE object_id = ? AND NOT EXISTS (SELECT 1 FROM CardOwnership WHERE card_id = ?)', args: [card.media_object_id, cardId] },
+        { sql: 'DELETE FROM Likes WHERE object_id = ? AND NOT EXISTS (SELECT 1 FROM CardOwnership WHERE card_id = ?)', args: [card.media_object_id, cardId] },
+        { sql: 'DELETE FROM Objects WHERE id = ? AND NOT EXISTS (SELECT 1 FROM CardOwnership WHERE card_id = ?)', args: [card.media_object_id, cardId] },
         // A burned card must not linger in any deck either; drop its deck
         // references so decks never hold dangling card entries after cash-out.
-        { sql: 'DELETE FROM DeckCards WHERE card_id = ?', args: [cardId] },
+        { sql: 'DELETE FROM DeckCards WHERE card_id = ? AND NOT EXISTS (SELECT 1 FROM CardOwnership WHERE card_id = ?)', args: [cardId, cardId] },
       ])
     } catch (err) {
       if (isConstraintError(err)) {

@@ -3,9 +3,7 @@
 import { useState, useRef } from 'react'
 import { isMediaVideo } from '../../utils/media'
 import { MediaBadge } from '../MediaBadge'
-import { getApiBaseUrl } from '../../utils/api'
-import { HoloCard } from 'react-holo-card-effect/dist/index.js'
-import { useObjectImage } from '../../hooks/useObjectImage'
+import { CardArtwork } from '../cards/CardArtwork'
 import { computeCardRarity, RARITY_TIERS, formatGc, parseTags } from '@orbit/shared'
 import type { User } from '@orbit/shared'
 import { useNow } from '../../hooks/useNow'
@@ -71,7 +69,6 @@ export function CardTile({
   const localNow = useNow(now === undefined ? 30_000 : 0)
   const currentNow = now ?? localNow
   const isVid = Boolean(item.mime_type?.startsWith('video/')) || isMediaVideo(item.content_url)
-  const cardImg = useObjectImage(item.id, identity || null)
 
   const isReceived = Boolean(item.is_received || (identity && item.owner_id !== identity.orbitId))
   const likes = Number(item.likes_count ?? item.like_count ?? 0)
@@ -87,19 +84,6 @@ export function CardTile({
   )
 
   const cardTitle = item.name?.trim() || item.caption?.trim() || ownerLabel || 'Untitled Card'
-
-  const handleMediaError = () => {
-    if (typeof window === 'undefined' || !item.id) return
-    if (item.id.startsWith('p2p-obj-') || item.id.startsWith('p2p-wrtc-')) return
-    const verifyUrl = `${getApiBaseUrl()}/api/objects/${item.id}`
-    fetch(verifyUrl, { method: 'HEAD', cache: 'no-store' })
-      .then((res) => {
-        if (res.status === 404 || res.status === 410) {
-          window.dispatchEvent(new CustomEvent('orbit-object-404', { detail: { cardId: item.id } }))
-        }
-      })
-      .catch(() => {})
-  }
 
   const hasValuation =
     item.card_id != null ||
@@ -219,7 +203,13 @@ export function CardTile({
 
         {/* Card Image */}
         <div className="relative w-full aspect-[3/4.2] bg-surface-canvas overflow-hidden">
-          <HoloCard url={cardImg.url || ''} height={210} width={150} showSparkles={false} />
+          <CardArtwork
+            objectId={item.id}
+            identity={identity}
+            width={150}
+            height={210}
+            isVideo={isVid}
+          />
           {isVid && <MediaBadge className="absolute bottom-1.5 right-1.5 z-10" />}
         </div>
 

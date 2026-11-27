@@ -6,8 +6,8 @@ import { orbitFetch } from '../utils/api';
 import { userFacingError } from '../utils/userError';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { computeCashoutPayout, clampCashoutRateBps, DEFAULT_CASHOUT_RATE_BPS, formatGc } from '@orbit/shared';
-import { HoloCard } from 'react-holo-card-effect/dist/index.js';
-import { useObjectImage } from '../hooks/useObjectImage';
+import { CardArtwork } from './cards/CardArtwork';
+import { isMediaVideo } from '../utils/media';
 
 interface CardRecord {
   id: string;
@@ -29,6 +29,8 @@ interface CardRecord {
   contentUrl?: string | null;
   mimeType?: string | null;
   caption?: string | null;
+  /** Open market ask, joined by GET /api/cards/:id (may be outside the market feed's first page). */
+  listingPrice?: number | null;
 }
 
 interface CardDetailViewProps {
@@ -58,9 +60,6 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
   const [listingPrice, setListingPrice] = useState<number | null>(null);
   const [buying, setBuying] = useState(false);
   const inflightRef = useRef(false);
-  // Resolve the card's bytes to a blob URL (signed fetch) — the HoloCard's
-  // CSS background cannot do the authenticated /api/objects request.
-  const cardImg = useObjectImage(card?.mediaObjectId ?? null, identity);
 
   const refreshCardData = useCallback(async (initial: boolean) => {
     if (!cardId || !identity) return;
@@ -80,16 +79,19 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
       const cardData = await cardRes.json();
       setCard(cardData.card);
 
-      // Open listings carry the ask price; pull it from the market feed.
-      if (cardData.card?.marketStatus === 'listed') {
+      // The single-card response joins the OPEN listing's ask directly. The
+      // market feed is newest-first and capped, so scraping it used to leave a
+      // legitimately listed card with no price (and therefore no Buy button)
+      // once its listing fell off page one, or whenever that fetch failed.
+      const detailPrice = typeof cardData.card?.listingPrice === 'number' ? cardData.card.listingPrice : null;
+      setListingPrice(detailPrice);
+      if (cardData.card?.marketStatus === 'listed' && detailPrice === null) {
         const marketRes = await orbitFetch('/api/cards/market?limit=100', {}, identity);
         if (marketRes.ok) {
           const marketData = await marketRes.json();
           const listing = (Array.isArray(marketData?.listings) ? marketData.listings : []).find((l: { cardId?: string }) => l.cardId === cardId);
           setListingPrice(typeof listing?.price === 'number' ? listing.price : null);
         }
-      } else {
-        setListingPrice(null);
       }
 
       const rateRes = await orbitFetch('/api/economy/cashout-rate', {}, identity);
@@ -236,11 +238,12 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
         <div className="p-5 space-y-4 overflow-y-auto">
           {/* The card as a tall card, Pokemon-style holo (react-holo-card-effect). */}
           <div className="flex justify-center">
-            <HoloCard
-              url={cardImg.url || ''}
-              height={340}
+            <CardArtwork
+              objectId={card.mediaObjectId}
+              identity={identity}
               width={300}
-              showSparkles={false}
+              height={340}
+              isVideo={Boolean(card.mimeType?.startsWith('video/') || isMediaVideo(card.contentUrl))}
             />
           </div>
 

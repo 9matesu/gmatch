@@ -450,4 +450,64 @@ describe('CardService', () => {
     await db.prepare("INSERT INTO SystemMeta (key, value) VALUES ('economy_cashout_rate_bps', '999999') ON CONFLICT(key) DO UPDATE SET value = excluded.value").run()
     await expect(getCashoutRateBps(db)).resolves.toBe(50000)
   })
+
+  it('joins the open listing price into the single-card detail', async () => {
+    await seedMedia(db, 'media-detail-price', CREATOR)
+    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-detail-price', name: 'Priced' })
+
+    expect((await cards.getCard(card.id))!.listingPrice).toBeNull()
+    await cards.listForSale(CREATOR, card.id, 333)
+    expect((await cards.getCard(card.id))!.listingPrice).toBe(333)
+    await cards.cancelListing(CREATOR, card.id)
+    expect((await cards.getCard(card.id))!.listingPrice).toBeNull()
+  })
+
+  it('refuses a stranger cash-out without burning the owner media', async () => {
+    await seedMedia(db, 'media-cash-foreign', CREATOR)
+    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-cash-foreign', name: 'Not Yours' })
+
+    await expect(cards.cashOutCard(OTHER, card.id, 'cashout-key-foreign-1')).rejects.toMatchObject({ code: 'FORBIDDEN' })
+
+    const media = await db.prepare('SELECT id FROM Objects WHERE id = ?').bind('media-cash-foreign').first()
+    expect(media).toBeTruthy()
+    expect((await cards.getCard(card.id))!.marketStatus).toBe('none')
+    await expect(economy.getBalance(OTHER)).resolves.toBe(0)
+  })
+
+  it('does not rename a card the creator no longer owns on re-upload', async () => {
+    const hash = 'aaaa4442'.padEnd(64, 'f')
+    for (const id of ['media-resale-1', 'media-resale-2']) {
+      await db.prepare('INSERT INTO Objects (id, owner_id, size_bytes, mime_type, content_hash) VALUES (?, ?, 1000, ?, ?)')
+        .bind(id, CREATOR, 'image/jpeg', hash).run()
+    }
+    const first = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-resale-1', name: 'Original' })
+    await cards.transferOwnership(CREATOR, BUYER, first.id)
+
+    const again = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-resale-2', name: 'Renamed by seller' })
+    expect(again.id).not.toBe(first.id)
+    expect(again.ownerId).toBe(CREATOR)
+    const original = await db.prepare('SELECT name FROM Cards WHERE id = ?').bind(first.id).first<{ name: string }>()
+    expect(original?.name).toBe('Original')
+  })
+
+  it('refuses to list a hidden card nobody could buy', async () => {
+    await seedMedia(db, 'media-hidden-1', CREATOR)
+    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-hidden-1', name: 'Hidden' })
+    await db.prepare("UPDATE Cards SET moderation_state = 'hidden' WHERE id = ?").bind(card.id).run()
+
+    await expect(cards.listForSale(CREATOR, card.id, 100)).rejects.toMatchObject({ code: 'FORBIDDEN' })
+    expect((await cards.getCard(card.id, CREATOR))!.marketStatus).toBe('none')
+  })
+
+  it('gifting a listed card closes its listing so the new owner can re-list', async () => {
+    await seedMedia(db, 'media-gift-1', CREATOR)
+    const card = await cards.createCard({ creatorId: CREATOR, mediaObjectId: 'media-gift-1', name: 'Gift' })
+    await cards.listForSale(CREATOR, card.id, 100)
+
+    await cards.transferOwnership(CREATOR, BUYER, card.id)
+
+    expect((await cards.getCard(card.id))!.marketStatus).toBe('none')
+    expect((await cards.listMarket()).find((l) => l.cardId === card.id)).toBeUndefined()
+    await expect(cards.listForSale(BUYER, card.id, 120)).resolves.toMatchObject({ ownerId: BUYER })
+  })
 })
