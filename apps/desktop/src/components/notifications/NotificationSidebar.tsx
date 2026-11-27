@@ -27,7 +27,7 @@ export function NotificationSidebar({
         role="complementary"
         aria-label="Notifications"
         onClick={(e) => e.stopPropagation()}
-        className="pointer-events-auto h-full w-[380px] max-w-[92vw] bg-[var(--color-glass)] backdrop-blur-xl border-r border-edge shadow-2xl flex flex-col animate-orbit-slide-left"
+        className="pointer-events-auto h-full w-[380px] max-w-[92vw] bg-[var(--color-glass)] backdrop-blur-xl border-r border-edge shadow-2xl flex flex-col animate-orbit-slide-in-left"
       >
         <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-edge shrink-0">
           <h2 className="text-base font-black tracking-tight text-retro-fg">Notifications</h2>

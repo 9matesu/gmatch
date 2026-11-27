@@ -1170,6 +1170,11 @@ select.bg-transparent {
   from { transform: translateX(100%); }
   to { transform: translateX(0); }
 }
+/* A LEFT panel enters from the left edge (the right-side sheets use the one above). */
+@keyframes orbit-slide-in-left {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
 @keyframes orbit-tier-flash {
   0% { transform: scale(1.1); opacity: 0; }
   25% { opacity: 1; }
@@ -1208,6 +1213,7 @@ select.bg-transparent {
 .animate-orbit-card-flux { animation: orbit-card-flux 1.7s ease-in-out infinite; }
 .animate-orbit-match-flux { animation: orbit-match-flux .45s cubic-bezier(.16,1,.3,1) both; }
 .animate-orbit-slide-left { animation: orbit-slide-left .3s cubic-bezier(.16,1,.3,1) both; }
+.animate-orbit-slide-in-left { animation: orbit-slide-in-left .3s cubic-bezier(.16,1,.3,1) both; }
 .animate-orbit-tier-flash { animation: orbit-tier-flash .5s cubic-bezier(.16,1,.3,1) both; }
 .animate-orbit-feed-in { animation: orbit-feed-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .create-action {

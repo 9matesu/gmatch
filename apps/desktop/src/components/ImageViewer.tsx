@@ -233,7 +233,7 @@ export function ImageViewer({
 
   return (
     <div
-      className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex flex-col justify-between p-2 sm:p-4 md:p-6 overflow-hidden select-none font-sans animate-orbit-fade-in"
+      className="fixed inset-0 z-[var(--z-modal)] bg-black/70 backdrop-blur-sm flex flex-col justify-between p-2 sm:p-4 md:p-6 pb-[calc(0.5rem+var(--island-clearance))] sm:pb-[calc(1rem+var(--island-clearance))] md:pb-[calc(1.5rem+var(--island-clearance))] overflow-hidden select-none font-sans animate-orbit-fade-in"
       onClick={() => {
         if (!didDragRef.current) onClose()
       }}
@@ -392,7 +392,7 @@ export function ImageViewer({
 
       {/* Bottom Action Dock Bar */}
       <div
-        className="glass-card w-full max-w-4xl mx-auto px-3 py-2 flex items-center justify-center gap-2 flex-wrap shrink-0 z-40 rounded-xl"
+        className="glass-card w-full max-w-4xl mx-auto px-2 py-1.5 flex items-center justify-center gap-1.5 flex-wrap shrink-0 z-40 rounded-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <button

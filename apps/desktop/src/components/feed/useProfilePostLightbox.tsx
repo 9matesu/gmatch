@@ -20,6 +20,9 @@ export interface ProfileLightboxDeps {
   users?: Array<{ id: string; display_name?: string }>;
   followingIds?: string[];
   shareGroups?: { id: string; name: string; member_count: number }[];
+  /** Inline mode: openPost shows the post in the consumer's right pane
+   *  (UserProfileModal). Default: open the fullscreen ImageViewer. */
+  inline?: boolean;
   toast?: ToastFn;
   onPersistLike?: (postId: string, liked: boolean) => Promise<number | undefined>;
   onPersistSave?: (postId: string, saved: boolean) => void;
@@ -55,6 +58,7 @@ export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
     users = [],
     followingIds = [],
     shareGroups = [],
+    inline = false,
     toast,
     onPersistLike,
     onPersistSave,
@@ -104,8 +108,10 @@ export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
       setLiked((prev) => (prev[post.id] === undefined ? { ...prev, [post.id]: !!post.is_liked } : prev));
       setSaved((prev) => (prev[post.id] === undefined ? { ...prev, [post.id]: !!post.is_saved } : prev));
       setCounts((prev) => (prev[post.id] === undefined ? { ...prev, [post.id]: post.like_count ?? 0 } : prev));
-      // Clicking a post opens the fullscreen ImageViewer modal (no inline card).
-      window.dispatchEvent(new CustomEvent('gmatch-open-image', { detail: { id: post.id } }));
+      // Inline (modal right pane) shows the card; the grid opens the fullscreen
+      // ImageViewer modal.
+      if (inline) setActivePost(post);
+      else window.dispatchEvent(new CustomEvent('gmatch-open-image', { detail: { id: post.id } }));
       // The profile endpoints don't inline comments (post.comments is only
       // populated on the single-post route, which the app never calls), so
       // seeding from it left every profile lightbox permanently empty. Fetch
@@ -128,7 +134,7 @@ export function useProfilePostLightbox(deps: ProfileLightboxDeps) {
         cancelled = true;
       };
     },
-    [identity],
+    [identity, inline],
   );
 
   const closePost = useCallback(() => setActivePost(null), []);
