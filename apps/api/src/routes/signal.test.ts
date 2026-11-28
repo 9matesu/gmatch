@@ -431,4 +431,17 @@ describe('candidateLeaksIp (ICE hygiene gate)', () => {
     expect(candidateLeaksIp({})).toBe(false)
     expect(candidateLeaksIp({ candidate: 'garbage' })).toBe(true)
   })
+
+  it('accepts Radmin 26/8 and global IPv6 host candidates like the client gate', () => {
+    expect(candidateLeaksIp({ candidate: 'candidate:1 1 udp 100 26.26.113.34 54321 typ host' })).toBe(false)
+    expect(candidateLeaksIp({ candidate: 'candidate:1 1 udp 100 2001:db8::1 54321 typ host' })).toBe(false)
+    expect(candidateLeaksIp({ candidate: 'candidate:1 1 udp 100 2a01:e0a::5 54321 typ host' })).toBe(false)
+  })
+
+  it('still drops literal LAN IPv4 and non-global IPv6 host candidates', () => {
+    expect(candidateLeaksIp({ candidate: 'candidate:1 1 udp 100 192.168.1.5 54321 typ host' })).toBe(true)
+    expect(candidateLeaksIp({ candidate: 'candidate:1 1 udp 100 fd00::1 54321 typ host' })).toBe(true)
+    expect(candidateLeaksIp({ candidate: 'candidate:1 1 udp 100 fe80::1 54321 typ host' })).toBe(true)
+    expect(candidateLeaksIp({ candidate: 'candidate:1 1 udp 100 ::1 54321 typ host' })).toBe(true)
+  })
 })

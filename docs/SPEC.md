@@ -1275,9 +1275,9 @@ what it lives in.
   - **host** (default since 2026-10-21): spawns the bundled server on
     `:8790` (world data lives in `userData/orbit.sqlite` + `userData/blobs`);
     the Server tab lists this machine's LAN URLs (`http://<ip>:8790`) to share
-    with friends. There is no hosted world to dial (nothing hosted is in the
-    loop since 2026-11-07), so a packaged build with no stored mode starts
-    its own node.
+    with friends. There is no hosted world to dial (no hosted data node exists
+    since 2026-11-07; the hosted rendezvous in §12b holds no world rows), so a
+    packaged build with no stored mode starts its own node.
   - **Resilience (2026-11-24):** the bundled server is supervised — a crash or a
     failed health probe restarts it with capped backoff, and the roster re-pulls
     on window focus, so leaving the app idle and returning to the profile no
@@ -1429,8 +1429,12 @@ still lives only on each install's node.
   message bodies, media, profiles or signatures: `sealed` is stored verbatim,
   directory rows carry `owner_id: ''`, and `pubkey`/`sig`/`epoch` are ignored.
   There is no WebSocket on the free Worker: `MailClient`'s existing 20 s
-  mailbox polling is the honest fallback. `gmatch.central.url` /
-  `VITE_CENTRAL_URL` still override this default; `none`/`off`/`0` opts out.
+  mailbox polling is the honest fallback. The DEFAULT is ON:
+  `getCentralApiUrl()` (`utils/central.ts:23,48-64`) returns the deployed,
+  answering Worker `https://gmatch-rendezvous.mcos-mateus.workers.dev` when no
+  override is stored. `gmatch.central.url` / `VITE_CENTRAL_URL` override it
+  (another hub you run); `none`/`off`/`0` opts out. A pointer to the retired
+  `*.gmatch.pages.dev` origin is dropped, never dialed.
 - **The node is a rendezvous too.** The node a client is connected to still
   serves `PUT/GET /api/mail/:token`, `GET/POST /api/servers` and
   `GET /api/health` for its clients, and still gossips the directory to the
@@ -1554,10 +1558,12 @@ ADR-002 (`docs/ADR-002-servers.md`) é canônico; resumo de operação:
   mecanismo honesto de handoff v1. Tabelas de segurança/transporte do nó
   (SystemMeta, Sessions, ServerDirectory…) são excluídas por design.
 - **Central** (`VITE_CENTRAL_URL` / Settings→Server): diretório + mail selado,
-  nada mais; desde gmatch 2.0 o padrão é `none` — o próprio nó é o diretório e
-  o relay, e nada hospedado participa (`none` desliga; um hub próprio pode
-  substituir). O diretório nunca lê conteúdo de
-  nenhum servidor federado.
+  nada mais; o padrão desde 2026-11-27 é o Worker cego da §12b
+  (`https://gmatch-rendezvous.mcos-mateus.workers.dev`, um Durable Object
+  SQLite, sem KV), que não guarda nenhum dado de mundo. O nó próprio também é
+  diretório e relay para seus clientes; `none`/`off`/`0` desligam o hub
+  hospedado e um hub próprio pode substituí-lo. O diretório nunca lê conteúdo
+  de nenhum servidor federado.
 
 ## 14. Chat (`#/messages`) — reconstruction
 

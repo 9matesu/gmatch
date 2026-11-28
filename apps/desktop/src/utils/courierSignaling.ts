@@ -7,8 +7,28 @@ import {
 import { getApiBaseUrl } from './api'
 import { getCentralApiUrl } from './central'
 import { defaultIceConfig, sanitizeCandidate } from './ice-hygiene'
-import { peerNodeFor } from './peerNodes'
+import { isRelayableNodeUrl, peerNodeFor } from './peerNodes'
 import { logger } from './logger'
+
+/**
+ * Which node holds the sealed signal envelope.
+ *
+ * A signed presence beacon names the peer's node; when it is DIALABLE, the
+ * mail PUT goes THERE — that node's watch socket/mail drain sees it at once.
+ * The hosted rendezvous polls at 20s, which can outlive the 30s direct-dial
+ * deadline and lose the handshake even though the peer was reachable. A beacon
+ * can self-declare `127.0.0.1` (meaning ITS loopback, not ours), so loopback and
+ * link-local claims are ignored: the rendezvous, then this machine's node, are
+ * the honest fallbacks. Pure so the routing rule is testable without a mailbox.
+ */
+export function signalMailBase(
+  peerBase: string | null | undefined,
+  centralBase: string | null | undefined,
+  ownBase: string,
+): string {
+  const peer = isRelayableNodeUrl(peerBase) ? peerBase! : ''
+  return (peer || centralBase || ownBase || '').replace(/\/+$/, '')
+}
 
 export function readTurnEnv(): Record<string, string | undefined> {
   // A packaged renderer is sandboxed (no process.env) and nothing injects
@@ -253,11 +273,11 @@ export async function sendCourierSignal(
   )
 
   try {
-    // Sealed mail is relayed by the node this client is connected to (the hub,
-    // when one is configured), so the
-    // signal reaches a peer on ANY world. With no hub configured the base is
-    // this machine's node.
-    const base = (getCentralApiUrl() || opts?.base || getApiBaseUrl()).replace(/\/+$/, '')
+    // When the peer's signed beacon named its node, drop the envelope in THAT
+    // box: the peer's mail watch answers immediately instead of waiting for a
+    // 20s rendezvous poll inside our 30s dial deadline. Otherwise the hub (or
+    // this machine's node) is the meeting point.
+    const base = signalMailBase(opts?.base, getCentralApiUrl(), getApiBaseUrl())
     const url = `${base}/api/mail/${token}`
     const res = await fetchImpl(url, {
       method: 'PUT',

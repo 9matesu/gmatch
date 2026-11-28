@@ -3,7 +3,7 @@ import { OrbitIdentity } from '@orbit/crypto';
 import { User, OrbitObject, generateFallbackName } from '@orbit/shared';
 import { parseBareSwarmAnnounce, parseSwarmEnvelope, type SwarmAnnounce, type SwarmMessage } from '@orbit/protocol';
 import { saveObject, getObject } from '../utils/storage';
-import { getApiBaseUrl, getApiWebSocketUrl, isCourierHost, isLoopbackApiUrl, orbitFetch, subscribeApiBase } from '../utils/api';
+import { getApiBaseUrl, getApiWebSocketUrl, isCourierHost, isLoopbackApiUrl, orbitFetch, subscribeApiBase, wsUrlForBase } from '../utils/api';
 import { getCentralApiUrl } from '../utils/central';
 import { ingestSnapshot } from '../game/presenceStore';
 import { PeerRoster, knownPeersStorageKey } from '../utils/peerRoster';
@@ -13,7 +13,7 @@ import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, hydrateDura
 import { broadcastPresence, fetchPresenceRosterFrom } from '../services/courierPresence';
 import { startMesh, meshPeerAsUser, type MeshHandle } from '../utils/mesh/mesh';
 import { readSettings } from './useSettings';
-import { knownNodes, normalizeNodeUrl, rememberKnownNode, rememberPeerNode, peerNodeFor } from '../utils/peerNodes';
+import { isRelayableNodeUrl, knownNodes, normalizeNodeUrl, rememberKnownNode, rememberPeerNode, peerNodeFor } from '../utils/peerNodes';
 import { broadcastMeshFrame, onMeshMessage, connectToPeerMesh, setMeshIceFailureHandler, MESH_BACKPRESSURE_HIGH_BYTES, type PeerMeshConnection } from '../utils/courierSignaling';
 import { swarmTransportRegistry, transportLabel } from '../utils/transportState';
 import { isGlobalIpv6, isRadminVpnAddress } from '../utils/ice-hygiene';
@@ -27,6 +27,16 @@ const MAX_QUEUED_FRAMES = 200;
 const MAX_ROSTER_NODES_PER_ROUND = 8;
 /** How often the transport-selection tick runs direct retries & deadlines. */
 const TRANSPORT_TICK_MS = 4000;
+/** Bounded extra WS relay sockets to peer nodes (never an unbounded socket storm). */
+export const MAX_EXTRA_RELAY_NODES = 2;
+/** A CONNECTING socket that never opens must not hold one of those two slots. */
+export const EXTRA_RELAY_CONNECT_TIMEOUT_MS = 10_000;
+/** Bounded routing hints: the last N wants/advertisements, not a growing map. */
+const MAX_TRANSFER_ROUTES = 64;
+const MAX_OBJECT_ROUTES = 128;
+
+/** Which pipe delivered an inbound frame. Only the HOME relay's stamp is proof. */
+export type SwarmPipeOrigin = 'home-relay' | 'extra-relay' | 'mesh' | 'local-tab';
 
 /** The live hook registers ONE retry dialer. The header chip calls it through
  *  `retryPeerTransport` — no UI component ever fabricates a connection. */
@@ -164,13 +174,26 @@ export interface ChatMessage {
  * The frames are NARROWED by the shared contract (@orbit/protocol): a field
  * of the wrong type is dropped, and a frame that does not fit its declared
  * shape never reaches a handler.
+ *
+ * `origin` is explicit because a stamp is only proof on the HOME relay socket:
+ * an extra node (or a peer on the mesh) can write any `relayedBy` it likes, so
+ * the stamp is removed BEFORE narrowing on those pipes.
  */
 export function routeInboundFrame(
   raw: unknown,
   onSwarm: (msg: SwarmMessage) => void,
   onAnnounce: (msg: SwarmAnnounce) => void,
+  origin: SwarmPipeOrigin = 'home-relay',
 ): boolean {
-  const envelope = parseSwarmEnvelope(raw)
+  let input = raw
+  if (origin !== 'home-relay' && raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    const record = raw as Record<string, unknown>
+    if (record.type === 'SWARM_FRAME' && 'relayedBy' in record) {
+      const { relayedBy: _untrusted, ...clean } = record
+      input = clean
+    }
+  }
+  const envelope = parseSwarmEnvelope(input)
   if (envelope) {
     if (envelope.kind === 'swarm') onSwarm(envelope.frame)
     else onAnnounce(envelope.announce)
@@ -263,6 +286,86 @@ export function isCrossNodePeerUrl(peerNode: string | null | undefined, selfBase
 
 export function isCrossNodePeer(peerId: string, selfBase: string): boolean {
   return isCrossNodePeerUrl(normalizeNodeUrl(peerNodeFor(peerId)), selfBase);
+}
+
+/**
+ * Which peer nodes need an extra SWARM_FRAME relay socket? A peer's beacon is
+ * only a HINT: the node must also be one the user chose or the directory
+ * published (`knownNodes`). That keeps a signed-but-hostile `127.0.0.1` (or any
+ * made-up URL) from opening a socket. Pure seam: deduped, bounded, and it never
+ * claims a direct path — the transport registry still owns that decision.
+ */
+export function planTrustedRelayNodes(
+  peerNodes: Iterable<string | null | undefined>,
+  trusted: Iterable<string | null | undefined>,
+  selfBase: string,
+  limit = MAX_EXTRA_RELAY_NODES,
+): string[] {
+  const allowed = new Set<string>()
+  for (const raw of trusted) {
+    const node = normalizeNodeUrl(raw || '')
+    if (node && isRelayableNodeUrl(node)) allowed.add(node)
+  }
+  return planExtraRelayNodes(
+    Array.from(peerNodes).filter((node) => !!node && allowed.has(normalizeNodeUrl(node)!)),
+    selfBase,
+    limit,
+  )
+}
+
+/** Which node OWNS the recipient of one outbound frame? Null = our own node
+ *  relays it (broadcasts to its clients); an extra socket is never a fan-out. */
+export function relayTargetForFrame(
+  msg: SwarmMessage,
+  byTransfer: Map<string, string>,
+  byObject: Map<string, string>,
+): string | null {
+  const transferId = 'transferId' in msg ? msg.transferId : undefined
+  if (typeof transferId === 'string') {
+    const node = byTransfer.get(transferId)
+    if (node) return node
+  }
+  // A WANT is addressed by the object whose HAVE advertised it.
+  if (msg.type === 'SWARM_WANT') {
+    const node = byObject.get(msg.id)
+    if (node) return node
+  }
+  return null
+}
+
+/** Remember one routing hint without letting it grow without bound. */
+function rememberRoute(map: Map<string, string>, key: string, node: string, cap: number): void {
+  if (map.get(key) === node) return
+  map.delete(key)
+  map.set(key, node)
+  while (map.size > cap) {
+    const oldest = map.keys().next().value
+    if (oldest === undefined) break
+    map.delete(oldest)
+  }
+}
+
+/**
+ * Which nodes need an extra SWARM_FRAME relay socket? Our node's WS only
+ * reaches ITS clients. Pure seam: deduped, bounded, and it never claims a
+ * direct path — the transport registry still owns that decision.
+ */
+export function planExtraRelayNodes(
+  nodes: Iterable<string | null | undefined>,
+  selfBase: string,
+  limit = MAX_EXTRA_RELAY_NODES,
+): string[] {
+  const picked: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of nodes) {
+    const node = normalizeNodeUrl(raw || '');
+    if (!node || seen.has(node)) continue;
+    if (!isCrossNodePeerUrl(node, selfBase) || !isRelayableNodeUrl(node)) continue;
+    seen.add(node);
+    picked.push(node);
+    if (picked.length >= limit) break;
+  }
+  return picked;
 }
 
 export function useP2P(identity: OrbitIdentity | null) {
@@ -369,6 +472,8 @@ export function useP2P(identity: OrbitIdentity | null) {
   const lastBaseRef = useRef<string>('');
   useEffect(() => subscribeApiBase(() => setBaseGen((g) => g + 1)), []);
   const wsRef = useRef<WebSocket | null>(null);
+  /** Extra relay sockets, keyed by peer node base (bounded by planTrustedRelayNodes). */
+  const extraRelaySocketsRef = useRef<Map<string, WebSocket>>(new Map());
   const channelRef = useRef<BroadcastChannel | null>(null);
   const sendHeartbeatRef = useRef<() => void>(() => {});
 
@@ -462,26 +567,35 @@ export function useP2P(identity: OrbitIdentity | null) {
     channelRef.current = channel;
     const selfUser = selfUserRef.current;
 
-    // Swarm transport wire: allow requestSwarmObject / handleSwarmMessage to
-    // fan out WANT and CHUNK frames over BroadcastChannel (same-device tabs),
-    // WebSocket relay (network peers), and direct WebRTC DataChannel mesh.
-    // Every pipe is best-effort per frame — chunk reassembly is index-based,
-    // so a withheld frame is a retry, never corruption; the relay socket
-    // carries the same low-water gate as the DataChannel send (one shared
-    // rule so a congested pipe cannot swallow RAM either).
+    // Routing hints learned from inbound frames on an extra node's socket:
+    // which node ASKED for a transfer, and which node ADVERTISED an object.
+    // Both are bounded and only ever choose one socket — never a fan-out.
+    const byTransfer = new Map<string, string>();
+    const byObject = new Map<string, string>();
+
+    // Swarm transport wire: WANT / CHUNK frames go over BroadcastChannel
+    // (same-device tabs), the direct DataChannel mesh, and the relay socket of
+    // the node that owns the RECIPIENT. Frames without a known external
+    // recipient stay on our own node (it relays to its clients). The local tab
+    // and mesh pipes stay best-effort broadcast there by design.
     setSwarmTransport((msg: SwarmMessage) => {
       try { channel.postMessage({ type: 'SWARM_FRAME', swarm: msg }); } catch {}
-      const ws = wsRef.current
+      const frame = JSON.stringify({ type: 'SWARM_FRAME', swarm: msg });
+      const target = relayTargetForFrame(msg, byTransfer, byObject);
+      const ws = target
+        ? extraRelaySocketsRef.current.get(target)
+        : wsRef.current;
       if (ws && ws.readyState === WebSocket.OPEN && ws.bufferedAmount <= MESH_BACKPRESSURE_HIGH_BYTES) {
-        ws.send(JSON.stringify({ type: 'SWARM_FRAME', swarm: msg }));
+        ws.send(frame);
       }
-      broadcastMeshFrame(JSON.stringify({ type: 'SWARM_FRAME', swarm: msg }));
+      broadcastMeshFrame(frame);
     });
 
     const unsubMesh = onMeshMessage((data: string) => {
       try {
         const parsed = JSON.parse(data);
-        routeInboundFrame(parsed, (m) => { void handleSwarmMessage(m); }, processSwarmMessage);
+        routeInboundFrame(parsed, (m) => { void handleSwarmMessage(m); },
+          (announce) => processSwarmMessage(announce, 'mesh'), 'mesh');
       } catch {}
     });
     // Local-first seeding: reload persisted bytes into RAM so this client
@@ -627,7 +741,7 @@ export function useP2P(identity: OrbitIdentity | null) {
      * peer: it does not enter the roster and it is not stored again (the
      * bytes are already local) — but the other tab still lists the item.
      */
-    const processSwarmMessage = (data: SwarmAnnounce) => {
+    const processSwarmMessage = (data: SwarmAnnounce, origin: SwarmPipeOrigin = 'home-relay') => {
       const currentSelf = selfUserRef.current;
       const isSelf = data.user.id === currentSelf.id;
 
@@ -663,7 +777,11 @@ export function useP2P(identity: OrbitIdentity | null) {
         // provider link is stored as `source_url` — separate from `data` — and
         // the claimed owner is only accepted when the envelope's sender proves
         // it (a relayed claim stays unverified instead of impersonating).
-        const claim = resolveClaimedOwner(newItem.owner_id, data.relayedBy || data.user.id)
+        // Only OUR node's relay stamp proves the sender. On another pipe the
+        // self-described user is all we have, so a stolen owner_id stays
+        // unverified instead of borrowing a victim's name and avatar.
+        const provenSender = origin === 'home-relay' ? data.relayedBy || data.user.id : data.user.id
+        const claim = resolveClaimedOwner(newItem.owner_id, provenSender)
 
         if (newItem.content_url && !isSelf) {
           const sourceUrl = newItem.content_url
@@ -822,7 +940,8 @@ export function useP2P(identity: OrbitIdentity | null) {
             const rawData = JSON.parse(event.data);
             if (!rawData) return;
 
-            if (routeInboundFrame(rawData, (m) => { void handleSwarmMessage(m); }, processSwarmMessage)) {
+            if (routeInboundFrame(rawData, (m) => { void handleSwarmMessage(m); },
+              (announce) => processSwarmMessage(announce, 'home-relay'), 'home-relay')) {
               return;
             }
 
@@ -916,6 +1035,84 @@ export function useP2P(identity: OrbitIdentity | null) {
 
     sendHeartbeat();
     const interval = setInterval(sendHeartbeat, 60_000);
+
+    // Cross-node relay: our WS reaches only OUR node's clients. A peer whose
+    // signed beacon names another node is heard through that node's relay —
+    // but ONLY when the user or the directory published that node. At most two
+    // sockets, each bounded by a CONNECT timeout so a node that never opens
+    // cannot hold a slot. No relay path is ever labelled direct.
+    const extraConnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
+    const dropExtraSocket = (base: string, socket?: WebSocket) => {
+      const timer = extraConnectTimers.get(base);
+      if (timer) { clearTimeout(timer); extraConnectTimers.delete(base); }
+      if (socket) { try { socket.close(); } catch { /* already gone */ } }
+      extraRelaySocketsRef.current.delete(base);
+    };
+    const syncExtraRelaySockets = () => {
+      if (cancelled) return;
+      const wanted = planTrustedRelayNodes(
+        [...roster.entries()]
+          .filter(([id, peer]) => id !== selfUserRef.current.id && !!peer?.online)
+          .map(([id]) => peerNodeFor(id)),
+        knownNodes(),
+        getApiBaseUrl(),
+      );
+      const sockets = extraRelaySocketsRef.current;
+      for (const [base, socket] of sockets) {
+        if (wanted.includes(base)) continue;
+        dropExtraSocket(base, socket);
+      }
+      for (const base of wanted) {
+        if (sockets.has(base)) continue;
+        let socket: WebSocket;
+        try { socket = new WebSocket(wsUrlForBase(base, '/api/ws')); } catch { continue; }
+        sockets.set(base, socket);
+        extraConnectTimers.set(base, setTimeout(() => {
+          // A CONNECTING socket that never opened is not a relay: free the
+          // slot for the next roster round instead of holding it forever.
+          if (sockets.get(base) === socket && socket.readyState === WebSocket.CONNECTING) {
+            dropExtraSocket(base, socket);
+          }
+        }, EXTRA_RELAY_CONNECT_TIMEOUT_MS));
+        socket.onopen = () => {
+          const timer = extraConnectTimers.get(base);
+          if (timer) { clearTimeout(timer); extraConnectTimers.delete(base); }
+          // The relay only accepts authenticated sockets: a ticket is issued
+          // by THAT node, so ask it directly rather than replaying ours.
+          void orbitFetch(`${base}/api/ws-ticket`, { method: 'POST' }, identity)
+            .then((r) => (r.ok ? r.json() : null))
+            .then((json: any) => {
+              const ticket = json && typeof json.ticket === 'string' ? json.ticket : null;
+              if (ticket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: 'auth', ticket }));
+              }
+            })
+            .catch(() => { /* offline node: no relay, never a fabricated success */ });
+        };
+        socket.onmessage = (event) => {
+          try {
+            const raw = JSON.parse(event.data);
+            const inner = raw?.type === 'SWARM_FRAME' ? raw.swarm : null;
+            // Only wiring hints: a WANT names the node that will answer our
+            // CHUNK, a HAVE names the node that holds an object we may want.
+            if (inner && typeof inner === 'object') {
+              if (inner.type === 'SWARM_WANT' && typeof inner.transferId === 'string') {
+                rememberRoute(byTransfer, inner.transferId, base, MAX_TRANSFER_ROUTES);
+              }
+              if (inner.type === 'SWARM_HAVE' && Array.isArray(inner.ids)) {
+                for (const id of inner.ids) {
+                  if (typeof id === 'string') rememberRoute(byObject, id, base, MAX_OBJECT_ROUTES);
+                }
+              }
+            }
+            routeInboundFrame(raw, (m) => { void handleSwarmMessage(m); },
+              (announce) => processSwarmMessage(announce, 'extra-relay'), 'extra-relay');
+          } catch { /* non-swarm frames stay on the home node */ }
+        };
+        socket.onclose = () => { dropExtraSocket(base); };
+        socket.onerror = () => { try { socket.close(); } catch { /* already gone */ } };
+      }
+    };
 
     // 4b. Discovery roster (plan P2.2): seed the peer map immediately from
     // the server's current online set instead of waiting passively for the
@@ -1013,6 +1210,7 @@ export function useP2P(identity: OrbitIdentity | null) {
               swarmTransportRegistry.markRelayInUse(u.id)
             }
           }
+          syncExtraRelaySockets();
         })
         .catch(() => {})
     }
@@ -1098,7 +1296,8 @@ export function useP2P(identity: OrbitIdentity | null) {
     // carries the same frames as the relay (wrapped swarm frames) and bare
     // announcements, so it goes through the SAME route.
     channel.onmessage = (event: MessageEvent<unknown>) => {
-      routeInboundFrame(event.data, (m) => { void handleSwarmMessage(m); }, processSwarmMessage);
+      routeInboundFrame(event.data, (m) => { void handleSwarmMessage(m); },
+        (announce) => processSwarmMessage(announce, 'local-tab'), 'local-tab');
     };
 
     return () => {
@@ -1122,6 +1321,8 @@ export function useP2P(identity: OrbitIdentity | null) {
       if (wsRef.current) {
         wsRef.current.close();
       }
+      for (const [base, socket] of [...extraRelaySocketsRef.current]) dropExtraSocket(base, socket);
+      extraRelaySocketsRef.current.clear();
     };
   }, [identity, baseGen]);
 

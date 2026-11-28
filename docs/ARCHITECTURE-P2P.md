@@ -12,11 +12,16 @@ the app runs **its own node** (host mode is the default). Since 2026-11-07 the
 hosted courier function and its D1 were removed and the release page is static.
 Since 2026-11-27 a free, always-on, zero-knowledge rendezvous is back — one
 Cloudflare Worker (`worker/`, `gmatch-rendezvous`) holding ONLY sealed envelope
-ciphertext and bounded, self-declared directory metadata. It exists because
-"the node each client is connected to is the rendezvous" fails when no peer's
-node is reachable. Two rendezvous now coexist: the hosted mailbox/directory
-(reachability) and each node for its own clients (SPEC §12b). Neither is a
-world, never a data base. Signed presence beacons AND signed social operations
+ciphertext and bounded, self-declared directory metadata. It is the DEFAULT
+rendezvous: `getCentralApiUrl()` (`utils/central.ts:23,48-64`) returns the
+deployed `https://gmatch-rendezvous.mcos-mateus.workers.dev` unless
+`gmatch.central.url` / `VITE_CENTRAL_URL` override it or `none`/`off`/`0` opt
+out. Storage is ONE SQLite-backed Durable Object, NOT KV (a 60 s heartbeat
+exhausts the free KV write budget). It exists because "the node each client is
+connected to is the rendezvous" fails when no peer's node is reachable. Two
+rendezvous now coexist: the hosted mailbox/directory (reachability) and each
+node for its own clients (SPEC §12b). Neither is a world, never a data base.
+Signed presence beacons AND signed social operations
 are published to BOTH the node/mesh and public mailbox tokens on the hosted box,
 so two installs on different nodes read one roster, see each other online, and
 exchange verified posts/profile updates even with no shared node and no TURN.
@@ -224,8 +229,11 @@ Rules the state machine enforces:
   DataChannel opens; a successful ICE trickle or a glare-handled offer proves
   nothing. `markRelayInUse` never demotes a validated direct path.
 - **Attempts are bounded.** A direct dial has a deadline
-  (`createTransportRegistry` default `directDeadlineMs` = 12 s; the tick in
-  `useP2P` expires it and marks the failure with a reason).
+  (`createTransportRegistry` default `directDeadlineMs` = 30 s, `utils/transportState.ts:121`;
+  the tick in `useP2P` expires it and marks the failure with a reason). It must
+  outlast the mesh dial's own 30 s timeout: a shorter deadline killed slow
+  IPv6/Radmin handshakes that were still gathering, declaring a viable direct
+  path as relay before it opened.
 - **Failure is not a restart.** After a failed direct, the relay keeps
   carrying frames and a retry is scheduled with exponential backoff
   (`baseRetryMs` 1.5 s doubling, capped at `maxRetryMs` 30 s, ±25 % jitter so

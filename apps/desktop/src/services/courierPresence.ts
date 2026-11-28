@@ -8,6 +8,7 @@ import { normalizeNodeUrl } from '../utils/peerNodes'
 import { resolveNodeAddress } from '../utils/serverAddress'
 import { resolveObjectRefId, isRequestableObjectId } from '../utils/objectRef'
 import { getSecureItem } from '../utils/secure-storage'
+import { rememberPresenceName } from '../game/nameDirectory'
 
 /**
  * Well-known 64-hex delivery token on the blind courier dedicated to
@@ -46,6 +47,14 @@ export interface PresenceBeacon {
    * why a cross-node picture will not load. Absent = unknown, never a guess.
    */
   appVersion?: string
+  /**
+   * The display name this peer SIGNED, used as the only beacon-derived input
+   * to the trusted name directory. `displayName` stays the roster/chat label
+   * and is deliberately unsigned, so a relay rewriting it cannot forge a feed
+   * byline. Signed LAST and only when present, so a legacy beacon verifies
+   * against the shorter payload (see beaconSignaturePayload).
+   */
+  signedName?: string
   timestamp: number
   sig?: string
 }
@@ -67,9 +76,11 @@ function beaconSignaturePayload(b: Omit<PresenceBeacon, 'sig'>): Uint8Array {
   // an older peer is still seen (it just has no address / avatar hash).
   if (b.nodeUrl) base += `|${b.nodeUrl}`
   if (b.pfpHash) base += `|${b.pfpHash}`
-  // Appended LAST so a beacon from a client that does not know the field
-  // still verifies against the shorter payload.
+  // Appended LAST so a beacon from a client that does not know a field still
+  // verifies against the shorter payload. signedName is the newest field, so
+  // it comes after every optional field an older client might already carry.
   if (b.appVersion) base += `|${b.appVersion}`
+  if (b.signedName) base += `|${b.signedName}`
   return new TextEncoder().encode(base)
 }
 
@@ -204,9 +215,13 @@ export async function broadcastPresence(
   // identity-scoped secure key, written by every pfp save path. Without this
   // read the beacon has no pfp ref at all and no hash can be derived.
   const pfpUrl = profile.pfpUrl || getSecureItem(`orbit_pfp_url:${identity.orbitId}`) || getSecureItem('orbit_pfp_url') || null
+  // One value in both fields: the roster label and the signed feed name must
+  // agree at publish time, only the latter is covered by the signature.
+  const displayName = localName || profile.displayName?.trim() || 'Player'
   const rawBeacon: Omit<PresenceBeacon, 'sig'> = {
     orbitId: identity.orbitId,
-    displayName: localName || profile.displayName?.trim() || 'Player',
+    displayName,
+    signedName: displayName,
     pfpUrl,
     publicKeyHex: identity.publicKeyHex,
     encryptionPubHex: identity.encryptionPubHex || '',
@@ -328,6 +343,13 @@ export async function fetchPresenceRosterFrom(
         // Verify cryptographic signature against declared public key
         const expectedSigPayload = beaconSignaturePayload(beacon)
         if (!verifySignature(hexToBytes(beacon.sig), expectedSigPayload, beacon.publicKeyHex)) continue
+
+        // Only signedName is covered by the signature; the legacy displayName
+        // is a relay-writable roster/chat label. Seed only an EMPTY trusted
+        // slot: a node row or an accepted profile.update is stronger and must
+        // keep winning in the feed's `signedNameFor` projection. A legacy
+        // beacon without signedName verifies but seeds no trusted name.
+        if (beacon.signedName) rememberPresenceName(beacon.orbitId, beacon.signedName)
 
         const existing = activeMap.get(beacon.orbitId)
         if (!existing || beacon.timestamp > existing.timestamp) {

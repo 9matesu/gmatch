@@ -3,7 +3,17 @@
 > Statuses: **accepted** (binds this line), **target** (approved direction, not
 > yet implemented). Rejected alternatives stay recorded so they are not relitigated.
 
-## ADR-2026-11-07-01 — No hosted service of any kind (accepted)
+## ADR-2026-11-07-01 — No hosted WORLD of any kind (accepted, amended 2026-11-27)
+
+> **Amended 2026-11-27:** the hosted WORLD and the Pages courier stay retired,
+> but a free, always-on rendezvous is back and is now the default. `central.ts`
+> returns the deployed Worker `https://gmatch-rendezvous.mcos-mateus.workers.dev`
+> (`utils/central.ts:23,48-64`) — one Cloudflare Worker with ONE SQLite-backed
+> Durable Object (no KV; a 60s presence heartbeat exhausts the free KV write
+> budget), holding only sealed ciphertext and self-declared directory metadata.
+> Each install's node remains the world and a rendezvous for its own clients;
+> `none`/`off`/`0` still opts out of the hosted one. SPEC §12b is the current
+> rule; the text below records the 2026-11-07 decision.
 
 - **Context:** the product had three hosted surfaces — a full node on
   fly.dev, a blind courier on Cloudflare Pages (directory + sealed mail in D1)
@@ -11,22 +21,26 @@
   first (2026-10-24); the courier stayed as "the rendezvous".
 - **Decision:** the courier is retired too. `gmatch.pages.dev` becomes a
   **static release page** (no function, no D1); the `gmatch-courier` database
-  is emptied and deleted; `central.ts` defaults to `none`, so the node a client
-  is connected to is the directory, the mail relay and the swarm rendezvous.
-  A shared hub stays possible and is opt-in (`gmatch.central.url` /
-  `VITE_CENTRAL_URL`). A pointer to the retired origin is dropped, never
-  dialed.
+  is emptied and deleted; the node a client is connected to is the directory,
+  the mail relay and the swarm rendezvous for its clients. A shared hub remains
+  configurable (`gmatch.central.url` / `VITE_CENTRAL_URL`) and, since the
+  amendment above, DEFAULTS to the blind Worker; a pointer to the retired
+  origin is dropped, never dialed.
 - **Why:** a hosted rendezvous still means a third party holds a mailbox and a
-  listing for every install — a silent dependency on somebody else's account
-  and uptime, and a privacy claim the app could not fully keep. The node
-  already speaks every protocol the courier spoke (mail, directory, presence,
-  relay), so the hosted copy bought reachability, not function.
+  listing for every install. That trade was accepted on 2026-11-27 because the
+  Worker is blind (sealed bytes only, no world rows) and fixes the case where
+  no peer's node is reachable. The node already speaks every protocol the
+  courier spoke (mail, directory, presence, relay), so the hosted copy only
+  ever bought reachability, not function.
 - **Cost, stated honestly:** two peers on NATed machines with no reachable
-  node cannot meet (§10d of SPEC). That was already true for the hosted
-  courier's content, and a shared hub remains one `localStorage` entry away.
+  node still cannot form a DIRECT path (§10c/§10d of SPEC) — the default
+  mailbox is a meeting point, not NAT traversal, so a symmetric-NAT pair needs
+  TURN or the node relay. Opting out of the hosted rendezvous is one
+  `localStorage` entry (`none`).
 - **Consequence:** the legal corpus is re-issued (`2026-11-07.1`) because the
-  controller of the data changed, and the site copy stops describing a
-  directory the project no longer runs.
+  controller of the data changed, and the site copy stops describing the
+  retired Pages directory; the §12b Worker directory is a separate, blind
+  rendezvous that holds no world data.
 
 ## ADR-1.5.5-01 — SSBC ecosystem: rejected as a dependency (accepted)
 
@@ -100,8 +114,10 @@
 > **Superseded by ADR-2026-11-07-01.** The "one hosted rendezvous" this ADR kept
 > was removed on 2026-11-07; gmatch 2.1 reinstated a Cloudflare-KV courier in
 > `site/functions/`, and that too was deleted on 2026-11-26 (the courier shape is
-> now a capability a node can run, not an origin the app assumes). The text below
-> records the 2026-10-25 position; read it as history.
+> now a capability a node can run, not an origin the app assumes). The CURRENT
+> default rendezvous (`worker/`) is a different origin backed by ONE SQLite
+> Durable Object, not KV. The text below records the 2026-10-25 position; read
+> it as history.
 
 - Every install runs its own node (bundled Bun sidecar, host mode by default).
   The only hosted component is the Cloudflare Pages courier

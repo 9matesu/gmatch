@@ -8,6 +8,7 @@ import {
   MESH_BACKPRESSURE_LOW_BYTES,
   sendCourierSignal,
   setMeshIceFailureHandler,
+  signalMailBase,
   type CourierSignalPayload,
 } from './courierSignaling'
 import { generateIdentity, type OrbitIdentity } from '@orbit/crypto'
@@ -34,6 +35,32 @@ class FakePC {
 describe('courierSignaling', () => {
   const alice = generateIdentity() as OrbitIdentity
   const bob = generateIdentity() as OrbitIdentity
+
+  describe('signalMailBase (30s handshake, no 20s poll detour)', () => {
+    it('uses the peer node named by its signed beacon when reachable', () => {
+      expect(signalMailBase('http://26.0.0.9:8790/', 'http://rendezvous', 'http://127.0.0.1:8790'))
+        .toBe('http://26.0.0.9:8790')
+    })
+
+    it('falls back to the rendezvous, then to this machine node', () => {
+      expect(signalMailBase(null, 'http://rendezvous', 'http://127.0.0.1:8790')).toBe('http://rendezvous')
+      expect(signalMailBase('', '', 'http://127.0.0.1:8790')).toBe('http://127.0.0.1:8790')
+    })
+
+    it('refuses a loopback/link-local beacon address so it cannot poison the handshake', () => {
+      // Any peer can self-declare 127.0.0.1 in a signed beacon; reading it as a
+      // mail base would send our SDP to OUR OWN loopback mailbox (no peer there).
+      expect(signalMailBase('http://127.0.0.1:9999', 'http://rendezvous', 'http://127.0.0.1:8790'))
+        .toBe('http://rendezvous')
+      expect(signalMailBase('http://localhost:8790', 'http://rendezvous', 'http://127.0.0.1:8790'))
+        .toBe('http://rendezvous')
+      expect(signalMailBase('http://[::1]:8790', 'http://rendezvous', 'http://127.0.0.1:8790'))
+        .toBe('http://rendezvous')
+      expect(signalMailBase('http://169.254.4.4:8790', 'http://rendezvous', 'http://127.0.0.1:8790'))
+        .toBe('http://rendezvous')
+      expect(signalMailBase('not a url', '', 'http://127.0.0.1:8790')).toBe('http://127.0.0.1:8790')
+    })
+  })
 
   it('seals signal envelope to recipient token via PUT /api/mail/:token', async () => {
     let capturedUrl = ''

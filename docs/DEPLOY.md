@@ -1,18 +1,21 @@
 # Deploy notes (security-relevant ops)
 
-## Hosts (2026-11-07) — no hosted data node, no hosted courier
+## Hosts (updated 2026-11-27) — no hosted data node; blind rendezvous Worker only
 
 | Host | State | Action |
 |---|---|---|
 | `https://gmatch.pages.dev` | **live**: static release page + legal pages + `release.json`. No function, no D1, no mailbox, no directory. | deploy with `node site/deploy-pages.mjs` |
+| `https://gmatch-rendezvous.mcos-mateus.workers.dev` | **live, DEFAULT**: blind rendezvous — sealed mail (`/api/mail/:token`) + public server directory (`/api/servers`). ONE SQLite Durable Object, no KV; no world rows. | deploy with `npx wrangler deploy --config worker/wrangler.toml` |
 | a self-hosted full node | optional, run by whoever hosts a world | `npm run dist` on that machine, or `docker build` + the image |
 
 The end state is direct peer-to-peer (SPEC §12b): no third-party host stores
-posts, media, comments, likes or profiles — and no third-party host holds a
-mailbox or a directory row either. Every install runs its own node, and that
-node is the rendezvous: the directory, the sealed-mail relay and the swarm
-meeting point. A peer on another node is reached through the address its
-signed beacon carries.
+posts, media, comments, likes or profiles. Every install runs its own node —
+the world, plus the directory and sealed-mail relay for its clients — AND the
+blind Worker above is the default meeting point when no peer's node is
+reachable. It holds only sealed ciphertext and self-declared directory
+metadata in one SQLite-backed Durable Object (no KV). A peer on another node
+is reached through the address its signed beacon carries; the Worker buys
+reachability, never a direct WebRTC channel or a copy of the world.
 
 **The release feed is the last host-dependent piece.** `release.json` lives on
 the Pages origin; the updater also asks the node this install talks to when
@@ -40,8 +43,9 @@ the `gmatch-courier` D1 database) was **removed in gmatch 2.0**: the D1 was
 emptied and then deleted, and the function is gone. `/api/*` on this origin now
 returns the static page (the Pages fallback), never courier JSON — a client
 that still points here gets HTML and fails loudly instead of talking to a stale
-rendezvous. A shared hub is still possible for people who want one — set
-`gmatch.central.url` (or `VITE_CENTRAL_URL`) to a node they run.
+rendezvous. The shared rendezvous is now ON by default at the Worker in the
+table above; set `gmatch.central.url` (or `VITE_CENTRAL_URL`) to a hub you run
+instead, or `none`/`off`/`0` to switch it off.
 
 ## Self-hosted node (optional)
 

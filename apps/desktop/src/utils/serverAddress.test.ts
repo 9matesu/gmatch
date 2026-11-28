@@ -90,7 +90,7 @@ describe('resolveNodeAddress', () => {
       ok: true,
       json: async () => ({ lanUrls: ['http://172.28.48.1:8790', 'http://192.168.5.2:8790'] }),
     })
-    expect(await resolveNodeAddress(null)).toBe('http://192.168.5.2:8790')
+    expect(await resolveNodeAddress(null, globalThis.fetch, async () => null)).toBe('http://192.168.5.2:8790')
     expect(api.orbitFetch).toHaveBeenCalledWith('/api/servers/node', { method: 'GET' }, null, expect.anything())
   })
 
@@ -100,7 +100,7 @@ describe('resolveNodeAddress', () => {
       ok: true,
       json: async () => ({ lanUrls: ['http://192.168.5.2:8790'] }),
     })
-    expect(await resolveNodeAddress(null)).toBe('http://192.168.5.2:8790')
+    expect(await resolveNodeAddress(null, globalThis.fetch, async () => null)).toBe('http://192.168.5.2:8790')
   })
 
   it('caches the answer: one round trip for many callers', async () => {
@@ -109,18 +109,46 @@ describe('resolveNodeAddress', () => {
       ok: true,
       json: async () => ({ lanUrls: ['http://192.168.5.2:8790'] }),
     })
-    expect(await resolveNodeAddress(null)).toBe('http://192.168.5.2:8790')
-    expect(await resolveNodeAddress(null)).toBe('http://192.168.5.2:8790')
+    expect(await resolveNodeAddress(null, globalThis.fetch, async () => null)).toBe('http://192.168.5.2:8790')
+    expect(await resolveNodeAddress(null, globalThis.fetch, async () => null)).toBe('http://192.168.5.2:8790')
     expect(api.orbitFetch).toHaveBeenCalledTimes(1)
   })
 
   it('never invents an address the node did not report', async () => {
     api.base = 'http://127.0.0.1:8790'
     api.orbitFetch.mockResolvedValue({ ok: true, json: async () => ({ lanUrls: [] }) })
-    expect(await resolveNodeAddress(null)).toBeNull()
+    expect(await resolveNodeAddress(null, globalThis.fetch, async () => null)).toBeNull()
 
     api.orbitFetch.mockRejectedValue(new Error('offline'))
     _resetNodeAddress()
-    expect(await resolveNodeAddress(null)).toBeNull()
+    expect(await resolveNodeAddress(null, globalThis.fetch, async () => null)).toBeNull()
+  })
+
+  it('prefers the detected Radmin adapter in the beacon, with the node real port', async () => {
+    api.base = 'http://127.0.0.1:8790'
+    api.orbitFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ lanUrls: ['http://192.168.5.2:8790', 'http://26.0.0.7:8790'] }),
+    })
+    expect(await resolveNodeAddress(null, globalThis.fetch, async () => '26.0.0.7')).toBe('http://26.0.0.7:8790')
+  })
+
+  it('falls back to LAN, then to a loopback the node actually reported', async () => {
+    api.base = 'http://127.0.0.1:8790'
+    api.orbitFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ lanUrls: ['http://127.0.0.1:8790', 'http://192.168.5.2:8790'] }),
+    })
+    expect(await resolveNodeAddress(null, globalThis.fetch, async () => null)).toBe('http://192.168.5.2:8790')
+
+    _resetNodeAddress()
+    api.orbitFetch.mockResolvedValue({ ok: true, json: async () => ({ lanUrls: ['http://127.0.0.1:8790'] }) })
+    expect(await resolveNodeAddress(null, globalThis.fetch, async () => null)).toBe('http://127.0.0.1:8790')
+  })
+
+  it('a Radmin IP without a known port is never turned into an invented address', async () => {
+    api.base = ''
+    api.orbitFetch.mockResolvedValue({ ok: true, json: async () => ({ lanUrls: [] }) })
+    expect(await resolveNodeAddress(null, globalThis.fetch, async () => '26.0.0.7')).toBeNull()
   })
 })

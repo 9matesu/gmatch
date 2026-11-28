@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { projectFeed } from './feedProjection'
 import type { FeedPost } from '../../components/feed/GMatchFeed'
 import type { OrbitObject } from '@orbit/shared'
+import { __resetNameDirectoryForTests, rememberName, rememberSignedName } from '../../game/nameDirectory'
 
 /**
  * Feed projection contract tests.
@@ -53,6 +54,8 @@ function post(id: string, over: Partial<FeedPost> = {}): FeedPost {
 }
 
 describe('projectFeed', () => {
+  beforeEach(() => __resetNameDirectoryForTests())
+
   it('dedupes the same id coming from two sources', () => {
     const rows = projectFeed({
       ...base,
@@ -246,6 +249,64 @@ describe('projectFeed', () => {
       } as unknown as OrbitObject],
     })
     expect(rows[0].url).toBe('/api/objects/obj-1')
+  })
+
+  it('uses a signed profile.update name over a stale node row', () => {
+    // The chat already reads the accepted-name directory; the feed used only
+    // the capped /api/users page, so a peer who renamed after that page was
+    // read stayed "User_xxx" (or their old name) forever in the timeline.
+    rememberSignedName('peer-1', 'Renamed Peer')
+    const rows = projectFeed({
+      ...base,
+      users: [{ id: 'peer-1', publicKey: 'pk1', createdAt: '', display_name: 'Old Node Name' }],
+      serverPosts: [post('peer', { author_id: 'peer-1', author_name: 'Older Cached Name' })],
+    })
+    expect(rows[0].author_name).toBe('Renamed Peer')
+  })
+
+  it('resolves a peer outside the node page from the name directory', () => {
+    rememberSignedName('peer-2', 'Outside The Cap')
+    const rows = projectFeed({
+      ...base,
+      peerFeedPosts: [post('op', { author_id: 'peer-2', author_name: 'User_peer2' })],
+    })
+    expect(rows[0].author_name).toBe('Outside The Cap')
+  })
+
+  it('does not let a Player placeholder from the node row override a signed name', () => {
+    rememberSignedName('peer-1', 'Real Name')
+    const rows = projectFeed({
+      ...base,
+      users: [{ id: 'peer-1', publicKey: 'pk1', createdAt: '', display_name: 'Player' }],
+      serverPosts: [post('peer', { author_id: 'peer-1', author_name: 'Player' })],
+    })
+    expect(rows[0].author_name).toBe('Real Name')
+  })
+
+  it('never prints a DM self-label as a feed author name', () => {
+    // The label a peer wrote about itself in a DM is chat-only. Only a signed
+    // profile.update name may replace the node/post name on a feed row.
+    rememberName('peer-1', 'I Am Definitely Alice')
+    const rows = projectFeed({
+      ...base,
+      serverPosts: [post('p', { author_id: 'peer-1', author_name: 'Peer One' })],
+    })
+    expect(rows[0].author_name).toBe('Peer One')
+  })
+
+  it('rejects the Player placeholder in the feed even though it is a legal account name', () => {
+    // `Player` is a legal display name at PATCH / onboarding (isDefaultPeerName
+    // accepts it), but the feed's own fallback must never be mistaken for a
+    // real author name from the directory or a stale node row.
+    rememberSignedName('peer-1', 'Player')
+    const rows = projectFeed({
+      ...base,
+      users: [{ ...base.users[0], display_name: 'Player' }],
+      serverPosts: [post('p', { author_id: 'peer-1', author_name: 'Peer One' })],
+    })
+    // The row keeps its own name — a `Player` from the directory/node is a
+    // placeholder, never an authority that overwrites it.
+    expect(rows[0].author_name).toBe('Peer One')
   })
 
   it('returns an empty timeline when there is no input', () => {

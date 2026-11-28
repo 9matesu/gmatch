@@ -17,12 +17,25 @@ function isParticipant(offer: { sender_id: string; receiver_id: string }, orbitI
   return offer.sender_id === orbitId || offer.receiver_id === orbitId
 }
 
+/** Mirror of isRadminVpnAddress in apps/desktop/src/utils/ice-hygiene.ts. */
+function isRadminVpnAddress(address: string): boolean {
+  return /^26\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(address)
+}
+
+/** Mirror of isGlobalIpv6 in apps/desktop/src/utils/ice-hygiene.ts (2000::/3). */
+function isGlobalIpv6(address: string): boolean {
+  const a = address.toLowerCase().split('%')[0]
+  if (!a.includes(':') || a === '::1' || a === '::') return false
+  if (/^f[cd][0-9a-f]{2}:/.test(a) || /^fe[89ab][0-9a-f]:/.test(a)) return false
+  return /^[23][0-9a-f]{3}:/.test(a)
+}
+
 /**
- * ICE hygiene (server-side gate, defense in depth): literal IPv4/IPv6 `host`
- * addresses leak the LAN — those stay blocked. mDNS host candidates (.local),
- * `srflx`/`prflx` reflexive candidates (the NAT traversal) and TURN relay
- * candidates pass. Mirrors apps/desktop/src/utils/ice-hygiene.ts (trust-domain
- * boundary — the vendored API stays dependency-only, so the rule is duplicated).
+ * ICE hygiene (server-side gate, defense in depth): literal LAN IPv4/IPv6
+ * `host` addresses stay blocked. mDNS (.local), Radmin VPN (26/8) and GLOBAL
+ * IPv6 (2000::/3) hosts are real direct paths and pass, as do srflx/prflx
+ * reflexive and TURN relay candidates. Mirrors apps/desktop/src/utils/ice-hygiene.ts
+ * (trust-domain boundary — the vendored API stays dependency-only).
  */
 export function candidateLeaksIp(candidate: unknown): boolean {
   try {
@@ -35,7 +48,12 @@ export function candidateLeaksIp(candidate: unknown): boolean {
     const typIdx = parts.indexOf('typ')
     const type = typIdx >= 0 ? parts[typIdx + 1] : ''
     if (type === 'relay') return false
-    if (type === 'host') return !address.endsWith('.local')
+    if (type === 'host') {
+      if (address.endsWith('.local')) return false
+      if (/^\d+\.\d+\.\d+\.\d+$/.test(address)) return !isRadminVpnAddress(address)
+      if (address.includes(':')) return !isGlobalIpv6(address)
+      return true
+    }
     if (type === 'srflx' || type === 'prflx') return false // reflexive = NAT traversal
     return true
   } catch {

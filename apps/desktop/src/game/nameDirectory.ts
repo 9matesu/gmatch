@@ -25,39 +25,59 @@ import { isUsableName, type NameRosterEntry } from '../utils/displayName'
  */
 
 const STORAGE_KEY = 'gmatch.name_directory_v1'
+/** Self-declared labels from sealed DMs are chat-only; never feed identities. */
+const DM_STORAGE_KEY = 'gmatch.name_directory_dm_v1'
 
 /** Bounded so a long-lived install cannot grow localStorage without limit. */
 const MAX_ENTRIES = 2000
 
+/**
+ * Two classes, not one: `names` holds TRUSTED names (signed profile.update and
+ * the node's own directory — the two sources that already had authority here),
+ * `dmNames` holds self-declared chat labels. A peer can write anything into its
+ * own DM label, so only `names` may feed author/comment rendering. `nameFor`
+ * (chat) reads both, trusted first; `signedNameFor` (feed) reads only trusted.
+ */
 let names = new Map<string, string>()
+let dmNames = new Map<string, string>()
+
+function loadMap(raw: string | null, into: Map<string, string>): void {
+  if (!raw) return
+  const parsed = JSON.parse(raw) as unknown
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return
+  for (const [id, name] of Object.entries(parsed as Record<string, unknown>)) {
+    // Junk in the file must not become a name: only a usable string keyed on
+    // a non-empty id is admitted.
+    if (id && typeof name === 'string' && isUsableName(name)) into.set(id, name.trim())
+  }
+}
 
 function load(): void {
   try {
     if (typeof localStorage === 'undefined') return
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return
-    const parsed = JSON.parse(raw) as unknown
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return
-    for (const [id, name] of Object.entries(parsed as Record<string, unknown>)) {
-      // Junk in the file must not become a name: only a usable string keyed on
-      // a non-empty id is admitted.
-      if (id && typeof name === 'string' && isUsableName(name)) names.set(id, name.trim())
-    }
+    loadMap(localStorage.getItem(STORAGE_KEY), names)
+    loadMap(localStorage.getItem(DM_STORAGE_KEY), dmNames)
   } catch {
     // A corrupt directory is survivable — we simply start empty and refill.
   }
 }
 
+function persistMap(key: string, map: Map<string, string>): Map<string, string> {
+  let current = map
+  if (current.size > MAX_ENTRIES) {
+    // Drop the oldest half. Insertion order is first-seen order, so this
+    // keeps the names we have seen most recently.
+    current = new Map([...current.entries()].slice(-MAX_ENTRIES))
+  }
+  localStorage.setItem(key, JSON.stringify(Object.fromEntries(current)))
+  return current
+}
+
 function persist(): void {
   try {
     if (typeof localStorage === 'undefined') return
-    if (names.size > MAX_ENTRIES) {
-      // Drop the oldest half. Insertion order is first-seen order, so this
-      // keeps the names we have seen most recently.
-      const keep = [...names.entries()].slice(-MAX_ENTRIES)
-      names = new Map(keep)
-    }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.fromEntries(names)))
+    names = persistMap(STORAGE_KEY, names)
+    dmNames = persistMap(DM_STORAGE_KEY, dmNames)
   } catch {
     // Quota exceeded: keep the in-memory directory working for this session.
   }
@@ -66,28 +86,75 @@ function persist(): void {
 /** Reload from storage. Call once at startup. */
 export function hydrateFromStorage(): void {
   names = new Map()
+  dmNames = new Map()
   load()
 }
 
-/** The remembered name for an id, or undefined if we have never known one. */
+/** Chat's name: the trusted name wins, a DM self-label is a fallback. */
 export function nameFor(id: string): string | undefined {
+  if (!id) return undefined
+  return names.get(id) ?? dmNames.get(id)
+}
+
+/**
+ * The ONLY class the feed/comment projection trusts. A self-declared DM label
+ * is deliberately invisible here, so it cannot become a post author's name.
+ * Signed profile.update names and node-directory rows both arrive through the
+ * `rememberNames` funnel, so they share this trusted class; the excluded class
+ * is the DM label written by `rememberName`.
+ */
+export function signedNameFor(id: string): string | undefined {
   if (!id) return undefined
   return names.get(id)
 }
 
 /**
- * Remember one name.
- *
- * Refuses placeholders (`User_1da964`) on purpose: the server mints them for
- * accounts with no display_name, and storing one would freeze a placeholder as
- * if it were the person's real, permanent name.
+ * An accepted `profile.update` name. Signed operations travel through the same
+ * batch funnel as node rows, so this writes the trusted class explicitly —
+ * callers that know the provenance should use it rather than the generic batch.
+ */
+export function rememberSignedName(id: string, name: string | null | undefined): void {
+  rememberTrusted(id, name)
+}
+
+function usableName(name: string | null | undefined): string | undefined {
+  if (typeof name !== 'string' || !isUsableName(name) || isDefaultPeerName(name.trim())) return undefined
+  return name.trim()
+}
+
+function rememberTrusted(id: string, name: string | null | undefined): void {
+  const next = usableName(name)
+  if (!id || !next || names.get(id) === next) return
+  names.set(id, next)
+  persist()
+}
+
+/**
+ * A name from a SIGNED presence beacon. The signature proves the peer owns the
+ * key, but the node directory and an accepted profile.update are stronger: an
+ * already-known trusted name is NEVER overwritten by a beacon. Minted
+ * placeholders (`User_<hex>`, `Player`) are refused — freezing one would make
+ * it a permanent feed byline.
+ */
+export function rememberPresenceName(id: string, name: string | null | undefined): void {
+  if (!id || names.has(id)) return
+  const next = usableName(name)
+  if (!next || next.toLowerCase() === 'player') return
+  names.set(id, next)
+  persist()
+}
+
+/**
+ * Remember a self-declared label from a sealed DM/room message. It is chat
+ * ONLY: it never overwrites a trusted name and never reaches `signedNameFor`.
+ * Refuses placeholders (`User_1da964`): the server mints those for accounts
+ * with no display_name, and freezing one would make it a permanent name.
  */
 export function rememberName(id: string, name: string | null | undefined): void {
   if (!id) return
-  if (typeof name !== 'string' || !isUsableName(name) || isDefaultPeerName(name.trim())) return
-  const next = name.trim()
-  if (names.get(id) === next) return
-  names.set(id, next)
+  const next = usableName(name)
+  if (!next || dmNames.get(id) === next) return
+  dmNames.set(id, next)
   persist()
 }
 
@@ -98,16 +165,13 @@ export interface NamedSubject {
   name?: string | null
 }
 
-/** Remember a batch — a /api/users page, a group member list, a poll payload. */
+/** Remember a trusted batch — a /api/users page or accepted profile.update. */
 export function rememberNames(users: readonly NamedSubject[]): void {
   let changed = false
   for (const u of users) {
     const id = u?.id || u?.orbitId
-    if (!id) continue
-    const name = u.display_name ?? u.name
-    if (typeof name !== 'string' || !isUsableName(name) || isDefaultPeerName(name.trim())) continue
-    const next = name.trim()
-    if (names.get(id) === next) continue
+    const next = usableName(u?.display_name ?? u?.name)
+    if (!id || !next || names.get(id) === next) continue
     names.set(id, next)
     changed = true
   }
@@ -117,16 +181,18 @@ export function rememberNames(users: readonly NamedSubject[]): void {
 /**
  * A view compatible with the shared name resolver, so every chat surface can
  * swap its capped roster for the durable directory without changing the
- * resolution order.
+ * resolution order. Trusted entries win over DM labels.
  */
 export function nameRoster(): Map<string, NameRosterEntry> {
   const out = new Map<string, NameRosterEntry>()
   for (const [id, name] of names) out.set(id, { display_name: name })
+  for (const [id, name] of dmNames) if (!out.has(id)) out.set(id, { display_name: name })
   return out
 }
 
 export function __resetNameDirectoryForTests(): void {
   names = new Map()
+  dmNames = new Map()
 }
 
 // Bootstrap as early as possible so the first render already has the names.

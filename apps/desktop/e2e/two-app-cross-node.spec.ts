@@ -18,7 +18,7 @@
  * pixels they must show are asserted; a `User` row, an empty list or an offline
  * state is a FAIL, never evidence.
  */
-import { expect, test, type BrowserContext, type Page } from '@playwright/test'
+import { expect, test, type BrowserContext, type Locator, type Page } from '@playwright/test'
 import { _electron as electron, type ElectronApplication } from 'playwright'
 import { spawnSync } from 'node:child_process'
 import { mkdirSync } from 'node:fs'
@@ -170,9 +170,43 @@ async function dismissOverlays(page: Page) {
   }
 }
 
-async function shot(page: Page, name: string) {
+/**
+ * A screenshot is evidence only of what is actually on screen: scroll the
+ * exact subject into view first, or a tile/row below the fold is captured as a
+ * blank page and reads as a pass. Same paths as before — no new PNG files.
+ */
+async function shot(page: Page, name: string, focus?: Locator) {
+  if (focus) await focus.scrollIntoViewIfNeeded()
   await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: false })
   console.log(`captured ${SHOTS}/${name}.png`)
+}
+
+/**
+ * Mirrors e2e/feed-latest.spec.ts:36 expectMediaTile (that file owns the helper
+ * and does not export it), strengthened for review 9: the card must never say
+ * "No preview" or "Loading media...", and its img/video must have DECODED real
+ * pixels (naturalWidth for an image, videoWidth for a clip) — a mounted element
+ * with an empty/zero-sized frame is not media evidence.
+ */
+async function expectMediaTile(card: Locator) {
+  await expect(card).toBeVisible({ timeout: 20_000 })
+  await expect(card).not.toContainText('No preview', { timeout: 20_000 })
+  await expect(card).not.toContainText('Loading media', { timeout: 20_000 })
+  const media = card.locator('img, video').first()
+  await expect(media).toBeVisible({ timeout: 20_000 })
+  const src = await media.getAttribute('src')
+  expect(src).toBeTruthy()
+  expect(String(src)).not.toContain('No preview')
+  await expect
+    .poll(
+      () =>
+        media.evaluate((el) => {
+          const node = el as HTMLImageElement & HTMLVideoElement
+          return Math.max(node.naturalWidth || 0, node.videoWidth || 0)
+        }),
+      { timeout: 20_000, message: 'media tile never decoded real pixels (0x0 frame)' },
+    )
+    .toBeGreaterThan(0)
 }
 
 test('browser and Electron on separate nodes see each other, chat, post and stay online', async ({ browser, baseURL }) => {
@@ -289,15 +323,15 @@ test('browser and Electron on separate nodes see each other, chat, post and stay
     }
     expect(await activePeerRow(pageBrowser, ELECTRON_NAME).innerText()).toContain(ELECTRON_NAME)
     expect(await activePeerRow(pageShell, BROWSER_NAME).innerText()).toContain(BROWSER_NAME)
-    await shot(pageBrowser, 'roster-browser-sees-electron')
-    await shot(pageShell, 'roster-electron-sees-browser')
+    await shot(pageBrowser, 'roster-browser-sees-electron', activePeerRow(pageBrowser, ELECTRON_NAME))
+    await shot(pageShell, 'roster-electron-sees-browser', activePeerRow(pageShell, BROWSER_NAME))
     console.log('LEG roster PASS: each app shows the other signed name with Active now')
 
     // â”€â”€ LEG count: the live CommandIsland chip is non-zero in BOTH apps â”€â”€â”€â”€â”€â”€
     await expect(peerChip(pageBrowser), 'LEG count FAIL: browser peer chip shows zero').toBeVisible({ timeout: 30_000 })
     await expect(peerChip(pageShell), 'LEG count FAIL: Electron peer chip shows zero').toBeVisible({ timeout: 30_000 })
-    await shot(pageBrowser, 'count-browser-peer-chip')
-    await shot(pageShell, 'count-electron-peer-chip')
+    await shot(pageBrowser, 'count-browser-peer-chip', peerChip(pageBrowser))
+    await shot(pageShell, 'count-electron-peer-chip', peerChip(pageShell))
     console.log('LEG count PASS: both CommandIsland chips reflect the roster peer (not zero)')
 
     // â”€â”€ LEG dm: sealed browser -> Electron, Delivered then Seen on real read â”€â”€
@@ -309,12 +343,12 @@ test('browser and Electron on separate nodes see each other, chat, post and stay
     await expect(pageShell.getByText(MSG).first(), 'LEG dm FAIL: sealed DM never arrived in Electron').toBeVisible({ timeout: 60_000 })
     await expect(messageRow(pageBrowser, MSG).locator('[title="Delivered"]'), 'LEG dm FAIL: no real delivery ack').toBeVisible({ timeout: 30_000 })
     await expect(messageRow(pageBrowser, MSG).locator('[title="Seen"]')).toHaveCount(0)
-    await shot(pageBrowser, 'dm-browser-delivered')
+    await shot(pageBrowser, 'dm-browser-delivered', messageRow(pageBrowser, MSG))
     await dismissOverlays(pageShell)
     await pageShell.getByRole('button').filter({ hasText: MSG }).first().click()
     await expect(pageShell.locator('[data-message-id]', { hasText: MSG }).first()).toBeVisible({ timeout: 20_000 })
     await expect(messageRow(pageBrowser, MSG).locator('[title="Seen"]'), 'LEG dm FAIL: opening the thread earned no read receipt').toBeVisible({ timeout: 30_000 })
-    await shot(pageShell, 'dm-electron-thread')
+    await shot(pageShell, 'dm-electron-thread', pageShell.locator('[data-message-id]', { hasText: MSG }).first())
     console.log('LEG dm PASS: cross-node sealed DM arrived, Delivered -> Seen on real read')
 
     // â”€â”€ LEG post: browser post appears in Electron's feed â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -336,9 +370,27 @@ test('browser and Electron on separate nodes see each other, chat, post and stay
     await expect(pageBrowser.getByText(CAPTION).first()).toBeVisible({ timeout: 30_000 })
     await pageShell.goto(`${baseURL}/#/feed`, { waitUntil: 'domcontentloaded' })
     await expect(pageShell.getByText(CAPTION).first(), 'LEG post FAIL: browser post never reached the Electron feed').toBeVisible({ timeout: 60_000 })
-    await shot(pageBrowser, 'post-browser-published')
-    await shot(pageShell, 'post-electron-feed')
-    console.log('LEG post PASS: post published on the browser node is visible in the Electron feed')
+    // The caption can land while its bytes are still "Loading media...". Both
+    // screenshots must show a REAL media tile, not just the text row.
+    const browserCard = pageBrowser.locator('article').filter({ hasText: CAPTION }).first()
+    const shellCard = pageShell.locator('article').filter({ hasText: CAPTION }).first()
+    await expectMediaTile(browserCard)
+    await expectMediaTile(shellCard)
+    // The cross-node BYLINE is the regression: the roster and the profile both
+    // showed the real signed name, while the feed minted `User_<hex>` because a
+    // verified presence beacon never reached the trusted name directory. The
+    // screenshot is evidence only AFTER the byline itself is proven real.
+    await expect(
+      shellCard,
+      'LEG post FAIL: cross-node feed byline is not the signed name CrossNode Browser',
+    ).toContainText(BROWSER_NAME, { timeout: 30_000 })
+    await expect(
+      shellCard,
+      'LEG post FAIL: a minted User_/Player placeholder leaked into the cross-node feed byline',
+    ).not.toContainText(/User_|Player\b/, { timeout: 30_000 })
+    await shot(pageBrowser, 'post-browser-published', browserCard)
+    await shot(pageShell, 'post-electron-feed', shellCard)
+    console.log('LEG post PASS: post published on the browser node is visible in the Electron feed with its real signed byline')
 
     // â”€â”€ LEG profile: Electron opens the browser peer's real profile â”€â”€â”€â”€â”€â”€â”€â”€â”€
     await pageShell.goto(`${baseURL}/#/messages`, { waitUntil: 'domcontentloaded' })
@@ -350,7 +402,7 @@ test('browser and Electron on separate nodes see each other, chat, post and stay
     await expect(dialog, 'LEG profile FAIL: opened profile shows no real signed name').toBeVisible({ timeout: 20_000 })
     await expect(dialog.getByText('Online'), 'LEG profile FAIL: peer shown offline').toBeVisible()
     await expect(dialog.getByText(/^Posts \([1-9]\d*\)$/), 'LEG profile FAIL: no posts from the browser peer').toBeVisible({ timeout: 60_000 })
-    await shot(pageShell, 'profile-electron-opens-browser')
+    await shot(pageShell, 'profile-electron-opens-browser', dialog)
     console.log('LEG profile PASS: Electron opened the browser peer profile â€” real name, Online, posts >= 1')
 
     // â”€â”€ LEG decay: ~130s later the peers are STILL online (60/120s bug) â”€â”€â”€â”€â”€
@@ -365,8 +417,8 @@ test('browser and Electron on separate nodes see each other, chat, post and stay
     await expect(activePeerRow(pageShell, BROWSER_NAME), 'LEG decay FAIL: Electron lost the browser peer after 130s').toBeVisible({ timeout: 30_000 })
     await expect(peerChip(pageBrowser), 'LEG decay FAIL: browser peer chip fell back to zero').toBeVisible({ timeout: 30_000 })
     await expect(peerChip(pageShell), 'LEG decay FAIL: Electron peer chip fell back to zero').toBeVisible({ timeout: 30_000 })
-    await shot(pageBrowser, 'decay-browser-still-online')
-    await shot(pageShell, 'decay-electron-still-online')
+    await shot(pageBrowser, 'decay-browser-still-online', activePeerRow(pageBrowser, ELECTRON_NAME))
+    await shot(pageShell, 'decay-electron-still-online', activePeerRow(pageShell, BROWSER_NAME))
     console.log('LEG decay PASS: peers still Active now after 130s')
 
     console.log(`ALL CROSS-NODE LEGS PASS; screenshots in ${SHOTS}`)

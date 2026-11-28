@@ -1,7 +1,12 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { broadcastPresence, fetchPresenceRosterFrom, PRESENCE_TOKEN } from './courierPresence'
-import { generateIdentity, type OrbitIdentity } from '@orbit/crypto'
+import {
+  __resetNameDirectoryForTests,
+  rememberSignedName,
+  signedNameFor,
+} from '../game/nameDirectory'
+import { generateIdentity, signMessage, bytesToHex, type OrbitIdentity } from '@orbit/crypto'
 import { _resetNodeAddress } from '../utils/serverAddress'
 
 /**
@@ -22,6 +27,7 @@ describe('courierPresence across nodes', () => {
       clear: () => store.clear(),
     } as Storage)
     _resetNodeAddress()
+    __resetNameDirectoryForTests()
   })
 
   afterEach(() => {
@@ -151,5 +157,196 @@ describe('courierPresence across nodes', () => {
       getFetch as unknown as typeof globalThis.fetch,
     )
     expect(roster.users).toEqual([])
+  })
+
+  it('feeds a VERIFIED beacon name into the trusted class the feed reads', async () => {
+    localStorage.setItem('gmatch.api.url', 'http://node.test:8790')
+    let captured: any = null
+    const putFetch = vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
+      captured = JSON.parse(init?.body as string).env
+      return new Response(JSON.stringify({ ok: true }), { status: 200 })
+    })
+    await broadcastPresence(
+      bob,
+      { displayName: 'CrossNode Browser' },
+      putFetch as unknown as typeof globalThis.fetch,
+    )
+    const getFetch = vi.fn().mockImplementation(async () => new Response(
+      JSON.stringify({ envelopes: [captured] }),
+      { status: 200 },
+    ))
+
+    expect(signedNameFor(bob.orbitId)).toBeUndefined()
+    const roster = await fetchPresenceRosterFrom(
+      'http://node.test:8790',
+      alice.orbitId,
+      getFetch as unknown as typeof globalThis.fetch,
+    )
+    expect(roster.users[0].display_name).toBe('CrossNode Browser')
+    expect(signedNameFor(bob.orbitId)).toBe('CrossNode Browser')
+  })
+
+  it('publishes the display name inside the signature; mutating signedName drops the beacon', async () => {
+    localStorage.setItem('gmatch.api.url', 'http://node.test:8790')
+    let captured: any = null
+    const putFetch = vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
+      captured = JSON.parse(init?.body as string).env
+      return new Response(JSON.stringify({ ok: true }), { status: 200 })
+    })
+    await broadcastPresence(bob, { displayName: 'Signed Bob' }, putFetch as unknown as typeof globalThis.fetch)
+    const beacon = JSON.parse(decodeURIComponent(escape(atob(captured.sealed))))
+    expect(beacon.signedName).toBe('Signed Bob')
+
+    // A relay swaps the signed name too: the beacon no longer verifies, so it
+    // cannot seed a forged feed byline.
+    const forged = {
+      ...captured,
+      sealed: btoa(unescape(encodeURIComponent(JSON.stringify({ ...beacon, signedName: 'Forged By Relay' })))),
+    }
+    const getFetch = vi.fn().mockImplementation(async () => new Response(
+      JSON.stringify({ envelopes: [forged] }),
+      { status: 200 },
+    ))
+    const roster = await fetchPresenceRosterFrom(
+      'http://node.test:8790',
+      alice.orbitId,
+      getFetch as unknown as typeof globalThis.fetch,
+    )
+    expect(roster.users).toHaveLength(0)
+    expect(signedNameFor(bob.orbitId)).toBeUndefined()
+  })
+
+  it('a relay rewriting only the unsigned displayName cannot forge the feed name', async () => {
+    localStorage.setItem('gmatch.api.url', 'http://node.test:8790')
+    let captured: any = null
+    const putFetch = vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
+      captured = JSON.parse(init?.body as string).env
+      return new Response(JSON.stringify({ ok: true }), { status: 200 })
+    })
+    await broadcastPresence(bob, { displayName: 'Real Bob' }, putFetch as unknown as typeof globalThis.fetch)
+    const beacon = JSON.parse(decodeURIComponent(escape(atob(captured.sealed))))
+    const relayed = {
+      ...captured,
+      sealed: btoa(unescape(encodeURIComponent(JSON.stringify({ ...beacon, displayName: 'Forged By Relay' })))),
+    }
+    const getFetch = vi.fn().mockImplementation(async () => new Response(
+      JSON.stringify({ envelopes: [relayed] }),
+      { status: 200 },
+    ))
+    const roster = await fetchPresenceRosterFrom(
+      'http://node.test:8790',
+      alice.orbitId,
+      getFetch as unknown as typeof globalThis.fetch,
+    )
+    // The legacy label still serves the roster/chat; the feed reads only the
+    // name the peer signed.
+    expect(roster.users[0].display_name).toBe('Forged By Relay')
+    expect(signedNameFor(bob.orbitId)).toBe('Real Bob')
+  })
+
+  it('a legacy beacon without signedName still verifies but seeds no trusted feed name', async () => {
+    const timestamp = Date.now()
+    const legacy = {
+      orbitId: bob.orbitId,
+      displayName: 'Legacy Bob',
+      publicKeyHex: bob.publicKeyHex,
+      timestamp,
+      // Old clients signed only orbitId|publicKey|timestamp (no optional fields).
+      sig: bytesToHex(signMessage(
+        new TextEncoder().encode(`presence-v1|${bob.orbitId}|${bob.publicKeyHex}|${timestamp}`),
+        bob.privateKeyHex,
+      )),
+    }
+    const envelope = {
+      v: 2,
+      kind: 'announce',
+      to: PRESENCE_TOKEN,
+      id: 'legacy',
+      sealed: btoa(unescape(encodeURIComponent(JSON.stringify(legacy)))),
+      exp: timestamp + 60_000,
+    }
+    const getFetch = vi.fn().mockImplementation(async () => new Response(
+      JSON.stringify({ envelopes: [envelope] }),
+      { status: 200 },
+    ))
+    const roster = await fetchPresenceRosterFrom(
+      'http://node.test:8790',
+      alice.orbitId,
+      getFetch as unknown as typeof globalThis.fetch,
+    )
+    expect(roster.users).toHaveLength(1)
+    expect(roster.users[0].display_name).toBe('Legacy Bob')
+    expect(signedNameFor(bob.orbitId)).toBeUndefined()
+  })
+
+  it('a later profile.update prevails even when the beacon is read again', async () => {
+    localStorage.setItem('gmatch.api.url', 'http://node.test:8790')
+    let captured: any = null
+    const putFetch = vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
+      captured = JSON.parse(init?.body as string).env
+      return new Response(JSON.stringify({ ok: true }), { status: 200 })
+    })
+    await broadcastPresence(bob, { displayName: 'Beacon Name' }, putFetch as unknown as typeof globalThis.fetch)
+    const beacon = JSON.parse(decodeURIComponent(escape(atob(captured.sealed))))
+    expect(beacon.signedName).toBe('Beacon Name')
+    const getFetch = vi.fn().mockImplementation(async () => new Response(
+      JSON.stringify({ envelopes: [captured] }),
+      { status: 200 },
+    ))
+    await fetchPresenceRosterFrom(
+      'http://node.test:8790',
+      alice.orbitId,
+      getFetch as unknown as typeof globalThis.fetch,
+    )
+    expect(signedNameFor(bob.orbitId)).toBe('Beacon Name')
+
+    rememberSignedName(bob.orbitId, 'Renamed By Profile Update')
+    await fetchPresenceRosterFrom(
+      'http://node.test:8790',
+      alice.orbitId,
+      getFetch as unknown as typeof globalThis.fetch,
+    )
+    expect(signedNameFor(bob.orbitId)).toBe('Renamed By Profile Update')
+  })
+
+  it('never seeds an unverified beacon or a minted placeholder into the feed directory', async () => {
+    localStorage.setItem('gmatch.api.url', 'http://node.test:8790')
+    let captured: any = null
+    const putFetch = vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
+      captured = JSON.parse(init?.body as string).env
+      return new Response(JSON.stringify({ ok: true }), { status: 200 })
+    })
+    await broadcastPresence(bob, { displayName: 'User_376a02' }, putFetch as unknown as typeof globalThis.fetch)
+
+    // Rewrite a SIGNED field: the beacon no longer verifies, so it contributes
+    // no name to the trusted directory. The published name rides signedName.
+    const beacon = JSON.parse(decodeURIComponent(escape(atob(captured.sealed))))
+    const tampered = {
+      ...captured,
+      sealed: btoa(unescape(encodeURIComponent(JSON.stringify({ ...beacon, nodeUrl: 'http://evil.test:8790' })))),
+    }
+    const getFetch = vi.fn().mockImplementation(async () => new Response(
+      JSON.stringify({ envelopes: [tampered] }),
+      { status: 200 },
+    ))
+    await fetchPresenceRosterFrom(
+      'http://node.test:8790',
+      alice.orbitId,
+      getFetch as unknown as typeof globalThis.fetch,
+    )
+    expect(signedNameFor(bob.orbitId)).toBeUndefined()
+
+    // Even a VALID signature naming a placeholder / the feed's own fallback
+    // must never freeze as a permanent trusted name.
+    const validGet = vi.fn().mockImplementation(async () => new Response(
+      JSON.stringify({ envelopes: [captured] }),
+      { status: 200 },
+    ))
+    await fetchPresenceRosterFrom(
+      'http://node.test:8790',
+      alice.orbitId,
+      validGet as unknown as typeof globalThis.fetch,
+    )
+    expect(signedNameFor(bob.orbitId)).toBeUndefined()
   })
 })

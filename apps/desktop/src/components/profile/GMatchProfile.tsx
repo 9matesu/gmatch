@@ -24,6 +24,7 @@ import { BadgeShelf } from './BadgeShelf';
 import { useProfilePostLightbox } from '../feed/useProfilePostLightbox';
 import { ProfilePostCard } from '../feed/ProfileTextPostCard';
 import { ObjectImage } from '../ObjectImage';
+import { MEDIA_RETRY_EVENT } from '../../hooks/useObjectImage';
 import { GameCard } from '../cards/GameCard';
 import { computeCardRarity } from '@orbit/shared';
 import { isVideoPost } from '../../utils/media';
@@ -190,6 +191,27 @@ export function GMatchProfile({
       setPfp(profilePic);
     }
   }, [profilePic]);
+
+  // A missing avatar byte run shows the initial, but that is a DISPLAY mark,
+  // not a deletion: the ref and the mounted ObjectImage stay for the retry.
+  // ObjectImage calls onMediaUnavailable on a stuck signed fetch / its 8s
+  // ceiling as well as on a real failure — those are indistinguishable here,
+  // so the retry wave is what separates them. Erasing the ref on that callback
+  // (the old behaviour) made the picture disappear for good.
+  const [pfpDead, setPfpDead] = useState(false);
+  useEffect(() => {
+    const onRetry = () => setPfpDead(false);
+    window.addEventListener(MEDIA_RETRY_EVENT, onRetry);
+    return () => window.removeEventListener(MEDIA_RETRY_EVENT, onRetry);
+  }, []);
+  // A newly chosen/refreshed photo is a new byte run: do not keep the old
+  // miss's initial-letter overlay on top of it.
+  useEffect(() => setPfpDead(false), [pfp]);
+  // Only an explicit absence on the profile clears the photo ref itself.
+  useEffect(() => {
+    if (myUser && !myUser.pfp_url && !profilePic) setPfp('');
+  }, [myUser, profilePic]);
+  const avatarInitial = (displayName || 'U').charAt(0).toUpperCase();
   const activePowerups: string[] = [];
 
   const isFlashing = activePowerups.includes('powerup_flash') || activePowerups.includes('flash');
@@ -418,21 +440,29 @@ export function GMatchProfile({
             )}
           >
             {pfp ? (
-              <ObjectImage
-                contentUrl={pfp}
-                objectId={resolveObjectRefId(pfp)}
-                contentHash={contentHashFromRef(pfp)}
-                identity={identity}
-                alt={displayName}
-                className={CELL_IMG}
-                loading="eager"
-                fetchPriority="high"
-                hideUnavailable
-                onMediaUnavailable={() => setPfp('')}
-              />
+              <>
+                <ObjectImage
+                  contentUrl={pfp}
+                  objectId={resolveObjectRefId(pfp)}
+                  contentHash={contentHashFromRef(pfp)}
+                  identity={identity}
+                  alt={displayName}
+                  className={CELL_IMG}
+                  loading="eager"
+                  fetchPriority="high"
+                  hideUnavailable
+                  onMediaUnavailable={() => setPfpDead(true)}
+                  onLoad={() => setPfpDead(false)}
+                />
+                {pfpDead && (
+                  <div className={classes('absolute inset-0 flex items-center justify-center sm:text-2xl', COLOR.interactive, TYPE.display, WEIGHT.medium, COLOR.muted)}>
+                    {avatarInitial}
+                  </div>
+                )}
+              </>
             ) : (
               <div className={classes('w-full h-full flex items-center justify-center sm:text-2xl', COLOR.interactive, TYPE.display, WEIGHT.medium, COLOR.muted)}>
-                {(displayName || 'U').charAt(0).toUpperCase()}
+                {avatarInitial}
               </div>
             )}
             {isSelf && (

@@ -18,7 +18,8 @@ Single portable `.exe`, no installer, no sign-up, no telemetry, no ads.
   Legacy plaintext transfer is disabled by default.
 - **A blind relay.** The node you are connected to forwards sealed envelopes
   addressed to rotating tokens. It stores no content tables, keeps no presence
-  directory, and never sees a message body. No hosted service is involved.
+  directory, and never sees a message body. The optional hosted blind rendezvous
+  (on by default, below) moves sealed bytes only — it holds no world data.
 - **Explicit transport selection.** Direct WebRTC is attempted under a bounded
   deadline; the relay stays available meanwhile; a peer is labelled direct
   only after the DataChannel opens. The UI reports the real path. NAT
@@ -39,9 +40,12 @@ A packaged install starts **its own node**, so the first world is the machine
 you are on. To meet other people, share your node code or join a node a friend
 runs (`+ Add server` → *Join with code*). The Servers list also shows the nodes
 published in the directory of the node you are on; that node carries the
-metadata and sealed mail only, never content. There is **no hosted service in
-the loop** — a shared hub is opt-in (`gmatch.central.url`), and the default is
-the own node.
+metadata and sealed mail only, never content. There is **no hosted WORLD in the
+loop** — every world lives on its own install. The default rendezvous for sealed
+mail and the public directory IS on: `https://gmatch-rendezvous.mcos-mateus.workers.dev`,
+one free Cloudflare Worker backed by a single SQLite Durable Object (no KV).
+`gmatch.central.url` / `VITE_CENTRAL_URL` point at another hub; `none`/`off`/`0`
+opts out entirely. The Worker holds no posts, profiles, media or identities.
 
 Check the release page (it is static and stores nothing):
 

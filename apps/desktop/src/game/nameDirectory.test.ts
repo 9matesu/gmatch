@@ -2,9 +2,12 @@ import { describe, expect, it, beforeEach, vi } from 'vitest'
 import {
   __resetNameDirectoryForTests,
   nameFor,
+  signedNameFor,
   nameRoster,
   rememberName,
   rememberNames,
+  rememberSignedName,
+  rememberPresenceName,
   hydrateFromStorage,
 } from './nameDirectory'
 
@@ -109,5 +112,87 @@ describe('name directory', () => {
     expect(nameFor('u7')).toBeUndefined()
     expect(nameFor('u8')).toBe('Real')
     expect(nameFor('u9')).toBeUndefined()
+  })
+
+  it('keeps DM self-labels out of the signed class chat vs feed readers use', () => {
+    // A label a peer wrote about itself in a DM is a chat convenience, never a
+    // verified identity. It stays in `nameFor` (chat) but `signedNameFor` — the
+    // only class the feed/comment projection trusts — never sees it.
+    rememberName('dm-peer', 'I Am Totally Alice')
+    expect(nameFor('dm-peer')).toBe('I Am Totally Alice')
+    expect(signedNameFor('dm-peer')).toBeUndefined()
+  })
+
+  it('treats the node directory as trusted, but never a DM self-label', () => {
+    // Both signed profile.update ops and node rows arrive through the batch
+    // funnel, so both belong to the trusted class the feed may read. A DM
+    // label arrives through the single-write funnel and stays chat-only.
+    rememberNames([{ id: 'node-peer', display_name: 'Node Name' }])
+    expect(nameFor('node-peer')).toBe('Node Name')
+    expect(signedNameFor('node-peer')).toBe('Node Name')
+    rememberName('dm-peer', 'Self Label')
+    expect(nameFor('dm-peer')).toBe('Self Label')
+    expect(signedNameFor('dm-peer')).toBeUndefined()
+  })
+
+  it('a signed profile.update name outranks any DM label everywhere', () => {
+    rememberName('p', 'Self Declared DM Label')
+    rememberNames([{ id: 'p', display_name: 'Node Name' }])
+    rememberSignedName('p', 'Signed Rename')
+    expect(nameFor('p')).toBe('Signed Rename')
+    expect(signedNameFor('p')).toBe('Signed Rename')
+    // A later DM label can never demote a trusted name.
+    rememberName('p', 'Later DM Label')
+    expect(nameFor('p')).toBe('Signed Rename')
+    expect(signedNameFor('p')).toBe('Signed Rename')
+  })
+
+  it('persists signed and DM provenance separately across a restart', () => {
+    rememberSignedName('s1', 'Signed One')
+    rememberName('d1', 'Dm One')
+    __resetNameDirectoryForTests()
+    hydrateFromStorage()
+    expect(signedNameFor('s1')).toBe('Signed One')
+    expect(signedNameFor('d1')).toBeUndefined()
+    expect(nameFor('d1')).toBe('Dm One')
+  })
+
+  it('seeds a verified beacon name into the trusted class the feed reads', () => {
+    rememberPresenceName('beacon-peer', 'CrossNode Browser')
+    expect(signedNameFor('beacon-peer')).toBe('CrossNode Browser')
+    expect(nameFor('beacon-peer')).toBe('CrossNode Browser')
+  })
+
+  it('never overwrites a node row or a profile.update with a beacon name', () => {
+    rememberPresenceName('beacon-peer', 'Beacon Name')
+    rememberNames([{ id: 'beacon-peer', display_name: 'Node Name' }])
+    expect(signedNameFor('beacon-peer')).toBe('Node Name')
+    // A stale beacon read again must not demote the stronger source.
+    rememberPresenceName('beacon-peer', 'Stale Beacon Name')
+    expect(signedNameFor('beacon-peer')).toBe('Node Name')
+    // A later profile.update is the actor's own signed statement: it wins too.
+    rememberSignedName('beacon-peer', 'Renamed By Profile Update')
+    rememberPresenceName('beacon-peer', 'Stale Beacon Name')
+    expect(signedNameFor('beacon-peer')).toBe('Renamed By Profile Update')
+  })
+
+  it('a later profile.update prevails over an earlier signed beacon', () => {
+    rememberPresenceName('b', 'Beacon Name')
+    rememberSignedName('b', 'Renamed By Profile Update')
+    expect(signedNameFor('b')).toBe('Renamed By Profile Update')
+  })
+
+  it('never freezes a minted placeholder from a beacon as a permanent name', () => {
+    rememberPresenceName('p1', 'User_376a02')
+    rememberPresenceName('p2', 'Player')
+    expect(signedNameFor('p1')).toBeUndefined()
+    expect(signedNameFor('p2')).toBeUndefined()
+  })
+
+  it('a beacon seed survives a restart', () => {
+    rememberPresenceName('beacon-peer', 'CrossNode Browser')
+    __resetNameDirectoryForTests()
+    hydrateFromStorage()
+    expect(signedNameFor('beacon-peer')).toBe('CrossNode Browser')
   })
 })

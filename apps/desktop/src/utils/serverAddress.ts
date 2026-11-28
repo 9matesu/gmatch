@@ -1,4 +1,5 @@
 import { getApiBaseUrl, isLoopbackApiUrl, orbitFetch, type OrbitIdentityLike } from './api'
+import { radminAdapterIp } from '../services/radmin'
 
 /**
  * Addresses a friend can dial, and whose node they belong to.
@@ -91,6 +92,38 @@ export function pickShareableHint(urls: string[] | null | undefined): string {
   return best
 }
 
+/** A loopback address the NODE itself reported — never guessed from the base. */
+function pickLoopbackHint(urls: string[]): string {
+  for (const raw of urls) {
+    const value = String(raw || '').trim()
+    if (!value) continue
+    try {
+      const u = new URL(/^https?:\/\//i.test(value) ? value : `http://${value}`)
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') continue
+      const host = u.hostname.replace(/^\[|\]$/g, '').toLowerCase()
+      if (host === 'localhost' || host.startsWith('127.') || host === '::1') return `${u.protocol}//${u.host}`
+    } catch { /* junk */ }
+  }
+  return ''
+}
+
+/**
+ * The node's own report for a detected Radmin IP: the SAME address plus the
+ * scheme/port it answers on. Without a matching report there is no evidence
+ * this machine's node is reachable at that IP, so nothing is invented.
+ */
+function radminReportFor(ip: string, urls: string[]): { scheme: string; port: string } | null {
+  for (const raw of urls) {
+    try {
+      const u = new URL(/^https?:\/\//i.test(raw) ? raw : `http://${raw}`)
+      if (u.hostname.replace(/^\[|\]$/g, '').toLowerCase() === ip.toLowerCase() && u.port) {
+        return { scheme: u.protocol, port: u.port }
+      }
+    } catch { /* keep looking */ }
+  }
+  return null
+}
+
 /** The dev-proxy cookie (vite.config.ts `resolveDevApiTarget`) — where /api goes. */
 function readProxyCookie(): string {
   try {
@@ -161,15 +194,21 @@ export function _resetNodeAddress(): void {
  * Sources, in order:
  *   1. an absolute, non-loopback API base: that IS the node we are on (a
  *      client joined to a friend's node) and it is already dialable;
- *   2. the node's own report (`GET /api/servers/node` -> `lanUrls`) — how a
- *      loopback or relative base gets a real LAN address.
+ *   2. a Radmin adapter this machine actually has (26/8) AND that the node
+ *      itself reports — two installs on the same Radmin VLAN can then reach
+ *      each other's node directly;
+ *   3. the node's own report (`GET /api/servers/node` -> `lanUrls`) — how a
+ *      loopback or relative base gets a real LAN address;
+ *   4. a loopback the node reported (last resort, honest but not cross-node).
  *
  * Returns null when nothing dialable is known: a beacon without a node URL
- * is still a valid beacon (it just cannot be routed across nodes).
+ * is still a valid beacon (it just cannot be routed across nodes). No address
+ * is ever synthesized: every part comes from the adapter or the node report.
  */
 export async function resolveNodeAddress(
   identity: OrbitIdentityLike | null,
   fetchImpl: typeof globalThis.fetch = globalThis.fetch,
+  radminIp: () => Promise<string | null> = radminAdapterIp,
 ): Promise<string | null> {
   const base = getApiBaseUrl().trim()
   if (base && !isLoopbackApiUrl(base)) {
@@ -181,17 +220,24 @@ export async function resolveNodeAddress(
   if (nodeAddressCache && nodeAddressCache.base === base && Date.now() - nodeAddressCache.at < NODE_ADDRESS_TTL_MS) {
     return nodeAddressCache.url || null
   }
-  let url = ''
+  let urls: string[] = []
   try {
     const res = await orbitFetch('/api/servers/node', { method: 'GET' }, identity, fetchImpl)
     if (res.ok) {
       const j = (await res.json()) as { lanUrls?: string[] }
-      url = pickShareableHint(j?.lanUrls ?? [])
+      urls = j?.lanUrls ?? []
     }
   } catch {
     // The node is unreachable (or has no such route): the beacon simply
     // carries no address. Never a guess.
   }
+  let url = ''
+  try {
+    const ip = (await radminIp())?.trim()
+    const shape = ip ? radminReportFor(ip, urls) : null
+    if (ip && shape) url = `${shape.scheme}//${ip}:${shape.port}`
+  } catch { /* no adapter / no bridge: the LAN fallback stands */ }
+  if (!url) url = pickShareableHint(urls) || pickLoopbackHint(urls)
   nodeAddressCache = { base, url, at: Date.now() }
   return url || null
 }

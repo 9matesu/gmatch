@@ -60,7 +60,13 @@ export function generateFallbackName(orbitId: string): string {
 export function isDefaultPeerName(name?: string | null): boolean {
   if (!name || !name.trim()) return true;
   const n = name.trim();
-  return /^user[-_].*/i.test(n) || n.toLowerCase() === 'user' || n.toLowerCase() === 'unknown user' || n.toLowerCase() === 'anonymous';
+  const lower = n.toLowerCase();
+  // Only machine-minted fallbacks are global defaults. `Player` is a FEED
+  // placeholder, not a global one: this gate also guards PATCH / onboarding,
+  // so rejecting it here broke a real account actually named Player. The feed
+  // filters its own placeholder where it renders authors.
+  return /^user[-_].*/i.test(n) || lower === 'user'
+    || lower === 'unknown user' || lower === 'anonymous';
 }
 
 /**

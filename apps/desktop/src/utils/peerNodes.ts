@@ -48,6 +48,25 @@ export function normalizeNodeUrl(url: string | null | undefined): string | null 
 }
 
 /**
+ * Dialable from THIS machine as a relay/mail node: loopback and link-local are
+ * local-only, every LAN / Radmin / public address is allowed. Unlike
+ * `isPrivateNodeUrl` (which judges reachability from a FOREIGN network), this
+ * predicate answers "can I open a socket to this node here?" — so a directory
+ * listing on the home LAN is a legitimate relay target.
+ */
+export function isRelayableNodeUrl(url: string | null | undefined): boolean {
+  const clean = normalizeNodeUrl(url)
+  if (!clean) return false
+  try {
+    const host = new URL(clean).hostname.replace(/^\[|\]$/g, '').toLowerCase()
+    return !!host && host !== 'localhost' && host !== '::1' && !host.startsWith('127.')
+      && !host.startsWith('169.254.') && !host.startsWith('fe80')
+  } catch {
+    return false
+  }
+}
+
+/**
  * True when a node URL points at an address only dialable on its OWN network:
  * loopback, link-local, RFC1918 (10/8, 172.16/12, 192.168/16) or CGNAT
  * (100.64/10). A peer's beacon names the node IT can reach; on another network
@@ -86,7 +105,9 @@ export function peerNodeFor(orbitId: string): string | null {
 /**
  * Remember where a peer lives. A beacon is signed by the peer, so the URL it
  * carries is the peer's own claim — but a claim is still a claim: it decides
- * WHERE a sealed envelope is dropped, never WHAT it contains.
+ * WHERE a sealed envelope is dropped, never WHAT it contains. It is NOT added
+ * to `knownNodes`: only a node the USER chose or the DIRECTORY published may
+ * become a relay/dial target.
  */
 export function rememberPeerNode(orbitId: string, nodeUrl: string | null | undefined): void {
   if (!orbitId) return
@@ -103,16 +124,15 @@ export function rememberPeerNode(orbitId: string, nodeUrl: string | null | undef
   // Bounded: drop the oldest half when the cap is hit (insertion order).
   const trimmed = entries.length > MAX_PEER_NODES ? entries.slice(entries.length - MAX_PEER_NODES) : entries
   writeJson(PEER_NODES_KEY, Object.fromEntries(trimmed))
-  rememberKnownNode(url)
 }
 
-/** Nodes we know about (our own + the ones a beacon or the directory named). */
+/** Nodes we TRUST as destinations (this machine's + user/directory published). */
 export function knownNodes(): string[] {
   const list = readJson<string[]>(KNOWN_NODES_KEY) ?? []
   return list.map((url) => normalizeNodeUrl(url)).filter((url): url is string => !!url)
 }
 
-/** Remember a node address (ours, a friend's, or one a beacon named). */
+/** Remember a node address the user chose or the directory published. */
 export function rememberKnownNode(nodeUrl: string | null | undefined): void {
   const url = normalizeNodeUrl(nodeUrl)
   if (!url) return

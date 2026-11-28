@@ -9,7 +9,7 @@ import { useSettings } from "./hooks/useSettings";
 import { useIdle } from "./hooks/useIdle";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from "react";
-import { getApiBaseUrl, orbitFetch, invalidateCache, subscribeApiBase, clearNonLoopbackServerCookie } from "./utils/api";
+import { getApiBaseUrl, orbitFetch, invalidateCache, subscribeApiBase, clearNonLoopbackServerCookie, type OrbitIdentityLike } from "./utils/api";
 import { loadSeen, saveSeen } from "./utils/scopedSeen";
 import { useAppChat } from "./hooks/useAppChat";
 import type { NotificationTarget } from "./utils/notifications";
@@ -128,6 +128,55 @@ const STORY_PREFETCH_CONCURRENCY = 3;
 const MAX_PROFILE_PICS_IN_MEMORY = 120;
 
 const desktopChatOnLoad = () => false;
+
+/**
+ * One bounded background reconcile wave (peer online / foreground / interval).
+ * The retry dispatch lives in `finally`: a failed dynamic import or a throwing
+ * pending-transfer resume must never skip the re-resolution of tiles whose
+ * seeder just came online. Every trigger shares the same ~15s throttle and the
+ * same hidden-tab skip — the signed presence beacon still goes out from
+ * `sendHeartbeat`, so going invisible never means going offline.
+ */
+export function createBackgroundReconcile(deps: {
+  identity: OrbitIdentityLike
+  now: () => number
+  hidden: () => boolean
+  dispatchRetry: () => void
+  refreshFeed: () => void
+  loadCards: () => void
+  throttleMs?: number
+}): () => void {
+  let last = -Infinity
+  return () => {
+    if (deps.hidden()) return
+    const now = deps.now()
+    if (now - last < (deps.throttleMs ?? 15_000)) return
+    last = now
+    void (async () => {
+      try {
+        const { autoReplicateOwnPosts } = await import('./services/socialPostImport')
+        const { sharedSocialOperationLog } = await import('./services/socialOperationLog')
+        const { flushPostOutbox, rearmMissingReplicated } = await import('./services/postOutbox')
+        await autoReplicateOwnPosts(deps.identity, sharedSocialOperationLog(), {
+          flushOutbox: async () => {
+            await rearmMissingReplicated(deps.identity).catch(() => { })
+            const summary = await flushPostOutbox(deps.identity).catch(() => null)
+            if (summary && (summary.registered > 0 || summary.replicated > 0)) invalidateCache('/api/posts')
+          },
+          refreshFeed: () => { deps.refreshFeed(); deps.loadCards() },
+        })
+        // A resumed transfer is only useful if the tiles that gave up earlier
+        // get one more honest look at the bytes.
+        const { resumePendingTransfers } = await import('./utils/pendingTransfers')
+        await resumePendingTransfers((id, hash) =>
+          import('./utils/p2pSwarm').then(({ requestSwarmObject }) =>
+            requestSwarmObject(id, 5000, { expectedHash: hash ?? undefined }))).catch(() => { })
+      } finally {
+        deps.dispatchRetry()
+      }
+    })().catch(() => { })
+  }
+}
 
 /** Per-identity seen stamps (see utils/scopedSeen — the `:<orbitId>` suffix). */
 const DM_SEEN_KEY = 'gmatch_dm_seen_v1';
@@ -2777,36 +2826,19 @@ export default function Home() {
   // sender, no storm, no claim that a hand-off was delivered.
   useEffect(() => {
     if (!identity) return
-    let disposed = false
-    const reconcile = () => {
-      if (disposed || typeof window === 'undefined') return
-      void (async () => {
-        const { autoReplicateOwnPosts } = await import('./services/socialPostImport')
-        const { sharedSocialOperationLog } = await import('./services/socialOperationLog')
-        const { flushPostOutbox, rearmMissingReplicated } = await import('./services/postOutbox')
-        await autoReplicateOwnPosts(identity, sharedSocialOperationLog(), {
-          flushOutbox: async () => {
-            await rearmMissingReplicated(identity).catch(() => { })
-            const summary = await flushPostOutbox(identity).catch(() => null)
-            if (summary && (summary.registered > 0 || summary.replicated > 0)) invalidateCache('/api/posts')
-          },
-          refreshFeed: () => { void forceRefreshFeed(); loadCards() },
-        })
-        // A resumed transfer is only useful if the tiles that gave up earlier
-        // get one more honest look at the bytes.
-        const { resumePendingTransfers } = await import('./utils/pendingTransfers')
-        await resumePendingTransfers((id, hash) =>
-          import('./utils/p2pSwarm').then(({ requestSwarmObject }) =>
-            requestSwarmObject(id, 5000, { expectedHash: hash ?? undefined }))).catch(() => { })
-        window.dispatchEvent(new Event(MEDIA_RETRY_EVENT))
-      })().catch(() => { })
-    }
+    const reconcile = createBackgroundReconcile({
+      identity,
+      now: () => Date.now(),
+      hidden: () => typeof document !== 'undefined' && document.hidden,
+      dispatchRetry: () => window.dispatchEvent(new Event(MEDIA_RETRY_EVENT)),
+      refreshFeed: () => { void forceRefreshFeed() },
+      loadCards,
+    })
     window.addEventListener(PEER_ONLINE_EVENT, reconcile)
     window.addEventListener('focus', reconcile)
     document.addEventListener('visibilitychange', reconcile)
     const interval = window.setInterval(reconcile, 60_000)
     return () => {
-      disposed = true
       window.removeEventListener(PEER_ONLINE_EVENT, reconcile)
       window.removeEventListener('focus', reconcile)
       document.removeEventListener('visibilitychange', reconcile)

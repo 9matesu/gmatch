@@ -17,13 +17,15 @@ Two topologies, chosen once per launch in Settings → Server
 
 - **host (default):** spawns the bundled server (bun sidecar on `:8790`,
   `electron/apiSidecar.cjs`); one world per host, LAN addresses shown for
-  friends. No cloud account, no telemetry, no hosted dependency — the machine
-  you are sitting at IS the node.
+  friends. No cloud account, no telemetry, no REQUIRED hosted service — the
+  machine you are sitting at IS the node (the blind rendezvous below is a
+  default, optional meeting point, not a dependency for running the world).
 - **client (opt-in):** talks to someone else's node (a friend's machine, or any
-  `http(s)://host[:port]` you were given). There is no hosted data default and
-  no hosted rendezvous: the node a client is connected to is the directory and
-  the sealed-mail relay for its clients, so a packaged build with no stored mode
-  starts its own node instead of dialing a host that cannot hold a world.
+  `http(s)://host[:port]` you were given). There is no hosted data default: the
+  node a client is connected to is the directory and the sealed-mail relay for
+  its clients, so a packaged build with no stored mode starts its own node
+  instead of dialing a host that cannot hold a world. The separate, hosted
+  rendezvous (sealed mail + public directory only) IS on by default — see below.
 - **Worlds are per-server local caches (SPEC §12c).** Host mode is the single
   `official` world at the legacy `userData` root; a client switch records a
   `worldId` (`w_<hash>` of the node address) so the renderer namespaces cached
@@ -43,18 +45,22 @@ Two topologies, chosen once per launch in Settings → Server
   so Settings → Server explains which of the two happened and offers Reconnect /
   Forget it. No hostname list exists; nothing is deleted.
 
-## Running with no hosted world or rendezvous (2026-10-24, host-free since 2026-11-26)
+## Running with no hosted world (2026-10-24, host-free since 2026-11-26; rendezvous default 2026-11-27)
 
 There is no hosted full node, so the app is self-sufficient: **host mode is the
-default** and the bundled node is the world. There is no hosted rendezvous
-either — the node you are connected to serves the signed node directory and the
-sealed-mail relay for its clients, and gossips them onward. A shared hub is
-opt-in (`gmatch.central.url` / `VITE_CENTRAL_URL` pointing at a node you run)
-and defaults to `none`. Nothing else in the client resolves to a hosted
+default** and the bundled node is the world. That node also serves the signed
+node directory and the sealed-mail relay for its clients, and gossips them
+onward. Separately, the default shared rendezvous IS on: `getCentralApiUrl()`
+(`src/utils/central.ts:23,48-64`) returns the deployed Worker
+`https://gmatch-rendezvous.mcos-mateus.workers.dev`, one free Cloudflare Worker
+backed by ONE SQLite Durable Object (no KV) that holds only sealed ciphertext
+and self-declared directory metadata — never a profile, post, like or media
+byte. `gmatch.central.url` / `VITE_CENTRAL_URL` point at another hub (a node you
+run); `none`/`off`/`0` opts out. Nothing else in the client resolves to a hosted
 address — the API base falls back to `http://127.0.0.1:8790`, a stored node is
 kept only while it answers (the launch probe above; the renderer also drops a
 stored base that fails its own `/api/health` probe), and the server directory is
-read from the node you are on.
+also read from the node you are on.
 
 What the local node gives you, with no third party involved:
 
@@ -140,7 +146,10 @@ debounces failed probes (3 in a row), serialises/generation-tags them (a slow
 reply from before a recovery cannot seed a new streak), and a recovery CANCELS
 a restart already waiting in backoff. Before spawning it stops the old child
 and waits for :8790 to actually close, so two Bun processes never fight over
-the port.
+the port. The app's default port is **8790**: `apiSidecar.cjs` defaults
+`GMATCH_API_PORT` to 8790 and passes it to the Bun sidecar as `PORT`. The
+`parseInt(process.env.PORT || '8080', 10)` at `apps/api/src/serve.ts:241` is only
+the fallback for running `bun run src/serve.ts` bare — it is not the app's port.
 
 Launch (`electron/apiSidecar.cjs`) arbitrates with an exclusive `api-lease.json`
 in userData: the loser of a simultaneous start waits for the winner's node

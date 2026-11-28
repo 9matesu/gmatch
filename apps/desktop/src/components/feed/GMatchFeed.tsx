@@ -33,9 +33,11 @@ import {
 import { FeedbackState, type FeedbackTone } from '../../ui/kit';
 import type { OrbitIdentity } from '@orbit/crypto';
 import type { OrbitObject as StoryItem } from '@orbit/shared';
-import { generateFallbackName } from '@orbit/shared';
+import { generateFallbackName, isDefaultPeerName } from '@orbit/shared';
+import { signedNameFor } from '../../game/nameDirectory';
+import { MEDIA_RETRY_EVENT } from '../../hooks/useObjectImage';
 import { countHidden, isRenderable } from './isRenderable';
-import { displayMedia, hasMedia, readPostContent } from './postModel';
+import { displayMedia, readPostContent } from './postModel';
 import { PostBody } from './PostBody';
 import { FeedGrid } from './FeedGrid';
 import { GMatchStories } from '../GMatchStories';
@@ -48,7 +50,6 @@ import CachedImg from '../../ui/CachedImg';
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer';
 import { isVideoPost } from '../../utils/media';
 import { vaultBridge } from '../../services/vault';
-import { PEER_ONLINE_EVENT } from '../../utils/p2pSwarm';
 import {
   classes, COLOR, DIALOG_WIDTH, GAP, ICON, LAYOUT, PADDING_X, RADIUS,
   SHADOW, TRANSITION, TYPE, WEIGHT,
@@ -629,21 +630,19 @@ function GMatchFeedImpl({
   // memos so the minute tick behind relative timestamps only re-ranks the
   // "for you" order — the "latest" order does not depend on the clock at all.
   //
-  // A row is shown as soon as it EXISTS (text is content), but a row whose media
-  // bytes cannot be resolved must not sit in the timeline as an empty frame or a
-  // "No preview" strip: it is hidden until its bytes are actually available.
-  //
-  // The hide is REVERSIBLE, which is the whole point: the tile reports a terminal
-  // miss (`onMediaUnavailable`) and the id joins `deadPosts`; the moment the SAME
-  // row's media loads (`onLoad`) it is promoted back. A peer coming online can
-  // deliver bytes that were absent, so the hidden set is cleared then too — a
-  // re-check, never a one-way tombstone.
+  // A row is shown as soon as it EXISTS (text is content). A row whose MEDIA
+  // bytes are terminally missing is NOT unmounted and NOT turned into a text
+  // card: ObjectImage's `hideUnavailable` keeps the media slot at zero height,
+  // and the article stays mounted so the App's reconcile (60s / focus / peer
+  // online) can dispatch MEDIA_RETRY_EVENT and fill the SAME tile. While dead,
+  // only the byline/words/actions are hidden — no new label is invented.
+  // The mark is display-only and is cleared on retry and on the first load.
   const hiddenCount = useMemo(() => countHidden(posts), [posts]);
   const [deadPosts, setDeadPosts] = useState<Set<string>>(() => new Set());
-  const hidePost = useCallback((id: string) => {
+  const markMediaDead = useCallback((id: string) => {
     setDeadPosts((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
   }, []);
-  const promotePost = useCallback((id: string) => {
+  const clearMediaDead = useCallback((id: string) => {
     setDeadPosts((prev) => {
       if (!prev.has(id)) return prev;
       const next = new Set(prev);
@@ -652,13 +651,12 @@ function GMatchFeedImpl({
     });
   }, []);
   useEffect(() => {
-    // Bytes can only arrive from a peer that just connected: give every hidden
-    // row another chance. A row whose bytes are still absent re-hides after the
-    // same bounded probe (useObjectImage owns the retry TTL), so this is a
-    // re-check, not a flip-flop.
-    const onPeerOnline = () => setDeadPosts((prev) => (prev.size ? new Set() : prev));
-    window.addEventListener(PEER_ONLINE_EVENT, onPeerOnline);
-    return () => window.removeEventListener(PEER_ONLINE_EVENT, onPeerOnline);
+    // A retry wave means bytes may have arrived: give every marked row another
+    // chance. ObjectImage re-resolves on the same event; a still-dead row marks
+    // itself again after its own bounded probe.
+    const onRetry = () => setDeadPosts((prev) => (prev.size ? new Set() : prev));
+    window.addEventListener(MEDIA_RETRY_EVENT, onRetry);
+    return () => window.removeEventListener(MEDIA_RETRY_EVENT, onRetry);
   }, []);
   /** How many rows the projection actually produced — the count the empty copy
    *  needs, computed once instead of re-deriving it inside the memo. */
@@ -667,10 +665,9 @@ function GMatchFeedImpl({
     [posts],
   );
   const visiblePosts = useMemo(
-    // Text-only posts have no media to miss, so the reversible media hide never
-    // applies to them — text is content and is never hidden.
-    () => posts.filter((p) => !p.is_archived && isRenderable(p) && !isPostDeleted(p.id) && !(hasMedia(p) && deadPosts.has(p.id))),
-    [posts, deadPosts],
+    // Text-only posts have no media to miss; text is content and never hides.
+    () => posts.filter((p) => !p.is_archived && isRenderable(p) && !isPostDeleted(p.id)),
+    [posts],
   );
 
   // Hold the reader's place when rows arrive above them.
@@ -1028,6 +1025,24 @@ function GMatchFeedImpl({
     setOptionsPost(null);
   };
 
+  // One comment view for both surfaces. A peer comment carries a minted
+  // `User_<hex>` label; only the TRUSTED name class (signed profile.update and
+  // the node directory) may replace it — a self-declared DM label is chat-only
+  // and never becomes a comment author here. Read at render time — the
+  // directory has no React subscription, exactly as in the chat surfaces.
+  const commentsFor = useCallback((postId: string) => {
+    const withLiveNames = (list: PostComment[]) => list.map((c) => {
+      if (identity?.orbitId && c.author_id === identity.orbitId) return c;
+      const name = signedNameFor(c.author_id);
+      return name && !isDefaultPeerName(name) && name.trim().toLowerCase() !== 'player'
+        ? { ...c, author_name: name } : c;
+    });
+    return mergeCommentRows(
+      withLiveNames(commentsMap[postId] || []),
+      withLiveNames(peerComments.get(postId) || []),
+    );
+  }, [commentsMap, peerComments, identity?.orbitId]);
+
   // Fetch the comments for the post that is open — lightbox (profile grids,
   // Etapa B) or inline expansion. Keyed on the post that is actually open.
   //
@@ -1173,8 +1188,6 @@ function GMatchFeedImpl({
                likeCounts={likeCounts}
                onToggleLike={toggleLike}
                onOpen={toggleExpand}
-               onMediaReady={promotePost}
-               onMediaDead={hidePost}
                onSaveToVault={vaultBridge() ? (p) => void savePostToVault(p) : undefined}
                vaultSaved={vaultSaved}
              />
@@ -1194,10 +1207,7 @@ function GMatchFeedImpl({
             // Node rows and peer operations live in two places; the thread
             // is the union, deduped by id (a node row wins: it carries the
             // display name and the avatar).
-            const postComments = mergeCommentRows(
-              commentsMap[post.id] || [],
-              peerComments.get(post.id) || [],
-            );
+            const postComments = commentsFor(post.id);
             // Server truth for the count; the local map is only warm once the
             // post has been opened (inline expansion or lightbox).
             const postCommentCount = Math.max(post.comment_count ?? 0, postComments.length);
@@ -1212,6 +1222,9 @@ function GMatchFeedImpl({
             const isObjectMedia = OBJECT_URL_RE.test(mediaUrl) || !mediaUrl;
             const isVideo = videoCache(post);
            const isNewPost = animatedPostIds.has(post.id);
+            // A media post whose bytes are gone is a zero-height mount, not a
+            // text card: hide the byline/words/actions until a retry fills it.
+            const mediaDead = !textOnly && deadPosts.has(post.id);
            const multiMedia = content.media && content.media.length > 1 ? content.media : null;
             const currentIdx = multiMedia ? Math.min(Math.max(0, mediaIdx[post.id] || 0), multiMedia.length - 1) : 0;
             // Inline expand: the clicked card grows in place (image only), no
@@ -1342,8 +1355,8 @@ function GMatchFeedImpl({
                                 muted={true}
                                 loop={true}
                                 hideUnavailable
-                                onMediaUnavailable={() => hidePost(post.id)}
-                                onLoad={() => promotePost(post.id)}
+                                onMediaUnavailable={() => markMediaDead(post.id)}
+                                onLoad={() => clearMediaDead(post.id)}
                                 onExpand={() => toggleExpand(post)}
                                 onDoubleTapLike={() => handleDoubleTap(post)}
                               />
@@ -1409,8 +1422,8 @@ function GMatchFeedImpl({
                           muted={true}
                           loop={true}
                           hideUnavailable
-                          onMediaUnavailable={() => hidePost(post.id)}
-                          onLoad={() => promotePost(post.id)}
+                          onMediaUnavailable={() => markMediaDead(post.id)}
+                          onLoad={() => clearMediaDead(post.id)}
                           onExpand={() => toggleExpand(post)}
                           onDoubleTapLike={() => handleDoubleTap(post)}
                           />
@@ -1478,6 +1491,7 @@ function GMatchFeedImpl({
                   );
                 })()}
 
+                {!mediaDead && (<>
                 {textOnly ? (
                   /* TEXT POST — a clean card: author, words, actions. There is
                      no media panel, no placeholder and no media probe; the row
@@ -1662,7 +1676,8 @@ function GMatchFeedImpl({
                   )}
                 </div>
                 </>)}
-                {expanded && (
+                </>)}
+                {expanded && !mediaDead && (
                   <ProfileExpandedPost
                     post={post}
                     onClose={() => toggleExpand(post)}
@@ -1671,7 +1686,7 @@ function GMatchFeedImpl({
                     isLiked={!!likedPosts[post.id]}
                     isSaved={!!savedPosts[post.id]}
                     likeCount={likeCounts[post.id] ?? post.like_count ?? 0}
-                    comments={mergeCommentRows(commentsMap[post.id] || [], peerComments.get(post.id) || [])}
+                    comments={commentsFor(post.id)}
                     commentsLoading={commentsLoadingId === post.id}
                     onToggleLike={toggleLike}
                     onToggleSave={toggleSave}

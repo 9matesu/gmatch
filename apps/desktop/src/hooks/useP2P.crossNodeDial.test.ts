@@ -1,6 +1,13 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { directPathFromRemoteIp, isCrossNodePeer } from './useP2P'
+import {
+  directPathFromRemoteIp,
+  isCrossNodePeer,
+  MAX_EXTRA_RELAY_NODES,
+  planExtraRelayNodes,
+  planTrustedRelayNodes,
+  relayTargetForFrame,
+} from './useP2P'
 import { _resetPeerNodes, rememberPeerNode } from '../utils/peerNodes'
 
 /**
@@ -66,6 +73,79 @@ describe('a failed cross-node direct attempt leaves the label on relay', () => {
     reg.markDirectFailed(PEER, 'ice failed', true)
     expect(reg.phaseFor(PEER)).toBe('relay')
     expect(transportLabel(reg.phaseFor(PEER))).toBe('relay via node (NAT)')
+  })
+})
+
+describe('planExtraRelayNodes (cross-node SWARM_FRAME relay sockets)', () => {
+  it('picks distinct peer nodes reachable over Radmin/LAN, never self or loopback', () => {
+    const nodes = planExtraRelayNodes(
+      [
+        'http://26.0.0.9:8790',
+        'http://192.168.1.20:8790',
+        'http://26.0.0.9:8790',
+        SELF_BASE,
+        'http://127.0.0.1:9999',
+        'http://169.254.4.4:8790',
+        'not a url',
+      ],
+      SELF_BASE,
+    )
+    expect(nodes).toEqual(['http://26.0.0.9:8790', 'http://192.168.1.20:8790'])
+  })
+
+  it('caps the number of extra sockets so a roster cannot open them without bound', () => {
+    const many = Array.from({ length: 10 }, (_, i) => `http://26.0.0.${i + 1}:8790`)
+    expect(planExtraRelayNodes(many, SELF_BASE)).toHaveLength(MAX_EXTRA_RELAY_NODES)
+    expect(planExtraRelayNodes(many, SELF_BASE, 1)).toEqual(['http://26.0.0.1:8790'])
+  })
+})
+
+describe('trusted relay sockets (never a beacon self-declaration)', () => {
+  it('opens extra sockets only for nodes the user or directory published', () => {
+    const trusted = ['http://26.0.0.9:8790', 'http://192.168.1.20:8790', 'http://rendezvous.test']
+    const peerClaims = [
+      'http://26.0.0.9:8790', // published AND named by a beacon: allowed
+      'http://attacker.test:8790', // beacon-only: never a socket
+      'http://127.0.0.1:9999', // beacon-only loopback: never a socket
+    ]
+    expect(planTrustedRelayNodes(peerClaims, trusted, SELF_BASE)).toEqual([
+      'http://26.0.0.9:8790',
+    ])
+  })
+
+  it('keeps the two-socket ceiling even with several published nodes and peers', () => {
+    const trusted = [
+      'http://26.0.0.1:8790', 'http://26.0.0.2:8790',
+      'http://26.0.0.3:8790', 'http://26.0.0.4:8790',
+    ]
+    expect(planTrustedRelayNodes(trusted, trusted, SELF_BASE)).toHaveLength(MAX_EXTRA_RELAY_NODES)
+  })
+})
+
+describe('relayTargetForFrame (one frame, one owner node)', () => {
+  const byTransfer = new Map([['transfer-b', 'http://node-b:8790']])
+  const byObject = new Map([['obj-c', 'http://node-c:8790']])
+
+  it('answers a WANT only on the node that advertised the object', () => {
+    expect(relayTargetForFrame(
+      { type: 'SWARM_WANT', id: 'obj-c' }, byTransfer, byObject,
+    )).toBe('http://node-c:8790')
+  })
+
+  it('answers KEY/CHUNK only on the node that asked for the transfer', () => {
+    expect(relayTargetForFrame(
+      { type: 'SWARM_KEY', id: 'obj-c', transferId: 'transfer-b', wrapped: 'x' }, byTransfer, byObject,
+    )).toBe('http://node-b:8790')
+    expect(relayTargetForFrame(
+      { type: 'SWARM_CHUNK', id: 'obj-c', index: 0, total: 1, mimeType: 'image/jpeg', dataBase64: 'AA==', transferId: 'transfer-b' },
+      byTransfer, byObject,
+    )).toBe('http://node-b:8790')
+  })
+
+  it('never gives a broadcast frame an extra-node target', () => {
+    expect(relayTargetForFrame({ type: 'SWARM_OP', operation: {} }, byTransfer, byObject)).toBeNull()
+    expect(relayTargetForFrame({ type: 'SWARM_HAVE', ids: ['obj-c'] }, byTransfer, byObject)).toBeNull()
+    expect(relayTargetForFrame({ type: 'SWARM_WANT', id: 'unknown' }, byTransfer, byObject)).toBeNull()
   })
 })
 

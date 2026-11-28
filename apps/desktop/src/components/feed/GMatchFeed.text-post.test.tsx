@@ -24,7 +24,7 @@ vi.mock('../../services/imageCache', () => ({
 // terminal miss — the row would vanish. Its absence is the assertion.
 vi.mock('../ObjectImage', () => ({
   ObjectImage: ({ onMediaUnavailable }: { onMediaUnavailable?: () => void }) => (
-    <button type="button" onClick={() => onMediaUnavailable?.()}>media panel</button>
+    <button type="button" onClick={(e) => { e.stopPropagation(); onMediaUnavailable?.(); }}>media panel</button>
   ),
 }));
 
@@ -95,7 +95,7 @@ describe('GMatchFeed text posts', () => {
     expect(screen.getAllByText('First line.')).toHaveLength(1);
   });
 
-  it('keeps the media panel and the reversible no-preview hide for image posts', () => {
+  it('keeps an image post mounted when its media reports no bytes', () => {
     const image = textPost({
       id: 'image-1',
       caption: 'Still a picture post',
@@ -108,8 +108,15 @@ describe('GMatchFeed text posts', () => {
     expect(screen.getByText('Still a picture post')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'media panel' })).toBeTruthy();
     expect(container.querySelector('article .group\\/post')).toBeTruthy();
-    // The media hide rule is unchanged: a terminal miss hides THIS row.
+    // The tile stays mounted so the retry wave can fill it in; ObjectImage
+    // collapses the media slot to zero height with no text and no spinner.
+    // With its bytes gone the post is NOT a text card: its caption/actions hide
+    // until the retry fills the media back in.
     fireEvent.click(screen.getByRole('button', { name: 'media panel' }));
-    expect(container.querySelector('article')).toBeNull();
+    expect(container.querySelector('article')).not.toBeNull();
+    expect(screen.queryByText('Still a picture post')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Like post' })).toBeNull();
+    expect(screen.queryByText(/No preview|Loading media/i)).toBeNull();
+    expect(screen.getByRole('button', { name: 'media panel' })).toBeTruthy();
   });
 });

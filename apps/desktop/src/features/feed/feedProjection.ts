@@ -1,7 +1,8 @@
 import type { FeedPost } from '../../components/feed/GMatchFeed'
 import { readPostContent, type PostLike } from '../../components/feed/postModel'
 import { findUserById } from '../../utils/userLookup'
-import type { User } from '@orbit/shared'
+import { signedNameFor } from '../../game/nameDirectory'
+import { isDefaultPeerName, type User } from '@orbit/shared'
 
 /**
  * Feed projection: the PURE half of the timeline.
@@ -86,6 +87,30 @@ function isMediaVideo(url: string): boolean {
 }
 
 /**
+ * `Player` is the feed's own placeholder, not a global default: the shared
+ * gate must keep accepting it as a real account name for PATCH / onboarding,
+ * so the feed rejects it here, at the only place it can leak into a byline.
+ */
+function isFeedPlaceholder(name?: string | null): boolean {
+  return !name || isDefaultPeerName(name) || name.trim().toLowerCase() === 'player'
+}
+
+/**
+ * A name worth showing for an author. ONLY the trusted name class — signed
+ * `profile.update` names and the node's own directory — is consulted here; a
+ * self-declared DM label is chat-only and never becomes a byline. Minted
+ * fallbacks (`User_<hex>`, `Player`) are never names, wherever they came from.
+ */
+function acceptedAuthorName(id: string | null | undefined, users: readonly User[]): string | undefined {
+  if (!id) return undefined
+  const remembered = signedNameFor(id)
+  if (remembered && !isFeedPlaceholder(remembered)) return remembered
+  const row = findUserById(users, id)
+  if (row?.display_name && !isFeedPlaceholder(row.display_name)) return row.display_name
+  return undefined
+}
+
+/**
  * Read a local object through the same `{ text, media? }` model the renderer
  * uses. A public object with bytes (or a mime type) is addressable by its id;
  * a caption-only row with no bytes and no url is a TEXT post, so the projection
@@ -151,9 +176,13 @@ export function projectFeed(input: FeedProjectionInput): FeedPost[] {
       const authorUser = !isSelf && !unverified && obj.owner_id
         ? findUserById(users, obj.owner_id)
         : null
+      const trustedName = authorUser?.display_name && !isFeedPlaceholder(authorUser.display_name)
+        ? authorUser.display_name : undefined
+      const claimedName = (obj.author_name || obj.sender_name) && !isFeedPlaceholder(obj.author_name || obj.sender_name)
+        ? (obj.author_name || obj.sender_name)! : undefined
       const authorName = isSelf
         ? (myProfile.displayName || 'You')
-        : (authorUser?.display_name || obj.author_name || obj.sender_name || 'Player')
+        : (trustedName || claimedName || 'Player')
       const authorAvatar = isSelf
         ? (profilePics[selfId ?? ''] || null)
         : (authorUser?.pfp_url || (!unverified && obj.owner_id ? profilePics[obj.owner_id] : null) || null)
@@ -203,10 +232,13 @@ export function projectFeed(input: FeedProjectionInput): FeedPost[] {
     .map((p) => {
       const isSelf = !!selfId && p.author_id === selfId
       const author = findUserById(users, p.author_id)
-      if (!isSelf && !author) return p
+      const trustedName = author?.display_name && !isFeedPlaceholder(author.display_name)
+        ? author.display_name : undefined
+      if (!isSelf && !author && !trustedName) return p
       return {
         ...p,
-        author_name: isSelf ? (myProfile.displayName || 'You') : (author?.display_name || p.author_name),
+        ...(isSelf ? { author_name: myProfile.displayName || 'You' }
+          : trustedName ? { author_name: trustedName } : {}),
         author_avatar: isSelf
           ? (profilePics[selfId ?? ''] || null)
           : (author?.pfp_url || p.author_avatar || null),
@@ -256,11 +288,12 @@ export function projectFeed(input: FeedProjectionInput): FeedPost[] {
       continue
     }
     const author = p.author_id ? findUserById(users, p.author_id) : null
-    if (author) {
+    const knownName = acceptedAuthorName(p.author_id, users)
+    if (knownName || author?.pfp_url) {
       out.push({
         ...p,
-        author_name: author.display_name || p.author_name,
-        author_avatar: author.pfp_url || p.author_avatar,
+        ...(knownName ? { author_name: knownName } : {}),
+        author_avatar: author?.pfp_url || p.author_avatar,
       })
       continue
     }
