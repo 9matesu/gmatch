@@ -6,6 +6,7 @@ import { getApiBaseUrl } from '../utils/api'
 import { getCentralApiUrl } from '../utils/central'
 import { normalizeNodeUrl } from '../utils/peerNodes'
 import { resolveNodeAddress } from '../utils/serverAddress'
+import { resolveObjectRefId, isRequestableObjectId } from '../utils/objectRef'
 
 /**
  * Well-known 64-hex delivery token on the blind courier dedicated to
@@ -18,6 +19,16 @@ export interface PresenceBeacon {
   orbitId: string
   displayName: string
   pfpUrl: string | null
+  /**
+   * The avatar's CONTENT address (sha256 of the avatar bytes), when the local
+   * client can prove one. A peer uses it to resolve the picture through the
+   * SAME verified content-addressed ladder as a peer post (Avatar.tsx): local
+   * bytes, then the swarm asking for that hash — never our node's pfp route,
+   * which does not own a cross-node peer's picture, and never a provider
+   * hotlink. Optional and SIGNED: a beacon without it still verifies against
+   * the old payload (see beaconSignaturePayload).
+   */
+  pfpHash?: string
   publicKeyHex: string
   encryptionPubHex?: string
   /**
@@ -43,11 +54,63 @@ function randomHex(bytesLen: number): string {
 }
 
 function beaconSignaturePayload(b: Omit<PresenceBeacon, 'sig'>): Uint8Array {
-  const base = `presence-v1|${b.orbitId}|${b.publicKeyHex}|${b.timestamp}`
-  // The node URL is signed ONLY when it is present: a beacon from a client
-  // that does not know the field keeps verifying against the old payload, so
-  // an older peer is still seen (it just has no address).
-  return new TextEncoder().encode(b.nodeUrl ? `${base}|${b.nodeUrl}` : base)
+  let base = `presence-v1|${b.orbitId}|${b.publicKeyHex}|${b.timestamp}`
+  // nodeUrl and pfpHash are signed ONLY when present: a beacon from a client
+  // that does not know a field keeps verifying against the shorter payload, so
+  // an older peer is still seen (it just has no address / avatar hash).
+  if (b.nodeUrl) base += `|${b.nodeUrl}`
+  if (b.pfpHash) base += `|${b.pfpHash}`
+  return new TextEncoder().encode(base)
+}
+
+const SHA256_HEX = /^[0-9a-f]{64}$/i
+const LEGACY_HEX = /^[0-9a-f]{40}$/i
+
+/**
+ * The avatar's content address when the ref ALREADY names one
+ * (`urn:sha256:<hex>`, a bare 64/40-hex id, a magnet btih). A hash-bearing ref
+ * is resolved by the verified ladder, so it is also what we can advertise.
+ */
+function avatarHashFromRef(pfpUrl: string | null | undefined): string | null {
+  if (!pfpUrl) return null
+  const id = resolveObjectRefId(pfpUrl)
+  if (!id) return null
+  const lower = id.toLowerCase()
+  return SHA256_HEX.test(lower) || LEGACY_HEX.test(lower) ? lower : null
+}
+
+// A pfp_url is usually `/api/objects/<uuid>` after upload — the id only exists
+// on the author's node, so a peer 404s. The bytes are held locally under that
+// id (forgeMediaLocally / the media picker register both keys), so hash them
+// once and cache by ref: the durable content hash is the address a peer can
+// actually resolve. Bounded so a long session cannot grow it forever.
+const avatarHashCache = new Map<string, string | null>()
+const AVATAR_HASH_CACHE_MAX = 8
+
+async function avatarHashFromLocalObject(pfpUrl: string): Promise<string | null> {
+  const id = resolveObjectRefId(pfpUrl)
+  if (!id || !isRequestableObjectId(id)) return null
+  if (avatarHashCache.has(pfpUrl)) return avatarHashCache.get(pfpUrl) ?? null
+  let hash: string | null = null
+  try {
+    const { getLocalObject, sha256HexBlob } = await import('../utils/p2pSwarm')
+    const blob = await getLocalObject(id)
+    if (blob) hash = await sha256HexBlob(blob)
+  } catch {
+    hash = null
+  }
+  if (avatarHashCache.size >= AVATAR_HASH_CACHE_MAX) {
+    const oldest = avatarHashCache.keys().next().value
+    if (oldest) avatarHashCache.delete(oldest)
+  }
+  avatarHashCache.set(pfpUrl, hash)
+  return hash
+}
+
+/** The pfp_url a peer's roster should carry: the content address when we have
+ *  one (so Avatar resolves verified bytes), else the original ref. */
+function avatarRefForHash(hash: string): string {
+  return SHA256_HEX.test(hash) ? `urn:sha256:${hash.toLowerCase()}` : hash.toLowerCase()
 }
 
 /**
@@ -55,7 +118,7 @@ function beaconSignaturePayload(b: Omit<PresenceBeacon, 'sig'>): Uint8Array {
  */
 export async function broadcastPresence(
   identity: OrbitIdentity,
-  profile: { displayName?: string; pfpUrl?: string | null },
+  profile: { displayName?: string; pfpUrl?: string | null; pfpHash?: string | null },
   fetchImpl: typeof globalThis.fetch = globalThis.fetch,
 ): Promise<boolean> {
   const now = Date.now()
@@ -66,20 +129,31 @@ export async function broadcastPresence(
   // proxy with no address at all. The node reports the addresses it answers
   // on, so both cases resolve to a real one.
   const nodeUrl = await resolveNodeAddress(identity, fetchImpl)
-  // The in-memory self profile can lag a profile PATCH (the node row updates
-  // first). Fall back to the local display name so a fresh beacon is never
-  // nameless; the signed payload still carries whatever name we can prove.
+  // The local display name is the freshest source: a node profile row can
+  // lag a rename (or belong to an older session). Prefer it, then the
+  // in-memory profile, then a neutral label — never a nameless beacon.
   let localName = ''
   try { localName = (localStorage.getItem('orbit_display_name') || '').trim() } catch { /* private mode */ }
   const rawBeacon: Omit<PresenceBeacon, 'sig'> = {
     orbitId: identity.orbitId,
-    displayName: profile.displayName?.trim() || localName || 'Player',
+    displayName: localName || profile.displayName?.trim() || 'Player',
     pfpUrl: profile.pfpUrl || null,
     publicKeyHex: identity.publicKeyHex,
     encryptionPubHex: identity.encryptionPubHex || '',
     ...(nodeUrl ? { nodeUrl } : {}),
     timestamp: now,
   }
+
+  // Advertise the avatar by its CONTENT when we can prove one: an explicit
+  // hash, a hash-bearing ref, or the local bytes behind a node-local object id.
+  // A peer then resolves the picture off the swarm instead of a pfp route that
+  // 404s on its node. Best-effort: no provable hash simply omits the field.
+  const pfpHash =
+    (profile.pfpHash && profile.pfpHash.trim()) ||
+    avatarHashFromRef(profile.pfpUrl) ||
+    (profile.pfpUrl ? await avatarHashFromLocalObject(profile.pfpUrl) : null) ||
+    null
+  if (pfpHash) rawBeacon.pfpHash = pfpHash.toLowerCase()
 
   const sigBytes = signMessage(beaconSignaturePayload(rawBeacon), identity.privateKeyHex)
   const beacon: PresenceBeacon = {
@@ -200,7 +274,10 @@ export async function fetchPresenceRosterFrom(
       users.push({
         id: beacon.orbitId,
         display_name: beacon.displayName?.trim() || generateFallbackName(beacon.orbitId),
-        pfp_url: beacon.pfpUrl || undefined,
+        // A hash-bearing avatar resolves through the verified content ladder on
+        // the reader's side (Avatar.tsx); the node-local pfpUrl is the fallback
+        // for a peer that advertised no hash.
+        pfp_url: beacon.pfpHash ? avatarRefForHash(beacon.pfpHash) : (beacon.pfpUrl || undefined),
         publicKey: beacon.publicKeyHex,
         encryptionPubKey: beacon.encryptionPubHex || undefined,
         createdAt: new Date(beacon.timestamp).toISOString(),

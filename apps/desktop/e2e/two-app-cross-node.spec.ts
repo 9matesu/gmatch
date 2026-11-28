@@ -2,10 +2,11 @@
  * BATCH 2.5 / D3 â€” CROSS-NODE two-app proof. NO PINNING.
  *
  * App 1: browser dev (Playwright webServer vite :5273, whose /api proxy rides
- *        its own fresh Bun node on :8791 â€” playwright.config.ts).
+ *        its own fresh Bun node on GMATCH_E2E_PORT (default :8791) â€” playwright.config.ts).
  * App 2: the UNPACKAGED Electron shell (Playwright _electron), whose renderer
  *        loads the same vite bundle but has the preload bridge, its own
- *        userData and its OWN sidecar at window.__API_BASE__ = :8793
+ *        userData and its OWN sidecar at window.__API_BASE__ =
+ *        GMATCH_E2E_ELECTRON_PORT (default :8793)
  *        (electron/dev-runtime.cjs).
  *
  * Neither renderer is pointed at the other's node: any stored `gmatch.api.url`
@@ -26,7 +27,9 @@ import { seedApp } from './helpers'
 
 const SHOTS = 'I:/temp/opencode/batch25-cross'
 const APP_DIR = fileURLToPath(new URL('../', import.meta.url))
-const ELECTRON_API = 'http://127.0.0.1:8793'
+const E2E_PORT = process.env.GMATCH_E2E_PORT || '8791'
+const ELECTRON_PORT = process.env.GMATCH_E2E_ELECTRON_PORT || '8793'
+const ELECTRON_API = `http://127.0.0.1:${ELECTRON_PORT}`
 const BROWSER_NAME = 'CrossNode Browser'
 const ELECTRON_NAME = 'CrossNode Electron'
 const MSG = 'cross-node sealed hello from the browser'
@@ -105,7 +108,7 @@ async function clearApiOverride(page: Page) {
   })
 }
 
-/** Publish a real name on the app's OWN node (browser -> :8791, shell -> :8793). */
+/** Publish a real name on the app's OWN node (browser -> E2E_PORT, shell -> ELECTRON_PORT). */
 async function publishDisplayName(page: Page, name: string) {
   await expect
     .poll(
@@ -191,8 +194,8 @@ test('browser and Electron on separate nodes see each other, chat, post and stay
       env: {
         ...process.env,
         // The shell gets its own dev-runtime userData + sidecar. The vite
-        // webServer already owns :8791, so never let the shell claim it.
-        GMATCH_DEV_API_PORT: '8793',
+        // webServer already owns E2E_PORT, so never let the shell claim it.
+        GMATCH_DEV_API_PORT: ELECTRON_PORT,
         VITE_DEV_SERVER_URL: baseURL,
         STORAGE_ENCRYPTION_KEY: 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90',
       },
@@ -202,7 +205,7 @@ test('browser and Electron on separate nodes see each other, chat, post and stay
     pageShell.on('dialog', (dialog) => { void dialog.accept().catch(() => {}) })
     pageBrowser.on('dialog', (dialog) => { void dialog.accept().catch(() => {}) })
 
-    await waitForNode('http://127.0.0.1:8791', 'browser dev node')
+    await waitForNode(`http://127.0.0.1:${E2E_PORT}`, 'browser dev node')
     await waitForNode(ELECTRON_API, 'electron node')
 
     const idBrowser = await seedApp(pageBrowser, { displayName: BROWSER_NAME })
@@ -369,7 +372,7 @@ test('browser and Electron on separate nodes see each other, chat, post and stay
     console.log(`ALL CROSS-NODE LEGS PASS; screenshots in ${SHOTS}`)
   } finally {
     // A native Electron dialog can keep close() pending forever; bound it,
-    // then tree-kill the child so no orphan holds the :8793 sidecar for a
+    // then tree-kill the child so no orphan holds the ELECTRON_PORT sidecar for a
     // later run.
     try {
       await Promise.race([

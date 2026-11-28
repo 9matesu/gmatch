@@ -1,11 +1,15 @@
 "use client";
 
+import { useMemo } from 'react';
 // Extracted verbatim from App.tsx `mainView === 'profile'` branch.
 import type { OrbitIdentity } from '@orbit/crypto';
 import { setSecureItem } from '../../utils/secure-storage'
 import type { OrbitObject, User } from '@orbit/shared';
 import { GMatchProfile } from '../profile/GMatchProfile';
 import type { FeedPost, PostComment } from '../feed/GMatchFeed';
+import { ObjectImage } from '../ObjectImage';
+import { useGame } from '../../game/store';
+import { classes, COLOR, GAP, PADDING, RADIUS, TYPE, WEIGHT } from '../../ui/tokens';
 
 type ToastFn = (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 type MyProfileState = { displayName: string; tags: string[]; isAdmin: boolean; pfpUrl: string; bio?: string; website?: string };
@@ -80,6 +84,11 @@ export function ProfileView({
   /** Repost from a profile text card (gated: no handler, no repost row). */
   onRepostPost?: (post: FeedPost) => void;
 }) {
+  // Uploads are stored as Vault keepsakes (content-addressed bytes), not as
+  // cards. Read the same source as the Vault so both surfaces agree: a forged
+  // card lives in `cards`, a plain upload lives here as media.
+  const gallery = useGame((s) => s.gallery);
+  const media = useMemo(() => gallery.slice(-12).reverse(), [gallery]);
   return (
     <div className="p-4 sm:p-6 w-full max-w-3xl mx-auto">
       <GMatchProfile
@@ -147,6 +156,30 @@ export function ProfileView({
         onEditPost={onEditPost}
         onRepostPost={onRepostPost}
       />
+      {media.length > 0 && (
+        <section
+          aria-label="Profile media"
+          className={classes('mt-4 border', COLOR.edge, RADIUS.panel, COLOR.surfaceRaised, PADDING[4])}
+        >
+          <h2 className={classes(TYPE.sub, WEIGHT.heading, COLOR.fg)}>Media ({gallery.length})</h2>
+          <div className={classes('grid grid-cols-3 sm:grid-cols-4', GAP[2])}>
+            {media.map((keep) => (
+              <div key={keep.id} className={classes('aspect-square overflow-hidden border', COLOR.edge, COLOR.canvasSurface, RADIUS.control)}>
+                <ObjectImage
+                  contentUrl={keep.url}
+                  objectId={keep.localRef || keep.url}
+                  contentHash={keep.localRef}
+                  mimeType={keep.kind === 'video' ? 'video/mp4' : undefined}
+                  identity={identity}
+                  alt=""
+                  thumb
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

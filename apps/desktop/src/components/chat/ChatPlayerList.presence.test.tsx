@@ -30,18 +30,16 @@ describe('ChatPlayerList presence decay (no ghosts)', () => {
     try { window.localStorage?.clear() } catch {}
   })
 
-  it('shows a stale online:true flag as offline once its timestamp decays', () => {
+  it('drops a stale online:true flag once its timestamp decays', () => {
     // Snapshot is fresh (just mounted) but the sighting is 10 min old:
-    // server truth says this player left — must not show "Active now".
+    // server truth says this player left — no row at all, not "Seen 10m ago".
     render(
       <ChatPlayerList
         identity={identity}
         users={[baseUser('ghost', { display_name: 'Ghost', online: true, last_seen: ago(10 * 60_000) })]}
       />,
     )
-    expect(row('Ghost').queryByText('Active now')).toBeNull()
-    expect(row('Ghost').getByLabelText('Offline')).toBeDefined()
-    expect(row('Ghost').getByText(/Seen /)).toBeDefined()
+    expect(screen.queryByTitle("View Ghost's profile")).toBeNull()
   })
 
   it('treats space-separated SQLite timestamps as UTC, not local time', () => {
@@ -54,8 +52,7 @@ describe('ChatPlayerList presence decay (no ghosts)', () => {
         users={[baseUser('stale-sql', { display_name: 'StaleSql', online: true, last_seen: sqliteStale })]}
       />,
     )
-    expect(row('StaleSql').queryByText('Active now')).toBeNull()
-    expect(row('StaleSql').getByLabelText('Offline')).toBeDefined()
+    expect(screen.queryByTitle("View StaleSql's profile")).toBeNull()
   })
 
   it('keeps a fresh sighting online even when the flag lags', () => {
@@ -84,8 +81,7 @@ describe('ChatPlayerList presence decay (no ghosts)', () => {
         users={[baseUser('leaver', { display_name: 'Leaver', online: false, last_seen: ago(5 * 60_000) })]}
       />,
     )
-    expect(row('Leaver').queryByText('Active now')).toBeNull()
-    expect(row('Leaver').getByLabelText('Offline')).toBeDefined()
+    expect(screen.queryByTitle("View Leaver's profile")).toBeNull()
   })
 
   it('header shows server counts while the dashboard snapshot is fresh', async () => {
@@ -100,7 +96,7 @@ describe('ChatPlayerList presence decay (no ghosts)', () => {
     } as Response)
     render(<ChatPlayerList identity={null} users={[]} />)
     expect(await screen.findByText('5')).toBeDefined()
-    expect(await screen.findByText(/12 24h/)).toBeDefined()
+    expect(await screen.findByText(/0 connecting/)).toBeDefined()
   })
 
   it('the roster wins over a fresh server count for the online number', async () => {
@@ -120,7 +116,7 @@ describe('ChatPlayerList presence decay (no ghosts)', () => {
     })
     render(<ChatPlayerList identity={identity} users={[]} roster={roster} />)
     // Let the dashboard snapshot land so it would have claimed 5.
-    await screen.findByText(/12 24h/)
+    await screen.findByText(/0 connecting/)
     expect(screen.getByText('2')).toBeDefined()
     expect(screen.queryByText('5')).toBeNull()
     act(() => { roster.markOffline('a') })
@@ -145,7 +141,7 @@ describe('ChatPlayerList roster rows (the one roster owns the list)', () => {
       roster.upsert(baseUser('cross-node', { display_name: 'Signed Roster Name', online: true, last_seen: fresh() }))
     })
     render(<ChatPlayerList identity={identity} users={[]} roster={roster} />)
-    await screen.findByText(/7 24h/) // dashboard lands; roster still owns the rows
+    await screen.findByText(/0 connecting/) // dashboard lands; roster still owns the rows
     const subject = row('Signed Roster Name')
     expect(subject.getByText('Signed Roster Name')).toBeDefined()
     expect(subject.getByText('Active now')).toBeDefined()
@@ -160,7 +156,7 @@ describe('ChatPlayerList roster rows (the one roster owns the list)', () => {
       roster.upsert(baseUser('only-here', { display_name: 'RosterRider', online: true, last_seen: fresh() }))
     })
     render(<ChatPlayerList identity={identity} users={[]} roster={roster} />)
-    await screen.findByText(/7 24h/)
+    await screen.findByText(/0 connecting/)
     // The dashboard claims 9 online; the roster has exactly one.
     expect(screen.getByText('1')).toBeDefined()
     expect(screen.queryByText('9')).toBeNull()
@@ -177,11 +173,10 @@ describe('ChatPlayerList roster rows (the one roster owns the list)', () => {
       roster.upsert(baseUser('live', { display_name: 'LivePeer', online: true, last_seen: fresh() }))
     })
     render(<ChatPlayerList identity={identity} users={[]} roster={roster} />)
-    await screen.findByText(/7 24h/)
+    await screen.findByText(/0 connecting/)
     expect(row('LivePeer').getByText('Active now')).toBeDefined()
     act(() => { roster.markOffline('live') })
-    expect(row('LivePeer').queryByText('Active now')).toBeNull()
-    expect(row('LivePeer').getByText(/Seen /)).toBeDefined()
+    expect(screen.queryByTitle("View LivePeer's profile")).toBeNull()
   })
 
   it('a nameless roster row uses the shared fallback, never the literal User', async () => {
@@ -190,7 +185,7 @@ describe('ChatPlayerList roster rows (the one roster owns the list)', () => {
       roster.upsert(baseUser('abcdef123456', { display_name: '', online: true, last_seen: fresh() }))
     })
     render(<ChatPlayerList identity={identity} users={[]} roster={roster} />)
-    await screen.findByText(/7 24h/)
+    await screen.findByText(/0 connecting/)
     expect(screen.getByText(generateFallbackName('abcdef123456'))).toBeDefined()
     expect(screen.queryByText('User')).toBeNull()
   })
@@ -207,7 +202,7 @@ describe('ChatPlayerList roster rows (the one roster owns the list)', () => {
         roster={roster}
       />,
     )
-    await screen.findByText(/7 24h/)
+    await screen.findByText(/0 connecting/)
     expect(row('Known Name').getByText('Known Name')).toBeDefined()
     expect(screen.queryByText('User')).toBeNull()
   })
@@ -220,7 +215,7 @@ describe('ChatPlayerList roster rows (the one roster owns the list)', () => {
       return unsubscribe
     })
     const { unmount } = render(<ChatPlayerList identity={identity} users={[]} roster={roster} />)
-    await screen.findByText(/7 24h/)
+    await screen.findByText(/0 connecting/)
     expect(subscribe).toHaveBeenCalledTimes(1)
     unmount()
     expect(unsubscribe).toHaveBeenCalledTimes(1)

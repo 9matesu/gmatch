@@ -182,6 +182,74 @@ describe('useFeedController projection stability', () => {
     expect(invalidateCache).toHaveBeenCalledWith('/api/posts')
   })
 
+  it('keeps the last good timeline when a refresh fails', async () => {
+    // The node can die between two reads. A 502 (or a network throw) is not an
+    // empty feed: the rows already on screen came from a real answer and must
+    // stay, with an honest offline status instead of "No posts yet".
+    let calls = 0
+    vi.mocked(orbitFetch).mockImplementation(async () => {
+      calls += 1
+      if (calls === 1) {
+        return { ok: true, status: 200, json: async () => ({ posts: [post('a'), post('b'), post('c')] }) } as Response
+      }
+      return { ok: false, status: 502, json: async () => ({}) } as Response
+    })
+
+    const { result } = renderHook(() => useFeedController({
+      identity: { orbitId: 'refresh-failure' } as never,
+      users: USERS,
+      profilePics: PROFILE_PICS,
+      myProfile: MY_PROFILE,
+      items: ITEMS,
+      deletedPostIds: DELETED,
+      archivedPostIds: ARCHIVED,
+      feedSort: 'latest',
+      normalizePost: normalizeFeedPost,
+    }))
+
+    await act(async () => { await result.current.load() })
+    expect(result.current.posts.map((p) => p.id)).toEqual(['a', 'b', 'c'])
+    expect(result.current.status).toBe('ready')
+
+    await act(async () => { await result.current.refresh() })
+    expect(result.current.status).toBe('offline')
+    expect(result.current.posts.map((p) => p.id)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('does not wipe a populated timeline when the node answers empty on refresh', async () => {
+    // A sidecar that restarted with a fresh DB can answer 200 with no rows.
+    // That is not "nobody posted" for a device that already read three posts:
+    // keep the last good rows and say the refresh did not confirm them.
+    let calls = 0
+    vi.mocked(orbitFetch).mockImplementation(async () => {
+      calls += 1
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ posts: calls === 1 ? [post('a'), post('b'), post('c')] : [] }),
+      } as Response
+    })
+
+    const { result } = renderHook(() => useFeedController({
+      identity: { orbitId: 'empty-refresh' } as never,
+      users: USERS,
+      profilePics: PROFILE_PICS,
+      myProfile: MY_PROFILE,
+      items: ITEMS,
+      deletedPostIds: DELETED,
+      archivedPostIds: ARCHIVED,
+      feedSort: 'latest',
+      normalizePost: normalizeFeedPost,
+    }))
+
+    await act(async () => { await result.current.load() })
+    expect(result.current.posts.map((p) => p.id)).toEqual(['a', 'b', 'c'])
+
+    await act(async () => { await result.current.refresh() })
+    expect(result.current.posts.map((p) => p.id)).toEqual(['a', 'b', 'c'])
+    expect(result.current.status).toBe('offline')
+  })
+
   it('drops the previous world\'s timeline when a server switch commits', () => {
     const { result } = renderHook(() => useFeedController({
       identity: null,

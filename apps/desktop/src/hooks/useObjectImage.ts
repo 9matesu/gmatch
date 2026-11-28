@@ -6,7 +6,7 @@ import { getLocalObject, registerLocalObject, requestSwarmObject, PEER_ONLINE_EV
 import { vaultProbe } from '../services/vault'
 import { resolveVideoMime, sniffFileHead } from '../utils/media'
 import { normalizeObjectId, isRequestableObjectId, parseObjectRef } from '../utils/objectRef'
-import { isContentAddress, resolveContentAddressedMedia } from '../utils/contentAddressedMedia'
+import { contentHashFromRef, isContentAddress, resolveContentAddressedMedia } from '../utils/contentAddressedMedia'
 import { countMetric, timeMetric } from '../utils/metrics'
 
 /**
@@ -59,6 +59,14 @@ interface ImageState {
 }
 
 const EMPTY: ObjectImageResult = { url: null, failed: false, isVideo: false, isLink: false, linkUrl: null, awaitingSeeder: false }
+
+/**
+ * A bounded "bytes may have arrived" signal for a foreground reconcile (feed
+ * refresh + pending-transfer resume). Distinct from PEER_ONLINE_EVENT: a peer
+ * coming online is not the only reason a previously missing picture can now
+ * resolve — a resumed swarm transfer or a node coming back can do it too.
+ */
+export const MEDIA_RETRY_EVENT = 'gmatch-media-retry'
 
 function isProtectedObjectUrl(value: string): boolean {
   return value.startsWith('/api/objects/') || value.includes('/api/objects/')
@@ -643,7 +651,15 @@ export function useObjectImage(
   }
 ): ObjectImageResult {
   const enabled = options?.enabled !== false
-  const contentHash = options?.contentHash ?? null
+  // A caller that hands us a hash-bearing ref (`urn:sha256:`, magnet btih, a
+  // bare digest) should NOT also have to pass contentHash: the address is IN
+  // the ref. Deriving it here is the root-cause fix for every media surface —
+  // without it a hash-bearing descriptor hit the legacy ladder and asked
+  // nobody for the bytes, even when a peer was seeding them.
+  const contentHash =
+    (isContentAddress(options?.contentHash) ? options!.contentHash!.toLowerCase() : null) ??
+    contentHashFromRef(cardId) ??
+    null
   // If cardId is already a direct URL (http, https, data, blob, or static endpoint)
   const isDirectUrl = Boolean(cardId && isDirectUrlLike(cardId))
 
@@ -681,7 +697,11 @@ export function useObjectImage(
       if (cur && cur.failed) setRetryNonce((n) => n + 1)
     }
     window.addEventListener(PEER_ONLINE_EVENT, onPeerOnline)
-    return () => window.removeEventListener(PEER_ONLINE_EVENT, onPeerOnline)
+    window.addEventListener(MEDIA_RETRY_EVENT, onPeerOnline)
+    return () => {
+      window.removeEventListener(PEER_ONLINE_EVENT, onPeerOnline)
+      window.removeEventListener(MEDIA_RETRY_EVENT, onPeerOnline)
+    }
   }, [])
 
   useEffect(() => {

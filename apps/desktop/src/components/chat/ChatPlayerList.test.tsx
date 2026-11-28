@@ -37,7 +37,7 @@ describe('ChatPlayerList', () => {
     },
   ]
 
-  it('renders online and 24h offline users and excludes users inactive > 24h', () => {
+  it('lists only live players: offline and long-idle users are not a roster', () => {
     render(
       <ChatPlayerList
         identity={{ orbitId: 'me', publicKeyHex: 'pk', privateKeyHex: 'sk', encryptionPubHex: 'ep', encryptionPrivHex: 'es' }}
@@ -45,12 +45,9 @@ describe('ChatPlayerList', () => {
       />,
     )
 
-    // Alice is online
+    // Alice is online; "Seen 2h ago" and "Seen 48h ago" are dead rows.
     expect(screen.getByText('Alice')).toBeDefined()
-    // Bob is offline (2h ago)
-    expect(screen.getByText('Bob')).toBeDefined()
-    expect(screen.getByText(/2h ago/)).toBeDefined()
-    // OldUser (>24h) should not be displayed
+    expect(screen.queryByText('Bob')).toBeNull()
     expect(screen.queryByText('OldUser')).toBeNull()
   })
 
@@ -71,7 +68,8 @@ describe('ChatPlayerList', () => {
     // Clear search
     const clearBtn = screen.getByLabelText('Clear player search')
     fireEvent.click(clearBtn)
-    expect(screen.getByText('Bob')).toBeDefined()
+    expect(screen.getByText('Alice')).toBeDefined()
+    expect(screen.queryByText('Bob')).toBeNull()
   })
 
   it('keeps player search a compact single-line field', () => {

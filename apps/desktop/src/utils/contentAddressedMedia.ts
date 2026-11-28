@@ -1,6 +1,7 @@
 "use client";
 
 import { getLocalObject, requestSwarmObject, sha256HexBlob } from './p2pSwarm'
+import { resolveObjectRefId } from './objectRef'
 
 /**
  * Content-addressed media ladder (roadmap L4 — a peer post's own bytes).
@@ -82,6 +83,21 @@ export function isLegacyContentHash(value: string | null | undefined): value is 
  */
 export function isContentAddress(value: string | null | undefined): value is string {
   return isContentHash(value) || isLegacyContentHash(value)
+}
+
+/**
+ * The content address NAMED BY a media ref, when it names one. A `urn:sha256:`,
+ * a legacy magnet btih, a bare hex id or `/api/objects/<hex>` all carry the
+ * address a peer actually seeds under; an http(s) URL, a UUID object id or a
+ * descriptor with no hash carry none. ONE helper so every surface can hand the
+ * ladder the address instead of silently falling back to the legacy id path —
+ * the "picture does not load, but the bytes exist on a peer" root cause.
+ */
+export function contentHashFromRef(ref: string | null | undefined): string | null {
+  const id = resolveObjectRefId(ref)
+  if (!id) return null
+  const lower = id.toLowerCase()
+  return isContentAddress(lower) ? lower : null
 }
 
 const defaultDeps: ContentAddressedDeps = {

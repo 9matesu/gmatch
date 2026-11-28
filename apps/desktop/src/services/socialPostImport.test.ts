@@ -8,7 +8,10 @@ import {
 import { projectPosts } from './socialFeedProjection'
 import { sha256HexBlob } from '../utils/p2pSwarm'
 import {
+  AUTO_IMPORT_LIMIT,
   MAX_IMPORT_PER_RUN,
+  __resetAutoReplicateForTests,
+  autoReplicateOwnPosts,
   importOwnPosts,
   type ImportOwnPostsDeps,
   type ImportablePost,
@@ -249,5 +252,40 @@ describe('importOwnPosts (L4 migration)', () => {
     await importOwnPosts(ME, log, { limit: 5_000, deps: deps({ listOwnPosts }) })
 
     expect(listOwnPosts).toHaveBeenCalledWith(MAX_IMPORT_PER_RUN)
+  })
+})
+
+describe('autoReplicateOwnPosts (foreground / peer-online reconcile)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    __resetAutoReplicateForTests()
+  })
+
+  it('flushes the outbox, signs my posts for peers and refreshes the feed once', async () => {
+    const log = new SocialOperationLog(memoryBackend())
+    const flushOutbox = vi.fn(async () => ({ registered: 1 }))
+    const refreshFeed = vi.fn()
+    const d = deps()
+
+    const ran = await autoReplicateOwnPosts(ME, log, {
+      flushOutbox, refreshFeed, importDeps: d,
+    })
+
+    expect(ran).toBe(true)
+    expect(flushOutbox).toHaveBeenCalledOnce()
+    expect(d.listOwnPosts).toHaveBeenCalledWith(AUTO_IMPORT_LIMIT)
+    expect(projectPosts(await log.listAllOperations())).toHaveLength(1)
+    expect(refreshFeed).toHaveBeenCalledOnce()
+  })
+
+  it('does not storm: a second hint inside the interval does no work', async () => {
+    const log = new SocialOperationLog(memoryBackend())
+    const flushOutbox = vi.fn(async () => ({}))
+    const d = deps()
+
+    expect(await autoReplicateOwnPosts(ME, log, { flushOutbox, importDeps: d })).toBe(true)
+    expect(await autoReplicateOwnPosts(ME, log, { flushOutbox, importDeps: d })).toBe(false)
+    expect(flushOutbox).toHaveBeenCalledOnce()
+    expect(d.listOwnPosts).toHaveBeenCalledOnce()
   })
 })

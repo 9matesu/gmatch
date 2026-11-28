@@ -1,57 +1,16 @@
-import { useEffect } from 'react'
-import { useMediaqInstall } from '../../services/mediaqInstall'
-
 /**
- * One-shot mediaq setup suite.
+ * Mediaq is opt-in, not part of first-run.
  *
- * On first load, if mediaq is not installed (and the desktop bridge exists), the
- * suite opens ONCE. It is marked as "shown" once the install finishes or the
- * player closes it, so it never nags — but a mid-install crash leaves it unshown,
- * so it returns next run. The app is fully usable offline without mediaq.
+ * This hook used to open the one-shot installer on the very first launch (as
+ * soon as the bridge reported mediaq missing), which put a media-suite modal
+ * in front of the age gate and onboarding. Nothing is auto-shown on startup
+ * any more: the installer stays reachable later from Settings → Preferences
+ * (MediaqSection) and from the notification centre's "Show setup" button —
+ * both call useMediaqInstall.openModal() directly.
+ *
+ * Kept as a hook because App.tsx calls it once at boot; it is deliberately a
+ * no-op so future callers keep the same import path.
  */
-
-const SETUP_KEY = 'gmatch.mediaq.setup.v1'
-
-function alreadyShown(): boolean {
-  try {
-    return localStorage.getItem(SETUP_KEY) === '1'
-  } catch {
-    return true // private mode: do not nag
-  }
-}
-
 export function useMediaqSetup(): void {
-  useEffect(() => {
-    let live = true
-    if (!alreadyShown()) {
-      const g = window.gmatch
-      if (g?.mediaqStatus) {
-        void g
-          .mediaqStatus()
-          .then((st) => {
-            if (live && !st.installed) useMediaqInstall.getState().openModal()
-          })
-          .catch(() => {
-            /* offline probe failed: try again next launch */
-          })
-      }
-    }
-
-    // Mark the suite as handled once it is done or explicitly dismissed.
-    const unsub = useMediaqInstall.subscribe((s, prev) => {
-      if (s.status === prev.status) return
-      const settled = s.status === 'done' || (s.status === 'idle' && prev.status !== 'idle')
-      if (!settled) return
-      try {
-        localStorage.setItem(SETUP_KEY, '1')
-      } catch {
-        /* ignore */
-      }
-    })
-
-    return () => {
-      live = false
-      unsub()
-    }
-  }, [])
+  return
 }

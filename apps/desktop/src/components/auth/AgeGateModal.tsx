@@ -45,9 +45,10 @@ export function AgeGateModal() {
         className={classes('bg-retro-bg border border-edge rounded-xl max-w-md w-full p-6 sm:p-7 shadow-2xl space-y-5 text-center flex flex-col items-center', MOTION.keyframe.slideUp, 'text-retro-fg')}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Brand lockup + the age icon: the gate stays unchanged, only the
-            name now renders through the same lockup as the header/splash. */}
-        <Brand />
+        {/* Brand lockup + the age icon: the shipped icon.png mark (LOGO.markSrc)
+            renders at the hero size here and in onboarding, so both first-run
+            surfaces show the same brand asset. The 18+ decision is unchanged. */}
+        <Brand size="hero" />
         <div className="w-12 h-12 rounded-xl bg-retro-panel border border-edge text-retro-fg flex items-center justify-center">
           <ShieldAlert className="w-6 h-6 text-retro-fg" />
         </div>

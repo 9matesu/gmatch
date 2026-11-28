@@ -9,6 +9,7 @@ import { dataUrlToFile } from '../utils/mediaData'
 import { useCropper } from '../hooks/useCropper'
 import { isCropableImage } from './CropModal'
 import { forgeMediaLocally } from '../services/mediaForge'
+import { rememberUploadedMediaKeep } from '../utils/mediaVault'
 import { UploadCloud, Camera, Link as LinkIcon, X, Check, Loader2, ImagePlus } from 'lucide-react'
 
 interface IdentityLike {
@@ -164,6 +165,10 @@ export function AttachmentUploadModal({
             isChat: true,
             recipients: recipientStr,
           })
+          // The bytes are already durable in the vault; record ONE keepsake so
+          // this attachment shows in the Vault/profile media, never as a card.
+          // A failed record never fakes a delivered message.
+          void rememberUploadedMediaKeep(forged, { tags: [] }).catch(() => { })
           onSuccess({
             id: forged.id,
             url: `/api/objects/${forged.id}`,

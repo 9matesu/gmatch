@@ -136,6 +136,16 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
   const gallery = useGame((s) => s.gallery)
   const popCap = useGame((s) => s.popCap)
 
+  // Motion foes autoplay muted (Chromium requires it). One mute state for the
+  // whole clicker: right-click toggles sound instead of a purge or the global
+  // media/wallpaper menu. preventDefault makes the window handler bail out.
+  const [motionMuted, setMotionMuted] = useState(true)
+  const toggleMotionMute = (e: MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setMotionMuted((m) => !m)
+  }
+
   const [floats, setFloats] = useState<Float[]>([])
   const [critFlash, setCritFlash] = useState(false)
   const [failedUrl, setFailedUrl] = useState<string | null>(null)
@@ -744,8 +754,13 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                 // Keyboard activation arrives as click with detail 0.
                 onClick={(e) => handleCellClick(i, e)}
                 onAuxClick={handleAuxClick}
-                onContextMenu={(e) => { e.preventDefault(); purgePost(cell.post) }}
-                aria-label={`Foe ${i + 1}: ${name}, ${rarity}, ${Math.ceil(cell.hp)} of ${cell.maxHp} HP. Activate to attack, drag to reorder, right-click to purge`}
+                onContextMenu={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  if (motion) { setMotionMuted((m) => !m); return }
+                  purgePost(cell.post)
+                }}
+                aria-label={`Foe ${i + 1}: ${name}, ${rarity}, ${Math.ceil(cell.hp)} of ${cell.maxHp} HP. Activate to attack, drag to reorder, right-click to ${motion ? (motionMuted ? 'unmute' : 'mute') : 'purge'}`}
               >
                 {motion ? (
                   <video
@@ -754,7 +769,7 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
                     poster={cell.post.preview ? redgifsPlayable(cell.post.preview) : undefined}
                     autoPlay
                     loop
-                    muted
+                    muted={motionMuted}
                     playsInline
                     preload="auto"
                     controls={reduceMotion}
@@ -878,7 +893,9 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               }}
               onClick={(e) => { if (e.detail === 0) handleClick(e) }}
               onAuxClick={handleAuxClick}
+              onContextMenu={isMotion ? toggleMotionMute : undefined}
               aria-label="Attack the current foe"
+              title={isMotion ? (motionMuted ? 'Right-click to unmute' : 'Right-click to mute') : undefined}
               className="absolute inset-0 z-[2] cursor-pointer"
             />
           )}
@@ -926,10 +943,11 @@ export default function GoonPanel({ headerRight }: { headerRight?: React.ReactNo
               poster={current.preview ? redgifsPlayable(current.preview) : undefined}
               autoPlay
               loop
-              muted
+              muted={motionMuted}
               playsInline
               preload="auto"
               controls={reduceMotion}
+              onContextMenu={toggleMotionMute}
               onError={onImageError}
             />
           ) : !showOffline && shownUrl ? (

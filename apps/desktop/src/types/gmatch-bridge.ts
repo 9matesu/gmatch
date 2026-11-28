@@ -110,6 +110,8 @@ export interface GmatchBridge {
   secureSet?: (key: string, value: string) => Promise<void>
   secureDelete?: (key: string) => Promise<void>
   serverState?: () => Promise<{ packaged: boolean; mode: 'host' | 'client'; url: string; worldId?: string; lanUrls: string[]; nodeOwnerId?: string | null; pausedUrl?: string; pausedReason?: 'legacy' | 'unreachable' }>
+  radminStatus?: () => Promise<{ installed: boolean; ip: string | null }>
+  radminJoin?: (name: string, password: string) => Promise<{ status: 'joined' | 'failed'; ip?: string; reason?: string }>
   /** Bind this install's first identity as owner; sticky across account switches. */
   claimAdminOwner?: (orbitId: string) => Promise<{ ok: boolean; orbitId?: string; error?: string } | null>
   winMinimize?: () => void

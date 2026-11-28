@@ -95,6 +95,34 @@ describe('GoonPanel click feedback', () => {
     expect(container.querySelector('video')).toBe(video)
   })
 
+  it('right-click unmutes a motion foe and right-click again mutes it', () => {
+    useGame.setState({ viewMode: '1x1', current: post('foe-1', 'video'), foeHp: 100, foeMaxHp: 100, imageReady: true } as never)
+    const { container } = render(<GoonPanel />)
+    const video = container.querySelector('video')!
+    const attack = screen.getByLabelText('Attack the current foe')
+
+    expect(video.muted).toBe(true)
+    fireEvent.contextMenu(attack)
+    expect(video.muted).toBe(false)
+    fireEvent.contextMenu(attack)
+    expect(video.muted).toBe(true)
+  })
+
+  it('a right-click on a motion grid square toggles sound, not a purge', () => {
+    const motionCell = { post: post('g-video', 'video'), hp: 100, maxHp: 100, clicks: 0 } as GridCell
+    seedGrid([motionCell, cell('g-2', 100, 100), cell('g-3', 100, 100), cell('g-4', 100, 100)])
+    const { container } = render(<GoonPanel />)
+    const video = container.querySelector('video')!
+    expect(video.muted).toBe(true)
+
+    fireEvent.contextMenu(screen.getByRole('button', { name: /Foe 1:/ }))
+    expect(video.muted).toBe(false)
+    // Still-image squares keep saying purge; only motion squares toggle sound.
+    expect(screen.getByRole('button', { name: /Foe 2:/ }).getAttribute('aria-label')).toContain('right-click to purge')
+    expect(container.querySelector('video')).toBe(video)
+    seedSingle(100, 100)
+  })
+
   it('does not remount the image element when the stage is clicked', () => {
     useGame.setState({ viewMode: '1x1', current: post('foe-1'), foeHp: 100, foeMaxHp: 100, imageReady: true } as never)
     const { container } = render(<GoonPanel />)

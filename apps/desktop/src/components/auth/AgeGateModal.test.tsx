@@ -2,6 +2,7 @@
 import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AgeGateModal } from './AgeGateModal';
+import { LOGO } from '../../ui/tokens';
 
 beforeEach(() => {
   const store = new Map<string, string>();
@@ -27,5 +28,13 @@ describe('AgeGateModal', () => {
     localStorage.setItem('goonMatch_age_verified', 'true');
     const { container } = render(<AgeGateModal />);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('shows the shipped icon.png mark on the age gate', () => {
+    const { container } = render(<AgeGateModal />);
+    const mark = container.querySelector('img');
+    expect(mark, 'the brand mark must render').not.toBeNull();
+    expect(mark?.getAttribute('src')).toBe(LOGO.markSrc);
+    expect(mark?.className).toContain('w-(--logo-mark-size-hero)');
   });
 });

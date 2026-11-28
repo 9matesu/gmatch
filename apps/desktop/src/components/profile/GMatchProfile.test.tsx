@@ -303,4 +303,30 @@ describe('GMatchProfile', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Comment' }));
     expect(container.querySelector('[data-expanded-post="saved-comment"]')).toBeInTheDocument();
   });
+
+  it('header aligns avatar, name and readable counts with a single action row', () => {
+    render(
+      <GMatchProfile
+        identity={fakeIdentity}
+        myUser={fakeUser}
+        posts={[]}
+        cards={[]}
+        followingIds={['user_2']}
+      />,
+    );
+    // Avatar + name are present.
+    expect(screen.getByRole('button', { name: 'Change profile photo' })).toBeInTheDocument();
+    expect(screen.getByText('Alice Wonder')).toBeInTheDocument();
+    // The three counts are readable (the number is the larger, tabular step).
+    for (const label of ['posts', 'followers', 'following']) {
+      const labelEl = screen.getByText(label);
+      const valueEl = labelEl.previousElementSibling as HTMLElement;
+      expect(valueEl.className).toContain('text-lg');
+      expect(valueEl.className).toContain('tabular-nums');
+    }
+    // Exactly ONE of each action — no duplicated action rows.
+    expect(screen.getAllByRole('button', { name: 'Edit profile' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Share' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Profile settings' })).toHaveLength(1);
+  });
 });

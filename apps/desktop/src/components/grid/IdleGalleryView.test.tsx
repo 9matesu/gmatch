@@ -494,6 +494,41 @@ describe('IdleGalleryView', () => {
     }
   })
 
+  it('plays a stored video inline from the vault loopback URL even without a kind flag', async () => {
+    const playStub = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(window.HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      writable: true,
+      value: playStub,
+    })
+    const hash = 'd'.repeat(64)
+    const raw = `vault://f/${hash}`
+    const loopback = `http://127.0.0.1:9/v/${hash}.mp4`
+    const source = 'https://example.com/clip.mp4'
+    vaultMap[source] = raw
+    vaultHttpMap[raw] = loopback
+    const keep: GalleryImage = {
+      id: 'k-video-vault', url: source, tags: ['t'], rarityBase: 1, clicks: 0,
+      rarity: 'Common', boughtAt: 1, saveState: 'persisted', localRef: hash,
+      // no `kind`: keeps saved from the clicker cache before kind was recorded
+    }
+    useGame.setState({ gallery: [keep] })
+
+    render(<IdleGalleryView />)
+    await userEvent.click(screen.getAllByRole('button', { name: /^View /i })[0])
+
+    const dialog = screen.getByRole('dialog', { name: 'Keepsake viewer' })
+    await waitFor(() => {
+      expect(dialog.querySelector('video')?.getAttribute('src')).toBe(loopback)
+    })
+    const video = dialog.querySelector('video')!
+    // Raw vault:// would not play inline; the loopback server speaks Range.
+    expect(video.getAttribute('src')).not.toMatch(/^vault:/)
+    expect(video.muted).toBe(true) // silent autoplay, controls still offer sound
+    expect(video).toHaveAttribute('preload', 'auto')
+    expect(video).toHaveAttribute('autoplay')
+  })
+
   it('never hotlinks the provider for a keep verified local whose bytes are gone', () => {
     // A keep verified local is supposed to have bytes on disk; a remote
     // hotlink would hide a broken or evicted vault entry behind a working tile.

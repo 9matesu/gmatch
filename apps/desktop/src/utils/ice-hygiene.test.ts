@@ -4,6 +4,8 @@ import {
   defaultIceConfig,
   iceServersFor,
   isLiteralIp,
+  isRadminHostCandidate,
+  isRadminVpnAddress,
   normalizeTurnEnv,
   parseCandidate,
   peerConnectionConfig,
@@ -13,6 +15,7 @@ import {
 } from './ice-hygiene'
 
 const hostV4 = 'candidate:1 1 udp 2122260223 192.168.1.5 54321 typ host'
+const radminHost = 'candidate:1 1 udp 2122260223 26.0.0.135 54321 typ host'
 
 const mdnsHost = 'candidate:1 1 udp 2122260223 my-laptop.local 54321 typ host'
 const hostV6 = 'candidate:1 1 udp 2122260223 2001:db8::42 54321 typ host'
@@ -28,6 +31,14 @@ describe('isLiteralIp', () => {
     expect(isLiteralIp('fe80::1')).toBe(true)
     expect(isLiteralIp('my-laptop.local')).toBe(false)
     expect(isLiteralIp('')).toBe(false)
+  })
+
+  it('treats a Radmin VPN 26.x address as signalable, not a leaking literal', () => {
+    expect(isRadminVpnAddress('26.0.0.135')).toBe(true)
+    expect(isRadminVpnAddress('26.255.255.255')).toBe(true)
+    expect(isRadminVpnAddress('27.0.0.1')).toBe(false)
+    expect(isRadminVpnAddress('192.168.1.5')).toBe(false)
+    expect(isLiteralIp('26.0.0.135')).toBe(false)
   })
 })
 
@@ -51,6 +62,17 @@ describe('candidateLeaksIp', () => {
     expect(candidateLeaksIp('candidate:1 1 udp 2122260223 fd00::1 54321 typ host')).toBe(true)
     expect(candidateLeaksIp('candidate:1 1 udp 2122260223 fe80::1 54321 typ host')).toBe(true)
     expect(candidateLeaksIp(mdnsHost)).toBe(false)
+  })
+
+  it('signals a Radmin VPN 26.x host candidate, still drops RFC1918/CGNAT', () => {
+    expect(candidateLeaksIp(radminHost)).toBe(false)
+    expect(isRadminHostCandidate(radminHost)).toBe(true)
+    expect(isRadminHostCandidate(hostV4)).toBe(false)
+    // Private LAN ranges stay hidden — Radmin does NOT open all private space.
+    expect(candidateLeaksIp('candidate:1 1 udp 2122260223 10.0.0.1 54321 typ host')).toBe(true)
+    expect(candidateLeaksIp('candidate:1 1 udp 2122260223 172.16.5.5 54321 typ host')).toBe(true)
+    // CGNAT 100.64/10 is dropped too.
+    expect(candidateLeaksIp('candidate:1 1 udp 2122260223 100.64.0.1 54321 typ host')).toBe(true)
   })
 
   it('srflx IS the NAT traversal — reflexive candidates are exchanged', () => {
@@ -92,18 +114,19 @@ describe('turnCredentials + config', () => {
     ).toEqual({ url: 'turn:x', username: 'u', credential: 'p' })
   })
 
-  it('without TURN: STUN only, no forced transport policy', () => {
+  it('without TURN: no ICE servers, no forced transport policy', () => {
     const cfg = peerConnectionConfig(null)
-    expect(cfg.iceServers!.length).toBe(STUN_SERVERS.length)
+    expect(cfg.iceServers).toEqual([])
     expect(cfg.iceTransportPolicy).toBeUndefined()
   })
 
   it('with TURN: relay-only transport (no direct P2P, no IP exposure)', () => {
     const turn = { url: 'turn:x', username: 'u', credential: 'p' }
     const cfg = peerConnectionConfig(turn)
+    expect(cfg.iceServers).toEqual([{ urls: 'turn:x', username: 'u', credential: 'p' }])
     expect(cfg.iceServers!.length).toBe(STUN_SERVERS.length + 1)
     expect(cfg.iceTransportPolicy).toBe('relay')
-    // TURN is appended after the STUN list, wherever that list ends.
+    // TURN is appended to the (empty) STUN list, so it is the only server.
     expect(iceServersFor(turn).some((s) => s.urls === 'turn:x')).toBe(true)
   })
 
@@ -112,24 +135,22 @@ describe('turnCredentials + config', () => {
   // and an explicit env/Settings TURN is the only way to get a relay path.
   it('no baked TURN: the dead free relay is not offered', () => {
     const cfg = defaultIceConfig({})
-    expect(cfg.iceServers!.every((s) => String(s.urls).startsWith('stun:'))).toBe(true)
+    expect(cfg.iceServers).toEqual([])
     expect(cfg.iceServers!.some((s) => String(s.urls).includes('openrelay'))).toBe(false)
   })
 
-  it('STUN is one public, stateless endpoint (Cloudflare) — not four', () => {
-    // One server, not a redundant list: every extra provider is one more
-    // "Failed to resolve address" line in Chromium's log when DNS cannot reach
-    // it, and the WS-relay swarm is the fallback. Keep this at one.
-    expect(STUN_SERVERS).toHaveLength(1)
-    expect(STUN_SERVERS[0]).toEqual({ urls: 'stun:stun.cloudflare.com:3478' })
-    expect(STUN_SERVERS.every((s) => String(s.urls).startsWith('stun:'))).toBe(true)
+  it('no STUN by default: an unreachable resolver cannot spam the log per peer', () => {
+    // Direct is host candidates only (mDNS, global IPv6, Radmin); a STUN host
+    // this network cannot resolve printed one DNS error per peer for no route.
+    expect(STUN_SERVERS).toEqual([])
+    expect(defaultIceConfig({}).iceServers).toEqual([])
+    expect(iceServersFor(null)).toEqual([])
   })
 
-  it('defaultIceConfig: no config → STUN only, NOT forced relay', () => {
+  it('defaultIceConfig: no config → no ICE servers, NOT forced relay', () => {
     const cfg = defaultIceConfig({})
     expect(cfg.iceServers).toEqual(STUN_SERVERS)
-    expect(cfg.iceServers!.length).toBe(STUN_SERVERS.length)
-    expect(cfg.iceServers!.some((s) => String(s.urls).startsWith('stun:'))).toBe(true)
+    expect(cfg.iceServers!.length).toBe(0)
     expect(cfg.iceTransportPolicy).toBeUndefined()
   })
 
@@ -170,7 +191,7 @@ describe('turnCredentials + config', () => {
       setItem: (k: string, v: string) => { store.set(k, v) },
       removeItem: (k: string) => { store.delete(k) },
     })
-    // Nothing saved → STUN only, direct/srflx wins, no dead relay in the list.
+    // Nothing saved → no ICE servers, host candidates are the direct path.
     expect(defaultIceConfig({}).iceServers).toEqual(STUN_SERVERS)
     expect(defaultIceConfig({}).iceTransportPolicy).toBeUndefined()
     // A stored TURN is the only relay path and forces the zero-exposure posture.

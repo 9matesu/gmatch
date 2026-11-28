@@ -6,7 +6,7 @@
 // Dev/browser builds fall back to the old release.json check that links
 // straight to the download.
 import { useEffect, useState } from 'react';
-import { Download, RefreshCw, ShieldCheck, ShieldAlert, Rocket, Sparkles } from 'lucide-react';
+import { Download, RefreshCw, ShieldCheck, ShieldAlert, Rocket } from 'lucide-react';
 import { getApiBaseUrl } from '../../utils/api';
 import { isNewer } from '../../utils/version';
 import { playPress } from '../../utils/sounds';
@@ -165,16 +165,6 @@ export function UpdateSection({ toast }: {
             className="px-3 py-1.5 rounded-lg border border-edge text-xs text-retro-muted hover:text-retro-fg disabled:opacity-40 cursor-pointer flex items-center gap-1.5"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${busy ? 'animate-spin' : ''}`} /> {busy ? 'Checking…' : 'Check for updates'}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              playPress(700);
-              window.dispatchEvent(new CustomEvent('gmatch-open-changelog'));
-            }}
-            className="px-3 py-1.5 rounded-lg border border-edge text-xs text-retro-muted hover:text-retro-fg cursor-pointer flex items-center gap-1.5"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-retro-accent" /> What&apos;s New
           </button>
         </div>
       </div>

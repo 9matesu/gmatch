@@ -1,6 +1,6 @@
 import { Context, Next } from 'hono'
 
-const MAX_BODY_SIZE = 1_048_576 // 1MB
+const MAX_BODY_SIZE = 64 * 1024 * 1024 // 64MB — a 1.2MB video POST must not be refused
 const MAX_MULTIPART_SIZE = 104_857_600 // 100MB for file uploads
 
 export async function bodySizeLimit(c: Context, next: Next) {

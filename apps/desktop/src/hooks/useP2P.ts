@@ -14,8 +14,9 @@ import { broadcastPresence, fetchPresenceRosterFrom } from '../services/courierP
 import { startMesh, meshPeerAsUser, type MeshHandle } from '../utils/mesh/mesh';
 import { readSettings } from './useSettings';
 import { knownNodes, normalizeNodeUrl, rememberKnownNode, rememberPeerNode, peerNodeFor } from '../utils/peerNodes';
-import { broadcastMeshFrame, onMeshMessage, connectToPeerMesh, setMeshIceFailureHandler, MESH_BACKPRESSURE_HIGH_BYTES } from '../utils/courierSignaling';
+import { broadcastMeshFrame, onMeshMessage, connectToPeerMesh, setMeshIceFailureHandler, MESH_BACKPRESSURE_HIGH_BYTES, type PeerMeshConnection } from '../utils/courierSignaling';
 import { swarmTransportRegistry, transportLabel } from '../utils/transportState';
+import { isRadminVpnAddress } from '../utils/ice-hygiene';
 import { resolveDisplayName } from '../utils/displayName';
 import { parseApiTimestamp } from '../utils/timeAgo';
 import { mediaFlag, resolveClaimedOwner, descriptorUrlFromBytes } from '../utils/objectDescriptor';
@@ -40,13 +41,77 @@ export function retryPeerTransport(peerId: string): boolean {
   return true
 }
 
+/** The live hook registers ONE whole-reconnect dialer. Settings → Networking's
+ *  "Retry peer connections" button calls it through `retryPeerConnections` —
+ *  no UI component ever fabricates a connection. */
+type PeerReconnectAll = () => void
+let activePeerReconnectAll: PeerReconnectAll | null = null
+
+/**
+ * Re-issue ONE bounded direct mesh attempt for every eligible peer.
+ *
+ * Pure seam so the rule is unit-testable without mounting the hook: a peer is
+ * dialed only when it is online, is NOT us, has both keys, and is a cross-node
+ * peer (a same-node peer already has the local relay). Each eligible peer gets
+ * exactly one `dial` call — no storm, no fabricated route.
+ */
+export function planRetryDials(
+  peers: Iterable<[string, User]>,
+  selfId: string,
+  isCrossNode: (peerId: string) => boolean,
+  dial: (peerId: string, pubKey: string, encKey: string) => void,
+): number {
+  let issued = 0
+  for (const [peerId, peer] of peers) {
+    if (!peer || peerId === selfId || !peer.online) continue
+    if (!isCrossNode(peerId)) continue
+    const pubKey = peer.publicKey || (peer as any).public_key
+    const encKey = peer.encryptionPubKey || (peer as any).encryption_pub_key
+    if (!pubKey || !encKey) continue
+    dial(peerId, pubKey, encKey)
+    issued += 1
+  }
+  return issued
+}
+
+/** Re-pull the roster, re-announce presence, and re-issue ONE bounded direct
+ *  mesh attempt for every cross-node peer with keys. False when no live P2P
+ *  hook owns the identity (browser dev / logged out), so the UI can say so. */
+export function retryPeerConnections(): boolean {
+  if (!activePeerReconnectAll) return false
+  activePeerReconnectAll()
+  return true
+}
+
 
 /** Human label for the peer list: what path is this peer's traffic really
  *  taking? Null = nothing worth showing yet (idle/connecting). The registry
  *  lives in utils/transportState so the header chip reads the SAME phases the
  *  swarm writes, never a second guessed copy. */
 export function swarmTransportLabel(peerId: string): string | null {
-  return transportLabel(swarmTransportRegistry.phaseFor(peerId))
+  return transportLabel(swarmTransportRegistry.phaseFor(peerId), swarmTransportRegistry.isDirectViaRadmin(peerId))
+}
+
+/** A validated direct channel over Radmin VPN: the remote candidate (read from
+ *  the open pc's stats) is a 26.x address. Only called once the DataChannel is
+ *  open, so the VPN label can never precede validation. */
+async function directConnViaRadmin(pc: RTCPeerConnection): Promise<boolean> {
+  try {
+    const stats = await pc.getStats()
+    let ip = ''
+    stats.forEach((r: { type?: string; ip?: string }) => {
+      if (r.type === 'remote-candidate' && r.ip) ip = r.ip
+    })
+    return isRadminVpnAddress(ip)
+  } catch {
+    return false
+  }
+}
+
+/** Promote a peer to `direct` after its DataChannel opened, tagging the Radmin
+ *  VPN path when the negotiated remote candidate is in 26.0.0.0/8. */
+function promoteDirect(peerId: string, conn: PeerMeshConnection): void {
+  void directConnViaRadmin(conn.pc).then((radmin) => swarmTransportRegistry.markDirectValidated(peerId, radmin))
 }
 
 export interface ChatMessage {
@@ -921,7 +986,7 @@ export function useP2P(identity: OrbitIdentity | null) {
               // a backoff retry and the label stays relay until it opens.
               swarmTransportRegistry.startDirectAttempt(u.id)
               void connectToPeerMesh({ id: u.id, public_key: pubKey, encryption_pub_key: encKey }, identity)
-                .then(() => swarmTransportRegistry.markDirectValidated(u.id))
+                .then((conn) => promoteDirect(u.id, conn))
                 .catch((err) => swarmTransportRegistry.markDirectFailed(
                   u.id,
                   err instanceof Error ? err.message : 'direct connect failed',
@@ -937,6 +1002,31 @@ export function useP2P(identity: OrbitIdentity | null) {
     }
     pullRoster()
     const rosterInterval = setInterval(pullRoster, 60_000)
+
+    // Whole-reconnect dialer for Settings → Networking's retry button: re-pull
+    // the roster, re-announce presence, and re-issue ONE bounded direct attempt
+    // for every cross-node peer with keys. Same one-attempt-per-peer rule as
+    // the transport tick — no storm.
+    activePeerReconnectAll = () => {
+      sendHeartbeat()
+      pullRoster()
+      planRetryDials(
+        roster.entries(),
+        selfUserRef.current.id,
+        (peerId) => isCrossNodePeer(peerId, getApiBaseUrl()),
+        (peerId, pubKey, encKey) => {
+          swarmTransportRegistry.startDirectAttempt(peerId)
+          void connectToPeerMesh({ id: peerId, public_key: pubKey, encryption_pub_key: encKey }, identity)
+            .then((conn) => promoteDirect(peerId, conn))
+            .catch((err) => swarmTransportRegistry.markDirectFailed(
+              peerId,
+              err instanceof Error ? err.message : 'direct connect failed',
+              true,
+            ))
+        },
+      )
+    }
+    const reconnectAll = activePeerReconnectAll
 
     // 4d. Transport-selection tick (P0): decay deadlines, keep the relay
     // mapping honest, and fire due direct retries. Cheap: a few dozen peers,
@@ -962,7 +1052,7 @@ export function useP2P(identity: OrbitIdentity | null) {
         if (!pubKey || !encKey) continue
         swarmTransportRegistry.startDirectAttempt(peerId)
         void connectToPeerMesh({ id: peerId, public_key: pubKey, encryption_pub_key: encKey }, identity)
-          .then(() => swarmTransportRegistry.markDirectValidated(peerId))
+          .then((conn) => promoteDirect(peerId, conn))
           .catch((err) => swarmTransportRegistry.markDirectFailed(
             peerId,
             err instanceof Error ? err.message : 'direct connect failed',
@@ -1001,6 +1091,7 @@ export function useP2P(identity: OrbitIdentity | null) {
       clearInterval(rosterInterval);
       clearInterval(transportInterval);
       clearInterval(pruneTimer);
+      if (activePeerReconnectAll === reconnectAll) activePeerReconnectAll = null;
       setMeshIceFailureHandler(null);
       if (typeof document !== 'undefined') {
         document.removeEventListener('visibilitychange', onVisible)
@@ -1031,7 +1122,7 @@ export function useP2P(identity: OrbitIdentity | null) {
       if (!pubKey || !encKey) return
       swarmTransportRegistry.startDirectAttempt(peerId)
       void connectToPeerMesh({ id: peerId, public_key: pubKey, encryption_pub_key: encKey }, identity)
-        .then(() => swarmTransportRegistry.markDirectValidated(peerId))
+        .then((conn) => promoteDirect(peerId, conn))
         .catch((err) => swarmTransportRegistry.markDirectFailed(
           peerId,
           err instanceof Error ? err.message : 'direct connect failed',

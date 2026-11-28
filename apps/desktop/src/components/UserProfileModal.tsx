@@ -5,13 +5,37 @@ import type { OrbitIdentity } from '@orbit/crypto';
 import { parseTags, type User, type OrbitObject } from '@orbit/shared';
 import { X, Copy, Check, Star, Ban, Send, Grid, MessageCircle, Play, Swords, Flag, Bell } from 'lucide-react';
 import { playPress } from '../utils/sounds';
-import { resolveMediaUrl } from '../utils/media';
 import { ObjectImage } from './ObjectImage';
 import { useProfilePostLightbox } from './feed/useProfilePostLightbox';
 import type { FeedPost, PostComment } from './feed/GMatchFeed';
 import { orbitFetch, invalidateCache } from '../utils/api';
-import { isUserOnline, fresherPresence } from '../utils/presence';
+import { isUserOnline, fresherPresence, isRosterOnline } from '../utils/presence';
 import { usePresence } from '../game/presenceStore';
+import { nameFor } from '../game/nameDirectory';
+import { contentHashFromRef } from '../utils/contentAddressedMedia';
+import { resolveObjectRefId } from '../utils/objectRef';
+
+/**
+ * The profile's post window starts from the timeline slice, but a peer's rows
+ * can be projected from the durable operation log a beat later — and the node
+ * has no row for a cross-node author at all. Merge both sources by id, pure so
+ * the first-open behaviour is unit-tested without mounting the app.
+ */
+export function profilePostsForAuthor(
+  authorId: string,
+  ...sources: (readonly FeedPost[])[]
+): FeedPost[] {
+  const seen = new Set<string>();
+  const rows: FeedPost[] = [];
+  for (const source of sources) {
+    for (const post of source) {
+      if (!post || post.author_id !== authorId || post.is_archived || seen.has(post.id)) continue;
+      seen.add(post.id);
+      rows.push(post);
+    }
+  }
+  return rows;
+}
 
 interface UserProfileModalProps {
   user: User | null;
@@ -90,6 +114,11 @@ export function UserProfileModal({
 }: UserProfileModalProps) {
   const [showPic, setShowPic] = useState(false);
   const [copied, setCopied] = useState(false);
+  /** Bumped by an accepted `profile.update` from this peer. The name itself
+   *  lives in the durable signed-name directory, never in a second copy here. */
+  const [nameTick, setNameTick] = useState(0);
+  const [avatarUnavailable, setAvatarUnavailable] = useState(false);
+  useEffect(() => { setAvatarUnavailable(false) }, [profilePic]);
   /** Which profile post is open in the right-hand pane. Kept here (not in the
    *  lightbox hook) so the empty state and the pane share one source. */
   const [activePostId, setActivePostId] = useState<string | null>(null);
@@ -167,37 +196,48 @@ export function UserProfileModal({
       if (detail.followee_id !== user?.id && detail.follower_id !== user?.id) return;
       loadFollowCounts();
     };
+    const onProfileSync = () => {
+      // A peer's rename lands in the durable directory through the signed
+      // profile.update path; re-read it instead of waiting for the peer to
+      // re-save while we happen to have their modal open.
+      setNameTick((n) => n + 1);
+      loadFollowCounts();
+    };
     window.addEventListener('orbit-follow-event', handler);
-    window.addEventListener('orbit-profilesync', handler);
+    window.addEventListener('orbit-profilesync', onProfileSync);
     return () => {
       window.removeEventListener('orbit-follow-event', handler);
-      window.removeEventListener('orbit-profilesync', handler);
+      window.removeEventListener('orbit-profilesync', onProfileSync);
     };
   }, [loadFollowCounts, user?.id]);
 
   if (!user) return null;
 
-  const displayName = user.display_name?.trim() || 'Unknown User';
-  // Canonical presence via the shared helper, taking whichever record carries
-  // the FRESHER sighting. The roster entry is not automatically the better one:
-  // the chat hub hands us a 30s-dashboard record while the roster's last_seen
-  // only moves when the roster poll commits.
+  // The durable directory holds the latest SIGNED name (profile.update), fed
+  // by every accepted operation and every roster/beacon sighting. The opener's
+  // object is only a fallback: it can be minutes old, so a peer who renamed
+  // while we were looking still showed the old name until they saved again.
+  void nameTick;
+  const displayName = nameFor(user.id) || user.display_name?.trim() || 'Unknown User';
+  // Two sightings of the same live fact: the shared dashboard presence store,
+  // and the roster-backed entry the chat list reads (the P2P roster has no
+  // dashboard row for a cross-node peer). A roster-online flag wins over a
+  // stale 60s dashboard record so the modal cannot say "Offline" while the
+  // player list says "Active now" — and cannot decay while the roster still
+  // lists the peer. Nothing is invented: with neither source online the dot
+  // stays offline.
   //
-  // `presenceTick` is the clock this read: the interval above re-renders the
-  // modal so `Date.now()` advances past the 60s window and the dot tracks
-  // reality while the modal stays open. It is deliberately not a dependency —
-  // it is the trigger, not the input.
-  // One presence source for the whole app. The store already holds the newest
-  // sighting this client has seen for anyone, from every feed (shared
-  // dashboard poll, peer updates, the user directory), so the modal does not
-  // have to re-derive an answer from whichever object the opener happened to
-  // hand it — the reason the same person showed "Online" in the chat list and
-  // "Offline" here. The local fresherPresence/user check is kept only as a
-  // fallback for a user the store has never seen.
-  const storeOnline = usePresence((s) => s.isOnline(user.id, Date.now()));
+  // `presenceTick` only re-runs this read: the interval above re-renders the
+  // modal so Date.now() advances and an actual departure is honoured.
+  const now = Date.now();
+  const rosterUser = users?.find((u) => u.id === user.id);
+  const storeOnline = usePresence((s) => s.isOnline(user.id, now));
   const storeKnows = usePresence((s) => s.records.has(user.id));
-  const liveUser = fresherPresence(user, users?.find((u) => u.id === user.id));
-  const isOnline = storeKnows ? storeOnline : isUserOnline(liveUser as User | undefined, Date.now());
+  const liveUser = fresherPresence(user, rosterUser);
+  const isOnline = storeOnline
+    || isRosterOnline(rosterUser, now)
+    || isRosterOnline(user, now)
+    || (storeKnows ? false : isUserOnline(liveUser as User | undefined, now));
   void presenceTick;
   const tags: string[] = parseTags(user.tags);
   const userStories = stories.filter((s) => s.owner_id === user.id || (s as any).user_id === user.id);
@@ -212,10 +252,25 @@ export function UserProfileModal({
   });
   const seenCardIds = new Set<string>();
   const userCards = cards.filter((c) => {
-    if ((c.owner_id !== user.id && (c as any).user_id !== user.id) || !c.content_url || seenCardIds.has(c.id)) return false;
+    if ((c.owner_id !== user.id && (c as any).user_id !== user.id) || seenCardIds.has(c.id)) return false;
+    // A gallery row is not a card: chat attachments, public posts, stories and
+    // avatars are uploads/keepsakes, even if an older caller hands us the raw
+    // gallery. Only minted cards belong in this shelf.
+    const raw = c as unknown as Record<string, unknown>;
+    const marked = (v: unknown) => v === 1 || v === '1' || v === true || v === 'true';
+    if (marked(raw.is_chat) || marked(raw.is_public) || marked(raw.is_story) || marked(raw.is_avatar) || c.id.startsWith('p2p-obj-')) return false;
     seenCardIds.add(c.id);
     return true;
   });
+  // A locally forged card keeps its bytes in the swarm/vault store, not in a
+  // `content_url`. Requiring that field erased the card entirely (not just its
+  // picture); `/api/objects/<id>` is the honest address the resolver already
+  // knows how to follow.
+  const cardMediaRef = (c: OrbitObject): string => {
+    const raw = c as unknown as Record<string, unknown>;
+    const candidate = raw.content_url ?? raw.data ?? raw.url;
+    return typeof candidate === 'string' && candidate ? candidate : `/api/objects/${c.id}`;
+  };
   const followHandler = onToggleFollow || onToggleContact;
   const following = onToggleFollow ? isFollowing : Boolean(isContact);
 
@@ -319,8 +374,18 @@ export function UserProfileModal({
                       : 'border-edge'
                   }`}
                 >
-                  {profilePic ? (
-                    <img src={resolveMediaUrl(profilePic)} alt={displayName} className="w-full h-full object-cover" />
+                  {profilePic && !avatarUnavailable ? (
+                    <ObjectImage
+                      contentUrl={profilePic}
+                      objectId={resolveObjectRefId(profilePic)}
+                      contentHash={contentHashFromRef(profilePic)}
+                      identity={identity}
+                      alt={displayName}
+                      className="w-full h-full object-cover"
+                      loading="eager"
+                      hideUnavailable
+                      onMediaUnavailable={() => setAvatarUnavailable(true)}
+                    />
                   ) : (
                     <div className="w-full h-full bg-glass-w12 flex items-center justify-center text-lg font-semibold text-retro-muted">
                       {displayName.substring(0, 2).toUpperCase()}
@@ -534,7 +599,8 @@ export function UserProfileModal({
                     >
                       <ObjectImage
                         contentUrl={post.url}
-                        objectId={post.id}
+                        objectId={resolveObjectRefId(post.url) || post.id}
+                        contentHash={post.content_hash || contentHashFromRef(post.url)}
                         identity={identity}
                         mimeType={(post as any).mime_type}
                         alt={post.caption || ''}
@@ -562,12 +628,13 @@ export function UserProfileModal({
                   {userCards.slice(0, 6).map((card) => (
                     <div
                       key={card.id}
-                      onClick={() => setSelectedCardImage(card.content_url || (card as any).data || (card as any).url || `/api/objects/${card.id}`)}
+                      onClick={() => setSelectedCardImage(cardMediaRef(card))}
                       className="aspect-square bg-surface-interactive rounded-lg overflow-hidden border border-edge cursor-pointer group hover:opacity-90 transition-opacity"
                     >
                       <ObjectImage
-                        contentUrl={card.content_url || (card as any).data || (card as any).url || `/api/objects/${card.id}`}
-                        objectId={card.id}
+                        contentUrl={cardMediaRef(card)}
+                        objectId={resolveObjectRefId(cardMediaRef(card)) || card.id}
+                        contentHash={(card as any).content_hash || contentHashFromRef(cardMediaRef(card))}
                         identity={identity}
                         mimeType={(card as any).mime_type}
                         alt=""
@@ -607,7 +674,15 @@ export function UserProfileModal({
           onClick={() => setShowPic(false)}
         >
           <div className="relative max-w-sm max-h-(--max-h-panel)" onClick={(e) => e.stopPropagation()}>
-            <img src={resolveMediaUrl(profilePic)} alt={displayName} className="max-w-full max-h-(--max-h-panel) rounded-lg border border-edge shadow-xl object-contain" />
+            <ObjectImage
+              contentUrl={profilePic}
+              objectId={resolveObjectRefId(profilePic)}
+              contentHash={contentHashFromRef(profilePic)}
+              identity={identity}
+              alt={displayName}
+              className="max-w-full max-h-(--max-h-panel) rounded-lg border border-edge shadow-xl object-contain"
+              loading="eager"
+            />
             <button
               type="button"
               onClick={() => setShowPic(false)}
@@ -628,7 +703,9 @@ export function UserProfileModal({
           <div className="relative max-w-md max-h-(--max-h-dialog-sm)" onClick={(e) => e.stopPropagation()}>
             <ObjectImage
               contentUrl={selectedCardImage}
-              identity={null}
+              objectId={resolveObjectRefId(selectedCardImage)}
+              contentHash={contentHashFromRef(selectedCardImage)}
+              identity={identity}
               alt="Card preview"
               className="max-w-full max-h-(--max-h-dialog-sm) rounded-lg border border-edge shadow-xl object-contain"
               controls

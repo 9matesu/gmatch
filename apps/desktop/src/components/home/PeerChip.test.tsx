@@ -20,8 +20,8 @@ describe('peerChipStatus — the three honest states', () => {
     expect(peerChipStatus(peer('a', 'Alpha'), 'direct')).toBe('connected');
     expect(peerChipStatus(peer('a', 'Alpha'), 'relay')).toBe('connected');
     expect(peerChipStatus(peer('a', 'Alpha'), 'connecting-direct')).toBe('connecting');
-    // idle has no dial in flight, so it reads as cannot-connect, not connecting.
-    expect(peerChipStatus(peer('a', 'Alpha'), 'idle')).toBe('cannot-connect');
+    // idle is a roster-confirmed online peer with no dial yet: online, not dead.
+    expect(peerChipStatus(peer('a', 'Alpha'), 'idle')).toBe('connected');
   });
 
   it('calls a failed dial or an offline roster row "cannot connect"', () => {
@@ -76,7 +76,7 @@ describe('PeerChip', () => {
     expect(rowFor('Beta')).toHaveTextContent(PEER_STATUS_LABEL.connecting);
   });
 
-  it('labels ONLY the real transport: direct, relay, failed — never a guess', () => {
+  it('labels ONLY the real transport: direct, relay, idle — never a guess', () => {
     const roster = new PeerRoster(null);
     const registry = createTransportRegistry();
     act(() => {
@@ -86,16 +86,18 @@ describe('PeerChip', () => {
       roster.upsert(peer('d', 'Delta'));
       registry.markDirectValidated('a');
       registry.markRelayInUse('b');
+      // A failed dial has no live route: it is not a peer to show.
       registry.markDirectFailed('c', 'no relay', false);
-      // Delta stays `idle`: no dial has opened, so no route may be claimed.
+      // Delta stays `idle`: online per the roster, but no route may be claimed.
     });
     render(<PeerChip roster={roster} registry={registry} />);
     fireEvent.click(screen.getByRole('button', { name: 'Peers, 4 connected' }));
 
-    expect(rowFor('Alpha')).toHaveTextContent('P2P direto');
-    expect(rowFor('Beta')).toHaveTextContent('relay via nó (NAT)');
-    expect(rowFor('Cy')).toHaveTextContent('sem rota');
-    expect(rowFor('Delta').textContent).not.toMatch(/P2P direto|relay via nó|sem rota/);
+    const dialog = screen.getByRole('dialog', { name: 'Connected peers' });
+    expect(rowFor('Alpha')).toHaveTextContent('P2P direct');
+    expect(rowFor('Beta')).toHaveTextContent('relay via node (NAT)');
+    expect(dialog).not.toHaveTextContent('Cy');
+    expect(rowFor('Delta').textContent).not.toMatch(/P2P direct|relay via node|no route/);
   });
 
   it('the count is the roster projection, not a supplied snapshot', () => {
@@ -126,31 +128,27 @@ describe('PeerChip', () => {
     expect(rowFor('Beta')).toHaveTextContent(PEER_STATUS_LABEL.connected);
   });
 
-  it('offers retry only for peers that cannot connect, with the peer id', () => {
+  it('hides dead rows: offline ghosts and failed dials are not in the peers list', () => {
     const roster = new PeerRoster(null);
     const registry = createTransportRegistry();
-    const onRetry = vi.fn();
     act(() => {
       roster.upsert(peer('a', 'Alpha'));
       roster.upsert(peer('b', 'Beta'));
-      roster.upsert(peer('d', 'Delta'));
       roster.hydrate([peer('c', 'Ghost', false)]);
       registry.markDirectValidated('a');
-      // hasRelay=false is the only path that parks a peer in `failed` (with a
-      // relay the transport honestly reports `relay` = still reachable).
+      // hasRelay=false is the only path that parks a peer in `failed`.
       registry.markDirectFailed('b', 'no relay path', false);
-      // Delta is left in `idle` (no dial in flight) — it must read cannot-connect
-      // and be offered Retry just like a failed dial.
     });
-    render(<PeerChip roster={roster} registry={registry} onRetry={onRetry} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Peers, 3 connected' }));
+    render(<PeerChip roster={roster} registry={registry} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Peers, 2 connected' }));
 
-    const retryBeta = screen.getByRole('button', { name: 'Retry connecting to Beta' });
-    expect(screen.getByRole('button', { name: 'Retry connecting to Delta' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Retry connecting to Ghost' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Retry connecting to Alpha' })).toBeNull();
-    fireEvent.click(retryBeta);
-    expect(onRetry).toHaveBeenCalledWith('b');
+    const dialog = screen.getByRole('dialog', { name: 'Connected peers' });
+    expect(dialog).toHaveTextContent('Alpha');
+    expect(dialog).not.toHaveTextContent('Beta');
+    expect(dialog).not.toHaveTextContent('Ghost');
+    // The header count stays the roster's honest online projection; the dead
+    // rows are simply not listed.
+    expect(dialog).toHaveTextContent('2 online');
   });
 
   it('is keyboard reachable: aria state, a native trigger, and closes on Escape', () => {
@@ -184,6 +182,22 @@ describe('PeerChip', () => {
     expect(screen.getByRole('button', { name: 'Peers, 0 connected' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Peers, 0 connected' }));
     expect(screen.getByRole('dialog', { name: 'Connected peers' })).toHaveTextContent('No peers connected yet');
+  });
+
+  it('pops the count on a real change (existing MOTION token, reduced-motion gated globally)', () => {
+    const roster = new PeerRoster(null);
+    render(<PeerChip roster={roster} registry={createTransportRegistry()} />);
+    const trigger = screen.getByRole('button', { name: 'Peers, 0 connected' });
+    // The animated count is the one bounded gacha-ish pop; it is aria-hidden so
+    // the accessible name (the button's label) stays the single source.
+    const countEl = trigger.querySelector('.animate-orbit-pop');
+    expect(countEl).not.toBeNull();
+    expect(countEl).toHaveAttribute('aria-hidden', 'true');
+    expect(countEl).toHaveTextContent('0');
+    act(() => { roster.upsert(peer('a', 'Alpha')); });
+    // Remounted on change (key={count}) so the pop replays with the new value.
+    const next = screen.getByRole('button', { name: 'Peers, 1 connected' }).querySelector('.animate-orbit-pop');
+    expect(next).toHaveTextContent('1');
   });
 });
 

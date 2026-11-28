@@ -21,6 +21,7 @@ import { selectionToFile, type MediaSelection } from '../media/picker';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { orbitFetch } from '../../utils/api';
 import { mediaUrlToCachedFile } from '../../utils/cacheMedia';
+import { rememberUploadedMediaKeep } from '../../utils/mediaVault';
 import { isMediaVideo, isTwitterUrl, isVideoPageUrl, isVideoPost, resolveTwitterMediaAll, resolveVideoMime, sniffFileHead, urlFallbackMime } from '../../utils/media';
 import { forgeMediaLocally } from '../../services/mediaForge';
 import { devFetchable } from '../../services/imageCache';
@@ -529,6 +530,11 @@ function addLinkToCaption(raw: string): void {
             });
             ids.push(forged.id);
             if (!primaryId) primaryId = forged.id;
+            // A post is a post, not a card. Its bytes are already in the vault;
+            // register the same keep the Vault shows for every other capture.
+            void rememberUploadedMediaKeep(forged, {
+              tags: tags.split(/[\s,#]+/).map((t) => t.trim()).filter(Boolean),
+            }).catch(() => { });
             // Instant tile: render the session blob URL with zero fetch.
             if (!primaryLocalUrl && forged.localUrl) primaryLocalUrl = forged.localUrl;
             // Optimistic mime so the feed renders <video> immediately (the

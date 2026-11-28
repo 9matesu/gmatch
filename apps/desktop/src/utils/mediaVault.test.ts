@@ -1,14 +1,30 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { GalleryImage } from '../game/types'
+import { getObject } from './storage'
 import {
   _resetPermanentMedia,
   ensurePermanentMedia,
   isPermanentlySaved,
   permanentRefFor,
+  rememberUploadedMediaKeep,
   type PermanentMediaDeps,
 } from './mediaVault'
 
 const HASH = 'b'.repeat(64)
 const LEGACY = 'a'.repeat(40)
+
+/** The gallery store is a test seam here: the helper owns the decision, the
+ *  store only holds the resulting keep. */
+const galleryState = { gallery: [] as GalleryImage[], totalGallerySaved: 0, save: vi.fn() }
+vi.mock('../game/store', () => ({
+  useGame: {
+    getState: () => galleryState,
+    setState: (updater: (s: typeof galleryState) => Partial<typeof galleryState>) => {
+      Object.assign(galleryState, updater(galleryState))
+    },
+  },
+}))
+vi.mock('./storage', () => ({ getObject: vi.fn(async () => null) }))
 
 function deps(over: Partial<PermanentMediaDeps> = {}): PermanentMediaDeps & {
   probe: ReturnType<typeof vi.fn>
@@ -21,7 +37,16 @@ function deps(over: Partial<PermanentMediaDeps> = {}): PermanentMediaDeps & {
   } as PermanentMediaDeps & { probe: ReturnType<typeof vi.fn>; persist: ReturnType<typeof vi.fn> }
 }
 
-beforeEach(() => _resetPermanentMedia())
+beforeEach(() => {
+  _resetPermanentMedia()
+  galleryState.gallery = []
+  galleryState.totalGallerySaved = 0
+  galleryState.save.mockClear()
+  vi.mocked(getObject).mockReset()
+  vi.mocked(getObject).mockResolvedValue(null)
+})
+
+const forged = { id: 'upload-1', contentHash: HASH, mimeType: 'image/png' }
 
 describe('permanentRefFor', () => {
   it('finds the address inside legacy urn/magnet rows and bare hashes', () => {
@@ -87,5 +112,58 @@ describe('ensurePermanentMedia', () => {
     const d = deps({ persist: vi.fn(async () => ({ status: 'local' as const })) })
     expect(await ensurePermanentMedia('https://cdn.example/a.jpg', 'image', d))
       .toEqual({ state: 'failed', reason: 'not-saved' })
+  })
+})
+
+describe('rememberUploadedMediaKeep', () => {
+  it('records an uploaded image as one verified Vault keep — never a card', async () => {
+    const keep = await rememberUploadedMediaKeep(forged, {
+      tags: ['sunset'],
+      deps: { probe: vi.fn(async (key: string) => (key === HASH ? `vault://f/${HASH}` : null)) },
+    })
+    expect(keep).toMatchObject({
+      id: 'upload:upload-1',
+      url: HASH,
+      localRef: HASH,
+      saveState: 'persisted',
+      kind: 'image',
+      tags: ['sunset'],
+    })
+    expect(keep).not.toHaveProperty('card_id')
+    expect(galleryState.gallery).toEqual([keep])
+    expect(galleryState.totalGallerySaved).toBe(1)
+    expect(galleryState.save).toHaveBeenCalledTimes(1)
+    // A repeat never duplicates the keep or the lifetime counter.
+    await rememberUploadedMediaKeep(forged, {
+      deps: { probe: vi.fn(async () => `vault://f/${HASH}`) },
+    })
+    expect(galleryState.gallery).toHaveLength(1)
+    expect(galleryState.totalGallerySaved).toBe(1)
+  })
+
+  it('infers video from the forged MIME', async () => {
+    const keep = await rememberUploadedMediaKeep(
+      { ...forged, mimeType: 'video/mp4' },
+      { deps: { probe: vi.fn(async () => `vault://f/${HASH}`) } },
+    )
+    expect(keep?.kind).toBe('video')
+  })
+
+  it('accepts the browser dev durable copy when there is no vault bridge', async () => {
+    vi.mocked(getObject).mockResolvedValue({ id: HASH, data: new ArrayBuffer(4) } as never)
+    const keep = await rememberUploadedMediaKeep(forged)
+    expect(keep).toMatchObject({ saveState: 'persisted', localRef: HASH })
+    expect(keep?.kind).toBe('image')
+  })
+
+  it('reports no keep when the upload bytes cannot be found anywhere', async () => {
+    const keep = await rememberUploadedMediaKeep(forged)
+    expect(keep).toBeNull()
+    expect(galleryState.gallery).toEqual([])
+  })
+
+  it('refuses an object with no content address instead of minting a fake keep', async () => {
+    expect(await rememberUploadedMediaKeep({ ...forged, contentHash: '' })).toBeNull()
+    expect(galleryState.gallery).toEqual([])
   })
 })

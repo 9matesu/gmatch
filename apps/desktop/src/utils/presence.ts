@@ -6,6 +6,9 @@ export interface PresenceSubject {
 
 const SEEN_FRESH_MS = 60_000;
 const MAX_CLOCK_SKEW_MS = 15_000;
+/** The P2P roster's own decay window (STALE_PEER_MS), inlined so this pure
+ *  helper does not pull in the roster store and its storage dependencies. */
+const ROSTER_FRESH_MS = 90_000;
 
 /**
  * Normalizes UTC dates from SQLite (which lack trailing 'Z') and parses to milliseconds.
@@ -52,6 +55,21 @@ export function isUserOnline(user?: PresenceSubject | null, referenceNow = Date.
  * beats a presence-less one, and when neither has a sighting the one that
  * actually says "online" wins instead of silently degrading to offline.
  */
+/**
+ * The live roster's `online` flag is a sighting in its own right: a cross-node
+ * peer never appears in the node dashboard, so a dashboard-only record goes
+ * stale at 60s while the roster still calls that peer online. Taking the
+ * roster flag inside its 90s window keeps the profile in step with the chat
+ * list, without ever inventing a presence a live roster did not report.
+ */
+export function isRosterOnline(subject?: PresenceSubject | null, referenceNow = Date.now()): boolean {
+  if (!subject?.online) return false;
+  const seenMs = parseSeenMs(subject.last_seen);
+  if (seenMs <= 0) return true;
+  const delta = referenceNow - seenMs;
+  return delta >= -MAX_CLOCK_SKEW_MS && delta < ROSTER_FRESH_MS;
+}
+
 export function fresherPresence<T extends PresenceSubject>(
   subject: T | undefined | null,
   roster: T | undefined | null,

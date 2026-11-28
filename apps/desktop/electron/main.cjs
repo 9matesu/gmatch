@@ -1086,6 +1086,7 @@ const { createImhentaiSource } = require("./imhentai.cjs")
 const registerSecureHandlers = require("./ipc/secure.cjs")
 const registerCacheHandlers = require("./ipc/cache.cjs")
 const registerVaultHandlers = require("./ipc/vault.cjs")
+const registerRadminHandlers = require('./ipc/radmin.cjs')
 const registerWindowHandlers = require("./ipc/window.cjs")
 const registerServerHandlers = require("./ipc/server.cjs")
 const registerNotifyHandlers = require("./ipc/notify.cjs")
@@ -1396,6 +1397,7 @@ app.whenReady().then(async () => {
   registerSecureHandlers({ ipcMain, secureKV, secureAvailable })
   registerCacheHandlers({ ipcMain, imageCache })
   registerVaultHandlers({ ipcMain, vault, vaultServer })
+  registerRadminHandlers({ ipcMain })
   // Update check (Settings): installed version + open the download in the OS browser.
   registerAppHandlers({
     ipcMain, app,

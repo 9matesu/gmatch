@@ -76,6 +76,21 @@ describe('useObjectImage content-addressed rows (L4)', () => {
     h.unmount()
   })
 
+  it('resolves a hash-bearing ref through the content ladder even when the caller passes no contentHash', async () => {
+    // Root cause of "peer images never load": every surface that renders a
+    // `urn:sha256:` / magnet ref relies on the hook to see the address INSIDE
+    // the descriptor. Without this the legacy ladder treats the ref as an
+    // unresolvable descriptor and asks nobody for the bytes.
+    const m = await modules()
+
+    const h = renderHook(() => m.useObjectImage(`urn:sha256:${CONTENT_HASH}`, identity))
+    await waitFor(() => expect(h.result.current.url).toBe('blob:peer-picture'))
+
+    expect(m.orbitFetch).not.toHaveBeenCalled()
+    expect(m.requestSwarmObject).toHaveBeenCalledWith(CONTENT_HASH, 5000, { expectedHash: CONTENT_HASH })
+    h.unmount()
+  })
+
   it('resolves a legacy 40-hex ref from local bytes (the prefix branch callers used to gate out)', async () => {
     const bytes = new Blob(['legacy-prefix-bytes'], { type: 'image/png' })
     const prefix = CONTENT_HASH.slice(0, 40)

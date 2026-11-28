@@ -10,6 +10,27 @@ vi.mock('../../hooks/useCropper', () => ({
 vi.mock('../../utils/sounds', () => ({ playPress: vi.fn(), playWin: vi.fn() }))
 vi.mock('../../utils/profile', () => ({ saveUserProfile: vi.fn() }))
 
+const HASH = 'd'.repeat(64)
+const gallery = [{
+  id: `upload:${HASH}`, url: HASH, localRef: HASH, saveState: 'persisted',
+  kind: 'image', tags: ['upload'], rarityBase: 0, clicks: 0, rarity: 'Common',
+}]
+vi.mock('../../game/store', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../game/store')>()
+  const useGame = Object.assign(
+    (selector: (s: any) => unknown) => selector({ ...actual.useGame.getState(), gallery }),
+    {
+      getState: actual.useGame.getState,
+      setState: actual.useGame.setState,
+      subscribe: actual.useGame.subscribe,
+    },
+  )
+  return { ...actual, useGame }
+})
+vi.mock('../ObjectImage', () => ({
+  ObjectImage: ({ contentHash, alt }: any) => <img data-testid="media-tile" data-hash={contentHash || ''} alt={alt || ''} />,
+}))
+
 const identity = { orbitId: 'me', publicKey: 'pk' } as any
 const post = {
   id: 'profile-text-1', author_id: 'me', author_name: 'Me', caption: 'Words to repost',
@@ -51,6 +72,19 @@ function renderProfile(onRepostPost: (p: any) => void) {
     />,
   )
 }
+
+describe('ProfileView media surface', () => {
+  it('shows uploaded keeps in Media, not as cards in the Cards tab', async () => {
+    renderProfile(vi.fn())
+    expect(screen.getByText(/Media \(1\)/)).toBeInTheDocument()
+    expect(screen.getByTestId('media-tile')).toHaveAttribute('data-hash', HASH)
+
+    await userEvent.click(screen.getByRole('button', { name: /cards/i }))
+    expect(screen.getByText('No cards yet')).toBeInTheDocument()
+    // The upload stays in its own Media surface; it never becomes a card tile.
+    expect(screen.getByTestId('media-tile')).toBeInTheDocument()
+  })
+})
 
 describe('ProfileView repost prop chain', () => {
   it('passes onRepostPost to the profile text card as exactly one action', async () => {

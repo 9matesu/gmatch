@@ -47,13 +47,15 @@ export type PeerTransportPhase =
 /**
  * The ONE human label for a validated transport phase. `idle` and
  * `connecting-direct` have no settled route yet, so they say nothing — the UI
- * never claims "P2P direto" for a dial that has not opened.
+ * never claims "P2P direct" for a dial that has not opened. A validated direct
+ * channel whose remote candidate is a Radmin VPN address reads
+ * "VPN direct (Radmin)".
  */
-export function transportLabel(phase: PeerTransportPhase): string | null {
+export function transportLabel(phase: PeerTransportPhase, viaRadmin = false): string | null {
   switch (phase) {
-    case 'direct': return 'P2P direto'
-    case 'relay': return 'relay via nó (NAT)'
-    case 'failed': return 'sem rota'
+    case 'direct': return viaRadmin ? 'VPN direct (Radmin)' : 'P2P direct'
+    case 'relay': return 'relay via node (NAT)'
+    case 'failed': return 'no route'
     default: return null
   }
 }
@@ -61,6 +63,8 @@ export function transportLabel(phase: PeerTransportPhase): string | null {
 export interface PeerTransportEntry {
   phase: PeerTransportPhase
   directAttempts: number
+  /** The validated direct channel's remote candidate is a Radmin VPN address. */
+  directViaRadmin: boolean
   /** Epoch ms when the next direct retry is allowed (0 = not scheduled). */
   nextDirectRetryAt: number
   lastChangeAt: number
@@ -83,10 +87,12 @@ export interface TransportRegistry {
   subscribe(listener: () => void): () => void
   snapshot(): ReadonlyMap<string, PeerTransportEntry>
   phaseFor(peerId: string): PeerTransportPhase
+  /** True only for a validated direct channel whose remote candidate is Radmin. */
+  isDirectViaRadmin(peerId: string): boolean
   /** A direct handshake starts; deadline-bounded. */
   startDirectAttempt(peerId: string): void
   /** The DataChannel opened: the direct path is validated and promoted. */
-  markDirectValidated(peerId: string): void
+  markDirectValidated(peerId: string, viaRadmin?: boolean): void
   /**
    * The direct attempt failed or timed out. If the session still has a relay
    * pipe (`hasRelay`), the peer demotes to `relay` with a scheduled retry;
@@ -118,7 +124,7 @@ export function createTransportRegistry(options: TransportRegistryOptions = {}):
   function entry(peerId: string): PeerTransportEntry {
     let found = peers.get(peerId)
     if (!found) {
-      found = { phase: 'idle', directAttempts: 0, nextDirectRetryAt: 0, lastChangeAt: now() }
+      found = { phase: 'idle', directAttempts: 0, directViaRadmin: false, nextDirectRetryAt: 0, lastChangeAt: now() }
       peers.set(peerId, found)
     }
     return found
@@ -143,17 +149,22 @@ export function createTransportRegistry(options: TransportRegistryOptions = {}):
     },
     snapshot() { return peers },
     phaseFor(peerId) { return peers.get(peerId)?.phase ?? 'idle' },
+    isDirectViaRadmin(peerId) {
+      const e = peers.get(peerId)
+      return e?.phase === 'direct' && e.directViaRadmin
+    },
     startDirectAttempt(peerId) {
       if (!peerId) return
       const e = setPhase(peerId, 'connecting-direct')
       e.directAttempts += 1
       e.nextDirectRetryAt = 0
     },
-    markDirectValidated(peerId) {
+    markDirectValidated(peerId, viaRadmin = false) {
       if (!peerId) return
       const e = setPhase(peerId, 'direct')
       e.directAttempts = 0
       e.nextDirectRetryAt = 0
+      e.directViaRadmin = viaRadmin
       e.lastFailure = undefined
     },
     markDirectFailed(peerId, reason, hasRelay) {

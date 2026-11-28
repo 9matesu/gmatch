@@ -873,6 +873,11 @@ with names and thresholds deliberately distinct from the achievements.
   the decentralized fix. A symmetric-NAT IPv4-only pair still needs a TURN or
   the node relay; no free anonymous TURN is bundled (Cloudflare TURN needs a
   card, and the old public relay is globally 401/blackholed).
+- **Radmin VPN is a first-class direct path.** Radmin assigns `26.0.0.0/8`
+  addresses; those host candidates are signaled (all other RFC1918/CGNAT
+  literals stay hidden). A validated DataChannel whose selected remote
+  candidate is in `26/8` shows `VPN directo (Radmin)`; other direct paths keep
+  `P2P direto`, and relay/failed labels are unchanged.
 - **Presence is published even from a hidden window.** The 60s heartbeat skips
   only the local BroadcastChannel/WS swarm noise when `document.hidden`; the
   signed hosted beacon still goes out, because the mailbox TTL is 90s and a

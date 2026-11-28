@@ -11,8 +11,9 @@ import { usePresence } from '../../game/presenceStore';
 import { usePresencePoll } from '../../hooks/usePresencePoll';
 import { swarmTransportLabel } from '../../hooks/useP2P';
 import type { PeerRoster } from '../../utils/peerRoster';
+import { swarmTransportRegistry } from '../../utils/transportState';
 import { FeedbackState } from '../../ui/kit';
-import { classes } from '../../ui/tokens';
+import { classes, PRESENCE } from '../../ui/tokens';
 
 export interface ChatPlayerItem {
   id: string;
@@ -74,6 +75,10 @@ export function ChatPlayerList({
   onToggleCollapse,
 }: ChatPlayerListProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  // A dial can validate/fail without touching the roster, so the list needs
+  // the transport registry's own change event to show "connecting" live.
+  const [transportTick, setTransportTick] = useState(0);
+  useEffect(() => swarmTransportRegistry.subscribe(() => setTransportTick((n) => n + 1)), []);
   // Presence now lives in one app-wide store fed by one ref-counted poll, so
   // this list and the profile modal can no longer disagree about who is online.
   // Previously each surface ran its own 30s dashboard poll and derived its own
@@ -119,8 +124,9 @@ export function ChatPlayerList({
   const mergedPlayers = useMemo(() => {
     const map = new Map<string, ChatPlayerItem>();
     const now = Date.now();
-    const oneDayMs = 24 * 60 * 60 * 1000;
     const seenMs = parseSeenMs;
+    const phaseFor = (id: string) => swarmTransportRegistry.phaseFor(id);
+    const isConnecting = (id: string) => phaseFor(id) === 'connecting-direct';
 
     // 1. Seed from the shared presence store — the same record the profile
     // modal and the roster read, so the three can never disagree.
@@ -139,7 +145,6 @@ export function ChatPlayerList({
       if (!u.id) continue;
       const lastSeenMs = seenMs(u.last_seen);
       const online = isOnline(u.id, now);
-      const isWithin24h = online || (lastSeenMs > 0 && (now - lastSeenMs) <= oneDayMs);
 
       const existing = map.get(u.id);
       if (existing) {
@@ -149,7 +154,7 @@ export function ChatPlayerList({
         const existingSeenMs = seenMs(existing.last_seen);
         if (lastSeenMs >= existingSeenMs) existing.last_seen = u.last_seen || existing.last_seen;
         existing.online = isOnline(u.id, now);
-      } else if (isWithin24h || (identity && u.id === identity.orbitId)) {
+      } else if (online || isConnecting(u.id) || (identity && u.id === identity.orbitId)) {
         map.set(u.id, {
           id: u.id,
           display_name: u.display_name,
@@ -168,15 +173,13 @@ export function ChatPlayerList({
     for (const p of rosterPeers) {
       if (!p?.id || p.id === identity?.orbitId) continue;
       const name = p.display_name?.trim();
-      const lastSeenMs = seenMs(p.last_seen);
       const online = p.online === true;
       const existing = map.get(p.id);
       if (existing) {
         if (name) existing.display_name = name;
         existing.pfp_url = p.pfp_url || profilePics[p.id] || existing.pfp_url;
-        if (lastSeenMs >= seenMs(existing.last_seen)) existing.last_seen = p.last_seen || existing.last_seen;
         existing.online = online;
-      } else if (online || (lastSeenMs > 0 && (now - lastSeenMs) <= oneDayMs)) {
+      } else if (online || isConnecting(p.id)) {
         map.set(p.id, {
           id: p.id,
           display_name: name || undefined,
@@ -212,34 +215,22 @@ export function ChatPlayerList({
       }
     }
 
-    // 5. Filter for only active in last 24h or online
+    // 5. Only live players: a confirmed-online peer, or one with a dial in
+    //    flight. "Seen 6h ago" rows are dead weight, not a roster.
     const list: ChatPlayerItem[] = [];
     for (const p of map.values()) {
-      const lastSeenMs = seenMs(p.last_seen);
-      const is24h = p.online || (lastSeenMs > 0 && (now - lastSeenMs) <= oneDayMs);
-
-      if (is24h || (identity && p.id === identity.orbitId)) {
-        list.push(p);
-      }
+      if (p.online || isConnecting(p.id) || (identity && p.id === identity.orbitId)) list.push(p);
     }
 
-    // 6. Sort: online first, then offline by last_seen desc
+    // 6. Online first, then connecting, each group named alphabetically.
     list.sort((a, b) => {
-      if (a.online !== b.online) {
-        return a.online ? -1 : 1;
-      }
-      if (a.online) {
-        const nameA = (a.display_name || a.id).toLowerCase();
-        const nameB = (b.display_name || b.id).toLowerCase();
-        return nameA.localeCompare(nameB);
-      }
-      const timeA = seenMs(a.last_seen);
-      const timeB = seenMs(b.last_seen);
-      return timeB - timeA;
+      const rank = (p: ChatPlayerItem) => (p.online ? 0 : 1);
+      if (rank(a) !== rank(b)) return rank(a) - rank(b);
+      return (a.display_name || a.id).toLowerCase().localeCompare((b.display_name || b.id).toLowerCase());
     });
 
     return list;
-  }, [records, isOnline, users, rosterPeers, profilePics, identity]);
+  }, [records, isOnline, users, rosterPeers, profilePics, identity, transportTick]);
 
   const localOnlineCount = useMemo(() => mergedPlayers.filter((p) => p.online).length, [mergedPlayers]);
   // Server counts are only trustworthy while the snapshot carrying them is
@@ -247,7 +238,11 @@ export function ChatPlayerList({
   // fallback is 75s — after that the number is a lie and we use our own count.
   const isDashboardCountsFresh = Boolean(counts && countsAt > 0 && (Date.now() - countsAt) < 75_000);
   const displayOnlineCount = rosterCount ?? (isDashboardCountsFresh && counts ? counts.online : localOnlineCount);
-  const displayActiveCount = isDashboardCountsFresh && counts ? counts.active : mergedPlayers.length;
+  // The second number is a dial in flight, not a 24h-seen tally: the list
+  // shows only live players, so there is no stale row to count any more.
+  const connectingCount = mergedPlayers.filter(
+    (p) => swarmTransportRegistry.phaseFor(p.id) === 'connecting-direct',
+  ).length;
 
   const filteredPlayers = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -297,13 +292,13 @@ export function ChatPlayerList({
         </button>
         {!collapsed && (
           <div className="flex items-center gap-1.5 text-xs font-mono shrink-0">
-            <span className="flex items-center gap-1 text-retro-online font-medium">
-              <span className="w-2 h-2 rounded-full bg-retro-online inline-block" />
-              {displayOnlineCount}
+            <span className="flex items-center gap-1 font-medium">
+              <span className={classes('w-2 h-2 rounded-full inline-block', PRESENCE.currentDot)} />
+              <span className={PRESENCE.currentText}>{displayOnlineCount}</span>
             </span>
             <span className="text-retro-muted">/</span>
-            <span className="text-retro-muted" title="Total active in the last 24 hours">
-              {displayActiveCount} 24h
+            <span className={classes('text-retro-muted', connectingCount > 0 && PRESENCE.connectingText)} title="Players with a connection in flight">
+              {connectingCount} connecting
             </span>
           </div>
         )}
@@ -341,7 +336,7 @@ export function ChatPlayerList({
         {filteredPlayers.length === 0 ? (
           <FeedbackState
             compact
-            title={searchQuery ? `No players matching "${searchQuery}"` : 'No players active in last 24h'}
+            title={searchQuery ? `No players matching "${searchQuery}"` : 'No players online or connecting right now'}
           />
         ) : (
           filteredPlayers.map((player) => {
@@ -350,12 +345,16 @@ export function ChatPlayerList({
             const usableName = knownName && knownName.toLowerCase() !== 'user' ? knownName : null;
             const displayName = usableName || (isSelf ? 'You' : generateFallbackName(player.id));
             const pfp = player.pfp_url || profilePics[player.id];
+            // Only a SETTLED live path may claim a route; a dial in flight has
+            // no transport to name yet.
+            const connecting = swarmTransportRegistry.phaseFor(player.id) === 'connecting-direct';
+            const route = player.online && !connecting ? swarmTransportLabel(player.id) : null;
 
             return (
               <div
                 key={player.id}
                 data-testid="chat-player-row"
-                className="group flex items-center gap-2.5 p-2 rounded-lg hover:bg-glass-w8 active:bg-glass-w12 transition-colors"
+                className="group flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-glass-w8 active:bg-glass-w12 transition-colors"
               >
                 <button
                   type="button"
@@ -371,12 +370,11 @@ export function ChatPlayerList({
                       imageUrl={pfp}
                     />
                     <span
-                      className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-surface-raised ${
-                        player.online
-                          ? 'bg-retro-online'
-                          : 'bg-retro-muted/60'
-                      }`}
-                      aria-label={player.online ? 'Online' : 'Offline'}
+                      className={classes(
+                        'absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-surface-raised',
+                        connecting ? PRESENCE.connectingDot : player.online ? PRESENCE.currentDot : PRESENCE.idleDot,
+                      )}
+                      aria-label={connecting ? 'Connecting' : player.online ? 'Online' : 'Offline'}
                     />
                   </div>
 
@@ -392,13 +390,13 @@ export function ChatPlayerList({
                         </span>
                       )}
                     </div>
-                    <span className="block text-2xs text-retro-muted truncate">
-                      {player.online ? (
+                    <span className="block text-2xs text-retro-muted truncate tabular-nums">
+                      {connecting ? (
+                        <span className={classes(PRESENCE.connectingText, 'font-medium')}>Connecting…</span>
+                      ) : player.online ? (
                         <>
-                          <span className="text-retro-online font-medium">Active now</span>
-                          {swarmTransportLabel(player.id) && (
-                            <span> · {swarmTransportLabel(player.id)}</span>
-                          )}
+                          <span className={classes(PRESENCE.currentText, 'font-medium')}>Active now</span>
+                          {route && <span> · {route}</span>}
                         </>
                       ) : (
                         <span>Seen {formatRelativeTime(player.last_seen)}</span>

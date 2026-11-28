@@ -93,6 +93,11 @@ export interface ImportOwnPostsOptions {
 }
 
 export const MAX_IMPORT_PER_RUN = 100
+/** A foreground/peer-online reconcile is a hint, not a subscription: never
+ *  more than one bounded import wave per this many ms per identity. */
+export const AUTO_REPLICATE_INTERVAL_MS = 15_000
+export const AUTO_IMPORT_LIMIT = 20
+const lastAutoReplicateAt = new Map<string, number>()
 
 const SHA256_HEX = /^[0-9a-f]{64}$/i
 /** An object id must be a single path segment (never a descriptor/URL). */
@@ -270,4 +275,39 @@ export async function importOwnPosts(
   }
 
   return summary
+}
+
+/**
+ * The automatic half of "send my posts to users" (the opt-in button in
+ * Settings still imports the whole history). A peer coming online, a window
+ * returning to the foreground or a bounded interval calls this: the durable
+ * outbox is flushed FIRST so the node knows the rows, then this install's own
+ * public posts are turned into signed ops peers can fetch by content. Nothing
+ * runs twice inside the throttle window, and a failure is swallowed (the next
+ * hint retries) — no storm, no fabricated success.
+ */
+export async function autoReplicateOwnPosts(
+  identity: OrbitIdentityLike,
+  log: SocialOperationLog,
+  options: {
+    flushOutbox: () => Promise<unknown>
+    refreshFeed?: () => void
+    importDeps?: Partial<ImportOwnPostsDeps>
+    now?: () => number
+  },
+): Promise<boolean> {
+  const now = options.now?.() ?? Date.now()
+  const last = lastAutoReplicateAt.get(identity.orbitId) ?? 0
+  if (now - last < AUTO_REPLICATE_INTERVAL_MS) return false
+  lastAutoReplicateAt.set(identity.orbitId, now)
+
+  await options.flushOutbox().catch(() => { })
+  await importOwnPosts(identity, log, { limit: AUTO_IMPORT_LIMIT, deps: options.importDeps })
+  options.refreshFeed?.()
+  return true
+}
+
+/** Test-only: forget the throttle so suites sharing the module stay hermetic. */
+export function __resetAutoReplicateForTests(): void {
+  lastAutoReplicateAt.clear()
 }

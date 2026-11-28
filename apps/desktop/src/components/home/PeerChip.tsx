@@ -42,17 +42,19 @@ export const PEER_STATUS_LABEL: Record<PeerChipStatus, string> = {
 
 /**
  * Map the transport registry's five phases onto the three statuses the chip
- * shows. `direct` and `relay` are both a live, settled connection, so they read
- * as `connected` — the user never sees which transport is in use. Only
- * `connecting-direct` is a genuinely in-flight dial (`connecting`); `idle` has
- * no dial in flight and an offline roster row is a peer we cannot reach right
- * now, so both read as `cannot-connect`.
+ * shows. `direct` and `relay` are settled routes, and `idle` is a roster-
+ * confirmed online peer whose dial has not started — all three read as
+ * `connected`; the chip never claims WHICH transport is in use (the route
+ * line does that, and only when one is settled). Only `connecting-direct`
+ * is an in-flight dial. A failed dial or an offline roster row is the one
+ * `cannot-connect` state, and the popover hides those rows entirely.
  */
 export function peerChipStatus(peer: User | undefined, phase: PeerTransportPhase): PeerChipStatus {
   if (!peer || peer.online !== true) return 'cannot-connect';
   switch (phase) {
-    case 'direct': return 'connected';
-    case 'relay': return 'connected';
+    case 'direct':
+    case 'relay':
+    case 'idle': return 'connected';
     case 'connecting-direct': return 'connecting';
     default: return 'cannot-connect';
   }
@@ -161,7 +163,11 @@ export function PeerChip({
     };
   }, [open, close]);
 
-  const visible = peers.filter((p) => !!p?.id && p.id !== selfId);
+  // Only live players belong here: an offline/ghost row or a failed dial is
+  // dead weight in a "who is here now" list, and never gets a fake presence.
+  const visible = peers.filter(
+    (p) => !!p?.id && p.id !== selfId && peerChipStatus(p, registry.phaseFor(p.id)) !== 'cannot-connect',
+  );
   // ONE count for every surface: the roster's projection, not a per-component
   // re-count and never a node dashboard number.
   const count = roster

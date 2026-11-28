@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo, useCallback, Fragment } from 'rea
 import { playPress } from '../../utils/sounds';
 import { ContextMenu, type ContextMenuItem } from '../ui/ContextMenu';
 import { resolveMediaUrl } from '../../utils/media';
+import { contentHashFromRef } from '../../utils/contentAddressedMedia';
 import { GroupMembersPopover, type GroupMember } from './GroupMembersPopover';
 import {
   Send,
@@ -1433,6 +1434,8 @@ export function GMatchDMs({
                                   >
                                     <ObjectImage
                                       contentUrl={msg.attachmentUrl}
+                                      objectId={msg.attachmentId || undefined}
+                                      contentHash={(msg as any).contentHash || contentHashFromRef(msg.attachmentUrl)}
                                       mimeType={msg.attachmentMime}
                                       identity={identity}
                                       alt="Attached image"

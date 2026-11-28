@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
+const E2E_PORT = process.env.GMATCH_E2E_PORT || '8791'
+
 // E2E runs against the vite dev server (browser mode). The dev-sidecar plugin
 // in vite.config.ts boots the same Bun API the packaged app uses, so the full
 // stack is live and /api answers a FULL node — never the central courier,
@@ -32,7 +34,7 @@ export default defineConfig({
     // Wait for the sidecar too, not just vite's socket: /api/health answers 503
     // until the cold schema + VACUUM finish, and a test that starts before that
     // burns its whole budget polling a node that is still booting.
-    url: 'http://127.0.0.1:8791/api/health',
+    url: `http://127.0.0.1:${E2E_PORT}/api/health`,
     reuseExistingServer: false,
     // Fresh schema + VACUUM on a cold DB is slower than the default budget.
     timeout: 120_000,
@@ -45,7 +47,7 @@ export default defineConfig({
       // nor be broken by local dev data, and leftover rows never leak between
       // runs. Wiping is opt-in via GMATCH_API_FRESH and happens in the vite
       // plugin, which owns the sidecar's data dir.
-      GMATCH_API_PORT: '8791',
+      GMATCH_API_PORT: E2E_PORT,
       GMATCH_API_FRESH: '1',
       SNAPSHOT_PATH: 'I:/tmp/gmatch-e2e/orbit.sqlite',
       WATCH_PARTIES_PATH: 'I:/tmp/gmatch-e2e/watchparties.json',

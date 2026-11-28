@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingFlow } from './OnboardingFlow';
 import { SERVER_MARKER_KEY } from './onboardingState';
+import { LOGO } from '../ui/tokens';
 
 function stubLocalStorage(initial: Record<string, string> = {}) {
   const store = new Map<string, string>(Object.entries(initial));
@@ -96,5 +97,22 @@ describe('OnboardingFlow', () => {
       expect(onCreateAccount).toHaveBeenCalledWith('VoyeurMaster', '', undefined);
     });
     expect(onComplete).toHaveBeenCalled();
+  });
+
+  it('shows the shipped icon.png mark on onboarding', () => {
+    const { container } = render(
+      <OnboardingFlow
+        identity={null}
+        initialProfile={{ displayName: '', tags: [] }}
+        onCreateAccount={vi.fn().mockResolvedValue(undefined)}
+        onLogin={vi.fn()}
+        onProfileUpdated={() => {}}
+        onComplete={() => {}}
+        ensureIdentity={() => null}
+      />
+    );
+    const mark = container.querySelector('img');
+    expect(mark, 'the brand mark must render').not.toBeNull();
+    expect(mark?.getAttribute('src')).toBe(LOGO.markSrc);
   });
 });

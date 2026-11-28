@@ -27,6 +27,8 @@ import { ObjectImage } from '../ObjectImage';
 import { GameCard } from '../cards/GameCard';
 import { computeCardRarity } from '@orbit/shared';
 import { isVideoPost } from '../../utils/media';
+import { contentHashFromRef } from '../../utils/contentAddressedMedia';
+import { resolveObjectRefId } from '../../utils/objectRef';
 import { saveUserProfile } from '../../utils/profile';
 import { openCardDetail } from '../../utils/openCard';
 import { profileShareUrl, orbitFetch, invalidateCache } from '../../utils/api';
@@ -418,7 +420,8 @@ export function GMatchProfile({
             {pfp ? (
               <ObjectImage
                 contentUrl={pfp}
-                objectId={pfp?.includes('/api/objects/') ? pfp.slice(pfp.indexOf('/api/objects/') + 13).split(/[?#]/)[0] : null}
+                objectId={resolveObjectRefId(pfp)}
+                contentHash={contentHashFromRef(pfp)}
                 identity={identity}
                 alt={displayName}
                 className={CELL_IMG}
@@ -447,7 +450,7 @@ export function GMatchProfile({
                 className="flex flex-col cursor-pointer"
                 onClick={(stat as any).onClick}
               >
-                <span className={classes(TYPE.base, WEIGHT.semibold, COLOR.fg, MONO)}>
+                <span className={classes(TYPE.title, WEIGHT.semibold, COLOR.fg, MONO, TRACKING.tight)}>
                   {stat.value}
                 </span>
                 <span className={classes(TYPE.body, COLOR.muted)}>{stat.label}</span>

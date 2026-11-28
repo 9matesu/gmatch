@@ -21,6 +21,9 @@ vi.mock('../../services/mediaForge', async (importActual) => ({
   forgeMediaLocally: forgeMock,
 }));
 
+const rememberKeepMock = vi.hoisted(() => vi.fn(async () => null));
+vi.mock('../../utils/mediaVault', () => ({ rememberUploadedMediaKeep: rememberKeepMock }));
+
 const identity = { orbitId: 'me-1' } as never;
 
 /** B7: URL entry now flows through the shared media picker. */
@@ -41,11 +44,12 @@ beforeEach(() => {
   // jsdom has no createObjectURL; the file path mints a preview URL.
   (URL as unknown as { createObjectURL: unknown }).createObjectURL = vi.fn(() => 'blob:preview');
   (URL as unknown as { revokeObjectURL: unknown }).revokeObjectURL = vi.fn();
+  rememberKeepMock.mockClear();
   // Default: every item forges successfully. Individual tests override.
   forgeMock.mockReset();
   forgeMock.mockImplementation(async (file: File) => ({
     id: 'forged-' + file.name,
-    contentHash: 'h',
+    contentHash: 'b'.repeat(64),
     mimeType: file.type || 'image/png',
     sizeBytes: file.size,
     localUrl: 'blob:local',
@@ -162,6 +166,28 @@ describe('CreatePostModal URL uploads', () => {
     render(<CreatePostModal mode="story" identity={identity} onClose={() => {}} toast={vi.fn()} />);
     expect(screen.getByRole('button', { name: /Share Story/i })).toBeDisabled();
     expect(screen.queryByRole('textbox')).toBeNull();
+  });
+
+  it('an uploaded picture is a public post and a Vault keep — never a card', async () => {
+    render(<CreatePostModal identity={identity} onClose={() => {}} toast={vi.fn()} />);
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await userEvent.upload(input, new File([new Uint8Array([1, 2, 3])], 'sunset.png', { type: 'image/png' }));
+    await userEvent.click(screen.getByRole('button', { name: /^share$/i }));
+
+    await waitFor(() => expect(forgeMock).toHaveBeenCalledTimes(1));
+    const [, , options] = forgeMock.mock.calls[0];
+    expect(options).toMatchObject({ isPublic: true, isStory: false, durable: true });
+    expect(options).not.toHaveProperty('cardId');
+    expect(options.isChat).toBeUndefined();
+    // No card is minted from an ordinary upload.
+    expect(vi.mocked(orbitFetch).mock.calls.some(([url]) => String(url).includes('/api/cards'))).toBe(false);
+
+    await waitFor(() =>
+      expect(rememberKeepMock).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'forged-sunset.png', contentHash: 'b'.repeat(64), mimeType: 'image/png' }),
+        expect.anything(),
+      ),
+    );
   });
 
   it('Write a text post opens text mode with no media requirement and publishes', async () => {

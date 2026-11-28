@@ -251,4 +251,28 @@ describe('projectFeed', () => {
   it('returns an empty timeline when there is no input', () => {
     expect(projectFeed({ ...base })).toEqual([])
   })
+
+  it('lets a signed peer post win over its public gallery mirror', () => {
+    // A peer's post is also mirrored in the local gallery as an `is_public`
+    // object. That mirror has no content_hash, so when it shadowed the signed
+    // operation row the media ladder lost the content address and the tile
+    // was hidden as "no preview" — the feed read as empty.
+    const signed = post('peer-post', {
+      url: 'urn:sha256:abc123',
+      content_hash: 'abc123',
+      caption: 'from the signed op',
+    })
+    const rows = projectFeed({
+      ...base,
+      items: [{
+        id: 'peer-post', owner_id: 'peer-1', is_public: 1,
+        mime_type: 'image/jpeg', data: new Uint8Array([1, 2, 3]),
+        created_at: '2026-01-01T00:00:00.000Z',
+      } as unknown as OrbitObject],
+      peerFeedPosts: [signed],
+    })
+    expect(rows.map((r) => r.id)).toEqual(['peer-post'])
+    expect(rows[0].content_hash).toBe('abc123')
+    expect(rows[0].url).toBe('urn:sha256:abc123')
+  })
 })

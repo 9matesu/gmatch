@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createTransportRegistry } from './transportState'
+import { createTransportRegistry, transportLabel } from './transportState'
 
 function fixedClock(start = 1000): { now: () => number; tick: (ms: number) => void } {
   let t = start
@@ -113,5 +113,38 @@ describe('peer transport-selection registry', () => {
     reg.forget('p')
     expect(reg.phaseFor('p')).toBe('idle')
     expect(reg.snapshot().size).toBe(0)
+  })
+})
+
+describe('transport labels', () => {
+  it('never claims a route before the DataChannel opens', () => {
+    expect(transportLabel('idle')).toBeNull()
+    expect(transportLabel('connecting-direct')).toBeNull()
+    // Radmin flag is irrelevant until the channel is validated.
+    expect(transportLabel('connecting-direct', true)).toBeNull()
+    expect(transportLabel('idle', true)).toBeNull()
+  })
+
+  it('reads VPN direct (Radmin) only for a validated Radmin direct channel', () => {
+    expect(transportLabel('direct')).toBe('P2P direct')
+    expect(transportLabel('direct', true)).toBe('VPN direct (Radmin)')
+    expect(transportLabel('relay')).toBe('relay via node (NAT)')
+    expect(transportLabel('relay', true)).toBe('relay via node (NAT)')
+    expect(transportLabel('failed')).toBe('no route')
+  })
+
+  it('registry exposes the Radmin flag only while the direct path is validated', () => {
+    const reg = createTransportRegistry({ now: fixedClock().now })
+    reg.startDirectAttempt('p')
+    expect(reg.isDirectViaRadmin('p')).toBe(false)
+    reg.markDirectValidated('p', true)
+    expect(reg.phaseFor('p')).toBe('direct')
+    expect(reg.isDirectViaRadmin('p')).toBe(true)
+    // A relay sighting never demotes a validated direct path.
+    reg.markRelayInUse('p')
+    expect(reg.isDirectViaRadmin('p')).toBe(true)
+    // A later non-Radmin validation clears the flag.
+    reg.markDirectValidated('p', false)
+    expect(reg.isDirectViaRadmin('p')).toBe(false)
   })
 })

@@ -134,11 +134,16 @@ export function projectFeed(input: FeedProjectionInput): FeedPost[] {
   // Local public objects -> rows. An unverified owner claim is a relay, not a
   // proof: it may not borrow another user's directory name or avatar.
   const seenServerIds = new Set(serverVisible.map((p) => p.id))
+  // A peer's signed operation is the authority for its own post. The same post
+  // is often mirrored locally as an `is_public` gallery object with no
+  // content_hash; that mirror used to shadow the signed row, so the media
+  // ladder lost the content address and the tile was hidden as "no preview".
+  const peerIds = new Set(peerFeedPosts.filter((p) => !deletedPostIds.has(p.id)).map((p) => p.id))
   // Local objects whose owner claim was NOT verified: they may never borrow a
   // directory name/avatar, so the live-name pass must skip them.
   const unverifiedIds = new Set<string>()
   const localPublicPosts: FeedPost[] = items
-    .filter((obj) => (obj.is_public === 1 || obj.is_public === true) && !deletedPostIds.has(obj.id) && !seenServerIds.has(obj.id))
+    .filter((obj) => (obj.is_public === 1 || obj.is_public === true) && !deletedPostIds.has(obj.id) && !seenServerIds.has(obj.id) && !peerIds.has(obj.id))
     .map((obj) => {
       const isSelf = !!selfId && obj.owner_id === selfId
       const unverified = obj.owner_verified === false

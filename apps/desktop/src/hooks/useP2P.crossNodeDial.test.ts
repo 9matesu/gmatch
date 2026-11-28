@@ -58,13 +58,13 @@ describe('a failed cross-node direct attempt leaves the label on relay', () => {
   it('startDirectAttempt -> markDirectFailed(true) demotes to relay, never direct', async () => {
     const { createTransportRegistry, transportLabel } = await import('../utils/transportState')
     const reg = createTransportRegistry()
-    // No settled route yet: the label says nothing (never "P2P direto").
+    // No settled route yet: the label says nothing (never "P2P direct").
     expect(transportLabel(reg.phaseFor(PEER))).toBeNull()
     reg.startDirectAttempt(PEER)
     expect(transportLabel(reg.phaseFor(PEER))).toBeNull()
     // The dial failed but the node relay is wired: honest fallback label.
     reg.markDirectFailed(PEER, 'ice failed', true)
     expect(reg.phaseFor(PEER)).toBe('relay')
-    expect(transportLabel(reg.phaseFor(PEER))).toBe('relay via nó (NAT)')
+    expect(transportLabel(reg.phaseFor(PEER))).toBe('relay via node (NAT)')
   })
 })

@@ -88,6 +88,9 @@ export function useFeedController(input: FeedControllerInput): FeedController {
   const seqRef = useRef(0)
   const pushedRef = useRef<Map<string, PushedEntry<FeedPost>>>(new Map())
   const postsRef = useRef<FeedPost[]>([])
+  /** The last server snapshot on screen, read inside `load` without making the
+   *  request callback depend on the whole timeline. */
+  const serverPostsRef = useRef<FeedPost[]>([])
   /**
    * The caller's `normalizePost`, read through a ref.
    *
@@ -178,6 +181,7 @@ export function useFeedController(input: FeedControllerInput): FeedController {
   ])
 
   useEffect(() => { postsRef.current = posts }, [posts])
+  useEffect(() => { serverPostsRef.current = serverPosts }, [serverPosts])
 
   const load = useCallback((): Promise<FeedPost[]> => {
     if (!identity) return Promise.resolve([])
@@ -193,10 +197,19 @@ export function useFeedController(input: FeedControllerInput): FeedController {
         if (snap.stale) return []
         if (!snap.ok) {
           // 404 = this node hosts no feed: a state, not a retryable failure.
-          // A restored snapshot stays on screen (it is this device's own data);
-          // the status says which one the player is looking at.
+          // Every failed read keeps the rows already on screen; they are stale
+          // now, so say so instead of implying a live answer to the player.
           setStatus('offline')
+          setRestoredFromCache(true)
           return []
+        }
+        if (snap.posts.length === 0 && serverPostsRef.current.length > 0) {
+          // A node that restarted with an empty DB answers 200 with no rows.
+          // That is not proof nobody posted: keep the last good timeline and
+          // label it cached. Only a first successful empty read shows empty.
+          setStatus('offline')
+          setRestoredFromCache(true)
+          return serverPostsRef.current
         }
         setServerPosts((prev) => (feedTimelineUnchanged(prev, snap.posts) ? prev : snap.posts))
         setRestoredFromCache(false)
@@ -206,8 +219,10 @@ export function useFeedController(input: FeedControllerInput): FeedController {
       })
       .catch(() => {
         if (seq === seqRef.current) {
-          // Keep a working feed on screen when only a background refresh fails.
-          setStatus((prev) => (prev === 'ready' ? 'ready' : 'error'))
+          // Keep a working feed on screen when a refresh fails, but never claim
+          // the rows were confirmed by this read: they are cached from before.
+          setStatus('error')
+          setRestoredFromCache(true)
         }
         return []
       })

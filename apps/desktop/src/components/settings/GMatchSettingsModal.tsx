@@ -62,6 +62,7 @@ import { UpdateSection } from './UpdateSection';
 import { CommunitySection } from './CommunitySection';
 import { ImportPostsSection } from './ImportPostsSection';
 import { TurnSection } from './TurnSection';
+import { NetworkSection } from './NetworkSection';
 import { MediaqSection } from './MediaqSection';
 import { BlocklistSection } from './BlocklistSection';
 import { DiagnosticsSection } from './DiagnosticsSection';
@@ -685,6 +686,7 @@ export function GMatchSettingsModal({
                   </Panel>
                 )}
                 <TurnSection toast={toast} />
+                <NetworkSection toast={toast} />
                 <MediaqSection onClose={onClose} toast={toast} />
                 <DiagnosticsSection identity={identity} />
                 <CommunitySection toast={toast} />

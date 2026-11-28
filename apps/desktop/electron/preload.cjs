@@ -58,6 +58,8 @@ contextBridge.exposeInMainWorld('gmatch', {
   secureSet: (key, value) => ipcRenderer.invoke('secure:set', key, value),
   secureDelete: (key) => ipcRenderer.invoke('secure:delete', key),
   serverState: () => ipcRenderer.invoke('server:state'),
+  radminStatus: () => ipcRenderer.invoke('radmin:status'),
+  radminJoin: (name, password) => ipcRenderer.invoke('radmin:join', { name, password }),
   claimAdminOwner: (orbitId) => ipcRenderer.invoke('server:claim-admin-owner', orbitId),
   // Frameless window controls (renderer draws its own titlebar; absence of
   // these = plain browser/dev, chrome hides the buttons).

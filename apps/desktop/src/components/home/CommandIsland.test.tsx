@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { act, render, screen, fireEvent } from '@testing-library/react'
+import { act, render, screen, fireEvent, within } from '@testing-library/react'
 import type { User } from '@orbit/shared'
 import { CommandIsland } from './CommandIsland'
 import { isNodeOwner } from '../../admin/nodeOwner'
@@ -177,25 +177,35 @@ describe('CommandIsland live player chip (one roster, real routes)', () => {
     expect(screen.queryByRole('dialog', { name: 'Connected peers' })).toBeNull()
   })
 
-  it('lists real roster peers with the transport they actually proved', () => {
+  it('lists live roster peers with the transport they actually proved', () => {
     const roster = new PeerRoster(null)
     act(() => {
       roster.upsert(peer('a', 'Alpha'))
       roster.upsert(peer('b', 'Beta'))
       roster.upsert(peer('c', 'Cy'))
+      roster.upsert(peer('d', 'Delta'))
       swarmTransportRegistry.markDirectValidated('a')
       swarmTransportRegistry.markRelayInUse('b')
       swarmTransportRegistry.markDirectFailed('c', 'no relay', false)
+      // 'd' is roster-online but no dial has started: still connected, with
+      // no route label at all (never an invented "P2P direct").
     })
     render(<CommandIsland mainView="feed" setMainView={vi.fn()} roster={roster} selfId="me" />)
-    fireEvent.click(screen.getByRole('button', { name: 'Peers, 3 connected' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Peers, 4 connected' }))
     const dialog = screen.getByRole('dialog', { name: 'Connected peers' })
-    expect(dialog).toHaveTextContent('Alpha')
-    expect(dialog).toHaveTextContent('Beta')
-    expect(dialog).toHaveTextContent('Cy')
-    expect(dialog).toHaveTextContent('P2P direto')
-    expect(dialog).toHaveTextContent('relay via nó (NAT)')
-    expect(dialog).toHaveTextContent('sem rota')
+    const rows = within(dialog).getAllByRole('listitem')
+    // A failed dial is hidden from the live list, not shown as "no route".
+    expect(rows).toHaveLength(3)
+    expect(rows[0]).toHaveTextContent('Alpha')
+    expect(rows[0]).toHaveTextContent('Connected')
+    expect(rows[0]).toHaveTextContent('P2P direct')
+    expect(rows[1]).toHaveTextContent('Beta')
+    expect(rows[1]).toHaveTextContent('relay via node (NAT)')
+    expect(rows[2]).toHaveTextContent('Delta')
+    expect(rows[2]).toHaveTextContent('Connected')
+    expect(rows[2]).not.toHaveTextContent('·')
+    expect(dialog).not.toHaveTextContent('Cy')
+    expect(dialog).not.toHaveTextContent('no route')
   })
 
   it('the chip count is the roster count, never a stale server/lobby number', () => {

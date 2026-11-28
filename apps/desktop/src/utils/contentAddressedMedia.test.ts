@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { sha256HexBlob } from './p2pSwarm'
 import {
   PEER_MEDIA_TIMEOUT_MS,
+  contentHashFromRef,
   isContentAddress,
   isContentHash,
   isLegacyContentHash,
@@ -32,6 +33,23 @@ function deps(overrides: Partial<ContentAddressedDeps> = {}): ContentAddressedDe
     requestSwarm: ReturnType<typeof vi.fn>
   }
 }
+
+describe('contentHashFromRef', () => {
+  it('reads the address out of a urn, a magnet btih and a bare digest', () => {
+    const hash = 'c'.repeat(64)
+    expect(contentHashFromRef(`urn:sha256:${hash}`)).toBe(hash)
+    expect(contentHashFromRef(`magnet:?xt=urn:btih:${hash.slice(0, 40)}`)).toBe(hash.slice(0, 40))
+    expect(contentHashFromRef(`/api/objects/${hash}`)).toBe(hash)
+    expect(contentHashFromRef(hash.toUpperCase())).toBe(hash)
+  })
+
+  it('names no content for a UUID object id, an http URL or a descriptor with no id', () => {
+    expect(contentHashFromRef('/api/objects/00000000-0000-4000-8000-000000000000')).toBeNull()
+    expect(contentHashFromRef('https://cdn.example/pic.jpg')).toBeNull()
+    expect(contentHashFromRef('magnet:?xt=urn:btih:')).toBeNull()
+    expect(contentHashFromRef(null)).toBeNull()
+  })
+})
 
 describe('isContentHash', () => {
   it('accepts a sha256 hex digest and nothing else', () => {

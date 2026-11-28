@@ -26,8 +26,9 @@ import { useDurableCustody } from '../../hooks/useDurableCustody';
 import { PostComments } from './PostComments';
 import {
   classes, COLOR, GAP, ICON, MOTION, PADDING, PADDING_X, PADDING_Y,
-  RADIUS, STATUS, TRACKING, TRANSITION, TYPE, WEIGHT,
+  PRESENCE, RADIUS, STATUS, TRACKING, TRANSITION, TYPE, WEIGHT,
 } from '../../ui/tokens';
+import { usePresence } from '../../game/presenceStore';
 
 /** The expanded post is CONTENT on the caller's single card, never a second
  *  card stacked inside it. Edges/padding stay token-composed and quiet. */
@@ -137,6 +138,10 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
 
   const authorAvatar = profilePics[post.author_id] || post.author_avatar;
   const resolvedAuthorAvatar = authorAvatar ? resolveMediaUrl(authorAvatar) : '';
+  // Positive-only presence: a green dot when the author is genuinely online
+  // (the shared store's sighting), nothing when there is no sighting — the
+  // sheet never invents an "offline" state for an author nobody has seen.
+  const authorOnline = usePresence((s) => s.isOnline(post.author_id));
 
   return (
     <article
@@ -158,7 +163,7 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
           aria-label={`View profile of ${post.author_name}`}
           className={classes('flex items-center text-left cursor-pointer', GAP[3])}
         >
-          <div className={classes('w-8 h-8 p-[1px] shrink-0', RADIUS.pill, COLOR.glassW12, 'border', COLOR.edge)}>
+          <div className={classes('relative shrink-0', 'w-8 h-8 p-[1px]', RADIUS.pill, COLOR.glassW12, 'border', COLOR.edge)}>
             <div className={classes('w-full h-full overflow-hidden flex items-center justify-center', RADIUS.pill, COLOR.panelGlass, TYPE.body, WEIGHT.semibold, COLOR.fg)}>
               {authorAvatar ? (
                 <img src={resolvedAuthorAvatar} alt="" className="w-full h-full object-cover" />
@@ -166,12 +171,18 @@ export function ProfileExpandedPost({ post, onClose, identity, profilePics = {},
                 post.author_name.charAt(0).toUpperCase()
               )}
             </div>
+            {authorOnline && (
+              <span
+                className={classes('absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-surface-raised', PRESENCE.currentDot)}
+                aria-label="Author online"
+              />
+            )}
           </div>
-          <div>
+          <div className="min-w-0">
             <div className={classes('flex items-center', GAP[1])}>
-              <span className={classes(TYPE.sub, WEIGHT.semibold, COLOR.fg, 'hover:underline')}>{post.author_name}</span>
+              <span className={classes(TYPE.sub, WEIGHT.semibold, COLOR.fg, 'hover:underline truncate')}>{post.author_name}</span>
             </div>
-            <span className={classes(TYPE.caption, COLOR.muted, WEIGHT.medium, 'block')}>
+            <span className={classes(TYPE.caption, COLOR.muted, WEIGHT.medium, 'block tabular-nums')}>
               {post.location ? `${post.location} · ` : ''}{formatRelativeDate(post.created_at)}
             </span>
           </div>

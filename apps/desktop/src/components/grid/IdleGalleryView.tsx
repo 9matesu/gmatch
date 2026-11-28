@@ -30,6 +30,14 @@ import {
 } from 'lucide-react'
 import { MUTED } from '../../ui/styles'
 import { ensurePermanentMedia, isPermanentlySaved } from '../../utils/mediaVault'
+import { isMediaVideo } from '../../utils/media'
+
+/** Keeps saved from the clicker cache predate `kind`; their URL still says
+ *  mp4/webm. Treat that as video so the viewer plays bytes instead of handing
+ *  a video file to <img> (the "only opens in a new tab" symptom). */
+function keepIsVideo(img: GalleryImage): boolean {
+  return img.kind === 'video' || isMediaVideo(img.url)
+}
 
 const RARITY_ORDER: Record<string, number> = {
   Common: 1,
@@ -692,6 +700,11 @@ export default function IdleGalleryView({
         ? viewerProbe.media
         : { status: 'loading' }
   const viewerLocalUrl = viewerResolved.status === 'local' ? viewerResolved.url : null
+  // A vault hit can still be a raw `vault://f/<hash>` when the stored row has
+  // no mime/extension. The vault's own localhost server speaks Range and sets
+  // the real Content-Type, so normalise it here for the mounted <video>.
+  const viewerHttpUrls = useVaultHttpUrls(viewerLocalUrl ? [viewerLocalUrl] : [])
+  const viewerSrc = viewerLocalUrl ? viewerHttpUrls[viewerLocalUrl] || viewerLocalUrl : null
 
   // A manual view is the one-time trigger for a permanent vault write. The
   // helper checks the vault FIRST, so viewing an already-saved keep (or a
@@ -980,7 +993,7 @@ export default function IdleGalleryView({
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
             {paginatedGallery.map((img) => {
               const isBackdrop = backgroundUrl === img.url
-              const isMotion = img.kind === 'video'
+              const isMotion = keepIsVideo(img)
               const isSelected = selectedIds.has(img.id)
               const tileUrl = getTileUrl(img)
               // Vault flicker guard: while THIS mount's local vault lookup is
@@ -1179,22 +1192,25 @@ export default function IdleGalleryView({
         <MediaViewerModal onClose={() => setViewerId(null)} label="Keepsake viewer">
           <figure className="relative flex max-h-(--max-h-panel) min-h-0 w-auto max-w-full flex-col items-center">
             <div className="relative min-h-0 w-auto max-w-full" data-keepsake-id={viewer.id}>
-              {viewerResolved.status === 'local' ? (
-                viewerResolved.media === 'video' ? (
+              {viewerResolved.status === 'local' && viewerSrc ? (
+                keepIsVideo(viewer) ? (
                   <NativeVideoPlayer
-                    src={viewerResolved.url}
+                    src={viewerSrc}
                     poster={viewer.preview || undefined}
                     className="max-h-(--max-h-sheet) w-auto max-w-full rounded-lg"
                     videoClassName="max-h-(--max-h-sheet) w-auto max-w-full rounded-lg object-contain"
                     controls
+                    // Silent autoplay is what Chromium actually permits; the
+                    // player's own mute control lets the user turn sound on.
                     autoPlay
-                    muted={false}
+                    muted
+                    preload="auto"
                     loop
                     playsInline
                   />
                 ) : (
                   <img
-                    src={viewerResolved.url}
+                    src={viewerSrc}
                     alt={viewer.tags.slice(0, 3).join(' ') || 'keepsake'}
                     className="max-h-(--max-h-sheet) w-auto max-w-full rounded-lg object-contain"
                     referrerPolicy="no-referrer"

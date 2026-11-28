@@ -13,6 +13,9 @@
 import { vaultGet } from '../services/vault'
 import { contentRefFromText } from './objectDescriptor'
 import { isContentAddress } from './contentAddressedMedia'
+import { isMediaVideo } from './media'
+import { getObject } from './storage'
+import type { GalleryImage } from '../game/types'
 
 export type PermanentMediaResult =
   | {
@@ -52,7 +55,11 @@ const defaultDeps: PermanentMediaDeps = {
 /** One successful write per url per session — repeat views cost no fetch. */
 const settled = new Map<string, PermanentMediaResult>()
 
-function permanent(ref: string, via: 'vault' | 'idb', reused: boolean): PermanentMediaResult {
+function permanent(
+  ref: string,
+  via: 'vault' | 'idb',
+  reused: boolean,
+): Extract<PermanentMediaResult, { state: 'permanent' }> {
   return { state: 'permanent', ref, via, reused }
 }
 
@@ -134,4 +141,71 @@ export async function ensurePermanentMedia(
 /** Test seam: forget the session's one-time decisions. */
 export function _resetPermanentMedia(): void {
   settled.clear()
+}
+
+/**
+ * An upload is a post / chat attachment, never a card. `forgeMediaLocally`
+ * already sealed its bytes into the vault (or the browser's durable object
+ * store) under the content hash; this records ONE keepsake for the Vault and
+ * the profile media grid so the same bytes are visible in both surfaces.
+ *
+ * It never mints a card, never re-downloads a bare hash as a provider URL, and
+ * never claims a keep when neither durable store can be read back.
+ */
+export async function rememberUploadedMediaKeep(
+  forged: { id: string; contentHash: string; mimeType?: string | null },
+  opts: {
+    tags?: string[]
+    deps?: Partial<PermanentMediaDeps>
+  } = {},
+): Promise<GalleryImage | null> {
+  const ref = String(forged.contentHash || '').trim().toLowerCase()
+  if (!isContentAddress(ref)) return null
+  const kind = isMediaVideo(forged.mimeType || undefined) ? 'video' : 'image'
+  // The upload's bytes are already durable; a bare hash is not fetchable as a
+  // URL, so the fallback probe below reads the local store instead of guessing.
+  const result = await ensurePermanentMedia(ref, kind, {
+    persist: async () => ({ status: 'failed', reason: 'upload-bytes-only' }),
+    ...opts.deps,
+  })
+  let pinned: Extract<PermanentMediaResult, { state: 'permanent' }> | null =
+    result.state === 'permanent' ? result : null
+  if (!pinned) {
+    const hasBridge = typeof window !== 'undefined' && typeof window.gmatch?.vaultGet === 'function'
+    if (hasBridge) {
+      // A second probe covers a forge whose fire-and-forget vault write landed
+      // just after the first lookup. An IndexedDB row here holds only a
+      // descriptor, so it is NOT proof of bytes.
+      if (await vaultGet(ref).catch(() => null)) pinned = permanent(ref, 'vault', true)
+    } else {
+      // Browser dev has no vault bridge: IndexedDB holds the real bytes.
+      const row = await getObject(ref).catch(() => null)
+      if (row?.data) pinned = permanent(ref, 'idb', true)
+    }
+  }
+  if (!pinned) return null
+
+  const keep: GalleryImage = {
+    id: `upload:${forged.id}`,
+    // A content address is a stable local URL: the Vault resolves it from the
+    // verified bytes, unlike a session-only blob: URL.
+    url: ref,
+    tags: (opts.tags || []).slice(0, 24),
+    rarityBase: 0,
+    clicks: 0,
+    rarity: 'Common',
+    boughtAt: Date.now(),
+    kind,
+    localRef: pinned.ref,
+    saveState: 'persisted',
+  }
+  const { useGame } = await import('../game/store')
+  const existing = useGame.getState().gallery.find((g) => g.id === keep.id || g.url === ref)
+  if (existing) return existing
+  useGame.setState((s) => ({
+    gallery: [...s.gallery, keep],
+    totalGallerySaved: s.totalGallerySaved + 1,
+  }))
+  useGame.getState().save()
+  return keep
 }

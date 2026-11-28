@@ -32,13 +32,13 @@ describe('presence: one answer for every surface', () => {
     __resetPresenceForTests()
   })
 
-  it('the chat list and the profile agree on a stale sighting', () => {
-    // The reported bug: the same person read Online in one place and Offline
-    // in another, because each surface derived presence from its own object.
+  it('the chat list hides a stale sighting while the profile still names it offline', () => {
+    // Same shared presence answer; the chat list simply no longer shows dead
+    // rows. No surface claims the player is online.
     const stale = u('subject', 'Subject', { last_seen: ago(10 * 60_000), online: true })
     render(<Surfaces users={[stale]} />)
 
-    expect(screen.getByTitle(`View Subject's profile`).textContent).toContain('Seen')
+    expect(screen.queryByTitle(`View Subject's profile`)).toBeNull()
     expect(screen.getByTestId('dot-subject').textContent).toBe('Offline')
   })
 

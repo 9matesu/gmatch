@@ -24,8 +24,10 @@ vi.mock('./PostComments', () => ({ PostComments: () => <div data-testid="comment
 vi.mock('../../utils/sounds', () => ({ playPress: vi.fn() }))
 
 import { ProfileExpandedPost } from './ProfileExpandedPost'
+import { __resetPresenceForTests, ingestSnapshot } from '../../game/presenceStore'
 
 const HASH = 'a'.repeat(64)
+const fresh = () => new Date().toISOString()
 
 function post(overrides: Partial<FeedPost> = {}): FeedPost {
   return {
@@ -107,5 +109,31 @@ describe('ProfileExpandedPost · save to Vault', () => {
       />,
     )
     expect(screen.queryByLabelText('Save to Vault')).toBeNull()
+  })
+})
+
+describe('ProfileExpandedPost · author header', () => {
+  beforeEach(() => __resetPresenceForTests())
+
+  it('shows a green dot only when the author is genuinely online', () => {
+    ingestSnapshot([{ id: 'author-1', last_seen: fresh(), online: true }])
+    renderPost(post())
+    expect(screen.getByLabelText('Author online')).toBeTruthy()
+  })
+
+  it('never invents an offline state for an author nobody has seen', () => {
+    renderPost(post())
+    expect(screen.queryByLabelText('Author online')).toBeNull()
+  })
+
+  it('aligns avatar, name and time on one row with a readable, tabular timestamp', () => {
+    renderPost(post({ location: 'Berlin' }))
+    const name = screen.getByText('Tester')
+    expect(name.className).toContain('truncate')
+    const time = screen.getByText(/Berlin/)
+    expect(time.className).toContain('tabular-nums')
+    // The avatar is the 32px (w-8 h-8) ring; the name/time sit beside it.
+    const avatar = name.closest('button')?.querySelector('.w-8.h-8')
+    expect(avatar).not.toBeNull()
   })
 })

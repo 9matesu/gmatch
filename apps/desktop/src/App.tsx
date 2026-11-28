@@ -40,7 +40,7 @@ import { devFetchable } from "./services/imageCache";
 import { hashForView, resolveInitialView, viewFromHash } from "./utils/routing";
 import { playPress } from "./utils/sounds";
 import { useLobby } from "./hooks/useLobby";
-import { UserProfileModal } from "./components/UserProfileModal";
+import { UserProfileModal, profilePostsForAuthor } from "./components/UserProfileModal";
 import { EditPostModal } from "./components/feed/EditPostModal";
 import { SendCardModal } from "./components/cards/SendCardModal";
 import { MIN_GAME_CARDS, generateFallbackName, type User, type OrbitObject } from "@orbit/shared";
@@ -94,9 +94,9 @@ import { ChatCircleText } from "@phosphor-icons/react";
 import { WallpaperBackground } from "./components/WallpaperBackground";
 import { ContextOverlay, ReportModal, type ContextMenuState } from "./components/ContextOverlay";
 import { isMediaVideo, resolveMediaUrl } from "./utils/media";
-import { prefetchObject, isRequestableObjectId } from "./hooks/useObjectImage";
+import { prefetchObject, isRequestableObjectId, MEDIA_RETRY_EVENT } from "./hooks/useObjectImage";
 import { GlobalModals } from "./components/GlobalModals";
-import { ChangelogModal, CURRENT_CHANGELOG_VERSION } from "./components/ChangelogModal";
+
 import { GalleryTabView } from "./components/views/GalleryTabView";
 import { CreateCardModal } from "./components/CreateCardModal";
 import { CardDetailView } from "./components/CardDetailView";
@@ -1050,27 +1050,6 @@ export default function Home() {
 
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [showFlashModal, setShowFlashModal] = useState(false);
-  const [showChangelogModal, setShowChangelogModal] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    try {
-      return localStorage.getItem('gmatch_last_seen_changelog') !== CURRENT_CHANGELOG_VERSION;
-    } catch {
-      return false;
-    }
-  });
-
-  const handleCloseChangelog = useCallback(() => {
-    setShowChangelogModal(false);
-    try {
-      localStorage.setItem('gmatch_last_seen_changelog', CURRENT_CHANGELOG_VERSION);
-    } catch {}
-  }, []);
-
-  useEffect(() => {
-    const onOpen = () => setShowChangelogModal(true);
-    window.addEventListener('gmatch-open-changelog', onOpen);
-    return () => window.removeEventListener('gmatch-open-changelog', onOpen);
-  }, []);
   const [announcements, setAnnouncements] = useState<{ id: string; message: string; created_at: string; created_by_name: string | null }[]>([])
   // Host mode at the SHELL level (ServersView keeps its own copy): the Admin
   // entry shows only when this machine hosts the node or the node says this
@@ -1494,7 +1473,10 @@ export default function Home() {
     }
 
     let cancelled = false
-    const fallbackPosts = feedPosts.filter((post) => post.author_id === selectedProfileUser.id)
+    // A peer's rows can be projected from the durable operation log even when
+    // the 50-row timeline has not caught up (and its node has no row at all),
+    // so seed from BOTH rather than reading only the current projection.
+    const fallbackPosts = profilePostsForAuthor(selectedProfileUser.id, feedPosts, feed.peerPosts)
     setSelectedProfilePosts((prev) => (
       prev.length === fallbackPosts.length && prev.every((post, i) => post === fallbackPosts[i])
         ? prev
@@ -1516,7 +1498,7 @@ export default function Home() {
       .catch(() => { })
 
     return () => { cancelled = true }
-  }, [selectedProfileUser, identity, feedPosts])
+  }, [selectedProfileUser, identity, feedPosts, feed.peerPosts])
 
   // Own profile: load the player's posts explicitly so they always appear on
   // the own profile even when they fall out of the general 50-row feed
@@ -2787,6 +2769,50 @@ export default function Home() {
     window.addEventListener('orbit-cards-refresh', onCardsRefresh);
     return () => window.removeEventListener('orbit-cards-refresh', onCardsRefresh);
   }, [loadCards, loadGallery]);
+
+  // Peer-online / foreground reconcile: re-pull the feed, re-arm media that
+  // failed while no seeder was around, and hand this install's OWN posts to the
+  // swarm. One bounded wave per 15s per identity (autoReplicateOwnPosts), via
+  // the SAME outbox flush and operation log the publish path uses — no second
+  // sender, no storm, no claim that a hand-off was delivered.
+  useEffect(() => {
+    if (!identity) return
+    let disposed = false
+    const reconcile = () => {
+      if (disposed || typeof window === 'undefined') return
+      void (async () => {
+        const { autoReplicateOwnPosts } = await import('./services/socialPostImport')
+        const { sharedSocialOperationLog } = await import('./services/socialOperationLog')
+        const { flushPostOutbox, rearmMissingReplicated } = await import('./services/postOutbox')
+        await autoReplicateOwnPosts(identity, sharedSocialOperationLog(), {
+          flushOutbox: async () => {
+            await rearmMissingReplicated(identity).catch(() => { })
+            const summary = await flushPostOutbox(identity).catch(() => null)
+            if (summary && (summary.registered > 0 || summary.replicated > 0)) invalidateCache('/api/posts')
+          },
+          refreshFeed: () => { void forceRefreshFeed(); loadCards() },
+        })
+        // A resumed transfer is only useful if the tiles that gave up earlier
+        // get one more honest look at the bytes.
+        const { resumePendingTransfers } = await import('./utils/pendingTransfers')
+        await resumePendingTransfers((id, hash) =>
+          import('./utils/p2pSwarm').then(({ requestSwarmObject }) =>
+            requestSwarmObject(id, 5000, { expectedHash: hash ?? undefined }))).catch(() => { })
+        window.dispatchEvent(new Event(MEDIA_RETRY_EVENT))
+      })().catch(() => { })
+    }
+    window.addEventListener(PEER_ONLINE_EVENT, reconcile)
+    window.addEventListener('focus', reconcile)
+    document.addEventListener('visibilitychange', reconcile)
+    const interval = window.setInterval(reconcile, 60_000)
+    return () => {
+      disposed = true
+      window.removeEventListener(PEER_ONLINE_EVENT, reconcile)
+      window.removeEventListener('focus', reconcile)
+      document.removeEventListener('visibilitychange', reconcile)
+      window.clearInterval(interval)
+    }
+  }, [identity, forceRefreshFeed, loadCards])
 
   // Local vault backfill (opt-in): pin gallery keeps + card media to disk in
   // the background whenever the vault is on. Session-idempotent — only new
@@ -4370,7 +4396,9 @@ export default function Home() {
                     profilePic={profilePics[selectedProfileUser.id] || selectedProfileUser.pfp_url}
                     isContact={friendsIds.includes(selectedProfileUser.id)}
                     stories={stories}
-                    cards={items}
+                    cards={selectedProfileUser.id === identity?.orbitId
+                      ? allOwnedCards
+                      : mergeMyCards(items, canonicalCards, selectedProfileUser.id, profilePics[selectedProfileUser.id] || selectedProfileUser.pfp_url)}
                     posts={selectedProfilePosts}
                     identity={identity}
                     onClose={() => setSelectedProfileUser(null)}
@@ -4597,10 +4625,7 @@ export default function Home() {
                 initialFiles={attachmentModal?.initialFiles}
                 initialUrl={attachmentModal?.initialUrl}
               />
-              <ChangelogModal
-                isOpen={showChangelogModal}
-                onClose={handleCloseChangelog}
-              />
+
               {groupPickerOpen && chatGroups.length > 0 && (
                 <div className="fixed inset-0 z-[var(--z-lightbox)] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
                   <div className="bg-surface-raised border border-edge rounded-xl max-w-md w-full shadow-2xl overflow-hidden">

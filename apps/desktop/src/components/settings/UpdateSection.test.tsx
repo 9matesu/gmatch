@@ -116,7 +116,8 @@ describe('UpdateSection (legacy fallback without updater bridge)', () => {
     render(<UpdateSection toast={() => {}} />)
     await new Promise((r) => setTimeout(r, 20))
     expect(screen.getByRole('button', { name: /check for updates/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /what's new/i })).toBeInTheDocument()
+    // Changelog surfaces were removed in 1.7.1.
+    expect(screen.queryByRole('button', { name: /what's new/i })).toBeNull()
   })
 })
 

@@ -193,6 +193,7 @@ type CourierSignalPayload =
 - Peer connections configure Cloudflare STUN by default (`defaultIceConfig()`), plus an explicitly configured TURN from Settings/environment when present, which forces `iceTransportPolicy:'relay'`. No anonymous free TURN is bundled: the former public relay is globally 401/blackholed, so claiming one would be a fabrication.
 - **Presence survives a hidden window.** The 60s heartbeat skips local swarm noise when the document is hidden, but still publishes the signed beacon to the node + hosted mailbox (TTL 90s). A full node also starts ONE bounded direct mesh attempt for a peer whose signed beacon names a different node; same-node peers keep the local relay.
 - **Global IPv6 host candidates are signaled** (`2000::/3`); ULA/link-local/loopback stay hidden. IPv6-capable peers behind CGNAT connect directly with no relay. No free anonymous TURN is bundled (Cloudflare TURN needs a card); an explicit TURN from Settings/env remains the IPv4-only fallback.
+- **Radmin VPN host candidates (`26.0.0.0/8`) are signaled**, so two peers on the same Radmin network connect directly; a validated direct channel over Radmin is labelled `VPN directo (Radmin)`. Other private/CGNAT literals stay hidden.
 - Private LAN IP candidates are stripped/sanitized before dispatch over the courier (`sanitizeCandidate`) to prevent internal network leakage.
 - **One STUN endpoint, not a list (2026-11-23).** `STUN_SERVERS` is a single
   Cloudflare server. Chromium logs a `socket_manager.cc` error for every STUN
@@ -499,6 +500,16 @@ seeding to it: no relay keeps a DM for later, and the app does not claim
 otherwise. Server-side engagement rows (`Notifications`) are a separate,
 node-hosted system that does survive an offline client — the two are merged for
 display only (SPEC §15) and never written into each other.
+
+### Profile pictures are content-addressed too (2026-11-28)
+
+A peer's `pfp_url` is often a node-local `/api/objects/<id>` that 404s on the
+reader's node. The presence beacon now carries an optional signed `pfpHash`
+(the avatar's sha256, derived from local bytes or a hash-bearing ref); the
+roster exposes it as `urn:sha256:<hash>`, and `Avatar` resolves it through the
+same verified content ladder as post media. A wrong hash fails the signature or
+the digest check; a peer with no local bytes honestly falls back to the
+geometric avatar. No media is uploaded to the hosted rendezvous.
 
 ### Profile fields are signed state, not node rows (2026-10-22)
 
