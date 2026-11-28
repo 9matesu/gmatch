@@ -104,7 +104,8 @@
     "linux": {
       "target": ["AppImage", "deb"],
       "icon": "build/icon.png",
-      "category": "Network"
+      "category": "Network",
+      "executableName": "gmatch"
     },
     "portable": {
       "unicode": true
