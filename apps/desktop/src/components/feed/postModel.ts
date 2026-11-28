@@ -46,6 +46,9 @@ function usableUrl(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+/** One post pages through at most 10 media items (both inline and expanded). */
+export const MAX_CAROUSEL_MEDIA = 10;
+
 /**
  * Fold a stored row into the model. Media precedence mirrors the renderer:
  * per-item `media[]` (each item keeps its own mime), then legacy `mediaUrls`,
@@ -59,7 +62,7 @@ export function readPostContent(post: PostLike | null | undefined): PostContent 
   if (!post) return { text, media: undefined };
 
   const add = (item: PostMedia) => {
-    if (seen.has(item.url)) return;
+    if (media.length >= MAX_CAROUSEL_MEDIA || seen.has(item.url)) return;
     seen.add(item.url);
     media.push(item);
   };

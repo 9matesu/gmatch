@@ -2,8 +2,6 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   candidateLeaksIp,
   defaultIceConfig,
-  defaultTurn,
-  effectiveTurn,
   iceServersFor,
   isLiteralIp,
   normalizeTurnEnv,
@@ -24,7 +22,10 @@ const relay = 'candidate:3 1 udp 150 198.51.100.9 50000 typ relay raddr 203.0.11
 describe('isLiteralIp', () => {
   it('flags v4 and v6, allows mDNS', () => {
     expect(isLiteralIp('192.168.1.5')).toBe(true)
-    expect(isLiteralIp('2001:db8::42')).toBe(true)
+    // Global IPv6 is a routable direct path (the decentralized CGNAT fix).
+    expect(isLiteralIp('2001:db8::42')).toBe(false)
+    expect(isLiteralIp('fd00::1')).toBe(true)
+    expect(isLiteralIp('fe80::1')).toBe(true)
     expect(isLiteralIp('my-laptop.local')).toBe(false)
     expect(isLiteralIp('')).toBe(false)
   })
@@ -45,7 +46,10 @@ describe('parseCandidate', () => {
 describe('candidateLeaksIp', () => {
   it('drops host candidates with literal IPs, keeps mDNS hosts', () => {
     expect(candidateLeaksIp(hostV4)).toBe(true)
-    expect(candidateLeaksIp(hostV6)).toBe(true)
+    // Global IPv6 host candidates ARE signaled; private/link-local stay hidden.
+    expect(candidateLeaksIp(hostV6)).toBe(false)
+    expect(candidateLeaksIp('candidate:1 1 udp 2122260223 fd00::1 54321 typ host')).toBe(true)
+    expect(candidateLeaksIp('candidate:1 1 udp 2122260223 fe80::1 54321 typ host')).toBe(true)
     expect(candidateLeaksIp(mdnsHost)).toBe(false)
   })
 
@@ -103,14 +107,13 @@ describe('turnCredentials + config', () => {
     expect(iceServersFor(turn).some((s) => s.urls === 'turn:x')).toBe(true)
   })
 
-  // A baked public relay gives cross-NAT pairs a fallback out of the box.
-  // It is only a CANDIDATE: explicit env/Settings TURN still wins and forces
-  // relay, and neither posture changes the literal-LAN-IP sanitization.
-  it('defaultTurn() bakes a public relay with shared credentials', () => {
-    const d = defaultTurn()
-    expect(d.url).toMatch(/^turns?:/)
-    expect(d.username).toBeTruthy()
-    expect(d.credential).toBeTruthy()
+  // The old baked `openrelayproject` relay is dead (TEST-NET DNS + revoked
+  // global credentials). No dead relay is offered: ICE never stalls on it,
+  // and an explicit env/Settings TURN is the only way to get a relay path.
+  it('no baked TURN: the dead free relay is not offered', () => {
+    const cfg = defaultIceConfig({})
+    expect(cfg.iceServers!.every((s) => String(s.urls).startsWith('stun:'))).toBe(true)
+    expect(cfg.iceServers!.some((s) => String(s.urls).includes('openrelay'))).toBe(false)
   })
 
   it('STUN is one public, stateless endpoint (Cloudflare) — not four', () => {
@@ -122,21 +125,12 @@ describe('turnCredentials + config', () => {
     expect(STUN_SERVERS.every((s) => String(s.urls).startsWith('stun:'))).toBe(true)
   })
 
-  it('defaultIceConfig: no config → STUN + baked TURN candidates, NOT forced relay', () => {
+  it('defaultIceConfig: no config → STUN only, NOT forced relay', () => {
     const cfg = defaultIceConfig({})
-    expect(cfg.iceServers!.length).toBe(STUN_SERVERS.length + 1)
+    expect(cfg.iceServers).toEqual(STUN_SERVERS)
+    expect(cfg.iceServers!.length).toBe(STUN_SERVERS.length)
     expect(cfg.iceServers!.some((s) => String(s.urls).startsWith('stun:'))).toBe(true)
-    expect(cfg.iceServers!.some((s) => s.urls === defaultTurn().url)).toBe(true)
     expect(cfg.iceTransportPolicy).toBeUndefined()
-  })
-
-  it('effectiveTurn: baked default without config, the user config when set', () => {
-    expect(effectiveTurn({})).toEqual(defaultTurn())
-    expect(effectiveTurn({
-      NEXT_PUBLIC_TURN_URL: 'turn:y',
-      NEXT_PUBLIC_TURN_USERNAME: 'u2',
-      NEXT_PUBLIC_TURN_CREDENTIAL: 'p2',
-    })).toEqual({ url: 'turn:y', username: 'u2', credential: 'p2' })
   })
 
   it('defaultIceConfig: explicit env → forced relay (zero-exposure posture)', () => {
@@ -169,29 +163,26 @@ describe('turnCredentials + config', () => {
     vi.unstubAllGlobals()
   })
 
-  it('no config yields the baked TURN; env and Settings override it', () => {
+  it('Settings TURN forces relay; env wins over Settings', () => {
     const store = new Map<string, string>()
     vi.stubGlobal('localStorage', {
       getItem: (k: string) => store.get(k) ?? null,
       setItem: (k: string, v: string) => { store.set(k, v) },
       removeItem: (k: string) => { store.delete(k) },
     })
-    // Nothing saved → the baked public relay is the answer, but only as a
-    // candidate: the direct path still wins.
-    expect(effectiveTurn({})).toEqual(defaultTurn())
-    const baked = defaultIceConfig({})
-    expect(baked.iceServers!.some((s) => s.urls === defaultTurn().url)).toBe(true)
-    expect(baked.iceTransportPolicy).toBeUndefined()
-    // Settings TURN wins over the baked default and forces relay.
+    // Nothing saved → STUN only, direct/srflx wins, no dead relay in the list.
+    expect(defaultIceConfig({}).iceServers).toEqual(STUN_SERVERS)
+    expect(defaultIceConfig({}).iceTransportPolicy).toBeUndefined()
+    // A stored TURN is the only relay path and forces the zero-exposure posture.
     store.set('gmatch.turn.v1', JSON.stringify({ url: 'turn:settings', username: 'su', credential: 'sp' }))
-    expect(effectiveTurn({})).toEqual({ url: 'turn:settings', username: 'su', credential: 'sp' })
+    expect(turnCredentials({})).toEqual({ url: 'turn:settings', username: 'su', credential: 'sp' })
     expect(defaultIceConfig({}).iceTransportPolicy).toBe('relay')
     expect(defaultIceConfig({}).iceServers!.some((s) => s.urls === 'turn:settings')).toBe(true)
-    // Env wins over both Settings and the baked default.
+    // Env wins over Settings.
     const env = { NEXT_PUBLIC_TURN_URL: 'turn:env', NEXT_PUBLIC_TURN_USERNAME: 'eu', NEXT_PUBLIC_TURN_CREDENTIAL: 'ep' }
-    expect(effectiveTurn(env)).toEqual({ url: 'turn:env', username: 'eu', credential: 'ep' })
+    expect(turnCredentials(env)).toEqual({ url: 'turn:env', username: 'eu', credential: 'ep' })
     expect(defaultIceConfig(env).iceServers!.some((s) => s.urls === 'turn:env')).toBe(true)
-    expect(defaultIceConfig(env).iceServers!.some((s) => s.urls === defaultTurn().url)).toBe(false)
+    expect(defaultIceConfig(env).iceServers!.some((s) => s.urls === 'turn:settings')).toBe(false)
     vi.unstubAllGlobals()
   })
 

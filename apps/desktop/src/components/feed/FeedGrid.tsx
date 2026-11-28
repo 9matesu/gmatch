@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FeedPost } from './GMatchFeed'
 import { justifyRows, type JustifiedInput } from './justifyRows'
 import { ratioOf, rememberRatio } from './tileMetrics'
 import { FeedTile } from './FeedTile'
+import { displayMedia, readPostContent } from './postModel'
 import { resolveMediaUrl } from '../../utils/media'
 import { resolveObjectRefId } from '../../utils/objectRef'
 import { getLocalObject } from '../../utils/p2pSwarm'
@@ -41,6 +42,20 @@ export function FeedGrid({ posts, identity, onOpen, likedPosts, likeCounts, onTo
   const ref = useRef<HTMLDivElement | null>(null)
   const [width, setWidth] = useState(0)
   const [, bump] = useState(0)
+
+  // ONE tile per post id. Two sources can describe the same post (a node row
+  // and a local/P2P mirror); projecting them into two justified rows drew the
+  // tile twice and gave two rows the same React key, which also dropped one.
+  // The first occurrence wins — the projection already puts the authoritative
+  // node row ahead of a stale local mirror.
+  const uniquePosts = useMemo(() => {
+    const seen = new Set<string>()
+    return posts.filter((p) => {
+      if (seen.has(p.id)) return false
+      seen.add(p.id)
+      return true
+    })
+  }, [posts])
 
   useEffect(() => {
     const el = ref.current
@@ -90,14 +105,21 @@ export function FeedGrid({ posts, identity, onOpen, likedPosts, likeCounts, onTo
       img.onerror = done
       img.src = src
     }
-    for (const post of posts) {
+    for (const post of uniquePosts) {
       if (ratioOf(post) !== undefined) continue
-      const url = post.media?.[0]?.url || post.url
+      // Probe the SAME media the tile will render. Reading raw `url`/`media[0]`
+      // missed posts whose images live only in the normalizer's `mediaUrls`,
+      // so they had no ratio and never entered the grid.
+      const content = readPostContent(post)
+      const media = displayMedia(post, content)
+      const url = media?.url || post.url
       if (!url) continue
-      const isVideo = isVideoUrl(url) || !!post.mime_type?.startsWith('video/') || !!post.media?.[0]?.mime_type?.startsWith('video/')
+      const isVideo = isVideoUrl(url)
+        || !!media?.mimeType?.startsWith('video/')
+        || !!content.media?.some((m) => m.mimeType?.startsWith('video/'))
       if (/^https?:/i.test(url)) { measure(post, resolveMediaUrl(url), isVideo); continue }
       // Local object: resolve bytes (vault/IndexedDB) and measure the blob.
-      const id = resolveObjectRefId(url) || post.media?.[0]?.id || post.id
+      const id = resolveObjectRefId(url) || media?.id || post.id
       if (!id) continue
       void getLocalObject(id).then((blob) => {
         if (!live || !blob) return
@@ -107,16 +129,16 @@ export function FeedGrid({ posts, identity, onOpen, likedPosts, likeCounts, onTo
     return () => {
       live = false
     }
-  }, [posts])
+  }, [uniquePosts])
 
   const items: JustifiedInput[] = []
-  for (const p of posts) {
+  for (const p of uniquePosts) {
     const r = ratioOf(p)
     if (r) items.push({ id: p.id, ratio: r })
   }
 
   const { rows } = justifyRows(items, { containerWidth: width, targetHeight: 260, maxCrop: 0.12, gap: 4 })
-  const byId = new Map(posts.map((p) => [p.id, p]))
+  const byId = new Map(uniquePosts.map((p) => [p.id, p]))
 
   return (
     <div ref={ref} className="w-full" data-testid="feed-grid">
@@ -149,7 +171,7 @@ export function FeedGrid({ posts, identity, onOpen, likedPosts, likeCounts, onTo
       {/* No label while pictures are still being measured: that strip appeared
           and vanished on every load, reading as a flaky "nothing here" flash.
           Only a grid with no posts at all says so. */}
-      {rows.length === 0 && posts.length === 0 && <p className="py-8 text-center text-xs text-retro-faint">Nothing to lay out yet.</p>}
+      {rows.length === 0 && uniquePosts.length === 0 && <p className="py-8 text-center text-xs text-retro-faint">Nothing to lay out yet.</p>}
     </div>
   )
 }

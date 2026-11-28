@@ -3,7 +3,9 @@ import { OrbitIdentity } from '@orbit/crypto';
 import { User, OrbitObject, generateFallbackName } from '@orbit/shared';
 import { parseBareSwarmAnnounce, parseSwarmEnvelope, type SwarmAnnounce, type SwarmMessage } from '@orbit/protocol';
 import { saveObject, getObject } from '../utils/storage';
-import { getApiBaseUrl, getApiWebSocketUrl, isCourierHost, orbitFetch, subscribeApiBase } from '../utils/api';
+import { getApiBaseUrl, getApiWebSocketUrl, isCourierHost, isLoopbackApiUrl, orbitFetch, subscribeApiBase } from '../utils/api';
+import { getCentralApiUrl } from '../utils/central';
+import { ingestSnapshot } from '../game/presenceStore';
 import { PeerRoster, knownPeersStorageKey } from '../utils/peerRoster';
 import { areUsersStructurallyEqual } from '../utils/compare';
 import { logger } from '../utils/logger';
@@ -11,9 +13,9 @@ import { handleSwarmMessage, setSwarmTransport, hydrateLocalObjects, hydrateDura
 import { broadcastPresence, fetchPresenceRosterFrom } from '../services/courierPresence';
 import { startMesh, meshPeerAsUser, type MeshHandle } from '../utils/mesh/mesh';
 import { readSettings } from './useSettings';
-import { knownNodes, rememberKnownNode, rememberPeerNode } from '../utils/peerNodes';
+import { knownNodes, normalizeNodeUrl, rememberKnownNode, rememberPeerNode, peerNodeFor } from '../utils/peerNodes';
 import { broadcastMeshFrame, onMeshMessage, connectToPeerMesh, setMeshIceFailureHandler, MESH_BACKPRESSURE_HIGH_BYTES } from '../utils/courierSignaling';
-import { swarmTransportRegistry } from '../utils/transportState';
+import { swarmTransportRegistry, transportLabel } from '../utils/transportState';
 import { resolveDisplayName } from '../utils/displayName';
 import { parseApiTimestamp } from '../utils/timeAgo';
 import { mediaFlag, resolveClaimedOwner, descriptorUrlFromBytes } from '../utils/objectDescriptor';
@@ -44,12 +46,7 @@ export function retryPeerTransport(peerId: string): boolean {
  *  lives in utils/transportState so the header chip reads the SAME phases the
  *  swarm writes, never a second guessed copy. */
 export function swarmTransportLabel(peerId: string): string | null {
-  switch (swarmTransportRegistry.phaseFor(peerId)) {
-    case 'direct': return 'P2P direto'
-    case 'relay': return 'relay via nó (NAT)'
-    case 'failed': return 'sem rota'
-    default: return null
-  }
+  return transportLabel(swarmTransportRegistry.phaseFor(peerId))
 }
 
 export interface ChatMessage {
@@ -136,6 +133,55 @@ function transmitOverWebSocket(socket: WebSocket | null, queue: SwarmAnnounce[],
   const fullPayloadStr = JSON.stringify({ type: 'SWARM_FRAME', swarm: msg });
   logger.log('[ORBIT Network Swarm] Transmitting event over WebSocket network to remote peers for item:', msg.payload?.id || msg.type);
   socket.send(fullPayloadStr);
+}
+
+/**
+ * The hosted-presence half of ONE 60s heartbeat. Pure seam so the full-node
+ * case is testable without mounting the hook.
+ *
+ * The signed beacon must reach the shared rendezvous for EVERY signed-in
+ * identity. A full node's local WS only reaches peers on THAT node, so it is
+ * not a substitute: publish alongside the local paths. The publish is
+ * unconditional; the caller decides which local paths run in parallel.
+ */
+export function publishPresenceForHeartbeat(
+  identity: OrbitIdentity | null,
+  self: User,
+  publish: (identity: OrbitIdentity, profile: { displayName?: string; pfpUrl?: string | null }) => void,
+): boolean {
+  if (!identity) return false;
+  publish(identity, { displayName: self.display_name, pfpUrl: self.pfp_url });
+  return true;
+}
+
+/**
+ * Does this peer live on a DIFFERENT node than ours?
+ *
+ * A full node's own WS relay only reaches peers connected to THAT node, so a
+ * peer whose signed presence beacon names another node is exactly the case a
+ * direct mesh dial exists for: the relay can never carry its media bytes. A
+ * same-node peer (or one whose node we do not know) is already reachable
+ * through the local relay, so it needs no direct dial.
+ *
+ * The peer's node URL is its own signed claim (`peerNodeFor`, learned from the
+ * beacon). Loopback and the dev-proxy base are not dialable addresses, so a
+ * peer whose node resolves to one of those reads as same-node.
+ */
+export function isCrossNodePeerUrl(peerNode: string | null | undefined, selfBase: string): boolean {
+  const peer = normalizeNodeUrl(peerNode || '');
+  if (!peer) return false;
+  const base = selfBase.trim().replace(/\/+$/, '');
+  if (base) {
+    const normBase = normalizeNodeUrl(base) ?? base;
+    if (peer === normBase) return false;
+  }
+  // A loopback / dev-proxy base is not a dialable node address: a peer whose
+  // node resolves to one of those is not provably on another machine.
+  return !isLoopbackApiUrl(peer);
+}
+
+export function isCrossNodePeer(peerId: string, selfBase: string): boolean {
+  return isCrossNodePeerUrl(normalizeNodeUrl(peerNodeFor(peerId)), selfBase);
 }
 
 export function useP2P(identity: OrbitIdentity | null) {
@@ -404,9 +450,11 @@ export function useP2P(identity: OrbitIdentity | null) {
     // network on boot and whenever a peer comes online. Broadcast is
     // fire-and-forget ('sending', never 'delivered' — proof comes later).
     let teardownOperations: (() => void) | null = null
+    const operationSelfId = identity.orbitId
     void import('../services/socialOperationLog').then(async ({ sharedSocialOperationLog }) => {
       const { acceptInboundOperation, applyOperationAck, broadcastPendingOperations, broadcastRecentOperations } = await import('../services/socialOpTransport')
       const { wireOperationBroadcast } = await import('../services/socialOpBroadcast')
+      const { wireCourierSocialOps } = await import('../services/courierSocialOps')
       const operationLog = sharedSocialOperationLog()
       // Inbound: validate + authorize + durable append, then ACK the sender
       // (a duplicate is already durable here, so it is acked too). Never ack a
@@ -456,8 +504,14 @@ export function useP2P(identity: OrbitIdentity | null) {
         log: operationLog,
         sendOperation: (operation) => { sendSwarmFrame({ type: 'SWARM_OP', operation }) },
       })
+      // Additional path for two installs on different nodes with no reachable
+      // node and no TURN: signed ops ride the blind rendezvous mailbox. It is
+      // fire-and-forget too — the same authorizer protects the box, and no
+      // delivery is claimed just because an envelope was PUT/GET.
+      const unwireCourierOps = wireCourierSocialOps({ log: operationLog, selfId: operationSelfId })
       teardownOperations = () => {
         unwireBroadcast()
+        unwireCourierOps()
         window.removeEventListener(PEER_ONLINE_EVENT, broadcastAll)
         setSwarmOperationHandler(null)
         setSwarmOperationAckHandler(null)
@@ -748,22 +802,30 @@ export function useP2P(identity: OrbitIdentity | null) {
 
     // 4. Broadcast presence heartbeat over local BroadcastChannel & WebSocket network.
     const sendHeartbeat = () => {
-      // Skip presence broadcasts from hidden tabs: browsers throttle background
-      // timers anyway, and hidden tabs should not contribute swarm noise.
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       const currentSelf = selfUserRef.current;
-      const msg: SwarmAnnounce = {
-        type: 'PRESENCE',
-        user: currentSelf,
-        timestamp: Date.now(),
-      };
-      try { channel.postMessage(msg); } catch {}
+      // Hidden tabs skip the LOCAL swarm noise (browsers throttle background
+      // timers anyway), but the signed hosted beacon must still go out: a
+      // backgrounded app is still online, and the mailbox TTL is 90s.
+      const hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden';
+      if (!hidden) {
+        const msg: SwarmAnnounce = {
+          type: 'PRESENCE',
+          user: currentSelf,
+          timestamp: Date.now(),
+        };
+        try { channel.postMessage(msg); } catch {}
 
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        transmitOverWebSocket(wsRef.current, queuedMessagesRef.current, msg);
-      } else if (courierOnlyWs && identity) {
-        void broadcastPresence(identity, { displayName: currentSelf.display_name, pfpUrl: currentSelf.pfp_url });
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          transmitOverWebSocket(wsRef.current, queuedMessagesRef.current, msg);
+        }
       }
+      // Publish the signed beacon to the hosted rendezvous for EVERY signed-in
+      // identity, alongside the local paths above. A full node's own WS cannot
+      // reach a peer living on another node; only the shared mailbox can.
+      // Fire-and-forget: the helper already tries node + central — ignore result.
+      publishPresenceForHeartbeat(identity, currentSelf, (id, profile) => {
+        void broadcastPresence(id, profile);
+      });
 
       // NOTE: No direct WebRTC connections on heartbeat — causes RTCPeerConnection exhaustion.
       // Presence is broadcast via WebSocket and BroadcastChannel only.
@@ -782,11 +844,16 @@ export function useP2P(identity: OrbitIdentity | null) {
       // know — ours, plus the nodes peers told us they live on. A peer on
       // another node is then reachable (its mailbox is there), which is what
       // makes the mesh work across the open internet without a hub.
-      const crossNodeRoster = async (): Promise<{ users: User[] }> => {
+      const crossNodeRoster = async (): Promise<{ users: User[]; nodeById: Map<string, string> }> => {
         rememberKnownNode(getApiBaseUrl())
-        const nodes = [getApiBaseUrl(), ...knownNodes()].filter(Boolean)
+        // The hosted rendezvous is a presence mailbox too: two installs on
+        // different nodes read the SAME beacon box, so they see each other
+        // even when neither knows the other's node address yet.
+        const central = getCentralApiUrl()
+        const nodes = [getApiBaseUrl(), ...(central ? [central] : []), ...knownNodes()].filter(Boolean)
         const seen = new Set<string>()
         const users: User[] = []
+        const nodeById = new Map<string, string>()
         // Bounded: a client never fans out to the whole known-node list in
         // one round. The nearest nodes come first (ours is always first).
         let asked = 0
@@ -798,13 +865,29 @@ export function useP2P(identity: OrbitIdentity | null) {
           asked++
           const roster = await fetchPresenceRosterFrom(base, selfUserRef.current.id).catch(() => ({ users: [], nodeById: new Map<string, string>() }))
           for (const [peerId, peerNode] of roster.nodeById) rememberPeerNode(peerId, peerNode)
+          for (const [peerId, peerNode] of roster.nodeById) nodeById.set(peerId, peerNode)
           users.push(...roster.users)
         }
-        return { users }
+        return { users, nodeById }
       }
       ;(courierOnlyWs
         ? crossNodeRoster()
-        : orbitFetch('/api/users/online', {}, identity).then((r) => (r.ok ? r.json() : { users: [] })).catch(() => ({ users: [] })))
+        : orbitFetch('/api/users/online', {}, identity)
+            .then(async (r) => {
+              const body = r.ok ? await r.json() : { users: [] }
+              // A FULL node (npm run dev / packaged host) answers mode:'host',
+              // so courierOnlyWs is false and the node roster alone can never
+              // see a peer living on ANOTHER node. The hosted rendezvous holds
+              // every signed presence beacon, so read it as a SECOND input and
+              // merge — the roster owns the dedupe and the online transition.
+              const central = getCentralApiUrl()
+              if (!central) return body
+              const hosted = await fetchPresenceRosterFrom(central, selfUserRef.current.id)
+                .catch(() => ({ users: [], nodeById: new Map<string, string>() }))
+              for (const [peerId, peerNode] of hosted.nodeById) rememberPeerNode(peerId, peerNode)
+              return { ...body, users: [...(Array.isArray(body?.users) ? body.users : []), ...hosted.users], nodeById: hosted.nodeById }
+            })
+            .catch(() => ({ users: [], nodeById: new Map<string, string>() })))
         .then((res: any) => (res && 'users' in res ? res : (res && res.ok ? res.json() : { users: [] })))
         .then(({ users }: { users?: User[] }) => {
           // NOTE: an empty roster is a valid signal (everyone left) — it
@@ -814,16 +897,28 @@ export function useP2P(identity: OrbitIdentity | null) {
           // the peers that just came online, so there is no second "was this
           // peer online before?" bookkeeping here.
           const newlyOnline = roster.mergeServerRoster(users, selfUserRef.current.id);
+          // The profile modal reads the shared presence store, not the roster.
+          // Ingest the same signed sightings with a fresh sighting time so a
+          // cross-node peer is Online in the profile too (the chat list reads
+          // the roster directly).
+          const sighting = new Date().toISOString()
+          ingestSnapshot(users.map((u) => ({ ...u, last_seen: sighting })));
           // Freshly-online roster members may be seeders for failed P2P
           // tiles — wake them to retry.
           for (const u of newlyOnline) {
             announcePeerOnline(u.id)
             const pubKey = u.publicKey || (u as any).public_key
             const encKey = u.encryptionPubKey || (u as any).encryption_pub_key
-            if (courierOnlyWs && pubKey && encKey) {
-              // Transport selection (P0): every roster arrival gets one
-              // deadline-bounded direct attempt. The node's relay carries
-              // the frames meanwhile; failure schedules a backoff retry.
+            // ONE bounded direct mesh dial for a peer on ANOTHER node — a full
+            // node included (courierOnlyWs is false there, and its own WS relay
+            // can never reach a peer living on a different node, so media bytes
+            // have no transport without this). A same-node peer keeps the local
+            // relay and gets no dial (the transport tick owns its retries).
+            const crossNode = isCrossNodePeer(u.id, getApiBaseUrl())
+            if (pubKey && encKey && (courierOnlyWs || crossNode)) {
+              // Transport selection (P0): one deadline-bounded direct attempt.
+              // The node's relay carries the frames meanwhile; failure schedules
+              // a backoff retry and the label stays relay until it opens.
               swarmTransportRegistry.startDirectAttempt(u.id)
               void connectToPeerMesh({ id: u.id, public_key: pubKey, encryption_pub_key: encKey }, identity)
                 .then(() => swarmTransportRegistry.markDirectValidated(u.id))
@@ -832,6 +927,9 @@ export function useP2P(identity: OrbitIdentity | null) {
                   err instanceof Error ? err.message : 'direct connect failed',
                   true,
                 ))
+            } else if (crossNode) {
+              // No keys yet: frames still ride the node relay honestly.
+              swarmTransportRegistry.markRelayInUse(u.id)
             }
           }
         })

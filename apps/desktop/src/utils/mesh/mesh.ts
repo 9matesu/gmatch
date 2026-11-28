@@ -38,10 +38,12 @@ import {
 } from './pex';
 import { startTrackerClient, type TrackerAnswer, type TrackerHandle, type TrackerOffer } from './tracker';
 
+// Three distinct operators, all answering a WebSocket upgrade (verified
+// 2026-11-27). `tracker.btorrent.xyz` resolves to 127.0.0.1 — dead, removed.
 export const DEFAULT_TRACKERS = [
   'wss://tracker.openwebtorrent.com',
-  'wss://tracker.btorrent.xyz',
   'wss://tracker.webtorrent.dev',
+  'wss://open.ftorrent.com',
 ];
 
 /** How long one published offer stays fresh (the reference's OFFER_TIMEOUT). */

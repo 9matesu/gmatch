@@ -626,7 +626,7 @@ function addLinkToCaption(raw: string): void {
                   value={caption}
                   onChange={(e) => setCaption(e.target.value)}
                   placeholder={mediaList.length === 0 ? 'What is happening?!' : 'Write a caption...'}
-                  rows={3}
+                  rows={2}
                   maxLength={1000}
                 />
                 <div className="text-right text-2xs font-mono text-retro-muted mt-0.5">

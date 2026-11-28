@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, type ReactNode } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { playPress } from '../../utils/sounds';
 import {
   Grid,
@@ -9,8 +9,6 @@ import {
   Settings,
   Share2,
   ExternalLink,
-  Heart,
-  MessageCircle,
   Camera,
   Repeat,
   CheckCircle2,
@@ -24,8 +22,7 @@ import { ProfileEditorModal } from './ProfileEditorModal';
 import { ProfilePicModal } from './ProfilePicModal';
 import { BadgeShelf } from './BadgeShelf';
 import { useProfilePostLightbox } from '../feed/useProfilePostLightbox';
-import { ProfileTextPostCard } from '../feed/ProfileTextPostCard';
-import { isTextOnlyPost } from '../feed/postModel';
+import { ProfilePostCard } from '../feed/ProfileTextPostCard';
 import { ObjectImage } from '../ObjectImage';
 import { GameCard } from '../cards/GameCard';
 import { computeCardRarity } from '@orbit/shared';
@@ -38,15 +35,15 @@ import { parseApiTimestamp } from '../../utils/timeAgo';
 import { usePeerFollowEdges } from '../../hooks/usePeerFollows';
 import {
   classes, COLOR, GAP, ICON, MONO, MOTION, PADDING, PADDING_X, PADDING_Y,
-  PADDING_SM, PRESENCE, RADIUS, SHADOW, TRACKING, TRANSITION, TYPE, WEIGHT,
+  PADDING_SM, RADIUS, SHADOW, TRACKING, TRANSITION, TYPE, WEIGHT,
 } from '../../ui/tokens';
 import { Button } from '../../ui/kit';
 
 /**
  * SURFACE + TYPOGRAPHY recipes for the repeated profile chrome. Every value is
- * composed from ui/tokens; the grid, the lightbox contract and the 18+ gate are
+ * composed from ui/tokens; the lightbox contract and the 18+ gate are
  * untouched. One recipe per shape means the raised header, the action buttons,
- * the tabs and the media cells cannot drift apart in colour/size/weight.
+ * the tabs and the post cards cannot drift apart in colour/size/weight.
  */
 const PROFILE_ROOT = classes(
   'w-full font-sans select-none overflow-hidden animate-orbit-fade-in',
@@ -57,15 +54,9 @@ const TAB_BTN = classes(
   'py-1.5 px-3 flex items-center justify-center cursor-pointer',
   GAP[1.5], TYPE.body, WEIGHT.medium, RADIUS.chip, TRANSITION.micro,
 );
-const GRID_CELL = classes('relative aspect-square overflow-hidden cursor-pointer group', COLOR.canvasSurface);
 const CELL_IMG = classes('w-full h-full object-cover group-hover:scale-105', MOTION.transition.transform);
-const CELL_GRID = classes('grid grid-cols-3 sm:gap-1', GAP[0.5]);
-const EMPTY_CELL = classes('col-span-3 py-16 text-center', TYPE.body, COLOR.muted);
+const EMPTY_CELL = classes('py-16 text-center', TYPE.body, COLOR.muted);
 const VIDEO_CHIP = classes('absolute top-1.5 right-1.5 p-1 pointer-events-none z-[var(--z-dropdown)]', COLOR.scrim, 'backdrop-blur-xs', RADIUS.chip, COLOR.fg);
-const CELL_SCRIM = classes(
-  'absolute inset-0 opacity-0 group-hover:opacity-100', MOTION.transition.fade,
-  'flex items-center justify-center z-[var(--z-dropdown)]', COLOR.fg, TYPE.body, WEIGHT.medium, COLOR.mediaVeil,
-);
 
 /**
  * The ids a follower/following JSON answer carries.
@@ -207,17 +198,8 @@ export function GMatchProfile({
   );
   const displayPosts = myPosts;
 
-  // isVideoPost ran four times per render (once per grid) with a fresh
-  // post.media.map() each time. The profile re-renders often, so this was
-  // thousands of allocations and regex tests per second. One pass per list.
-  const videoPostIds = useMemo(() => {
-    const ids = new Set<string>()
-    for (const post of [...displayPosts, ...(savedPosts ?? []), ...(repostPosts ?? [])]) {
-      if (isVideoPost(post.mime_type, post.url, post.media?.map((mm) => mm.mime_type) ?? [])) ids.add(post.id)
-    }
-    return ids
-  }, [displayPosts, savedPosts, repostPosts]);
-
+  // Video detection for the collectible card shelf; post cards read their own
+  // content through the shared post model.
   const videoCardIds = useMemo(() => {
     const ids = new Set<string>()
     for (const card of cards) {
@@ -367,107 +349,45 @@ export function GMatchProfile({
   ];
 
   /**
-   * One chronological list per tab: text posts are twitter-shaped cards,
-   * media posts keep the existing square tile. A text post NEVER enters the
-   * media grid — that path mounted ObjectImage on an empty url and printed
-   * "No preview" where the words should be.
+   * One grid for every post on every tab. Text and image posts are the SAME
+   * card with the same author/action row, so a run of one or two pictures can
+   * never leave a ragged row and a text post can never be replaced by an empty
+   * media cell. Dedupe by id first (a node row and a local mirror are one
+   * post), then order newest-first.
    */
-  const mediaCell = (post: FeedPost, variant: 'posts' | 'saved' | 'reposts') => (
-    <div
-      key={post.id}
-      data-post-id={post.id}
-      onClick={() => { playPress(700); openPost(post); }}
-      className={GRID_CELL}
-    >
-      <ObjectImage
-        objectId={post.id}
-        contentUrl={post.url}
-        identity={identity}
-        mimeType={post.mime_type}
-        alt=""
-        className={CELL_IMG}
-        videoClassName={CELL_IMG}
-        muted
-        autoPlay={false}
-        playsInline
-      />
-      {videoPostIds.has(post.id) && (
-        <div className={VIDEO_CHIP}><Play className={classes(ICON.sm, COLOR.onMediaFill)} /></div>
-      )}
-      {variant === 'posts' && (
-        <div className={classes(CELL_SCRIM, GAP[4])}>
-          <div className={classes('flex items-center', GAP[1])}>
-            <Heart className={classes(ICON.md, COLOR.onMediaFill)} />
-            <span>{post.like_count || 0}</span>
-          </div>
-          <div className={classes('flex items-center', GAP[1])}>
-            <MessageCircle className={classes(ICON.md, COLOR.onMediaFill)} />
-            <span>{post.comment_count || 0}</span>
-          </div>
-        </div>
-      )}
-      {variant === 'saved' && (
-        <div className={CELL_SCRIM}><Bookmark className={classes(ICON.lg, COLOR.onMediaFill)} /></div>
-      )}
-      {variant === 'reposts' && (
-        <div className={classes(CELL_SCRIM, PRESENCE.currentText)}><Repeat className="w-5 h-5" /></div>
-      )}
-    </div>
-  );
-
-  // ONE chronological timeline per tab: a text card stays where it happened
-  // and consecutive media posts become a grid row at the same position.
-  const renderPostLists = (
-    list: FeedPost[] | undefined,
-    variant: 'posts' | 'saved' | 'reposts',
-    empty: string,
-  ) => {
-    const ordered = [...(list ?? [])].sort(
-      (a, b) =>
-        (parseApiTimestamp(b.created_at)?.getTime() ?? 0) -
-        (parseApiTimestamp(a.created_at)?.getTime() ?? 0),
-    );
-    const blocks: ReactNode[] = [];
-    let mediaRun: FeedPost[] = [];
-    const flushMedia = () => {
-      if (mediaRun.length === 0) return;
-      const run = mediaRun;
-      mediaRun = [];
-      blocks.push(
-        <div key={`media-${run[0].id}`} className={CELL_GRID}>
-          {run.map((post) => mediaCell(post, variant))}
-        </div>,
+  const renderPostGrid = (list: FeedPost[] | undefined, empty: string) => {
+    const seen = new Set<string>();
+    const ordered = (list ?? [])
+      .filter((post) => {
+        if (seen.has(post.id)) return false;
+        seen.add(post.id);
+        return true;
+      })
+      .sort(
+        (a, b) =>
+          (parseApiTimestamp(b.created_at)?.getTime() ?? 0) -
+          (parseApiTimestamp(a.created_at)?.getTime() ?? 0),
       );
-    };
-    for (const post of ordered) {
-      if (isTextOnlyPost(post)) {
-        flushMedia();
-        blocks.push(
-          <div key={post.id} className="mb-3" data-testid="profile-text-posts">
-            <ProfileTextPostCard
-              post={post}
-              liked={likedOf(post.id)}
-              saved={savedOf(post.id)}
-              likes={likeCountOf(post.id, post.like_count ?? 0)}
-              onOpen={openPost}
-              onToggleLike={toggleLike}
-              onToggleSave={toggleSave}
-              onRepost={onRepostPost ? openRepost : undefined}
-              onShare={openShare}
-              onAuthorClick={(id) => onOpenNetwork ? onOpenNetwork(id) : onSelectUser?.(id)}
-            />
-          </div>,
-        );
-      } else {
-        mediaRun.push(post);
-      }
-    }
-    flushMedia();
+    if (ordered.length === 0) return <div className={EMPTY_CELL}>{empty}</div>;
     return (
-      <>
-        {blocks}
-        {ordered.length === 0 && <div className={EMPTY_CELL}>{empty}</div>}
-      </>
+      <div className={classes('grid grid-cols-1 sm:grid-cols-2', GAP[3])} data-testid="profile-post-grid">
+        {ordered.map((post) => (
+          <ProfilePostCard
+            key={post.id}
+            post={post}
+            identity={identity}
+            liked={likedOf(post.id)}
+            saved={savedOf(post.id)}
+            likes={likeCountOf(post.id, post.like_count ?? 0)}
+            onOpen={openPost}
+            onToggleLike={toggleLike}
+            onToggleSave={toggleSave}
+            onRepost={onRepostPost ? openRepost : undefined}
+            onShare={openShare}
+            onAuthorClick={(id) => onOpenNetwork ? onOpenNetwork(id) : onSelectUser?.(id)}
+          />
+        ))}
+      </div>
     );
   };
 
@@ -633,11 +553,11 @@ export function GMatchProfile({
           Comment action on a Saved/Reposts card must open it too. */}
       <div className={classes(PADDING[1], PADDING_SM[1.5])}>
         {expandedNode}
-        {profileTab === 'posts' && renderPostLists(displayPosts, 'posts', 'No posts yet')}
+        {profileTab === 'posts' && renderPostGrid(displayPosts, 'No posts yet')}
 
-        {profileTab === 'saved' && renderPostLists(savedPosts, 'saved', 'No saved posts')}
+        {profileTab === 'saved' && renderPostGrid(savedPosts, 'No saved posts')}
 
-        {profileTab === 'reposts' && renderPostLists(repostPosts, 'reposts', 'No reposts yet')}
+        {profileTab === 'reposts' && renderPostGrid(repostPosts, 'No reposts yet')}
 
         {profileTab === 'cards' && (
           <div className={classes('grid grid-cols-2 sm:grid-cols-3', GAP[2])}>

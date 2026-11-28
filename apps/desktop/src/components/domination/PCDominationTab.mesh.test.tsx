@@ -57,10 +57,10 @@ const ALL_CONSENTS = {
   allowHacks: true,
 };
 
-function mockServer(target = TARGET) {
+function mockServerTargets(targets: unknown[]) {
   (orbitFetch as ReturnType<typeof vi.fn>).mockImplementation(async (url: string) => {
     if (String(url).includes('/api/domination/targets')) {
-      return { ok: true, json: async () => ({ targets: [target] }) };
+      return { ok: true, json: async () => ({ targets }) };
     }
     if (String(url).includes('/api/domination/settings')) {
       return { ok: true, json: async () => ({ enabled: false }) };
@@ -73,6 +73,10 @@ function mockServer(target = TARGET) {
     }
     return { ok: false, status: 404, json: async () => ({}) };
   });
+}
+
+function mockServer(target = TARGET) {
+  mockServerTargets([target]);
 }
 
 const baseProps = {
@@ -163,5 +167,96 @@ describe('PCDominationTab mesh-first send (Fase 5/6 slice 4)', () => {
     );
     expect(effectButtons).toHaveLength(7);
     expect(effectButtons.some((b) => (b as HTMLButtonElement).disabled)).toBe(false);
+  });
+
+  it('lays the effect cards out as one dense, aligned grid (density contract)', async () => {
+    mockServer({ ...TARGET, consents: ALL_CONSENTS });
+    render(<PCDominationTab {...baseProps} mesh={{ peerKnown: () => false, send: vi.fn() }} />);
+    await screen.findByRole('button', { name: /bob/i });
+    const message = screen.getAllByRole('button').find((b) => (b.textContent || '').startsWith('Message'))!;
+    const grid = message.parentElement as HTMLElement;
+    expect(grid.className).toMatch(/\bgrid\b/);
+    expect(grid.className).toMatch(/grid-cols-/);
+    // No horizontal overflow from a fixed min-width wider than the track.
+    expect(grid.className).not.toMatch(/min-w-\[/);
+  });
+
+  it('states the free model and never fabricates a landed ack on send', async () => {
+    const meshSend = vi.fn(async () => ({ ok: true as const, id: 'dom-77' }));
+    const toast = vi.fn();
+    render(
+      <PCDominationTab
+        {...baseProps}
+        toast={toast}
+        mesh={{ peerKnown: () => true, send: meshSend }}
+      />,
+    );
+    await screen.findByRole('button', { name: /bob/i });
+    // The free + consent-gated model is stated up front, not buried.
+    expect(screen.getByText(/free to send/i)).toBeTruthy();
+    await sendMessageFlow();
+    await waitFor(() => expect(meshSend).toHaveBeenCalled());
+    // A sealed send is "sent / receipt in Outbox" — never a fabricated "landed".
+    expect(toast).toHaveBeenCalledWith(
+      expect.stringMatching(/Receipt shows in Outbox\./),
+      'success',
+    );
+    expect(toast).not.toHaveBeenCalledWith(expect.stringMatching(/landed/i), expect.anything());
+  });
+});
+
+/** The picker must only offer players a send would actually reach/accept. */
+describe('PCDominationTab target freshness', () => {
+  const STALE = {
+    ...TARGET,
+    id: 'peer-stale',
+    displayName: 'Stale Sam',
+    online: false,
+    last_seen: '2026-09-01T00:00:00Z',
+  };
+  const DISABLED = { ...TARGET, id: 'peer-off', displayName: 'Off Olivia', enabled: false };
+  const FRESH = { ...TARGET, id: 'peer-new', displayName: 'Fresh Fran' };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it('drops stale/offline and Domination-disabled players; keeps the fresh online one', async () => {
+    mockServerTargets([STALE, DISABLED, FRESH]);
+    render(<PCDominationTab {...baseProps} mesh={{ peerKnown: () => false, send: vi.fn() }} />);
+    await screen.findByRole('button', { name: /fresh fran/i });
+    expect(screen.queryByRole('button', { name: /stale sam/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /off olivia/i })).toBeNull();
+    expect(screen.getByText(/1 online/)).toBeTruthy();
+  });
+
+  it('states an honest empty state when nobody is currently reachable', async () => {
+    mockServerTargets([STALE]);
+    render(<PCDominationTab {...baseProps} mesh={{ peerKnown: () => false, send: vi.fn() }} />);
+    await waitFor(() =>
+      expect(screen.getByText(/Nobody is online with Domination enabled/i)).toBeTruthy());
+    expect(screen.queryByRole('button', { name: /stale sam/i })).toBeNull();
+  });
+
+  it('keeps a fresh target sendable with a real ack — still free, still consent-gated', async () => {
+    mockServerTargets([STALE, TARGET]);
+    const toast = vi.fn();
+    render(
+      <PCDominationTab
+        {...baseProps}
+        toast={toast}
+        mesh={{ peerKnown: () => false, send: vi.fn() }}
+      />,
+    );
+    await screen.findByRole('button', { name: /bob/i });
+    expect(screen.queryByRole('button', { name: /stale sam/i })).toBeNull();
+    expect(screen.queryByText(/g\$|price/i)).toBeNull();
+    await sendMessageFlow();
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith(
+        expect.stringMatching(/Landed status shows in Outbox\./),
+        'success',
+      ));
   });
 });

@@ -15,6 +15,7 @@
 // DROPPED, and a frame that does not fit its declared shape is refused.
 
 import type { User } from '@orbit/shared'
+import type { Envelope } from './envelope'
 import { isRecord } from './record'
 
 // ─── The bounds (one rule, both ends) ───
@@ -76,6 +77,16 @@ export type SwarmMessage =
   | { type: 'SWARM_OP'; operation: unknown }
   /** Peer reports it durably appended that operation. */
   | { type: 'SWARM_OP_ACK'; operationId: string; actorId: string }
+  /**
+   * A SEALED 1:1 envelope (Envelope v2) riding the mesh.
+   *
+   * A direct message is the SAME sealed envelope the courier mailbox carries
+   * (utils/mail-dm.ts decodeBody / Envelope v2) — the mesh only moves the
+   * ciphertext it cannot open, exactly like the node relay. This lets two
+   * NAT'd peers with NO reachable mailbox still chat over a direct
+   * DataChannel (or the node's SWARM_FRAME relay when direct ICE fails).
+   */
+  | { type: 'SWARM_DM'; envelope: Envelope }
 
 // ─── The announcement frames ───
 
@@ -180,6 +191,27 @@ function bounded(value: unknown, max: number): value is string {
   return typeof value === 'string' && value.length > 0 && value.length <= max
 }
 
+const ENVELOPE_KINDS: readonly string[] = ['mail', 'signal', 'announce', 'invite', 'report', 'api_req']
+
+/** Narrow one sealed Envelope v2 (the DM mesh payload). A field of the wrong
+ *  type is dropped, never coerced; a malformed envelope is refused. */
+export function parseEnvelope(raw: unknown): Envelope | null {
+  if (!isRecord(raw)) return null
+  if (raw.v !== 2) return null
+  if (typeof raw.kind !== 'string' || !ENVELOPE_KINDS.includes(raw.kind)) return null
+  if (!bounded(raw.to, 256) || !bounded(raw.id, 128) || !bounded(raw.sealed, 32 * 1024)) return null
+  const env: Envelope = {
+    v: 2,
+    kind: raw.kind as Envelope['kind'],
+    to: raw.to,
+    id: raw.id,
+    sealed: raw.sealed,
+  }
+  if (bounded(raw.fromEph, 128)) env.fromEph = raw.fromEph
+  if (typeof raw.exp === 'number' && Number.isFinite(raw.exp)) env.exp = raw.exp
+  return env
+}
+
 /**
  * May the node carry this frame?
  *
@@ -255,6 +287,12 @@ export function isRelayableSwarmFrame(inner: unknown): boolean {
       return !!inner.operation && typeof inner.operation === 'object'
     case 'SWARM_OP_ACK':
       return bounded(inner.operationId, 256) && bounded(inner.actorId, 256)
+    case 'SWARM_DM':
+      // A sealed envelope: the relay moves ciphertext it cannot open (the
+      // recipient's private key is the only thing that opens it), exactly like
+      // the mailbox path. Without this the guaranteed relay fallback could
+      // never carry a DM between two peers that cannot punch a direct hole.
+      return parseEnvelope(inner.envelope) !== null
     default:
       return false
   }
@@ -439,6 +477,11 @@ export function parseSwarmFrame(inner: unknown): SwarmMessage | null {
     case 'SWARM_OP_ACK': {
       if (typeof inner.operationId !== 'string' || typeof inner.actorId !== 'string') return null
       return { type, operationId: inner.operationId, actorId: inner.actorId }
+    }
+    case 'SWARM_DM': {
+      const envelope = parseEnvelope(inner.envelope)
+      if (!envelope) return null
+      return { type, envelope }
     }
     default:
       return null

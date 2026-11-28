@@ -12,6 +12,8 @@
     "electron": "electron .",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:wan": "node scripts/wan-two-peer.mjs",
+    "test:wan:ice": "node scripts/wan-ice.mjs",
     "typecheck": "tsc --noEmit",
     "e2e:clean": "node scripts/clean-e2e-state.mjs",
     "check:ui-tokens": "node scripts/check-ui-tokens.mjs",

@@ -3,13 +3,14 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Search, Users, X, MessageSquare, Swords } from 'lucide-react';
 import type { OrbitIdentity } from '@orbit/crypto';
-import type { User } from '@orbit/shared';
+import { generateFallbackName, type User } from '@orbit/shared';
 import { playPress } from '../../utils/sounds';
 import { Avatar } from '../Avatar';
 import { parseSeenMs } from '../../utils/presence';
 import { usePresence } from '../../game/presenceStore';
 import { usePresencePoll } from '../../hooks/usePresencePoll';
 import { swarmTransportLabel } from '../../hooks/useP2P';
+import type { PeerRoster } from '../../utils/peerRoster';
 import { FeedbackState } from '../../ui/kit';
 import { classes } from '../../ui/tokens';
 
@@ -33,6 +34,9 @@ export interface ChatPlayerListProps {
   /** Why invites are unavailable on this node. Never null on a blind courier,
    *  so the button explains itself instead of 404-ing. */
   inviteUnavailableReason?: string | null;
+  /** THE one roster. When supplied, the header count reads it instead of the
+   *  node dashboard's snapshot (which is an input, not a second authority). */
+  roster?: PeerRoster;
   /** When true the list body is hidden and the header stays as the toggle. */
   collapsed?: boolean;
   /** Toggle the collapsed state from the Players header label. */
@@ -65,6 +69,7 @@ export function ChatPlayerList({
   onMessagePlayer,
   onInvitePlayer,
   inviteUnavailableReason = null,
+  roster,
   collapsed = false,
   onToggleCollapse,
 }: ChatPlayerListProps) {
@@ -92,6 +97,24 @@ export function ChatPlayerList({
   useEffect(() => {
     setSelfId(identity?.orbitId ?? null);
   }, [identity?.orbitId, setSelfId]);
+
+  // The roster is the one authority for who is online AND for the rows a peer
+  // discovered outside this node (a cross-node presence beacon never appears
+  // in the node's /api/users snapshot). One subscription drives both: the
+  // header count and the list body must change together, and unmount cleans up.
+  const [rosterPeers, setRosterPeers] = useState<User[]>([]);
+  const [rosterCount, setRosterCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (!roster) {
+      setRosterPeers([]);
+      setRosterCount(null);
+      return undefined;
+    }
+    return roster.subscribe((peers) => {
+      setRosterPeers(peers);
+      setRosterCount(roster.countOnline(identity?.orbitId));
+    });
+  }, [roster, identity?.orbitId]);
 
   const mergedPlayers = useMemo(() => {
     const map = new Map<string, ChatPlayerItem>();
@@ -137,7 +160,34 @@ export function ChatPlayerList({
       }
     }
 
-    // 3. Ensure self is always present and online
+    // 3. Merge the one roster. A peer found only through a cross-node presence
+    //    beacon is not in `users` or the node dashboard, so without this step
+    //    its row was missing entirely (or nameless). A signed name wins; an
+    //    empty one never blanks a name learned from another source. The roster
+    //    owns the online flag for rows it carries.
+    for (const p of rosterPeers) {
+      if (!p?.id || p.id === identity?.orbitId) continue;
+      const name = p.display_name?.trim();
+      const lastSeenMs = seenMs(p.last_seen);
+      const online = p.online === true;
+      const existing = map.get(p.id);
+      if (existing) {
+        if (name) existing.display_name = name;
+        existing.pfp_url = p.pfp_url || profilePics[p.id] || existing.pfp_url;
+        if (lastSeenMs >= seenMs(existing.last_seen)) existing.last_seen = p.last_seen || existing.last_seen;
+        existing.online = online;
+      } else if (online || (lastSeenMs > 0 && (now - lastSeenMs) <= oneDayMs)) {
+        map.set(p.id, {
+          id: p.id,
+          display_name: name || undefined,
+          pfp_url: p.pfp_url || profilePics[p.id],
+          last_seen: p.last_seen || null,
+          online,
+        });
+      }
+    }
+
+    // 4. Ensure self is always present and online
     if (identity?.orbitId) {
       const self = map.get(identity.orbitId);
       let localName = '';
@@ -162,7 +212,7 @@ export function ChatPlayerList({
       }
     }
 
-    // 4. Filter for only active in last 24h or online
+    // 5. Filter for only active in last 24h or online
     const list: ChatPlayerItem[] = [];
     for (const p of map.values()) {
       const lastSeenMs = seenMs(p.last_seen);
@@ -173,7 +223,7 @@ export function ChatPlayerList({
       }
     }
 
-    // 5. Sort: online first, then offline by last_seen desc
+    // 6. Sort: online first, then offline by last_seen desc
     list.sort((a, b) => {
       if (a.online !== b.online) {
         return a.online ? -1 : 1;
@@ -189,21 +239,21 @@ export function ChatPlayerList({
     });
 
     return list;
-  }, [records, isOnline, users, profilePics, identity]);
+  }, [records, isOnline, users, rosterPeers, profilePics, identity]);
 
   const localOnlineCount = useMemo(() => mergedPlayers.filter((p) => p.online).length, [mergedPlayers]);
   // Server counts are only trustworthy while the snapshot carrying them is
   // fresh. Two polls can be missed inside the 60s presence window, so the
   // fallback is 75s — after that the number is a lie and we use our own count.
   const isDashboardCountsFresh = Boolean(counts && countsAt > 0 && (Date.now() - countsAt) < 75_000);
-  const displayOnlineCount = isDashboardCountsFresh && counts ? counts.online : localOnlineCount;
+  const displayOnlineCount = rosterCount ?? (isDashboardCountsFresh && counts ? counts.online : localOnlineCount);
   const displayActiveCount = isDashboardCountsFresh && counts ? counts.active : mergedPlayers.length;
 
   const filteredPlayers = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return mergedPlayers;
     return mergedPlayers.filter((p) => {
-      const name = (p.display_name || '').toLowerCase();
+      const name = (p.display_name?.trim() || generateFallbackName(p.id)).toLowerCase();
       const id = p.id.toLowerCase();
       return name.includes(q) || id.includes(q);
     });
@@ -296,7 +346,9 @@ export function ChatPlayerList({
         ) : (
           filteredPlayers.map((player) => {
             const isSelf = identity?.orbitId === player.id;
-            const displayName = player.display_name?.trim() || (isSelf ? 'You' : 'User');
+            const knownName = player.display_name?.trim();
+            const usableName = knownName && knownName.toLowerCase() !== 'user' ? knownName : null;
+            const displayName = usableName || (isSelf ? 'You' : generateFallbackName(player.id));
             const pfp = player.pfp_url || profilePics[player.id];
 
             return (

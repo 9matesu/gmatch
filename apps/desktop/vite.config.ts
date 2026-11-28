@@ -2,6 +2,7 @@ import { defineConfig, type Plugin, type ProxyOptions } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
+import { createRequire } from 'node:module'
 import http, { type IncomingMessage, type ServerResponse } from 'node:http'
 import https from 'node:https'
 import { spawn, spawnSync } from 'node:child_process'
@@ -619,6 +620,15 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      // styled-components' ESM build loses the `.div`/`.span`… dom-element
+      // attachments to tree-shaking in the production bundle, so the CJS dep
+      // react-holo-card-effect crashes with "styled.div is not a function"
+      // before React mounts (the `npm run electron` black screen; dev is fine
+      // because esbuild pre-bundles it). Pin the CJS build, whose default
+      // export keeps them.
+      'styled-components': createRequire(import.meta.url).resolve(
+        'styled-components/dist/styled-components.cjs.js',
+      ),
     },
   },
   server: {

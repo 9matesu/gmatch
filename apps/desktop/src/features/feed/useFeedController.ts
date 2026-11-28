@@ -218,6 +218,53 @@ export function useFeedController(input: FeedControllerInput): FeedController {
     return load()
   }, [load])
 
+  /**
+   * A first read that answers with NO rows is not a settled timeline. The
+   * local node can still be booting, and the 3s GET cache can hold that empty
+   * answer while the real posts arrive. The caller's boot loop only retries
+   * error/offline states, so a "ready but empty" first read used to sit there
+   * until the player opened a profile (whose own author_id query re-read the
+   * node) and came back. Re-read with a cache BYPASS, bounded, and let the
+   * request sequence above discard any superseded answer.
+   */
+  const emptyReadRetries = useRef(0)
+  useEffect(() => {
+    if (!identity || status !== 'ready' || posts.length > 0) {
+      emptyReadRetries.current = 0
+      return
+    }
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout>
+    const retry = () => {
+      if (cancelled) return
+      emptyReadRetries.current += 1
+      void refresh()
+      if (emptyReadRetries.current < 3) timer = setTimeout(retry, 1200)
+    }
+    timer = setTimeout(retry, 1200)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [identity, status, posts.length, refresh])
+
+  /**
+   * Returning to a visible window re-reads the node, with the response cache
+   * dropped: a push can land while the tab is hidden and the cached answer
+   * would otherwise keep the new row off screen. Bounded to one refresh per
+   * 15s, generation-guarded by `load` above.
+   */
+  const lastVisibleRefresh = useRef(0)
+  useEffect(() => {
+    if (!identity || typeof document === 'undefined') return
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return
+      const now = Date.now()
+      if (now - lastVisibleRefresh.current < 15_000) return
+      lastVisibleRefresh.current = now
+      void refresh()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [identity, refresh])
+
   const loadMore = useCallback(async () => {
     if (!identity || loadingMore || !hasMore) return
     setLoadingMore(true)
@@ -269,6 +316,8 @@ export function useFeedController(input: FeedControllerInput): FeedController {
     setMyProfilePosts([])
     setRestoredFromCache(false)
     setStatus('idle')
+    emptyReadRetries.current = 0
+    lastVisibleRefresh.current = 0
   }, [])
 
   /**

@@ -15,6 +15,25 @@ app.commandLine.appendSwitch('disable-dev-shm-usage')
 const https = require('https')
 const fs = require('node:fs')
 const path = require('node:path')
+
+// W6 dev isolation: the UNPACKAGED shell (`npm run electron`) runs alongside
+// `npm run dev` (vite 5173 + sidecar 8790). Give it its OWN API port and
+// userData so the two never clash (EADDRINUSE / shared world / shared
+// single-instance lock). Must run before the single-instance lock and before
+// apiSidecar/server-mode read GMATCH_API_PORT at module load. The PACKAGED app
+// (app.isPackaged) is untouched: host node on 8790, legacy userData, normal
+// lock.
+if (!app.isPackaged) {
+  try {
+    const devRuntime = require('./dev-runtime.cjs')
+    process.env.GMATCH_API_PORT = String(devRuntime.DEV_ELECTRON_API_PORT)
+    app.setPath('userData', devRuntime.devUserDataDir(app.getPath('appData')))
+  } catch (err) {
+    // Best effort: fall back to the defaults (8790 + packaged userData) rather
+    // than refusing to boot.
+    try { console.error('[dev-runtime] isolation setup failed:', err && err.message) } catch { /* ignore */ }
+  }
+}
 // A closed stdout/stderr pipe used to kill the whole main process with an
 // uncaught "EPIPE: broken pipe, write" (main.log, 2026-11-25). The error is
 // an async 'error' EVENT on the stream, so the try/catch in apiSidecar.cjs

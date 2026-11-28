@@ -1,8 +1,16 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
+import { act, render, screen, fireEvent } from '@testing-library/react'
+import type { User } from '@orbit/shared'
 import { CommandIsland } from './CommandIsland'
 import { isNodeOwner } from '../../admin/nodeOwner'
+import { PeerRoster } from '../../utils/peerRoster'
+import { swarmTransportRegistry } from '../../utils/transportState'
+
+const peer = (id: string, displayName: string): User =>
+  ({ id, display_name: displayName, online: true, publicKey: `pk-${id}`, createdAt: '2026-01-01T00:00:00Z' }) as User
+
+afterEach(() => swarmTransportRegistry.reset())
 
 // The sidebar/footer chrome was replaced by the island; these tests pin that
 // every view keeps an entry point (regression: pc_domination + rooms went
@@ -139,6 +147,75 @@ describe('CommandIsland count badges', () => {
     for (const b of badges) expect(b).toHaveTextContent('99+');
   });
 });
+
+describe('CommandIsland live player chip (one roster, real routes)', () => {
+  it('the chip is a button that opens and closes the peer popover', () => {
+    const roster = new PeerRoster(null)
+    render(<CommandIsland mainView="feed" setMainView={vi.fn()} roster={roster} selfId="me" />)
+    const chip = screen.getByRole('button', { name: 'Peers, 0 connected' })
+    expect(chip).toHaveAttribute('aria-haspopup', 'dialog')
+    expect(chip).toHaveAttribute('aria-expanded', 'false')
+
+    fireEvent.click(chip)
+    expect(screen.getByRole('dialog', { name: 'Connected peers' })).toBeInTheDocument()
+    expect(screen.getByText('No peers connected yet')).toBeInTheDocument()
+    expect(chip).toHaveAttribute('aria-expanded', 'true')
+
+    // Fixed (not absolute) so the island's overflow-x-auto cannot clip it.
+    expect(screen.getByRole('dialog').className).toContain('fixed')
+
+    fireEvent.click(chip)
+    expect(screen.queryByRole('dialog', { name: 'Connected peers' })).toBeNull()
+    fireEvent.click(chip)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: 'Connected peers' })).toBeNull()
+    fireEvent.click(chip)
+    fireEvent.pointerDown(document.body)
+    expect(screen.queryByRole('dialog', { name: 'Connected peers' })).toBeNull()
+  })
+
+  it('lists real roster peers with the transport they actually proved', () => {
+    const roster = new PeerRoster(null)
+    act(() => {
+      roster.upsert(peer('a', 'Alpha'))
+      roster.upsert(peer('b', 'Beta'))
+      roster.upsert(peer('c', 'Cy'))
+      swarmTransportRegistry.markDirectValidated('a')
+      swarmTransportRegistry.markRelayInUse('b')
+      swarmTransportRegistry.markDirectFailed('c', 'no relay', false)
+    })
+    render(<CommandIsland mainView="feed" setMainView={vi.fn()} roster={roster} selfId="me" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Peers, 3 connected' }))
+    const dialog = screen.getByRole('dialog', { name: 'Connected peers' })
+    expect(dialog).toHaveTextContent('Alpha')
+    expect(dialog).toHaveTextContent('Beta')
+    expect(dialog).toHaveTextContent('Cy')
+    expect(dialog).toHaveTextContent('P2P direto')
+    expect(dialog).toHaveTextContent('relay via nó (NAT)')
+    expect(dialog).toHaveTextContent('sem rota')
+  })
+
+  it('the chip count is the roster count, never a stale server/lobby number', () => {
+    const roster = new PeerRoster(null)
+    act(() => { roster.upsert(peer('a', 'Alpha')) })
+    render(
+      <CommandIsland
+        mainView="feed"
+        setMainView={vi.fn()}
+        roster={roster}
+        selfId="me"
+        gamesOnlineCount={12}
+      />,
+    )
+    expect(screen.getByRole('button', { name: 'Peers, 1 connected' })).toHaveTextContent('1')
+    // A lobby count is a different metric and stays where it belongs.
+    expect(screen.getByRole('status', { name: '12 in lobby' })).toHaveTextContent('12')
+    act(() => { roster.upsert(peer('b', 'Beta')) })
+    expect(screen.getByRole('button', { name: 'Peers, 2 connected' })).toHaveTextContent('2')
+    act(() => { roster.markOffline('a') })
+    expect(screen.getByRole('button', { name: 'Peers, 1 connected' })).toHaveTextContent('1')
+  })
+})
 
 describe('CommandIsland styling & layout compliance', () => {
   it('pill bar keeps one row and scrolls silently instead of spilling, and the picker lives outside it', () => {

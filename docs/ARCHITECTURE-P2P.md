@@ -8,21 +8,33 @@
 ## 1. System Overview
 
 Since 2026-10-24 there is **no central data deployment**: every packaged copy of
-the app runs **its own node** (host mode is the default). Since 2026-11-07 there
-is no hosted rendezvous either — the hosted courier function and its D1 were
-removed, and the release page is static. The rendezvous is **the node each
-client is connected to**: it serves a signed public-node directory and a
-sealed-mail relay, with no content tables, no accounts and no presence. It is
-not a world, never a data base.
+the app runs **its own node** (host mode is the default). Since 2026-11-07 the
+hosted courier function and its D1 were removed and the release page is static.
+Since 2026-11-27 a free, always-on, zero-knowledge rendezvous is back — one
+Cloudflare Worker (`worker/`, `gmatch-rendezvous`) holding ONLY sealed envelope
+ciphertext and bounded, self-declared directory metadata. It exists because
+"the node each client is connected to is the rendezvous" fails when no peer's
+node is reachable. Two rendezvous now coexist: the hosted mailbox/directory
+(reachability) and each node for its own clients (SPEC §12b). Neither is a
+world, never a data base. Signed presence beacons AND signed social operations
+are published to BOTH the node/mesh and public mailbox tokens on the hosted box,
+so two installs on different nodes read one roster, see each other online, and
+exchange verified posts/profile updates even with no shared node and no TURN.
+Every operation is re-validated by the receiver's authorizer; the Worker only
+moves base64 bytes it cannot read or authenticate. The hosted mailbox guarantees a meeting point for
+sealed mail, presence and discovery — NOT a direct WebRTC channel: a
+symmetric-NAT pair still needs an explicitly configured TURN or the node's
+`SWARM_FRAME` relay as transport.
 
 A packaged install runs a **full node**: it stores the world it serves
 (profiles, posts, objects, presence) and is the directory, the mail relay and
 the swarm rendezvous for its clients. The **courier** shape is the same code
 with `SITE_SERVICES` set: blind and stateless, holding only
 sealed envelopes and relayed swarm frames, with every other route 404 at the
-edge. The two are one codebase with one env flag, not two deployments. No
-hosted courier is deployed any more (since 2026-11-26) — the courier shape is a
-capability a node can run, not an origin the app assumes.
+edge. The two are one codebase with one env flag, not two deployments. The old
+hosted courier is gone (since 2026-11-26) — the courier shape is a capability a
+node can run. The only hosted origin the app assumes is the blind rendezvous
+Worker above: it carries sealed mail and discovery metadata, never world data.
 
 The courier role moved from "one central host" to "the node each client is
 connected to":
@@ -178,7 +190,9 @@ type CourierSignalPayload =
 
 ### NAT Traversal & ICE Hygiene
 
-- Peer connections configure STUN plus a baked public TURN candidate (`defaultTurn()`), or the TURN relay configured in Settings/environment (`defaultIceConfig(readTurnEnv())`, which wins over the baked default).
+- Peer connections configure Cloudflare STUN by default (`defaultIceConfig()`), plus an explicitly configured TURN from Settings/environment when present, which forces `iceTransportPolicy:'relay'`. No anonymous free TURN is bundled: the former public relay is globally 401/blackholed, so claiming one would be a fabrication.
+- **Presence survives a hidden window.** The 60s heartbeat skips local swarm noise when the document is hidden, but still publishes the signed beacon to the node + hosted mailbox (TTL 90s). A full node also starts ONE bounded direct mesh attempt for a peer whose signed beacon names a different node; same-node peers keep the local relay.
+- **Global IPv6 host candidates are signaled** (`2000::/3`); ULA/link-local/loopback stay hidden. IPv6-capable peers behind CGNAT connect directly with no relay. No free anonymous TURN is bundled (Cloudflare TURN needs a card); an explicit TURN from Settings/env remains the IPv4-only fallback.
 - Private LAN IP candidates are stripped/sanitized before dispatch over the courier (`sanitizeCandidate`) to prevent internal network leakage.
 - **One STUN endpoint, not a list (2026-11-23).** `STUN_SERVERS` is a single
   Cloudflare server. Chromium logs a `socket_manager.cc` error for every STUN
@@ -253,6 +267,76 @@ decrypted body kind (`utils/mail-dm.ts`, one decoder):
 
 Unknown kinds are ignored by older clients (the body fails to decode), so the
 courier needed no change and the store is still the only source of history.
+
+### Mesh-carried DMs: a sealed envelope over the swarm (SWARM_DM)
+
+The courier mailbox is the durable path, but it has a hard prerequisite: a
+REACHABLE node. Two peers behind NATs with no reachable mailbox could not chat
+at all — the sealed envelope had nowhere to land. The mesh now carries the
+SAME envelope:
+
+- **One frame, one format.** `SWARM_DM` (`packages/protocol/src/swarm-frame.ts`)
+  carries an `Envelope` v2 — the identical ciphertext the mailbox carries. The
+  relay allowlist shape-checks it (`parseEnvelope`: `v:2`, a known `kind`,
+  bounded `to`/`id`/`sealed`, optional `fromEph`); the node moves ciphertext it
+  cannot open, exactly as it does for a mailbox envelope. There is NO second DM
+  format: `utils/mail-dm.ts` `decodeBody` is still the one decoder.
+- **Send** (`useCourierDms`): the facade seals the envelope ONCE with `seal1to1`
+  and broadcasts it via `sendSwarmFrame` (direct DataChannel, the local-tab
+  channel, or the node's `SWARM_FRAME` relay — the guaranteed fallback when
+  direct ICE fails), THEN still PUTs it to the mailbox. The mesh copy is
+  fire-and-forget; the mailbox stays the durable fallback and a real `dm_ack`
+  is still the only proof of delivery (never fabricated).
+- **Receive** (`useCourierDms` → `setSwarmDmHandler` in `p2pSwarm.ts`): the
+  inbound frame is routed through the existing `routeInboundFrame` /
+  `handleSwarmMessage` pipe; the handler opens it with the recipient's private
+  key (`open1to1`), which VERIFIES the sender's Ed25519 signature over
+  `kind|id|to|body` — the SAME authorization the swarm-op path uses. A forged
+  or foreign envelope throws and is dropped; nothing is stored. The opened body
+  is then handled exactly as the courier path handles it, so ack/read/edit/
+  delete/react all work over the mesh unchanged, and a message that arrives by
+  BOTH paths is deduped by message id.
+
+### WAN two-peer harness (`scripts/wan-two-peer.mjs`, `npm run test:wan`)
+
+Modelled on `p2p-two-process.mjs`: the production engine runs in TWO real OS
+processes (distinct identity, world, operation log and durable store) with the
+parent as an UNTRUSTED relay that is never given a transfer key. It adds a real
+ICE leg — a genuine `RTCPeerConnection` DataChannel using public STUN
+(`defaultIceConfig`; no anonymous free TURN exists), the parent relaying the SDP — and
+asserts (a) a signed `post.create` crosses, (b) media arrives byte-identical
+(sha256 == content id), (c) a SEALED DM round-trips (send → ack) over the mesh,
+and (d) no plaintext media slice crosses the relay. It is HONEST: when a real
+direct WAN path cannot be established in the runtime (e.g. no global
+`RTCPeerConnection`, as in current Node), it FAILS LOUD and names the failing
+leg — the relay legs (a–d) still run over the guaranteed `SWARM_FRAME` fallback
+so the social/media/DM logic is proven even then. A PASS requires the direct
+ICE leg AND the relay legs.
+
+**Real-ICE browser leg (`scripts/wan-ice.mjs`, `npm run test:wan:ice`).** Node
+has no global `RTCPeerConnection`, so that harness cannot open a direct channel
+here; Chromium can. `wan-ice-entry.ts` is bundled for the browser and loaded
+into TWO isolated Playwright contexts (distinct identity, world and durable
+store). It opens a genuine `RTCPeerConnection` DataChannel with the production
+direct-first config (`peerConnectionConfig(null)`: public STUN, no forced
+relay), the node relaying ONLY the SDP, then proves the real wire: (a) a signed
+`post.create` built by `createSocialOperation` with the production manifest
+binding, verified on the peer by `validateSocialOperation`; (b) 48 KiB of real
+`SWARM_CHUNK` frames reassembled and verified byte-identical against the
+content id by `sha256HexBlob`; (c) a sealed `Envelope` v2 DM opened by
+`open1to1` (signature = authorization) and acked; (d) no plaintext media slice
+anywhere the untrusted relay could see (media crossed DTLS-encrypted,
+page-to-page). Executed on this machine: **PASS** on all four legs — one-machine
+simulation (two networks are not simulated), so this proves real public-STUN
+ICE and the production wire, not cross-NAT behaviour on two real networks.
+
+Relay availability is diagnosed, not silently claimed: on this machine the
+former public TURN `openrelay.metered.ca` resolves to `192.0.2.1` (TEST-NET
+blackhole), refuses TCP:80, and the shared account is globally 401. A STUN-only
+probe gathers `host` + `srflx` normally. The harness prints that diagnosis and
+uses the direct path it can actually prove; an explicitly configured TURN (from
+Settings/env) still forces relay where the user has one. A blocked egress fails
+loud with the exact leg name, never a fake pass.
 
 **Drain correctness.** A notice is emitted only after the envelope is written,
 so a box listing that was already running cannot contain it. `MailClient.pull()`

@@ -3,6 +3,7 @@ import { signMessage, verifySignature, hexToBytes, bytesToHex } from '@orbit/cry
 import { sha256Hex } from '@orbit/protocol'
 import { type User, generateFallbackName } from '@orbit/shared'
 import { getApiBaseUrl } from '../utils/api'
+import { getCentralApiUrl } from '../utils/central'
 import { normalizeNodeUrl } from '../utils/peerNodes'
 import { resolveNodeAddress } from '../utils/serverAddress'
 
@@ -65,9 +66,14 @@ export async function broadcastPresence(
   // proxy with no address at all. The node reports the addresses it answers
   // on, so both cases resolve to a real one.
   const nodeUrl = await resolveNodeAddress(identity, fetchImpl)
+  // The in-memory self profile can lag a profile PATCH (the node row updates
+  // first). Fall back to the local display name so a fresh beacon is never
+  // nameless; the signed payload still carries whatever name we can prove.
+  let localName = ''
+  try { localName = (localStorage.getItem('orbit_display_name') || '').trim() } catch { /* private mode */ }
   const rawBeacon: Omit<PresenceBeacon, 'sig'> = {
     orbitId: identity.orbitId,
-    displayName: profile.displayName || 'Player',
+    displayName: profile.displayName?.trim() || localName || 'Player',
     pfpUrl: profile.pfpUrl || null,
     publicKeyHex: identity.publicKeyHex,
     encryptionPubHex: identity.encryptionPubHex || '',
@@ -90,17 +96,28 @@ export async function broadcastPresence(
     exp: now + PRESENCE_TTL_MS,
   }
 
-  try {
-    const url = `${getApiBaseUrl()}/api/mail/${PRESENCE_TOKEN}`
-    const res = await fetchImpl(url, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ env: envelope }),
-    })
-    return res.ok
-  } catch {
-    return false
+  // Publish to BOTH the node we are on and the free hosted rendezvous. Two
+  // installs on different nodes (or two dev surfaces on different ports) then
+  // share ONE presence mailbox, so each sees the other online instead of an
+  // empty roster. The beacon is signed and bound to the node it names; the
+  // Worker stores the envelope verbatim and cannot rewrite it.
+  const own = getApiBaseUrl().replace(/\/+$/, '')
+  const central = getCentralApiUrl().replace(/\/+$/, '')
+  const bases = central && central !== own ? [getApiBaseUrl(), central] : [getApiBaseUrl()]
+  let published = false
+  for (const base of bases) {
+    try {
+      const res = await fetchImpl(`${base}/api/mail/${PRESENCE_TOKEN}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ env: envelope }),
+      })
+      if (res.ok) published = true
+    } catch {
+      /* one unreachable mailbox cannot block the other */
+    }
   }
+  return published
 }
 
 /**

@@ -51,6 +51,16 @@ describe('post model · { text, media? }', () => {
     expect(displayMedia(post, content)?.url).toBe('https://cdn.test/one')
   })
 
+  it('pages at most 10 media items, no matter how many the row carries', () => {
+    const post = row({
+      caption: 'long carousel',
+      media: Array.from({ length: 14 }, (_, i) => ({ id: `m${i}`, url: `https://cdn.test/${i}`, mime_type: 'image/jpeg' })),
+    })
+    const content = readPostContent(post)
+    expect(content.media).toHaveLength(10)
+    expect(content.media?.[9].url).toBe('https://cdn.test/9')
+  })
+
   it('does not invent media for a blank row', () => {
     const content = readPostContent(null)
     expect(content).toEqual({ text: '', media: undefined })

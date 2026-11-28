@@ -74,6 +74,21 @@ describe('ChatPlayerList', () => {
     expect(screen.getByText('Bob')).toBeDefined()
   })
 
+  it('keeps player search a compact single-line field', () => {
+    render(
+      <ChatPlayerList
+        identity={{ orbitId: 'me', publicKeyHex: 'pk', privateKeyHex: 'sk', encryptionPubHex: 'ep', encryptionPrivHex: 'es' }}
+        users={mockUsers}
+      />,
+    )
+    const input = screen.getByLabelText('Search players')
+    const shell = input.parentElement as HTMLElement
+    expect(input.tagName).toBe('INPUT')
+    expect(input.className).toContain('text-xs')
+    expect(shell.className).toContain('py-1.5')
+    expect(shell.className).not.toMatch(/\bpy-(2|2\.5|3)\b/)
+  })
+
   it('triggers onOpenProfile when clicking a player', () => {
     const onOpenProfile = vi.fn()
     render(

@@ -31,6 +31,19 @@ describe('courierPresence', () => {
     expect(capturedBody.env.sealed).toBeDefined()
   })
 
+  it('publishes one signed beacon to both the node and the hosted rendezvous', async () => {
+    const urls: string[] = []
+    const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+      urls.push(String(url))
+      return new Response(JSON.stringify({ ok: true, lanUrls: [] }), { status: 200 })
+    })
+    const ok = await broadcastPresence(alice, { displayName: 'A' }, fetchMock as unknown as typeof globalThis.fetch)
+    expect(ok).toBe(true)
+    const boxes = urls.filter((u) => u.includes(`/api/mail/${PRESENCE_TOKEN}`))
+    expect(boxes.length).toBeGreaterThanOrEqual(2)
+    expect(boxes.some((u) => u.includes('gmatch-rendezvous'))).toBe(true)
+  })
+
   it('fetches presence beacons, verifies signatures, and maps to online users', async () => {
     let capturedEnvelope: any = null
 

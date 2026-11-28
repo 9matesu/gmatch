@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, cleanup, within } from '@testing-library/react'
-import { ServersView } from './ServersView'
+import { ServersView, OFFICIAL_NODE_NAME } from './ServersView'
+import { DIRECTORY_CACHE_KEY } from './directoryMerge'
+import { CHROME } from '../../ui/tokens'
+import type { PeerRoster } from '../../utils/peerRoster'
 
 type FetchCall = { url: string; init?: RequestInit }
 let calls: FetchCall[] = []
@@ -18,6 +21,8 @@ function mockFetch(handler: (url: string, init?: RequestInit) => Promise<Respons
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json' } })
 }
+
+const ago = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString()
 
 import { generateIdentity } from '@orbit/crypto'
 const real = generateIdentity()
@@ -136,10 +141,10 @@ describe('ServersView', () => {
       if (url.includes('/api/servers/node')) return json({ name: 'My Realm', description: '', isAdmin: true })
       if (url.includes('/api/servers')) return json({ servers: [
         // the node on this machine, listed twice under two directory ids
-        { id: 'reg1', name: 'My Realm', owner_id: ownId, password_required: 0, endpoint_hint: 'https://world.test:8790', last_seen: '2026-01-01' },
-        { id: 'reg2', name: 'My Realm', owner_id: ownId, password_required: 0, endpoint_hint: 'http://world.test:8790/', last_seen: '2026-01-02' },
+        { id: 'reg1', name: 'My Realm', owner_id: ownId, password_required: 0, endpoint_hint: 'https://world.test:8790', last_seen: ago(2) },
+        { id: 'reg2', name: 'My Realm', owner_id: ownId, password_required: 0, endpoint_hint: 'http://world.test:8790/', last_seen: ago(1) },
         // a different server that happens to share the display name
-        { id: 'other', name: 'My Realm', owner_id: 'someone', password_required: 0, endpoint_hint: 'https://other.test:8790', last_seen: '2026-01-01' },
+        { id: 'other', name: 'My Realm', owner_id: 'someone', password_required: 0, endpoint_hint: 'https://other.test:8790', last_seen: ago(2) },
       ] })
       return json({})
     })
@@ -149,6 +154,89 @@ describe('ServersView', () => {
     // this machine's node (2 records collapsed) + the namesake on another address
     expect(rows).toHaveLength(2)
     expect(screen.getAllByText('My Realm')).toHaveLength(2)
+  })
+
+  it('shows this machine once as the official verified node; a proven peer is verified, an unproven one is not', async () => {
+    ;(window as unknown as { gmatch?: unknown }).gmatch = {
+      serverSet: vi.fn(), serverRelaunch: vi.fn(),
+      serverState: vi.fn().mockResolvedValue({ packaged: true, mode: 'host', url: 'http://127.0.0.1:8790', lanUrls: [] }),
+    }
+    stubLocalStorage({ 'gmatch.central.url': 'https://central.test', 'gmatch.api.url': 'http://127.0.0.1:8790' })
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'gmatch', users: [], posts_24h: 0, members_total: 1 })
+      if (url.includes('/api/servers/node')) return json({ name: 'gmatch', description: '', isAdmin: true })
+      if (url.includes('/api/servers')) return json({ servers: [
+        // a signed directory entry (real owner) — earns the verified chip
+        { id: 'proven', name: 'Proven Node', owner_id: 'someone-real', password_required: 0, endpoint_hint: 'https://proven.test:8790', last_seen: 'x' },
+        // a pasted node code (no owner) — never verified
+        { id: 'mask:unproven.test:8790', name: 'Unproven Node', owner_id: '', password_required: 0, endpoint_hint: 'unproven.test:8790', last_seen: 'x' },
+        // a legacy nameless gmatch row — purged, never shown
+        { id: 'legacy', name: 'gmatch', owner_id: '', password_required: 0, last_seen: 'x' },
+      ] })
+      return json({})
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+
+    // this machine appears exactly once, as the official node, with the logo
+    expect(await screen.findByText(OFFICIAL_NODE_NAME)).toBeInTheDocument()
+    expect(screen.getAllByText(OFFICIAL_NODE_NAME)).toHaveLength(1)
+    expect(screen.getAllByTestId('verified-chip')).toHaveLength(2) // own + proven peer
+    // the nameless legacy gmatch row is gone
+    expect(screen.queryByText(/^gmatch$/)).toBeNull()
+    // own row shows the game logo, not a letter glyph
+    const ownRow = screen.getByText(OFFICIAL_NODE_NAME).closest('li')!
+    expect(ownRow.querySelector('img[src="/icon.png"]')).not.toBeNull()
+    // the proven peer is verified; the unproven one is not
+    const provenRow = rowOf('Proven Node')
+    expect(within(provenRow).getByTestId('verified-chip')).toBeInTheDocument()
+    const unprovenRow = rowOf('Unproven Node')
+    expect(within(unprovenRow).queryByTestId('verified-chip')).toBeNull()
+    delete (window as unknown as { gmatch?: unknown }).gmatch
+  })
+
+  it('drops stale gMatch rows and a second official claim, but keeps a fresh signed friend', async () => {
+    ;(window as unknown as { gmatch?: unknown }).gmatch = {
+      serverSet: vi.fn(), serverRelaunch: vi.fn(),
+      serverState: vi.fn().mockResolvedValue({ packaged: true, mode: 'host', url: 'http://127.0.0.1:8790', lanUrls: [] }),
+    }
+    stubLocalStorage({ 'gmatch.central.url': 'https://central.test', 'gmatch.api.url': 'http://127.0.0.1:8790' })
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'gmatch', users: [], posts_24h: 0, members_total: 1 })
+      if (url.includes('/api/servers/node')) return json({ name: 'gmatch', description: '', isAdmin: true })
+      if (url.includes('/api/servers')) return json({ servers: [
+        { id: 'old-brand', name: 'gMatch', owner_id: 'ghost', password_required: 0, endpoint_hint: 'https://old.test:8790', last_seen: ago(14 * 24) },
+        { id: '23h-brand', name: 'gMatch', owner_id: 'ghost', password_required: 0, endpoint_hint: 'https://stale.test:8790', last_seen: ago(23) },
+        { id: 'fake-official', name: OFFICIAL_NODE_NAME, owner_id: 'impostor', password_required: 0, endpoint_hint: 'https://fake.test:8790', last_seen: ago(0.1) },
+        { id: 'friend', name: 'Friend World', owner_id: 'someone-real', password_required: 0, endpoint_hint: 'https://friend.test:8790', last_seen: ago(0.1) },
+      ] })
+      return json({})
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+
+    expect(await screen.findByText(OFFICIAL_NODE_NAME)).toBeInTheDocument()
+    // ONE canonical official row: no second verified "official", no stale brand rows.
+    expect(screen.getAllByText(OFFICIAL_NODE_NAME)).toHaveLength(1)
+    expect(screen.queryByText(/^gmatch$/i)).toBeNull()
+    expect(screen.queryByText('https://fake.test:8790')).toBeNull()
+    expect(screen.getAllByRole('listitem')).toHaveLength(2)
+    // A joined friend node with a signed owner stays and is verified.
+    const friend = rowOf('Friend World')
+    expect(friend).toBeTruthy()
+    expect(within(friend).getByTestId('verified-chip')).toBeInTheDocument()
+    expect(screen.getAllByTestId('verified-chip')).toHaveLength(2) // own + friend
+    // The stale rows are gone from the durable mirror, not merely hidden.
+    // The mirror key is namespaced by the API base (which varies by runtime),
+    // so read every mirror rather than assume one literal key.
+    const mirrors: Array<Array<{ id: string }>> = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (k?.startsWith(DIRECTORY_CACHE_KEY)) {
+        mirrors.push(JSON.parse(localStorage.getItem(k) || '[]') as Array<{ id: string }>)
+      }
+    }
+    expect(mirrors.some((rows) => rows.some((x) => x.id === 'friend'))).toBe(true)
+    expect(mirrors.every((rows) => rows.every((x) => !['old-brand', '23h-brand', 'fake-official'].includes(x.id)))).toBe(true)
+    delete (window as unknown as { gmatch?: unknown }).gmatch
   })
 
   it('makes the active server one inert current row, never a separate card', async () => {
@@ -197,7 +285,7 @@ describe('ServersView', () => {
       return json({})
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('n')
+    await screen.findByText(OFFICIAL_NODE_NAME)
     // there is no built-in world row any more, and the courier is a
     // directory, not a destination: no row, no transport chip.
     expect(screen.queryByText(/gmatch Node/)).toBeNull()
@@ -216,7 +304,7 @@ describe('ServersView', () => {
     })
     const toast = vi.fn()
     render(<ServersView identity={identity} toast={toast} />)
-    await screen.findByText('n')
+    await screen.findByText(OFFICIAL_NODE_NAME)
     // The dead row is filtered out of the list entirely.
     expect(screen.queryByText('Old Central')).toBeNull()
   })
@@ -450,6 +538,30 @@ describe('ServersView', () => {
     expect(screen.getByLabelText('Search servers')).toHaveValue('')
   })
 
+  it('uses a compact raised search shell and no glass surface on server rows', async () => {
+    mockFetch(async (url) => {
+      if (url.includes('/api/servers/dashboard')) return json({ name: 'n', users: [], posts_24h: 0, members_total: 0 })
+      if (url.includes('/api/servers')) return json({ servers: [
+        { id: 'tech', name: 'Tech Node', description: '', owner_id: 'o', password_required: 0, endpoint_hint: 'tech.example:8790', last_seen: 'x' },
+      ] })
+      return json({})
+    })
+    render(<ServersView identity={identity} toast={() => {}} />)
+    await screen.findByText('Tech Node')
+
+    const search = screen.getByLabelText('Search servers')
+    const shell = Array.from(search.parentElement!.classList)
+    expect(shell).toContain('py-1.5')
+    expect(shell).not.toContain('py-2')
+    for (const token of CHROME.tile.split(' ')) expect(shell).toContain(token)
+    expect(shell.some((c) => c.startsWith('bg-glass-'))).toBe(false)
+    expect(search.className).toContain('placeholder:text-retro-muted')
+
+    // A row sits on the canvas; a hover tint is allowed, a glass surface is not.
+    const row = Array.from(rowOf('Tech Node').classList)
+    expect(row.some((c) => c.startsWith('bg-glass-'))).toBe(false)
+  })
+
   it('search filters the node on this machine too, so nothing matching is honest', async () => {
     ;(window as unknown as { gmatch?: unknown }).gmatch = {
       serverSet: vi.fn(), serverRelaunch: vi.fn(),
@@ -462,15 +574,15 @@ describe('ServersView', () => {
       return json({})
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('This Machine')
+    await screen.findByText(OFFICIAL_NODE_NAME)
 
-    fireEvent.change(screen.getByLabelText('Search servers'), { target: { value: 'machine' } })
-    expect(await screen.findByText('This Machine')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Search servers'), { target: { value: 'central' } })
+    expect(await screen.findByText(OFFICIAL_NODE_NAME)).toBeInTheDocument()
 
     // a query nothing matches empties the list instead of leaving a stale row
     fireEvent.change(screen.getByLabelText('Search servers'), { target: { value: 'zzz' } })
     expect(await screen.findByText(/no servers match/i)).toBeInTheDocument()
-    expect(screen.queryByText('This Machine')).toBeNull()
+    expect(screen.queryByText(OFFICIAL_NODE_NAME)).toBeNull()
     delete (window as unknown as { gmatch?: unknown }).gmatch
   })
 
@@ -481,7 +593,7 @@ describe('ServersView', () => {
       return json({ servers: [] })
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    expect(await screen.findByText('This Machine')).toBeInTheDocument()
+    expect(await screen.findByText(OFFICIAL_NODE_NAME)).toBeInTheDocument()
     expect(screen.queryByText(/no central/i)).toBeNull()
   })
 
@@ -494,7 +606,7 @@ describe('ServersView', () => {
     await waitFor(() => expect(screen.getByText(/directory unreachable/i)).toBeInTheDocument())
     expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument()
     // the list still renders what it knows instead of a blank page
-    expect(screen.getByText('n')).toBeInTheDocument()
+    expect(screen.getByText(OFFICIAL_NODE_NAME)).toBeInTheDocument()
   })
 
   it('central admin door lives behind the directory menu', async () => {
@@ -505,7 +617,7 @@ describe('ServersView', () => {
       return json({})
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('hub')
+    await screen.findByText(OFFICIAL_NODE_NAME)
     // The button no longer pre-gates on node.isAdmin: the user's .exe is the
     // central admin. CentralAdminPanel itself refuses until the PIN unlocks.
     fireEvent.click(screen.getByRole('button', { name: /directory options/i }))
@@ -520,7 +632,7 @@ describe('ServersView', () => {
       return json({})
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('n')
+    await screen.findByText(OFFICIAL_NODE_NAME)
     await openJoinForm()
     expect(screen.getByRole('dialog', { name: /add server/i })).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText(/invite code/i), { target: { value: 'not-a-code' } })
@@ -538,7 +650,7 @@ describe('ServersView', () => {
       return json({})
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('n')
+    await screen.findByText(OFFICIAL_NODE_NAME)
     // with no directory configured, this machine's node is the only row; a
     // label is never a server and adds no list row
     expect(screen.getAllByRole('listitem')).toHaveLength(1)
@@ -690,16 +802,16 @@ describe('ServersView', () => {
       }
       // someone else's listing that happens to carry the default node name
       return json({ servers: [
-        { id: 'aaa', name: 'gmatch', owner_id: 'another-owner', password_required: 0, endpoint_hint: 'http://192.168.5.2:8790', last_seen: '2026-01-01' },
+        { id: 'aaa', name: 'gmatch', owner_id: 'another-owner', password_required: 0, endpoint_hint: 'http://192.168.5.2:8790', last_seen: ago(0.1) },
       ] })
     })
     render(<ServersView identity={identity} toast={() => {}} />)
     // The node on this machine + a directory listing that carries THIS
     // machine's own LAN address are ONE node: one row (the duplicate the
-    // directory merge used to show is gone), and the row is not hidden by
-    // its name — this machine stays findable.
+    // directory merge used to show is gone). The single row is the canonical
+    // official entry — this machine stays findable, not hidden by its name.
     await waitFor(() => expect(screen.getAllByRole('listitem').length).toBe(1))
-    expect(screen.getByText('gmatch')).toBeInTheDocument()
+    expect(screen.getByText(OFFICIAL_NODE_NAME)).toBeInTheDocument()
   })
 
   it('a claim with a LAN address survives the boot migration; a loopback claim does not', async () => {
@@ -712,7 +824,7 @@ describe('ServersView', () => {
       return json({ servers: [] })
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    await waitFor(() => expect(screen.getByText(/my realm/i)).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText(OFFICIAL_NODE_NAME)).toBeInTheDocument())
     // a joinable address keeps the claim: otherwise the listing dies on the
     // next boot and the heartbeat has nothing to replay
     expect(localStorage.getItem('gmatch.server.register')).toBeTruthy()
@@ -857,7 +969,7 @@ describe('ServersView', () => {
       return json({ servers: [] })
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    const activeRow = (await screen.findByLabelText('My Realm, current server')).closest('li')!
+    const activeRow = (await screen.findByLabelText(`${OFFICIAL_NODE_NAME}, current server`)).closest('li')!
     fireEvent.click(within(activeRow).getByRole('button', { name: /more actions/i }))
     fireEvent.click(await within(activeRow).findByText('Server settings'))
     expect(await screen.findByLabelText('Current server tags')).toBeInTheDocument()
@@ -886,7 +998,7 @@ describe('ServersView', () => {
       return json({ servers: [] })
     })
     render(<ServersView identity={identity} toast={() => {}} />)
-    await screen.findByText('My Realm')
+    await screen.findByText(OFFICIAL_NODE_NAME)
     expect(screen.queryByTestId('admin-pin-banner')).toBeNull()
     spy.mockRestore()
     delete (window as unknown as { gmatch?: unknown }).gmatch
@@ -916,7 +1028,7 @@ describe('ServersView', () => {
     expect(screen.queryByRole('button', { name: /manage hub/i })).toBeNull()
     expect(screen.queryByRole('button', { name: /online \(/i })).toBeNull()
 
-    const activeRow = (await screen.findByLabelText('hub, current server')).closest('li')!
+    const activeRow = (await screen.findByLabelText(`${OFFICIAL_NODE_NAME}, current server`)).closest('li')!
     fireEvent.click(within(activeRow).getByRole('button', { name: /more actions/i }))
     fireEvent.click(await within(activeRow).findByText('Open dashboard'))
     // Stacked sections: BobOnline is in Online, CarolRecent in Offline.
@@ -927,6 +1039,25 @@ describe('ServersView', () => {
 
     fireEvent.click(screen.getByText('BobOnline'))
     expect(onSelectUser).toHaveBeenCalledWith(expect.objectContaining({ display_name: 'BobOnline' }))
+    spy.mockRestore()
+  })
+
+  it('derives the hub Online count from the one roster when supplied', async () => {
+    const orbitApi = await import('../../utils/api')
+    const spy = vi.spyOn(orbitApi, 'orbitFetch').mockImplementation(async (endpoint: string) => {
+      if (String(endpoint).includes('/api/servers/dashboard')) {
+        return json({ name: 'hub', users: [], posts_24h: 0, members_total: 1 })
+      }
+      return json({ servers: [] })
+    })
+    stubLocalStorage({ 'gmatch.central.url': 'https://central.test', 'gmatch.api.url': 'http://127.0.0.1:8790' })
+    const roster = { countOnline: vi.fn(() => 2) } as unknown as PeerRoster
+    render(<ServersView identity={identity} toast={() => {}} roster={roster} />)
+    const activeRow = (await screen.findByLabelText(`${OFFICIAL_NODE_NAME}, current server`)).closest('li')!
+    fireEvent.click(within(activeRow).getByRole('button', { name: /more actions/i }))
+    fireEvent.click(await within(activeRow).findByText('Open dashboard'))
+    expect(await screen.findByText(/Online \(2\)/i)).toBeInTheDocument()
+    expect(roster.countOnline).toHaveBeenCalled()
     spy.mockRestore()
   })
 })

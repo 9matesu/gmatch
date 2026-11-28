@@ -77,3 +77,4 @@ apps/api/.env.local
 
 # wrangler staging for the Cloudflare Pages deploy (site/deploy-pages.mjs)
 .pages-stage/
+worker/.wrangler/

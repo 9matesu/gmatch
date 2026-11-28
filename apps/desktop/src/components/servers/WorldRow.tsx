@@ -9,12 +9,12 @@
 //
 // SURFACE + TYPOGRAPHY: the grid slots, status dot and every text step come
 // from ui/tokens. No per-call colour, radius, shadow, text-size or weight.
-import { Loader2, Lock, MoreVertical } from 'lucide-react'
+import { Loader2, Lock, MoreVertical, ShieldCheck } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { serverKey, type DirectoryServer } from './directoryMerge'
 import { worldGlyph, worldTileStyle } from './worldIdentity'
 import {
-  classes, CHROME, COLOR, GAP, ICON, MONO, MOTION, PADDING_X, PADDING_Y,
+  classes, CHROME, COLOR, GAP, ICON, LOGO, MONO, MOTION, PADDING_X, PADDING_Y,
   PRESENCE, RADIUS, SHADOW, STATUS, TRACKING, TRANSITION,
   TYPE, WEIGHT,
 } from '../../ui/tokens'
@@ -30,6 +30,11 @@ export interface WorldRowState {
   counts?: string | null
   /** Secondary line: what the world is, never its address (that owns a column). */
   meta?: string
+  /** Identity is proven (own node, or a signed directory entry). Renders the
+   *  Verified chip. Never set on an unproven row. */
+  verified?: boolean
+  /** This install's own canonical node: renders the game logo as its picture. */
+  official?: boolean
 }
 
 const DOT: Record<NonNullable<WorldRowState['status']>, string> = {
@@ -118,17 +123,20 @@ export function WorldRow({
   const columns = (
     <>
       <span className={classes('flex min-w-0 items-center', GAP[2.5], BROWSER_COLUMNS.server)}>
-        {/* Deterministic glyph so two worlds are recognisable at a glance. It
-            is chrome, never a reachability claim — status is the dot below. */}
+        {/* Deterministic glyph so two worlds are recognisable at a glance. The
+            official own node shows the shipped game logo instead. It is chrome,
+            never a reachability claim — status is the dot below. */}
         <span className="relative shrink-0" aria-hidden>
           <span
             className={classes(
-              'flex size-9 items-center justify-center border',
+              'flex size-9 items-center justify-center overflow-hidden border',
               RADIUS.control, TYPE.sub, WEIGHT.bold, COLOR.fgSoft, SHADOW.inset,
             )}
-            style={worldTileStyle(key)}
+            style={state.official ? undefined : worldTileStyle(key)}
           >
-            {worldGlyph(server.name)}
+            {state.official
+              ? <img src={LOGO.markSrc} alt="" className="size-full object-cover" />
+              : worldGlyph(server.name)}
           </span>
           <span
             className={classes(
@@ -142,6 +150,15 @@ export function WorldRow({
             <span className={classes('truncate', TYPE.sub, WEIGHT.semibold, COLOR.fg, COLOR.hoverAccent, TRANSITION.micro)}>
               {server.name}
             </span>
+            {state.verified && (
+              <span
+                data-testid="verified-chip"
+                title="Verified identity"
+                className={classes('flex shrink-0 items-center uppercase', GAP[1], TYPE.caption, TRACKING.wider, STATUS.success)}
+              >
+                <ShieldCheck className={ICON.sm} aria-hidden /> Verified
+              </span>
+            )}
             {state.kind && (
               <span className={classes('shrink-0 uppercase', TYPE.caption, TRACKING.wider, COLOR.muted)}>{state.kind}</span>
             )}
@@ -187,7 +204,7 @@ export function WorldRow({
   return (
     <li
       className={classes(
-        'group relative flex items-center', PADDING_Y[2.5], PADDING_X[3],
+        'group relative flex items-center', PADDING_Y[2], PADDING_X[3],
         GAP[2], TRANSITION.micro, current ? COLOR.selectionBg : COLOR.hoverW5,
       )}
       aria-current={current || undefined}

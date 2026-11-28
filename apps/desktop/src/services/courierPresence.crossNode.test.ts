@@ -116,6 +116,30 @@ describe('courierPresence across nodes', () => {
     expect(roster.nodeById.size).toBe(0)
   })
 
+  it('a peer on a different node is visible through the shared hosted mailbox', async () => {
+    localStorage.setItem('gmatch.api.url', 'http://node-b.test:8790')
+    const boxes = new Map<string, any[]>()
+    const fetchMock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      const u = String(url)
+      if (u.includes('/api/mail/')) {
+        const base = u.split('/api/mail/')[0]
+        if (init?.method === 'PUT') {
+          boxes.set(base, [...(boxes.get(base) ?? []), JSON.parse(String(init.body)).env])
+          return new Response(JSON.stringify({ ok: true }), { status: 200 })
+        }
+        return new Response(JSON.stringify({ envelopes: boxes.get(base) ?? [] }), { status: 200 })
+      }
+      return new Response(JSON.stringify({ lanUrls: [] }), { status: 200 })
+    })
+    await broadcastPresence(bob, { displayName: 'Bob on node B' }, fetchMock as unknown as typeof globalThis.fetch)
+    const roster = await fetchPresenceRosterFrom(
+      'https://gmatch-rendezvous.mcos-mateus.workers.dev',
+      alice.orbitId,
+      fetchMock as unknown as typeof globalThis.fetch,
+    )
+    expect(roster.users.map((u) => u.id)).toContain(bob.orbitId)
+  })
+
   it('reads the presence mailbox of another node', async () => {
     const getFetch = vi.fn().mockImplementation(async (url: string) => {
       expect(url).toBe(`http://other.test:8790/api/mail/${PRESENCE_TOKEN}`)

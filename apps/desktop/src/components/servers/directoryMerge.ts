@@ -2,6 +2,15 @@ import type { DirectoryServer } from './ServersView'
 
 export type { DirectoryServer }
 
+/** This install's own node is ALWAYS the one canonical, verified official row. */
+export const OFFICIAL_NODE_NAME = 'gMatch Central (Official)'
+
+/** A listing dies after 24h of silence (ADR-002, §Vivacidade). A healthy node
+ *  re-lists every 15min, so a gmatch-branded row older than two beats is a
+ *  ghost from a retired node, not a friend who merely stopped by. */
+const LISTING_TTL_MS = 24 * 60 * 60 * 1000
+const BRAND_FRESH_MS = 2 * 15 * 60 * 1000
+
 /**
  * Wave 2 (D2): nodes teach each other without the hub. After joining node B,
  * the client fetches B's directory (GET /api/servers — same shape as the
@@ -30,6 +39,9 @@ export function mergeDirectory(
   const byId = new Map<string, DirectoryServer>()
   for (const s of cached) byId.set(s.id, s)
   for (const s of fresh) {
+    // Reject dead/impersonating rows at the SOURCE: a fresh directory answer
+    // must never re-seed a row the boot purge removed from the cache.
+    if (isDroppedDirectoryRow(s)) continue
     const prev = byId.get(s.id)
     // newest last_seen wins; fresh entries with no hint don't erase a known one
     if (!prev || (s.last_seen || '') >= (prev.last_seen || '')) {
@@ -79,11 +91,46 @@ export function dedupeServers(list: DirectoryServer[]): DirectoryServer[] {
   return [...byKey.values()]
 }
 
+function lastSeenAt(s: DirectoryServer): number {
+  if (!s.last_seen) return NaN
+  const raw = s.last_seen
+  // Same lenient ISO reading as formatRelativeTime; an unparseable stamp is
+  // UNKNOWN, never stale (fixtures and old nodes both carry bare strings).
+  const iso = !raw.endsWith('Z') && !raw.includes('+')
+    ? (raw.includes('T') ? `${raw}Z` : `${raw.replace(' ', 'T')}Z`)
+    : raw
+  const t = new Date(iso).getTime()
+  return Number.isFinite(t) && t > 0 ? t : NaN
+}
+
+/**
+ * A row that is NOT a destination and must never reach the list: retired
+ * synthetic `central-*` rows, the legacy nameless "gmatch" placeholder, any
+ * listing past the 24h TTL, a remote row claiming the canonical official
+ * identity, and a gmatch-branded row whose owner stopped heartbeating. One
+ * predicate for the boot purge, the cache read, the merge and the render —
+ * a stale mirror cannot resurrect a row a name filter later has to hide.
+ * A self row is this machine's own node; an unknown timestamp is kept.
+ */
+export function isDroppedDirectoryRow(s: DirectoryServer, now = Date.now()): boolean {
+  if (s.id.startsWith('central-')) return true
+  if (s.name.trim().toLowerCase() === 'gmatch' && !s.endpoint_hint?.trim()) return true
+  if (s.id.startsWith('self:')) return false
+  const name = s.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+  if (name === 'gmatch central official') return true
+  const seen = lastSeenAt(s)
+  if (!Number.isFinite(seen)) return false
+  const brand = name === 'gmatch' || name === 'gmatch central'
+  return now - seen > (brand ? BRAND_FRESH_MS : LISTING_TTL_MS)
+}
+
 export function readDirectoryCache(base?: string | null): DirectoryServer[] {
   try {
     const raw = localStorage.getItem(directoryCacheKey(base))
     const parsed = raw ? JSON.parse(raw) : []
-    return Array.isArray(parsed) ? parsed : []
+    // Purge on READ too: a caller that never boots the Servers view (or a
+    // cached reply served while the directory is down) still sees no ghosts.
+    return Array.isArray(parsed) ? parsed.filter((s) => !isDroppedDirectoryRow(s)) : []
   } catch {
     return []
   }

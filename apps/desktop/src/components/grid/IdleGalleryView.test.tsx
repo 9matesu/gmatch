@@ -678,7 +678,7 @@ describe('IdleGalleryView', () => {
     }
   })
 
-  it('labels a vault-held keepsake as permanent, never as a cached tile', () => {
+  it('does not print a Permanent label on a vault-held keepsake, nor call it uncached', () => {
     const img: GalleryImage = {
       id: 'k-permanent', url: 'https://example.com/p.jpg', tags: ['t'], rarityBase: 1,
       clicks: 0, rarity: 'Common', boughtAt: 1, kind: 'image',
@@ -686,7 +686,7 @@ describe('IdleGalleryView', () => {
     }
     useGame.setState({ gallery: [img] })
     render(<IdleGalleryView />)
-    expect(screen.getByTitle(/Saved permanently in the local vault/i)).toBeTruthy()
+    expect(screen.queryByTitle(/Saved permanently in the local vault/i)).toBeNull()
     expect(screen.queryByText(/Not cached/i)).toBeNull()
   })
 

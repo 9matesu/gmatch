@@ -867,23 +867,41 @@ with names and thresholds deliberately distinct from the achievements.
   (`srflx`/`prflx`) candidates are exchanged, so peers on different NATs
   hole-punch into a direct DataChannel. A peer necessarily learns the
   address it connects to; Cloudflare learns nothing but an anonymous query.
-- **A baked public TURN works out of the box.** `defaultTurn()` supplies
-  `turn:openrelay.metered.ca:80` with shared `openrelayproject` credentials as a
-  CANDIDATE alongside Cloudflare STUN, so cross-NAT pairs connect in packaged
-  builds with no injected env. It does NOT force `iceTransportPolicy: 'relay'`:
-  direct/srflx paths still win, a relay outage cannot take P2P down, and the
-  literal-LAN-IP sanitization is unchanged. Third-party and rate-limited — a
-  best-effort fallback, not a guarantee.
+- **Global IPv6 is a first-class direct path.** Host candidates in `2000::/3`
+  are signaled; ULA (`fc00::/7`), link-local (`fe80::/10`) and loopback stay
+  hidden. Two IPv6-capable peers behind CGNAT connect directly with no relay —
+  the decentralized fix. A symmetric-NAT IPv4-only pair still needs a TURN or
+  the node relay; no free anonymous TURN is bundled (Cloudflare TURN needs a
+  card, and the old public relay is globally 401/blackholed).
+- **Presence is published even from a hidden window.** The 60s heartbeat skips
+  only the local BroadcastChannel/WS swarm noise when `document.hidden`; the
+  signed hosted beacon still goes out, because the mailbox TTL is 90s and a
+  backgrounded app is still online. Without this, a two-window setup decayed to
+  `Seen Nm ago` after ~90s.
+- **A full node dials a cross-node peer.** A packaged/dev full node's own WS
+  reaches only peers on THAT node. When a signed presence beacon names a
+  DIFFERENT node, the roster starts ONE bounded direct mesh attempt (the same
+  transport registry/backoff as courier mode); media bytes then flow over the
+  direct DataChannel or the node/relay fallback. A same-node peer keeps the
+  local relay and gets no dial.
+- **A baked public TURN is not bundled (2026-11-27).** The former
+  `turn:openrelay.metered.ca:80` candidate resolved to `192.0.2.1` (TEST-NET)
+  and the shared `openrelayproject` account now answers 401 everywhere measured;
+  `turn.cloudflare.com` requires an account token. Shipping either as "free"
+  would be a fabrication, so `defaultIceConfig()` is STUN-only by default.
+  Direct/srflx paths still win and the literal-LAN-IP sanitization is unchanged.
 - Literal-IP `host` candidates NEVER leave the machine (mDNS `.local` hosts
   only) — the LAN stays private. Unknown shapes fail closed. The signal
   server re-validates every posted candidate (defense in depth against a
   malicious peer) and 400s raw-IP `host` ones.
 - TURN from Settings (`gmatch.turn.v1`) or env (`NEXT_PUBLIC_TURN_URL/
-  USERNAME/CREDENTIAL`, with `VITE_TURN_*` aliases) WINS over the baked default
-  and flips the config to `iceTransportPolicy: 'relay'` — fully relayed
-  connections, zero IP exposure, for users who choose that posture.
-- Symmetric-NAT pairs (which STUN cannot traverse) fall back to the baked TURN
-  relay or the sealed WS-relay swarm; the UI reports the real path.
+  USERNAME/CREDENTIAL`, with `VITE_TURN_*` aliases) is the ONLY relay config and
+  flips the config to `iceTransportPolicy: 'relay'` — fully relayed connections,
+  zero IP exposure, for users who choose that posture. A free provider signup is
+  needed; none is bundled or claimed as default.
+- Symmetric-NAT pairs (which STUN cannot traverse) fall back to an explicitly
+  configured TURN or the sealed node-relay/rendezvous swarm; the UI reports the
+  real path, never an invented direct one.
 - Wave 2 (masks): peers address each other ONLY through delivery tokens
   rendered as `gmatch://node/...` codes (`utils/nodeMask.ts`); tokens
   rotate per boot (`utils/handleRotation.ts`, epoch travels sealed inside
@@ -1379,21 +1397,37 @@ what it lives in.
   hidden. A 503 from the release host is the free-tier dyno waking up — an
   error to retry, not a missing release.
 
-### 12b. No hosted WORLD and no hosted RENDEZVOUS — the node is both
+### 12b. No hosted WORLD — but a free hosted RENDEZVOUS (2026-11-27)
 
-**Decision (2026-11-26).** Two earlier attempts split the difference and each
-left a Cloudflare dependency behind. This settles it: **nothing hosted holds app
-state, and nothing hosted relays for the app.**
+**Decision.** Nothing hosted ever holds app state. The earlier rule ("the node
+you are on is the rendezvous") failed when no peer's node was reachable, so a
+free, always-on, zero-knowledge Worker is the meeting point again. World data
+still lives only on each install's node.
 
 - **No hosted world.** No third party stores a profile, a post, a like, a
   presence row or a media byte. Each install keeps its own node, and media never
   leaves the peers.
-- **No hosted rendezvous either.** The node a client is connected to **is** the
-  directory and the sealed-mail relay for its clients: it serves
-  `PUT/GET /api/mail/:token` (TTL 120 s), `GET/POST /api/servers` and
-  `GET /api/health`, and it gossips the directory to the nodes that know it
-  (§10d, wave 2). `gmatch.central.url` defaults to **none**
-  (`utils/central.ts`): the app runs from the node you are on.
+- **A hosted rendezvous, blind by construction.** `worker/` is one free
+  Cloudflare Worker (`gmatch-rendezvous`) plus ONE free Durable Object
+  (SQLite-backed; no KV — a 60s presence heartbeat exhausts the free KV write
+  budget). It serves
+  `PUT/GET/DELETE /api/mail/:token` (sealed ciphertext, TTL ≈120 s) and
+  `GET/POST /api/servers` (self-declared directory metadata, TTL 24 h) over the
+  SAME wire the node's courier speaks — no second protocol. Signed presence
+  beacons and signed social operations (`post.create`, `profile.update`, …) are
+  published to public mailbox tokens and re-verified by the existing authorizer
+  on the receiving client; the Worker stores only base64 bytes and cannot read
+  or authenticate them. It holds no
+  message bodies, media, profiles or signatures: `sealed` is stored verbatim,
+  directory rows carry `owner_id: ''`, and `pubkey`/`sig`/`epoch` are ignored.
+  There is no WebSocket on the free Worker: `MailClient`'s existing 20 s
+  mailbox polling is the honest fallback. `gmatch.central.url` /
+  `VITE_CENTRAL_URL` still override this default; `none`/`off`/`0` opts out.
+- **The node is a rendezvous too.** The node a client is connected to still
+  serves `PUT/GET /api/mail/:token`, `GET/POST /api/servers` and
+  `GET /api/health` for its clients, and still gossips the directory to the
+  nodes that know it (§10d, wave 2). The hosted mailbox is an extra meeting
+  point, never a replacement for the local node.
 - **The Pages origin is a STATIC release page.** gmatch 2.0 removed the
   D1-backed courier; gmatch 2.1 reintroduced a Cloudflare-KV one
   (`site/functions/`) and pointed every install at it. That too is gone
@@ -1401,14 +1435,16 @@ state, and nothing hosted relays for the app.**
   publish a function, and `/api/*` on that origin returns the page. A client
   that still carries a pointer to it **drops** it (`isRetiredRendezvous` in
   `central.ts`, `isCourierApiUrl` in `api.ts`) instead of dialing a service
-  that no longer exists.
-- **A shared hub is opt-in** (`gmatch.central.url` / `VITE_CENTRAL_URL` → a node
-  you run), only to bridge two networks that cannot reach each other.
-  `none`/`off`/`0` is the default state.
-- **Why it is free and scalable:** a static page is CDN-cached and costs
-  nothing at any population; discovery and mail ride the nodes the peers
-  already run plus the public WebTorrent trackers (§10d). There is no account,
-  no quota and no bill that grows with users.
+  that no longer exists. The new Worker is a different origin.
+- **Why it is free and scalable:** a static page is CDN-cached and one Worker
+  only moves bounded ciphertext/metadata on the free tier; nothing is billed
+  per user, there is no account, and no media or world row ever touches it.
+- **Honest boundary.** The hosted mailbox/directory guarantees a meeting point
+  for sealed mail and discovery when no peer's node is reachable; it does NOT
+  turn a symmetric-NAT pair into a direct WebRTC channel. An explicitly
+  configured TURN and the node's `SWARM_FRAME` relay remain the transport
+  fallback.
+  A mailbox is a ~2-minute best-effort window, not a durable log or a receipt.
 - **A node without a WebSocket is still reachable, and no host is
   special-cased.** `MailClient` opens one watch socket per mailbox base and
   falls back to polling that box (every 20 s) only after a socket dies **twice

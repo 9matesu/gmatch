@@ -9,7 +9,7 @@ import { playPress } from '../utils/sounds';
 import { formatCount } from '../ui/format';
 import { Button, PageHeader, Input, Select, FeedbackState } from '../ui/kit';
 import {
-  classes, CHROME, COLOR, FEEDBACK, FIELD, GAP, ICON, MONO, MOTION, PADDING, PADDING_X,
+  classes, CHROME, COLOR, FEEDBACK, GAP, ICON, MONO, MOTION, PADDING, PADDING_X,
   PADDING_Y, RADIUS, RECIPE, STATUS, TRACKING, TYPE, WEIGHT,
 } from '../ui/tokens';
 import type { CanonicalCard } from '../utils/cardCollection';
@@ -35,6 +35,13 @@ import {
   type StoreCategory, type StoreMarketListing, type StoreProduct, type StoreSort,
 } from './store/storeCatalog';
 
+/** One compact, single-line search shell — the chat search's py-1.5 height,
+ *  with the field's own fg/placeholder roles. No glass tier, no tall block. */
+const SEARCH_SHELL = classes(
+  RADIUS.control, 'border', COLOR.edge, COLOR.canvasSurface,
+  PADDING_X[2.5], PADDING_Y[1.5], 'flex items-center', GAP[2], TYPE.body, COLOR.fg,
+);
+
 interface IdentityLike {
   orbitId: string;
   publicKeyHex: string;
@@ -50,7 +57,7 @@ function RecentChip({ product, identity, onClick }: { product: StoreProduct; ide
       onClick={onClick}
       title={product.name}
       className={classes(
-        RECIPE.card, 'shrink-0 w-16 overflow-hidden cursor-pointer',
+        CHROME.tile, 'shrink-0 w-16 overflow-hidden cursor-pointer',
         MOTION.transition.quick, COLOR.hoverEdgeStrong,
       )}
     >
@@ -426,7 +433,7 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
   const canAffordProduct = (p: StoreProduct) => p.price != null && points >= p.price;
 
   return (
-    <div className="w-full space-y-4 font-sans select-none text-retro-fg">
+    <div className="w-full space-y-3 font-sans select-none text-retro-fg">
       {!arsenalOnly && (
       <>
       {/* Header: one title, one number. The balance is the datum, so it sits
@@ -448,113 +455,130 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
         }
       />
 
-      {/* Wallet strip: portfolio value + the SAME set cash-out-all pays. */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className={CHROME.statTile}>
+      {/* Wallet bar: one dense, opaque plate. Portfolio value + the SAME set
+          cash-out-all pays, side by side with a hairline divider. The balance
+          is the datum, so it lives here instead of in a tall dashboard card. */}
+      <section className={classes(CHROME.tile, 'grid grid-cols-1 sm:grid-cols-2', GAP[0])}>
+        <div className={classes(PADDING_X[3], PADDING_Y[2.5], 'min-w-0')}>
           <div className={classes('flex items-center', GAP[1.5], COLOR.muted, TYPE.caption, WEIGHT.semibold, 'uppercase', TRACKING.wider)}>
             <Layers className={ICON.sm} />
             Portfolio Value
           </div>
-          <div className={classes('mt-1', TYPE.title, WEIGHT.bold, MONO, 'tabular-nums', COLOR.fg)}>{formatGc(portfolioValue)}</div>
-          <div className={classes(TYPE.caption, COLOR.muted, 'mt-0.5')}>{portfolio.length} card{portfolio.length === 1 ? '' : 's'}</div>
+          <div className={classes('mt-0.5 flex items-baseline', GAP[2])}>
+            <span className={classes(TYPE.title, WEIGHT.bold, MONO, 'tabular-nums', COLOR.fg)}>{formatGc(portfolioValue)}</span>
+            <span className={classes(TYPE.caption, COLOR.muted)}>{portfolio.length} card{portfolio.length === 1 ? '' : 's'}</span>
+          </div>
         </div>
 
-        <div className={classes(CHROME.statTile, STATUS.warningEdgeSoft)}>
-          <div className={classes('flex items-center', GAP[1.5], STATUS.warning, TYPE.caption, WEIGHT.semibold, 'uppercase', TRACKING.wider)}>
-            <Sparkles className={ICON.sm} />
-            Cashout Value
+        <div className={classes(PADDING_X[3], PADDING_Y[2.5], 'min-w-0', 'border-t sm:border-t-0 sm:border-l', COLOR.edgeSubtle)}>
+          <div className={classes('flex items-start justify-between', GAP[2])}>
+            <div className="min-w-0">
+              <div className={classes('flex items-center', GAP[1.5], STATUS.warning, TYPE.caption, WEIGHT.semibold, 'uppercase', TRACKING.wider)}>
+                <Sparkles className={ICON.sm} />
+                Cashout Value
+              </div>
+              <div className={classes('mt-0.5', TYPE.title, WEIGHT.bold, MONO, 'tabular-nums', STATUS.warning)}>{formatGc(cashoutEstimate)}</div>
+            </div>
+            <span className={classes(TYPE.caption, COLOR.muted, MONO, 'tabular-nums', 'shrink-0')}>{(cashoutRate / 100).toFixed(1)}%</span>
           </div>
-          <div className={classes('mt-1', TYPE.title, WEIGHT.bold, MONO, 'tabular-nums', STATUS.warning)}>{formatGc(cashoutEstimate)}</div>
-          <div className={classes(TYPE.caption, COLOR.muted, 'mt-0.5')}>{(cashoutRate / 100).toFixed(1)}% rate</div>
+          <div className="mt-1.5 flex items-center justify-between gap-2">
+            <span className={classes(TYPE.caption, COLOR.muted)}>
+              {cashableCount} cashable{skippedCount > 0 ? ` · ${skippedCount} listed skipped` : ''}
+            </span>
+            {!cashingOutAll && !confirmCashoutAll && (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  playPress(780);
+                  setConfirmCashoutAll(true);
+                }}
+                disabled={cashableCount === 0}
+                className={classes('flex items-center', GAP[1.5], STATUS.warning)}
+              >
+                <Coins className={ICON.sm} />
+                Cash Out All
+              </Button>
+            )}
+          </div>
 
           {cashingOutAll && cashoutProgress ? (
-            <div className={classes('mt-2.5 flex items-center', GAP[2], TYPE.body, STATUS.warning, WEIGHT.medium)}>
+            <div className={classes('mt-2 flex items-center', GAP[2], TYPE.body, STATUS.warning, WEIGHT.medium)}>
               <span className={RECIPE.spinner} />
               Cashing out {cashoutProgress.done}/{cashoutProgress.total}...
             </div>
           ) : confirmCashoutAll ? (
-            <div className={classes('mt-2.5 space-y-2')}>
-              <p className={classes(TYPE.body, COLOR.body, WEIGHT.medium)}>
+            <div className={classes('mt-2 flex flex-wrap items-center', GAP[2])}>
+              <span className={classes(TYPE.caption, COLOR.body)}>
                 Cash out {cashableCount} card{cashableCount === 1 ? '' : 's'} for ~{formatGc(cashoutEstimate)}?
-                {skippedCount > 0 && (
-                  <span className={COLOR.muted}> ({skippedCount} listed skipped)</span>
-                )}
-              </p>
+              </span>
               <div className={classes('flex items-center', GAP[1.5])}>
-                <Button type="button" variant="secondary" onClick={() => void handleCashOutAll()}>
+                <Button type="button" variant="secondary" size="sm" onClick={() => void handleCashOutAll()}>
                   Confirm
                 </Button>
-                <Button type="button" variant="ghost" onClick={() => setConfirmCashoutAll(false)}>
+                <Button type="button" variant="ghost" size="sm" onClick={() => setConfirmCashoutAll(false)}>
                   Cancel
                 </Button>
               </div>
             </div>
-          ) : (
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => {
-                playPress(780);
-                setConfirmCashoutAll(true);
-              }}
-              disabled={cashableCount === 0}
-              className={classes('mt-2.5 w-full', 'flex items-center justify-center', GAP[1.5], STATUS.warning)}
-            >
-              <Coins className={ICON.sm} />
-              Cash Out All
-            </Button>
-          )}
+          ) : null}
         </div>
       </section>
 
-      {/* Toolbar: one search field, one sort select. */}
-      <section className={classes('flex flex-col sm:flex-row sm:items-center', GAP[2])}>
-        <div className={classes(FIELD.shell, 'flex flex-1 items-center', GAP[2])}>
-          <Search className={classes(ICON.sm, COLOR.muted)} aria-hidden />
-          <Input
-            bare
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search cards, tags, gear..."
-            aria-label="Search the store"
-          />
+      {/* Toolbar rail: search + sort + category chips on ONE dense row that
+          wraps. The chips ARE the category filter, so there is no second
+          heading repeating "Shop". */}
+      <section className={classes(CHROME.tile, PADDING[2.5], 'flex flex-col gap-2.5')}>
+        <div className={classes('flex flex-col sm:flex-row sm:items-center', GAP[2])}>
+          <div className={classes(SEARCH_SHELL, 'flex-1')}>
+            <Search className={classes(ICON.sm, COLOR.muted)} aria-hidden />
+            <Input
+              bare
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search cards, tags, gear..."
+              aria-label="Search the store"
+            />
+          </div>
+          <Select value={sort} onChange={(e) => setSort(e.target.value as StoreSort)} aria-label="Sort products">
+            {STORE_SORTS.map((s) => (
+              <option key={s.id} value={s.id}>{s.label}</option>
+            ))}
+          </Select>
         </div>
-        <Select value={sort} onChange={(e) => setSort(e.target.value as StoreSort)} aria-label="Sort products">
-          {STORE_SORTS.map((s) => (
-            <option key={s.id} value={s.id}>{s.label}</option>
-          ))}
-        </Select>
+        <div className={classes('flex flex-wrap items-center', GAP[1.5])}>
+          {STORE_CATEGORIES.map((c) => {
+            const active = category === c.id;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setCategory(c.id)}
+                className={classes(
+                  RADIUS.chip, PADDING_X[2.5], PADDING_Y[1], TYPE.body, WEIGHT.semibold,
+                  'border cursor-pointer', MOTION.transition.micro,
+                  active ? classes(COLOR.accentBg, COLOR.onAccent, COLOR.accentEdge) : classes(COLOR.glassW8, COLOR.edge, COLOR.muted, COLOR.hoverFg),
+                )}
+              >
+                {c.label}
+                <span className={classes('ml-1.5', MONO, 'tabular-nums', active ? undefined : COLOR.faint)}>
+                  {categoryCounts[c.id] ?? 0}
+                </span>
+              </button>
+            );
+          })}
+          <span className={classes('ml-auto', TYPE.caption, COLOR.muted, MONO, 'tabular-nums')}>
+            {visible.length} item{visible.length === 1 ? '' : 's'}
+          </span>
+        </div>
       </section>
-
-      {/* Category chips — the shop's rail. Each chip states its real count. */}
-      <div className={classes('flex flex-wrap', GAP[2])}>
-        {STORE_CATEGORIES.map((c) => {
-          const active = category === c.id;
-          return (
-            <button
-              key={c.id}
-              type="button"
-              aria-pressed={active}
-              onClick={() => setCategory(c.id)}
-              className={classes(
-                RADIUS.chip, PADDING_X[3], PADDING_Y[1.5], TYPE.body, WEIGHT.semibold,
-                'border cursor-pointer', MOTION.transition.micro,
-                active ? classes(COLOR.accentBg, COLOR.onAccent, COLOR.accentEdge) : classes(COLOR.glassW8, COLOR.edge, COLOR.muted, COLOR.hoverFg),
-              )}
-            >
-              {c.label}
-              <span className={classes('ml-1.5', MONO, 'tabular-nums', active ? undefined : COLOR.faint)}>
-                {categoryCounts[c.id] ?? 0}
-              </span>
-            </button>
-          );
-        })}
-      </div>
 
       {/* Recently viewed — local-only, per identity. */}
       {recentProducts.length > 0 && (
-        <section className="space-y-2">
+        <section className="space-y-1.5">
           <h3 className={classes(CHROME.sectionLabel)}>Recently viewed</h3>
           <div className={classes('flex overflow-x-auto pb-1', GAP[2])}>
             {recentProducts.map((p) => (
@@ -564,12 +588,8 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
         </section>
       )}
 
-      {/* The shop floor. */}
-      <section className="space-y-3">
-        <div className={classes('flex items-center justify-between', GAP[2])}>
-          <h3 className={classes(CHROME.sectionLabel)}>Shop</h3>
-          <span className={classes(TYPE.caption, COLOR.muted)}>{visible.length} item{visible.length === 1 ? '' : 's'}</span>
-        </div>
+      {/* The shop floor: one dense, aligned tile grid. */}
+      <section>
         {visible.length === 0 ? (
           <FeedbackState
             icon={<ShoppingBag className={FEEDBACK.icon} />}
@@ -577,7 +597,10 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
             description={products.length === 0 ? 'Gear, community listings and your cards show up here.' : 'Try another search or category.'}
           />
         ) : (
-          <div className={classes('grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5', GAP[3])}>
+          <div
+            data-testid="store-grid"
+            className={classes('grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5', GAP[2.5], 'items-stretch')}
+          >
             {visible.map((p) => (
               <ProductTile
                 key={p.key}
@@ -602,9 +625,9 @@ export function StoreTab({ points, onPurchase, onDeployHack, identity, onOpenCar
         const owned = storeItems.filter((item) => (inventory[item.id] || 0) > 0);
         if (owned.length === 0) return null;
         return (
-          <section className={CHROME.statTile}>
-            <h3 className={classes(CHROME.sectionLabel, 'mb-3')}>Inventory</h3>
-            <div className={classes('space-y-1.5')}>
+          <section className={classes(CHROME.tile, PADDING[3])}>
+            <h3 className={classes(CHROME.sectionLabel, 'mb-2')}>Inventory</h3>
+            <div className={classes('grid grid-cols-1 sm:grid-cols-2', GAP[1.5])}>
               {owned.map((item) => (
                 <div key={item.id} className={classes(CHROME.rowTile, 'flex items-center', GAP[2.5])}>
                   <span className={classes('min-w-0 flex-1 truncate', TYPE.body, COLOR.body)}>{item.name}</span>

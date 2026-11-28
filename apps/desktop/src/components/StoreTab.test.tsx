@@ -3,6 +3,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import type { ReactNode } from 'react'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import * as api from '../utils/api'
+import { CHROME } from '../ui/tokens'
 import { StoreTab } from './StoreTab'
 
 vi.mock('./ObjectImage', () => ({ ObjectImage: () => null }))
@@ -253,6 +254,54 @@ describe('StoreTab shop floor', () => {
     expect(screen.getByText('Recently viewed')).toBeTruthy()
     // The sheet carries the honest buy price.
     expect(screen.getByRole('button', { name: 'Buy for g$ 500' })).toBeTruthy()
+  })
+
+  it('lays the shop out as one dense, aligned tile grid (density contract)', async () => {
+    vi.spyOn(api, 'orbitFetch').mockImplementation(
+      mockApi(
+        [{ ...marketCard(), id: 'card-x', name: 'X', marketStatus: 'none', ownerId: 'me-1' }],
+        [{ listingId: 'l1', cardId: 'card-9', price: 500, sellerId: 'seller-1', card: marketCard() }],
+        [gearItem],
+      ) as never,
+    )
+
+    render(<StoreTab points={5000} identity={identity} />)
+    await waitFor(() => expect(screen.getByText('Rare Find')).toBeTruthy())
+
+    const grid = screen.getByTestId('store-grid')
+    // A real CSS grid with equal columns (aligned tiles), never a flex sprawl.
+    expect(grid.className).toMatch(/\bgrid\b/)
+    expect(grid.className).toMatch(/grid-cols-/)
+    // No horizontal overflow: the grid never forces a min-width wider than its track.
+    expect(grid.className).not.toMatch(/min-w-\[/)
+    // Tiles stretch to equal height so the footer actions line up.
+    expect(grid.className).toMatch(/items-stretch/)
+  })
+
+  it('uses the raised card recipe on products and a compact, non-glass search', async () => {
+    vi.spyOn(api, 'orbitFetch').mockImplementation(
+      mockApi([], [{ listingId: 'l1', cardId: 'card-9', price: 500, sellerId: 'seller-1', card: marketCard() }]) as never,
+    )
+
+    render(<StoreTab points={100} identity={identity} />)
+    await waitFor(() => expect(screen.getByText('Rare Find')).toBeTruthy())
+
+    // Search is one compact line (chat's py-1.5), with readable placeholder.
+    const search = screen.getByLabelText('Search the store')
+    const shell = Array.from(search.parentElement!.classList)
+    expect(shell).toContain('py-1.5')
+    expect(shell).not.toContain('py-2')
+    expect(shell.some((c) => c.startsWith('bg-glass-'))).toBe(false)
+    expect(search.className).toContain('placeholder:text-retro-muted')
+
+    // One card recipe, reused: the raised plate, never a translucent glass tier.
+    const tiles = screen.getByTestId('store-grid').querySelectorAll('article')
+    expect(tiles.length).toBeGreaterThan(0)
+    for (const tile of tiles) {
+      const card = Array.from(tile.classList)
+      for (const token of CHROME.tile.split(' ')) expect(card).toContain(token)
+      expect(card.some((c) => c.startsWith('bg-glass-'))).toBe(false)
+    }
   })
 
   it('reports an honest network error when a market buy cannot reach the node', async () => {

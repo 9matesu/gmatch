@@ -264,9 +264,12 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
       if (!targetsRes.ok) throw new Error(`targets ${targetsRes.status}`);
       const data = await targetsRes.json();
       const rawList = Array.isArray(data.targets) ? data.targets : [];
+      // Offer only players a send would actually reach and be accepted from:
+      // the trigger gate requires Domination enabled AND last_seen < 10 min,
+      // so stale/offline/disabled rows are never pickable.
       const list: DominationTarget[] = rawList.filter((t: DominationTarget) => {
         const name = (t.displayName || '').trim();
-        return Boolean(name) && !isDefaultPeerName(name);
+        return Boolean(name) && !isDefaultPeerName(name) && t.enabled === true && t.online === true;
       });
       setTargets(list);
       setSelectedTarget((prev) => {
@@ -489,13 +492,13 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
   };
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-4 px-3 py-6 font-sans select-none sm:px-6">
+    <div className="mx-auto w-full max-w-5xl space-y-3 px-3 py-5 font-sans select-none sm:px-6">
       {/* ONE title at the top of the scale; the receiving state is its only action. */}
       <PageHeader
         title="PC Domination"
-        meta="Send effects, manage consent, and run hacks."
+        meta="Free to send · consent-gated · every action reports its real result."
         action={
-          <div className="flex flex-wrap items-center justify-end gap-2 rounded-lg glass-panel px-3 py-2">
+          <div className={cn('flex flex-wrap items-center justify-end gap-2 rounded-lg px-3 py-2', COLOR.surfaceRaised, 'border', COLOR.edge)}>
             <Radio
               className={cn('size-3.5', receiving && !paused ? STATUS.success : COLOR.muted)}
               aria-hidden="true"
@@ -533,10 +536,10 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
         />
       </div>
 
-      <div className="p-4">
+      <div className="p-3.5">
       {subtab === 'send' && (
       <section aria-label="Send">
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-5">
           {/* Targets: one list, one status chip per row, equal padding. */}
           <Card className="flex flex-col overflow-hidden lg:col-span-2" tone="raised">
             <CardHeader
@@ -554,7 +557,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                 </Button>
               }
             />
-            <div className="border-b border-edge-subtle p-3">
+            <div className="border-b border-edge-subtle p-2.5">
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -562,7 +565,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                 aria-label="Search players"
               />
             </div>
-            <div className="styled-scrollbar max-h-[420px] overflow-y-auto">
+            <div className="styled-scrollbar max-h-[360px] overflow-y-auto">
               {targetsState === 'loading' && targets.length === 0 && (
                 <FeedbackState state="loading" compact title="Loading players…" />
               )}
@@ -584,7 +587,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                   state="empty"
                   compact
                   icon={<WifiOff className={FEEDBACK.icon} aria-hidden="true" />}
-                  title={search ? 'No player matches that name.' : 'Nobody has Domination switched on yet.'}
+                  title={search ? 'No online player matches that name.' : 'Nobody is online with Domination enabled right now.'}
                   action={!search ? (
                     <Button variant="primary" size="sm" onClick={() => setSubtab('consent')}>
                       Set up my consent
@@ -601,7 +604,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                     type="button"
                     onClick={() => setSelectedTarget(t)}
                     className={cn(
-                      'flex w-full items-center gap-3 border-b border-edge-subtle px-4 py-3 text-left transition-colors',
+                      'flex w-full items-center gap-2.5 border-b border-edge-subtle px-3 py-2 text-left transition-colors',
                       isSel ? 'glass-nav-active' : 'hover:bg-glass-w10',
                     )}
                   >
@@ -624,7 +627,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
           </Card>
 
           {/* Effects: every card is the same shape — label, icon, what it does. */}
-          <div className="space-y-3 lg:col-span-3">
+          <div className="space-y-2.5 lg:col-span-3">
             {!selectedTarget ? (
               <FeedbackState
                 state="empty"
@@ -634,7 +637,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
               />
             ) : (
               <>
-                <div className="rounded-lg glass-panel px-4 py-2.5">
+                <div className={cn('rounded-lg px-3.5 py-2', COLOR.surfaceRaised, 'border', COLOR.edge)}>
                   <Title>
                     Effects for <span className="font-semibold">{selectedTarget.displayName}</span>
                   </Title>
@@ -660,7 +663,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                     </div>
                   )
                 })()}
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                   {ACTION_ORDER.map((action) => {
                     const { label, icon: Icon, consent, description } = ACTION_LABELS[action];
                     const allowed = Boolean(selectedTarget.consents?.[consent]);
@@ -680,7 +683,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
                         }
                         className={cn(
                           BUTTON_CONTRACT,
-                          'flex min-h-24 w-full flex-col items-stretch justify-start gap-3 border p-4 text-left',
+                          'flex min-h-20 w-full flex-col items-stretch justify-start gap-2 border p-3 text-left',
                           COLOR.surfaceRaised,
                           sending === action
                             ? 'cursor-wait border-retro-accent'
@@ -714,8 +717,8 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
 
       {subtab === 'consent' && (
       <section id="pc-dom-consent" aria-label="My consent">
-        <div className="space-y-4">
-          <Card className="space-y-3 p-4">
+        <div className="space-y-3">
+          <Card className={cn('space-y-2.5 p-3.5', COLOR.surfaceRaised)}>
             <Title className="flex items-center gap-1.5">
               <Zap className="size-3.5 text-retro-muted" aria-hidden="true" /> Preset
             </Title>
@@ -747,7 +750,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
               {CONSENT_ROWS.map(({ key, label }) => {
                 const value = Boolean((settings as any)[key]);
                 return (
-                  <div key={key} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-glass-w10">
+                  <div key={key} className="flex items-center gap-3 px-3.5 py-2.5 transition-colors hover:bg-glass-w10">
                     <Switch
                       checked={value}
                       label={label}
@@ -816,7 +819,7 @@ export function PCDominationTab({ identity, allUsers, profilePics, points, toast
               const summary = payloadSummary(action.action, typeof action.payload === 'string' ? (() => { try { return JSON.parse(action.payload); } catch { return null; } })() : action.payload);
               const other = historyPane === 'outgoing' ? action.victim_name : action.dominator_name;
               return (
-                <div key={action.id} className={cn(CHROME.rowTile, 'gap-3 px-4 py-3')}>
+                <div key={action.id} className={cn(CHROME.rowTile, 'gap-2.5 px-3.5 py-2')}>
                   <Icon className="size-4 shrink-0 text-retro-muted" aria-hidden="true" />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-xs font-medium text-retro-fg">

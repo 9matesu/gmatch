@@ -1,0 +1,14 @@
+name = "gmatch-rendezvous"
+main = "src/index.ts"
+compatibility_date = "2026-11-27"
+workers_dev = true
+
+# One free Durable Object (SQLite-backed) holds sealed mail + the directory.
+# No KV namespace: a 60s presence heartbeat exhausts the free KV write budget.
+[[durable_objects.bindings]]
+name = "RENDEZVOUS_DO"
+class_name = "RendezvousDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RendezvousDO"]

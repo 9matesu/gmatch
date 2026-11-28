@@ -4,8 +4,8 @@
 
 const PUBLIC_WEBTORRENT_TRACKERS = [
   'wss://tracker.openwebtorrent.com',
-  'wss://tracker.btorrent.xyz',
   'wss://tracker.webtorrent.dev',
+  'wss://open.ftorrent.com',
 ]
 
 export function isMagnetUri(url?: string | null): boolean {

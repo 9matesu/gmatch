@@ -14,6 +14,7 @@ import {
   SWARM_MAX_OBJECT_BYTES,
   type ReplicationReceipt,
   type SwarmMessage,
+  type Envelope,
 } from '@orbit/protocol'
 import {
   createSwarmEngine,
@@ -575,6 +576,14 @@ export function setSwarmOperationAckHandler(handler: ((ack: unknown) => void) | 
   swarmOperationAckHandler = handler
 }
 
+// SWARM_DM: a sealed 1:1 envelope riding the mesh. Untrusted transport — the
+// injected handler (wired by useCourierDms) opens it with the recipient's
+// private key; a bad signature / a foreign envelope throws and is dropped.
+let swarmDmHandler: ((envelope: Envelope) => void) | null = null
+export function setSwarmDmHandler(handler: ((envelope: Envelope) => void) | null): void {
+  swarmDmHandler = handler
+}
+
 /** Fire one frame out over every wired transport pipe. Best-effort. */
 export function sendSwarmFrame(msg: SwarmMessage): boolean {
   if (!swarmSend) return false
@@ -737,6 +746,12 @@ export async function handleSwarmMessage(msg: SwarmMessage): Promise<boolean> {
   }
   if (msg.type === 'SWARM_OP_ACK') {
     swarmOperationAckHandler?.({ operationId: msg.operationId, actorId: msg.actorId })
+    return true
+  }
+  if (msg.type === 'SWARM_DM') {
+    // Untrusted transport: the handler opens (verifies the signature) and
+    // routes the DM; a foreign/corrupt envelope is dropped there.
+    swarmDmHandler?.(msg.envelope)
     return true
   }
   // WANT / KEY / CHUNK / CHALLENGE / RECEIPT: the shared engine.

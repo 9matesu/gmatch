@@ -11,7 +11,7 @@ import { RARITY_TIERS, formatGc } from '@orbit/shared';
 import { Button, SideSheet } from '../../ui/kit';
 import { GameCard } from '../cards/GameCard';
 import {
-  classes, CHROME, COLOR, GAP, ICON, MONO, MOTION, PADDING_X, RADIUS, RECIPE,
+  classes, CHROME, COLOR, GAP, ICON, MONO, MOTION, PADDING_X, RADIUS,
   STATUS, TRACKING, TYPE, WEIGHT,
 } from '../../ui/tokens';
 import { GearPoster } from './ProductTile';
@@ -48,15 +48,15 @@ export function ProductQuickView({
   return (
     <SideSheet open={Boolean(product)} onClose={onClose} title={product?.name ?? 'Product'}>
       {product && (
-        <div className="space-y-4">
-          <div className="mx-auto max-w-xs">
+        <div className="space-y-3">
+          <div className="mx-auto max-w-[220px]">
             {product.card ? (
               <GameCard
                 objectId={product.card.mediaObjectId ?? null}
                 src={product.card.contentUrl}
                 identity={identity}
-                width={280}
-                height={280}
+                width={220}
+                height={220}
                 isVideo={Boolean(product.card.mimeType?.startsWith('video/'))}
                 name={product.card.name}
                 rarity={tier ?? undefined}
@@ -66,7 +66,7 @@ export function ProductQuickView({
                 interactive
               />
             ) : (
-              <div className={classes(RECIPE.card, 'overflow-hidden')}>
+              <div className={classes(CHROME.tile, 'overflow-hidden')}>
                 <GearPoster product={product} />
               </div>
             )}

@@ -2,22 +2,25 @@
  * Directory hub base URL (docs/ADR-002-servers.md): the rendezvous where sealed
  * mail is dropped and servers are listed.
  *
- * THERE IS NO DEFAULT RENDEZVOUS. The node you are connected to IS the
- * directory and the mail relay: a full node stores the world it serves AND
- * gossips the directory to the nodes that know it. A hosted rendezvous would
- * be a third party that has to exist, be paid for, and be trusted with the
- * metadata of every sealed envelope — for a service that adds nothing the
- * local node does not already do.
+ * The DEFAULT is a free, always-on, zero-knowledge Worker (`worker/`). It holds
+ * ONLY sealed ciphertext envelopes and signed/self-declared directory metadata
+ * — never message bodies, media, profiles or world rows. This fixes the case
+ * where no peer's node is reachable: mail and discovery still have a meeting
+ * point. The hosted WORLD is still forbidden; every install keeps its own node.
+ * It is reachability, not NAT traversal — TURN / the node relay remain the
+ * transport fallback (docs/ARCHITECTURE-P2P.md §1).
  *
- * A shared hub is OPT-IN (`gmatch.central.url` / `VITE_CENTRAL_URL`): point
- * it at a node you run to bridge two networks that cannot reach each other.
- * `none`/`off`/`0` switches it off explicitly (the default state).
+ * `gmatch.central.url` (Settings → Servers) and `VITE_CENTRAL_URL` override the
+ * default with a node you run. `none`/`off`/`0` switches it off explicitly.
  *
  * The retired Pages rendezvous (`*.gmatch.pages.dev`) is DROPPED, never
  * dialed: that origin is a static release page — there is no mailbox and no
  * directory behind it — so an old install cannot keep talking to a service
  * that no longer exists.
  */
+
+/** Free blind rendezvous deployed from `worker/` (only HTTP; mail polls at 20s). */
+export const DEFAULT_CENTRAL_URL = 'https://gmatch-rendezvous.mcos-mateus.workers.dev'
 
 const NO_CENTRAL = ['none', 'off', '0']
 
@@ -54,11 +57,10 @@ export function getCentralApiUrl(): string {
   } catch { /* private mode */ }
   if (import.meta.env.VITE_CENTRAL_URL) {
     const env = (import.meta.env.VITE_CENTRAL_URL as string).trim()
-    if (env && !NO_CENTRAL.includes(env.toLowerCase()) && !isRetiredRendezvous(env)) {
-      return env.replace(/\/+$/, '')
-    }
+    if (NO_CENTRAL.includes(env.toLowerCase()) || isRetiredRendezvous(env)) return ''
+    if (env) return env.replace(/\/+$/, '')
   }
-  return ''
+  return DEFAULT_CENTRAL_URL
 }
 
 export function setCentralApiUrl(url: string): void {

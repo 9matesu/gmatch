@@ -116,6 +116,22 @@ describe('PeerRoster (the single owner of "who is online")', () => {
     expect(seen).toEqual([0])
   })
 
+  it('countOnline is the one count: live peers only, never self or a ghost', () => {
+    const r = roster()
+    r.upsert(u('me'))
+    r.upsert(u('alice'))
+    r.upsert(u('bob'))
+    r.hydrate([u('ghost', { last_seen: new Date(Date.now() - 60_000).toISOString() })])
+    expect(r.onlinePeers('me').map((p) => p.id)).toEqual(['alice', 'bob'])
+    expect(r.countOnline('me')).toBe(2)
+    // A peer going away changes the count here and nowhere else; surfaces that
+    // read a stale node number can no longer disagree with the UI.
+    r.markOffline('alice')
+    expect(r.countOnline('me')).toBe(1)
+    r.markOffline('bob')
+    expect(r.countOnline('me')).toBe(0)
+  })
+
   it('the node roster reports the peers that just came online', () => {
     const r = roster()
     const newly = r.mergeServerRoster([u('alice'), u('me')], 'me')

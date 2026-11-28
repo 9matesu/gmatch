@@ -61,7 +61,6 @@ import { PasskeyManager } from '../PasskeyManager';
 import { UpdateSection } from './UpdateSection';
 import { CommunitySection } from './CommunitySection';
 import { ImportPostsSection } from './ImportPostsSection';
-import { RecacheMediaSection } from './RecacheMediaSection';
 import { TurnSection } from './TurnSection';
 import { MediaqSection } from './MediaqSection';
 import { BlocklistSection } from './BlocklistSection';
@@ -201,7 +200,7 @@ function FeedSettingsTab({ toast }: { toast?: (msg: string, type?: string) => vo
           aria-label="Add an excluded tag"
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
-          className="flex-1 bg-surface-raised border border-edge rounded-lg px-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent placeholder:text-retro-muted/60"
+          className="flex-1 bg-surface-raised border border-edge rounded-lg px-3 py-1.5 text-xs text-retro-fg outline-none focus:border-retro-accent placeholder:text-retro-muted/60"
         />
         <button
           type="button"
@@ -732,7 +731,7 @@ export function GMatchSettingsModal({
                             value={customWallpaperInput}
                             onChange={(e) => setCustomWallpaperInput(e.target.value)}
                             placeholder="Direct image or video URL (https://...)"
-                            className="flex-1 bg-surface-raised border border-edge rounded-lg px-3 py-2 text-xs text-retro-fg outline-none focus:border-retro-accent"
+                            className="flex-1 bg-surface-raised border border-edge rounded-lg px-3 py-1.5 text-xs text-retro-fg outline-none focus:border-retro-accent"
                           />
                           <button
                             type="button"
@@ -818,7 +817,6 @@ export function GMatchSettingsModal({
                 </Panel>
 
                 <ImportPostsSection identity={identity} toast={toast} />
-                <RecacheMediaSection toast={toast} />
               </div>
             )}
 

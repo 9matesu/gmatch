@@ -23,6 +23,10 @@ describe('isRelayableSwarmFrame (the node allowlist)', () => {
     expect(isRelayableSwarmFrame({ type: 'SWARM_RECEIPT', id: 'obj-1', receipt: { sig: 'x' } })).toBe(true)
     expect(isRelayableSwarmFrame({ type: 'SWARM_OP', operation: { id: 'op-1' } })).toBe(true)
     expect(isRelayableSwarmFrame({ type: 'SWARM_OP_ACK', operationId: 'op-1', actorId: 'u1' })).toBe(true)
+    expect(isRelayableSwarmFrame({
+      type: 'SWARM_DM',
+      envelope: { v: 2, kind: 'mail', to: 'tok', id: 'env-1', sealed: 'AAAA', fromEph: 'eph' },
+    })).toBe(true)
   })
 
   it('carries the announcement envelopes', () => {
@@ -48,6 +52,10 @@ describe('isRelayableSwarmFrame (the node allowlist)', () => {
     expect(isRelayableSwarmFrame({ type: 'SWARM_RECEIPT', id: 'o' })).toBe(false)
     expect(isRelayableSwarmFrame({ type: 'SWARM_OP' })).toBe(false)
     expect(isRelayableSwarmFrame({ type: 'SWARM_OP_ACK', operationId: 'op' })).toBe(false)
+    // A DM without a well-formed sealed envelope is refused.
+    expect(isRelayableSwarmFrame({ type: 'SWARM_DM' })).toBe(false)
+    expect(isRelayableSwarmFrame({ type: 'SWARM_DM', envelope: { v: 2, kind: 'mail' } })).toBe(false)
+    expect(isRelayableSwarmFrame({ type: 'SWARM_DM', envelope: { v: 1, kind: 'mail', to: 't', id: 'i', sealed: 's' } })).toBe(false)
   })
 
   it('refuses a chunk whose index does not belong to its total', () => {
@@ -106,6 +114,22 @@ describe('parseSwarmFrame', () => {
     expect(parseSwarmFrame({ type: 'SWARM_HAVE', ids: ['a', 2] })).toBeNull()
     expect(parseSwarmFrame({ type: 'SWARM_HAVE', ids: ['a'] })).not.toBeNull()
   })
+
+  it('narrows a sealed DM envelope, dropping a malformed one', () => {
+    const frame = parseSwarmFrame({
+      type: 'SWARM_DM',
+      envelope: { v: 2, kind: 'mail', to: 'tok', id: 'env-1', sealed: 'AAAA', fromEph: 'eph', exp: 99 },
+    })
+    expect(frame).not.toBeNull()
+    if (frame?.type !== 'SWARM_DM') throw new Error('expected a dm frame')
+    expect(frame.envelope.kind).toBe('mail')
+    expect(frame.envelope.to).toBe('tok')
+    expect(frame.envelope.fromEph).toBe('eph')
+    expect(frame.envelope.exp).toBe(99)
+    // Wrong version / missing sealed are refused, never coerced.
+    expect(parseSwarmFrame({ type: 'SWARM_DM', envelope: { v: 2, kind: 'mail', to: 't', id: 'i' } })).toBeNull()
+    expect(parseSwarmFrame({ type: 'SWARM_DM', envelope: { v: 3, kind: 'mail', to: 't', id: 'i', sealed: 's' } })).toBeNull()
+  })
 })
 
 describe('parseSwarmEnvelope (the relay envelope)', () => {
@@ -136,6 +160,17 @@ describe('parseSwarmEnvelope (the relay envelope)', () => {
     expect(envelope!.announce.type).toBe('PRESENCE')
     expect(envelope!.announce.user.id).toBe('u1')
     expect(envelope!.announce.relayedBy).toBe('u1')
+  })
+
+  it('reads a wrapped sealed DM envelope (the mesh DM relay path)', () => {
+    const envelope = parseSwarmEnvelope({
+      type: 'SWARM_FRAME', relayedBy: 'u1',
+      swarm: { type: 'SWARM_DM', envelope: { v: 2, kind: 'mail', to: 'tok', id: 'e1', sealed: 'AAAA', fromEph: 'eph' } },
+    })
+    expect(envelope).not.toBeNull()
+    if (envelope?.kind !== 'swarm') throw new Error('expected a swarm frame')
+    expect(envelope.frame.type).toBe('SWARM_DM')
+    expect(envelope.relayedBy).toBe('u1')
   })
 
   it('refuses a frame that is not the relay envelope', () => {

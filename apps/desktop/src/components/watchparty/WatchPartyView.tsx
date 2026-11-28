@@ -6,7 +6,7 @@
 // disclosure so the player reads title / host / controls / queue only.
 
 import { useEffect, useState } from 'react'
-import { ChevronDown, Clapperboard, Users } from 'lucide-react'
+import { ChevronDown, Clapperboard, Film, Users } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { Avatar } from '../Avatar'
 import {
@@ -23,6 +23,7 @@ import {
 } from '../../ui/tokens'
 import { MUTED } from '../../ui/styles'
 import { useWatchParty, joinPartyById, canControlParty, MAX_SLOTS, type PartyRuntime } from '../../hooks/watchPartyStore'
+import { useObjectImage } from '../../hooks/useObjectImage'
 import { watchInviteFromHash, stripWatchRoom } from './invite'
 import { WatchPartySlot } from './WatchPartySlot'
 import { WatchPartyTimeline } from './WatchPartyTimeline'
@@ -36,6 +37,61 @@ interface IdentityLike {
   orbitId: string
   publicKeyHex: string
   privateKeyHex: string
+}
+
+/**
+ * Compact "now playing" card for the rail. Hovering it reveals a small, muted,
+ * looping preview of what the room is playing RIGHT NOW — resolved through the
+ * same media ladder as the slot, so a consent-shared local file shows its bytes
+ * only once they are actually local (transfer-first, never a sender path).
+ */
+function NowPlayingCard({ party, identity }: { party: PartyRuntime; identity: IdentityLike }) {
+  const [hovering, setHovering] = useState(false)
+  const currentItem = party.queue.find((q) => q.id === party.current) || null
+  const currentUrl = currentItem?.url || party.url || null
+  const media = useObjectImage(currentUrl, identity, { enabled: Boolean(currentUrl) })
+  const thumb = useObjectImage(currentItem?.thumb ?? null, identity, { enabled: Boolean(currentItem?.thumb) })
+  const name = currentItem?.name || party.mediaName || 'Nothing playing'
+  const canPreview = Boolean(media.url) && (media.isVideo || /\.mp4\b|\.webm\b|\/stream/.test(currentUrl || ''))
+
+  return (
+    <div
+      onMouseEnter={() => setHovering(true)}
+      onMouseLeave={() => setHovering(false)}
+      className={cx('relative border-b', COLOR.edge)}
+    >
+      <div className={cx('flex items-center', PADDING_X[3], PADDING_Y[2], 'gap-2')}>
+        <span className={cx('relative size-9 shrink-0 overflow-hidden', RADIUS.chip, COLOR.canvasSurface, 'border', COLOR.edge)}>
+          {thumb.url ? (
+            <img src={thumb.url} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <span className="flex size-full items-center justify-center">
+              <Film className={cx(ICON.md, COLOR.muted)} aria-hidden />
+            </span>
+          )}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className={cx('block uppercase', TYPE.caption, TRACKING.wider, COLOR.muted)}>Now playing</span>
+          <span className={cx('block truncate', TYPE.body, COLOR.fg)}>{name}</span>
+        </span>
+      </div>
+
+      {hovering && canPreview && (
+        <video
+          data-testid="now-playing-preview"
+          src={media.url || undefined}
+          poster={thumb.url || undefined}
+          muted
+          autoPlay
+          loop
+          playsInline
+          preload="auto"
+          aria-label={`Preview of ${name}`}
+          className={cx('absolute inset-0 size-full object-cover pointer-events-none', COLOR.canvas, MOTION.transition.fade)}
+        />
+      )}
+    </div>
+  )
 }
 
 /** Secondary room facts: shown only when the player asks for them. */
@@ -157,8 +213,21 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
   // ROOM MODE: full-bleed video; the rail holds only the room identity, the
   // queue and chat. Everything else is one Details disclosure away.
   return (
-    <div className="group/watch relative h-full flex-1 flex flex-row min-h-0 overflow-hidden">
-      <div className={cn('flex-1 min-w-0 min-h-0 relative flex flex-col overflow-hidden', COLOR.canvas)}>
+    <div
+      data-testid="watch-room-root"
+      className={cn(
+        'group/watch relative h-full flex-1 flex flex-row min-h-0 overflow-hidden',
+        // Reserve the floating CommandIsland's strip so the rail's bottom (the
+        // chat composer) never slides under it. The whole view is height-bounded
+        // (min-h-0 + overflow-hidden) and the rail scrolls internally, so the
+        // page itself never overflows.
+        'pb-[var(--island-clearance)]',
+      )}
+    >
+      {/* The theater owns the remaining height. The transport bar is anchored to
+          this bounded column's bottom, so the controls never reach the island
+          strip the root reserves below it. */}
+      <div data-testid="watch-theater" className={cn('flex-1 min-w-0 min-h-0 relative flex flex-col overflow-hidden', COLOR.canvas)}>
         {parties.length === 1 ? (
           <WatchPartySlot
             party={parties[0]}
@@ -202,6 +271,7 @@ export function WatchPartyView({ identity, profilePics }: { identity: IdentityLi
         )}
       >
         {active && <WatchRoomHeader party={active} identity={identity} profilePics={profilePics} />}
+        {active && <NowPlayingCard party={active} identity={identity} />}
         {active && <RoomDetails party={active} identity={identity} profilePics={profilePics} />}
 
         {active && <WatchPartyQueue party={active} identity={identity} />}

@@ -64,10 +64,37 @@ describe('WatchPartyTimeline Component', () => {
     expect(screen.getByLabelText('Fullscreen')).toBeDefined()
   })
 
-  it('lifts controls above the pill bar clearance', () => {
+  it('renders the control bar at the BOTTOM of the player area', () => {
     const { container } = render(<WatchPartyTimeline party={sampleParty} />)
     const root = container.firstChild as HTMLElement
-    expect(root.className).toMatch(/pb-\[calc\(.*island-clearance.*\)\]/)
+    // Needle + one control row are anchored to the bottom edge again. The plate
+    // edge sits on top; the parent view owns the island clearance below.
+    expect(root.className).toMatch(/\bbottom-0\b/)
+    expect(root.className).toMatch(/inset-x-0/)
+    expect(root.className).toMatch(/border-t/)
+    expect(root.className).not.toMatch(/\btop-0\b/)
+    expect(root.className).not.toMatch(/border-b/)
+  })
+
+  it('seeks the element locally on release, then broadcasts (instant seek)', () => {
+    render(<WatchPartyTimeline party={sampleParty} isHost />)
+    const v = document.querySelector('video') as HTMLVideoElement
+    const bar = screen.getByLabelText('Seek video position')
+    // jsdom reports a zero-size rect and drops clientX on synthetic pointer
+    // events, so drive the geometry explicitly: a 100px bar, pointer at 50%.
+    bar.getBoundingClientRect = () => ({ left: 0, width: 100, right: 100, top: 0, bottom: 10, height: 10, x: 0, y: 0, toJSON() {} }) as DOMRect
+    const pointer = (type: string) => {
+      const e = new MouseEvent(type, { bubbles: true, clientX: 50 })
+      Object.defineProperty(e, 'pointerId', { value: 1 })
+      return e
+    }
+    fireEvent(bar, pointer('pointerdown'))
+    fireEvent(bar, pointer('pointermove'))
+    fireEvent(bar, pointer('pointerup'))
+    // Local element moved immediately (to ~half of the 120s duration)...
+    expect(v.currentTime).toBeGreaterThan(0)
+    // ...and the room was told.
+    expect(mockControlPlayback).toHaveBeenCalledWith('party-1', 'play', expect.any(Number))
   })
 
   it('handles play/pause toggle clicking controlPlayback', () => {

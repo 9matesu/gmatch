@@ -159,9 +159,49 @@ export function MediaPickerPanel({
   const httpUrlMap = useVaultHttpUrls(vaultTileUrls);
   const tileUrl = (img: GalleryImage): string => {
     const raw = tileUrlById.get(img.id) || '';
-    if (raw.startsWith('vault://')) return httpUrlMap[raw] || raw;
+    if (raw.startsWith('vault://')) {
+      // The vault loopback map is the only browser-playable form of a vault
+      // URL. If it is not ready (or the bytes went missing), fall back to the
+      // IndexedDB blob the gallery already resolved. NEVER hand a raw
+      // `vault://` string to <img>/<video>: that is the broken-tile bug.
+      return httpUrlMap[raw] || localUrls[img.url || ''] || '';
+    }
     return raw;
   };
+
+  // Silent, bounded vault auto-heal: a persisted keep whose bytes vanished
+  // (evicted IDB / vault) is retried ONCE per mount, off the render path.
+  // `ensurePermanentMedia` probes first, verifies the hash and never claims a
+  // success it did not write. No manual button, no spinner.
+  const healAttempted = useRef(new Set<string>());
+  const missingKeepIds = browseGallery
+    .filter((g) => {
+      const raw = tileUrlById.get(g.id) || '';
+      return g.saveState === 'persisted' && !!g.url &&
+        (!raw || (raw.startsWith('vault://') && !httpUrlMap[raw] && !localUrls[g.url]));
+    })
+    .map((g) => g.id)
+    .join('|');
+  useEffect(() => {
+    if (!missingKeepIds) return;
+    const ids = missingKeepIds.split('|');
+    const queue = browseGallery.filter((g) => ids.includes(g.id) && !healAttempted.current.has(g.id));
+    for (const g of queue) healAttempted.current.add(g.id);
+    let cursor = 0;
+    const worker = async () => {
+      while (cursor < queue.length) {
+        const g = queue[cursor++];
+        try {
+          const { ensurePermanentMedia } = await import('../../utils/mediaVault');
+          const res = await ensurePermanentMedia(g.url, g.kind);
+          if (res.state === 'permanent' && typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('orbit-keepsake-updated', { detail: { url: g.url } }));
+          }
+        } catch { /* a failed heal stays honest; no retry storm */ }
+      }
+    };
+    void Promise.all(Array.from({ length: Math.min(3, queue.length) }, () => worker()));
+  }, [missingKeepIds]); // browseGallery is keyed by the ids in missingKeepIds
 
   /**
    * Select a keepsake: resolve its LOCAL bytes (vault, else the swarm object
@@ -326,7 +366,6 @@ export function MediaPickerPanel({
                     const video = g.kind === 'video';
                     const selected = selectedKeepId === g.id && pending?.kind === 'file' && pending.source === 'browse';
                     const src = tileUrl(g);
-                    const raw = tileUrlById.get(g.id) || '';
                     // No local bytes and no preview: an empty tile is honest.
                     const unresolvable = !src;
                     return (
@@ -362,9 +401,6 @@ export function MediaPickerPanel({
                           <span className="absolute inset-0 bg-retro-accent/20 flex items-center justify-center">
                             <ImageIcon className="w-5 h-5 text-retro-fg drop-shadow" />
                           </span>
-                        )}
-                        {raw.startsWith('vault://') && !httpUrlMap[raw] && !unresolvable && (
-                          <span className="absolute inset-x-0 bottom-0 py-0.5 text-center text-2xs bg-black/60 text-retro-fg/80">…</span>
                         )}
                       </Button>
                     );

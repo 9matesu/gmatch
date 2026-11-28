@@ -18,7 +18,8 @@ import { pickShareableHint } from '../../utils/serverAddress'
 import { joinServer } from '../../utils/join-server'
 import { switchClientWorld } from '../../utils/server-switch'
 import { rememberPendingHost } from '../../utils/server-host-pending'
-import { mergeDirectory, dedupeServers, serverKey, readDirectoryCache, writeDirectoryCache } from './directoryMerge'
+import { mergeDirectory, dedupeServers, serverKey, readDirectoryCache, writeDirectoryCache, isDroppedDirectoryRow, OFFICIAL_NODE_NAME } from './directoryMerge'
+export { OFFICIAL_NODE_NAME }
 import { readLabels, writeLabels, type LocalMeshLabel } from './meshLabels'
 import { decodeNodeMask } from '../../utils/nodeMask'
 import { buildNodeCode } from '../../utils/nodeShare'
@@ -35,10 +36,11 @@ import { playPress } from '../../utils/sounds'
 import { resolveMediaUrl } from '../../utils/media'
 import { CentralAdminPanel } from './CentralAdminPanel'
 import { subscribeApiBase } from '../../utils/api'
+import type { PeerRoster } from '../../utils/peerRoster'
 import type { User } from '@orbit/shared'
 import {
   classes, CHROME, COLOR, DIALOG_WIDTH, FEEDBACK, GAP, ICON, LAYOUT, MONO,
-  MOTION, PADDING, PADDING_SM, PADDING_X, PADDING_Y, PRESENCE, RADIUS, RECIPE,
+  MOTION, PADDING, PADDING_SM, PADDING_X, PADDING_Y, PRESENCE, RADIUS,
   STATUS, TRACKING, TRANSITION, TYPE, WEIGHT,
 } from '../../ui/tokens'
 
@@ -47,6 +49,11 @@ import {
 const FORM_LABEL = classes('block', TYPE.body, COLOR.muted)
 const FORM_INPUT = classes('mt-1')
 const FORM_FIELD = classes('w-full', MONO)
+/** One compact, single-line search shell — the chat search's py-1.5 height on
+ *  the raised plate. No glass tier, no fixed height, no tall block. */
+const SEARCH_SHELL = classes(
+  CHROME.tile, 'flex items-center', GAP[1], PADDING_X[2.5], PADDING_Y[1.5], TYPE.body, COLOR.fg,
+)
 
 export interface DirectoryServer {
   id: string
@@ -167,6 +174,7 @@ export function ServersView({
   profilePics = {},
   onServerJoined,
   p2pPeers = [],
+  roster,
   onWorldSwitch,
 }: {
   identity: Parameters<typeof orbitFetch>[2] | null
@@ -181,6 +189,9 @@ export function ServersView({
    *  appear in this node's dashboard, so without this the hub shows "nobody
    *  online" while the swarm is actually alive. */
   p2pPeers?: User[]
+  /** THE one online roster. The dashboard's "Online (N)" reads this projection
+   *  instead of re-counting a node snapshot that can disagree with the island. */
+  roster?: PeerRoster
 }) {
   const [central, setCentral] = useState(() => getCentralApiUrl())
   const [servers, setServers] = useState<DirectoryServer[]>([])
@@ -418,14 +429,13 @@ export function ServersView({
 
   useEffect(() => {
     try {
-      // The legacy built-in row ("gmatch", no address of its own) is not a
-      // destination. A REAL listing keeps its address — even on port 8790,
-      // which is the port every default node runs on.
-      const cached = readDirectoryCache(getApiBaseUrl()).filter(
-        (s) => s.id !== 'central-node' && !(s.name.trim().toLowerCase() === 'gmatch' && !s.endpoint_hint?.trim())
-      )
+      // Purge every non-destination from the cache at boot — synthetic rows,
+      // stale listings past the 24h TTL and fake official/brand duplicates.
+      // readDirectoryCache already filters; this writes the cleaned list back
+      // so a stale mirror cannot keep resurrecting a row the filter hides.
+      const cached = readDirectoryCache(getApiBaseUrl()).filter((s) => !isDroppedDirectoryRow(s))
       writeDirectoryCache(cached, getApiBaseUrl())
-      if (localStorage.getItem(DIRECTORY_ID_KEY) === 'central-node') localStorage.removeItem(DIRECTORY_ID_KEY)
+      if (localStorage.getItem(DIRECTORY_ID_KEY)?.startsWith('central-')) localStorage.removeItem(DIRECTORY_ID_KEY)
       const regRaw = localStorage.getItem(REG_KEY)
       if (regRaw) {
         try {
@@ -550,7 +560,9 @@ export function ServersView({
     const dashUsers = Array.isArray(dash?.users) ? dash.users : []
     return {
       id: `self:${nodeUrl.replace(/^https?:\/\//i, '').replace(/\/+$/, '').toLowerCase()}`,
-      name: (serverName || node?.name || dash?.name || '').trim() || 'This computer',
+      // This install's own node is ALWAYS the canonical, official world — one
+      // row, one name, whatever the host later renames the directory listing to.
+      name: OFFICIAL_NODE_NAME,
       description: node?.description || serverDescription || '',
       owner_id: (identity as unknown as { orbitId?: string }).orbitId || '',
       password_required: 0,
@@ -560,17 +572,15 @@ export function ServersView({
       user_count: typeof dash?.members_total === 'number' ? dash.members_total : dashUsers.length,
       last_seen: new Date().toISOString(),
     }
-  }, [identity, nodeUrl, serverName, node, dash, serverDescription, weHostThisNode])
+  }, [identity, nodeUrl, node, dash, serverDescription, weHostThisNode])
 
   const visibleServers = useMemo(() => {
     const q = query.trim().toLowerCase()
     return servers.filter((s) => {
-      if (s.id === 'central-node' || s.id === 'central-p2p' || s.id === 'central-local') return false
-      // The legacy built-in "gmatch" row carried no address of its own. A REAL
-      // listing named "gmatch" (the default node name) has one and stays
-      // visible — hiding it by name alone would make this machine unfindable
-      // for every other player.
-      if (s.name.trim().toLowerCase() === 'gmatch' && !s.endpoint_hint?.trim()) return false
+      // Dead listings, synthetic rows and fake official/brand duplicates are
+      // never destinations (the same predicate purges the cache at boot and
+      // rejects fresh answers; this render check is defence in depth).
+      if (isDroppedDirectoryRow(s)) return false
       // A blind courier is infrastructure, never a destination: a stale
       // directory mirror of it is never a row.
       if (isCourierApiUrl(s.endpoint_hint)) return false
@@ -638,13 +648,9 @@ export function ServersView({
     return serverName || 'Hub'
   }, [servers, serverName, getEffectiveServerUrl])
 
-  /** One quiet type label, and only when it helps: a world running on this
-   *  machine. Everything else is just hosted, which is the norm and needs no
-   *  label. */
-  const kindFor = (s: DirectoryServer): WorldRowState['kind'] => {
-    if (isOwnNode(s)) return 'P2P'
-    return undefined
-  }
+  /** No per-row type label: the official own node is marked by its logo +
+   *  Verified chip, and every other row is just a hosted world (the norm). */
+  const kindFor = (_s: DirectoryServer): WorldRowState['kind'] => undefined
 
   /** Secondary line: what a row is, plus what the directory actually told us.
    *  Never an address — that owns its own column — a transport, or a diagnostic. */
@@ -665,6 +671,19 @@ export function ServersView({
    * Connecting · Unavailable — and a row never claims reachability it has not
    * measured (visibility in the directory is not a connection).
    */
+  /**
+   * A row is "verified" only when its identity is proven: this install's own
+   * node is always official/verified; any OTHER node earns the chip only by
+   * carrying a signed directory entry (a real `owner_id` from the node's signed
+   * `/api/servers`), never a pasted `mask:` code (empty owner) or a synthetic
+   * row. An unproven row never shows verified.
+   */
+  const isVerifiedRow = (s: DirectoryServer): boolean => {
+    if (isOwnNode(s)) return true
+    if (s.id.startsWith('mask:')) return false
+    return !!s.owner_id && s.owner_id.trim().length > 0
+  }
+
   const rowStateFor = (
     s: DirectoryServer,
     opts: { connecting: boolean },
@@ -674,6 +693,8 @@ export function ServersView({
       counts: rowCounts(s, isCurrentServer, dash),
       meta: metaFor(s, isCurrentServer),
       kind: kindFor(s),
+      verified: isVerifiedRow(s),
+      official: isOwnNode(s),
     }
     if (opts.connecting) return { ...base, status: 'Connecting' }
     if (isCurrentServer) return { ...base, status: 'Current' }
@@ -1358,7 +1379,7 @@ export function ServersView({
         const preview = buildNodeCode(hint.trim() || pickShareableHint(hostState?.lanUrls ?? node?.lanUrls ?? []), name.trim())
         return preview ? (
           <div data-testid="create-handle-preview" className={classes(
-            'flex items-center justify-between', RECIPE.card, COLOR.canvasSurfaceSoft,
+            'flex items-center justify-between', CHROME.tile,
             PADDING_X[3], PADDING_Y[2], GAP[2], TYPE.caption, MONO, COLOR.muted,
           )}>
             <span className="min-w-0 truncate">{preview.slice(0, 28)}…</span>
@@ -1423,10 +1444,7 @@ export function ServersView({
           </div>
 
           {activeTab === 'browse' && (
-            <div className={classes(
-              RECIPE.card, COLOR.glassW5, 'ml-1 flex h-7 min-w-0 max-w-[13rem] flex-1 items-center',
-              GAP[1], PADDING_X[2],
-            )}>
+            <div className={classes(SEARCH_SHELL, 'ml-1 min-w-0 max-w-[13rem] flex-1')}>
               <Search className={classes(ICON.sm, COLOR.muted)} aria-hidden />
               <Input
                 bare
@@ -1787,7 +1805,9 @@ export function ServersView({
                   <div className={classes('flex items-center', GAP[2])}>
                     <span className={classes('size-2 shrink-0', RADIUS.pill, PRESENCE.currentDot)} />
                     <span className={classes(TYPE.body, WEIGHT.bold, COLOR.fg, 'uppercase', TRACKING.wider, MONO)}>
-                      Online ({typeof dash?.online_count === 'number' ? Math.max(dash.online_count, onlineUsers.length) : onlineUsers.length})
+                      Online ({roster
+                        ? roster.countOnline((identity as unknown as { orbitId?: string } | null)?.orbitId)
+                        : typeof dash?.online_count === 'number' ? Math.max(dash.online_count, onlineUsers.length) : onlineUsers.length})
                     </span>
                   </div>
                 </div>
@@ -1935,16 +1955,16 @@ export function ServersView({
             )}
 
             {/* ONE list: every server this client knows, the current one first.
-                A near-solid backing: a world list is data you read, not glass
-                you see the wallpaper through. */}
+                A solid backing (not glass): a world list is data you read, and
+                the rows sit on it with clear contrast. */}
             <div className={classes(
-              'flex-1 min-h-0 overflow-y-auto styled-scrollbar', PADDING_X[4], PADDING_Y[2],
-              COLOR.canvasVeil, 'backdrop-blur-md',
+              'flex-1 min-h-0 overflow-y-auto styled-scrollbar', PADDING_X[4], PADDING_Y[1.5],
+              COLOR.canvas,
             )}>
               {/* A failed directory request never erases servers we already know. */}
               {dirError && serverRows.length > 0 && (
                 <div role="status" className={classes(
-                  CHROME.rowTile, 'mb-2', GAP[2], TYPE.caption,
+                  CHROME.tile, 'mb-2', GAP[2], TYPE.caption, PADDING_X[3], PADDING_Y[1.5],
                 )}>
                   <span className="min-w-0 flex-1 truncate">
                     Directory unreachable. Showing the last known servers.

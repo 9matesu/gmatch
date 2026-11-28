@@ -1,8 +1,16 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest'
-import { act, renderHook } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { useFeedController, type FeedControllerInput } from './useFeedController'
 import type { FeedPost } from '../../components/feed/GMatchFeed'
+import { invalidateCache, orbitFetch } from '../../utils/api'
+
+// The controller owns the network; stub it so a first read can be made to
+// answer empty exactly once (the stale/early-node case).
+vi.mock('../../utils/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../utils/api')>()
+  return { ...actual, orbitFetch: vi.fn(), invalidateCache: vi.fn() }
+})
 
 // jsdom in this repo has no localStorage; stub it the way the other
 // persistence tests do.
@@ -137,6 +145,41 @@ describe('useFeedController projection stability', () => {
     const row = result.current.posts[0]
     expect(row.id).toBe('b')
     expect(row.mediaUrls).toEqual(['https://cdn.test/b-1.jpg', 'https://cdn.test/b-2.jpg'])
+  })
+
+  it('promotes posts from the first feed read without a profile round-trip', async () => {
+    // The node can answer with an empty snapshot while it boots, and the 3s
+    // GET cache can hold that answer. "ready but empty" used to be treated as
+    // settled: the posts only appeared after opening a profile (whose own
+    // author_id query re-read the node) and coming back.
+    let reads = 0
+    vi.mocked(orbitFetch).mockImplementation(async () => {
+      reads += 1
+      const posts = reads === 1 ? [] : [post('fresh')]
+      return { ok: true, status: 200, json: async () => ({ posts }) } as Response
+    })
+
+    const { result } = renderHook(() => useFeedController({
+      identity: { orbitId: 'self' } as never,
+      users: USERS,
+      profilePics: PROFILE_PICS,
+      myProfile: MY_PROFILE,
+      items: ITEMS,
+      deletedPostIds: DELETED,
+      archivedPostIds: ARCHIVED,
+      feedSort: 'latest',
+      normalizePost: normalizeFeedPost,
+    }))
+
+    await act(async () => { await result.current.load() })
+    expect(result.current.status).toBe('ready')
+    expect(result.current.posts).toEqual([])
+
+    await waitFor(() => {
+      expect(result.current.posts.map((p) => p.id)).toEqual(['fresh'])
+    }, { timeout: 5000 })
+    expect(reads).toBeGreaterThanOrEqual(2)
+    expect(invalidateCache).toHaveBeenCalledWith('/api/posts')
   })
 
   it('drops the previous world\'s timeline when a server switch commits', () => {

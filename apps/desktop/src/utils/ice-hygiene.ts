@@ -13,21 +13,37 @@
 //   address never leaves the machine (mDNS `.local` hosts only). `srflx`
 //   candidates ARE exchanged: without them cross-NAT peers can never meet,
 //   and a reflexive address is exactly what any direct connection reveals.
-// - `relay` candidates carry the TURN server's address, not yours. An explicit
-//   TURN (env / Settings) forces the whole connection through it (zero exposure);
-//   the baked public default only adds a relay candidate, direct still wins.
+// - `relay` candidates carry the TURN server's address, not yours. There is NO
+//   baked public TURN: `openrelay.metered.ca` resolves to 192.0.2.1 (TEST-NET)
+//   and the shared `openrelayproject` account was revoked globally, so a baked
+//   relay gathered zero candidates. An explicit TURN (env / Settings) forces
+//   the whole connection through it (zero exposure); with none, direct/srflx
+//   comes first and the node's SWARM_FRAME relay is the transport fallback.
 // - peerConnectionConfig() is the single source of truth for both the
 //   file-transfer peer (webrtc.ts) and the payload relay (removed).
 
 export const STUN_SERVERS: RTCIceServer[] = [{ urls: 'stun:stun.cloudflare.com:3478' }]
 
-/** Literal IPv4 (dotted quad) or IPv6 (contains ':') — never `.local`. */
+/**
+ * True for a literal IP that must NOT be signaled as a host candidate.
+ * IPv4 literals and private/link-local IPv6 stay private; a GLOBAL IPv6
+ * address (2000::/3) is a routable direct path and is allowed — that is the
+ * decentralized CGNAT fix. `.local` mDNS hosts are never literal.
+ */
 export function isLiteralIp(address: string): boolean {
   if (!address) return false
   if (address.endsWith('.local')) return false
   if (/^\d+\.\d+\.\d+\.\d+$/.test(address)) return true
-  if (address.includes(':')) return true
+  if (address.includes(':')) return !isGlobalIpv6(address)
   return false
+}
+
+/** Global unicast IPv6 only (2000::/3); ULA, link-local and loopback stay hidden. */
+function isGlobalIpv6(address: string): boolean {
+  const a = address.toLowerCase().split('%')[0]
+  if (!a.includes(':') || a === '::1' || a === '::') return false
+  if (/^f[cd][0-9a-f]{2}:/.test(a) || /^fe[89ab][0-9a-f]:/.test(a)) return false
+  return /^[23][0-9a-f]{3}:/.test(a)
 }
 
 /**
@@ -121,36 +137,20 @@ export function turnCredentials(env: Record<string, string | undefined> = {}): {
 }
 
 /**
- * Baked public TURN with shared credentials so cross-NAT works out of the box
- * in packaged builds (no injected env). Third-party and rate-limited: env /
- * Settings TURN still wins, and only an explicit choice forces relay.
- */
-export function defaultTurn(): { url: string; username: string; credential: string } {
-  return { url: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' }
-}
-
-/** TURN for a connection: explicit env/Settings first, baked public default otherwise. */
-export function effectiveTurn(env: Record<string, string | undefined> = {}): { url: string; username: string; credential: string } {
-  return turnCredentials(env) ?? defaultTurn()
-}
-
-/**
  * The config both P2P stacks use. Two modes (SPEC §10c semantics):
  * - explicit NEXT_PUBLIC_TURN_* env or Settings TURN → relay-forced, zero IP
  *   exposure posture.
- * - otherwise → STUN (Cloudflare) + the baked public TURN as CANDIDATES, no
- *   forced transport: LAN pairs meet via mDNS hosts, cross-NAT pairs hole-punch
- *   through reflexive candidates or fall back to TURN, and a relay outage
- *   cannot take all P2P down (WS-relay swarm is the last fallback). Literal
- *   LAN IPs are never signaled — the mDNS host gate stays on either way.
+ * - otherwise → STUN (Cloudflare) only, no forced transport: LAN pairs meet
+ *   via mDNS hosts, cross-NAT pairs hole-punch through reflexive candidates,
+ *   and the node's SWARM_FRAME relay is the last fallback. No dead relay is
+ *   offered, so ICE never waits on a host that cannot answer. Literal LAN IPs
+ *   are never signaled — the mDNS host gate stays on either way.
  */
 export function defaultIceConfig(env: Record<string, string | undefined> = {}): RTCConfiguration {
-  const userTurn = turnCredentials(env)
-  if (userTurn) return peerConnectionConfig(userTurn)
-  return { ...peerConnectionConfig(null), iceServers: iceServersFor(defaultTurn()) }
+  return peerConnectionConfig(turnCredentials(env))
 }
 
-/** ICE server list: STUN always; TURN only when configured. */
+/** ICE server list: STUN always; TURN only when explicitly configured. */
 export function iceServersFor(turn: { url: string; username: string; credential: string } | null): RTCIceServer[] {
   const servers = [...STUN_SERVERS]
   if (turn) servers.push({ urls: turn.url, username: turn.username, credential: turn.credential })

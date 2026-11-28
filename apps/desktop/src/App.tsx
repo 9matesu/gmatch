@@ -1507,7 +1507,9 @@ export default function Home() {
       .then(async (res) => {
         if (!res.ok || cancelled) return
         const data = await res.json().catch(() => null)
-        if (!cancelled && Array.isArray(data?.posts)) {
+        if (!cancelled && Array.isArray(data?.posts) && data.posts.length > 0) {
+          // A cross-node author has no node row: the node answers 0 and must
+          // not erase the posts the feed projection already holds.
           setSelectedProfilePosts(data.posts as FeedPost[])
         }
       })
@@ -3988,6 +3990,7 @@ export default function Home() {
                           identity={identity as never}
                           toast={toast}
                           p2pPeers={peers}
+                          roster={roster}
                           onSelectUser={(u) => {
                             const full = findUserById(users, u.id)
                             setSelectedProfileUser(full || u)
@@ -4034,6 +4037,7 @@ export default function Home() {
                           threads={pmThreads}
                           profilePics={profilePics}
                           myDisplayName={myProfile.displayName || 'You'}
+                          roster={roster}
                           groups={chatGroups.map((g) => ({ ...g, transport: groupTransport[g.id] }))}
                           groupMessages={groupMessagesByGroup}
                           activeGroupId={activeGroupId}

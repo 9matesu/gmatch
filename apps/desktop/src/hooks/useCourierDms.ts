@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { OrbitIdentity } from '@orbit/crypto'
 import { MailClient, type MailSocket } from '../utils/mail-client'
 import { DmManager, DmStore, scopedKey, type DmMessage } from '../utils/mail-dm'
+import { seal1to1, open1to1 } from '@orbit/protocol'
+import { sendSwarmFrame, setSwarmDmHandler } from '../utils/p2pSwarm'
 import { DominationMeshManager } from '../utils/dominationMeshManager'
 import { deliveryToken } from '@orbit/protocol'
 import { rotateEpoch, peerAddressToken, type EpochState } from '../utils/handleRotation'
@@ -122,14 +124,27 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
       return
     }
     const store = new DmStore(identity)
+    // Captured non-null for the closures below (a parameter is not narrowed
+    // inside a nested closure).
+    const ownIdentity = identity
     const refresh = (peerId: string) => {
       setThreads((prev) => ({ ...prev, [peerId]: store.thread(peerId) }))
     }
     const refreshRooms = () => setRoomsState(roomMgr.rooms())
     const facade: Pick<MailClient, 'send' | 'epoch'> = {
       send: (body, kind, recipient, opts) => {
-        if (!clientRef.current) return Promise.reject(new Error('mail client not ready'))
-        return clientRef.current.send(body, kind, recipient, opts)
+        const client = clientRef.current
+        if (!client) return Promise.reject(new Error('mail client not ready'))
+        // Mesh copy FIRST: the SAME sealed envelope the mailbox carries, sent
+        // over the swarm (direct DataChannel, or the node's SWARM_FRAME relay
+        // when direct ICE fails). This is the only path two NAT'd peers with NO
+        // reachable mailbox have. Fire-and-forget and idempotent: the receiver
+        // dedupes by message id, and the mailbox PUT below stays the durable
+        // fallback — a real dm_ack is still the only proof of delivery.
+        try {
+          sendSwarmFrame({ type: 'SWARM_DM', envelope: seal1to1(body, kind, ownIdentity, recipient, opts) })
+        } catch { /* sealing failed: the mailbox path still tries */ }
+        return client.send(body, kind, recipient, opts)
       },
       get epoch() {
         return clientRef.current?.epoch ?? { cur: '', prev: '' }
@@ -240,12 +255,24 @@ export function useCourierDms(identity: OrbitIdentity | null, deps: CourierDeps 
     domMgrRef.current = domMgr
     roomsRef.current = roomMgr
     clientRef.current = client
+    // Inbound mesh DM: a sealed envelope arrived over the swarm (direct
+    // DataChannel or the node's SWARM_FRAME relay). Opening it verifies the
+    // sender's Ed25519 signature over kind|id|to|body — the SAME authorization
+    // the swarm-op path uses — so a forged envelope throws and is dropped. The
+    // opened body is then handled exactly as the courier path handles it.
+    setSwarmDmHandler((envelope) => {
+      try {
+        const opened = open1to1(envelope, ownIdentity.encryptionPrivHex)
+        manager.handleOpened(opened, envelope)
+      } catch { /* not ours / bad signature: drop */ }
+    })
     client.start()
     setThreads(store.threads())
     setRoomsState(roomMgr.rooms())
     void client.pull() // drain whatever arrived while closed
     return () => {
       client.stop()
+      setSwarmDmHandler(null)
       clientRef.current = null
       managerRef.current = null
       domMgrRef.current = null

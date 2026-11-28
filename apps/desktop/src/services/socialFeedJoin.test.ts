@@ -6,7 +6,7 @@ import {
   type OperationLogBackend,
 } from './socialOperationLog'
 import { publishSignedPostOperation } from './socialPublish'
-import { acceptInboundOperation } from './socialOpTransport'
+import { drainSocialOpsFromMailbox, publishSocialOpsToMailbox } from './courierSocialOps'
 import { projectPosts } from './socialFeedProjection'
 import { projectedPostsToFeedPosts } from '../hooks/usePeerFeedPosts'
 import { projectFeed } from '../features/feed/feedProjection'
@@ -55,7 +55,7 @@ describe('L4 join: a peer post and its media, with no node', () => {
 
     // A: the signed operation is durably committed before any network call.
     const logA = new SocialOperationLog(memoryBackend())
-    const operation = await publishSignedPostOperation(AUTHOR, {
+    await publishSignedPostOperation(AUTHOR, {
       objectId: 'post-object-1',
       contentCid: contentHash,
       mimeType: 'image/png',
@@ -64,9 +64,22 @@ describe('L4 join: a peer post and its media, with no node', () => {
       tags: 'portrait,solo',
     }, logA)
 
-    // B: accepts the operation into its OWN log (signature, manifest, chain).
+    // B: the operation crosses the hosted rendezvous mailbox — a DIFFERENT
+    // install on a DIFFERENT node, with no shared DB — and only then the SAME
+    // authorizer (signature, manifest, chain) accepts it into B's own log.
     const logB = new SocialOperationLog(memoryBackend())
-    expect(await acceptInboundOperation(logB, operation)).toBe('accepted')
+    const envelopes: unknown[] = []
+    const mailboxFetch = (async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') {
+        envelopes.push(JSON.parse(String(init.body)).env)
+        return { ok: true } as Response
+      }
+      return { ok: true, json: async () => ({ envelopes }) } as Response
+    }) as typeof globalThis.fetch
+    const rendezvous = 'https://rendezvous.test'
+    expect(await publishSocialOpsToMailbox(logA, AUTHOR.orbitId, new Set(), rendezvous, mailboxFetch)).toBe(1)
+    expect(await drainSocialOpsFromMailbox(logB, READER.orbitId, rendezvous, mailboxFetch))
+      .toEqual({ accepted: 1, duplicate: 0, rejected: 0 })
 
     // B: the projection yields a feed row that still names its content.
     const projected = projectPosts(await logB.listAllOperations())

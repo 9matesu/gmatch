@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { getCentralApiUrl, setCentralApiUrl, hasCentral } from './central'
+import { DEFAULT_CENTRAL_URL, getCentralApiUrl, setCentralApiUrl, hasCentral } from './central'
 
 beforeEach(() => {
   const store = new Map<string, string>()
@@ -13,14 +13,26 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.unstubAllEnvs()
   vi.unstubAllGlobals()
 })
 
 describe('central utils', () => {
-  // The node you are connected to IS the directory and the mail relay: a
-  // hosted rendezvous is a third party that has to exist, be paid for and be
-  // trusted with every sealed envelope's metadata. It is opt-in now.
-  it('defaults to NO hosted rendezvous — the node you are on is the meeting point', () => {
+  // A free, blind Worker is the default meeting point so mail and discovery
+  // still work when no peer's node is reachable. It holds only ciphertext and
+  // directory metadata — the world stays on each install's own node.
+  it('defaults to the deployed blind rendezvous', () => {
+    expect(getCentralApiUrl()).toBe(DEFAULT_CENTRAL_URL)
+    expect(hasCentral()).toBe(true)
+  })
+
+  it('lets VITE_CENTRAL_URL override the default', () => {
+    vi.stubEnv('VITE_CENTRAL_URL', 'https://my-node.example:9000')
+    expect(getCentralApiUrl()).toBe('https://my-node.example:9000')
+  })
+
+  it('lets VITE_CENTRAL_URL=none opt out', () => {
+    vi.stubEnv('VITE_CENTRAL_URL', 'none')
     expect(getCentralApiUrl()).toBe('')
     expect(hasCentral()).toBe(false)
   })
@@ -29,8 +41,8 @@ describe('central utils', () => {
     setCentralApiUrl('http://custom-node:9000')
     expect(getCentralApiUrl()).toBe('http://custom-node:9000')
     expect(hasCentral()).toBe(true)
-    setCentralApiUrl('')
-    expect(getCentralApiUrl()).toBe('')
+    setCentralApiUrl('') // clearing the override returns to the default rendezvous
+    expect(getCentralApiUrl()).toBe(DEFAULT_CENTRAL_URL)
   })
 
   it('handles "none" central keyword', () => {

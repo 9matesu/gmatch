@@ -154,7 +154,7 @@ export function DeleteAccountSection({
               value={typed}
               onChange={(e) => setTyped(e.target.value)}
               autoComplete="off"
-              className="w-full bg-surface-interactive border border-danger/60 rounded-lg px-3 py-2 text-xs text-retro-fg outline-none focus:border-danger"
+              className="w-full bg-surface-interactive border border-danger/60 rounded-lg px-3 py-1.5 text-xs text-retro-fg outline-none focus:border-danger"
             />
           </div>
 

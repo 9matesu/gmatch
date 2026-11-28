@@ -229,7 +229,43 @@ describe('GMatchProfile', () => {
     );
     const ids = Array.from(container.querySelectorAll('[data-post-id]')).map((el) => el.getAttribute('data-post-id'));
     expect(ids).toEqual(['text-new', 'media-mid', 'text-old']);
-    expect(container.querySelectorAll('.grid-cols-3')).toHaveLength(1);
+    expect(container.querySelectorAll('[data-testid="profile-post-grid"]')).toHaveLength(1);
+    expect(container.querySelector('.grid-cols-3')).toBeNull();
+  });
+
+  it('uses one card shape for text and image posts with the same action row', () => {
+    const text = {
+      id: 'only-text', author_id: 'user_123', author_name: 'Alice Wonder', caption: 'Words only',
+      url: '', created_at: '2026-10-27T12:00:00.000Z', like_count: 0, comment_count: 0,
+    } as any;
+    const media = {
+      id: 'only-media', author_id: 'user_123', author_name: 'Alice Wonder', caption: 'A picture',
+      url: 'https://example.com/picture.jpg', mime_type: 'image/jpeg',
+      created_at: '2026-10-26T12:00:00.000Z', like_count: 0, comment_count: 0,
+    } as any;
+    const { container } = render(
+      <GMatchProfile identity={fakeIdentity} myUser={fakeUser} posts={[text, media]} cards={[]} />,
+    );
+    expect(screen.getByTestId('profile-text-post').getAttribute('data-profile-post-kind')).toBe('text');
+    expect(screen.getByTestId('profile-media-post').getAttribute('data-profile-post-kind')).toBe('media');
+    const likeButtons = screen.getAllByRole('button', { name: 'Like post' });
+    const saveButtons = screen.getAllByRole('button', { name: 'Save post' });
+    expect(likeButtons).toHaveLength(2);
+    expect(saveButtons).toHaveLength(2);
+    expect(screen.queryByText(/No preview|Loading media/i)).not.toBeInTheDocument();
+    expect(container.querySelector('[data-testid="profile-media-post"] img')).not.toBeNull();
+  });
+
+  it('drops a duplicated post id from the profile grid', () => {
+    const media = {
+      id: 'same-id', author_id: 'user_123', author_name: 'Alice Wonder', caption: 'one post',
+      url: 'https://example.com/picture.jpg', mime_type: 'image/jpeg',
+      created_at: '2026-10-26T12:00:00.000Z', like_count: 0, comment_count: 0,
+    } as any;
+    const { container } = render(
+      <GMatchProfile identity={fakeIdentity} myUser={fakeUser} posts={[media, { ...media }]} cards={[]} />,
+    );
+    expect(container.querySelectorAll('[data-post-id="same-id"]')).toHaveLength(1);
   });
 
   it('sorts zone-less SQLite stamps as UTC, like the ISO rows', () => {

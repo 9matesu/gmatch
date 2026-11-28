@@ -40,6 +40,18 @@ describe('ShopPanel category separation tags (REAL / HENTAI)', () => {
     expect(useGame.getState().allowReal).toBe(true)
   })
 
+  it('keeps the custom tag box a compact single-line field', async () => {
+    useGame.setState({ allowReal: true, allowHentai: true, tags: [] })
+    render(<ShopPanel />)
+
+    await userEvent.click(screen.getByRole('button', { name: /Add Tag/i }))
+    const input = screen.getByLabelText('Search a custom tag')
+    expect(input.tagName).toBe('INPUT')
+    expect(input.className).toContain('py-1.5')
+    expect(input.className).toContain('text-xs')
+    expect(input.className).not.toMatch(/\bpy-(2|2\.5|3)\b/)
+  })
+
   it('renders an owned tag as sibling buttons, never a button inside a button', () => {
     useGame.setState({
       allowReal: true,

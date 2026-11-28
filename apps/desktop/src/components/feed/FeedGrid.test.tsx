@@ -44,6 +44,25 @@ beforeEach(() => {
 })
 
 describe('FeedGrid (no remount jank)', () => {
+  it('draws one tile per post id and never drops the text row', () => {
+    // A node row and a local mirror can both carry the same id; two justified
+    // rows with one id drew the tile twice and collided on their React key,
+    // which made the neighbouring text card vanish. Dedupe before layout.
+    const textPost = { id: 'words', caption: 'just words' } as never
+    const { container } = render(
+      <FeedGrid
+        posts={[post('a'), post('a'), textPost]}
+        identity={null}
+        onOpen={() => {}}
+        likedPosts={{}}
+        likeCounts={{}}
+        onToggleLike={() => {}}
+      />,
+    )
+    expect(screenIds()).toEqual(['a', 'words'])
+    expect(container.querySelector('[data-testid="feed-grid"]')?.children).toHaveLength(1)
+  })
+
   it('keeps existing tiles mounted when a new ratio extends the last row', () => {
     const { rerender } = render(
       <FeedGrid posts={[post('a'), post('b'), post('c')]} identity={null} onOpen={() => {}} likedPosts={{}} likeCounts={{}} onToggleLike={() => {}} />,

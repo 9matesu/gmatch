@@ -37,6 +37,7 @@ import { formatDate, formatTime } from '../../utils/formatDate';
 import { ObjectImage } from '../ObjectImage';
 import { DropZone, readClipboard } from '../DropZone';
 import { ChatPlayerList } from './ChatPlayerList';
+import type { PeerRoster } from '../../utils/peerRoster';
 import { Linkify } from '../Linkify';
 import { chatDisplayName } from './chatDisplayName';
 import { nameFor, nameRoster as nameRosterFromDirectory, rememberName } from '../../game/nameDirectory';
@@ -155,6 +156,7 @@ export function GMatchDMs({
   onOpenImage,
   onLoadHistory,
   users = NO_USERS,
+  roster,
 }: {
   identity: OrbitIdentity | null;
   chatMessages?: ChatMessage[];
@@ -237,6 +239,9 @@ export function GMatchDMs({
   onOpenImage?: (message: ChatMessage) => void;
   onLoadHistory?: (peerId: string, beforeTimestamp: string) => Promise<boolean>;
   users?: User[];
+  /** THE one online roster. Forwarded to the player list so its header count
+   *  cannot disagree with the CommandIsland chip. */
+  roster?: PeerRoster;
 }) {
   const [inputText, setInputText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -832,7 +837,7 @@ export function GMatchDMs({
         )}
 
         <div className="p-2.5 border-b border-edge shrink-0">
-          <div className={FIELD.shell}>
+          <div className={FIELD.compactShell}>
             <Search className="w-3.5 h-3.5 text-retro-muted shrink-0" />
             <Input
               type="text"
@@ -1180,9 +1185,11 @@ export function GMatchDMs({
              </div>
 
              {searchOpen && openTarget === 'peer' && (
-               <div className="border-b border-edge bg-glass-w5 px-3 py-2 shrink-0 space-y-1">
+               <div className={classes(FIELD.compactShell, 'shrink-0 space-y-1')}>
                  <Input
                    autoFocus
+                   bare
+                   className="text-xs"
                    value={conversationSearch}
                    onChange={(e) => setConversationSearch(e.target.value)}
                    onKeyDown={(e) => { if (e.key === 'Escape') { setSearchOpen(false); setConversationSearch(''); } }}
@@ -1690,6 +1697,7 @@ export function GMatchDMs({
           }}
           onInvitePlayer={onInviteToGame}
           inviteUnavailableReason={inviteUnavailableReason}
+          roster={roster}
         />
       </div>
       {messageMenu && (

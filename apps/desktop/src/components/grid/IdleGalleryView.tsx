@@ -1089,16 +1089,6 @@ export default function IdleGalleryView({
                     )}
                   </button>
 
-                  {/* Phase 5: local-cache status — never imply a keep is saved
-                      when its bytes are not locally stored. */}
-                  {isPermanentlySaved(img) && (
-                    <span
-                      title="Saved permanently in the local vault, not the temporary picture cache."
-                      className="pointer-events-none absolute bottom-1.5 right-1.5 z-20 rounded-md bg-black/70 px-1.5 py-0.5 text-2xs font-mono text-retro-fg/80 backdrop-blur-md"
-                    >
-                      Permanent
-                    </span>
-                  )}
                   {img.saveState === 'downloading' && (
                     <span className="pointer-events-none absolute bottom-1.5 left-1.5 z-20 rounded-md bg-black/70 px-1.5 py-0.5 text-2xs font-mono text-retro-fg/80 backdrop-blur-md">
                       Saving permanently…{pinProgress[img.url] != null ? ` ${pinProgress[img.url]}%` : ''}

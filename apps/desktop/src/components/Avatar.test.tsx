@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { Avatar } from './Avatar';
 
@@ -13,7 +13,28 @@ vi.mock('../services/imageCache', () => ({
   cachedImageFor: vi.fn(() => undefined),
 }));
 
+// A cross-node avatar resolves through the SAME useObjectImage ladder as a
+// peer post. Drive it directly so the test pins the wiring, not the transport.
+vi.mock('../hooks/useIdentity', () => ({
+  useIdentity: vi.fn(() => ({
+    identity: { orbitId: 'me', publicKeyHex: 'p', privateKeyHex: 'k' },
+  })),
+}));
+vi.mock('../hooks/useObjectImage', () => ({
+  useObjectImage: vi.fn(() => ({
+    url: null, failed: false, isVideo: false, isLink: false, linkUrl: null, awaitingSeeder: false,
+  })),
+}));
+
 describe('Avatar offline cache and fallback', () => {
+  beforeEach(async () => {
+    const { useObjectImage } = await import('../hooks/useObjectImage');
+    vi.mocked(useObjectImage).mockReset().mockReturnValue({
+      url: null, failed: false, isVideo: false,
+      isLink: false, linkUrl: null, awaitingSeeder: false,
+    });
+  });
+
   it('resolves image through disk cache when available', async () => {
     const { container } = render(<Avatar id="user-1" imageUrl="https://cdn.example.com/cached-pfp.jpg" />);
     await waitFor(() => {
@@ -66,5 +87,34 @@ describe('Avatar offline cache and fallback', () => {
     expect(svg).toBeTruthy();
     expect(svg?.className.baseVal || svg?.getAttribute('class')).toContain('w-full h-full');
     expect(svg?.className.baseVal || svg?.getAttribute('class')).not.toContain('absolute');
+  });
+
+  it('resolves a content-addressed avatar through the verified media ladder', async () => {
+    const { useObjectImage } = await import('../hooks/useObjectImage');
+    const hash = 'b'.repeat(64);
+    vi.mocked(useObjectImage).mockReturnValue({
+      url: 'blob:verified-avatar', failed: false, isVideo: false,
+      isLink: false, linkUrl: null, awaitingSeeder: false,
+    });
+    const { container } = render(<Avatar id="peer-1" imageUrl={`urn:sha256:${hash}`} />);
+
+    expect(useObjectImage).toHaveBeenCalledWith(hash, expect.objectContaining({ orbitId: 'me' }), { contentHash: hash });
+    expect(container.querySelector('img')).toHaveAttribute('src', 'blob:verified-avatar');
+    // The pfp endpoint on OUR node is never asked for a peer's bytes.
+    expect(container.querySelector('img')?.getAttribute('src')).not.toContain('/api/users/');
+  });
+
+  it('shows the honest fallback when no peer can serve a hashed avatar', async () => {
+    const { useObjectImage } = await import('../hooks/useObjectImage');
+    const hash = 'c'.repeat(64);
+    vi.mocked(useObjectImage).mockReturnValue({
+      url: null, failed: true, isVideo: false,
+      isLink: false, linkUrl: null, awaitingSeeder: false,
+    });
+    const { container } = render(<Avatar id="peer-2" imageUrl={`/api/objects/${hash}`} />);
+
+    expect(useObjectImage).toHaveBeenCalledWith(hash, expect.anything(), { contentHash: hash });
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.querySelector('svg')).toBeTruthy();
   });
 });

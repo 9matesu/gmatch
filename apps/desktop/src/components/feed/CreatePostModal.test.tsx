@@ -53,6 +53,15 @@ beforeEach(() => {
   }));
 });
 
+describe('CreatePostModal layout', () => {
+  it('keeps the caption short and the composer in two columns on md+', () => {
+    const { container } = render(<CreatePostModal identity={identity} onClose={() => {}} toast={vi.fn()} />);
+    const caption = screen.getByPlaceholderText('What is happening?!') as HTMLTextAreaElement;
+    expect(caption.rows).toBe(2);
+    expect(container.querySelector('[class*="md:grid-cols-2"]')).toBeTruthy();
+  });
+});
+
 describe('CreatePostModal URL uploads', () => {
   it('resolves twitter post links to direct media through the picker', async () => {
     vi.mocked(fetch).mockResolvedValue({

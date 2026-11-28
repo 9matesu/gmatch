@@ -44,6 +44,20 @@ export type PeerTransportPhase =
   | 'relay'
   | 'failed'
 
+/**
+ * The ONE human label for a validated transport phase. `idle` and
+ * `connecting-direct` have no settled route yet, so they say nothing — the UI
+ * never claims "P2P direto" for a dial that has not opened.
+ */
+export function transportLabel(phase: PeerTransportPhase): string | null {
+  switch (phase) {
+    case 'direct': return 'P2P direto'
+    case 'relay': return 'relay via nó (NAT)'
+    case 'failed': return 'sem rota'
+    default: return null
+  }
+}
+
 export interface PeerTransportEntry {
   phase: PeerTransportPhase
   directAttempts: number

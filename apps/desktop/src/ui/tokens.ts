@@ -346,6 +346,8 @@ export const FIELD = {
   bare: classes('w-full bg-transparent border-none focus:outline-none', COLOR.fg, 'placeholder:text-retro-muted'),
   /** The bordered wrapper around a `bare` field with a leading icon. */
   shell: classes(RADIUS.control, 'border', COLOR.edge, 'bg-surface-canvas', PADDING_X[3], PADDING_Y[2]),
+  /** Compact search shell — the chat-player-search single-line height contract. */
+  compactShell: classes(RADIUS.control, 'border', COLOR.edge, 'bg-surface-canvas', PADDING_X[3], PADDING_Y[1.5]),
   /** Checkboxes/radios: one accent and one disabled contract, no bespoke fills. */
   check: 'w-4 h-4 accent-retro-accent cursor-pointer disabled:opacity-30',
 } as const

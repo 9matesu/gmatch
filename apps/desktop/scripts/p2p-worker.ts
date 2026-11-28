@@ -25,6 +25,7 @@
  */
 import 'fake-indexeddb/auto'
 import { generateIdentity } from '@orbit/crypto'
+import { seal1to1, open1to1, type Envelope } from '@orbit/protocol'
 import {
   __resetLocalObjectCacheForTests,
   __resetReceiptStateForTests,
@@ -37,9 +38,12 @@ import {
   registerLocalObject,
   requestSwarmObject,
   setSwarmReceiptIdentity,
+  setSwarmDmHandler,
   setSwarmTransport,
   sha256HexBlob,
 } from '../src/utils/p2pSwarm.ts'
+import { decodeBody, encodeAckBody, encodeDmBody } from '../src/utils/mail-dm.ts'
+import { defaultIceConfig } from '../src/utils/ice-hygiene.ts'
 import { sharedSocialOperationLog } from '../src/services/socialOperationLog.ts'
 import { acceptInboundOperation } from '../src/services/socialOpTransport.ts'
 import { publishSignedPostOperation } from '../src/services/socialPublish.ts'
@@ -90,7 +94,68 @@ setSwarmTransport((msg) => {
   emit({ kind: 'frame', peer: PEER, msg })
 })
 
-emit({ kind: 'identity', peer: PEER, orbitId: IDENTITY.orbitId, publicKeyHex: IDENTITY.publicKeyHex })
+emit({ kind: 'identity', peer: PEER, orbitId: IDENTITY.orbitId, publicKeyHex: IDENTITY.publicKeyHex, encryptionPubHex: IDENTITY.encryptionPubHex })
+
+// ---- Mesh-carried sealed DM (SWARM_DM) -----------------------------------
+// The SAME Envelope v2 the courier carries; here it rides the swarm. The
+// receiver opens it (signature check) and acks with its own sealed SWARM_DM —
+// exactly the production path (useCourierDms), with the parent as the wire.
+const seenDmIds = new Set<string>()
+let dmPeer: { orbitId: string; publicKeyHex: string; encryptionPubHex: string } | null = null
+setSwarmDmHandler((envelope: Envelope) => {
+  try {
+    const opened = open1to1(envelope, IDENTITY.encryptionPrivHex)
+    const body = decodeBody(opened.body)
+    if (!body) return
+    if (body.t === 'dm') {
+      if (seenDmIds.has(body.id)) return
+      seenDmIds.add(body.id)
+      emit({ kind: 'dm', peer: PEER, id: body.id, text: body.text ?? '', from: opened.senderOrbitId })
+      // Ack back to the sender, sealed to the key it proved (senderPub +
+      // fromEph): the round-trip's second leg, over the same mesh. Emit the
+      // frame directly — the parent relays it to the sender.
+      const ack = seal1to1(encodeAckBody(body.id), 'mail', IDENTITY, {
+        publicKeyHex: opened.senderPubHex,
+        encryptionPubHex: envelope.fromEph || '',
+      })
+      emit({ kind: 'frame', peer: PEER, msg: { type: 'SWARM_DM', envelope: ack } })
+    } else if (body.t === 'dm_ack') {
+      emit({ kind: 'dm-ack', peer: PEER, id: body.id })
+    }
+  } catch {
+    /* not ours / bad signature: drop */
+  }
+})
+
+// ---- Real ICE probe (direct WAN leg) -------------------------------------
+// A genuine RTCPeerConnection DataChannel between the two peers, using public
+// Public STUN (defaultIceConfig); no free TURN is bundled. Parent relays the SDP
+// (it is the untrusted relay / tracker stand-in). When the channel opens the
+// swarm transport switches to it, so the SAME frames then flow direct.
+let icePc: RTCPeerConnection | null = null
+function wireIceChannel(channel: RTCDataChannel): void {
+  channel.addEventListener('open', () => {
+    emit({ kind: 'ice-open', peer: PEER })
+    setSwarmTransport((msg) => {
+      try { channel.send(JSON.stringify(msg)) } catch { /* closing */ }
+    })
+  })
+  channel.addEventListener('message', (event) => {
+    try {
+      const msg = JSON.parse(String(event.data))
+      void handleSwarmMessage(msg)
+    } catch { /* non-swarm frame */ }
+  })
+}
+async function waitIceComplete(pc: RTCPeerConnection, budgetMs = 8000): Promise<void> {
+  if (pc.iceGatheringState === 'complete') return
+  await new Promise<void>((resolve) => {
+    const done = () => { pc.removeEventListener('icegatheringstatechange', check); resolve() }
+    const check = () => { if (pc.iceGatheringState === 'complete') done() }
+    pc.addEventListener('icegatheringstatechange', check)
+    setTimeout(done, budgetMs)
+  })
+}
 
 let buffer = ''
 process.stdin.setEncoding('utf8')
@@ -119,9 +184,66 @@ async function handleCommand(cmd: {
   timeoutMs?: number
   operationId?: string
   operation?: unknown
+  orbitId?: string
+  publicKeyHex?: string
+  encryptionPubHex?: string
+  text?: string
+  sdp?: unknown
 }) {
   const log = sharedSocialOperationLog()
   try {
+    if (cmd.type === 'dm-set-peer' && cmd.publicKeyHex && cmd.encryptionPubHex) {
+      dmPeer = { orbitId: cmd.orbitId || '', publicKeyHex: cmd.publicKeyHex, encryptionPubHex: cmd.encryptionPubHex }
+      emit({ kind: 'log', peer: PEER, message: 'dm peer set' })
+      return
+    }
+    // Seal a DM to the configured peer and emit it as a SWARM_DM frame (the
+    // parent relays it). Identical to the courier body, just a mesh wire.
+    if (cmd.type === 'dm-send' && cmd.text != null) {
+      if (!dmPeer) {
+        emit({ kind: 'error', peer: PEER, message: 'dm-send: no peer configured' })
+        return
+      }
+      const msg = { id: `dm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, peerId: dmPeer.orbitId, own: true, text: cmd.text, ts: Date.now(), status: 'sent' as const }
+      const env = seal1to1(encodeDmBody(msg), 'mail', IDENTITY, dmPeer)
+      emit({ kind: 'frame', peer: PEER, msg: { type: 'SWARM_DM', envelope: env } })
+      return
+    }
+    // Real ICE: create an offer. The parent relays the SDP to the other peer.
+    if (cmd.type === 'ice-start') {
+      const Rtc = (globalThis as { RTCPeerConnection?: typeof RTCPeerConnection }).RTCPeerConnection
+      if (!Rtc) {
+        emit({ kind: 'ice-error', peer: PEER, error: `RTCPeerConnection undefined in node ${process.version}` })
+        return
+      }
+      icePc = new Rtc(defaultIceConfig())
+      wireIceChannel(icePc.createDataChannel('gmatch-swarm'))
+      await icePc.setLocalDescription(await icePc.createOffer())
+      await waitIceComplete(icePc)
+      emit({ kind: 'ice-offer', peer: PEER, sdp: icePc.localDescription })
+      return
+    }
+    // Real ICE: answer an offer, then emit our answer SDP.
+    if (cmd.type === 'ice-answer' && cmd.sdp) {
+      const Rtc = (globalThis as { RTCPeerConnection?: typeof RTCPeerConnection }).RTCPeerConnection
+      if (!Rtc) {
+        emit({ kind: 'ice-error', peer: PEER, error: `RTCPeerConnection undefined in node ${process.version}` })
+        return
+      }
+      icePc = new Rtc(defaultIceConfig())
+      icePc.ondatachannel = (event) => wireIceChannel(event.channel)
+      await icePc.setRemoteDescription(cmd.sdp as RTCSessionDescriptionInit)
+      await icePc.setLocalDescription(await icePc.createAnswer())
+      await waitIceComplete(icePc)
+      emit({ kind: 'ice-answer', peer: PEER, sdp: icePc.localDescription })
+      return
+    }
+    // Real ICE: the answer to our offer arrived; apply it.
+    if (cmd.type === 'ice-remote' && cmd.sdp && icePc) {
+      await icePc.setRemoteDescription(cmd.sdp as RTCSessionDescriptionInit)
+      emit({ kind: 'log', peer: PEER, message: 'ice remote applied' })
+      return
+    }
     if (cmd.type === 'seed' && cmd.id && cmd.b64) {
       const blob = decode(cmd.b64)
       registerLocalObject(cmd.id, blob)

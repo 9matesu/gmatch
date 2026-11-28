@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { generateIdentity, type OrbitIdentity } from '@orbit/crypto'
 import { PeerRoster } from '../peerRoster'
-import { startMesh, meshPeerAsUser } from './mesh'
+import { DEFAULT_TRACKERS, startMesh, meshPeerAsUser } from './mesh'
 import { makeHello, signHello } from './hello'
 
 const FP_LOCAL = 'cc'.repeat(32)
@@ -186,6 +186,14 @@ function fakePcFor(remote: OrbitIdentity, made?: FakePc[]): typeof RTCPeerConnec
 }
 
 describe('the tracker mesh', () => {
+  it('announces on three distinct WebTorrent trackers, none dead', () => {
+    expect(DEFAULT_TRACKERS).toHaveLength(3)
+    expect(new Set(DEFAULT_TRACKERS).size).toBe(3)
+    expect(DEFAULT_TRACKERS.every((url) => url.startsWith('wss://'))).toBe(true)
+    // btorrent.xyz resolves to 127.0.0.1: no tracker there, ever.
+    expect(DEFAULT_TRACKERS.some((url) => url.includes('btorrent.xyz'))).toBe(false)
+  })
+
   it('a tracker-discovered peer becomes a visible roster peer', async () => {
     const alice = generateIdentity()
     const bob = generateIdentity()

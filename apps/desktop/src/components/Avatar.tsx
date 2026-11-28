@@ -13,16 +13,36 @@ function hashToInt(hex: string, index: number, max: number): number {
 import { useState, useEffect } from 'react'
 import { resolveMediaUrl } from '../utils/media'
 import { resolveImage, devFetchable } from '../services/imageCache'
+import { useIdentity } from '../hooks/useIdentity'
+import { useObjectImage } from '../hooks/useObjectImage'
+import { isContentAddress } from '../utils/contentAddressedMedia'
+import { resolveObjectRefId } from '../utils/objectRef'
+
+/**
+ * An avatar that names its bytes by content (`urn:sha256:<hex>`, a 64-hex id,
+ * a magnet btih) is resolved through the SAME verified ladder as a peer post:
+ * local bytes, then the swarm asking for that hash — never our node's pfp
+ * route and never a provider hotlink. A peer with no seeder gets the geometric
+ * fallback, not a fabricated picture.
+ */
+function avatarContentRef(imageUrl: string | null | undefined): string | null {
+  if (!imageUrl) return null
+  const ref = resolveObjectRefId(imageUrl)
+  return ref && isContentAddress(ref) ? ref : null
+}
 
 export function Avatar({ id, size = 40, imageUrl, fill = false }: { id: string; size?: number; imageUrl?: string | null; fill?: boolean }) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null)
   const [cachedUrl, setCachedUrl] = useState<string | null>(null)
+  const { identity } = useIdentity()
+  const contentRef = avatarContentRef(imageUrl)
+  const verified = useObjectImage(contentRef, identity ?? null, contentRef ? { contentHash: contentRef } : undefined)
 
   // Track the URL that failed to load. When the profile pic changes (e.g. just
   const failed = imageUrl ? failedUrl === imageUrl : false
 
   useEffect(() => {
-    if (!imageUrl) {
+    if (!imageUrl || contentRef) {
       setCachedUrl(null)
       return
     }
@@ -43,9 +63,29 @@ export function Avatar({ id, size = 40, imageUrl, fill = false }: { id: string; 
       if (live && local && local !== resolved) setCachedUrl(local)
     }).catch(() => {})
     return () => { live = false }
-  }, [imageUrl])
+  }, [imageUrl, contentRef])
 
-  if (imageUrl && !failed) {
+  // Hash-addressed avatar: only the verified bytes may render. No url yet (a
+  // seeder is offline) means the geometric fallback below — never a hotlink or
+  // this node's pfp route, which does not own a cross-node peer's picture.
+  if (contentRef && verified.url && !verified.failed) {
+    if (fill) {
+      return <img src={verified.url} alt="" className="w-full h-full object-cover" data-no-wallpaper />
+    }
+    return (
+      <img
+        src={verified.url}
+        alt=""
+        width={size}
+        height={size}
+        className="flex-shrink-0 object-cover rounded-full"
+        style={{ width: size, height: size }}
+        data-no-wallpaper
+      />
+    )
+  }
+
+  if (imageUrl && !failed && !contentRef) {
     const target = (imageUrl.includes('/api/objects/') && id) ? `/api/users/${id}/pfp` : imageUrl
     const resolvedUrl = cachedUrl || resolveMediaUrl(target)
 

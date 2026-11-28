@@ -183,6 +183,19 @@ export class PeerRoster {
     return this.snapshot
   }
 
+  /**
+   * THE online-peer projection every count surface reads. Self is never a
+   * peer, and a persisted row with `online:false` is not a live player — no
+   * surface gets to re-derive a different number from its own snapshot.
+   */
+  onlinePeers(selfId?: string): User[] {
+    return this.snapshot.filter((p) => !!p?.id && p.id !== selfId && p.online === true)
+  }
+
+  countOnline(selfId?: string): number {
+    return this.onlinePeers(selfId).length
+  }
+
   get(id: string): User | undefined {
     return this.map.get(id)
   }

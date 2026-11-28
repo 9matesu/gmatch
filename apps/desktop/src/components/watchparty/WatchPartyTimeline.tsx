@@ -78,7 +78,13 @@ export function WatchPartyTimeline({
 
   useEffect(() => {
     if (!frame) return
-    const t = setInterval(() => forceTick((n) => n + 1), 250)
+    // The playhead only needs repainting while the room is actually being
+    // watched. A hidden window (tab in the background) skips the repaint, so an
+    // idle second costs nothing — the 250 ms slot tick still reconciles.
+    const t = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return
+      forceTick((n) => n + 1)
+    }, 250)
     return () => clearInterval(t)
   }, [frame])
 
@@ -186,7 +192,7 @@ export function WatchPartyTimeline({
     if (!isHost) return
     const el = scrubBarRef.current
     if (!el || duration <= 0) return
-    el.setPointerCapture(e.pointerId)
+    try { el.setPointerCapture(e.pointerId) } catch { /* jsdom / no capture */ }
     setIsScrubbing(true)
 
     const rect = el.getBoundingClientRect()
@@ -203,6 +209,10 @@ export function WatchPartyTimeline({
     setHoverTime(pos * duration)
     if (isScrubbing) {
       setScrubPct(pos)
+      // Instant local seek: move the playhead under the pointer NOW, without
+      // waiting for the server to echo the frame back through the 250 ms tick.
+      const v = video()
+      if (v) v.currentTime = pos * duration
     }
   }
 
@@ -218,6 +228,10 @@ export function WatchPartyTimeline({
     const rect = el.getBoundingClientRect()
     const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
     const seekTime = pos * duration
+    // Apply locally first (instant), then broadcast. controlPlayback also
+    // applies an optimistic frame, but the element seek is what the eye sees.
+    const v = video()
+    if (v) v.currentTime = seekTime
     controlPlayback(party.id, playing ? 'play' : 'pause', seekTime)
   }
 
@@ -227,7 +241,7 @@ export function WatchPartyTimeline({
       className={cn(
         'absolute bottom-0 inset-x-0 z-20 flex flex-col justify-end border-t pt-2',
         COLOR.edge, COLOR.canvasVeil, MOTION.transition.fade,
-        'px-3 sm:px-4 pb-[calc(0.75rem+var(--island-clearance))] select-none',
+        'px-3 sm:px-4 pb-2 select-none',
         playing && !isScrubbing
           ? 'opacity-0 group-hover/watch:opacity-100 focus-within:opacity-100 pointer-events-none group-hover/watch:pointer-events-auto focus-within:pointer-events-auto'
           : 'opacity-100 pointer-events-auto',

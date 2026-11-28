@@ -19,7 +19,7 @@ import { ObjectImage } from '../ObjectImage';
 import { Button } from '../../ui/kit';
 import {
   classes, CHROME, COLOR, GAP, ICON, MONO, MOTION, PADDING, PADDING_X, PADDING_Y,
-  RADIUS, RECIPE, STATUS, TRACKING, TYPE, WEIGHT,
+  RADIUS, STATUS, TRACKING, TYPE, WEIGHT,
 } from '../../ui/tokens';
 import type { StoreProduct } from './storeCatalog';
 
@@ -97,7 +97,7 @@ export function ProductTile({
   return (
     <article
       className={classes(
-        RECIPE.card, COLOR.panel, 'flex flex-col overflow-hidden',
+        CHROME.tile, 'flex flex-col overflow-hidden h-full',
         MOTION.transition.quick, COLOR.hoverEdgeStrong,
       )}
     >
@@ -125,7 +125,7 @@ export function ProductTile({
         </button>
       </div>
 
-      <div className={classes(PADDING[2.5], 'flex flex-col flex-1', GAP[1], 'min-w-0')}>
+      <div className={classes(PADDING[2], 'flex flex-col flex-1', GAP[0.5], 'min-w-0')}>
         <button
           type="button"
           onClick={onQuickView}
@@ -166,8 +166,8 @@ export function ProductTile({
         )}
       </div>
 
-      <div className={classes('mt-auto flex items-center justify-between', GAP[1.5], PADDING_X[2.5], PADDING_Y[2], 'border-t', COLOR.edgeSubtle)}>
-        <span className={classes(TYPE.sub, MONO, WEIGHT.bold, STATUS.info, 'tabular-nums')}>{priceLabel}</span>
+      <div className={classes('mt-auto flex items-center justify-between', GAP[1.5], PADDING_X[2], PADDING_Y[1.5], 'border-t', COLOR.edgeSubtle)}>
+        <span className={classes(TYPE.sub, MONO, WEIGHT.bold, STATUS.info, 'tabular-nums', 'truncate')}>{priceLabel}</span>
         {product.own ? (
           <span className={classes(PADDING_X[2], PADDING_Y[1], RADIUS.chip, COLOR.interactive, COLOR.muted, TYPE.caption, WEIGHT.bold)} title="This is your own listing">
             Yours

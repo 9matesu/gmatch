@@ -70,6 +70,18 @@ describe('GMatchSettingsModal sections', () => {
     expect(screen.getByRole('button', { name: /wallpaper settings/i })).toBeVisible()
   })
 
+  it('keeps single-line settings text fields compact', () => {
+    open()
+    const excludes = screen.getByLabelText('Add an excluded tag')
+    expect(excludes.className).toContain('py-1.5')
+    expect(excludes.className).not.toMatch(/\bpy-(2|2\.5|3)\b/)
+
+    fireEvent.click(screen.getByRole('button', { name: /Expand wallpaper settings/i }))
+    const url = screen.getByPlaceholderText(/Direct image or video URL/)
+    expect(url.className).toContain('py-1.5')
+    expect(url.className).not.toMatch(/\bpy-(2|2\.5|3)\b/)
+  })
+
   it('drops the dead display options from General', () => {
     open()
     nav('General')

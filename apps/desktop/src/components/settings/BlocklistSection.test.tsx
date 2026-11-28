@@ -38,6 +38,18 @@ describe('BlocklistSection', () => {
     expect(screen.queryByRole('button', { name: /Save Changes/i })).not.toBeInTheDocument()
   })
 
+  it('keeps the tag search and add fields compact single-line inputs', () => {
+    render(<BlocklistSection />)
+    const add = screen.getByPlaceholderText(/Add tag\(s\) to blocklist/i)
+    const search = screen.getByPlaceholderText(/Search \d+ tags/i)
+    for (const input of [add, search]) {
+      expect(input.tagName).toBe('INPUT')
+      expect(input.className).toContain('py-1.5')
+      expect(input.className).toContain('text-xs')
+      expect(input.className).not.toMatch(/\bpy-(2|2\.5|3)\b/)
+    }
+  })
+
   it('allows switching to raw JSON mode and back to visual mode', () => {
     render(<BlocklistSection />)
     const jsonBtn = screen.getByText('Raw JSON')
