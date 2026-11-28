@@ -15,8 +15,8 @@
 //   node deploy-pages.mjs            # production (branch main)
 //   node deploy-pages.mjs --preview  # preview alias, production untouched
 //
-// Requires `npx wrangler login` once. Manual on purpose: there is no CI deploy
-// token, so publishing stays a local, auditable step.
+// Requires `npx wrangler login` locally, or CLOUDFLARE_API_TOKEN in CI (Pages
+// write). The release workflow uses the token; local deploys stay manual.
 import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -39,6 +39,7 @@ try {
   cpSync(join(here, 'index.html'), join(stage, 'index.html'))
   cpSync(join(here, 'release.json'), join(stage, 'release.json'))
   cpSync(join(here, 'img'), join(stage, 'img'), { recursive: true })
+  cpSync(join(here, 'fonts'), join(stage, 'fonts'), { recursive: true })
   cpSync(join(here, 'legal'), join(stage, 'legal'), { recursive: true })
 
   const args = [

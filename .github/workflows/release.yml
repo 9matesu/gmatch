@@ -73,3 +73,27 @@ jobs:
         with:
           files: dist/gMatch-*
           body_path: dist/RELEASE_BODY.md
+
+  site:
+    name: Update site manifest + deploy Pages
+    needs: publish
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Derive release.json from the built exe, sync index, verify
+        working-directory: site
+        run: |
+          EXE=$(find ../dist -name 'gMatch-*-portable.exe' | head -n 1)
+          test -n "$EXE" || { echo "no portable exe artifact"; exit 1; }
+          GH_DOWNLOAD_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/$(basename "$EXE")" node build-release.mjs "$EXE"
+          node sync-hash.mjs
+          node check.mjs
+      - name: Deploy static page to Cloudflare Pages
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: node site/deploy-pages.mjs
