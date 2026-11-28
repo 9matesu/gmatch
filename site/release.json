@@ -1,9 +1,9 @@
 {
-  "file": "gMatch-1.6.8-portable.exe",
-  "version": "1.6.8",
-  "sha256": "c2ce49c23edd51674fd55c85295dd3a2f0d1f4b745e939fc41d0d84069816b44",
-  "sha512": "75c0bbc55885ffb3a7d8f990956eba171c9bf9b59f9ceffb2ac9c11b7171b6a466343fe9f82df8fa0945303e80adff68da8921d48dcb43e72661814a3c89c947",
-  "buildDate": "2026-11-26T22:47:29.547Z",
-  "sizeBytes": 101242215,
-  "downloadUrl": "https://github.com/9matesu/gmatch/releases/download/v1.6.8/gMatch-1.6.8-portable.exe"
+  "file": "gMatch-1.6.9-portable.exe",
+  "version": "1.6.9",
+  "sha256": "1534e231589a9bea0bcc97f54c2fdd7136f8dae2bf3a3723b3fc53f2bd017806",
+  "sha512": "2455d77668ef1063f349e21c81c0361060ab12c112a7566f324f85cd185a0c7d49310cdeb490a622a58276c78316e42cd362778a225a1a8d0a95892ef81e7593",
+  "buildDate": "2026-11-28T01:49:28.501Z",
+  "sizeBytes": 111009185,
+  "downloadUrl": "https://github.com/9matesu/gmatch/releases/download/v1.6.9/gMatch-1.6.9-portable.exe"
 }
