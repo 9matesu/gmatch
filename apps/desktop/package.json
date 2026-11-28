@@ -126,5 +126,7 @@
     ]
   },
   "description": "gMatch — adults-only (18+) idle game + social desktop app",
-  "author": "gMatch"
+  "author": "gMatch <gmatch@users.noreply.github.com>",
+  "homepage": "https://gmatch.pages.dev",
+  "compression": "maximum",
 }
