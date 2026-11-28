@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, it, expect, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, fireEvent, waitFor } from '@testing-library/react';
+import { generateIdentity } from '@orbit/crypto';
 import { Avatar } from './Avatar';
+import { broadcastPresence, fetchPresenceRosterFrom } from '../services/courierPresence';
+import { registerLocalObject, sha256HexBlob } from '../utils/p2pSwarm';
 
 vi.mock('../services/imageCache', () => ({
   resolveImage: vi.fn(async (url: string) =>
@@ -27,6 +30,20 @@ vi.mock('../hooks/useObjectImage', () => ({
 }));
 
 describe('Avatar offline cache and fallback', () => {
+  beforeAll(() => {
+    // jsdom's Blob has no arrayBuffer(); Chromium (the real runtime) does.
+    if (typeof Blob !== 'undefined' && !Blob.prototype.arrayBuffer) {
+      Blob.prototype.arrayBuffer = function (this: Blob): Promise<ArrayBuffer> {
+        return new Promise((resolve, reject) => {
+          const fr = new FileReader();
+          fr.onload = () => resolve(fr.result as ArrayBuffer);
+          fr.onerror = () => reject(fr.error);
+          fr.readAsArrayBuffer(this);
+        });
+      };
+    }
+  });
+
   beforeEach(async () => {
     const { useObjectImage } = await import('../hooks/useObjectImage');
     vi.mocked(useObjectImage).mockReset().mockReturnValue({
@@ -102,6 +119,51 @@ describe('Avatar offline cache and fallback', () => {
     expect(container.querySelector('img')).toHaveAttribute('src', 'blob:verified-avatar');
     // The pfp endpoint on OUR node is never asked for a peer's bytes.
     expect(container.querySelector('img')?.getAttribute('src')).not.toContain('/api/users/');
+  });
+
+  it('renders a presence-roster pfpHash through the verified content ladder', async () => {
+    // The whole cross-node hand-off: a peer advertises its local avatar by
+    // hash, the reader's roster exposes urn:sha256:<hash>, and Avatar must
+    // resolve THAT hash — never our node's /api/users/:id/pfp route.
+    const avatar = new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 7, 7, 7])], { type: 'image/png' });
+    const hash = await sha256HexBlob(avatar);
+    registerLocalObject('avatar-object-1', avatar);
+    const peer = generateIdentity();
+    const boxes = new Map<string, any[]>();
+    const fetchMock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      const u = String(url);
+      if (u.includes('/api/mail/')) {
+        const base = u.split('/api/mail/')[0];
+        if (init?.method === 'PUT') {
+          boxes.set(base, [...(boxes.get(base) ?? []), JSON.parse(String(init.body)).env]);
+          return new Response(JSON.stringify({ ok: true }), { status: 200 });
+        }
+        return new Response(JSON.stringify({ envelopes: boxes.get(base) ?? [] }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ lanUrls: [] }), { status: 200 });
+    }) as unknown as typeof globalThis.fetch;
+    const store = new Map<string, string>([['gmatch.api.url', 'http://node.test:8790']]);
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => void store.set(k, v),
+      removeItem: (k: string) => void store.delete(k),
+      clear: () => store.clear(),
+    } as Storage);
+    await broadcastPresence(peer as any, { displayName: 'Peer', pfpUrl: '/api/objects/avatar-object-1' }, fetchMock);
+    const roster = await fetchPresenceRosterFrom('http://node.test:8790', 'me', fetchMock);
+    const row = roster.users.find((u) => u.id === (peer as any).orbitId)!;
+    expect(row.pfp_url).toBe(`urn:sha256:${hash}`);
+
+    const { useObjectImage } = await import('../hooks/useObjectImage');
+    vi.mocked(useObjectImage).mockReturnValue({
+      url: 'blob:peer-avatar', failed: false, isVideo: false,
+      isLink: false, linkUrl: null, awaitingSeeder: false,
+    });
+    const { container } = render(<Avatar id={row.id} imageUrl={row.pfp_url} />);
+
+    expect(useObjectImage).toHaveBeenCalledWith(hash, expect.anything(), { contentHash: hash });
+    expect(container.querySelector('img')).toHaveAttribute('src', 'blob:peer-avatar');
+    vi.unstubAllGlobals();
   });
 
   it('shows the honest fallback when no peer can serve a hashed avatar', async () => {

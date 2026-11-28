@@ -168,7 +168,7 @@ describe('CreatePostModal URL uploads', () => {
     expect(screen.queryByRole('textbox')).toBeNull();
   });
 
-  it('an uploaded picture is a public post and a Vault keep — never a card', async () => {
+  it('an uploaded picture is a public post — never a card or a Vault keepsake', async () => {
     render(<CreatePostModal identity={identity} onClose={() => {}} toast={vi.fn()} />);
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
     await userEvent.upload(input, new File([new Uint8Array([1, 2, 3])], 'sunset.png', { type: 'image/png' }));
@@ -182,12 +182,10 @@ describe('CreatePostModal URL uploads', () => {
     // No card is minted from an ordinary upload.
     expect(vi.mocked(orbitFetch).mock.calls.some(([url]) => String(url).includes('/api/cards'))).toBe(false);
 
-    await waitFor(() =>
-      expect(rememberKeepMock).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'forged-sunset.png', contentHash: 'b'.repeat(64), mimeType: 'image/png' }),
-        expect.anything(),
-      ),
-    );
+    // Publishing is a POST, not an explicit save: no gallery keepsake is
+    // minted behind the player's back. The bytes still live in the local
+    // swarm store from forgeMediaLocally, so the post renders normally.
+    expect(rememberKeepMock).not.toHaveBeenCalled();
   });
 
   it('Write a text post opens text mode with no media requirement and publishes', async () => {

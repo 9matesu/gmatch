@@ -3026,10 +3026,19 @@ export default function Home() {
   /** The node serves the NEWEST active announcement only. */
   const announcement = announcements[0] ?? null;
 
-  // Identity-scoped caches drop their contents when the identity changes: a
-  // snapshot read for account A must never render under account B, and any
-  // request still on the wire is superseded.
+  // Identity-scoped caches drop their contents when the identity CHANGES: a
+  // snapshot read for account A must never render under account B. The first
+  // resolution is not a switch — resetting then bumped the request sequence and
+  // cancelled the controller's just-started boot load, which is why the feed
+  // only populated after a navigation/focus triggered another read.
+  const feedIdentityRef = useRef<string | null | undefined>(undefined)
   useEffect(() => {
+    const previous = feedIdentityRef.current
+    feedIdentityRef.current = identity?.orbitId
+    // No previous identity means the store has only just resolved (or we were
+    // signed out): there is no old timeline to drop, so leave the boot read —
+    // and the cached rows it may already be revalidating — alone.
+    if (previous == null || previous === identity?.orbitId) return
     resetFeed()
   }, [identity?.orbitId, resetFeed])
 
@@ -3058,24 +3067,10 @@ export default function Home() {
     return () => { cancelled = true }
   }, [identity, loadUsers, loadGallery, loadCards, loadStories, fetchAnnouncements]);
 
-  // The feed is keyed on identity AND sort, and owns its own effect. It used to
-  // be one entry in the mount effect above, whose dependency array omitted it —
-  // so switching Latest/Trending kept reading the previous snapshot until an
-  // unrelated visibilitychange happened to refresh it.
-  // Boot retry: the first read can race the sidecar coming up (offline/error),
-  // and the next trigger was a WS connect or a focus. Retry a few times so the
-  // feed lands as soon as the node answers, without waiting for the user.
-  const feedBootRetry = useRef(0)
-  useEffect(() => {
-    if (!identity) return
-    if (feedStatus === 'ready') { feedBootRetry.current = 0; return }
-    if ((feedStatus === 'offline' || feedStatus === 'error') && feedPosts.length === 0 && feedBootRetry.current < 6) {
-      feedBootRetry.current += 1
-      const t = setTimeout(() => void loadServerFeed(), 1500)
-      return () => clearTimeout(t)
-    }
-    void loadServerFeed()
-  }, [identity, feedSort, loadServerFeed, feedStatus, feedPosts.length]);
+  // The first read and its boot retries live in useFeedController (one loader,
+  // keyed on identity/sort). This block used to double-fire here and then stop
+  // after one failed read: a repeated failure causes no state re-render, so an
+  // effect keyed on status/feedPosts never scheduled the next retry.
 
   // ONE boot screen. The static `#boot` cover (index.html) stays up until the
   // app has something real to show, then lifts — exactly once. This is what

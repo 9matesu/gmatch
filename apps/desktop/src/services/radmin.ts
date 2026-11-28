@@ -45,15 +45,16 @@ export interface RadminDeps {
 interface OsInterface { family: string | number; address: string; internal: boolean }
 
 /**
- * First non-internal 26.x IPv4 from an `os.networkInterfaces()`-shaped map.
- * Pure so the selection rule is testable without a real OS.
+ * First 26.x IPv4 from an `os.networkInterfaces()`-shaped map. The 26/8 range
+ * is Radmin's alone, so an `internal` flag cannot disqualify a real adapter —
+ * Windows marks some virtual TAP adapters that way. Pure for testing.
  */
 export function firstRadminIp(
   ifaces: Record<string, OsInterface[] | undefined>,
 ): string | null {
   for (const list of Object.values(ifaces)) {
     for (const ni of list ?? []) {
-      if (!ni || ni.internal) continue
+      if (!ni) continue
       const v4 = ni.family === 'IPv4' || ni.family === 4
       if (v4 && isRadminVpnAddress(ni.address)) return ni.address
     }
@@ -72,17 +73,26 @@ async function loadNodeModule(name: string): Promise<any | null> {
   }
 }
 
-function programFilesDirs(): string[] {
-  const env = (globalThis as any)?.process?.env ?? {}
+/**
+ * Every standard install location × both executable names. Radmin VPN 2.x
+ * installs `Radmin.exe` (not `RadminVPN.exe`) under Program Files (x86), so
+ * checking only the old name reported "not installed" on a machine that was
+ * already connected to a 26.x adapter. Pure so the list is testable.
+ */
+export function radminExeCandidates(env: Record<string, string | undefined> = {}): string[] {
   const pf = env.ProgramFiles || 'C:\\Program Files'
   const pfx = env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)'
-  return [`${pf}\\Radmin VPN\\RadminVPN.exe`, `${pfx}\\Radmin VPN\\RadminVPN.exe`]
+  const local = env.LOCALAPPDATA || ''
+  const dirs = [`${pf}\\Radmin VPN`, `${pfx}\\Radmin VPN`]
+  if (local) dirs.push(`${local}\\Programs\\Radmin VPN`)
+  return dirs.flatMap((dir) => [`${dir}\\RadminVPN.exe`, `${dir}\\Radmin.exe`])
 }
 
 async function findRadminVpnDefault(): Promise<string | null> {
   const fs = await loadNodeModule('fs')
   if (!fs?.existsSync) return null
-  for (const candidate of programFilesDirs()) {
+  const env = (globalThis as any)?.process?.env ?? {}
+  for (const candidate of radminExeCandidates(env)) {
     try {
       if (fs.existsSync(candidate)) return candidate
     } catch { /* keep looking */ }
@@ -162,11 +172,13 @@ export async function joinRadminVlanWith(
   }
 }
 
-function bridge(): { radminStatus?: () => Promise<{ installed: boolean; ip: string | null }>; radminJoin?: (name: string, password: string) => Promise<RadminJoinResult> } | undefined {
-  return (globalThis as { window?: { gmatch?: { radminStatus?: () => Promise<{ installed: boolean; ip: string | null }>; radminJoin?: (name: string, password: string) => Promise<RadminJoinResult> } } }).window?.gmatch
+type RadminStatus = { installed: boolean; ip: string | null; globalIpv6?: string | null }
+
+function bridge(): { radminStatus?: () => Promise<RadminStatus>; radminJoin?: (name: string, password: string) => Promise<RadminJoinResult> } | undefined {
+  return (globalThis as { window?: { gmatch?: { radminStatus?: () => Promise<RadminStatus>; radminJoin?: (name: string, password: string) => Promise<RadminJoinResult> } } }).window?.gmatch
 }
 
-/** Locate RadminVPN.exe in the common Program Files paths, or null. */
+/** Locate the Radmin executable in the standard install paths, or null. */
 export async function findRadminVpn(): Promise<string | null> {
   const b = bridge()
   if (b?.radminStatus) {
@@ -182,6 +194,16 @@ export async function radminAdapterIp(): Promise<string | null> {
     try { return (await b.radminStatus()).ip } catch { /* fall through */ }
   }
   return defaultDeps.adapterIp()
+}
+
+/** A global IPv6 (2000::/3) address on this machine, or null. The main process
+ *  reports it through the bridge; a browser build cannot see OS interfaces. */
+export async function globalIpv6Address(): Promise<string | null> {
+  const b = bridge()
+  if (b?.radminStatus) {
+    try { return (await b.radminStatus()).globalIpv6 ?? null } catch { /* fall through */ }
+  }
+  return null
 }
 
 /** Join the Radmin VLAN, reporting only a real outcome. */

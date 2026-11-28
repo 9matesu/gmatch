@@ -95,6 +95,17 @@ describe('useObjectImage terminal misses', () => {
     h.unmount()
   })
 
+  it('keeps a hash-bearing attachment in "waiting for seeder", not "No preview"', async () => {
+    const m = await modules()
+    const hash = 'a'.repeat(64)
+    const h = renderHook(() => m.useObjectImage(`urn:sha256:${hash}`, identity))
+    await waitFor(() => expect(h.result.current.failed).toBe(true))
+    // The hash is a real address: a peer coming online may still answer. The
+    // UI must not claim "no path exists" while that is possible.
+    expect(h.result.current.awaitingSeeder).toBe(true)
+    h.unmount()
+  })
+
   it('renders a resolved object without re-fetching on an equivalent re-render', async () => {
     const m = await modules()
     // An explicit local object skips the whole ladder, so use the node path:

@@ -83,4 +83,16 @@ describe('GameCard (one premium TCG card)', () => {
     )
     expect(screen.getByText('Zoom')).toBeTruthy()
   })
+
+  it('shows the small clicker! badge only when the card came from the clicker', () => {
+    vi.mocked(useObjectImage).mockReturnValue(result({ url: 'blob:image' }))
+    const { container, rerender } = render(
+      <GameCard objectId="m-1" identity={identity} width={150} height={210} name="X" clicker />,
+    )
+    const badge = container.querySelector('[data-clicker-badge]') as HTMLElement
+    expect(badge).toBeTruthy()
+    expect(badge).toHaveTextContent('clicker!')
+    rerender(<GameCard objectId="m-1" identity={identity} width={150} height={210} name="X" />)
+    expect(container.querySelector('[data-clicker-badge]')).toBeNull()
+  })
 })

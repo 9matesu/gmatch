@@ -62,6 +62,33 @@ export interface MergedCard extends OrbitObject {
   description?: string | null;
   frame?: string;
   accent_color?: string;
+  /** Cosmetic origin: forged from a picture found in the clicker game. */
+  clicker?: boolean;
+}
+
+/**
+ * Origin travels WITH the card (no server column): a reserved tag on the
+ * canonical card record, returned by every card read path. Sharing a card
+ * carries its tags, so the badge survives without a second field or a bridge.
+ */
+export const CLICKER_CARD_TAG = 'clicker';
+
+export function isClickerCard(card: { tags?: string[] | string | null } | null | undefined): boolean {
+  if (!card) return false;
+  const tags = Array.isArray(card.tags) ? card.tags : parseTags(card.tags);
+  return tags.some((tag) => tag.toLowerCase() === CLICKER_CARD_TAG);
+}
+
+/**
+ * A keepsake forged straight from the clicker is served by this device's local
+ * media schemes (encrypted cache / vault / in-memory keep), never a social
+ * `/api/objects/<id>` row. That is the one origin signal at the forge without
+ * changing the clicker/gallery callers.
+ */
+export function isClickerKeepsakeUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  return /^(gmcache:|vault:|idle-file:|blob:|data:)/i.test(url)
+    || /^https?:\/\/(127\.0\.0\.1|localhost)(?:[:/])/i.test(url);
 }
 
 /**
@@ -237,6 +264,7 @@ export function mergeMyCards(
       description: c.description,
       frame: c.frame,
       accent_color: c.accentColor,
+      clicker: isClickerCard({ tags: parsedCardTags }),
     });
   }
 

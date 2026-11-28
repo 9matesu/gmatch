@@ -3,6 +3,7 @@
 import { mediaUrlToCachedFile } from '../utils/cacheMedia';
 import { registerLocalObject, getLocalObject, sha256HexBlob } from '../utils/p2pSwarm';
 import { vaultPin, vaultGet } from './vault';
+import type { PermanentMediaDeps } from '../utils/mediaVault';
 import type { GalleryImage } from '../game/types';
 
 export interface KeepsakePersistResult {
@@ -118,6 +119,80 @@ export async function persistKeepsake(
   } catch (err) {
     return { status: 'failed', reason: err instanceof Error ? err.message : 'fetch' };
   }
+}
+
+/**
+ * The ONE verified path for an explicit "Save to Vault". It records a keepsake
+ * only when `ensurePermanentMedia` proves the bytes (vault read-back on
+ * Electron, IDB read-back in browser dev) — a pinned-but-unreadable URL never
+ * becomes a "persisted" tile. Nothing calls this from publishing or chat: only
+ * the player's explicit save action does.
+ */
+export async function saveMediaAsKeepsake(
+  url: string,
+  opts: {
+    tags?: string[];
+    kind?: 'image' | 'video';
+    /** Bytes the caller already holds (cache viewer): never re-fetch a blob: URL. */
+    bytes?: Blob;
+    /** Injectable vault steps (tests); production uses the real bridge. */
+    deps?: Partial<PermanentMediaDeps>;
+  } = {},
+): Promise<{ ok: boolean; ref?: string; reason?: string }> {
+  const src = String(url || '').trim();
+  if (!src) return { ok: false, reason: 'no-url' };
+  const kind = opts.kind ?? 'image';
+  const { ensurePermanentMedia } = await import('../utils/mediaVault');
+  const deps: Partial<PermanentMediaDeps> = opts.bytes
+    ? {
+        persist: async () => {
+          const file = opts.bytes!;
+          const ref = await sha256HexBlob(file);
+          const buf = await file.arrayBuffer();
+          const put = typeof window !== 'undefined' ? window.gmatch?.vaultPutBytes : undefined;
+          if (put) {
+            const out = await put(ref, file.type || 'application/octet-stream', buf, src);
+            if (!out?.ok) return { status: 'failed', reason: out?.reason || 'vault-write' };
+          } else {
+            // No bridge: IndexedDB is the durable store, and its read-back is
+            // the proof instead of a vault lookup that cannot exist here.
+            registerLocalObject(src, file);
+            registerLocalObject(ref, file);
+            const back = await getLocalObject(ref);
+            if (!back || back.size !== file.size) return { status: 'failed', reason: 'readback' };
+          }
+          return { status: 'local', ref, via: put ? 'vault' : 'idb' };
+        },
+        ...opts.deps,
+      }
+    : { ...opts.deps };
+  const res = await ensurePermanentMedia(src, kind, deps);
+  if (res.state !== 'permanent') return { ok: false, reason: res.reason };
+
+  const { useGame } = await import('../game/store');
+  const st = useGame.getState();
+  if (st.gallery.some((g) => g.url === src)) return { ok: true, ref: res.ref };
+  const keep: GalleryImage = {
+    id: `vault:${Date.now()}:${st.gallery.length}`,
+    url: src,
+    tags: (opts.tags || []).slice(0, 24),
+    rarityBase: 0,
+    clicks: 0,
+    rarity: 'Common',
+    boughtAt: Date.now(),
+    kind,
+    localRef: res.ref,
+    saveState: 'persisted',
+  };
+  useGame.setState((s) => ({
+    gallery: [...s.gallery, keep],
+    totalGallerySaved: s.totalGallerySaved + 1,
+  }));
+  useGame.getState().save();
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('orbit-keepsake-updated', { detail: { id: keep.id, url: src } }));
+  }
+  return { ok: true, ref: res.ref };
 }
 
 /** Streaming route: vault chunks + hashes on disk; verify by read-back. */

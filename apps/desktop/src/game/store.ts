@@ -567,13 +567,20 @@ function gallerySpoils(s: GameState, post: BooruPost, clicksOnFoe: number, now: 
 /** Persist a keep's bytes, then reconcile its local state in the gallery. */
 function kickKeepsakePersist(img: GalleryImage) {
   if (!img.url) return
-  void import('../services/keepsake')
-    .then(({ persistKeepsake }) => persistKeepsake(img.url, {}, img.kind))
+  // ensurePermanentMedia is the one persist+read-back contract: an IDB-only
+  // write must stay retryable, never claim a "persisted" badge the vault
+  // cannot back up.
+  void import('../utils/mediaVault')
+    .then(({ ensurePermanentMedia }) => ensurePermanentMedia(img.url, img.kind))
     .then((res) => {
       useGame.setState((s) => ({
         gallery: s.gallery.map((g) =>
           g.id === img.id
-            ? { ...g, saveState: res.status === 'local' ? 'persisted' : 'failed', localRef: res.ref }
+            ? {
+                ...g,
+                saveState: res.state === 'permanent' ? 'persisted' : 'failed',
+                localRef: res.state === 'permanent' ? res.ref : g.localRef,
+              }
             : g,
         ),
       }))

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../services/booru', () => ({
   fetchPosts: vi.fn(async () => ({ posts: [], source: null, ok: false, offline: true })),
@@ -20,11 +20,17 @@ vi.stubGlobal('localStorage', {
 
 import { useGame } from './store'
 import { persistKeepsake } from '../services/keepsake'
+import { _resetPermanentMedia } from '../utils/mediaVault'
 
 beforeEach(() => {
   mem.clear()
   useGame.getState().resetGame()
   vi.mocked(persistKeepsake).mockClear()
+  _resetPermanentMedia()
+})
+
+afterEach(() => {
+  vi.stubGlobal('window', undefined)
 })
 
 describe('clicker keep persists bytes before "saved" (Phase 5)', () => {
@@ -43,7 +49,7 @@ describe('clicker keep persists bytes before "saved" (Phase 5)', () => {
       expect(calls.length).toBeGreaterThan(0)
       // Full payload: the keep's kind must ride along (video takes the
       // streaming route), not just the url.
-      expect(calls[0]).toEqual(['https://x/k1.jpg', {}, undefined])
+      expect(calls[0]).toEqual(['https://x/k1.jpg', {}, 'image'])
     })
     // Wait for the dynamic import + status reconciliation.
     await vi.waitFor(() => {
@@ -66,5 +72,45 @@ describe('clicker keep persists bytes before "saved" (Phase 5)', () => {
       expect(g?.saveState).toBe('failed')
     })
     expect(useGame.getState().gallery.find((x) => x.id === keep.id)?.url).toBe('https://x/k2.jpg')
+  })
+})
+
+describe('a drained-foe keep waits for the vault read-back', () => {
+  it('is NOT persisted when the vault cannot read the bytes back', async () => {
+    vi.stubGlobal('window', { gmatch: { vaultGet: async () => null } })
+    useGame.setState({
+      current: { id: 'k3', url: 'https://x/k3.jpg', tags: ['a'] },
+      imageReady: true,
+      foeHp: 1,
+      foeMaxHp: 1,
+    })
+    useGame.getState().clickImage()
+    const keep = useGame.getState().gallery.at(-1)!
+    await vi.waitFor(() => {
+      expect(useGame.getState().gallery.find((g) => g.id === keep.id)?.saveState).toBe('failed')
+    })
+    // The source url stays for a later retry; no fake localRef is stamped.
+    expect(useGame.getState().gallery.find((g) => g.id === keep.id)?.url).toBe('https://x/k3.jpg')
+  })
+
+  it('becomes persisted only when the vault reads the content ref back', async () => {
+    const ref = 'c'.repeat(64)
+    vi.stubGlobal('window', {
+      gmatch: {
+        vaultGet: async (key: string) => (key === ref ? { local: `vault://f/${ref}` } : null),
+      },
+    })
+    useGame.setState({
+      current: { id: 'k4', url: 'https://x/k4.jpg', tags: ['a'] },
+      imageReady: true,
+      foeHp: 1,
+      foeMaxHp: 1,
+    })
+    useGame.getState().clickImage()
+    const keep = useGame.getState().gallery.at(-1)!
+    await vi.waitFor(() => {
+      expect(useGame.getState().gallery.find((g) => g.id === keep.id)?.saveState).toBe('persisted')
+    })
+    expect(useGame.getState().gallery.find((g) => g.id === keep.id)?.localRef).toBe(ref)
   })
 })

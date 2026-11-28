@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   _resetPeerNodes,
+  isPrivateNodeUrl,
   knownNodes,
   normalizeNodeUrl,
   peerNodeFor,
@@ -45,6 +46,28 @@ describe('peer node registry', () => {
   it('remembers the node a peer named', () => {
     rememberPeerNode('peer-2', 'http://c.test:8790')
     expect(knownNodes()).toContain('http://c.test:8790')
+  })
+
+  it('classifies a peer node as dialable only when it is publicly routable', () => {
+    // A beacon names the node the PEER can reach. On another network these are
+    // private literals we cannot dial; the sealed rendezvous is the fallback.
+    for (const url of [
+      'http://10.0.0.4:8790',
+      'http://172.16.3.4:8790',
+      'http://192.168.1.215:8790',
+      'http://100.64.12.7:8790',
+      'http://127.0.0.1:8790',
+      'http://169.254.10.2:8790',
+      'http://[::1]:8790',
+    ]) expect(isPrivateNodeUrl(url), url).toBe(true)
+
+    for (const url of [
+      'http://bob-node.test:8790',
+      'https://gmatch-rendezvous.mcos-mateus.workers.dev',
+      'http://93.184.216.34:8790',
+    ]) expect(isPrivateNodeUrl(url), url).toBe(false)
+
+    expect(isPrivateNodeUrl('not a url')).toBe(true)
   })
 
   it('forgets a peer without touching the others', () => {

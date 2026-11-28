@@ -1,8 +1,12 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import type { GalleryImage } from '../game/types';
 import {
   persistKeepsake, resolveFreshLocalUrl, resolveKeepsakeLocal, resolveLocalMedia,
   releaseLocalUrl, retainLocalUrl, _resetLocalUrls, _resetLocalLookups, keepsakeLocalSettled,
+  saveMediaAsKeepsake,
 } from './keepsake';
+import { _resetPermanentMedia, type PermanentMediaDeps } from '../utils/mediaVault';
+import { sha256HexBlob } from '../utils/p2pSwarm';
 
 vi.mock('../utils/p2pSwarm', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../utils/p2pSwarm')>()
@@ -12,6 +16,18 @@ vi.mock('./vault', async (importOriginal) => {
   const mod = await importOriginal<typeof import('./vault')>()
   return { ...mod, vaultGet: vi.fn(async () => null) }
 })
+
+/** The gallery store is a seam: the helper owns the decision, the store holds
+ *  the resulting keep. */
+const galleryState = { gallery: [] as GalleryImage[], totalGallerySaved: 0, save: vi.fn() }
+vi.mock('../game/store', () => ({
+  useGame: {
+    getState: () => galleryState,
+    setState: (updater: (s: typeof galleryState) => Partial<typeof galleryState>) => {
+      Object.assign(galleryState, updater(galleryState))
+    },
+  },
+}))
 
 const imgFile = () => new File(['image-bytes'], 'x.jpg', { type: 'image/jpeg' });
 
@@ -338,5 +354,73 @@ describe('local lookup settlement (tile status)', () => {
     await resolveLocalMedia(keep())
     _resetLocalLookups()
     expect(keepsakeLocalSettled('https://provider/x.jpg')).toBe(false)
+  })
+});
+
+describe('saveMediaAsKeepsake (explicit Save to Vault)', () => {
+  const REF = 'a'.repeat(64)
+  const makeDeps = (verify: (ref: string) => Promise<string | null>): Partial<PermanentMediaDeps> => ({
+    probe: vi.fn(async () => null),
+    verify: vi.fn(verify),
+    persist: vi.fn(async () => ({ status: 'local' as const, ref: REF, via: 'vault' as const })),
+  })
+
+  beforeEach(() => {
+    _resetPermanentMedia()
+    galleryState.gallery = []
+    galleryState.totalGallerySaved = 0
+    galleryState.save.mockClear()
+  })
+
+  afterEach(() => {
+    vi.stubGlobal('window', undefined)
+  })
+
+  it('records nothing on an unverified read-back; a verified save is one persisted keep', async () => {
+    // A bridge must be present for the vault read-back gate to run at all.
+    vi.stubGlobal('window', { dispatchEvent: vi.fn(), gmatch: { vaultGet: async () => null } })
+    expect(await saveMediaAsKeepsake('https://cdn.example/a.jpg', {
+      tags: ['hot'], deps: makeDeps(async () => null),
+    })).toEqual({ ok: false, reason: 'vault-unverified' })
+    expect(galleryState.gallery).toHaveLength(0)
+
+    expect(await saveMediaAsKeepsake('https://cdn.example/b.jpg', {
+      tags: ['hot'], deps: makeDeps(async (ref) => `vault://f/${ref}`),
+    })).toEqual({ ok: true, ref: REF })
+    expect(galleryState.gallery).toMatchObject([{
+      url: 'https://cdn.example/b.jpg', tags: ['hot'], localRef: REF, saveState: 'persisted', kind: 'image',
+    }])
+    expect(galleryState.totalGallerySaved).toBe(1)
+    expect(galleryState.save).toHaveBeenCalledTimes(1)
+
+    // Saving the same media twice never duplicates the keep.
+    await saveMediaAsKeepsake('https://cdn.example/b.jpg', {
+      deps: makeDeps(async (ref) => `vault://f/${ref}`),
+    })
+    expect(galleryState.gallery).toHaveLength(1)
+    expect(galleryState.totalGallerySaved).toBe(1)
+  })
+
+  it('writes caller-held bytes into the vault before recording the keep', async () => {
+    const file = imgFile()
+    const hash = await sha256HexBlob(file)
+    const put = vi.fn(async () => ({ ok: true, ref: hash }))
+    vi.stubGlobal('window', {
+      dispatchEvent: vi.fn(),
+      gmatch: {
+        vaultPutBytes: put,
+        vaultGet: async () => null, // bridge presence only; verify is injected below
+      },
+    })
+    const verify = vi.fn(async (ref: string) => (ref === hash ? `vault://f/${hash}` : null))
+    const res = await saveMediaAsKeepsake('cached-object-1', {
+      bytes: file, deps: { probe: vi.fn(async () => null), verify },
+    })
+    expect(res).toEqual({ ok: true, ref: hash })
+    expect(put).toHaveBeenCalledWith(hash, 'image/jpeg', expect.any(ArrayBuffer), 'cached-object-1')
+    expect(verify).toHaveBeenCalledWith(hash)
+    expect(galleryState.gallery).toMatchObject([{
+      url: 'cached-object-1', localRef: hash, saveState: 'persisted',
+    }])
   })
 });

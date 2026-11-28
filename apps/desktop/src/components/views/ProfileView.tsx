@@ -4,8 +4,10 @@ import { useMemo } from 'react';
 // Extracted verbatim from App.tsx `mainView === 'profile'` branch.
 import type { OrbitIdentity } from '@orbit/crypto';
 import { setSecureItem } from '../../utils/secure-storage'
-import type { OrbitObject, User } from '@orbit/shared';
+import { computeCardRarity, type OrbitObject, type User } from '@orbit/shared';
 import { GMatchProfile } from '../profile/GMatchProfile';
+import { GameCard } from '../cards/GameCard';
+import { isClickerCard, type MergedCard } from '../../utils/cardCollection';
 import type { FeedPost, PostComment } from '../feed/GMatchFeed';
 import { ObjectImage } from '../ObjectImage';
 import { useGame } from '../../game/store';
@@ -84,11 +86,19 @@ export function ProfileView({
   /** Repost from a profile text card (gated: no handler, no repost row). */
   onRepostPost?: (post: FeedPost) => void;
 }) {
-  // Uploads are stored as Vault keepsakes (content-addressed bytes), not as
-  // cards. Read the same source as the Vault so both surfaces agree: a forged
-  // card lives in `cards`, a plain upload lives here as media.
+  // Only keeps the player actually SAVED belong here. Posts (published or
+  // saved) are feed rows and stay in the Posts grid; an upload that was merely
+  // posted is never a keepsake. A keep is admitted when it carries verified
+  // local bytes (a content ref), including legacy rows; never while those
+  // bytes are still downloading. A keep that never got bytes does not show.
   const gallery = useGame((s) => s.gallery);
-  const media = useMemo(() => gallery.slice(-12).reverse(), [gallery]);
+  const media = useMemo(
+    () => gallery.filter((keep) => !!keep.localRef && keep.saveState !== 'downloading').slice(-12).reverse(),
+    [gallery],
+  );
+  // `myCards` arrives already merged (see App's mergeMyCards call); the shelf
+  // is read-only, so it reuses those canonical rows as-is.
+  const cards = myCards as MergedCard[];
   return (
     <div className="p-4 sm:p-6 w-full max-w-3xl mx-auto">
       <GMatchProfile
@@ -156,12 +166,45 @@ export function ProfileView({
         onEditPost={onEditPost}
         onRepostPost={onRepostPost}
       />
-      {media.length > 0 && (
+      {cards.length > 0 && (
         <section
-          aria-label="Profile media"
+          aria-label="Profile card collection"
           className={classes('mt-4 border', COLOR.edge, RADIUS.panel, COLOR.surfaceRaised, PADDING[4])}
         >
-          <h2 className={classes(TYPE.sub, WEIGHT.heading, COLOR.fg)}>Media ({gallery.length})</h2>
+          <div className={classes('flex items-baseline justify-between', GAP[2])}>
+            <h2 className={classes(TYPE.sub, WEIGHT.heading, COLOR.fg)}>Card collection ({cards.length})</h2>
+            <span className={classes(TYPE.caption, COLOR.muted)}>Showing your top {Math.min(6, cards.length)}</span>
+          </div>
+          <p className={classes(TYPE.caption, COLOR.muted)}>Cards you forged — a read-only shelf of your keeps.</p>
+          <div className={classes('grid grid-cols-2 sm:grid-cols-3', GAP[3])}>
+            {cards.slice(0, 6).map((card) => (
+              <GameCard
+                key={card.card_id || card.id}
+                objectId={card.id}
+                src={card.content_url}
+                identity={identity}
+                width={150}
+                height={210}
+                isVideo={Boolean(card.mime_type?.startsWith('video/'))}
+                name={card.name || card.caption}
+                rarity={computeCardRarity(card.value ?? 0)}
+                value={card.value ?? 0}
+                accentColor={card.accent_color}
+                frame={card.frame}
+                clicker={card.clicker ?? isClickerCard(card)}
+                interactive={false}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+      {media.length > 0 && (
+        <section
+          aria-label="Profile keepsakes"
+          className={classes('mt-4 border', COLOR.edge, RADIUS.panel, COLOR.surfaceRaised, PADDING[4])}
+        >
+          <h2 className={classes(TYPE.sub, WEIGHT.heading, COLOR.fg)}>Keepsakes ({media.length})</h2>
+          <p className={classes(TYPE.caption, COLOR.muted)}>Saved to this device — separate from your posts.</p>
           <div className={classes('grid grid-cols-3 sm:grid-cols-4', GAP[2])}>
             {media.map((keep) => (
               <div key={keep.id} className={classes('aspect-square overflow-hidden border', COLOR.edge, COLOR.canvasSurface, RADIUS.control)}>

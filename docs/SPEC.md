@@ -862,11 +862,11 @@ with names and thresholds deliberately distinct from the achievements.
 
 - Single source of truth: `apps/desktop/src/utils/ice-hygiene.ts` (client) +
   `candidateLeaksIp` in `apps/api/src/routes/signal.ts` (server gate).
-- **Direct first.** STUN is Cloudflare (`stun.cloudflare.com:3478` —
-  stateless UDP, no account, a few packets per connection). Reflexive
-  (`srflx`/`prflx`) candidates are exchanged, so peers on different NATs
-  hole-punch into a direct DataChannel. A peer necessarily learns the
-  address it connects to; Cloudflare learns nothing but an anonymous query.
+- **Direct first.** STUN is Google (`stun.l.google.com:19302` — stateless UDP,
+  no account) with Cloudflare (`stun.cloudflare.com:3478`) as a fallback.
+  Reflexive (`srflx`/`prflx`) candidates are exchanged, so peers on different
+  NATs hole-punch into a direct DataChannel. A peer necessarily learns the
+  address it connects to; the STUN host learns nothing but an anonymous query.
 - **Global IPv6 is a first-class direct path.** Host candidates in `2000::/3`
   are signaled; ULA (`fc00::/7`), link-local (`fe80::/10`) and loopback stay
   hidden. Two IPv6-capable peers behind CGNAT connect directly with no relay —
@@ -876,8 +876,8 @@ with names and thresholds deliberately distinct from the achievements.
 - **Radmin VPN is a first-class direct path.** Radmin assigns `26.0.0.0/8`
   addresses; those host candidates are signaled (all other RFC1918/CGNAT
   literals stay hidden). A validated DataChannel whose selected remote
-  candidate is in `26/8` shows `VPN directo (Radmin)`; other direct paths keep
-  `P2P direto`, and relay/failed labels are unchanged.
+  candidate is in `26/8` shows `VPN direct (Radmin)`; other direct paths keep
+  `P2P direct`, and relay/failed labels are unchanged.
 - **Presence is published even from a hidden window.** The 60s heartbeat skips
   only the local BroadcastChannel/WS swarm noise when `document.hidden`; the
   signed hosted beacon still goes out, because the mailbox TTL is 90s and a
@@ -893,8 +893,11 @@ with names and thresholds deliberately distinct from the achievements.
   `turn:openrelay.metered.ca:80` candidate resolved to `192.0.2.1` (TEST-NET)
   and the shared `openrelayproject` account now answers 401 everywhere measured;
   `turn.cloudflare.com` requires an account token. Shipping either as "free"
-  would be a fabrication, so `defaultIceConfig()` is STUN-only by default.
-  Direct/srflx paths still win and the literal-LAN-IP sanitization is unchanged.
+  would be a fabrication, so `defaultIceConfig()` uses STUN (Google primary +
+  Cloudflare fallback) plus host candidates (mDNS, global IPv6, Radmin) by
+  default; an explicit TURN is the only thing that forces relay. The direct
+  dial deadline is 30s so a slow IPv6/Radmin handshake is not declared relay
+  early. Direct/srflx paths win and the literal-LAN-IP sanitization is unchanged.
 - Literal-IP `host` candidates NEVER leave the machine (mDNS `.local` hosts
   only) — the LAN stays private. Unknown shapes fail closed. The signal
   server re-validates every posted candidate (defense in depth against a

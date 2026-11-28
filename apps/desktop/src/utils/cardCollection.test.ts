@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { deriveMyCards, mergeMyCards, filterToActiveDeck, galleryItemVisible, type CanonicalCard } from './cardCollection'
+import {
+  deriveMyCards, mergeMyCards, filterToActiveDeck, galleryItemVisible,
+  isClickerCard, isClickerKeepsakeUrl, type CanonicalCard,
+} from './cardCollection'
 import type { OrbitObject } from '@orbit/shared'
 
 const base = {
@@ -205,5 +208,31 @@ describe('galleryItemVisible (Phase 1: cards grid shows minted cards only)', () 
     expect(galleryItemVisible(item(), opts({ galleryFilter: 'sent' }))).toBe(true)
     expect(galleryItemVisible(item({ is_favorited: 1 } as never), opts({ galleryFilter: 'starred' }))).toBe(true)
     expect(galleryItemVisible(item({ owner_id: 'you' }), opts())).toBe(false)
+  })
+})
+
+describe('clicker origin flag (cosmetic, travels with the card)', () => {
+  it('recognises a keepsake forged from the clicker by its local schemes', () => {
+    expect(isClickerKeepsakeUrl('gmcache://f/abc.jpg')).toBe(true)
+    expect(isClickerKeepsakeUrl('vault://f/abc')).toBe(true)
+    expect(isClickerKeepsakeUrl('idle-file://abc')).toBe(true)
+    expect(isClickerKeepsakeUrl('blob:https://example.test/abc')).toBe(true)
+    expect(isClickerKeepsakeUrl('http://127.0.0.1:8765/v/abc.jpg')).toBe(true)
+  })
+
+  it('does NOT flag a social object row or a remote provider link', () => {
+    expect(isClickerKeepsakeUrl('/api/objects/obj-1')).toBe(false)
+    expect(isClickerKeepsakeUrl('https://tbib.org/images/1/a.jpg')).toBe(false)
+    expect(isClickerKeepsakeUrl(null)).toBe(false)
+  })
+
+  it('reads the flag from the card tags and projects it onto a merged card', () => {
+    expect(isClickerCard({ tags: ['clicker', 'hentai'] })).toBe(true)
+    expect(isClickerCard({ tags: '["CLICKER"]' })).toBe(true)
+    expect(isClickerCard({ tags: ['hentai'] })).toBe(false)
+    expect(isClickerCard(null)).toBe(false)
+    const merged = mergeMyCards([], [{ ...cardBase, tags: ['clicker'] }], 'me')
+    expect(merged[0].clicker).toBe(true)
+    expect(mergeMyCards([], [cardBase], 'me')[0].clicker).toBe(false)
   })
 })

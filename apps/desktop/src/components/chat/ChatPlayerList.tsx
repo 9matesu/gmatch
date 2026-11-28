@@ -23,6 +23,29 @@ export interface ChatPlayerItem {
   online: boolean;
 }
 
+/**
+ * Dotted numeric version compare for the cosmetic "older version" note.
+ * Absent or unparseable on either side means UNKNOWN — no note, never a
+ * fabricated verdict about a peer we cannot date.
+ */
+export function isOlderAppVersion(
+  peerVersion: string | null | undefined,
+  ownVersion: string | null | undefined,
+): boolean {
+  if (!peerVersion || !ownVersion) return false
+  const parts = (v: string) => v.split('.').map((n) => Number(n))
+  const peer = parts(peerVersion)
+  const own = parts(ownVersion)
+  if ([...peer, ...own].some((n) => !Number.isFinite(n) || n < 0)) return false
+  for (let i = 0; i < Math.max(peer.length, own.length); i += 1) {
+    const a = peer[i] ?? 0
+    const b = own[i] ?? 0
+    if (a < b) return true
+    if (a > b) return false
+  }
+  return false
+}
+
 export interface ChatPlayerListProps {
   identity: OrbitIdentity | null;
   users?: User[];
@@ -75,6 +98,16 @@ export function ChatPlayerList({
   onToggleCollapse,
 }: ChatPlayerListProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  // Cosmetic version note only: read the app's existing bridge once. No bridge
+  // (browser dev) means unknown, so no note and no fabricated version.
+  const [ownVersion, setOwnVersion] = useState<string | null>(null);
+  useEffect(() => {
+    let dead = false;
+    void Promise.resolve(window.gmatch?.appVersion?.())
+      .then((v) => { if (!dead) setOwnVersion(typeof v === 'string' ? v : null); })
+      .catch(() => {});
+    return () => { dead = true; };
+  }, []);
   // A dial can validate/fail without touching the roster, so the list needs
   // the transport registry's own change event to show "connecting" live.
   const [transportTick, setTransportTick] = useState(0);
@@ -345,10 +378,17 @@ export function ChatPlayerList({
             const usableName = knownName && knownName.toLowerCase() !== 'user' ? knownName : null;
             const displayName = usableName || (isSelf ? 'You' : generateFallbackName(player.id));
             const pfp = player.pfp_url || profilePics[player.id];
-            // Only a SETTLED live path may claim a route; a dial in flight has
-            // no transport to name yet.
+            // A dial in flight has no SETTLED route to claim, but the peer can
+            // still be roster-confirmed online: "connecting…" is a DETAIL,
+            // never a replacement for the honest "Active now" primary label.
             const connecting = swarmTransportRegistry.phaseFor(player.id) === 'connecting-direct';
-            const route = player.online && !connecting ? swarmTransportLabel(player.id) : null;
+            const route = player.online
+              ? (connecting ? 'connecting…' : swarmTransportLabel(player.id))
+              : null;
+            // The roster carries the peer's signed version (if any). A note
+            // here is cosmetic — it never changes media or DM resolution.
+            const peerVersion = (roster?.get(player.id) as (User & { appVersion?: string }) | undefined)?.appVersion;
+            const olderClient = isOlderAppVersion(peerVersion, ownVersion);
 
             return (
               <div
@@ -372,9 +412,9 @@ export function ChatPlayerList({
                     <span
                       className={classes(
                         'absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-surface-raised',
-                        connecting ? PRESENCE.connectingDot : player.online ? PRESENCE.currentDot : PRESENCE.idleDot,
+                        player.online ? PRESENCE.currentDot : connecting ? PRESENCE.connectingDot : PRESENCE.idleDot,
                       )}
-                      aria-label={connecting ? 'Connecting' : player.online ? 'Online' : 'Offline'}
+                      aria-label={player.online ? 'Online' : connecting ? 'Connecting' : 'Offline'}
                     />
                   </div>
 
@@ -391,15 +431,20 @@ export function ChatPlayerList({
                       )}
                     </div>
                     <span className="block text-2xs text-retro-muted truncate tabular-nums">
-                      {connecting ? (
-                        <span className={classes(PRESENCE.connectingText, 'font-medium')}>Connecting…</span>
-                      ) : player.online ? (
+                      {player.online ? (
                         <>
                           <span className={classes(PRESENCE.currentText, 'font-medium')}>Active now</span>
                           {route && <span> · {route}</span>}
                         </>
+                      ) : connecting ? (
+                        <span className={classes(PRESENCE.connectingText, 'font-medium')}>Connecting…</span>
                       ) : (
                         <span>Seen {formatRelativeTime(player.last_seen)}</span>
+                      )}
+                      {olderClient && (
+                        <span className={classes(PRESENCE.connectingText)}>
+                          {' · older version — update to share media'}
+                        </span>
                       )}
                     </span>
                   </div>

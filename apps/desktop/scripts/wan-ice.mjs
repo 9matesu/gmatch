@@ -7,16 +7,18 @@
  * The node harness (`wan-two-peer.mjs`) fails the direct leg because Node has
  * no RTCPeerConnection. Chromium does. This driver loads the REAL production
  * wire (esbuild-bundled `wan-ice-entry.ts`: peerConnectionConfig(null) —
- * public STUN, direct-first — createSocialOperation/validateSocialOperation,
+ * direct-first with Google + Cloudflare STUN — createSocialOperation/validateSocialOperation,
  * seal1to1/open1to1, encodeDmBody/decodeBody, sha256HexBlob) into TWO isolated
  * browser contexts (two identities / worlds / stores). The node is an
  * UNTRUSTED relay: it forwards ONLY the SDP; once the DataChannel opens the
  * frames flow page-to-page over the real ICE path, never through the node.
  *
- * The former public TURN is diagnosed, not forced: on this machine
- * `openrelay.metered.ca` resolves to 192.0.2.1 (TEST-NET blackhole) and refuses
- * TCP:80, so a relay-only policy gathers zero candidates (measured). Direct
- * STUN works (host + srflx), so THAT is the real path proven here.
+ * 1.7.3 ships two free STUN servers (Google primary, Cloudflare fallback):
+ * direct-first (host/srflx candidates, global IPv6 2000::/3, Radmin 26/8) with
+ * NO forced relay and NO baked TURN — a TURN is appended only when explicitly
+ * configured, and the node's SWARM_FRAME relay is the fallback. The gate
+ * asserts exactly that default: both STUN URLs in order, no forced relay,
+ * no TURN.
  *
  * Asserts, over the REAL channel:
  *   (a) a signed post.create crosses and verifies,
@@ -24,14 +26,12 @@
  *   (c) a sealed DM round-trips (send -> ack),
  *   (d) no plaintext media is visible to the untrusted relay (it saw only SDP).
  *
- * HONEST: if UDP/TCP egress to the public STUN/TURN is blocked, the channel
- * never opens and this FAILS LOUD with the exact error + "run where UDP is
- * open" — never a fake pass. Exit 0 = every leg passed.
+ * HONEST: if the direct ICE path cannot form a channel here, it FAILS LOUD with
+ * the exact ICE diagnostic — never a fake pass. Exit 0 = every leg passed.
  */
 import { build } from 'esbuild'
 import { mkdirSync, rmSync } from 'node:fs'
 import { createHash, randomBytes } from 'node:crypto'
-import { lookup as dnsLookup } from 'node:dns/promises'
 import { createServer } from 'node:http'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -102,21 +102,21 @@ async function run(browser) {
   const cfg = await pageA.evaluate(() => globalThis.__wan.config())
   ev(`two isolated browser contexts, distinct identities: A=${idA.orbitId.slice(0, 12)}… B=${idB.orbitId.slice(0, 12)}…`)
   ev(`ICE config: iceTransportPolicy=${cfg.iceTransportPolicy ?? 'default (direct-first)'}, iceServers=${JSON.stringify(cfg.iceServers)}`)
-  const stunConfigured = cfg.iceServers.some((u) => String(u).includes('stun.cloudflare.com'))
-  if (!stunConfigured || cfg.iceTransportPolicy === 'relay') {
-    ev(`FAIL leg=ICE-config: expected production direct-first config (public STUN, no forced relay)`)
+  // 1.7.3 default: Google primary + Cloudflare fallback STUN, direct-first;
+  // a TURN is appended ONLY when explicitly configured (null here => none).
+  const iceUrls = (Array.isArray(cfg.iceServers) ? cfg.iceServers : []).map(String)
+  const forcedRelay = cfg.iceTransportPolicy === 'relay'
+  const expectedStun = ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478']
+  const stunUrls = iceUrls.filter((u) => /^stun:/i.test(u.trim())).map((u) => u.trim().toLowerCase())
+  const turnUrls = iceUrls.filter((u) => /^turns?:/i.test(u.trim()))
+  const stunMatches = stunUrls.length === expectedStun.length && stunUrls.every((u, i) => u === expectedStun[i])
+  if (forcedRelay || !stunMatches || turnUrls.length > 0 || iceUrls.length !== expectedStun.length) {
+    ev(`FAIL leg=ICE-config: expected 1.7.3 direct-first default (${expectedStun.join(', ')} in order, no forced relay, no TURN); got policy=${cfg.iceTransportPolicy ?? 'default (direct-first)'}, iceServers=${JSON.stringify(cfg.iceServers)}`)
     return 1
   }
-  // Honest environment diagnosis: the baked TURN cannot be used here. This is
-  // NOT a gating leg — the direct path is what the proof exercises.
-  try {
-    const turnAddr = await dnsLookup('openrelay.metered.ca')
-    ev(`TURN diagnosis: baked host openrelay.metered.ca resolves to ${turnAddr.address}; ${turnAddr.address.startsWith('192.0.2.') ? 'TEST-NET blackhole — relay-only mode cannot gather a candidate on this machine' : 'relay candidate available'}`)
-  } catch (err) {
-    ev(`TURN diagnosis: openrelay.metered.ca did not resolve (${String(err).slice(0, 90)}) — relay-only mode unavailable here`)
-  }
+  ev(`ICE config PASS: direct-first default has ${stunUrls.join(' then ')} (Google primary, Cloudflare fallback), no forced relay and no TURN — host/srflx candidates are the direct path; TURN only when explicitly configured`)
 
-  // ---- open a REAL RTCPeerConnection DataChannel over the public relay -----
+  // ---- open a REAL RTCPeerConnection DataChannel over the direct path ------
   const sdpA = await pageA.evaluate(() => globalThis.__wan.createOffer())
   const sdpB = await pageB.evaluate((sdp) => globalThis.__wan.acceptOffer(sdp), sdpA)
   await pageA.evaluate((sdp) => globalThis.__wan.applyAnswer(sdp), sdpB)
@@ -132,10 +132,10 @@ async function run(browser) {
     ev(`ICE diag A: ice=${stA.ice} conn=${stA.conn} gather=${stA.gather} candidates=[${candTypes(stA.localSdp).join(',')}]`)
     ev(`ICE diag B: ice=${stB.ice} conn=${stB.conn} gather=${stB.gather} candidates=[${candTypes(stB.localSdp).join(',')}]`)
     const sawRelay = candTypes(stA.localSdp).includes('relay') || candTypes(stB.localSdp).includes('relay')
-    ev(`ICE leg failing leg = "direct WAN / ICE": ${sawRelay ? 'relay candidates were gathered but the pair never connected (TURN allocation/permission blocked)' : 'NO usable candidate was gathered — public STUN/TURN egress is BLOCKED in this environment — run where UDP is open'}`)
+    ev(`ICE leg failing leg = "direct WAN / ICE": ${sawRelay ? 'relay candidates were gathered but the pair never connected' : 'no host/srflx candidate pair connected — direct ICE cannot form a channel in this environment (check UDP egress to stun.l.google.com:19302 / stun.cloudflare.com:3478)'}`)
     return 1
   }
-  ev(`ICE leg PASS: a REAL RTCPeerConnection DataChannel opened between two isolated browser contexts via public STUN (srflx/host) — the direct WAN path works on this machine (one-machine simulation: two networks are not simulated)`)
+  ev(`ICE leg PASS: a REAL RTCPeerConnection DataChannel opened between two isolated browser contexts over the direct path (host/srflx via Google + Cloudflare STUN, no forced relay) — it works on this machine (one-machine simulation: two networks are not simulated)`)
 
   // ---- (a) signed post.create crosses + verifies --------------------------
   const postBytes = randomBytes(48 * 1024)

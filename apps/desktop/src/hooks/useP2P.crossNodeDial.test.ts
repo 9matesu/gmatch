@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { isCrossNodePeer } from './useP2P'
+import { directPathFromRemoteIp, isCrossNodePeer } from './useP2P'
 import { _resetPeerNodes, rememberPeerNode } from '../utils/peerNodes'
 
 /**
@@ -66,5 +66,40 @@ describe('a failed cross-node direct attempt leaves the label on relay', () => {
     reg.markDirectFailed(PEER, 'ice failed', true)
     expect(reg.phaseFor(PEER)).toBe('relay')
     expect(transportLabel(reg.phaseFor(PEER))).toBe('relay via node (NAT)')
+  })
+})
+
+describe('the direct-path ladder is honest', () => {
+  it('a slow IPv6/Radmin handshake is not killed by a 12s registry deadline', async () => {
+    const { createTransportRegistry } = await import('../utils/transportState')
+    let t = 1000
+    const reg = createTransportRegistry({ now: () => t })
+    reg.startDirectAttempt(PEER)
+    t += 20_000
+    // The mesh dial allows 30s; the registry must not declare it dead sooner.
+    expect(reg.isDirectAttemptOverdue(PEER)).toBe(false)
+    t += 11_000
+    expect(reg.isDirectAttemptOverdue(PEER)).toBe(true)
+  })
+
+  it('global IPv6 and Radmin are direct; CGNAT-only is not', () => {
+    expect(directPathFromRemoteIp('2601:646:1234::1')).toBe('ipv6')
+    expect(directPathFromRemoteIp('2001:0:14c9:cd04:3c06:4c04:759c:b4a5')).toBe('ipv6')
+    expect(directPathFromRemoteIp('26.26.113.34')).toBe('radmin')
+    expect(directPathFromRemoteIp('100.64.0.1')).toBeNull()
+    expect(directPathFromRemoteIp('192.168.6.3')).toBeNull()
+  })
+
+  it('labels IPv6/Radmin only after validation; CGNAT-only stays relay', async () => {
+    const { createTransportRegistry, transportLabel } = await import('../utils/transportState')
+    const reg = createTransportRegistry()
+    reg.markDirectFailed('cg', 'ice failed: no pair', true)
+    expect(reg.phaseFor('cg')).toBe('relay')
+    expect(transportLabel(reg.phaseFor('cg'), false, false)).toBe('relay via node (NAT)')
+
+    reg.markDirectValidated('v6', false, true)
+    expect(transportLabel(reg.phaseFor('v6'), reg.isDirectViaRadmin('v6'), reg.isDirectViaIpv6('v6'))).toBe('P2P direct (IPv6)')
+    reg.markDirectValidated('vpn', true, false)
+    expect(transportLabel(reg.phaseFor('vpn'), reg.isDirectViaRadmin('vpn'), reg.isDirectViaIpv6('vpn'))).toBe('VPN direct (Radmin)')
   })
 })

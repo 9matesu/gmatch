@@ -16,7 +16,7 @@ import { readSettings } from './useSettings';
 import { knownNodes, normalizeNodeUrl, rememberKnownNode, rememberPeerNode, peerNodeFor } from '../utils/peerNodes';
 import { broadcastMeshFrame, onMeshMessage, connectToPeerMesh, setMeshIceFailureHandler, MESH_BACKPRESSURE_HIGH_BYTES, type PeerMeshConnection } from '../utils/courierSignaling';
 import { swarmTransportRegistry, transportLabel } from '../utils/transportState';
-import { isRadminVpnAddress } from '../utils/ice-hygiene';
+import { isGlobalIpv6, isRadminVpnAddress } from '../utils/ice-hygiene';
 import { resolveDisplayName } from '../utils/displayName';
 import { parseApiTimestamp } from '../utils/timeAgo';
 import { mediaFlag, resolveClaimedOwner, descriptorUrlFromBytes } from '../utils/objectDescriptor';
@@ -89,29 +89,45 @@ export function retryPeerConnections(): boolean {
  *  lives in utils/transportState so the header chip reads the SAME phases the
  *  swarm writes, never a second guessed copy. */
 export function swarmTransportLabel(peerId: string): string | null {
-  return transportLabel(swarmTransportRegistry.phaseFor(peerId), swarmTransportRegistry.isDirectViaRadmin(peerId))
+  return transportLabel(
+    swarmTransportRegistry.phaseFor(peerId),
+    swarmTransportRegistry.isDirectViaRadmin(peerId),
+    swarmTransportRegistry.isDirectViaIpv6(peerId),
+  )
 }
 
-/** A validated direct channel over Radmin VPN: the remote candidate (read from
- *  the open pc's stats) is a 26.x address. Only called once the DataChannel is
- *  open, so the VPN label can never precede validation. */
-async function directConnViaRadmin(pc: RTCPeerConnection): Promise<boolean> {
+/**
+ * The negotiated remote candidate decides the honest direct-path label. A
+ * 26.x address is Radmin; a 2000::/3 address is global IPv6; anything else
+ * (LAN mDNS, STUN srflx, CGNAT) is the generic "P2P direct" — and only after
+ * the DataChannel really opened. Pure so the ladder is unit-testable.
+ */
+export function directPathFromRemoteIp(ip: string): 'radmin' | 'ipv6' | null {
+  if (isRadminVpnAddress(ip)) return 'radmin'
+  if (isGlobalIpv6(ip)) return 'ipv6'
+  return null
+}
+
+/** Read the selected remote candidate from an OPEN pc's stats. */
+export async function directPathForConnection(pc: RTCPeerConnection): Promise<'radmin' | 'ipv6' | null> {
   try {
     const stats = await pc.getStats()
     let ip = ''
     stats.forEach((r: { type?: string; ip?: string }) => {
       if (r.type === 'remote-candidate' && r.ip) ip = r.ip
     })
-    return isRadminVpnAddress(ip)
+    return directPathFromRemoteIp(ip)
   } catch {
-    return false
+    return null
   }
 }
 
-/** Promote a peer to `direct` after its DataChannel opened, tagging the Radmin
- *  VPN path when the negotiated remote candidate is in 26.0.0.0/8. */
+/** Promote a peer to `direct` after its DataChannel opened, tagging Radmin or
+ *  global IPv6 only when the negotiated remote candidate proves it. */
 function promoteDirect(peerId: string, conn: PeerMeshConnection): void {
-  void directConnViaRadmin(conn.pc).then((radmin) => swarmTransportRegistry.markDirectValidated(peerId, radmin))
+  void directPathForConnection(conn.pc).then((path) =>
+    swarmTransportRegistry.markDirectValidated(peerId, path === 'radmin', path === 'ipv6'),
+  )
 }
 
 export interface ChatMessage {

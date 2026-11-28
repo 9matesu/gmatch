@@ -128,4 +128,18 @@ describe('CardDetailView marketplace actions (P3.1–3.3)', () => {
     })
     expect(toast).not.toHaveBeenCalledWith(expect.stringMatching(/listed/i), 'success')
   })
+
+  it('renders the cosmetic clicker badge for a card found in the clicker', async () => {
+    mockFetch({ '/api/cards/c-1': () => json({ card: { ...card, tags: ['clicker'] } }) })
+    const { container } = render(<CardDetailView cardId="c-1" identity={identity} onClose={() => {}} toast={vi.fn()} />)
+    await screen.findByRole('button', { name: /list for sale/i })
+    expect(container.querySelector('[data-clicker-badge]')).toBeTruthy()
+    expect(screen.getAllByText('clicker!').length).toBeGreaterThan(0)
+  })
+
+  it('a normal card shows no clicker badge', async () => {
+    render(<CardDetailView cardId="c-1" identity={identity} onClose={() => {}} toast={vi.fn()} />)
+    await screen.findByRole('button', { name: /list for sale/i })
+    expect(screen.queryByText('clicker!')).toBeNull()
+  })
 })

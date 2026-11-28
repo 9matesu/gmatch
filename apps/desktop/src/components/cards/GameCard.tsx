@@ -5,7 +5,7 @@ import { computeCardRarity, formatGc, type CardRarityDetails } from '@orbit/shar
 import { CardArtwork } from './CardArtwork'
 import { useObjectImage } from '../../hooks/useObjectImage'
 import {
-  classes, MOTION, TCG_CARD,
+  CHROME, classes, MOTION, TCG_CARD,
 } from '../../ui/tokens'
 
 interface IdentityLike {
@@ -38,6 +38,8 @@ export interface GameCardProps {
   showNameplate?: boolean
   /** Extra rows under the stat row (owner, tags, meta). */
   footerExtra?: ReactNode
+  /** Cosmetic: forged from a picture the player found in the clicker game. */
+  clicker?: boolean
   /** Tactile tilt + sheen + cursor. Disable for dense grids. Default true. */
   interactive?: boolean
   selected?: boolean
@@ -73,6 +75,7 @@ export function GameCard({
   frame = 'chrome',
   showNameplate,
   footerExtra,
+  clicker = false,
   interactive = true,
   selected = false,
   className,
@@ -156,6 +159,9 @@ export function GameCard({
             <div className={TCG_CARD.back} role="status" aria-label="Card back — no artwork available">
               <span className={TCG_CARD.backCore} aria-hidden="true" />
             </div>
+          )}
+          {clicker && (
+            <span data-clicker-badge="" className={classes('absolute top-2 right-2 z-20', CHROME.cardChip)} title="Found in the clicker game">clicker!</span>
           )}
         </div>
 

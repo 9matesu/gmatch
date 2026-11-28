@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from 'vitest'
+import { beforeEach, describe, it, expect, vi } from 'vitest'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { useFeedController, type FeedControllerInput } from './useFeedController'
 import type { FeedPost } from '../../components/feed/GMatchFeed'
+import { writeCachedFeed } from './feedSnapshotCache'
 import { invalidateCache, orbitFetch } from '../../utils/api'
 
 // The controller owns the network; stub it so a first read can be made to
@@ -50,6 +51,16 @@ const ITEMS = [] as const
 const MY_PROFILE = { displayName: 'Tester' }
 const DELETED = new Set<string>()
 const ARCHIVED = new Set<string>()
+// One object per identity: App reads identity from a store (stable reference),
+// and an inline literal would re-arm any effect keyed on `load` every render.
+const IDENTITIES = {
+  mount: { orbitId: 'mount' },
+  cached: { orbitId: 'cached-mount' },
+  late: { orbitId: 'late-node' },
+  self: { orbitId: 'self' },
+  refreshFailure: { orbitId: 'refresh-failure' },
+  emptyRefresh: { orbitId: 'empty-refresh' },
+} as const
 
 function post(id: string, over: Partial<FeedPost> = {}): FeedPost {
   return {
@@ -79,6 +90,125 @@ function normalizeFeedPost(p: FeedPost): FeedPost {
 }
 
 describe('useFeedController projection stability', () => {
+  beforeEach(() => {
+    for (const key of Object.keys(storage)) delete storage[key]
+    vi.mocked(orbitFetch).mockReset()
+    vi.mocked(invalidateCache).mockClear()
+  })
+
+  it('loads the first page on mount, without a navigation or a manual load()', async () => {
+    vi.mocked(orbitFetch).mockImplementation(async () => ({
+      ok: true, status: 200, json: async () => ({ posts: [post('mount-a'), post('mount-b')] }),
+    } as Response))
+
+    const { result } = renderHook(() => useFeedController({
+      identity: IDENTITIES.mount as never,
+      users: USERS,
+      profilePics: PROFILE_PICS,
+      myProfile: MY_PROFILE,
+      items: ITEMS,
+      deletedPostIds: DELETED,
+      archivedPostIds: ARCHIVED,
+      feedSort: 'latest',
+      normalizePost: normalizeFeedPost,
+    }))
+
+    await waitFor(() => {
+      expect(result.current.posts.map((p) => p.id)).toEqual(['mount-a', 'mount-b'])
+    })
+    expect(result.current.status).toBe('ready')
+    expect(vi.mocked(orbitFetch)).toHaveBeenCalled()
+  })
+
+  it('paints the cached snapshot immediately, then revalidates it', async () => {
+    writeCachedFeed('cached-mount', [post('cached-1')])
+    let release: (res: Response) => void = () => {}
+    vi.mocked(orbitFetch).mockImplementation(() => new Promise<Response>((r) => { release = r }))
+
+    const { result } = renderHook(() => useFeedController({
+      identity: IDENTITIES.cached as never,
+      users: USERS,
+      profilePics: PROFILE_PICS,
+      myProfile: MY_PROFILE,
+      items: ITEMS,
+      deletedPostIds: DELETED,
+      archivedPostIds: ARCHIVED,
+      feedSort: 'latest',
+      normalizePost: normalizeFeedPost,
+    }))
+
+    // The cached rows are on screen BEFORE the first read settles — no blocking
+    // await, no second "Loading…" screen after the boot splash.
+    expect(result.current.posts.map((p) => p.id)).toEqual(['cached-1'])
+    expect(result.current.restoredFromCache).toBe(true)
+
+    await act(async () => {
+      release({ ok: true, status: 200, json: async () => ({ posts: [post('live-1')] }) } as Response)
+    })
+    await waitFor(() => {
+      expect(result.current.posts.map((p) => p.id)).toEqual(['live-1'])
+    })
+    expect(result.current.restoredFromCache).toBe(false)
+  })
+
+  it('retries a failed first read until the node answers, with no navigation', async () => {
+    let calls = 0
+    vi.mocked(orbitFetch).mockImplementation(async () => {
+      calls += 1
+      if (calls < 3) return { ok: false, status: 503, json: async () => ({}) } as Response
+      return { ok: true, status: 200, json: async () => ({ posts: [post('late')] }) } as Response
+    })
+
+    const { result } = renderHook(() => useFeedController({
+      identity: IDENTITIES.late as never,
+      users: USERS,
+      profilePics: PROFILE_PICS,
+      myProfile: MY_PROFILE,
+      items: ITEMS,
+      deletedPostIds: DELETED,
+      archivedPostIds: ARCHIVED,
+      feedSort: 'latest',
+      normalizePost: normalizeFeedPost,
+    }))
+
+    await waitFor(() => {
+      expect(result.current.posts.map((p) => p.id)).toEqual(['late'])
+    }, { timeout: 6000 })
+    expect(calls).toBeGreaterThanOrEqual(3)
+  }, 10_000)
+
+  it('re-arms the first read after a world switch resets the feed', async () => {
+    let reads = 0
+    vi.mocked(orbitFetch).mockImplementation(async () => {
+      reads += 1
+      return { ok: true, status: 200, json: async () => ({ posts: [post(`world-${reads}`)] }) } as Response
+    })
+
+    const { result } = renderHook(() => useFeedController({
+      identity: IDENTITIES.mount as never,
+      users: USERS,
+      profilePics: PROFILE_PICS,
+      myProfile: MY_PROFILE,
+      items: ITEMS,
+      deletedPostIds: DELETED,
+      archivedPostIds: ARCHIVED,
+      feedSort: 'latest',
+      normalizePost: normalizeFeedPost,
+    }))
+
+    await waitFor(() => {
+      expect(result.current.posts.map((p) => p.id)).toEqual(['world-1'])
+    })
+    act(() => {
+      window.dispatchEvent(new CustomEvent('gmatch-api-base-changed', {
+        detail: { base: 'http://friend-node:8790' },
+      }))
+    })
+    await waitFor(() => {
+      expect(result.current.posts.map((p) => p.id)).toEqual(['world-2'])
+    })
+  })
+
   it('does not re-project the timeline when the caller passes a new normalizePost', () => {
     const normalize = vi.fn(normalizeFeedPost)
 
@@ -160,7 +290,7 @@ describe('useFeedController projection stability', () => {
     })
 
     const { result } = renderHook(() => useFeedController({
-      identity: { orbitId: 'self' } as never,
+      identity: IDENTITIES.self as never,
       users: USERS,
       profilePics: PROFILE_PICS,
       myProfile: MY_PROFILE,
@@ -171,13 +301,12 @@ describe('useFeedController projection stability', () => {
       normalizePost: normalizeFeedPost,
     }))
 
-    await act(async () => { await result.current.load() })
-    expect(result.current.status).toBe('ready')
-    expect(result.current.posts).toEqual([])
-
+    // The mount read is the one that answers empty; the empty-read retry must
+    // pick it up with a cache bypass — no profile round-trip, no manual load().
     await waitFor(() => {
       expect(result.current.posts.map((p) => p.id)).toEqual(['fresh'])
     }, { timeout: 5000 })
+    expect(result.current.status).toBe('ready')
     expect(reads).toBeGreaterThanOrEqual(2)
     expect(invalidateCache).toHaveBeenCalledWith('/api/posts')
   })
@@ -196,7 +325,7 @@ describe('useFeedController projection stability', () => {
     })
 
     const { result } = renderHook(() => useFeedController({
-      identity: { orbitId: 'refresh-failure' } as never,
+      identity: IDENTITIES.refreshFailure as never,
       users: USERS,
       profilePics: PROFILE_PICS,
       myProfile: MY_PROFILE,
@@ -207,8 +336,11 @@ describe('useFeedController projection stability', () => {
       normalizePost: normalizeFeedPost,
     }))
 
-    await act(async () => { await result.current.load() })
-    expect(result.current.posts.map((p) => p.id)).toEqual(['a', 'b', 'c'])
+    // Mount already performed the first read; wait for it to settle before the
+    // refresh that fails, so the two requests cannot supersede each other.
+    await waitFor(() => {
+      expect(result.current.posts.map((p) => p.id)).toEqual(['a', 'b', 'c'])
+    })
     expect(result.current.status).toBe('ready')
 
     await act(async () => { await result.current.refresh() })
@@ -231,7 +363,7 @@ describe('useFeedController projection stability', () => {
     })
 
     const { result } = renderHook(() => useFeedController({
-      identity: { orbitId: 'empty-refresh' } as never,
+      identity: IDENTITIES.emptyRefresh as never,
       users: USERS,
       profilePics: PROFILE_PICS,
       myProfile: MY_PROFILE,
@@ -242,8 +374,9 @@ describe('useFeedController projection stability', () => {
       normalizePost: normalizeFeedPost,
     }))
 
-    await act(async () => { await result.current.load() })
-    expect(result.current.posts.map((p) => p.id)).toEqual(['a', 'b', 'c'])
+    await waitFor(() => {
+      expect(result.current.posts.map((p) => p.id)).toEqual(['a', 'b', 'c'])
+    })
 
     await act(async () => { await result.current.refresh() })
     expect(result.current.posts.map((p) => p.id)).toEqual(['a', 'b', 'c'])

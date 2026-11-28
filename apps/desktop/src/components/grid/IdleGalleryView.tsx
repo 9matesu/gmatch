@@ -267,6 +267,25 @@ async function retryKeepsake(img: GalleryImage): Promise<void> {
     // pin cache otherwise answers "null" without trying) and must wake the
     // tile's object-store resolution once the bytes land.
     vaultForgetFailure(img.url)
+    // The vault is PERMANENT: check it by content address BEFORE any download.
+    // A keep whose bytes the vault already holds is reconciled in place, so a
+    // stale `failed` flag never turns into a pointless re-fetch (or a retry
+    // badge that never clears). This probe is read-only; the download below is
+    // the sole writer when the vault really has nothing.
+    const held = await ensurePermanentMedia(img.url, img.kind, {
+      persist: async () => ({ status: 'failed', reason: 'vault-probe-only' }),
+    })
+    if (held.state === 'permanent') {
+      useGame.setState((s) => ({
+        gallery: s.gallery.map((g) =>
+          g.id === img.id ? { ...g, saveState: 'persisted' as const, localRef: held.ref } : g,
+        ),
+      }))
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('orbit-keepsake-updated', { detail: { id: img.id, url: img.url } }))
+      }
+      return
+    }
     const { persistKeepsake } = await import('../../services/keepsake')
     const res = await persistKeepsake(img.url, {}, img.kind)
     useGame.setState((s) => ({

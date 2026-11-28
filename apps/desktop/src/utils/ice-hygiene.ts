@@ -1,26 +1,26 @@
 // P2P ICE hygiene: peers connect DIRECTLY, with the minimum address exposure
-// that direct connections require.
-// - NO STUN by default. A resolver that cannot reach the STUN host makes
-//   Chromium print "Failed to resolve address ... (errorcode: -105)" once per
-//   peer; a server nobody can reach buys no route and only spams the log. The
-//   direct path is host candidates (mDNS, global IPv6 2000::/3, Radmin 26/8);
-//   everything else uses an explicitly configured TURN or the node's WS relay.
-// - sanitizeCandidate drops every literal-IP `host` candidate — the LAN
-//   address never leaves the machine (mDNS `.local` hosts only) — EXCEPT a
-//   Radmin VPN address (26.0.0.0/8): two peers on the same Radmin VPN are
-//   effectively on one LAN, so that host candidate is the direct path and is
-//   signaled. A `srflx`/`prflx` candidate (if one ever appears) is exchanged:
-//   a reflexive address is exactly what a direct connection would reveal.
-// - `relay` candidates carry the TURN server's address, not yours. There is NO
-//   baked public TURN: `openrelay.metered.ca` resolves to 192.0.2.1 (TEST-NET)
-//   and the shared `openrelayproject` account was revoked globally, so a baked
-//   relay gathered zero candidates. An explicit TURN (env / Settings) forces
-//   the whole connection through it (zero exposure); with none, a direct host
-//   path is tried first and the node's SWARM_FRAME relay is the fallback.
+// that direct connections require. The NAT-T ladder, in the order ICE tries it:
+//   1. STUN reflexive (srflx) — two free, stateless, no-account STUN hosts:
+//      Google is the primary, Cloudflare the fallback. A network that cannot
+//      resolve one logs one "Failed to resolve address ... (errorcode: -105)"
+//      per peer; that noise is accepted and the other rungs still run.
+//   2. host candidates — same LAN / mDNS `.local`; literal private IPv4 is
+//      never signaled (the LAN stays private).
+//   3. GLOBAL IPv6 (2000::/3) — a routable direct path, no relay needed.
+//   4. Radmin VPN (26.0.0.0/8) — peers on the same virtual LAN connect direct.
+//   5. the node's WS SWARM_FRAME relay — the fallback when no direct pair
+//      forms (CGNAT / symmetric NAT). It is never labelled direct.
+// There is NO baked public TURN: `openrelay.metered.ca` resolves to 192.0.2.1
+// (TEST-NET) and the shared `openrelayproject` account was revoked globally.
+// An explicit TURN (env / Settings) appends to STUN and forces the whole
+// connection through it (zero exposure).
 // - peerConnectionConfig() is the single source of truth for both the
-//   file-transfer peer (webrtc.ts) and the payload relay (removed).
+//   file-transfer peer (webrtc.ts) and the mesh (courierSignaling.ts, mesh.ts).
 
-export const STUN_SERVERS: RTCIceServer[] = []
+export const STUN_SERVERS: RTCIceServer[] = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun.cloudflare.com:3478' },
+]
 
 /**
  * True for a literal IP that must NOT be signaled as a host candidate.
@@ -44,7 +44,7 @@ export function isRadminVpnAddress(address: string): boolean {
 }
 
 /** Global unicast IPv6 only (2000::/3); ULA, link-local and loopback stay hidden. */
-function isGlobalIpv6(address: string): boolean {
+export function isGlobalIpv6(address: string): boolean {
   const a = address.toLowerCase().split('%')[0]
   if (!a.includes(':') || a === '::1' || a === '::') return false
   if (/^f[cd][0-9a-f]{2}:/.test(a) || /^fe[89ab][0-9a-f]:/.test(a)) return false
@@ -148,19 +148,19 @@ export function turnCredentials(env: Record<string, string | undefined> = {}): {
 }
 
 /**
- * The config both P2P stacks use. Two modes (SPEC §10c semantics):
- * - explicit NEXT_PUBLIC_TURN_* env or Settings TURN → relay-forced, zero IP
- *   exposure posture.
- * - otherwise → NO ICE servers: host candidates (mDNS, global IPv6, Radmin)
- *   are the direct path and the node's SWARM_FRAME relay is the fallback. No
- *   unreachable STUN host is offered, so ICE never logs a DNS failure per peer.
- *   Literal LAN IPs are never signaled — the mDNS host gate stays on either way.
+ * The config both P2P stacks use. Two modes:
+ * - explicit NEXT_PUBLIC_TURN_* env or Settings TURN → STUN + TURN, with the
+ *   relay-forced, zero-IP-exposure posture.
+ * - otherwise → the two STUN hosts only: srflx plus host candidates (mDNS, global
+ *   IPv6, Radmin) are the direct paths and the node's SWARM_FRAME relay is the
+ *   fallback. Literal private LAN IPs are never signaled — the mDNS host gate
+ *   stays on either way.
  */
 export function defaultIceConfig(env: Record<string, string | undefined> = {}): RTCConfiguration {
   return peerConnectionConfig(turnCredentials(env))
 }
 
-/** ICE server list: empty unless TURN is explicitly configured. */
+/** ICE server list: Google + Cloudflare STUN, plus TURN when explicitly configured. */
 export function iceServersFor(turn: { url: string; username: string; credential: string } | null): RTCIceServer[] {
   const servers = [...STUN_SERVERS]
   if (turn) servers.push({ urls: turn.url, username: turn.username, credential: turn.credential })

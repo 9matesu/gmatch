@@ -7,6 +7,7 @@ import { getCentralApiUrl } from '../utils/central'
 import { normalizeNodeUrl } from '../utils/peerNodes'
 import { resolveNodeAddress } from '../utils/serverAddress'
 import { resolveObjectRefId, isRequestableObjectId } from '../utils/objectRef'
+import { getSecureItem } from '../utils/secure-storage'
 
 /**
  * Well-known 64-hex delivery token on the blind courier dedicated to
@@ -39,6 +40,12 @@ export interface PresenceBeacon {
    * beaconSignaturePayload).
    */
   nodeUrl?: string
+  /**
+   * This build's version (e.g. "1.7.2"), signed like the other optional
+   * fields. A peer can then say "older version" honestly instead of guessing
+   * why a cross-node picture will not load. Absent = unknown, never a guess.
+   */
+  appVersion?: string
   timestamp: number
   sig?: string
 }
@@ -60,6 +67,9 @@ function beaconSignaturePayload(b: Omit<PresenceBeacon, 'sig'>): Uint8Array {
   // an older peer is still seen (it just has no address / avatar hash).
   if (b.nodeUrl) base += `|${b.nodeUrl}`
   if (b.pfpHash) base += `|${b.pfpHash}`
+  // Appended LAST so a beacon from a client that does not know the field
+  // still verifies against the shorter payload.
+  if (b.appVersion) base += `|${b.appVersion}`
   return new TextEncoder().encode(base)
 }
 
@@ -87,6 +97,49 @@ function avatarHashFromRef(pfpUrl: string | null | undefined): string | null {
 const avatarHashCache = new Map<string, string | null>()
 const AVATAR_HASH_CACHE_MAX = 8
 
+function cacheAvatarHash(pfpUrl: string, hash: string | null): void {
+  if (avatarHashCache.size >= AVATAR_HASH_CACHE_MAX) {
+    const oldest = avatarHashCache.keys().next().value
+    if (oldest) avatarHashCache.delete(oldest)
+  }
+  avatarHashCache.set(pfpUrl, hash)
+}
+
+/**
+ * ProfilePicModal saves a compact `data:image/jpeg;base64,…` thumb, which is
+ * neither an object id nor a hash-bearing ref. Hash the bytes and seed them
+ * under that address: without a seeder, a peer advertising the hash would be
+ * unresolvable and the avatar would stay invisible.
+ */
+async function avatarHashFromDataUrl(pfpUrl: string): Promise<string | null> {
+  if (!/^data:image\//i.test(pfpUrl)) return null
+  if (avatarHashCache.has(pfpUrl)) return avatarHashCache.get(pfpUrl) ?? null
+  const match = /^data:([^;,]*)(;base64)?,(.*)$/is.exec(pfpUrl)
+  if (!match) return null
+  let bytes: Uint8Array
+  try {
+    bytes = match[2]
+      ? Uint8Array.from(atob(match[3]), (c) => c.charCodeAt(0))
+      : new TextEncoder().encode(decodeURIComponent(match[3]))
+  } catch {
+    return null
+  }
+  // A profile thumb is a few KB. Never let a hostile giant data URL become a
+  // signed beacon field or a swarm object.
+  if (bytes.length === 0 || bytes.length > 2 * 1024 * 1024) return null
+  const hash = sha256Hex(bytes)
+  cacheAvatarHash(pfpUrl, hash)
+  try {
+    const { registerLocalObject } = await import('../utils/p2pSwarm')
+    const buffer = new ArrayBuffer(bytes.byteLength)
+    new Uint8Array(buffer).set(bytes)
+    registerLocalObject(hash, new Blob([buffer], { type: match[1] || 'image/jpeg' }))
+  } catch {
+    /* seed best-effort: a hash without bytes still resolves to a real fallback */
+  }
+  return hash
+}
+
 async function avatarHashFromLocalObject(pfpUrl: string): Promise<string | null> {
   const id = resolveObjectRefId(pfpUrl)
   if (!id || !isRequestableObjectId(id)) return null
@@ -99,11 +152,7 @@ async function avatarHashFromLocalObject(pfpUrl: string): Promise<string | null>
   } catch {
     hash = null
   }
-  if (avatarHashCache.size >= AVATAR_HASH_CACHE_MAX) {
-    const oldest = avatarHashCache.keys().next().value
-    if (oldest) avatarHashCache.delete(oldest)
-  }
-  avatarHashCache.set(pfpUrl, hash)
+  cacheAvatarHash(pfpUrl, hash)
   return hash
 }
 
@@ -111,6 +160,23 @@ async function avatarHashFromLocalObject(pfpUrl: string): Promise<string | null>
  *  one (so Avatar resolves verified bytes), else the original ref. */
 function avatarRefForHash(hash: string): string {
   return SHA256_HEX.test(hash) ? `urn:sha256:${hash.toLowerCase()}` : hash.toLowerCase()
+}
+
+/**
+ * This build's version, read from the app's EXISTING Electron bridge. Browser
+ * dev has no bridge: the beacon then honestly carries no version. Never a
+ * hardcoded/fabricated number, and no new dependency.
+ */
+async function localAppVersion(): Promise<string | null> {
+  try {
+    const bridge = (globalThis as unknown as {
+      window?: { gmatch?: { appVersion?: () => Promise<string> } }
+    }).window?.gmatch
+    const value = await bridge?.appVersion?.()
+    return typeof value === 'string' && value.trim() ? value.trim().slice(0, 32) : null
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -134,10 +200,14 @@ export async function broadcastPresence(
   // in-memory profile, then a neutral label — never a nameless beacon.
   let localName = ''
   try { localName = (localStorage.getItem('orbit_display_name') || '').trim() } catch { /* private mode */ }
+  // useP2P publishes only a display name: the avatar is held in the
+  // identity-scoped secure key, written by every pfp save path. Without this
+  // read the beacon has no pfp ref at all and no hash can be derived.
+  const pfpUrl = profile.pfpUrl || getSecureItem(`orbit_pfp_url:${identity.orbitId}`) || getSecureItem('orbit_pfp_url') || null
   const rawBeacon: Omit<PresenceBeacon, 'sig'> = {
     orbitId: identity.orbitId,
     displayName: localName || profile.displayName?.trim() || 'Player',
-    pfpUrl: profile.pfpUrl || null,
+    pfpUrl,
     publicKeyHex: identity.publicKeyHex,
     encryptionPubHex: identity.encryptionPubHex || '',
     ...(nodeUrl ? { nodeUrl } : {}),
@@ -150,10 +220,13 @@ export async function broadcastPresence(
   // 404s on its node. Best-effort: no provable hash simply omits the field.
   const pfpHash =
     (profile.pfpHash && profile.pfpHash.trim()) ||
-    avatarHashFromRef(profile.pfpUrl) ||
-    (profile.pfpUrl ? await avatarHashFromLocalObject(profile.pfpUrl) : null) ||
+    avatarHashFromRef(pfpUrl) ||
+    (pfpUrl ? await avatarHashFromLocalObject(pfpUrl) : null) ||
+    (pfpUrl ? await avatarHashFromDataUrl(pfpUrl) : null) ||
     null
   if (pfpHash) rawBeacon.pfpHash = pfpHash.toLowerCase()
+  const appVersion = await localAppVersion()
+  if (appVersion) rawBeacon.appVersion = appVersion
 
   const sigBytes = signMessage(beaconSignaturePayload(rawBeacon), identity.privateKeyHex)
   const beacon: PresenceBeacon = {
@@ -274,6 +347,12 @@ export async function fetchPresenceRosterFrom(
       users.push({
         id: beacon.orbitId,
         display_name: beacon.displayName?.trim() || generateFallbackName(beacon.orbitId),
+        // Cosmetic only: carried through the roster so the chat list can say
+        // "older version" without touching media resolution. A malformed or
+        // absent field stays absent — never a fabricated version.
+        ...(typeof beacon.appVersion === 'string' && beacon.appVersion.length <= 32
+          ? { appVersion: beacon.appVersion }
+          : {}),
         // A hash-bearing avatar resolves through the verified content ladder on
         // the reader's side (Avatar.tsx); the node-local pfpUrl is the fallback
         // for a peer that advertised no hash.

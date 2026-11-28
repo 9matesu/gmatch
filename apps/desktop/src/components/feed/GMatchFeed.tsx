@@ -47,7 +47,7 @@ import { Avatar } from '../Avatar';
 import CachedImg from '../../ui/CachedImg';
 import { NativeVideoPlayer } from '../media/NativeVideoPlayer';
 import { isVideoPost } from '../../utils/media';
-import { vaultPin, vaultBridge } from '../../services/vault';
+import { vaultBridge } from '../../services/vault';
 import { PEER_ONLINE_EVENT } from '../../utils/p2pSwarm';
 import {
   classes, COLOR, DIALOG_WIDTH, GAP, ICON, LAYOUT, PADDING_X, RADIUS,
@@ -887,9 +887,8 @@ function GMatchFeedImpl({
     }, 700);
   };
 
-  /** B6: one-click Vault save of the post's media bytes. The bridge fetches,
-   *  hashes and stores them (dedup by content hash); null = unreachable or
-   *  browser dev (where the button is hidden anyway). */
+  /** One-click Vault save: verified bytes become ONE keepsake, visible in the
+   *  Vault and the profile grid. A failed read-back records nothing. */
   const vaultSavedRef = useRef<Set<string>>(new Set());
   const [vaultSaved, setVaultSaved] = useState<Set<string>>(new Set());
   const savePostToVault = async (post: FeedPost) => {
@@ -897,10 +896,14 @@ function GMatchFeedImpl({
     if (!url || vaultSavedRef.current.has(url)) return;
     vaultSavedRef.current.add(url); // in-flight + done guard
     try {
-      const local = await vaultPin(url);
-      if (local) {
+      const { saveMediaAsKeepsake } = await import('../../services/keepsake');
+      const res = await saveMediaAsKeepsake(url, {
+        tags: post.tags ?? [],
+        kind: post.mime_type?.startsWith('video/') ? 'video' : 'image',
+      });
+      if (res.ok) {
         setVaultSaved((prev) => new Set(prev).add(url));
-        toast?.('Media saved to your Vault — it opens even offline.', 'success');
+        toast?.('Media saved to your Vault and Keepsakes — it opens even offline.', 'success');
       } else {
         vaultSavedRef.current.delete(url);
         toast?.('Could not save to the Vault: the media was unreachable.', 'error');

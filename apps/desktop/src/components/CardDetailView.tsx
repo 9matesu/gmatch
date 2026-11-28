@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Heart, Tag, TrendingUp, Coins, Gift } from 'lucide-react';
 import { orbitFetch } from '../utils/api';
+import { isClickerCard } from '../utils/cardCollection';
 import { userFacingError } from '../utils/userError';
 import type { OrbitIdentity } from '@orbit/crypto';
 import { computeCashoutPayout, clampCashoutRateBps, DEFAULT_CASHOUT_RATE_BPS, formatGc } from '@orbit/shared';
@@ -130,6 +131,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
 
   const isOwner = Boolean(identity && card && identity.orbitId === card.ownerId);
   const canBuy = Boolean(card && !isOwner && card.marketStatus === 'listed' && listingPrice !== null);
+  const fromClicker = isClickerCard(card);
 
   const mutateCard = async (
     action: 'list' | 'cancel' | 'buy',
@@ -255,6 +257,7 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
               value={card.value ?? 0}
               accentColor={card.accentColor}
               frame={card.frame}
+              clicker={fromClicker}
               className="max-w-[300px]"
             />
           </div>
@@ -270,6 +273,11 @@ export function CardDetailView({ cardId, identity, onClose, toast, onOpenProfile
             <span className={classes(CHROME.badge, WEIGHT.semibold)}>
               <Heart className={classes(ICON.sm, 'inline mr-1', COLOR.muted)} />{card.likeCount}
             </span>
+            {fromClicker && (
+              <span className={classes(CHROME.badge, WEIGHT.semibold)} title="You found this image in the clicker game">
+                clicker!
+              </span>
+            )}
             {card.creatorId && (
               <button
                 type="button"

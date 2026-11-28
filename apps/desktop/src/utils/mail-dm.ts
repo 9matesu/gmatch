@@ -5,7 +5,10 @@ import { logger } from './logger'
 import { isEpoch, peerAddressToken } from './handleRotation'
 import { TYPING_TTL_MS, shouldEmitTyping } from './dmTyping'
 import { getSecureItem, setSecureItem } from './secure-storage'
-import { peerNodeFor } from './peerNodes'
+import { isPrivateNodeUrl, peerNodeFor } from './peerNodes'
+import { getCentralApiUrl } from './central'
+import { PEER_ONLINE_EVENT } from './p2pSwarm'
+import { isContentAddress } from './contentAddressedMedia'
 
 /**
  * Courier-backed DM layer (plan P3.2). Source of truth is LOCAL
@@ -88,6 +91,60 @@ const MAX_REACTION_LEN = 16
  * even with several large threads in one install.
  */
 const MAX_PER_THREAD = 2000
+
+/** Outbox retry: one bounded timer per manager, never a polling storm. */
+const RETRY_BASE_MS = 30_000
+const RETRY_MAX_MS = 5 * 60_000
+const RETRY_MAX_ATTEMPTS = 12
+
+/**
+ * A retry actually in flight. Transient by design — it is not a durable
+ * message status and must never be mistaken for a delivery ack. The chat row
+ * reads it to say "Retrying…" only while a send is being attempted.
+ */
+const retryingIds = new Set<string>()
+const retryListeners = new Set<() => void>()
+function setRetrying(id: string, on: boolean): void {
+  const before = retryingIds.has(id)
+  if (on) retryingIds.add(id)
+  else retryingIds.delete(id)
+  if (before === on) return
+  for (const listener of retryListeners) {
+    try { listener() } catch { /* a UI subscriber must not fail a send */ }
+  }
+}
+export function isDmRetrying(id: string): boolean {
+  return retryingIds.has(id)
+}
+export function subscribeDmRetryChanges(listener: () => void): () => void {
+  retryListeners.add(listener)
+  return () => { retryListeners.delete(listener) }
+}
+
+/**
+ * The content address of an attachment we hold locally. A DM attachment is a
+ * random object id registered on the SENDER's node; on the recipient's node
+ * `/api/objects/<id>` 404s and a swarm ask by alias has nothing to verify
+ * against. The sealed body carries the sha256 instead, which is the only
+ * address that travels between worlds. Hashes are cached for the session —
+ * the id never changes, and hashing a picture per retry is pointless work.
+ */
+const attachmentHashes = new Map<string, string | null>()
+async function wireAttachmentId(id: string | undefined): Promise<string | undefined> {
+  if (!id) return undefined
+  if (isContentAddress(id)) return id.toLowerCase()
+  if (attachmentHashes.has(id)) return attachmentHashes.get(id) || id
+  let hash: string | null = null
+  try {
+    const { getLocalObject, sha256HexBlob } = await import('./p2pSwarm')
+    const blob = await getLocalObject(id)
+    if (blob) hash = await sha256HexBlob(blob)
+  } catch {
+    /* no local bytes: keep the legacy id, never invent an address */
+  }
+  attachmentHashes.set(id, hash)
+  return hash || id
+}
 
 export interface PeerKeys {
   publicKeyHex: string
@@ -418,11 +475,85 @@ export interface MailClientLike {
   readonly epoch?: { cur: string; prev: string }
 }
 
+/**
+ * Box to drop a peer's sealed mail into: the node its beacon names when that
+ * node is publicly dialable, otherwise the blind rendezvous both peers drain.
+ * A private/link-local node address belongs to the sender's network — a PUT
+ * there times out, while the worker is token-addressed and holds only sealed
+ * ciphertext. No remembered node (a failed probe) already falls through to the
+ * client's own base, which IS the same rendezvous in the default config.
+ */
+function sendBaseForPeer(peerId: string): string | null {
+  const node = peerNodeFor(peerId)
+  if (!node) return null
+  return isPrivateNodeUrl(node) ? (getCentralApiUrl() || null) : node
+}
+
 export class DmManager {
   private readonly lastTypingAt = new Map<string, number>()
   private readonly readWatermarks = new Map<string, number>()
+  private readonly retryAttempts = new Map<string, number>()
+  private retryTimer: ReturnType<typeof setTimeout> | null = null
+  private retryDelay = RETRY_BASE_MS
+  private retryRuns = 0
+  private disposed = false
 
-  constructor(private readonly deps: DmManagerDeps) {}
+  constructor(private readonly deps: DmManagerDeps) {
+    if (typeof window === 'undefined') return
+    window.addEventListener(PEER_ONLINE_EVENT, this.onRetrySignal)
+    window.addEventListener('online', this.onRetrySignal)
+    window.addEventListener('focus', this.onRetrySignal)
+    document.addEventListener('visibilitychange', this.onVisibility)
+  }
+
+  /** Stop the outbox driver (used by tests and on teardown). */
+  dispose(): void {
+    this.disposed = true
+    if (this.retryTimer !== null) clearTimeout(this.retryTimer)
+    this.retryTimer = null
+    if (typeof window === 'undefined' || typeof document === 'undefined') return
+    window.removeEventListener(PEER_ONLINE_EVENT, this.onRetrySignal)
+    window.removeEventListener('online', this.onRetrySignal)
+    window.removeEventListener('focus', this.onRetrySignal)
+    document.removeEventListener('visibilitychange', this.onVisibility)
+  }
+
+  /** A reason to believe delivery is possible again: reset backoff and retry. */
+  private readonly onRetrySignal = (): void => {
+    if (this.deps.store.threadsWithFailures().length === 0) return
+    // A peer coming back / the window being focused is NEW evidence that a
+    // held message can land: re-arm its attempt budget, not just the timer.
+    this.retryAttempts.clear()
+    this.retryDelay = RETRY_BASE_MS
+    void this.runRetry()
+  }
+
+  private readonly onVisibility = (): void => {
+    if (typeof document !== 'undefined' && !document.hidden) this.onRetrySignal()
+  }
+
+  /** One timer, chained only while a failed row still owes a send. */
+  private scheduleRetry(): void {
+    if (this.disposed || typeof window === 'undefined' || this.retryTimer !== null) return
+    if (this.deps.store.threadsWithFailures().length === 0) return
+    const delay = this.retryDelay
+    this.retryDelay = Math.min(delay * 2, RETRY_MAX_MS)
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = null
+      void this.runRetry()
+    }, delay)
+  }
+
+  private async runRetry(): Promise<void> {
+    if (this.retryRuns > 0 || this.disposed) return
+    this.retryRuns += 1
+    try {
+      if (await this.resendFailed() > 0) this.retryDelay = RETRY_BASE_MS
+    } finally {
+      this.retryRuns -= 1
+    }
+    this.scheduleRetry()
+  }
 
   private epochId(): string | undefined {
     return this.deps.mail.epoch?.cur
@@ -435,8 +566,10 @@ export class DmManager {
       return Promise.reject(new Error('peer keys unknown'))
     }
     // A peer on another node keeps its mailbox THERE: drop the sealed
-    // envelope straight into that node's box (it cannot read it either).
-    const peerBase = peerNodeFor(peerId)
+    // envelope straight into that node's box (it cannot read it either) —
+    // unless its node is an undialable private address, in which case the
+    // shared rendezvous is the only box both sides can reach.
+    const peerBase = sendBaseForPeer(peerId)
     return this.deps.mail.send(
       body,
       'mail',
@@ -477,11 +610,15 @@ export class DmManager {
       msg.status = 'failed'
       this.deps.store.setStatus(peerId, msg.id, 'failed')
       this.deps.onThreadChanged(peerId)
-      logger.warn('[dm] no pubkey known for peer — message held locally (will not deliver)')
+      logger.warn('[dm] no pubkey known for peer — message held locally (will deliver on retry)')
+      this.scheduleRetry()
       return msg
     }
     try {
-      const env = await this.sendBody(peerId, encodeDmBody(msg, this.epochId()))
+      // The recipient never has our node's row: seal the content address so
+      // they can verify swarm bytes instead of 404ing on a local object id.
+      const wire = { ...msg, attachmentId: await wireAttachmentId(msg.attachmentId) }
+      const env = await this.sendBody(peerId, encodeDmBody(wire, this.epochId()))
       msg.status = 'sent'
       msg.envelopeId = env.id
     } catch {
@@ -489,6 +626,9 @@ export class DmManager {
     }
     this.deps.store.setStatus(peerId, msg.id, msg.status)
     this.deps.onThreadChanged(peerId)
+    // Schedule only AFTER the failure is durable: threadsWithFailures() is the
+    // outbox view, and an unsaved row looks like "nothing owed".
+    if (msg.status === 'failed') this.scheduleRetry()
     return msg
   }
 
@@ -511,15 +651,23 @@ export class DmManager {
       const pending = this.deps.store.thread(peer).filter((m) => m.own && m.status === 'failed' && !m.deletedTs)
       for (const msg of pending.slice(0, limit)) {
         if (!this.deps.store.peerKeys(peer)) continue
+        const key = `${peer}:${msg.id}`
+        if ((this.retryAttempts.get(key) ?? 0) >= RETRY_MAX_ATTEMPTS) continue
+        this.retryAttempts.set(key, (this.retryAttempts.get(key) ?? 0) + 1)
+        setRetrying(msg.id, true)
         try {
-          const env = await this.sendBody(peer, encodeDmBody(msg, this.epochId()))
+          const wire = { ...msg, attachmentId: await wireAttachmentId(msg.attachmentId) }
+          const env = await this.sendBody(peer, encodeDmBody(wire, this.epochId()))
           this.deps.store.update(peer, msg.id, (m) => {
             m.status = 'sent'
             m.envelopeId = env.id
           })
+          this.retryAttempts.delete(key)
           sent += 1
         } catch {
           // Still unreachable: leave the row failed for the next attempt.
+        } finally {
+          setRetrying(msg.id, false)
         }
       }
     }

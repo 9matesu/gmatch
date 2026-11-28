@@ -5,6 +5,7 @@ import { playPress } from '../../utils/sounds';
 import { ContextMenu, type ContextMenuItem } from '../ui/ContextMenu';
 import { resolveMediaUrl } from '../../utils/media';
 import { contentHashFromRef } from '../../utils/contentAddressedMedia';
+import { isDmRetrying, subscribeDmRetryChanges } from '../../utils/mail-dm';
 import { GroupMembersPopover, type GroupMember } from './GroupMembersPopover';
 import {
   Send,
@@ -246,6 +247,10 @@ export function GMatchDMs({
 }) {
   const [inputText, setInputText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  // A retry is a real, transient send attempt. Re-render only while one is in
+  // flight; the durable status stays 'failed' until a dm_ack proves delivery.
+  const [, setRetryTick] = useState(0);
+  useEffect(() => subscribeDmRetryChanges(() => setRetryTick((n) => n + 1)), []);
   // One menu for every message: opened at the cursor, clamped to the viewport.
   const [messageMenu, setMessageMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
   const [pendingAttachment, setPendingAttachment] = useState<{ id: string; url: string; isVideo: boolean } | null>(null);
@@ -467,6 +472,25 @@ export function GMatchDMs({
     if (!peerId || !onDeleteForEveryone) return;
     const ok = await onDeleteForEveryone(peerId, msg.id);
     if (!ok) showPasteNotice('Deleted here, but the peer could not be notified.');
+  };
+
+  /**
+   * ONE cancel affordance, two honest outcomes. A message that never left the
+   * device is a local outbox row: cancel removes it (a local delete tombstone
+   * stops the retry driver and cannot be replayed back into the thread). A
+   * message the peer may hold is only removed through dm_del — never a hard
+   * delete of someone else's copy.
+   */
+  const isPendingDm = (msg: ChatMessage): boolean =>
+    msg.courierStatus === 'sending' ||
+    msg.courierStatus === 'failed' ||
+    isDmRetrying(msg.id);
+
+  const cancelMessage = (msg: ChatMessage) => {
+    const peerId = activePmPeer?.orbitId;
+    if (!peerId || msg.deletedAt) return;
+    if (isPendingDm(msg)) onDeleteMessage?.(msg.id, peerId);
+    else void handleDeleteForEveryone(msg);
   };
 
   const handleDeleteThread = async (peerId: string) => {
@@ -1465,7 +1489,7 @@ export function GMatchDMs({
                                 </>
                                 )}
                               </div>
-                              {(isLast || (isOwn && (msg.courierStatus === 'failed' || msg.courierStatus === 'sending'))) && (
+                              {(isLast || (isOwn && !msg.deletedAt && isPendingDm(msg))) && (
                                 <div className={`mt-0.5 flex items-center gap-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
                                   {/* The clock labels the block; the delivery state
                                       belongs to the message. Gating both on isLast
@@ -1477,7 +1501,11 @@ export function GMatchDMs({
                                     </time>
                                   )}
                                   {isOwn && msg.courierStatus === 'failed' && (
-                                    <span title="Not delivered" className="text-2xs text-danger-fg">not delivered</span>
+                                    isDmRetrying(msg.id) ? (
+                                      <span title="Retrying" className="text-2xs text-retro-muted">retrying…</span>
+                                    ) : (
+                                      <span title="Not delivered" className="text-2xs text-danger-fg">not delivered</span>
+                                    )
                                   )}
                                   {isOwn && msg.courierStatus === 'sending' && (
                                     <span title="Sending"><Clock3 className="w-3 h-3 text-retro-muted" /></span>
@@ -1491,6 +1519,23 @@ export function GMatchDMs({
                                   ) : null}
                                   {msg.editedAt && (
                                     <span className="text-2xs text-retro-muted">Edited</span>
+                                  )}
+                                  {isOwn && !msg.deletedAt && openTarget === 'peer' && msg.courierStatus && (
+                                    isPendingDm(msg) ? (
+                                      onDeleteMessage && (
+                                        <Button variant="ghost" size="sm" onClick={() => cancelMessage(msg)}
+                                          title="Cancel send" aria-label="Cancel send" className="p-0.5">
+                                          <X className="w-3 h-3" />
+                                        </Button>
+                                      )
+                                    ) : (
+                                      onDeleteForEveryone && (
+                                        <Button variant="ghost" size="sm" onClick={() => cancelMessage(msg)}
+                                          title="Delete for everyone" aria-label="Delete for everyone" className="p-0.5">
+                                          <X className="w-3 h-3" />
+                                        </Button>
+                                      )
+                                    )
                                   )}
                                 </div>
                               )}

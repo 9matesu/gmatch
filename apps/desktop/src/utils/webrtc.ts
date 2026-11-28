@@ -12,11 +12,6 @@ export interface FileMeta {
   encrypted: boolean
 }
 
-function getIceServers(): RTCIceServer[] {
-  // Single privacy gate (ice-hygiene): STUN always; TURN relay-only when set.
-  return defaultIceConfig(readTurnEnv()).iceServers as RTCIceServer[]
-}
-
 function readTurnEnv(): Record<string, string | undefined> {
   // Same three sources as courierSignaling.ts: Vite build-time env is the one
   // that exists in a sandboxed packaged renderer, window.__ENV is a runtime
@@ -65,12 +60,6 @@ export class OrbitPeer {
   onProgress?: (received: number, total: number) => void
   onComplete?: (blob: Blob, meta: FileMeta) => void
   onError?: (err: Error) => void
-
-  private iceServers: RTCIceServer[]
-
-  constructor() {
-    this.iceServers = getIceServers()
-  }
 
   async initiate(recipientId: string, identity: OrbitIdentity): Promise<string> {
     logger.log('[ORBIT WebRTC] Initiating peer connection to:', recipientId)

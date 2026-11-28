@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Check, Copy, Network, RefreshCw } from 'lucide-react';
-import { findRadminVpn, joinRadminVlan, radminAdapterIp, type RadminJoinResult } from '../../services/radmin';
+import { findRadminVpn, globalIpv6Address, joinRadminVlan, radminAdapterIp, type RadminJoinResult } from '../../services/radmin';
 import { retryPeerConnections } from '../../hooks/useP2P';
 
 /** The shared Radmin VLAN every player joins to share one virtual LAN. */
@@ -10,6 +10,28 @@ export const RADMIN_VLAN_NAME = 'gMatch Official VLAN';
 export const RADMIN_VLAN_PASSWORD = 'GMATCHVLAN';
 
 type Toast = (msg: string, type?: 'error' | 'success' | 'info' | 'warning' | any) => void;
+
+export interface DirectPathState {
+  globalIpv6: string | null;
+  radminIp: string | null;
+  exeFound: boolean | null;
+}
+
+/**
+ * What the machine can actually offer, stated plainly. A detected address is
+ * only a CANDIDATE for a direct path: the peer chip says "P2P direct" only
+ * after a DataChannel opens on it. Never claim a direct route from an adapter
+ * listing alone.
+ */
+export function directPathSummary(s: DirectPathState): string {
+  if (s.exeFound === null && !s.globalIpv6 && !s.radminIp) return 'Detecting direct paths on this machine…';
+  const parts: string[] = [];
+  if (s.globalIpv6) parts.push(`global IPv6 ${s.globalIpv6}`);
+  if (s.radminIp) parts.push(`Radmin adapter ${s.radminIp}`);
+  if (parts.length) return `Direct-path candidate: ${parts.join(' and ')}. A direct route is confirmed only when a peer's DataChannel opens on it.`;
+  if (s.exeFound) return 'Radmin VPN is installed but no 26.x adapter is up, and no global IPv6 was detected. Join the VLAN below to enable a direct path.';
+  return 'No global IPv6 and no Radmin 26.x adapter detected. Direct paths are limited to same-LAN mDNS or STUN srflx; on CGNAT/symmetric NAT traffic falls back to the node relay.';
+}
 
 function CopyField({ label, value }: { label: string; value: string }) {
   const [copied, setCopied] = useState(false);
@@ -48,16 +70,29 @@ function CopyField({ label, value }: { label: string; value: string }) {
  */
 export function NetworkSection({ toast }: { toast?: Toast }) {
   const [radminIp, setRadminIp] = useState<string | null>(null);
+  const [globalIpv6, setGlobalIpv6] = useState<string | null>(null);
   const [exeFound, setExeFound] = useState<boolean | null>(null);
   const [joining, setJoining] = useState(false);
   const [lastResult, setLastResult] = useState<RadminJoinResult | null>(null);
 
-  const refreshAdapter = () => {
-    void radminAdapterIp().then((ip) => setRadminIp(ip));
-    void findRadminVpn().then((p) => setExeFound(!!p));
+  const refreshAdapter = async (announce = false) => {
+    const [ip, v6, exe] = await Promise.all([
+      radminAdapterIp(),
+      globalIpv6Address(),
+      findRadminVpn(),
+    ]);
+    setRadminIp(ip);
+    setGlobalIpv6(v6);
+    setExeFound(!!exe);
+    if (announce) {
+      toast?.(
+        `Re-check: Radmin ${exe ? 'installed' : 'not found'}, adapter ${ip ?? 'none'}, global IPv6 ${v6 ?? 'none'}`,
+        ip ? 'success' : 'info',
+      );
+    }
   };
 
-  useEffect(refreshAdapter, []);
+  useEffect(() => { void refreshAdapter(); }, []);
 
   const join = async () => {
     setJoining(true);
@@ -114,6 +149,13 @@ export function NetworkSection({ toast }: { toast?: Toast }) {
         </button>
         <button
           type="button"
+          onClick={() => { void refreshAdapter(true) }}
+          className="px-3.5 py-2 bg-glass-w8 hover:bg-glass-w12 border border-edge text-retro-fg rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer shrink-0 transition-colors active:scale-(--scale-press)"
+        >
+          <RefreshCw className="w-3.5 h-3.5" /> Re-check detection
+        </button>
+        <button
+          type="button"
           onClick={retryPeers}
           className="px-3.5 py-2 bg-glass-w8 hover:bg-glass-w12 border border-edge text-retro-fg rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer shrink-0 transition-colors active:scale-(--scale-press)"
         >
@@ -121,13 +163,24 @@ export function NetworkSection({ toast }: { toast?: Toast }) {
         </button>
       </div>
 
-      <div className="text-xs text-retro-muted space-y-1">
+      <div className="text-xs text-retro-muted space-y-1 text-pretty">
         <div>
-          Detected Radmin IP:{' '}
+          Radmin VPN:{' '}
+          <span className="text-retro-fg">
+            {exeFound === null ? 'checking…' : exeFound ? 'installed' : 'not found at a standard path'}
+          </span>
+        </div>
+        <div>
+          26.x adapter:{' '}
           <span className="font-mono text-retro-fg">{radminIp ?? 'none (not joined)'}</span>
         </div>
-        {exeFound === false && (
-          <div className="text-retro-error">Radmin VPN is not installed on this device.</div>
+        <div>
+          Global IPv6:{' '}
+          <span className="font-mono text-retro-fg">{globalIpv6 ?? 'none detected'}</span>
+        </div>
+        <div className="text-retro-fg">{directPathSummary({ globalIpv6, radminIp, exeFound })}</div>
+        {exeFound === false && !radminIp && (
+          <div className="text-retro-error">Radmin VPN executable was not found at a standard install path.</div>
         )}
         {lastResult?.status === 'failed' && (
           <div className="text-retro-error">Last join attempt: {lastResult.reason}</div>

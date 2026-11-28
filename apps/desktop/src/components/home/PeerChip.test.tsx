@@ -16,10 +16,11 @@ const rowFor = (name: string): HTMLElement =>
   screen.getByText(name).closest('li') as HTMLElement;
 
 describe('peerChipStatus — the three honest states', () => {
-  it('calls a peer "connected" on a validated direct path or a live relay', () => {
+  it('calls an ONLINE peer "connected" even while a direct dial is in flight', () => {
     expect(peerChipStatus(peer('a', 'Alpha'), 'direct')).toBe('connected');
     expect(peerChipStatus(peer('a', 'Alpha'), 'relay')).toBe('connected');
-    expect(peerChipStatus(peer('a', 'Alpha'), 'connecting-direct')).toBe('connecting');
+    // A dial is a secondary detail, never a replacement for roster liveness.
+    expect(peerChipStatus(peer('a', 'Alpha'), 'connecting-direct')).toBe('connected');
     // idle is a roster-confirmed online peer with no dial yet: online, not dead.
     expect(peerChipStatus(peer('a', 'Alpha'), 'idle')).toBe('connected');
   });
@@ -73,7 +74,9 @@ describe('PeerChip', () => {
     expect(dialog).toHaveTextContent('Alpha');
     expect(dialog).toHaveTextContent('Beta');
     expect(rowFor('Alpha')).toHaveTextContent(PEER_STATUS_LABEL.connected);
-    expect(rowFor('Beta')).toHaveTextContent(PEER_STATUS_LABEL.connecting);
+    // Beta is roster-online; its in-flight dial is a DETAIL, not the status.
+    expect(rowFor('Beta')).toHaveTextContent(PEER_STATUS_LABEL.connected);
+    expect(rowFor('Beta')).toHaveTextContent('· connecting…');
   });
 
   it('labels ONLY the real transport: direct, relay, idle — never a guess', () => {
@@ -122,10 +125,13 @@ describe('PeerChip', () => {
     });
     render(<PeerChip roster={roster} registry={registry} />);
     fireEvent.click(screen.getByRole('button', { name: 'Peers, 1 connected' }));
-    expect(rowFor('Beta')).toHaveTextContent(PEER_STATUS_LABEL.connecting);
+    expect(rowFor('Beta')).toHaveTextContent(PEER_STATUS_LABEL.connected);
+    expect(rowFor('Beta')).toHaveTextContent('· connecting…');
 
     act(() => { registry.markDirectValidated('b') });
     expect(rowFor('Beta')).toHaveTextContent(PEER_STATUS_LABEL.connected);
+    expect(rowFor('Beta')).toHaveTextContent('P2P direct');
+    expect(rowFor('Beta')).not.toHaveTextContent('connecting…');
   });
 
   it('hides dead rows: offline ghosts and failed dials are not in the peers list', () => {

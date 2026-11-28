@@ -79,6 +79,32 @@ describe('courierPresence', () => {
     expect(users[0].publicKey).toBe(bob.publicKeyHex)
   })
 
+  it('carries the app version SIGNED when the bridge knows it; tampering fails verification', async () => {
+    const previous = (window as unknown as { gmatch?: unknown }).gmatch
+    ;(window as unknown as { gmatch?: unknown }).gmatch = { appVersion: async () => '1.6.9' }
+    try {
+      let captured: any = null
+      const putFetch = vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
+        captured = JSON.parse(init?.body as string).env
+        return new Response(JSON.stringify({ ok: true }), { status: 200 })
+      })
+      await broadcastPresence(bob, { displayName: 'Versioned' }, putFetch as unknown as typeof globalThis.fetch)
+
+      const beacon = JSON.parse(decodeURIComponent(escape(atob(captured.sealed))))
+      expect(beacon.appVersion).toBe('1.6.9')
+      // The field is inside the signed payload: changing it breaks the seal.
+      const tampered = {
+        ...captured,
+        sealed: btoa(unescape(encodeURIComponent(JSON.stringify({ ...beacon, appVersion: '9.9.9' })))),
+      }
+      const getFetch = vi.fn().mockImplementation(async () =>
+        new Response(JSON.stringify({ envelopes: [tampered] }), { status: 200 }))
+      expect(await fetchPresenceRoster(alice.orbitId, getFetch as unknown as typeof globalThis.fetch)).toHaveLength(0)
+    } finally {
+      (window as unknown as { gmatch?: unknown }).gmatch = previous
+    }
+  })
+
   it('ignores forged or tampered presence beacons', async () => {
     const fakeEnvelope = {
       v: 2,

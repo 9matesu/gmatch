@@ -2,18 +2,18 @@
  * Browser-side real-ICE proof (loaded into TWO Playwright pages).
  *
  * This is the BROWSER twin of `p2p-worker.ts`: it runs the REAL production
- * wire primitives — `peerConnectionConfig(null)` (public STUN, direct-first,
- * the production posture), `createSocialOperation` /
+ * wire primitives — `peerConnectionConfig(null)` (direct-first with Google
+ * primary + Cloudflare fallback STUN, the production posture), `createSocialOperation` /
  * `validateSocialOperation` (the signed post.create), `seal1to1` / `open1to1`
  * + `encodeDmBody` / `decodeBody` (the sealed DM) and `sha256HexBlob`
  * (content verification) — over a genuine `RTCPeerConnection` DataChannel.
  * Nothing here is a mock: the bytes that cross the channel are the same frames
  * the swarm carries in production.
  *
- * The baked public TURN is NOT forced here: on this machine
- * `openrelay.metered.ca` resolves to 192.0.2.1 (TEST-NET blackhole) and
- * refuses TCP:80, so a relay-only policy gathers zero candidates. The driver
- * reports that block; the direct/srflx path is the real WAN path under test.
+ * 1.7.3 ships TWO free STUN servers (Google primary, Cloudflare fallback) and
+ * no baked TURN: the direct path is host/srflx candidates (mDNS, global IPv6,
+ * Radmin). `peerConnectionConfig(null)` is exactly that default — no forced
+ * relay, a TURN is appended only when explicitly configured.
  *
  * esbuild bundles this (platform=browser) and the driver (`wan-ice.mjs`)
  * loads it into two isolated browser contexts and relays only the SDP.
@@ -26,7 +26,7 @@ import { sha256HexBlob } from '../src/utils/swarmEngine'
 
 const IDENTITY = generateIdentity()
 
-// Production posture: public STUN, direct/srflx first, no forced relay.
+// Production posture: Google + Cloudflare STUN host/srflx direct path, no forced relay.
 const CONFIG = peerConnectionConfig(null)
 
 let pc: RTCPeerConnection | null = null

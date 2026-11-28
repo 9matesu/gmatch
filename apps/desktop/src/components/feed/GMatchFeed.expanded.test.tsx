@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { GMatchFeed, type FeedPost } from './GMatchFeed'
+import { saveMediaAsKeepsake } from '../../services/keepsake'
 
 vi.mock('../../utils/sounds', () => ({
   playPress: vi.fn(), playLike: vi.fn(), playWin: vi.fn(), playMsgReceive: vi.fn(),
@@ -11,10 +12,14 @@ vi.mock('../../services/vault', async (importOriginal) => ({
   vaultBridge: () => ({}),
   vaultPin: vi.fn(async () => 'vault://f/abc'),
 }))
+vi.mock('../../services/keepsake', () => ({
+  saveMediaAsKeepsake: vi.fn(async () => ({ ok: true, ref: 'abc' })),
+}))
 
 const CAPTION = 'one body, one card'
 
 beforeEach(() => {
+  vi.mocked(saveMediaAsKeepsake).mockClear()
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ json: async () => ({}), ok: true }))
   vi.stubGlobal('IntersectionObserver', class {
     observe() { } unobserve() { } disconnect() { }
@@ -72,5 +77,14 @@ describe('GMatchFeed · one body, one card', () => {
   it('offers save-to-Vault on the inline card, not only in the expanded view', () => {
     renderFeed()
     expect(screen.getAllByLabelText('Save to Vault').length).toBeGreaterThan(0)
+  })
+
+  it('routes an explicit Save to Vault through the verified keepsake helper', async () => {
+    renderFeed()
+    fireEvent.click(screen.getAllByLabelText('Save to Vault')[0])
+    await waitFor(() => expect(saveMediaAsKeepsake).toHaveBeenCalledWith(
+      captionedPost.url,
+      expect.objectContaining({ kind: 'image' }),
+    ))
   })
 })

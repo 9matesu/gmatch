@@ -55,6 +55,18 @@ describe('UserProfileModal: one presence answer across surfaces', () => {
     expect(screen.getByText('Online')).toBeInTheDocument()
   })
 
+  it('a roster-online peer reads Online even when its sighting is older than the roster window', () => {
+    // ChatPlayerList calls this peer "Active now" straight from the roster's
+    // online flag. The profile used to re-derive liveness from last_seen with
+    // a 90s window, so a beacon arriving a little late made the SAME peer
+    // read "Offline" here.
+    ingestSnapshot([{ id: 'cross-node-peer', last_seen: ago(75_000), online: false }])
+    const subject = peer(true, ago(120_000))
+    render(<UserProfileModal user={subject} users={[subject]} onClose={() => {}} />)
+    expect(screen.getByText('Online')).toBeInTheDocument()
+    expect(screen.queryByText('Offline')).toBeNull()
+  })
+
   it('does not fabricate a presence neither source knows', () => {
     const subject = peer(false, ago(10 * 60_000))
     render(<UserProfileModal user={subject} users={[]} onClose={() => {}} />)

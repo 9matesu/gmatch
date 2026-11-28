@@ -49,7 +49,10 @@ describe('UserProfileModal presence sync', () => {
     expect(screen.getByText('Online')).toBeInTheDocument();
   });
 
-  it('renders Offline when user has stale sighting even if online flag was true', () => {
+  it('renders Online when the roster online flag is true even if last_seen is stale', () => {
+    // The roster's `online` boolean is the authority (the same flag the chat
+    // list trusts); a cross-node beacon can arrive a little late, so a stale
+    // last_seen must NOT flip a roster-online peer to Offline.
     const staleIso = new Date(Date.now() - 120_000).toISOString();
     render(
       <UserProfileModal
@@ -58,7 +61,7 @@ describe('UserProfileModal presence sync', () => {
       />
     );
 
-    expect(screen.getByText('Offline')).toBeInTheDocument();
+    expect(screen.getByText('Online')).toBeInTheDocument();
   });
 
   // THE SPLIT BRAIN. The modal used to do `users.find(...) || user`, so a

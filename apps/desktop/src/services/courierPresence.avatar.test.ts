@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vite
 import { generateIdentity, type OrbitIdentity } from '@orbit/crypto'
 import { broadcastPresence, fetchPresenceRosterFrom } from './courierPresence'
 import { resolveContentAddressedMedia } from '../utils/contentAddressedMedia'
-import { registerLocalObject, sha256HexBlob } from '../utils/p2pSwarm'
+import { getLocalObject, registerLocalObject, sha256HexBlob } from '../utils/p2pSwarm'
 import { SwarmTestNetwork } from '../utils/swarmHarness'
 import { _resetNodeAddress } from '../utils/serverAddress'
 
@@ -106,6 +106,34 @@ describe('cross-node avatars (presence avatar hash)', () => {
     expect(await sha256HexBlob(bytes!)).toBe(contentHash)
     expect(new Uint8Array(await bytes!.arrayBuffer())).toEqual(new Uint8Array(await AVATAR.arrayBuffer()))
   })
+
+  it('advertises and seeds the REAL profile photo: a data URL from secure storage', async () => {
+    // ProfilePicModal saves a compact data: URL and useP2P's heartbeat passes
+    // only a display name — the pfp lives in the identity-scoped secure key.
+    const contentHash = await sha256HexBlob(AVATAR)
+    const bytes = new Uint8Array(await AVATAR.arrayBuffer())
+    const pfpUrl = `data:image/png;base64,${Buffer.from(bytes).toString('base64')}`
+    localStorage.setItem(`orbit_pfp_url:${alice.orbitId}`, pfpUrl)
+
+    const boxes = new Map<string, any[]>()
+    const fetchMock = mailboxFetch(boxes)
+    await broadcastPresence(alice, { displayName: 'Alice' }, fetchMock)
+
+    const env = boxes.get('http://node-a.test:8790')![0]
+    const beacon = JSON.parse(decodeURIComponent(escape(atob(env.sealed))))
+    expect(beacon.pfpHash).toBe(contentHash)
+
+    // The reader's roster row is a content address, not our node-local pfp path.
+    const roster = await fetchPresenceRosterFrom('http://node-a.test:8790', bob.orbitId, fetchMock)
+    const peer = roster.users.find((u) => u.id === alice.orbitId)!
+    expect(peer.pfp_url).toBe(`urn:sha256:${contentHash}`)
+
+    // A seeds the bytes under that address, so the peer's verified ladder can
+    // actually fetch them instead of waiting on a seeder nobody started.
+    const seeded = await getLocalObject(contentHash)
+    expect(seeded).not.toBeNull()
+    expect(await sha256HexBlob(seeded!)).toBe(contentHash)
+  });
 
   it('both directions: each side advertises a hash the other resolves', async () => {
     const aliceHash = await sha256HexBlob(AVATAR)

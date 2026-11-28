@@ -9,7 +9,7 @@ import { ObjectImage } from './ObjectImage';
 import { useProfilePostLightbox } from './feed/useProfilePostLightbox';
 import type { FeedPost, PostComment } from './feed/GMatchFeed';
 import { orbitFetch, invalidateCache } from '../utils/api';
-import { isUserOnline, fresherPresence, isRosterOnline } from '../utils/presence';
+import { isUserOnline, fresherPresence } from '../utils/presence';
 import { usePresence } from '../game/presenceStore';
 import { nameFor } from '../game/nameDirectory';
 import { contentHashFromRef } from '../utils/contentAddressedMedia';
@@ -219,13 +219,13 @@ export function UserProfileModal({
   // while we were looking still showed the old name until they saved again.
   void nameTick;
   const displayName = nameFor(user.id) || user.display_name?.trim() || 'Unknown User';
-  // Two sightings of the same live fact: the shared dashboard presence store,
-  // and the roster-backed entry the chat list reads (the P2P roster has no
-  // dashboard row for a cross-node peer). A roster-online flag wins over a
-  // stale 60s dashboard record so the modal cannot say "Offline" while the
-  // player list says "Active now" — and cannot decay while the roster still
-  // lists the peer. Nothing is invented: with neither source online the dot
-  // stays offline.
+  // The roster's own `online` flag is the authority for "who is online" — it
+  // is the same boolean ChatPlayerList renders as "Active now". Re-checking it
+  // against a 90s last_seen window made this modal say "Offline" for a peer
+  // the chat list called online whenever beacons arrived a little late. The
+  // dashboard store's 60s sighting is the other source; the final sighting
+  // fallback covers a user neither source has seen. Nothing is invented: with
+  // no online signal anywhere the dot stays offline.
   //
   // `presenceTick` only re-runs this read: the interval above re-renders the
   // modal so Date.now() advances and an actual departure is honoured.
@@ -235,8 +235,8 @@ export function UserProfileModal({
   const storeKnows = usePresence((s) => s.records.has(user.id));
   const liveUser = fresherPresence(user, rosterUser);
   const isOnline = storeOnline
-    || isRosterOnline(rosterUser, now)
-    || isRosterOnline(user, now)
+    || rosterUser?.online === true
+    || user?.online === true
     || (storeKnows ? false : isUserOnline(liveUser as User | undefined, now));
   void presenceTick;
   const tags: string[] = parseTags(user.tags);

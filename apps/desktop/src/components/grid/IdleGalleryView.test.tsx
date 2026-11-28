@@ -78,10 +78,12 @@ describe('IdleGalleryView', () => {
   // so this is the only test where the repair can overlap a manual view.
   it('persists one viewed keep exactly once when boot repair is still running', async () => {
     const hash = 'a'.repeat(64)
-    let finish: (r: { status: 'local'; ref: string; bytes: number }) => void = () => {}
-    const gate = new Promise<{ status: 'local'; ref: string; bytes: number }>((res) => { finish = res })
+    type Permanent = Awaited<ReturnType<typeof ensurePermanentMedia>>
+    let finish: (r: Permanent) => void = () => {}
+    const gate = new Promise<Permanent>((res) => { finish = res })
     const { persistKeepsake } = await import('../../services/keepsake')
-    vi.mocked(persistKeepsake).mockImplementation(() => gate)
+    vi.mocked(persistKeepsake).mockClear()
+    vi.mocked(ensurePermanentMedia).mockImplementation(() => gate)
     const img: GalleryImage = {
       id: 'k-once', url: 'https://example.com/clip.mp4', tags: ['t'], rarityBase: 1,
       clicks: 0, rarity: 'Common', boughtAt: 1, kind: 'video', saveState: 'failed',
@@ -94,14 +96,16 @@ describe('IdleGalleryView', () => {
     try {
       render(<IdleGalleryView />)
       await userEvent.click(screen.getAllByRole('button', { name: /^View /i })[0])
-      // Only boot repair may have started the download while it was in flight.
-      expect(vi.mocked(persistKeepsake)).toHaveBeenCalledTimes(1)
-      expect(ensurePermanentMedia).not.toHaveBeenCalled()
-      await act(async () => { finish({ status: 'local', ref: hash, bytes: 10 }) })
+      // Only boot repair may have started the pin while it was in flight.
+      expect(ensurePermanentMedia).toHaveBeenCalledTimes(1)
+      expect(persistKeepsake).not.toHaveBeenCalled()
+      await act(async () => {
+        finish({ state: 'permanent', ref: hash, via: 'vault', reused: false })
+      })
       await waitFor(() => expect(useGame.getState().gallery[0].saveState).toBe('persisted'))
-      // The viewer does not re-persist the keep once the repair lands.
-      expect(vi.mocked(persistKeepsake)).toHaveBeenCalledTimes(1)
-      expect(ensurePermanentMedia).not.toHaveBeenCalled()
+      // The viewer does not re-pin the keep once the repair lands.
+      expect(ensurePermanentMedia).toHaveBeenCalledTimes(1)
+      expect(persistKeepsake).not.toHaveBeenCalled()
     } finally {
       g.gmatch = prevBridge
     }
@@ -723,6 +727,28 @@ describe('IdleGalleryView', () => {
     render(<IdleGalleryView />)
     expect(screen.queryByTitle(/Saved permanently in the local vault/i)).toBeNull()
     expect(screen.queryByText(/Not cached/i)).toBeNull()
+  })
+
+  it('a retry on a keep whose bytes the vault holds does not re-download', async () => {
+    const hash = 'a'.repeat(64)
+    const img: GalleryImage = {
+      id: 'k-vault-held', url: 'https://example.com/p.jpg', tags: ['t'], rarityBase: 1,
+      clicks: 0, rarity: 'Common', boughtAt: 1, kind: 'image',
+      saveState: 'failed', localRef: hash,
+    }
+    useGame.setState({ gallery: [img] })
+    const { persistKeepsake } = await import('../../services/keepsake')
+    vi.mocked(persistKeepsake).mockClear()
+    vi.mocked(ensurePermanentMedia).mockClear()
+    render(<IdleGalleryView />)
+    await userEvent.click(screen.getByRole('button', { name: /not saved · retry/i }))
+    await waitFor(() => expect(useGame.getState().gallery[0].saveState).toBe('persisted'))
+    expect(vi.mocked(ensurePermanentMedia)).toHaveBeenCalledWith(
+      img.url,
+      img.kind,
+      expect.objectContaining({ persist: expect.any(Function) }),
+    )
+    expect(persistKeepsake).not.toHaveBeenCalled()
   })
 
   it('a manual view writes the permanent vault once and reports the real outcome', async () => {

@@ -47,6 +47,34 @@ export function normalizeNodeUrl(url: string | null | undefined): string | null 
   return trimmed.replace(/\/+$/, '')
 }
 
+/**
+ * True when a node URL points at an address only dialable on its OWN network:
+ * loopback, link-local, RFC1918 (10/8, 172.16/12, 192.168/16) or CGNAT
+ * (100.64/10). A peer's beacon names the node IT can reach; on another network
+ * such an address is undialable — a sealed mail PUT there just times out.
+ * A DNS name or a public literal is dialable. Malformed input fails closed.
+ */
+export function isPrivateNodeUrl(url: string | null | undefined): boolean {
+  const clean = normalizeNodeUrl(url)
+  if (!clean) return true
+  try {
+    const host = new URL(clean).hostname.replace(/^\[|\]$/g, '').toLowerCase()
+    if (!host || host === 'localhost') return true
+    if (host === '::1' || host.startsWith('127.') || host.startsWith('169.254.') || host.startsWith('fe80')) return true
+    const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host)
+    if (!m) return false // a DNS name resolves wherever the sender is
+    const a = Number(m[1])
+    const b = Number(m[2])
+    if (a === 10) return true
+    if (a === 192 && b === 168) return true
+    if (a === 172 && b >= 16 && b <= 31) return true
+    if (a === 100 && b >= 64 && b <= 127) return true
+    return false
+  } catch {
+    return true
+  }
+}
+
 /** The node a peer is connected to. Null when we do not know (yet). */
 export function peerNodeFor(orbitId: string): string | null {
   if (!orbitId) return null

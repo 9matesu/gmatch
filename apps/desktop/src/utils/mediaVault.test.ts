@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GalleryImage } from '../game/types'
 import { getObject } from './storage'
@@ -32,6 +33,7 @@ function deps(over: Partial<PermanentMediaDeps> = {}): PermanentMediaDeps & {
 } {
   return {
     probe: vi.fn(async () => null),
+    verify: vi.fn(async () => null),
     persist: vi.fn(async () => ({ status: 'local' as const, ref: HASH, via: 'vault' as const })),
     ...over,
   } as PermanentMediaDeps & { probe: ReturnType<typeof vi.fn>; persist: ReturnType<typeof vi.fn> }
@@ -112,6 +114,31 @@ describe('ensurePermanentMedia', () => {
     const d = deps({ persist: vi.fn(async () => ({ status: 'local' as const })) })
     expect(await ensurePermanentMedia('https://cdn.example/a.jpg', 'image', d))
       .toEqual({ state: 'failed', reason: 'not-saved' })
+  })
+
+  it('marks a keep permanent only after the vault verifies the bytes', async () => {
+    const verify = vi.fn(async (_ref: string): Promise<string | null> => null)
+    const g = window as unknown as { gmatch?: unknown }
+    const prev = g.gmatch
+    g.gmatch = { vaultGet: async () => null, vaultPin: async () => null }
+    try {
+      const unverified = deps({
+        persist: vi.fn(async () => ({ status: 'local' as const, ref: HASH, via: 'idb' as const })),
+        verify,
+      })
+      expect(await ensurePermanentMedia('https://cdn.example/unverified.jpg', 'image', unverified))
+        .toEqual({ state: 'failed', reason: 'vault-unverified' })
+      // A verified read-back is the ONLY way to claim the permanent vault.
+      verify.mockResolvedValueOnce(`vault://f/${HASH}`)
+      const verified = deps({
+        persist: vi.fn(async () => ({ status: 'local' as const, ref: HASH, via: 'idb' as const })),
+        verify,
+      })
+      expect(await ensurePermanentMedia('https://cdn.example/verified.jpg', 'image', verified))
+        .toEqual({ state: 'permanent', ref: HASH, via: 'vault', reused: false })
+    } finally {
+      g.gmatch = prev
+    }
   })
 })
 

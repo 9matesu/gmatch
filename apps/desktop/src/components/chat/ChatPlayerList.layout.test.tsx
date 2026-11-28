@@ -92,19 +92,57 @@ describe('ChatPlayerList · cross-node parity & density', () => {
     expect(screen.queryByTitle("View Away Peer's profile")).toBeNull()
   })
 
-  it('a dial in flight reads Connecting and never claims a route', async () => {
+  it('an ONLINE peer with a dial in flight still reads Active now; connecting is only a detail', async () => {
     const roster = new PeerRoster(null)
     act(() => {
-      roster.upsert(u('dialing', 'Dialing Peer', { online: true, last_seen: fresh() }))
-      swarmTransportRegistry.startDirectAttempt('dialing')
+      roster.upsert(u('dialing-online', 'Dialing Online', { online: true, last_seen: fresh() }))
+      swarmTransportRegistry.startDirectAttempt('dialing-online')
     })
     render(<ChatPlayerList identity={identity} users={[]} roster={roster} />)
     await screen.findByText(/1 connecting/)
-    const row = rowFor('Dialing Peer')
-    expect(within(row).getByText(/Connecting/)).toBeDefined()
+    const row = rowFor('Dialing Online')
+    expect(within(row).getByText('Active now')).toBeDefined()
+    expect(within(row).getByText(/connecting…/)).toBeDefined()
+    // An unvalidated dial must never claim a settled route.
     expect(within(row).queryByText(/P2P direct|relay via node/)).toBeNull()
-    expect(within(row).getByLabelText('Connecting')).toBeDefined()
-    swarmTransportRegistry.forget('dialing')
+    expect(within(row).getByLabelText('Online')).toBeDefined()
+    swarmTransportRegistry.forget('dialing-online')
+  })
+
+  it('shows an older-version note only for a peer whose signed version is older', async () => {
+    const previous = (window as unknown as { gmatch?: unknown }).gmatch
+    ;(window as unknown as { gmatch?: unknown }).gmatch = { appVersion: async () => '1.7.2' }
+    try {
+      const roster = new PeerRoster(null)
+      act(() => {
+        roster.upsert(u('old', 'Old Peer', { online: true, last_seen: fresh() }))
+        roster.upsert(u('unknown', 'Unknown Peer', { online: true, last_seen: fresh() }))
+      })
+      // The roster row carries the peer's signed version; absence is unknown.
+      ;(roster.get('old') as unknown as { appVersion?: string }).appVersion = '1.6.0'
+      render(<ChatPlayerList identity={identity} users={[]} roster={roster} />)
+      await screen.findByText(/0 connecting/)
+      expect(within(rowFor('Old Peer')).getByText(/older version — update to share media/)).toBeDefined()
+      expect(within(rowFor('Unknown Peer')).queryByText(/older version/)).toBeNull()
+    } finally {
+      (window as unknown as { gmatch?: unknown }).gmatch = previous
+    }
+  })
+
+  it('only a NOT-online peer with a dial in flight reads Connecting as its primary label', async () => {
+    const roster = new PeerRoster(null)
+    act(() => {
+      // A ghost hydrated offline, then a dial started: the transport is the
+      // only honest thing to say because the roster has no online sighting.
+      roster.hydrate([u('dialing-offline', 'Dialing Offline', { online: false })])
+      swarmTransportRegistry.startDirectAttempt('dialing-offline')
+    })
+    render(<ChatPlayerList identity={identity} users={[]} roster={roster} />)
+    await screen.findByText(/1 connecting/)
+    const row = rowFor('Dialing Offline')
+    expect(within(row).getByText(/Connecting…/)).toBeDefined()
+    expect(within(row).queryByText('Active now')).toBeNull()
+    swarmTransportRegistry.forget('dialing-offline')
   })
 
   it('rows use the tightened density (px-2 py-1.5), not the old p-2', async () => {

@@ -31,6 +31,12 @@ export type PermanentMediaResult =
 export interface PermanentMediaDeps {
   /** Read-only vault lookup; null means no local copy. */
   probe(key: string): Promise<string | null>
+  /**
+   * Read-back of the CONTENT ref after a write. The vault bridge resolves a
+   * hash to a vault:// path only when the file is actually on disk, so this is
+   * the proof that a keep is permanent — not the persist call's own report.
+   */
+  verify(ref: string): Promise<string | null>
   /** Fetch + verify + write. Called AT MOST once per url per session. */
   persist(
     url: string,
@@ -46,6 +52,7 @@ export interface PermanentMediaDeps {
 
 const defaultDeps: PermanentMediaDeps = {
   probe: (key) => vaultGet(key),
+  verify: (ref) => vaultGet(ref),
   persist: async (url, kind) => {
     const { persistKeepsake } = await import('../services/keepsake')
     return persistKeepsake(url, {}, kind)
@@ -65,6 +72,11 @@ function permanent(
 
 function failed(reason: string): PermanentMediaResult {
   return { state: 'failed', reason }
+}
+
+/** Only the Electron bridge has a permanent on-disk vault. */
+function hasVaultBridge(): boolean {
+  return typeof window !== 'undefined' && typeof window.gmatch?.vaultGet === 'function'
 }
 
 function validRef(value: unknown): string | null {
@@ -133,7 +145,21 @@ export async function ensurePermanentMedia(
   if (res?.status !== 'local' || !savedRef) {
     return failed(res?.reason || 'not-saved')
   }
-  const out = permanent(savedRef, res.via === 'idb' ? 'idb' : 'vault', false)
+  // persistKeepsake writes the durable copy and pins it to the vault on the
+  // Electron bridge, but the pin is best-effort. Only a read-back of the
+  // content hash proves the PERMANENT vault holds the bytes; an IDB-only
+  // result must stay 'failed' so the gallery keeps it retryable instead of
+  // showing a keep whose "persisted" badge is a lie.
+  if (hasVaultBridge()) {
+    let verified: string | null = null
+    try {
+      verified = await d.verify(savedRef)
+    } catch {
+      /* an unreadable lookup is not proof of a permanent copy */
+    }
+    if (!verified) return failed('vault-unverified')
+  }
+  const out = permanent(savedRef, hasVaultBridge() ? 'vault' : res.via === 'idb' ? 'idb' : 'vault', false)
   settled.set(key, out)
   return out
 }
@@ -144,10 +170,11 @@ export function _resetPermanentMedia(): void {
 }
 
 /**
- * An upload is a post / chat attachment, never a card. `forgeMediaLocally`
- * already sealed its bytes into the vault (or the browser's durable object
- * store) under the content hash; this records ONE keepsake for the Vault and
- * the profile media grid so the same bytes are visible in both surfaces.
+ * Record an EXPLICITLY saved upload as a keepsake. Publishing a post or
+ * attaching a chat image does NOT call this: posts and messages are not
+ * keepsakes. `forgeMediaLocally` already sealed the bytes into the local store
+ * under the content hash; this only records the keep once the hash resolves to
+ * verified bytes.
  *
  * It never mints a card, never re-downloads a bare hash as a provider URL, and
  * never claims a keep when neither durable store can be read back.

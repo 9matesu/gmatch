@@ -29,12 +29,12 @@
  *   failed           direct failed AND the session has no relay pipe wired
  *                    (offline node). Recovery means re-marking the relay.
  *
- * Honest note (do not "fix" this away): 'direct' does not distinguish a
- * LAN-local candidate from a hole-punched reflexive pair — WebRTC's
- * selected-candidate-pair is implementation-internal here. What the phase
- * DOES promise: the bytes are traveling peer-to-peer over DTLS, not through
- * the node. Whether a symmetric NAT on BOTH sides can ever produce that pair
- * depends on the network, and the relay remains the usable fallback for it.
+ * Honest note: 'direct' means the DataChannel OPENED — bytes travel
+ * peer-to-peer over DTLS, never through the node. The caller tags the
+ * negotiated remote candidate as Radmin/global-IPv6 when its stats say so;
+ * otherwise the generic label is "P2P direct" (LAN or STUN-reflexive). When
+ * no direct pair forms (CGNAT/symmetric NAT), the phase stays `relay` and the
+ * label says so. A CGNAT-only peer is never promoted without a real channel.
  */
 
 export type PeerTransportPhase =
@@ -48,12 +48,12 @@ export type PeerTransportPhase =
  * The ONE human label for a validated transport phase. `idle` and
  * `connecting-direct` have no settled route yet, so they say nothing — the UI
  * never claims "P2P direct" for a dial that has not opened. A validated direct
- * channel whose remote candidate is a Radmin VPN address reads
- * "VPN direct (Radmin)".
+ * channel tags its negotiated remote candidate: Radmin reads
+ * "VPN direct (Radmin)", global IPv6 reads "P2P direct (IPv6)".
  */
-export function transportLabel(phase: PeerTransportPhase, viaRadmin = false): string | null {
+export function transportLabel(phase: PeerTransportPhase, viaRadmin = false, viaIpv6 = false): string | null {
   switch (phase) {
-    case 'direct': return viaRadmin ? 'VPN direct (Radmin)' : 'P2P direct'
+    case 'direct': return viaRadmin ? 'VPN direct (Radmin)' : viaIpv6 ? 'P2P direct (IPv6)' : 'P2P direct'
     case 'relay': return 'relay via node (NAT)'
     case 'failed': return 'no route'
     default: return null
@@ -65,6 +65,8 @@ export interface PeerTransportEntry {
   directAttempts: number
   /** The validated direct channel's remote candidate is a Radmin VPN address. */
   directViaRadmin: boolean
+  /** The validated direct channel's remote candidate is global IPv6 (2000::/3). */
+  directViaIpv6: boolean
   /** Epoch ms when the next direct retry is allowed (0 = not scheduled). */
   nextDirectRetryAt: number
   lastChangeAt: number
@@ -89,10 +91,12 @@ export interface TransportRegistry {
   phaseFor(peerId: string): PeerTransportPhase
   /** True only for a validated direct channel whose remote candidate is Radmin. */
   isDirectViaRadmin(peerId: string): boolean
+  /** True only for a validated direct channel whose remote candidate is global IPv6. */
+  isDirectViaIpv6(peerId: string): boolean
   /** A direct handshake starts; deadline-bounded. */
   startDirectAttempt(peerId: string): void
   /** The DataChannel opened: the direct path is validated and promoted. */
-  markDirectValidated(peerId: string, viaRadmin?: boolean): void
+  markDirectValidated(peerId: string, viaRadmin?: boolean, viaIpv6?: boolean): void
   /**
    * The direct attempt failed or timed out. If the session still has a relay
    * pipe (`hasRelay`), the peer demotes to `relay` with a scheduled retry;
@@ -111,7 +115,10 @@ export interface TransportRegistry {
 
 export function createTransportRegistry(options: TransportRegistryOptions = {}): TransportRegistry {
   const now = options.now ?? (() => Date.now())
-  const deadline = options.directDeadlineMs ?? 12_000
+  // Must outlast the mesh dial's own 30s timeout (connectToPeerMesh): a
+  // shorter deadline killed slow IPv6/Radmin handshakes that were still
+  // gathering, so a viable direct path was declared relay before it opened.
+  const deadline = options.directDeadlineMs ?? 30_000
   const baseRetry = options.baseRetryMs ?? 1_500
   const maxRetry = options.maxRetryMs ?? 30_000
   const peers = new Map<string, PeerTransportEntry>()
@@ -124,7 +131,7 @@ export function createTransportRegistry(options: TransportRegistryOptions = {}):
   function entry(peerId: string): PeerTransportEntry {
     let found = peers.get(peerId)
     if (!found) {
-      found = { phase: 'idle', directAttempts: 0, directViaRadmin: false, nextDirectRetryAt: 0, lastChangeAt: now() }
+      found = { phase: 'idle', directAttempts: 0, directViaRadmin: false, directViaIpv6: false, nextDirectRetryAt: 0, lastChangeAt: now() }
       peers.set(peerId, found)
     }
     return found
@@ -153,18 +160,23 @@ export function createTransportRegistry(options: TransportRegistryOptions = {}):
       const e = peers.get(peerId)
       return e?.phase === 'direct' && e.directViaRadmin
     },
+    isDirectViaIpv6(peerId) {
+      const e = peers.get(peerId)
+      return e?.phase === 'direct' && e.directViaIpv6
+    },
     startDirectAttempt(peerId) {
       if (!peerId) return
       const e = setPhase(peerId, 'connecting-direct')
       e.directAttempts += 1
       e.nextDirectRetryAt = 0
     },
-    markDirectValidated(peerId, viaRadmin = false) {
+    markDirectValidated(peerId, viaRadmin = false, viaIpv6 = false) {
       if (!peerId) return
       const e = setPhase(peerId, 'direct')
       e.directAttempts = 0
       e.nextDirectRetryAt = 0
       e.directViaRadmin = viaRadmin
+      e.directViaIpv6 = viaIpv6
       e.lastFailure = undefined
     },
     markDirectFailed(peerId, reason, hasRelay) {

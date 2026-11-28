@@ -84,10 +84,20 @@ export function useFeedController(input: FeedControllerInput): FeedController {
   const [repostedPosts, setRepostedPosts] = useState<FeedPost[]>([])
   const [myProfilePosts, setMyProfilePosts] = useState<FeedPost[]>([])
   const [outboxTick, setOutboxTick] = useState(0)
+  /** Bumped by `reset()` (identity switch / world switch) to re-arm the boot
+   *  read: a new node owns a new timeline, so it must be fetched again. */
+  const [bootEpoch, setBootEpoch] = useState(0)
 
   const seqRef = useRef(0)
   const pushedRef = useRef<Map<string, PushedEntry<FeedPost>>>(new Map())
   const postsRef = useRef<FeedPost[]>([])
+  /**
+   * The state `load` settled on, written by `load` itself rather than read back
+   * from React state. The first-load retry below must be able to tell a failed
+   * read from a genuine empty one WITHOUT waiting for a render: a second failed
+   * load leaves `status` unchanged, so there is no re-render to drive a retry.
+   */
+  const statusRef = useRef<FeedStatus>('idle')
   /** The last server snapshot on screen, read inside `load` without making the
    *  request callback depend on the whole timeline. */
   const serverPostsRef = useRef<FeedPost[]>([])
@@ -199,6 +209,7 @@ export function useFeedController(input: FeedControllerInput): FeedController {
           // 404 = this node hosts no feed: a state, not a retryable failure.
           // Every failed read keeps the rows already on screen; they are stale
           // now, so say so instead of implying a live answer to the player.
+          statusRef.current = 'offline'
           setStatus('offline')
           setRestoredFromCache(true)
           return []
@@ -207,12 +218,14 @@ export function useFeedController(input: FeedControllerInput): FeedController {
           // A node that restarted with an empty DB answers 200 with no rows.
           // That is not proof nobody posted: keep the last good timeline and
           // label it cached. Only a first successful empty read shows empty.
+          statusRef.current = 'offline'
           setStatus('offline')
           setRestoredFromCache(true)
           return serverPostsRef.current
         }
         setServerPosts((prev) => (feedTimelineUnchanged(prev, snap.posts) ? prev : snap.posts))
         setRestoredFromCache(false)
+        statusRef.current = 'ready'
         setStatus('ready')
         setHasMore(snap.posts.length >= PAGE_SIZE)
         return snap.posts
@@ -221,6 +234,7 @@ export function useFeedController(input: FeedControllerInput): FeedController {
         if (seq === seqRef.current) {
           // Keep a working feed on screen when a refresh fails, but never claim
           // the rows were confirmed by this read: they are cached from before.
+          statusRef.current = 'error'
           setStatus('error')
           setRestoredFromCache(true)
         }
@@ -234,13 +248,44 @@ export function useFeedController(input: FeedControllerInput): FeedController {
   }, [load])
 
   /**
+   * First read on open. The controller owns it so a mounted Feed is populated
+   * without a navigation or a focus event first. Cached rows are already on
+   * screen (hydration above) and are revalidated here — after paint, so there
+   * is no blocking await before the first frame.
+   *
+   * Retries are TIMER-driven, not state-driven: a repeated failed load leaves
+   * `status` unchanged, so an effect keyed on `status` stops after one attempt
+   * while the bundled node is still booting. Keyed on `load`, an identity or
+   * sort change re-arms the wave; a settled `ready` stops it (a genuinely empty
+   * feed is the empty-read retry's job, not this one's).
+   */
+  const bootTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (!identity) return
+    let cancelled = false
+    let attempts = 0
+    const attempt = () => {
+      if (cancelled) return
+      void load().then(() => {
+        if (cancelled || statusRef.current === 'ready') return
+        if (attempts++ < 6) bootTimer.current = setTimeout(attempt, 1500)
+      })
+    }
+    attempt()
+    return () => {
+      cancelled = true
+      if (bootTimer.current) clearTimeout(bootTimer.current)
+    }
+  }, [identity, load, bootEpoch])
+
+  /**
    * A first read that answers with NO rows is not a settled timeline. The
    * local node can still be booting, and the 3s GET cache can hold that empty
-   * answer while the real posts arrive. The caller's boot loop only retries
-   * error/offline states, so a "ready but empty" first read used to sit there
-   * until the player opened a profile (whose own author_id query re-read the
-   * node) and came back. Re-read with a cache BYPASS, bounded, and let the
-   * request sequence above discard any superseded answer.
+   * answer while the real posts arrive. The boot wave above stops at `ready`,
+   * so a "ready but empty" first read would sit there until the player opened a
+   * profile (whose own author_id query re-read the node) and came back. Re-read
+   * with a cache BYPASS, bounded, and let the request sequence above discard
+   * any superseded answer.
    */
   const emptyReadRetries = useRef(0)
   useEffect(() => {
@@ -330,7 +375,9 @@ export function useFeedController(input: FeedControllerInput): FeedController {
     setRepostedPosts([])
     setMyProfilePosts([])
     setRestoredFromCache(false)
+    statusRef.current = 'idle'
     setStatus('idle')
+    setBootEpoch((n) => n + 1)
     emptyReadRetries.current = 0
     lastVisibleRefresh.current = 0
   }, [])

@@ -5,7 +5,6 @@ import { HardDrive, Download } from 'lucide-react';
 import { sha256Hex } from '@orbit/protocol';
 import { getAllObjects, type StoredObject } from '../../utils/storage';
 import { localObjectBlobUrl } from '../../utils/mediaData';
-import { vaultPin } from '../../services/vault';
 
 /** Bounded window: a dense grid must not mount the whole cache at once. */
 const MAX_VISIBLE = 60;
@@ -60,10 +59,18 @@ export function CacheViewer({ toast }: { toast?: (m: string, t?: 'success' | 'er
     return () => { live = false; };
   }, []);
 
-  const pin = async (src: string) => {
+  const pin = async (o: StoredObject) => {
     try {
-      await vaultPin(src);
-      toast?.('Saved to vault', 'success');
+      const { saveMediaAsKeepsake } = await import('../../services/keepsake');
+      // The bytes are already here; hand them over directly instead of asking
+      // the main process to fetch a renderer-only blob: URL.
+      const res = await saveMediaAsKeepsake(o.id, {
+        bytes: new Blob([o.data], { type: o.mime_type || 'application/octet-stream' }),
+        kind: o.mime_type?.startsWith('video/') ? 'video' : 'image',
+      });
+      toast?.(res.ok
+        ? 'Saved to your Vault and Keepsakes'
+        : `Could not save to vault: ${res.reason || 'unreachable'}`, res.ok ? 'success' : 'error');
     } catch {
       toast?.('Could not save to vault', 'error');
     }
@@ -88,7 +95,7 @@ export function CacheViewer({ toast }: { toast?: (m: string, t?: 'success' | 'er
             <button
               key={o.id}
               type="button"
-              onClick={() => void pin(urls[o.id] || o.id)}
+              onClick={() => void pin(o)}
               title="Save to vault"
               aria-label={`Save to vault: ${o.name || o.id}`}
               className="group relative aspect-square overflow-hidden rounded-md border border-edge bg-retro-bg"

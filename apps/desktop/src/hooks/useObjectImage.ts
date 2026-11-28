@@ -56,6 +56,8 @@ interface ImageState {
   terminal?: boolean
   /** The content hash the terminal miss was judged against ('' for legacy). */
   terminalKey?: string
+  /** A bounded swarm ask timed out, but a peer may still arrive. */
+  seedWait?: boolean
 }
 
 const EMPTY: ObjectImageResult = { url: null, failed: false, isVideo: false, isLink: false, linkUrl: null, awaitingSeeder: false }
@@ -219,8 +221,8 @@ interface ResolvedObject {
   awaitingSeeder: boolean
 }
 
-const FAILED = (cardId: string, terminal = false, terminalKey = ''): ImageState =>
-  ({ cardId, url: '', failed: true, isVideo: false, isLink: false, linkUrl: null, terminal, terminalKey })
+const FAILED = (cardId: string, terminal = false, terminalKey = '', seedWait = false): ImageState =>
+  ({ cardId, url: '', failed: true, isVideo: false, isLink: false, linkUrl: null, terminal, terminalKey, seedWait })
 
 /**
  * At most N signed object streams in flight at once.
@@ -300,7 +302,8 @@ async function resolveObjectInner(
   // switch or a re-render must not restart the bounded swarm ask for bytes
   // nobody holds. PEER_ONLINE_EVENT evicts it, which is the only honest reason
   // to believe the answer could have changed.
-  const terminalMiss = (): ResolvedObject => commit(FAILED(cleanId, true, contentHash || ''))
+  const terminalMiss = (seedWait = false): ResolvedObject =>
+    commit(FAILED(cleanId, true, contentHash || '', seedWait))
 
   // A row that names its own CONTENT (a peer-replicated post carries the
   // sha256 of its bytes) is resolved from that content: bytes held locally,
@@ -320,7 +323,10 @@ async function resolveObjectInner(
           .catch(() => {})
       },
     })
-    if (!blob) return terminalMiss()
+    // A timed-out swarm ask is not proof of absence: the seeder may come
+    // online (PEER_ONLINE_EVENT evicts this miss) or a paused transfer may
+    // resume. Say "waiting for poster", never "No preview", while that holds.
+    if (!blob) return terminalMiss(true)
     // Cache the bytes under BOTH names the row may be asked for: the object id
     // alias (a remount by url is instant) and the content hash (the durable key
     // peers address). The resolver proved the hash, so neither registration
@@ -405,7 +411,7 @@ async function resolveObjectNetwork(
   cleanId: string,
   identity: IdentityLike,
   commit: (state: ImageState) => ResolvedObject,
-  terminalMiss: () => ResolvedObject,
+  terminalMiss: (seedWait?: boolean) => ResolvedObject,
   release: () => void,
 ): Promise<ResolvedObject> {
   const started = Date.now()
@@ -420,7 +426,7 @@ async function resolveObjectNetworkInner(
   cleanId: string,
   identity: IdentityLike,
   commit: (state: ImageState) => ResolvedObject,
-  terminalMiss: () => ResolvedObject,
+  terminalMiss: (seedWait?: boolean) => ResolvedObject,
   release: () => void,
 ): Promise<ResolvedObject> {
   let res: Response | null = null
@@ -564,8 +570,9 @@ async function resolveObjectNetworkInner(
         .then(({ enqueuePendingTransfer }) => enqueuePendingTransfer(cleanId, hash))
         .catch(() => {})
       // Cached as TERMINAL: a view switch or a re-render must not re-run the
-      // 5s swarm ask for bytes nobody has. Only PEER_ONLINE_EVENT evicts it.
-      return terminalMiss()
+      // 5s swarm ask for bytes nobody has. Only PEER_ONLINE_EVENT evicts it —
+      // until then this is a seeder wait, not a verified absence.
+      return terminalMiss(true)
     }
     return commit({
       cardId: cleanId,
@@ -764,6 +771,7 @@ export function useObjectImage(
     if (cached) {
       countMetric('media.hit', cleanId)
       if (!cached.failed) resolvedKeyRef.current = resolvedKey
+      awaitingSeederRef.current = Boolean(cached.seedWait)
       setImg(cached)
       return
     }
@@ -803,7 +811,7 @@ export function useObjectImage(
   if (!img || img.cardId !== normalized) {
     const cached = cardId && identity ? cachedFor(normalized, identity, contentHash) : null
     if (!cached) return EMPTY
-    return { ...cached, url: cached.url || null, awaitingSeeder: false }
+    return { ...cached, url: cached.url || null, awaitingSeeder: Boolean(cached.seedWait) && cached.failed }
   }
   // Keep the displayed card fresh in the LRU so eviction never reclaims it
   // while it is on screen.
@@ -814,6 +822,6 @@ export function useObjectImage(
     isVideo: img.isVideo,
     isLink: img.isLink,
     linkUrl: img.linkUrl,
-    awaitingSeeder: awaitingSeederRef.current && img.failed,
+    awaitingSeeder: img.failed && (Boolean(img.seedWait) || awaitingSeederRef.current),
   }
 }

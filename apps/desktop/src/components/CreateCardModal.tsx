@@ -10,7 +10,10 @@ import { selectionToFile, type MediaSelection } from './media/picker';
 import { mediaUrlToCachedFile } from '../utils/cacheMedia';
 import { dataUrlToFile } from '../utils/mediaData';
 import { forgeMediaLocally } from '../services/mediaForge';
-import { createCardFromMedia, type CanonicalCard, type CardCreationMetadata } from '../utils/cardCollection';
+import {
+  CLICKER_CARD_TAG, createCardFromMedia, isClickerKeepsakeUrl,
+  type CanonicalCard, type CardCreationMetadata,
+} from '../utils/cardCollection';
 import { useCropper } from '../hooks/useCropper';
 import { isCropableImage } from './CropModal';
 import { playPress } from '../utils/sounds';
@@ -46,6 +49,7 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0,
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const { crop, cropper } = useCropper();
+  const clickerOrigin = Boolean(initialMedia && isClickerKeepsakeUrl(initialMedia.url));
 
   // One-shot prefill (fresh mount per open): name/tags go straight in;
   // local-scheme media (idle-file://, blob:, data:) is fetched to a File
@@ -53,9 +57,13 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0,
   useEffect(() => {
     if (!initialMedia) return;
     if (initialMedia.name) setName(initialMedia.name.slice(0, 80));
-    if (initialMedia.tags?.length) {
-      setTags(initialMedia.tags.map((t) => t.trim().toLowerCase().replace(/^#/, '').slice(0, 24)).filter(Boolean).slice(0, 8));
-    }
+    const prefilled = initialMedia.tags?.length
+      ? initialMedia.tags.map((t) => t.trim().toLowerCase().replace(/^#/, '').slice(0, 24)).filter(Boolean).slice(0, 8)
+      : [];
+    // A clicker keepsake stamps its origin onto the card as a tag, so the
+    // "clicker!" badge travels with the card instead of living in this modal.
+    if (isClickerKeepsakeUrl(initialMedia.url)) prefilled.push(CLICKER_CARD_TAG);
+    if (prefilled.length) setTags([...new Set(prefilled)].slice(0, 8));
     const mediaUrl = initialMedia.url;
     if (!/^(idle-file|blob|data):/.test(mediaUrl)) {
       setUrl(mediaUrl);
@@ -255,6 +263,9 @@ export function CreateCardModal({ identity, onClose, onCreated, cardsNeeded = 0,
                 isVideo={isVideo}
               >
                 <span className={classes('absolute top-2 left-2 z-20', CHROME.cardChip)}>Chrome edition</span>
+                {clickerOrigin && (
+                  <span className={classes('absolute top-2 right-2 z-20', CHROME.cardChip)} title="Found in the clicker game">clicker!</span>
+                )}
                 <div className={classes('absolute inset-x-0 bottom-0 z-10', CHROME.cardFooter, COLOR.canvasVeil)}>
                   <div className={classes(CHROME.cardFooterTitle, 'mt-1')}>{name.trim() || 'Your Card Name'}</div>
                   <div className={classes('flex flex-wrap mt-1', GAP[1])}>

@@ -190,22 +190,19 @@ type CourierSignalPayload =
 
 ### NAT Traversal & ICE Hygiene
 
-- Peer connections configure Cloudflare STUN by default (`defaultIceConfig()`), plus an explicitly configured TURN from Settings/environment when present, which forces `iceTransportPolicy:'relay'`. No anonymous free TURN is bundled: the former public relay is globally 401/blackholed, so claiming one would be a fabrication.
+- Peer connections configure STUN by default (`defaultIceConfig()`) — Google (`stun.l.google.com:19302`) primary with Cloudflare (`stun.cloudflare.com:3478`) fallback — plus an explicitly configured TURN from Settings/environment when present, which forces `iceTransportPolicy:'relay'`. No anonymous free TURN is bundled: the former public relay is globally 401/blackholed, so claiming one would be a fabrication.
 - **Presence survives a hidden window.** The 60s heartbeat skips local swarm noise when the document is hidden, but still publishes the signed beacon to the node + hosted mailbox (TTL 90s). A full node also starts ONE bounded direct mesh attempt for a peer whose signed beacon names a different node; same-node peers keep the local relay.
 - **Global IPv6 host candidates are signaled** (`2000::/3`); ULA/link-local/loopback stay hidden. IPv6-capable peers behind CGNAT connect directly with no relay. No free anonymous TURN is bundled (Cloudflare TURN needs a card); an explicit TURN from Settings/env remains the IPv4-only fallback.
-- **Radmin VPN host candidates (`26.0.0.0/8`) are signaled**, so two peers on the same Radmin network connect directly; a validated direct channel over Radmin is labelled `VPN directo (Radmin)`. Other private/CGNAT literals stay hidden.
+- **Radmin VPN host candidates (`26.0.0.0/8`) are signaled**, so two peers on the same Radmin network connect directly; a validated direct channel over Radmin is labelled `VPN direct (Radmin)`. Other private/CGNAT literals stay hidden.
 - Private LAN IP candidates are stripped/sanitized before dispatch over the courier (`sanitizeCandidate`) to prevent internal network leakage.
-- **One STUN endpoint, not a list (2026-11-23).** `STUN_SERVERS` is a single
-  Cloudflare server. Chromium logs a `socket_manager.cc` error for every STUN
-  host whose DNS it cannot resolve, so the old four-provider list printed up to
-  eight `Failed to resolve address for stun... (errorcode: -105)` lines per peer
-  on an offline or filtering network. `errorcode: -105` is
-  `ERR_NAME_NOT_RESOLVED` — the network, not the app. One provider keeps that to
-  a single line; the WS-relay swarm remains the documented fallback when no
-  direct channel forms, so a redundant STUN costs a little direct-path reach, not
-  connectivity. TURN still appends to the list: explicitly configured TURN
-  (Settings/env) forces the relay-forced posture, the baked public default only
-  adds a candidate.
+- **STUN is a short list, not one host (2026-11-28).** `STUN_SERVERS` is Google
+  (`stun.l.google.com:19302`) primary + Cloudflare (`stun.cloudflare.com:3478`)
+  fallback — both free, stateless, no account. A network that cannot resolve one
+  still has the other, and host candidates (mDNS, global IPv6, Radmin) plus the
+  node WS relay remain the fallback when no direct channel forms. The direct dial
+  deadline is 30s so a slow IPv6/Radmin handshake is not declared relay early.
+  TURN still appends: explicitly configured TURN (Settings/env) forces the
+  relay-forced posture.
 
 ### Transport selection is explicit and bounded (2026-10-22)
 

@@ -42,20 +42,20 @@ export const PEER_STATUS_LABEL: Record<PeerChipStatus, string> = {
 
 /**
  * Map the transport registry's five phases onto the three statuses the chip
- * shows. `direct` and `relay` are settled routes, and `idle` is a roster-
- * confirmed online peer whose dial has not started — all three read as
- * `connected`; the chip never claims WHICH transport is in use (the route
- * line does that, and only when one is settled). Only `connecting-direct`
- * is an in-flight dial. A failed dial or an offline roster row is the one
- * `cannot-connect` state, and the popover hides those rows entirely.
+ * shows. A roster-confirmed ONLINE peer is `connected` in every phase: a
+ * `connecting-direct` dial is a detail (`· connecting…` on the route line),
+ * never a replacement for liveness. `direct`/`relay`/`idle` are the settled
+ * or not-yet-started variants of the same online state. Only a failed dial
+ * or an offline roster row is `cannot-connect`, and the popover hides those
+ * rows entirely.
  */
 export function peerChipStatus(peer: User | undefined, phase: PeerTransportPhase): PeerChipStatus {
   if (!peer || peer.online !== true) return 'cannot-connect';
   switch (phase) {
     case 'direct':
     case 'relay':
-    case 'idle': return 'connected';
-    case 'connecting-direct': return 'connecting';
+    case 'idle':
+    case 'connecting-direct': return 'connected';
     default: return 'cannot-connect';
   }
 }
@@ -224,9 +224,12 @@ export function PeerChip({
                 {visible.map((peer) => {
                   const phase = registry.phaseFor(peer.id);
                   const status = peerChipStatus(peer, phase);
-                  // Only a LIVE peer may claim a route. `idle`/`connecting`
-                  // have no settled path, so they carry no label at all.
-                  const route = peer.online === true ? transportLabel(phase) : null;
+                  // Only a LIVE peer may claim a route. `idle` has no path and
+                  // `connecting-direct` has no SETTLED one — it reads as a
+                  // secondary "connecting…" detail, never a primary status.
+                  const route = peer.online === true
+                    ? (phase === 'connecting-direct' ? 'connecting…' : transportLabel(phase))
+                    : null;
                   const name = peer.display_name?.trim() || generateFallbackName(peer.id);
                   return (
                     <li

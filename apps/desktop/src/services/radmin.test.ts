@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { firstRadminIp, joinRadminVlanWith, type RadminDeps } from './radmin'
+import { firstRadminIp, joinRadminVlanWith, radminExeCandidates, type RadminDeps } from './radmin'
 
 function deps(over: Partial<RadminDeps> = {}): RadminDeps {
   return {
@@ -13,21 +13,39 @@ function deps(over: Partial<RadminDeps> = {}): RadminDeps {
 }
 
 describe('firstRadminIp', () => {
-  it('returns the first non-internal 26.x IPv4 and ignores everything else', () => {
+  it('returns the first 26.x IPv4 and ignores everything else', () => {
     const ifaces = {
       eth0: [{ family: 'IPv4', address: '192.168.1.5', internal: false }],
       radmin: [
         { family: 'IPv4', address: '26.12.0.1', internal: false },
         { family: 'IPv4', address: '26.99.0.9', internal: false },
       ],
-      lo: [{ family: 'IPv4', address: '26.0.0.1', internal: true }],
     }
     expect(firstRadminIp(ifaces)).toBe('26.12.0.1')
+  })
+
+  it('does not miss an internal-flagged 26.x adapter (Windows virtual TAP)', () => {
+    // 26/8 is Radmin's range alone, so the internal flag cannot disqualify it.
+    expect(firstRadminIp({ lo: [{ family: 4, address: '26.26.113.34', internal: true }] })).toBe('26.26.113.34')
+    expect(firstRadminIp({ lo: [{ family: 'IPv4', address: '127.0.0.1', internal: true }] })).toBeNull()
   })
 
   it('is null when there is no Radmin adapter', () => {
     expect(firstRadminIp({ eth0: [{ family: 'IPv4', address: '10.0.0.2', internal: false }] })).toBeNull()
     expect(firstRadminIp({})).toBeNull()
+  })
+})
+
+describe('radminExeCandidates', () => {
+  it('checks both exe names in every standard install dir (Radmin 2.x is Radmin.exe)', () => {
+    const paths = radminExeCandidates({
+      ProgramFiles: 'C:\\Program Files',
+      'ProgramFiles(x86)': 'C:\\Program Files (x86)',
+      LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local',
+    })
+    expect(paths).toContain('C:\\Program Files (x86)\\Radmin VPN\\Radmin.exe')
+    expect(paths).toContain('C:\\Program Files\\Radmin VPN\\RadminVPN.exe')
+    expect(paths).toContain('C:\\Users\\me\\AppData\\Local\\Programs\\Radmin VPN\\Radmin.exe')
   })
 })
 
