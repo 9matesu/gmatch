@@ -17,6 +17,9 @@ afterEach(() => swarmTransportRegistry.reset())
 // unreachable in the HUD wave).
 beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ json: async () => ({}) }))
+  // The satellite bar persists its open state; an earlier test must not leak it
+  // into the next one (this passed on Windows only by ordering luck).
+  try { localStorage.removeItem('gmatch.satellite_bar.visible') } catch { /* no storage */ }
 })
 
 const openMore = () => {
